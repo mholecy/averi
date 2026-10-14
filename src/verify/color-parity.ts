@@ -1,7 +1,7 @@
 import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects } from '../ui-tree/geometry.js';
-import { pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
+import { clipThenInset, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -88,17 +88,20 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
   pngRegion(rect, scale, img, EDGE_INSET);
 
 /**
- * The part of an element's rect the sampler reads, in tree units: the rect
- * inset EDGE_INSET a side — what the pixel poll judges chrome over for a
- * colour assert (verify/pixel-poll.ts#overElement). The png
- * mapping's rounding is left out (a fraction of a unit). `patches` reads
- * inside it too, but for a rect under ~60 png px a side, whose corner
- * patches' 9-px squares reach a few pixels past the 12 % line.
+ * The part of an element's rect the sampler reads, in tree units: the part of the rect on `screen` (the screen the
+ * pixel assert judges, verify/pixel-poll.ts#judgeOver), inset EDGE_INSET a side of THAT — the sampler's own region
+ * (`sampleRegion`, capture.ts#pngRegion: clipped to the png, then inset), from the same function
+ * (capture.ts#clipThenInset), so the judge of what lies over what the colour assert reads
+ * (verify/pixel-poll.ts#overElement) and the sampler read one region. The png mapping's rounding is left out (a
+ * fraction of a unit). When nothing of the rect lies on `screen`, the rect inset whole — off the screen as the rect
+ * is, so the standing finds nothing of what it reads on the screen (ui-tree/standing.ts, its `offScreen` kind).
+ * `patches` reads inside it too, but for a rect under ~60 png px a side, whose corner patches' 9-px squares reach a
+ * few pixels past the 12 % line.
  */
-export const colorSampleRect = (rect: Rect): Rect => {
-  const dx = rect.width * EDGE_INSET;
-  const dy = rect.height * EDGE_INSET;
-  return { x: rect.x + dx, y: rect.y + dy, width: rect.width - 2 * dx, height: rect.height - 2 * dy };
+export const colorSampleRect = (rect: Rect, screen: Rect): Rect => {
+  const bounds = (r: Rect): PngBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
+  const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units') ?? clipThenInset(bounds(rect), bounds(rect), EDGE_INSET, 'units');
+  return read === undefined ? { ...rect } : { x: read.x0, y: read.y0, width: read.x1 - read.x0, height: read.y1 - read.y0 };
 };
 
 /**

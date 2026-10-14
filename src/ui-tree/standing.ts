@@ -72,6 +72,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * - THE PIXEL ASSERT (`PixelPurpose`) judges a REGION, not a point, in
  *   one box, the usable screen's `oriented` (verify/pixel-poll.ts hands it
  *   the usable screen) — the same order, its place a region's:
+ *   - off the screen when nothing of what it `reads` lies on the box —
+ *     `offScreen`, first: no capture shows any of it (the colour sample's
+ *     region is clipped to the screen before it is inset,
+ *     verify/capture.ts#clipThenInset, so a sliver on the screen is read
+ *     as the sliver its sampler reads);
  *   - under the band `keyboardTop` marks (`bandRect`) when the node's rect
  *     meets it at all — `underKeyboard`, before the system bands; its
  *     `keyboardTop` is idb's band only, the reading's frame being the
@@ -79,8 +84,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     docs/adr/0010-pixel-assert-keyboard-first.md
  *   - what it `reads` overlapping a system band past the slack
  *     (geometry.ts#overlapsPastSlack), the status band's before the
- *     navigation band's — `systemBar`, with the band's rect; never
- *     `offScreen` (it never judged that);
+ *     navigation band's — `systemBar`, with the band's rect;
  *     docs/adr/0002-pixel-overlap-slack.md
  *   - cut only at the navigation bar and only for a reader of `glyphs`
  *     (`cutAtNavigationBar`) — `cut`, with the bar;
@@ -264,8 +268,9 @@ export type TapPurpose = { readonly of: 'tap'; readonly keyboardTop?: KeyboardLi
 
 /**
  * The pixel assert's purpose (`Scene`'s contract): `reads`, the part of the
- * node's rect its measurement reads (the colour sampler's inset rect,
- * verify/color-parity.ts#colorSampleRect, or the ocr crop's whole rect);
+ * node's rect its measurement reads (the colour sampler's region, the rect
+ * clipped to the box and then inset, verify/color-parity.ts#colorSampleRect,
+ * or the ocr crop's whole rect);
  * `glyphs`, whether it reads glyphs (the ocr assert), which a cut at the
  * node's edge garbles where a colour sample of what shows stays true.
  */
@@ -335,13 +340,18 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  * `PixelStanding`'s `remedy`).
  *
  * The cases, in THE PRECEDENCE, one for every purpose — the first that holds is the remedy:
- * 1. `presented` — a surface of a screen presented over the node's own (a modal's dimming leaf, a sheet's form,
- *    draw-order.ts#Exposure.presented) is among its covers (`facts.presented`), whatever its kind: under the status
- *    bar, off the screen, cut, under the soft keyboard or under another cover beneath that screen alike. No scroll
- *    moves it out from under that screen, and hiding a keyboard leaves it there: close that screen first.
+ * 1. `presented` — a screen is presented over the node's own (a modal's dimming leaf, a sheet's form), judged of the
+ *    NODE, geometry-free: a presented surface among its covers in the frame (`facts.presented`,
+ *    draw-order.ts#Exposure.presented), else one drawn over it wherever it lies
+ *    (draw-order.ts#DrawOrder.presentedOver — `scroll_until`'s touch-down rule less the point), whatever its kind:
+ *    under the status bar (wholly inside the band too), off the screen (wholly too), cut, under the soft keyboard or
+ *    under another cover beneath that screen alike. No scroll moves it out from under that screen, and hiding a
+ *    keyboard leaves it there: close that screen first. Judged of what of it SHOWS alone, a target wholly below the
+ *    fold or wholly inside the status band had no covers, so no presented surface, and was told to scroll while
+ *    `scroll_until` stopped on the presented screen (the owner's decision: every non-reachable kind takes it).
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
- *    dim), else the last presented surface among its covers.
+ *    dim), else the last presented surface among its covers, else the last drawn over it.
  * 2. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
  * 3. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
@@ -399,6 +409,7 @@ interface TouchRemedies {
 
 /** The remedies each pixel kind can carry. */
 interface PixelRemedies {
+  readonly offScreen: RemedyCase<'presented' | 'scroll'>;
   readonly systemBar: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
   readonly covered: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
@@ -432,6 +443,8 @@ export type TapStanding = Exclude<Standing, { readonly kind: 'clipped' }>;
 /** The pixel assert's kinds, before the remedy is decided (`remedied`). */
 type PixelKind =
   | { readonly kind: 'reachable'; readonly at: Point }
+  /** Nothing of what it reads lies on the box judged (`box`, the sentence quotes it): no capture shows any of it. */
+  | { readonly kind: 'offScreen'; readonly box: Rect }
   /** `band`: the band's rect on the box, which what it reads overlaps. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band: Rect }
   /** Its own cut: at the navigation bar's top, `container` the clipping scroller flush with it. */
@@ -441,7 +454,7 @@ type PixelKind =
   /** `band`: the band the line marks on the box, which the node's rect meets. */
   | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine; readonly band: Rect };
 
-/** Where the node stands for the pixel assert (`Scene`'s contract: a region, never off the screen, never clipped), and why — and, not reachable, its `remedy`. */
+/** Where the node stands for the pixel assert (`Scene`'s contract: a region, never clipped), and why — and, not reachable, its `remedy`. */
 export type PixelStanding = { readonly facts: StandingFacts } & Remedied<PixelKind, PixelRemedies>;
 
 /** A touch standing before its remedy is decided. */
@@ -505,8 +518,10 @@ function remedied(
   { scene, node }: Judged,
 ): Unreached<Standing> | Unreached<PixelStanding> {
   const judgement = 'touch' in judging ? judging.touch : judging.pixel;
-  // 1. Beneath a screen presented over its own, whatever its kind.
-  const surface = judgement.facts.presented?.at(-1);
+  // 1. Beneath a screen presented over its own, whatever its kind and wherever it lies: a presented surface among its
+  // covers in the frame, else one judged of the node itself (draw-order.ts#DrawOrder.presentedOver) — a node with
+  // nothing in the frame (below the fold, inside the status band) has no covers there.
+  const surface = judgement.facts.presented?.at(-1) ?? scene.order.presentedOver(node);
   if (surface !== undefined) return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface } };
   if ('touch' in judging) {
     const touch = judging.touch;
@@ -535,6 +550,7 @@ function remedied(
     case 'underKeyboard':
       return { ...pixel, remedy: { of: 'keyboard' } };
     // 6. What a scroll brings within reach whatever lies around it.
+    case 'offScreen':
     case 'cut':
       return { ...pixel, remedy: { of: 'scroll' } };
     case 'systemBar': {
@@ -584,8 +600,8 @@ interface SystemBand<B extends SystemBar = SystemBar> {
   readonly band: Rect;
 }
 
-/** Where the pixel assert's region lies: on the screen, in a system band (with the band's rect), or under the band a keyboard line marks — never off the screen. */
-type RegionPlace = 'on' | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
+/** Where the pixel assert's region lies: on the screen, off it (nothing of what it reads on the box), in a system band (with the band's rect), or under the band a keyboard line marks. */
+type RegionPlace = 'on' | 'off' | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /**
  * The screen a touch (the tap, either stop) is judged on: the one handed
@@ -632,13 +648,15 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
 }
 
 /**
- * Where the pixel assert's region lies (`Scene`'s contract): under the band
+ * Where the pixel assert's region lies (`Scene`'s contract): off the screen
+ * when nothing of what it reads lies on `box`; under the band
  * `purpose.keyboardTop` marks on `box` when the node's rect meets it at
  * all; else in the status band, then the navigation band, when what it
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
- * else on the screen — never off it (`Scene`'s contract).
+ * else on the screen.
  */
 function regionPlace(rect: Rect, { reads, keyboardTop }: PixelPurpose, box: Rect, bands: StandingScreen | undefined): RegionPlace {
+  if (rectIntersection(reads, box) === undefined) return 'off';
   if (keyboardTop !== undefined) {
     const band = bandRect(keyboardTop, box);
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
@@ -906,6 +924,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   };
   const placed = ((): PixelJudgement | undefined => {
     if (place === 'on') return undefined;
+    if (place === 'off') return { facts, kind: 'offScreen', box: { ...box } };
     if ('keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
     return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, band: place.band };
   })();

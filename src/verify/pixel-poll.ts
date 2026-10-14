@@ -154,6 +154,14 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * measured, on `Verifier.poll` (verify/assert.ts).
  */
 
+/**
+ * The part of an element's rect a pixel measurement reads, in tree units, on `screen` (the box the pixel assert judges)
+ * — where chrome over the element counts (`overElement`): the colour assert's sample region
+ * (color-parity.ts#colorSampleRect: clipped to the screen, then inset, as its sampler reads it); the whole rect for
+ * the ocr assert's crop.
+ */
+export type Reads = (rect: Rect, screen: Rect) => Rect;
+
 interface PixelPollSpec {
   element: ElementSpec;
   timeoutMs: number;
@@ -165,13 +173,8 @@ interface PixelPollSpec {
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
   unchecked: Exclude<Unchecked, 'geometry'>;
-  /**
-   * The part of the element's rect the measurement reads, in tree units —
-   * where chrome over the element counts (`overElement`): the colour assert's sample rect
-   * (color-parity.ts#colorSampleRect); the whole rect when omitted, as the
-   * ocr assert crops it.
-   */
-  reads?: (rect: Rect) => Rect;
+  /** The part of the element's rect the measurement reads (`Reads`); the whole rect when omitted, as the ocr assert crops it. */
+  reads?: Reads;
   /**
    * The measurement reads glyphs (the ocr assert): an element that may be
    * cut at the navigation bar fails closed, where a colour sample of what
@@ -390,7 +393,7 @@ export async function overElement(
   adapter: Pick<DeviceAdapter, 'viewport' | 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
-  { reads = element.rect, glyphs = false, scene = sceneOf(tree) }: { reads?: Rect; glyphs?: boolean; scene?: Scene } = {},
+  { reads = (rect) => rect, glyphs = false, scene = sceneOf(tree) }: { reads?: Reads; glyphs?: boolean; scene?: Scene } = {},
 ): Promise<string | undefined> {
   const keyboard = readKeyboard(adapter, tree);
   const frame = await keyboard.overlapping(element.rect, element);
@@ -498,15 +501,19 @@ async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   tree: UiNode,
   element: UiNode,
-  { reads, glyphs, scene, keyboard }: { reads: Rect; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, scene, keyboard }: { reads: Reads; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
-  const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
+  // What the measurement reads, on the box the standing judges (the usable screen's `oriented`, D6): the colour
+  // sample's region clipped to it, then inset — the sampler's own (verify/capture.ts#clipThenInset).
+  const purpose = { of: 'pixel', reads: reads(element.rect, usable.oriented), glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
   const standing = scene.standing(element, usable, purpose);
   if (standing.kind === 'reachable') return undefined;
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
+    case 'offScreen':
+      return `${OFF_THE_SCREEN} ${at}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
       // screen (ui-tree/draw-order.ts#holderOf's `parent`); the type still lets this kind carry it, and the agreement
@@ -532,6 +539,15 @@ async function judgeOver(
     }
   }
 }
+
+/**
+ * The head of the miss for an element NOTHING of which — of what the assert reads — lies on the screen judged
+ * (ui-tree/standing.ts's pixel `offScreen`: below the fold, above the screen's top, past a side): no capture shows any
+ * of it. Its remedy is the standing's: beneath a presented screen, close it first (`PRESENTED_OVER_THE_ELEMENT`); else
+ * scroll it on-screen. The one sentence head the `assert` tool's description and the troubleshooting reference quote
+ * (mcp/tools.ts).
+ */
+export const OFF_THE_SCREEN = 'nothing of the element lies on the screen';
 
 /**
  * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it
@@ -637,7 +653,7 @@ export async function pollPixels(
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
     // The keyboard, then the system bands and what of the app is drawn over it — never a measurement.
-    const over = await overElement(adapter, tree, found[0], { reads: spec.reads?.(rect), glyphs: spec.glyphs === true });
+    const over = await overElement(adapter, tree, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true });
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".

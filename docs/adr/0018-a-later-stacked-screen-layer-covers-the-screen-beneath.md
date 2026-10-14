@@ -9,7 +9,13 @@ layer is its surface labelled or not (see "Amendment: a labelled dim" below). Am
 decision Q-A (a) on the round-14 device check): no stroke is sent that would touch down on a presented screen, for a
 target in the tree wherever it lies (see "Amendment: no stroke onto a presented screen" below; residual 6 narrowed to
 a target not yet in the tree). Amended again 2026-10-14 (owner decision on the architecture review of rounds 13–15):
-the tap under the status bar beneath a presented screen gives the presented screen's remedy (residual 8).
+the tap under the status bar beneath a presented screen gives the presented screen's remedy (residual 8). Amended
+again 2026-10-14 (owner decisions Q1 (a) and Q2 (a) on the round-16 device check): the presented fact is judged of
+the target node itself, geometry-free, so a target wholly off the screen or wholly inside the status band beneath a
+presented screen is told "close it first" by every verb (residual 8, its amendment); the pixel assert judges an
+element nothing of which it reads lies on the screen off the screen, and a colour assert's region is clipped to the
+screen before it is inset (residual 8, its amendment); an app-drawn strip with no node at a list's bottom is
+residual 10.
 Supersedes, in one part, ADR 0016's note that a screen-sized dimming node holding the title whole is excused (see
 "What changes" below).
 
@@ -392,6 +398,32 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    with no status band known (a screen read without one, or no screen) is that tap moved above the form, to (201,26)
    on its uncovered 402x52 — under the status bar. On a medium-detent sheet the area above it is that dim, and a tap
    there may dismiss the sheet.
+
+   **Amendment: presented judged of the node, geometry-free (2026-10-14, owner decisions Q1 (a) and Q2 (a) on the
+   round-16 device check).** "Presented first" held only where the presented surface lay over the part of the target
+   the verb judged — its covers in the frame (`Exposure.presented`), and a frame holds nothing of a target wholly
+   below the fold or wholly inside the status band. Measured on the raw run16 WDA payloads, replayed through the tools:
+   on the Fees half sheet `tap id:…bank_country_select` (`24,1209 354x52`, wholly below) said "scroll_until it first";
+   beneath Contacts' discard popover `tap role:text label:"add instant message"` (`20,1306`) the same; on the country
+   sheet `tap priority_select` flung to `24,-20 354x52`, wholly in the band, gave the bar's advice, and so did its
+   colour and ocr asserts — while `scroll_until` on each stopped on the presented screen, since it asks `presentedAt`
+   at its stroke's touch-down, wherever the target lies. Now `ui-tree/draw-order.ts#DrawOrder.presentedOver(node)` —
+   `presentedAt`'s rule less the point: the last node drawn after the target that draws for it and is a presented
+   screen's surface — is what the remedy (`ui-tree/standing.ts#remedied`) asks when the frame named none, for EVERY
+   non-reachable kind (Q1 (a): off the screen, under a bar, cut, covered, under idb's band). Kinds do not change, only
+   remedies. `scroll_until`'s own hold is unchanged: it stops on the standing's presented remedy only when the surface
+   lies over it in its read's frame, and otherwise asks its touch-down, as before — so a stroke that misses the
+   presented screen is still sent, and no `scroll_until` reply changes. The pixel assert's standing gains an
+   `offScreen` kind (Q2 (a)): nothing of what it reads lies on the screen; its remedy is the same decision, presented
+   first, else "scroll it on-screen", so no sampler sentence ("element rect is outside the screenshot") decides a
+   remedy any more. And the colour assert's region is ONE region for the judge and the sampler
+   (`verify/capture.ts#clipThenInset`): clipped to the screen, then inset — measured, `payee_street_input 24,869
+   354x52` beneath the Fees dim was judged on the inset of its unclipped rect (y 875–915, off the screen, nothing over
+   it) while the sampler read its 5-pt sliver, the sheet's grey, and a colour assert expecting that grey PASSED; it
+   now fails closed naming the dim, "close it first". Wider by design: a full-screen pass-through layer (residual 1)
+   over an off-screen target now gives "close it first" too; `scroll_until` already stopped there.
+   docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
+   docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
 9. **An in-window overlay with no node is not seen** (owner decision Q7 (a), 2026-10-14). mp-native's Account Detail
    `PAY` menu: a SwiftUI card inserted in the screen's own container over a blurred, dimmed Account Detail. Neither WDA
    nor idb lists a node for the blur/dim backdrop, so the rows beneath read uncovered: `tap
@@ -405,6 +437,13 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    of its own after the screen's, as a sheet's dim is (inserted in the screen's own container, as this menu is, it is
    an ordinary cover: refused, with "scroll_until it first").
    docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
+10. **An app-drawn strip at a list's bottom with no node is not seen** (round-16 device check, 2026-10-14; residual
+   9's class). mp-native's Account Detail: the raw WDA ancestry is `ScrollView transactions.list.container` from y 180
+   to 874 → its content → `row_4` from y 816 to 869, and no node clips at y 839, yet the capture shows an opaque blank strip
+   from about y 839 down. `tap id:transactions.list.row_4` is reported `Tapped` (`idb ui tap 201 843`) and a colour
+   assert on it measures — the tree gives no evidence of the strip, so averi cannot judge it. iOS reports no bottom
+   band to cut; inventing a 34-pt home-indicator band would refuse real taps elsewhere. The same list took no swipes
+   there, also app-side. No code change.
 
 ## Bug notes
 
@@ -413,3 +452,5 @@ docs/bugs/2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-th
 docs/bugs/2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md
 docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
 docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md
+docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
+docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md

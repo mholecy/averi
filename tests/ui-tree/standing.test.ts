@@ -71,7 +71,8 @@ const said = (s: Standing | PixelStanding): unknown => {
     case 'reachable':
       return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
     case 'offScreen':
-      return { kind: s.kind, at: s.at, visible: s.visible };
+      // The pixel's own: nothing of what it reads on the box judged, the box quoted.
+      return 'box' in s ? { kind: s.kind, box: s.box } : { kind: s.kind, at: s.at, visible: s.visible };
     case 'systemBar':
       return { kind: s.kind, at: s.at, bar: s.bar, ...('band' in s && { band: s.band }) };
     case 'clipped':
@@ -375,7 +376,8 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
 
   it('portrait only (N-c): the Settings shape on a landscape box is measured', async () => {
     const t = parseDump(SETTINGS_FLUSH);
-    const landscape = usable({ box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 2154 });
+    // A box wider than tall that still holds the title (y 2105–2154): on the turned 2220x1080 box it lies past the bottom, off the screen.
+    const landscape = usable({ box: box(2400, 2200), boxes: [box(2400, 2200)], statusBand: 66, navigationBand: 2154 });
     expect(said(sceneOf(t).standing(byId(t, 'title'), landscape, OCR(byId(t, 'title'))))).toMatchObject({ kind: 'reachable' });
   });
 
@@ -989,7 +991,8 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
     expectTypeOf<Extract<PixelStanding, { kind: 'covered' }>['reach']>().toEqualTypeOf<Rect>();
     expectTypeOf<Extract<PixelStanding, { kind: 'systemBar' }>['band']>().toEqualTypeOf<Rect>();
     expectTypeOf<Extract<PixelStanding, { kind: 'underKeyboard' }>['band']>().toEqualTypeOf<Rect>();
-    expectTypeOf<PixelStanding['kind']>().toEqualTypeOf<'reachable' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
+    expectTypeOf<PixelStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'offScreen' }>['remedy']['of']>().toEqualTypeOf<'presented' | 'scroll'>();
   });
 });
 
