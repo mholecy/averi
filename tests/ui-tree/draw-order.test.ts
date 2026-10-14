@@ -1520,7 +1520,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(window(target, layer), target)).toEqual([overlay]);
     });
 
-    it('`presented` lists the presented screen\'s surfaces — a structural leaf filling the screen, labelled or not (UIKit\'s `PopoverDismissRegion` \'dismiss popup\', the dim of a half sheet and of a popover), a scroll view — never a control of the layer (Safari\'s capsule bar, #158, or a backdrop button filling the screen) nor a labelled leaf smaller than the screen, whose sentence stays "scroll_until it first"', () => {
+    it('`presented` lists the presented screen\'s surfaces — a structural leaf filling the screen, labelled or not (UIKit\'s `PopoverDismissRegion` \'dismiss popup\', the dim of a half sheet and of a popover), a scroll view — never a control of the layer (Safari\'s capsule bar, or a backdrop button filling the screen) nor a labelled leaf smaller than the screen, whose sentence stays "scroll_until it first"', () => {
       const target = pay();
       const dim = uiNode({ role: 'other', rect: IPHONE });
       const dismissRegion = uiNode({ role: 'container', label: 'dismiss popup', identifier: 'PopoverDismissRegion', rect: rect(-402, -874, 1206, 2622) });
