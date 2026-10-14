@@ -5,7 +5,7 @@ import { presentedCover, type StandingScreen, type SystemBar } from '../ui-tree/
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { OPPOSITE, SIDES, sameStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
+import { OPPOSITE, SIDES, sameStroke, scrollStroke, strokeLength, strokeRoom, TOUCH_SLOP, type Direction, type StrokeRoom } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -162,13 +162,17 @@ export type RoundStep =
  *   layout defect, or the keyboard's edge when it is the bottom clip.
  * - `covered`: a corroborated cover leaves nothing above its top edge;
  *   nothing judged, no stroke sent.
- * - `presented`: the judged match in the frame lies under a screen
- *   presented over its own (ui-tree/standing.ts#underPresented: a modal's
- *   dim, a sheet's form — ADR 0018), on two reads with no stroke between,
- *   or on one when no confirm is left; no further stroke sent — none moves
- *   it out, and one on that screen may dismiss it (a page sheet's
- *   pull-to-dismiss). `cover`: the one the sentence names
- *   (ui-tree/standing.ts#presentedCover).
+ * - `presented`: a screen is presented over the judged match's own (ADR 0018:
+ *   a modal's dim, a sheet's form, a popover's `dismiss popup`), on two
+ *   reads with no stroke between, or on one when no confirm is left; no
+ *   further stroke sent — none moves it out, and one on that screen may
+ *   dismiss it (a page sheet's pull-to-dismiss, a popover closed by a touch
+ *   on its dim). Either the match lies in the frame under that screen
+ *   (ui-tree/standing.ts#underPresented; `cover` the one the sentence names,
+ *   ui-tree/standing.ts#presentedCover), or — `touchDown` set — it was not
+ *   judged in the frame (below the fold, under the soft keyboard, cut or
+ *   clipped) and the next stroke would touch down at `touchDown` on `cover`,
+ *   a surface of that screen (ui-tree/draw-order.ts#DrawOrder.presentedAt).
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -192,7 +196,7 @@ export type ScrollOutcome =
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect }
+  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point }
   | {
       kind: 'bound';
       swipes: number;
@@ -552,7 +556,7 @@ interface State {
   readonly carriedPast: boolean;
   /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke). */
   readonly confirmReads: number;
-  /** The last read found the judged match under a presented screen (`presented`): the next, after a confirm, decides. */
+  /** The last read found the judged match under a presented screen, or its next stroke touching down on one (`presented`): the next, after a confirm, decides. */
   readonly presentedRead: boolean;
   readonly strokesSent: number;
   /** Where the content lay for the last stroke sent: the caller's direction, or its opposite after a fling past the target. For "swiping … no longer moves it". */
@@ -593,8 +597,9 @@ interface State {
    * The stuck turn: the
    * direction the target was stuck in when, the other way never stroked,
    * ONE stroke was drawn back instead of failing — set once, never cleared;
-   * once only, as after it both ways were stroked (`strokedToward`). `backPending`: that stroke is the last sent and
-   * no read that read has answered it yet.
+   * once only, as after it both ways were stroked (`strokedToward`). `backPending`: that stroke is decided — sent, or
+   * held for a presented screen's confirming read at its touch-down (`round`) — and no read that read after it was
+   * sent has answered it yet.
    */
   readonly stuckOn: Direction | undefined;
   readonly backPending: boolean;
@@ -1115,12 +1120,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
   // The stroke back (`stuckOn`) is answered by the first read that reads
   // after it; a round whose tree did not read strokes as the last read
-  // round decided — back.
+  // round decided — back. Only a read after the stroke was SENT answers it:
+  // one held for a presented screen's confirming read (the touch-down stop,
+  // below) is still to be sent, and that read — no stroke between — would
+  // otherwise read "unmoved" and say swiping back moved nothing.
   // `presentedRead` is this read's to set again (below).
   const presentedBefore = s.presentedRead;
   if (now !== undefined) s.presentedRead = false;
-  const answersBack = now !== undefined && s.backPending;
-  if (now !== undefined) s.backPending = false;
+  const answersBack = now !== undefined && current === 'stroke' && s.backPending;
+  if (answersBack) s.backPending = false;
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
     if (stops(best)) {
       // The probe moved nothing: the match is where it was sent from — the
@@ -1314,6 +1322,30 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const room = strokeRoom(gesture, candidates.map((c) => c.rect), toward, kept, (w) => candidates.find((c) => c.rect === w)?.over);
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
+  const stroke = { do: 'stroke' as const, toward, reach, ...(coverTop !== undefined && { coverTop }), ...(box !== undefined && { box: { ...box } }) };
+  // Where this stroke would touch down — the driver's own point (swipe.ts#scrollStroke) — asked on behalf of a
+  // target this read holds but did not judge in the frame (off it, under the soft keyboard, cut or clipped, or
+  // short of the stop under something of its own screen): a surface of a screen PRESENTED over the target's there
+  // (ui-tree/draw-order.ts#DrawOrder.presentedAt, ADR 0018) means the stroke lands on that screen, not on the
+  // target's — it moves nothing toward the target and may dismiss the screen: the device check stroked from
+  // (201,699) for a cell below the fold of Contacts' New Contact sheet, closed the "Discard Changes" popover over
+  // it, and read the cell "fully visible after 1 swipe"; under the SWIFT form's Fees half sheet two strokes moved
+  // the sheet to another detent and read "content exhausted". So, as for a target judged under such a screen
+  // (above): one more read with no stroke between, then stop `presented` — or, should the screen be gone from
+  // the touch-down by then, stroke as before. Only for a target this read holds: one not in the tree has nothing
+  // to ask on behalf of, and is still stroked for (ADR 0018, residual 6). Only the touch-down is asked — where the
+  // gesture is recognised; the rest of the path follows the finger.
+  if (best !== undefined && now !== undefined && stroke.box !== undefined) {
+    const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
+    const surface = now.facts.scene.order.presentedAt(best.node, touchDown);
+    if (surface !== undefined) {
+      if ((current === 'settle' && presentedBefore) || !mayConfirm(s, seen.elapsedMs)) {
+        return stop(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: surface, viewport, touchDown });
+      }
+      s.presentedRead = true;
+      return confirm(s);
+    }
+  }
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
   if (turn) s.turns++;
   if (!s.strokedToward.includes(toward)) s.strokedToward = [...s.strokedToward, toward];
@@ -1324,10 +1356,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   s.since = 'stroke';
   s.swipes++;
   s.owesDrawn = true;
-  return {
-    state: s as unknown as Rounds,
-    step: { do: 'stroke', toward, reach, ...(coverTop !== undefined && { coverTop }), ...(box !== undefined && { box: { ...box } }) },
-  };
+  return { state: s as unknown as Rounds, step: stroke };
 }
 
 /**
