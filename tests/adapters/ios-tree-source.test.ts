@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
@@ -170,6 +171,18 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
 
   it('leaves error unset when no same-identifier text sits below the field', () => {
     expect(tree.children[1].error).toBeUndefined();
+  });
+
+  it('a pristine form whose fields and titles all share one component id reports no error (tests/fixtures/idb-swift-form-number-pad.json)', async () => {
+    // mp-native's SWIFT form: every field and its floating title carry
+    // `TextFieldWithComponentStyle`, so the text below a field is the NEXT
+    // field's title, not a validation message. The screen shows no error.
+    const pad = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
+    const fields = parseIdbDescribeAll(JSON.stringify(pad.elements)).children.filter(
+      (n) => n.role === 'textfield' && n.identifier === 'TextFieldWithComponentStyle',
+    );
+    expect(fields.length).toBe(11);
+    expect(fields.map((f) => f.error)).toEqual(fields.map(() => undefined));
   });
 
   it('a payload that is not an array is a loud error, not an empty screen', () => {
