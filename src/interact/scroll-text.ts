@@ -547,12 +547,14 @@ function shortText(short: Shortfall): string {
       }
       return `element was in the tree ${whenInFrame(short.inTreeAfter)} (off the viewport, or under the soft keyboard), never in the viewport, and is no longer in the tree — a swipe carried it out (a fling?) and a lazy list drops what scrolls away`;
     case 'offFrame': {
-      const offFrame = `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
+      const offFrame = short.outside !== undefined ? outsideScrollViewText(short.outside) : `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
       const rect = `(last rect ${JSON.stringify(short.rect)})`;
       const past = short.past !== undefined ? ` — it lay ${pastText(short.past)}: ${revealText(short.past.side)}` : '';
       return short.inFrameAfter !== undefined
-        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, off ${offFrame} at the last read ${rect}${past}`
-        : `element in tree but never intersected ${offFrame} ${rect}${past}`;
+        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, ${short.outside !== undefined ? '' : 'off '}${offFrame} at the last read ${rect}${past}`
+        : short.outside !== undefined
+          ? `element in tree but never drawn: it lies ${offFrame} ${rect}${past}`
+          : `element in tree but never intersected ${offFrame} ${rect}${past}`;
     }
   }
 }

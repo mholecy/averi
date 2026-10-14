@@ -306,6 +306,9 @@ export interface TouchedOn {
  * not "off the viewport, or under the soft keyboard … (a fling?)". Only
  * while no stroke was drawn that way (`strokedToward`): once one was — a
  * turn — that direction was tried, and the turn's own sentence says why.
+ * `outside` on `offFrame`: the last read judged it on the screen but outside
+ * what its scroll view draws (ui-tree/standing.ts, the drawn frame) — that
+ * scroll view, which the failure names in place of the viewport.
  */
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
@@ -313,7 +316,7 @@ export type Shortfall =
   | { of: 'absent'; unsearched?: Edge }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
-  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide };
+  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
 
 /** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
 export interface PastSide {
@@ -1542,5 +1545,6 @@ function shortfall(s: State, { readError, found, best, viewport, cover }: BoundR
     ...(cover !== undefined && { cover }),
     eitherWayUp: s.frame.boxes.length > 1 && cover?.above === undefined,
     ...(past !== undefined && { past }),
+    ...(best?.standing.kind === 'offScreen' && best.standing.scroller !== undefined && { outside: best.standing.scroller }),
   };
 }

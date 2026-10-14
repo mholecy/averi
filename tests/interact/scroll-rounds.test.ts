@@ -2177,3 +2177,17 @@ describe('round — the far edge at the edge of what the target\'s scroll view d
     expect(strokesToward(played)).toEqual(['down']);
   });
 });
+
+describe('round — a target the strokes never bring into what its scroll view draws', () => {
+  it('the at-rest SWIFT form\'s payee_name_input listed below its form, content that no longer moves: the failure says it was never drawn inside that scroll view — not that it never met the viewport it lies on', () => {
+    const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: { x: 24, y: 801, width: 354, height: 52 } });
+    const tree = node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 300, width: 354, height: 52 } }), name] })],
+    });
+    const row: Row = { tree, found: [name] };
+    const played = play({ ...IPHONE, maxSwipes: 5 }, [row, row, row]);
+    expect(failureOf(played, 'id:payee_name_input').message).toContain('element in tree but never drawn: it lies outside its scroll view scrollable id:form (0,0 402x780) (last rect');
+  });
+});
