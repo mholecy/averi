@@ -541,8 +541,9 @@ interface State {
   readonly frame: Frame;
   /** Some round matched the target, and how many rounds read a tree — the absence rule's evidence. */
   readonly everFound: boolean;
+  /** Not `reads.count`: a failed read is no evidence of absence, so only the reads that returned a tree count here. */
   readonly treesRead: number;
-  /** Every round's tree read, failed ones included — for the timeout's sentence. */
+  /** Every round's tree read, failed ones included — for the timeout's sentence, where a failed read's time counts. */
   readonly reads: ReadTime;
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   readonly lastCover: Cover | undefined;
