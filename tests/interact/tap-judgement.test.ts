@@ -254,6 +254,36 @@ describe('judgeTap(…).aim() — cut, cover, keyboard, after the guard', () => 
  * the two bug notes it answers (docs/bugs/2026-10-13-ios-wda-*), each a tap reported "Tapped"
  * that landed on the layer, on the real ui_snapshots of those calls (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
  */
+describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree\'s drawn frame), after the guard', () => {
+  /** The at-rest SWIFT form's shape under WDA: its ScrollView `0,0 402x780`, CONTINUE pinned below it, `rows` listed in the form. */
+  const atRest = (...rows: UiNode[]): UiNode =>
+    node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: rows }),
+        node({ role: 'button', label: 'Continue to summary', identifier: 'continue', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+      ],
+    });
+  const name = () => node({ role: 'textfield', identifier: 'payee_name_input', rect: { x: 24, y: 801, width: 354, height: 52 } });
+
+  it('payee_name_input, listed below the form, its centre (201,827) on the bare background: refused naming the scroll view — never "Tapped", and no fresh read of the screen', async () => {
+    const { outcome, freshReads } = await judge(atRest(name()), 'payee_name_input', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'OffScreenRefusal: payee_name_input is outside its scroll view scrollable id:form (0,0 402x780) at (201,827): nothing of it is drawn (rect 24,801 354x52) — scroll_until it first; nothing was tapped',
+    );
+    expect(freshReads).toEqual([]);
+  });
+
+  it('a row across the form\'s bottom edge, its centre outside it: refused as at the screen\'s edge, what is drawn of it quoted', async () => {
+    const across = node({ role: 'button', identifier: 'across', rect: { x: 24, y: 760, width: 354, height: 60 } });
+    const { outcome } = await judge(atRest(across), 'across', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'OffScreenRefusal: across is outside its scroll view scrollable id:form (0,0 402x780) at (201,790): only 33% of it (rect 24,760 354x60) is drawn, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped',
+    );
+  });
+});
+
 describe('judgeTap(…).aim() — a later stacked screen layer over the target (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
   const screens = async () =>
     (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;

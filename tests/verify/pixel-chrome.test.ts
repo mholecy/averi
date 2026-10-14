@@ -98,7 +98,10 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'text "Create contact" (154,115 407x77)': 2,
       'text "Phone (Mobile)" (176,1871 233x44)': 1,
       'text "Phone (Mobile)" (176,725 233x44)': 1,
-      offScreen: 105, // nothing of the node on the screen (below the fold, or in a scroll view's content above it): no capture shows any of it
+      // Nothing of the node on the screen (below the fold, or in a scroll view's content above it): no capture shows any
+      // of it — 105 — or, on the screen, nothing of it drawn: 38 nodes of MyPort's keyboard trees listed below their
+      // login ScrollView, laid out above the keyboard (0,0 402x539 / 402x566, 2FA's 402x518), the drawn frame's.
+      offScreen: 143,
     });
     // Every iOS window and screen-sized root reaches into the band: an ocr crop of it would read the clock.
     expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(190);
@@ -124,7 +127,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'container id:nav.tab_cards (540,1876 219x176)': 1,
       'other "More" (830,1926 77x77)': 9,
       'text "Create contact" (154,115 407x77)': 2,
-      offScreen: 105, // the same nodes as the ocr reader's: the sample is clipped to the screen before it is inset, so nothing of it shows exactly when nothing of the rect does
+      offScreen: 143, // the same nodes as the ocr reader's: the sample is clipped to the screen before it is inset, so nothing of it shows exactly when nothing of the rect does
     });
     // Not the filter sheet's dim `PopoverDismissRegion -402,-874 1206x2622` (twice): its sample is the part of it on the
     // screen inset — y 105–769, clear of the band — the region the sampler reads (verify/capture.ts#clipThenInset).

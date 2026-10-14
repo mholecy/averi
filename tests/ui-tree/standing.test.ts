@@ -71,9 +71,12 @@ const said = (s: Standing | PixelStanding): unknown => {
   switch (s.kind) {
     case 'reachable':
       return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
-    case 'offScreen':
+    case 'offScreen': {
+      // Outside the scroll view it lies in (its drawn frame, geometry.ts#Clips.drawnIn): the scroll view named.
+      const outside = s.scroller === undefined ? {} : { scroller: s.scroller.identifier };
       // The pixel's own: nothing of what it reads on the box judged, the box quoted.
-      return 'box' in s ? { kind: s.kind, box: s.box } : { kind: s.kind, at: s.at, visible: s.visible };
+      return 'box' in s ? { kind: s.kind, box: s.box, ...outside } : { kind: s.kind, at: s.at, visible: s.visible, ...outside };
+    }
     case 'systemBar':
       return { kind: s.kind, at: s.at, bar: s.bar, ...('band' in s && { band: s.band }) };
     case 'clipped':
@@ -1225,5 +1228,102 @@ describe('Scene.standing for the pixel assert — off the screen', () => {
     const list = node({ role: 'scrollable', clipsDescendants: true, rect: { x: 0, y: 737, width: 1080, height: 1417 }, children: [node({ identifier: 'filler', rect: { x: 0, y: 800, width: 1080, height: 100 } }), row] });
     const t = node({ role: 'container', rect: box(1080, 2220), children: [list] });
     expect(sceneOf(t).standing(row, PIXEL_NAV, { of: 'pixel', reads: WHOLE, glyphs: true }).kind).toBe('cut');
+  });
+});
+
+describe('Scene.standing — the drawn frame: what of a node its scroll views draw, on a tree of unclipped frames (WDA\'s)', () => {
+  const r = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
+  /**
+   * The at-rest SWIFT form's shape under WDA, synthetic: the form's ScrollView `0,0 402x780` above the pinned CONTINUE
+   * `24,780 354x44`; `payee_name_input`'s row `24,801 354x52` and the street field `24,869 354x52` listed below the
+   * scroll view, drawn nowhere (the capture shows the bare background from 824 down). `extra`: more of the form's rows.
+   */
+  const atRest = (...extra: UiNode[]) => {
+    const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: r(24, 801, 354, 52) });
+    const street = node({ role: 'textfield', identifier: 'payee_street_input', rect: r(24, 869, 354, 52) });
+    const form = node({ role: 'scrollable', identifier: 'form', rect: r(0, 0, 402, 780), children: [node({ role: 'other', rect: r(24, 801, 354, 52), children: [name] }), street, ...extra] });
+    const tree = node({ role: 'container', rect: box(402, 874), children: [form, node({ role: 'button', identifier: 'continue', label: 'Continue to summary', rect: r(24, 780, 354, 44) })] });
+    return { tree, name, street, form };
+  };
+  const ALL: readonly Purpose[] = [TAP, PLAIN, FULLY];
+
+  it('payee_name_input, wholly below its scroll view, its centre on the screen: off the screen for the tap and both stops — outside the form, nothing of it drawn', () => {
+    const { tree, name } = atRest();
+    for (const purpose of ALL) {
+      expect(said(sceneOf(tree).standing(name, IPHONE, purpose as TouchPurpose))).toEqual({ kind: 'offScreen', at: { x: 201, y: 827 }, visible: 0, scroller: 'form' });
+    }
+  });
+
+  it('payee_street_input, 5 pt on the screen and none in its scroll view: the colour and the ocr reader judge it outside the form, not measured', () => {
+    const { tree, street } = atRest();
+    for (const purpose of [COLOUR(street), OCR(street)]) {
+      expect(said(sceneOf(tree).standing(street, IPHONE, purpose))).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
+    }
+  });
+
+  it('off the screen is judged first: a row below the screen and below its scroll view is off the screen, no scroll view named', () => {
+    const below = node({ role: 'button', identifier: 'below', rect: r(24, 1000, 354, 52) });
+    const { tree } = atRest(below);
+    expect(said(sceneOf(tree).standing(below, IPHONE, TAP))).toEqual({ kind: 'offScreen', at: { x: 201, y: 1026 }, visible: 0 });
+    expect(said(sceneOf(tree).standing(below, IPHONE, COLOUR(below)))).toEqual({ kind: 'offScreen', box: box(402, 874) });
+  });
+
+  it('a row across the scroll view\'s edge, its centre outside it: the tap and the plain stop refuse it as the screen\'s edge would, what shows counted in the drawn part; fully: clipped at that edge', () => {
+    const across = node({ role: 'button', identifier: 'across', rect: r(24, 760, 354, 60) });
+    const { tree } = atRest(across);
+    for (const purpose of [TAP, PLAIN]) {
+      expect(said(sceneOf(tree).standing(across, IPHONE, purpose))).toEqual({ kind: 'offScreen', at: { x: 201, y: 790 }, visible: 20 / 60, scroller: 'form' });
+    }
+    // Its centre in the form: the plain stop and the tap at its centre; fully: true still cut at the form's bottom.
+    const inside = node({ role: 'button', identifier: 'inside', rect: r(24, 720, 354, 70) });
+    const t2 = atRest(inside).tree;
+    expect(said(sceneOf(t2).standing(inside, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 755 } });
+    expect(said(sceneOf(t2).standing(inside, IPHONE, PLAIN))).toEqual({ kind: 'reachable', at: { x: 201, y: 755 } });
+    expect(said(sceneOf(t2).standing(inside, IPHONE, FULLY))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+    expect(sceneOf(t2).standing(inside, IPHONE, PLAIN).facts.visible).toBeCloseTo(60 / 70);
+  });
+
+  it('a cover over the undrawn part is over nothing drawn: a row 700–800 with CONTINUE over its undrawn 780–800 is measured on its drawn part', () => {
+    const tall = node({ role: 'button', identifier: 'tall', rect: r(24, 700, 354, 100) });
+    const { tree } = atRest(tall);
+    expect(sceneOf(tree).standing(tall, IPHONE, COLOUR(tall)).kind).toBe('reachable');
+    expect(sceneOf(tree).standing(tall, IPHONE, OCR(tall)).kind).toBe('reachable');
+  });
+
+  it('the thin sliver at the scroll view\'s edge as at the screen\'s (ADR 0002\'s slack): 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
+    const two = node({ role: 'button', identifier: 'two', rect: r(24, 778, 354, 52) });
+    const three = node({ role: 'button', identifier: 'three', rect: r(24, 777, 354, 52) });
+    const { tree } = atRest(two, three);
+    const sliver = sceneOf(tree).standing(two, IPHONE, OCR(two));
+    expect(said(sliver)).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
+    expect(sliver.kind === 'offScreen' && 'sliver' in sliver && sliver.sliver).toEqual(r(24, 778, 354, 2));
+    // 3 pt drawn: measured — CONTINUE lies over the undrawn rest only.
+    expect(sceneOf(tree).standing(three, IPHONE, OCR(three)).kind).toBe('reachable');
+  });
+
+  it('the country sheet\'s list ending at 811: its row `Ukraine` 31,825 340x43 is judged outside the list by every verb', () => {
+    const ukraine = node({ role: 'button', identifier: 'Ukraine', rect: r(31, 825, 340, 43) });
+    const list = node({ role: 'scrollable', identifier: 'countries', rect: r(31, 456, 340, 355), children: [node({ role: 'button', identifier: 'Uganda', rect: r(31, 768, 340, 43) }), ukraine] });
+    const tree = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'other', rect: r(0, 400, 402, 474), children: [list] })] });
+    for (const purpose of ALL) expect(sceneOf(tree).standing(ukraine, IPHONE, purpose as TouchPurpose)).toMatchObject({ kind: 'offScreen', scroller: list, remedy: { of: 'scroll' } });
+    expect(sceneOf(tree).standing(ukraine, IPHONE, COLOUR(ukraine))).toMatchObject({ kind: 'offScreen', scroller: list, remedy: { of: 'scroll' } });
+    expect(sceneOf(tree).standing(byId(tree, 'Uganda'), IPHONE, TAP).kind).toBe('reachable');
+  });
+
+  it('unchanged where frames are already cut or nothing scrolls: the same rows on a tree with nothing that scrolls, on Android (a clipsDescendants scroller) and on idb\'s flat list', () => {
+    const { tree, name, street } = atRest();
+    const [form, bar] = tree.children;
+    const plain = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'other', rect: form.rect, children: form.children }), bar] });
+    const android = node({ role: 'container', rect: box(402, 874), children: [{ ...form, clipsDescendants: true as const }, bar] });
+    const flat = { ...node({ role: 'container', rect: box(402, 874), children: [form, ...form.children, name, street, bar] }), flatList: true as const };
+    // Judged on the screen alone, as before: the name field's centre (201,827) on it — tapped where nothing covers it
+    // (idb's CONTINUE, pinned at a flat list's bottom, reaches down over it) — and 5 pt of the street field measured.
+    expect(said(sceneOf(plain).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
+    expect(said(sceneOf(android).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
+    expect(said(sceneOf(flat).standing(name, IPHONE, TAP))).toEqual({ kind: 'covered', cover: 'continue' });
+    for (const t of [plain, android, flat]) {
+      for (const purpose of [PLAIN, FULLY]) expect(sceneOf(t).standing(name, IPHONE, purpose).kind).not.toBe('offScreen');
+      expect(sceneOf(t).standing(street, IPHONE, COLOUR(street)).kind).toBe(t === flat ? 'covered' : 'reachable');
+    }
   });
 });

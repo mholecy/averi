@@ -800,14 +800,17 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  */
 function beyondFarEdgeIn(found: FarFacts, direction: Direction, frames: readonly Rect[]): boolean {
   const { far } = FAR_EDGE[direction];
-  return found.clippedOut === far || found.slicedAt === far || frames.every((f) => beyondFarEdge(found.rect, direction, f));
+  // Each frame cut to what the target's scroll views draw: their edge is the far edge as the screen's is.
+  const cut = (f: Rect): Rect => (found.drawn === undefined ? f : (rectIntersection(f, found.drawn) ?? f));
+  return found.clippedOut === far || found.slicedAt === far || frames.every((f) => beyondFarEdge(found.rect, direction, cut(f)));
 }
 
-/** What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, and the edge its scroll container cuts it to a sliver at. */
+/** What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, the edge its scroll container cuts it to a sliver at, and the frame its scroll views draw it in (ui-tree/standing.ts#StandingFacts.drawn). */
 interface FarFacts {
   readonly rect: Rect;
   readonly clippedOut?: ClippedSide;
   readonly slicedAt?: Edge;
+  readonly drawn?: Rect;
 }
 
 /** A judged match's `FarFacts`, its rect copied. */
@@ -815,6 +818,7 @@ const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   rect: { ...node.rect },
   ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
   ...(facts.sliver !== undefined && { slicedAt: facts.sliver.edge }),
+  ...(facts.drawn !== undefined && { drawn: { ...facts.drawn } }),
 });
 
 /**

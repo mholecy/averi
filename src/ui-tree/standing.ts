@@ -6,13 +6,16 @@ import {
   clippedEdges,
   clipsOf,
   containsPoint,
+  drawnPart,
   overlapsPastSlack,
   PIXEL_OVERLAP_SLACK,
   rectWithin,
   rectCentre,
+  sameRect,
   visibleFractionInViewport,
   type Clips,
   type Cut,
+  type Drawn,
   type Edge,
 } from './geometry.js';
 import type { KeyboardLine } from './keyboard-position.js';
@@ -336,6 +339,8 @@ export interface StandingFacts {
   readonly minPiece?: number;
   /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind — never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
+  /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
+  readonly drawn?: Rect;
 }
 
 /**
@@ -439,8 +444,12 @@ type Remedied<K extends { readonly kind: string }, M> = K extends { readonly kin
 type TouchKind =
   /** `at`: the point a tap presses — the centre, or (`moved`, the tap's) the centre of the largest uncovered `piece`, `cover` being over the centre, chosen above a keyboard line when one applied. */
   | { readonly kind: 'reachable'; readonly at: Point; readonly moved?: { readonly piece: Rect; readonly cover: UiNode; readonly aboveKeyboard: boolean } }
-  /** `visible`: the most of the node inside any box judged. */
-  | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number }
+  /**
+   * `visible`: the most of the node inside any box judged, of what is drawn there. `scroller`: its centre lies on the
+   * screen but outside what its scroll views draw (`Scene`'s contract, the drawn frame) — the scroll view a sentence
+   * names (`scrollerOf`).
+   */
+  | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number; readonly scroller?: UiNode }
   /** `band`: the band's rect on the box, only when the node's rect (not its centre) lies in it past the slack — a `fully` stop's region rule. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band?: Rect }
   | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
@@ -459,8 +468,13 @@ export type TapStanding = Exclude<Standing, { readonly kind: 'clipped' }>;
 /** The pixel assert's kinds, before the remedy is decided (`remedied`). */
 type PixelKind =
   | { readonly kind: 'reachable'; readonly at: Point }
-  /** Nothing of what it reads lies on the box judged (`box`, the sentence quotes it): no capture shows any of it — or (`sliver`, the element's part on the box) the screen's edge leaves too thin a sliver of it to measure (`thinSliver`). */
-  | { readonly kind: 'offScreen'; readonly box: Rect; readonly sliver?: Rect }
+  /**
+   * Nothing of what it reads lies on the box judged (`box`, the sentence quotes it): no capture shows any of it — or
+   * (`sliver`, the element's part on the box) the screen's edge leaves too thin a sliver of it to measure
+   * (`thinSliver`). `scroller`: the scroll view it lies outside of — nothing of it drawn on the box (`Scene`'s
+   * contract, the drawn frame), or, with `sliver`, that scroll view's edge leaves the sliver (`scrollerOf`).
+   */
+  | { readonly kind: 'offScreen'; readonly box: Rect; readonly sliver?: Rect; readonly scroller?: UiNode }
   /** `band`: the band's rect on the box, which what it reads overlaps. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band: Rect }
   /** Its own cut: at the navigation bar's top, `container` the clipping scroller flush with it. */
@@ -507,16 +521,19 @@ export function sceneOf(tree: UiNode): Scene {
       const single = singleBox(usable);
       // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
       const failsOpen = 'failsOpen' in usable && usable.failsOpen === true;
-      const read: PixelRead = { ...purpose, reads: purpose.reads(node.rect, failsOpen ? node.rect : single.box) };
-      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen), single.box, single, read, !listsAncestry(tree));
+      // What it reads is asked of the part of the node its scroll views draw (the drawn frame), the sampler's rect too.
+      const drawn = failsOpen ? undefined : scene.clips.drawnIn(node);
+      const rect = drawnPart(node.rect, drawn) ?? node.rect;
+      const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
+      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, drawn), single.box, single, read, !listsAncestry(tree));
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
     }
     const touch = touchScreen(screen, tree);
     if (purpose.of === 'tap') {
-      const tap = tapStanding(judged, placeOf(judged.centre, touch?.boxes, touch), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
+      const tap = tapStanding(judged, drawnPlace(placeOf(judged.centre, touch?.boxes, touch), judged, purpose.keyboardTop), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
       return tap.kind === 'reachable' ? tap : remedied({ touch: tap }, judged);
     }
-    const place = placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch);
+    const place = drawnPlace(placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch), judged, purpose.keyboardTop);
     const box = touch?.box ?? node.rect;
     const stop = purpose.of === 'fully' ? fullyStanding(judged, place, box, touch, purpose.keyboardTop) : stopStanding(judged, place, box, touch, purpose.keyboardTop);
     return stop.kind === 'reachable' ? stop : remedied({ touch: stop }, judged);
@@ -611,8 +628,12 @@ interface Judged {
   readonly centre: Point;
 }
 
-/** Where a point lies: on the screen, off it, or in a system band — with the band's rect when a region, not the point, lies in it. */
-type PointPlace = 'on' | 'off' | { readonly bar: SystemBar; readonly band?: Rect };
+/**
+ * Where a point lies: on the screen, off it, in a system band — with the band's rect when a region, not the point,
+ * lies in it — or (`outside`, `drawnPlace`) on the screen outside what the node's scroll views draw, that scroll view
+ * named.
+ */
+type PointPlace = 'on' | 'off' | { readonly bar: SystemBar; readonly band?: Rect } | { readonly outside: UiNode };
 
 /** A system band on a box: the bar it is, as a sentence quotes it, and its rect on the box. */
 interface SystemBand<B extends SystemBar = SystemBar> {
@@ -620,8 +641,19 @@ interface SystemBand<B extends SystemBar = SystemBar> {
   readonly band: Rect;
 }
 
-/** Where the pixel assert's region lies: on the screen, off it (`wholly`: nothing of what it reads on the box; `sliver`: the element's on-screen part, `on`, too thin to measure), in a system band (with the band's rect), or under the band a keyboard line marks. */
-type RegionPlace = 'on' | { readonly off: 'wholly' } | { readonly off: 'sliver'; readonly on: Rect } | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
+/**
+ * Where the pixel assert's region lies: on the screen, off it (`wholly`: nothing of what it reads on the box;
+ * `outside`: on the box, but nothing of it drawn there — the scroll view named; `sliver`: the element's drawn part on
+ * the screen, `on`, too thin to measure — `scroller` when that scroll view's edge leaves it), in a system band (with
+ * the band's rect), or under the band a keyboard line marks.
+ */
+type RegionPlace =
+  | 'on'
+  | { readonly off: 'wholly' }
+  | { readonly off: 'outside'; readonly scroller: UiNode }
+  | { readonly off: 'sliver'; readonly on: Rect; readonly scroller?: UiNode }
+  | { readonly bar: SystemBar; readonly band: Rect }
+  | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /**
  * The screen a touch (the tap, either stop) is judged on: the one handed
@@ -668,6 +700,36 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
 }
 
 /**
+ * `place` judged against the node's DRAWN frame (`Scene`'s contract; geometry.ts#Clips.drawnIn): a centre on the
+ * screen, or in a system band, that lies outside what the node's scroll views draw is `outside` the scroll view
+ * `scrollerOf` names — off the screen as a touch judges it, its edge the scroll view's: nothing a tap there presses is
+ * the node. Off the screen stays off the screen, judged first. A tree whose frames are already cut (Android's), idb's
+ * flat list and a node under nothing that scrolls have no drawn frame: `place` as it is. Nor a centre under a
+ * WITNESSED keyboard line (`line`): the guard hides that keyboard before a tap, and a scroll view laid out above the
+ * keyboard (React Native's keyboard-avoiding view: MyPort's login `ScrollView` ends at the band's top, 566) may grow
+ * back over the centre — judged again then, on the look the guard hands back.
+ */
+function drawnPlace(place: PointPlace, { scene, node, centre }: Judged, line: KeyboardLine | undefined): PointPlace {
+  if (place === 'off' || (line?.witnessed === true && centre.y >= line.y)) return place;
+  const drawn = scene.clips.drawnIn(node);
+  if (drawn === undefined || (drawn.frame !== undefined && containsPoint(drawn.frame, centre))) return place;
+  return { outside: scrollerOf(drawn, (frame) => !containsPoint(frame, centre)) };
+}
+
+/** The scroll view a sentence names for a node outside what its scroll views draw (`Drawn`): the nearest whose frame `leaves` it, else the nearest. */
+const scrollerOf = (drawn: Drawn, leaves: (frame: Rect) => boolean): UiNode => drawn.scrollers.find((s) => leaves(s.rect)) ?? drawn.scrollers[0];
+
+/**
+ * `frame` cut by the node's drawn frame (geometry.ts#Clips.drawnIn): `frame` itself when nothing cuts it (the same
+ * object); of no area, at `frame`'s origin, when nothing of `frame` is drawn.
+ */
+function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
+  const drawn = scene.clips.drawnIn(node);
+  if (drawn === undefined) return frame;
+  return (drawn.frame === undefined ? undefined : rectIntersection(frame, drawn.frame)) ?? { ...frame, width: 0, height: 0 };
+}
+
+/**
  * Where the pixel assert's region lies (`Scene`'s contract): off the screen
  * when what it reads has area and none of it lies on `box`; under the band
  * `purpose.keyboardTop` marks (below); off the screen again when the
@@ -682,9 +744,14 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
  * else on the screen.
  */
-function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean): RegionPlace {
+function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean, drawn: Drawn | undefined): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
   if (on === undefined) return { off: 'wholly' };
+  // Outside its scroll view next: on the box, but nothing of it drawn there — what lies there is not the element.
+  const onBox = rectIntersection(rect, box) ?? rect;
+  const part = drawnPart(rect, drawn);
+  const shown = part === undefined ? undefined : rectIntersection(part, box);
+  if (on !== box && drawn !== undefined && shown === undefined) return { off: 'outside', scroller: scrollerOf(drawn, (frame) => !rectsOverlap(frame, onBox)) };
   // idb's keyboard band before a thin sliver, as it comes before the system bands (ADR 0010): the element under the band is a
   // keyboard miss, worded as WDA's and Android's reading words it. Nothing wholly off the box meets the band.
   // docs/adr/0010-pixel-assert-keyboard-first.md
@@ -692,23 +759,25 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
     const band = bandRect(keyboardTop, box);
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
   }
-  const sliver = on === box ? undefined : thinSliver(rect, on, box);
-  if (sliver !== undefined) return { off: 'sliver', on: sliver };
+  const sliver = on === box ? undefined : thinSliver(rect, shown ?? on, on);
+  // The sliver its scroll view's edge leaves, that scroll view named; the screen's edge's, none.
+  const cutBy = drawn === undefined || shown === undefined || sameRect(shown, onBox) ? undefined : scrollerOf(drawn, (frame) => !rectWithin(onBox, frame));
+  if (sliver !== undefined) return { off: 'sliver', on: sliver, ...(cutBy !== undefined && { scroller: cutBy }) };
   return systemBandOver(reads, box, bands) ?? 'on';
 }
 
 /**
- * The element's part on `box` when the screen's EDGE leaves what the pixel assert reads (`on`, its part on the box)
- * no thicker than PIXEL_OVERLAP_SLACK on a side the edge cuts — too thin to measure: what a neighbour laid flush may
+ * The element's part on the box (`shown`: its drawn part there) when the screen's EDGE — or its scroll view's, the
+ * drawn frame's (`Scene`'s contract), as at the screen's — leaves what the pixel assert reads (`on`, its part on the
+ * box) no thicker than PIXEL_OVERLAP_SLACK on a side the edge cuts — too thin to measure: what a neighbour laid flush may
  * share with the element without counting as over it (geometry.ts#overlapsPastSlack) is the most such a sliver
  * holds, so a cover reaching over it is never judged, and the sampler reads its few rows — measured:
  * `payee_street_input` moved to y 872–873.7 beneath the Fees sheet's dim passed on ~6 px rows of the dim, "clipped
  * 96% off-png". The same at the top edge, under the status band, which a sliver no thicker
- * than the slack does not overlap past it. Only a side the screen's edge cuts: a whole element thinner than the slack
+ * than the slack does not overlap past it. Only a side an edge cuts: a whole element thinner than the slack
  * on the screen (a 402x1 divider) is measured. Undefined when the sliver is thicker, or nothing is cut.
  */
-function thinSliver(rect: Rect, on: Rect, box: Rect): Rect | undefined {
-  const shown = rectIntersection(rect, box) ?? on;
+function thinSliver(rect: Rect, shown: Rect, on: Rect): Rect | undefined {
   const cutHigh = shown.height < rect.height;
   const cutWide = shown.width < rect.width;
   return (cutHigh && on.height <= PIXEL_OVERLAP_SLACK) || (cutWide && on.width <= PIXEL_OVERLAP_SLACK) ? shown : undefined;
@@ -807,10 +876,12 @@ function ordered<S>(placed: S | undefined, cut: S | undefined, cover: () => S | 
   return placed ?? cut ?? cover() ?? underLine ?? reachable;
 }
 
-/** A touch's place as its answer: off the screen, or its centre in a system band; undefined when on the screen. */
+/** A touch's place as its answer: off the screen — or outside what its scroll views draw, that scroll view named — or its centre in a system band; undefined when on the screen. */
 function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): TapJudgement | undefined {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
-  return place === 'on' ? undefined : { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
+  if (place === 'on') return undefined;
+  if ('outside' in place) return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible, scroller: place.outside };
+  return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
 }
 
 /** A touch's cut to a sliver as its answer, when the frame left a minimum to judge it by. */
@@ -829,6 +900,7 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
 function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = frame, { sliver: judgeSliver = true } = {}): { facts: StandingFacts; seen: Exposure } {
   const seen = scene.order.exposure(node, exposed);
   const sliver = judgeSliver ? scene.clips.cutSliver(node, seen.minPiece) : undefined;
+  const drawn = scene.clips.drawnIn(node)?.frame;
   const facts: StandingFacts = {
     centre,
     screen: frame,
@@ -842,6 +914,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),
+    ...(drawn !== undefined && { drawn: { ...drawn } }),
   };
   return { facts, seen };
 }
@@ -856,17 +929,23 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
  * the facts then being the frame's for the purpose's own judgement.
  */
 function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: TouchJudgement } {
-  const { node, centre } = judged;
+  const { scene, node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
     const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
     return { facts, outside: { facts, kind: 'underKeyboard', line } };
   }
-  const frame = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
+  const above = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
+  // Only what its scroll views draw (the drawn frame).
+  const frame = drawnFrame(judged, above);
   // Its covers below the status band; what shows keeps the node's own part in the band (`bandShows`).
   // docs/adr/0008-scroll-until-exposure-box-below-status-band.md
   const exposed = belowStatusBand(frame, bands, box);
   const facts = bandShows(judged, frame, exposed, factsIn(judged, frame, exposed).facts);
   if (facts.visible > 0) return { facts };
+  // Above the line but nothing of it drawn there: outside its scroll view, which a scroll moves it into.
+  const shown = rectIntersection(node.rect, above);
+  const drawn = scene.clips.drawnIn(node);
+  if (shown !== undefined && drawn !== undefined) return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0, scroller: scrollerOf(drawn, (f) => !rectsOverlap(f, shown)) } };
   if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, outside: { facts, kind: 'underKeyboard', line } };
   return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0 } };
 }
@@ -929,12 +1008,13 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
 function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): TapJudgement {
   const { scene, node } = judged;
-  const box = systemBands(chosen, bands).clear;
+  // Less the system bands, and only what its scroll views draw (the drawn frame).
+  const box = drawnFrame(judged, systemBands(chosen, bands).clear);
   const within = aboveLine(box, line);
   const unwitnessed = line?.witnessed === false ? line : undefined;
   const frame = unwitnessed === undefined ? box : within;
   const { facts, seen } = factsIn(judged, frame);
-  const offScreenVisible = boxes.length === 0 ? 0 : Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
+  const offScreenVisible = boxes.length === 0 ? 0 : Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, drawnFrame(judged, b))));
   const cover = (): TapJudgement | undefined => {
     const over = seen.centreCover;
     if (over === undefined) return undefined;
@@ -962,7 +1042,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   const read = rectIntersection(below, purpose.reads) ?? { ...purpose.reads, width: 0, height: 0 };
   // No sliver: the pixel assert measures a container-cut node on what shows (D5).
   // docs/adr/0012-pixel-assert-residuals-d4-d6.md
-  const { facts } = factsIn(judged, below, read, { sliver: false });
+  const { facts } = factsIn(judged, drawnFrame(judged, below), read, { sliver: false });
   const flush = purpose.glyphs ? cutAtNavigationBar(node, box, bands, scene) : undefined;
   const cover = (): PixelJudgement | undefined => {
     const covers = scene.order.paintsOver(node, read);
@@ -974,7 +1054,11 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   };
   const placed = ((): PixelJudgement | undefined => {
     if (place === 'on') return undefined;
-    if ('off' in place) return { facts, kind: 'offScreen', box: { ...box }, ...(place.off === 'sliver' && { sliver: { ...place.on } }) };
+    if ('off' in place) {
+      const sliver = place.off === 'sliver' && { sliver: { ...place.on } };
+      const scroller = place.off !== 'wholly' && place.scroller !== undefined && { scroller: place.scroller };
+      return { facts, kind: 'offScreen', box: { ...box }, ...sliver, ...scroller };
+    }
     if ('keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
     return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, band: place.band };
   })();

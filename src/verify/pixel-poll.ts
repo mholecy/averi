@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { drawnPart, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { pollTree } from '../ui-tree/read-tree.js';
@@ -504,6 +504,12 @@ async function judgeOver(
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
     case 'offScreen': {
+      if (standing.scroller !== undefined) {
+        // On the screen, but outside what its scroll view draws: what lies there is not the element.
+        const view = nodeText(standing.scroller);
+        const where = standing.sliver === undefined ? `${OUTSIDE_ITS_SCROLL_VIEW} ${view} ${at}` : `${TOO_THIN_IN_ITS_SCROLL_VIEW} ${view} ${at}, drawn ${rectText(standing.sliver)}`;
+        return `${where}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it into view: scroll_until the element first and re-run')}`;
+      }
       const where = standing.sliver === undefined ? `${OFF_THE_SCREEN} ${at}` : `${TOO_THIN_ON_THE_SCREEN} ${at}, on the screen ${rectText(standing.sliver)}`;
       return `${where}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
     }
@@ -548,6 +554,24 @@ export const OFF_THE_SCREEN = 'nothing of the element lies on the screen';
  * head the `assert` tool's description and the troubleshooting reference quote for it (mcp/tools.ts).
  */
 export const TOO_THIN_ON_THE_SCREEN = 'only a sliver of the element lies on the screen, too thin to measure';
+
+/**
+ * The head of the miss for an element on the screen NOTHING of which is drawn there: it lies outside the scroll view
+ * it is listed in, which draws none of it (ui-tree/standing.ts's pixel `offScreen` with its `scroller`, the drawn
+ * frame — a WDA tree's): what the capture shows there is not the element. The words end as
+ * ui-tree/geometry.ts#outsideScrollViewText's begin, the tap's and `scroll_until`'s. Measured: the at-rest SWIFT form's
+ * `payee_street_input` `24,869 354x52`, 5 pt of it on the screen below its form's `0,0 402x780`, passed a colour assert
+ * on the bare background. A sentence names the scroll view after these words; its remedy is the off-screen one. The
+ * one sentence head the `assert` tool's description and the troubleshooting reference quote (mcp/tools.ts).
+ */
+export const OUTSIDE_ITS_SCROLL_VIEW = 'nothing of the element is drawn: it lies outside its scroll view';
+
+/**
+ * The head of the same miss when the scroll view's edge leaves only a sliver of the element drawn, no thicker than the
+ * pixel slack (ui-tree/standing.ts#thinSliver, at the scroll view's edge as at the screen's): the drawn sliver is
+ * quoted. The one sentence head the `assert` tool's description and the troubleshooting reference quote.
+ */
+export const TOO_THIN_IN_ITS_SCROLL_VIEW = 'only a sliver of the element is drawn, too thin to measure: the rest lies outside its scroll view';
 
 /**
  * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it
@@ -653,7 +677,8 @@ export async function pollPixels(
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
     // The keyboard, then the system bands and what of the app is drawn over it — never a measurement.
-    const over = await overElement(adapter, tree, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true });
+    const scene = sceneOf(tree);
+    const over = await overElement(adapter, tree, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, scene });
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
@@ -666,7 +691,8 @@ export async function pollPixels(
     const { shot, measured } = frame;
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
-    const verdict = await measure({ rect, shot, measured });
+    // Measured on the part its scroll views draw — the rect the standing asked what it reads of (the drawn frame).
+    const verdict = await measure({ rect: drawnPart(rect, scene.clips.drawnIn(found[0])) ?? rect, shot, measured });
     // A failure no later round can change leaves the poll at once, as a refused capture does.
     if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;

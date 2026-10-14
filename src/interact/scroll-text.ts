@@ -1,5 +1,5 @@
 import { rectArea, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
-import { drawnOverText, frameText, nodeText, rectText, type Edge } from '../ui-tree/geometry.js';
+import { drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -431,6 +431,8 @@ function notInViewportText(judged: Judged, viewport: Rect): string {
   const { standing, node } = judged;
   if (standing.kind === 'underKeyboard') return `element lies ${underKeyboardText(tapPoint(node), standing.line.y)}`;
   if (standing.facts.visible === 0) {
+    // On the screen, but nothing of it drawn: its scroll view's frame, not the viewport's, is what it lies outside of.
+    if (standing.kind === 'offScreen' && standing.scroller !== undefined) return `element lies ${outsideScrollViewText(standing.scroller)}: nothing of it is drawn`;
     const side = wholePast(node.rect, viewport);
     return `element lies ${side === undefined ? 'outside the viewport' : pastSideText(side, node.clippedOut === side)}`;
   }
