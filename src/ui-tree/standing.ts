@@ -273,11 +273,11 @@ export type TapPurpose = { readonly of: 'tap'; readonly keyboardTop?: KeyboardLi
 /**
  * The pixel assert's purpose (`Scene`'s contract): `reads`, the part of the
  * node's rect its measurement reads, asked of the box the standing judges
- * (`PixelReads`); `glyphs`, whether it reads glyphs (the ocr assert), which a
+ * (`PixelRegionOf`); `glyphs`, whether it reads glyphs (the ocr assert), which a
  * cut at the node's edge garbles where a colour sample of what shows stays
  * true.
  */
-export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelReads; readonly glyphs: boolean; readonly keyboardTop?: KeyboardLine };
+export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelRegionOf; readonly glyphs: boolean; readonly keyboardTop?: KeyboardLine };
 
 /**
  * The part of a node's rect (`rect`) a pixel measurement reads, in tree units, given the box the standing judges in
@@ -287,9 +287,9 @@ export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelReads; r
  * that box is only the tree's largest node), the node's own rect, so nothing is clipped — and so owns the box what
  * the reader reads is clipped to: no caller picks a box of its own.
  */
-export type PixelReads = (rect: Rect, box: Rect) => Rect;
+export type PixelRegionOf = (rect: Rect, box: Rect) => Rect;
 
-/** A pixel purpose with what it reads asked of the box (`PixelReads`): the region judged. */
+/** A pixel purpose with what it reads asked of the box (`PixelRegionOf`): the region judged. */
 type PixelRead = Omit<PixelPurpose, 'reads'> & { readonly reads: Rect };
 
 /** The screen a standing is judged on: the usable screen's boxes and its system bands. */

@@ -1,7 +1,7 @@
 import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects, rectText } from '../ui-tree/geometry.js';
-import { clipThenInset, insetBy, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
+import { clipThenInset, insetBy, pngRegion, type MeasuredFrame, type EdgeBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -69,7 +69,7 @@ export type ColorTheme = 'light' | 'dark';
 export type ColorSampleMode = 'dominant' | 'patches';
 
 /** The frame's bounds (verify/capture.ts) — the sampler's regions carry no clipping of their own. */
-type Region = PngBounds;
+type Region = EdgeBounds;
 
 /** '#RRGGBB(AA)' → '#RRGGBB' uppercase (alpha dropped — see header). */
 export const normalizeHex = (raw: string): string => raw.slice(0, 7).toUpperCase();
@@ -99,8 +99,8 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
  * few pixels past the 12 % line.
  */
 export const colorSampleRect = (rect: Rect, screen: Rect): Rect => {
-  const bounds = (r: Rect): PngBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
-  const asRect = (b: PngBounds): Rect => ({ x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 });
+  const bounds = (r: Rect): EdgeBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
+  const asRect = (b: EdgeBounds): Rect => ({ x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 });
   const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units');
   if (read !== undefined) return asRect(read);
   // Nothing of it on the screen: the rect inset whole; a rect of no area as it is.

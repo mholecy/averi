@@ -947,8 +947,8 @@ async function readTreeWithRetry(
   throw new Error(`UI tree read failed after ${budget.attempts} attempts: ${last ?? 'unknown error'}`);
 }
 
-/** Pixel bounds in the png, half-open. */
-export interface PngBounds {
+/** A rect by its edges, half-open: png pixels (a region landed in the png) or tree units (`clipThenInset`'s `units`). */
+export interface EdgeBounds {
   x0: number;
   y0: number;
   x1: number;
@@ -956,7 +956,7 @@ export interface PngBounds {
 }
 
 /** A rect landed in the png: its bounds, plus how much of it fell outside. */
-export interface PngRegion extends PngBounds {
+export interface PngRegion extends EdgeBounds {
   /** Share of the rect's scaled area that lay off-png before clamping (0 = fully on-png). */
   clipped: number;
 }
@@ -1021,13 +1021,13 @@ export function pngRegion(
  * function with a unit, not two: the clip and the inset's fraction are what the judge and the sampler must share, and
  * only whole pixels need the flooring.
  */
-export function clipThenInset(rect: PngBounds, frame: PngBounds, inset: number, unit: 'pixels' | 'units'): PngBounds | undefined {
+export function clipThenInset(rect: EdgeBounds, frame: EdgeBounds, inset: number, unit: 'pixels' | 'units'): EdgeBounds | undefined {
   const on = clipTo(rect, frame);
   return on === undefined ? undefined : insetBy(on, inset, unit);
 }
 
 /** `rect`'s part inside `frame`; undefined when none is (no width or no height left). */
-function clipTo(rect: PngBounds, frame: PngBounds): PngBounds | undefined {
+function clipTo(rect: EdgeBounds, frame: EdgeBounds): EdgeBounds | undefined {
   const x0 = Math.max(rect.x0, frame.x0);
   const y0 = Math.max(rect.y0, frame.y0);
   const x1 = Math.min(rect.x1, frame.x1);
@@ -1036,7 +1036,7 @@ function clipTo(rect: PngBounds, frame: PngBounds): PngBounds | undefined {
 }
 
 /** `bounds` inset `inset` of its size on each side, in `unit` (`clipThenInset` says how the two differ). */
-export function insetBy(bounds: PngBounds, inset: number, unit: 'pixels' | 'units'): PngBounds {
+export function insetBy(bounds: EdgeBounds, inset: number, unit: 'pixels' | 'units'): EdgeBounds {
   const by = (size: number): number => (unit === 'pixels' ? Math.min(Math.floor(size * inset), Math.floor((size - 1) / 2)) : size * inset);
   const ix = by(bounds.x1 - bounds.x0);
   const iy = by(bounds.y1 - bounds.y0);

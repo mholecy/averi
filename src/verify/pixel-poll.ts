@@ -6,7 +6,7 @@ import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-positio
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { presentedRemedy, sceneOf, type PixelReads, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
+import { presentedRemedy, sceneOf, type PixelRegionOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -166,8 +166,8 @@ interface PixelPollSpec {
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
   unchecked: Exclude<Unchecked, 'geometry'>;
-  /** The part of the element's rect the measurement reads (ui-tree/standing.ts#PixelReads); the whole rect when omitted, as the ocr assert crops it. */
-  reads?: PixelReads;
+  /** The part of the element's rect the measurement reads (ui-tree/standing.ts#PixelRegionOf); the whole rect when omitted, as the ocr assert crops it. */
+  reads?: PixelRegionOf;
   /**
    * The measurement reads glyphs (the ocr assert): an element that may be
    * cut at the navigation bar fails closed, where a colour sample of what
@@ -386,7 +386,7 @@ export async function overElement(
   adapter: Pick<DeviceAdapter, 'viewport' | 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
-  { reads = (rect) => rect, glyphs = false, scene = sceneOf(tree) }: { reads?: PixelReads; glyphs?: boolean; scene?: Scene } = {},
+  { reads = (rect) => rect, glyphs = false, scene = sceneOf(tree) }: { reads?: PixelRegionOf; glyphs?: boolean; scene?: Scene } = {},
 ): Promise<string | undefined> {
   const keyboard = readKeyboard(adapter, tree);
   const frame = await keyboard.overlapping(element.rect, element);
@@ -494,10 +494,10 @@ async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   tree: UiNode,
   element: UiNode,
-  { reads, glyphs, scene, keyboard }: { reads: PixelReads; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, scene, keyboard }: { reads: PixelRegionOf; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
-  // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelReads).
+  // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelRegionOf).
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
   const standing = scene.standing(element, usable, purpose);
