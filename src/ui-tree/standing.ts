@@ -315,6 +315,15 @@ export interface StandingFacts {
  */
 export const underPresented = (facts: StandingFacts): boolean => (facts.presented?.length ?? 0) > 0;
 
+/**
+ * THE remedy for a node `underPresented`, the node named as `what` — `it` in the tap's refusal and `scroll_until`'s
+ * stop (interact/target-text.ts#PRESENTED_OVER), `the element` in the pixel assert's sentence, whose "it" is already
+ * the cover (verify/pixel-poll.ts): close that screen first, since no scroll moves the node out from under it. Here, in
+ * the UI-tree layer both verbs and the pixel assert may import, as system-bar.ts's words are.
+ */
+export const presentedRemedy = (what: 'it' | 'the element'): string =>
+  `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+
 /** Where the node stands for a touch (the tap, the stop), and why: `facts`, and one kind with what its sentence quotes. */
 export type Standing = { readonly facts: StandingFacts } & (
   /** `at`: the point a tap presses — the centre, or (`moved`, the tap's) the centre of the largest uncovered `piece`, `cover` being over the centre, chosen above a keyboard line when one applied. */

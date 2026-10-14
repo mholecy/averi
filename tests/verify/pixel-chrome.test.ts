@@ -454,3 +454,51 @@ describe('the Android navigation band (D7)', () => {
     expect(await over(adapter, pinned, row, colorSampleRect(row.rect))).toMatch(/^the navigation bar is drawn over the element \(element 66,2152 948x68, navigation bar 0,2154 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
   });
 });
+
+/**
+ * A pixel assert's element under a screen presented over its own (a modal's dim, a sheet: ADR 0018) — the remedy the
+ * tap and `scroll_until` say: close that screen first; no `scroll_until … fully: true`, which cannot move it out from under it.
+ */
+describe('the pixel assert under a presented screen (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
+  const IPHONE_ADAPTER = { viewport: async (): Promise<DeviceScreen> => IPHONE };
+  const screens = async () => (await json('wda-ui-snapshot-stacked-layers.json')).screens as Record<string, UiNode>;
+  const named = (tree: UiNode, label: string): UiNode => [...everyNode(tree)].find((x) => x.label === label || x.identifier === label)!;
+
+  it('the Contacts New Contact sheet over the list: a colour assert on a row\'s photo button names the sheet and says to close it first, not to scroll', async () => {
+    const tree = (await screens()).contactsSheet;
+    const photo = named(tree, 'Contact photo for Kate Bell');
+    expect(await over(IPHONE_ADAPTER, tree, photo, colorSampleRect(photo.rect))).toBe(
+      `scrollable (0,62 402x812) is drawn over the element (element ${photo.rect.x},${photo.rect.y} ${photo.rect.width}x${photo.rect.height}) — ` +
+        'the capture would show it, not the element; a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen',
+    );
+  });
+
+  it('the RN modal\'s dimming root over the login screen: the same remedy for lang_sk', async () => {
+    const tree = (await screens()).finportalForgot;
+    const lang = named(tree, 'lang_sk');
+    expect(await over(IPHONE_ADAPTER, tree, lang, colorSampleRect(lang.rect))).toMatch(
+      / is drawn over the element \(element [^)]*\) — the capture would show it, not the element; a screen is presented over the element \(a modal or a sheet\) — close it first; no scroll moves the element out from under that screen$/,
+    );
+  });
+
+  it('under the status bar AND beneath a presented screen: the bar\'s advice, then the presented screen\'s — "and a screen is presented over the element … close it first", never read as the bar', async () => {
+    const PRESENTED = '; and a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen';
+    const sheet = (await screens()).contactsSheet;
+    const top = [...everyNode(sheet)].find((x) => x.rect.x === 0 && x.rect.y === 0 && x.rect.width === 402 && x.rect.height === 156)!;
+    expect(await over(IPHONE_ADAPTER, sheet, top)).toBe(
+      'the status bar is drawn over the element (element 0,0 402x156, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that' +
+        PRESENTED,
+    );
+    const forgot = (await screens()).finportalForgot;
+    const header = [...everyNode(forgot)].find((x) => x.rect.x === 0 && x.rect.y === 0 && x.rect.width === 402 && x.rect.height === 102)!;
+    expect(await over(IPHONE_ADAPTER, forgot, header)).toMatch(new RegExp(`^the status bar is drawn over the element \\(element 0,0 402x102, status bar 0,0 402x62\\) — .*${PRESENTED.replace(/[()]/g, '\\$&')}$`));
+  });
+
+  it('a row of the sheet under another of the sheet\'s own rows keeps the scroll remedy: the screen over it is its own, not one presented over it', async () => {
+    const tree = (await screens()).contactsSheet;
+    const row = named(tree, 'add field');
+    expect(await over(IPHONE_ADAPTER, tree, row)).toBe(
+      'text "add to list" (0,62 286x22) is drawn over the element (element 0,62 330x22) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run',
+    );
+  });
+});

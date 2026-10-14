@@ -297,6 +297,101 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
   });
 });
 
+/**
+ * A non-interactive wrapper laid after the content whose only child is a small control (Android's floating action
+ * button host: Clock's `fab_container` 0,1582 1080x352 holding the 264x264 FAB, about 18 % of it) still counts as drawn
+ * over its whole rect — the tree cannot tell it from a tab bar's host that swallows touches — but the refusal says the
+ * wrapper may only position that child. Small: the child's area at most a quarter of the wrapper's.
+ */
+describe('judgeTap(…).aim() — a wrapper over the target holding one small control', () => {
+  const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
+  /** Clock's Alarm tab as dumped (the 9:00 card collapsed under the FAB host), the host's child `child`. */
+  const clock = (child: UiNode = node({ role: 'button', label: 'Add alarm', identifier: 'fab', rect: rect(408, 1626, 264, 264) })): UiNode =>
+    node({
+      role: 'container',
+      rect: rect(0, 0, 1080, 2220),
+      children: [
+        node({
+          role: 'container',
+          identifier: 'desk_clock_pager_frame',
+          rect: rect(0, 242, 1080, 1692),
+          children: [
+            node({
+              role: 'scrollable',
+              identifier: 'alarm_recycler_view',
+              clipsDescendants: true,
+              rect: rect(0, 242, 1080, 1692),
+              children: [
+                node({
+                  role: 'container',
+                  rect: rect(44, 1533, 992, 367),
+                  children: [
+                    node({ role: 'button', identifier: 'arrow', label: 'Expand 9:00 AM alarm', rect: rect(882, 1533, 110, 132) }),
+                    node({ role: 'text', label: '9:00 AM', rect: rect(88, 1577, 360, 191) }),
+                    node({ role: 'switch', identifier: 'onoff', label: '9:00 AM alarm', rect: rect(849, 1768, 143, 132) }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+        node({ role: 'container', identifier: 'fab_container', rect: rect(0, 1582, 1080, 352), children: [child] }),
+      ],
+    });
+
+  it('Clock\'s chevron beside the FAB: refused naming the host, and the refusal says the host may only position its FAB — tap that when it is the target, otherwise scroll_until the target out of the host\'s band', async () => {
+    expect(said((await judge(clock(), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toBe(
+      'CoveredRefusal: Expand 9:00 AM alarm is under container id:fab_container (0,1582 1080x352) at its centre (937,1599), drawn over it; only a 110x49 part of it shows, under the 65x65 a tap may be moved to — ' +
+        'the wrapper may only position its one child, button "Add alarm" (408,1626 264x264): tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first; nothing was tapped',
+    );
+    expect(said((await judge(clock(), 'onoff', { first: PIXEL })).outcome)).toBe(
+      'CoveredRefusal: onoff is under container id:fab_container (0,1582 1080x352) at its centre (921,1834), drawn over it; nothing of it shows — ' +
+        'the wrapper may only position its one child, button "Add alarm" (408,1626 264x264): tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first; nothing was tapped',
+    );
+  });
+
+  it('small is a quarter of the wrapper at most: a child of 26 % of it gets no hint — scroll_until it first', async () => {
+    // 1080x352 = 380160; a 330x300 child is 99000, 26.0 % of it.
+    const big = node({ role: 'button', label: 'Add alarm', identifier: 'fab', rect: rect(375, 1600, 330, 300) });
+    expect(said((await judge(clock(big), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
+    // …a 320x297 child is 95040, exactly 25 %: the hint.
+    const quarter = node({ role: 'button', label: 'Add alarm', identifier: 'fab', rect: rect(380, 1600, 320, 297) });
+    expect(said((await judge(clock(quarter), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toMatch(/ — the wrapper may only position its one child, button "Add alarm" \(380,1600 320x297\)/);
+  });
+
+  it('a child that is no control (a text) gets no hint', async () => {
+    const label = node({ role: 'text', label: 'Add alarm', rect: rect(408, 1626, 264, 264) });
+    expect(said((await judge(clock(label), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
+  });
+
+  it('a screen presented over the target wins over the hint: the RN modal\'s card made a wrapper of one small button still says close it first', async () => {
+    const tree = structuredClone((JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens.finportalForgot);
+    const modal = find(tree, 'forgot_modal');
+    modal.children = [node({ role: 'button', identifier: 'forgot_send', label: 'Send', rect: rect(32, 317, 80, 40) })];
+    expect(said((await judge(tree, 'login_title', { first: IPHONE })).outcome)).toBe(
+      'CoveredRefusal: login_title is under container id:forgot_modal (16,301 370x220) at its centre (201,303), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
+    );
+  });
+
+  it('a child of no area is no control to point at: no hint', async () => {
+    const empty = node({ role: 'button', label: 'Add alarm', identifier: 'fab', rect: rect(408, 1626, 0, 0) });
+    expect(said((await judge(clock(empty), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
+  });
+
+  it('a tab bar\'s host (several tabs, mp-native\'s Compose host 66,1840 948x248) gets no hint: it may swallow touches — scroll_until it first', async () => {
+    const tab = (i: number, id: string): UiNode => node({ role: 'button', identifier: id, rect: rect(102 + 219 * i, 1876, 219, 176) });
+    const tree = node({
+      role: 'container',
+      rect: rect(0, 0, 1080, 2220),
+      children: [
+        node({ role: 'scrollable', clipsDescendants: true, rect: rect(0, 242, 1080, 1912), children: [node({ role: 'button', identifier: 'row', rect: rect(66, 1900, 948, 132) })] }),
+        node({ role: 'container', rect: rect(66, 1840, 948, 248), children: [tab(0, 'nav.tab_home'), tab(1, 'nav.tab_transactions'), tab(2, 'nav.tab_cards'), tab(3, 'nav.tab_more')] }),
+      ],
+    });
+    expect(said((await judge(tree, 'row', { first: PIXEL })).outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
+  });
+});
+
 describe('the reading\'s line — asked lazily, once', () => {
   it('asked once when a node covers the centre', async () => {
     const { asked } = await judge(sheet(), 'row', { first: PIXEL }, { kb: reading(1380) });

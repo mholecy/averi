@@ -186,6 +186,15 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
     expect(description('tap')).toContain('tap the FAB\'s own button when that is the target, or scroll_until the row out of the host\'s band');
   });
 
+  it('tap and troubleshooting say the refusal names the wrapper\'s one small control, and that a tab bar\'s host gets no such line', () => {
+    const SENTENCE =
+      'When such a wrapper holds one child only, a control of at most a quarter of its area, the refusal says so in place of "scroll_until it first": \'the wrapper may only position its one child, <child>: tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first\'; a wrapper of several children (a tab bar\'s host) gets no such line.';
+    expect(description('tap')).toContain(SENTENCE);
+    expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(
+      'When the wrapper holds one child only, a control of at most a quarter of its area, the refusal ends `… — the wrapper may only position its one child, <child>: tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first` instead; a wrapper of several children (a tab bar\'s host) gets no such line.',
+    );
+  });
+
   it('scroll_until points at it where it fails naming a cover', () => {
     expect(description('scroll_until')).toContain('it fails naming that element (on Android a floating action button\'s full-width host counts as one — see tap)');
   });
@@ -219,6 +228,15 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain('(a host with children: Safari\'s full-screen host of its bottom bar) is no such screen');
     expect(TROUBLESHOOTING).toContain(
       'and so does a modal\'s full-screen dimming view or a sheet\'s scroll view over the screen beneath.',
+    );
+  });
+
+  it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', () => {
+    expect(description('assert')).toContain(
+      'Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen\' (under the status bar too, after the bar\'s own advice).',
+    );
+    expect(TROUBLESHOOTING).toContain(
+      'Under a modal or sheet still up over the element\'s screen the message ends `… a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen` instead (after the status bar\'s own advice, joined by `and`, when the bar lies over it too): close that screen, then assert again.',
     );
   });
 });

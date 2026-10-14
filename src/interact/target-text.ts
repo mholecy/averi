@@ -1,5 +1,6 @@
 import type { Rect, UiNode } from '../adapters/types.js';
 import { rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { presentedRemedy } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -74,9 +75,10 @@ export function cutRemedy(edge: Edge): string {
  * no scroll moves it out from under that screen, so neither "scroll_until it
  * first" nor the pinned-bar "layout defect" is said. One wording for the
  * tap's refusal (tap-judgement.ts) and `scroll_until`'s stop without a swipe
- * (scroll-text.ts, the `presented` outcome).
+ * (scroll-text.ts, the `presented` outcome); its words are
+ * ui-tree/standing.ts#presentedRemedy's, which the pixel assert says too.
  */
-export const PRESENTED_OVER = 'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen';
+export const PRESENTED_OVER = presentedRemedy('it');
 
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts
