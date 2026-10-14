@@ -6,7 +6,7 @@ import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-positio
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { presentedRemedy, sceneOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
+import { presentedRemedy, sceneOf, type PixelReads, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -155,12 +155,12 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  */
 
 /**
- * The part of an element's rect a pixel measurement reads, in tree units, on `screen` (the box the pixel assert judges)
- * — where chrome over the element counts (`overElement`): the colour assert's sample region
- * (color-parity.ts#colorSampleRect: clipped to the screen, then inset, as its sampler reads it); the whole rect for
- * the ocr assert's crop.
+ * The part of an element's rect a pixel measurement reads, asked of the box the standing judges
+ * (ui-tree/standing.ts#PixelReads, which says which box) — where chrome over the element counts (`overElement`): the
+ * colour assert's sample region (color-parity.ts#colorSampleRect: clipped to the box, then inset, as its sampler
+ * reads it); the whole rect for the ocr assert's crop.
  */
-export type Reads = (rect: Rect, screen: Rect) => Rect;
+export type Reads = PixelReads;
 
 interface PixelPollSpec {
   element: ElementSpec;
@@ -504,18 +504,17 @@ async function judgeOver(
   { reads, glyphs, scene, keyboard }: { reads: Reads; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
-  // What the measurement reads, on the box the standing judges (the usable screen's `oriented`, D6): the colour
-  // sample's region clipped to it, then inset — the sampler's own (verify/capture.ts#clipThenInset). Not clipped to
-  // the box of a root of no area (treeScreen's `failsOpen`): that box is the tree's largest node, not the screen.
-  const frame = 'failsOpen' in usable && usable.failsOpen ? element.rect : usable.oriented;
-  const purpose = { of: 'pixel', reads: reads(element.rect, frame), glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
+  // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelReads).
+  const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
   const standing = scene.standing(element, usable, purpose);
   if (standing.kind === 'reachable') return undefined;
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
-    case 'offScreen':
-      return `${OFF_THE_SCREEN} ${at}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
+    case 'offScreen': {
+      const where = standing.sliver === undefined ? OFF_THE_SCREEN : `${TOO_THIN_ON_THE_SCREEN} ${at}, on the screen ${rectText(standing.sliver)}`;
+      return `${standing.sliver === undefined ? `${where} ${at}` : where}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
+    }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
       // screen (ui-tree/draw-order.ts#holderOf's `parent`); the type still lets this kind carry it, and the agreement
@@ -550,6 +549,13 @@ async function judgeOver(
  * (mcp/tools.ts).
  */
 export const OFF_THE_SCREEN = 'nothing of the element lies on the screen';
+
+/**
+ * The head of the same miss when the screen's edge leaves only a sliver of the element no thicker than the pixel
+ * slack (ui-tree/standing.ts#thinSliver): the sliver is quoted, and its remedy is the off-screen one. The one sentence
+ * head the `assert` tool's description and the troubleshooting reference quote for it (mcp/tools.ts).
+ */
+export const TOO_THIN_ON_THE_SCREEN = 'only a sliver of the element lies on the screen, too thin to measure';
 
 /**
  * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it

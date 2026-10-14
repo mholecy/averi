@@ -139,9 +139,11 @@ export interface DrawOrder {
    * of the two layers (`presentedOver`: stacked screens inside one window, outside scrolled content), not of where the
    * node shows, so `exposure`'s `presented`, which judges only what of it shows inside the box, is its in-frame part:
    * a node with nothing in the box has none there. One reader: the standing's remedy (ui-tree/standing.ts#remedied),
-   * which asks it when the frame named no presented surface — so the tap, the pixel assert and `scroll_until`'s stop
-   * (which asks `presentedAt` at its touch-down) tell a target wholly off screen, or wholly under the status bar,
-   * beneath a sheet the same remedy: close that screen first.
+   * which asks it when the frame named no presented surface — so the tap and the pixel assert tell a target wholly
+   * off screen, or wholly under the status bar, beneath a sheet "close that screen first". `scroll_until` stops on it
+   * only where `presentedAt` holds at its stroke's touch-down (or the surface lies over the target in its read's
+   * frame): beneath a dim filling the screen it does, as the others say; beneath an UNDIMMED partial sheet the
+   * touch-down misses, it strokes while they say close it first (ADR 0018's residual 11).
    * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
    */
   presentedOver(node: UiNode): UiNode | undefined;

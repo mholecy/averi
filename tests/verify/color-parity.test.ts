@@ -472,9 +472,10 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
       measured(tree, shot(WHITE)),
     );
     expect(pass).toBe(false);
-    expect(detail).toContain('outside the screenshot');
-    // Recovery step, then the one fail-closed sentence (verify/fail-closed.ts).
-    expect(detail).toMatch(/— scroll it on-screen and re-run; failing closed, color unchecked$/);
+    // The fact the sampler found, and no remedy: where the element lies and what to do is the pixel standing's
+    // decision (ui-tree/standing.ts, its `offScreen` kind, presented first), asked before any capture. The sampler
+    // still meets it when the png's rows round a sliver to nothing, or the element moved between read and capture.
+    expect(detail).toBe('element rect is outside the screenshot (off-screen in this capture; scale 1.000); failing closed, color unchecked');
   });
 
   it('fails closed when the screen width cannot be inferred (never a vacuous pass)', () => {

@@ -56,7 +56,7 @@ async function sweep(androidBand?: number, reads: Reads = (r) => r, androidNavig
     for (const n of everyNode(tree)) {
       if (n === tree || n.ofKeyboard === true || !(n.rect.width * n.rect.height > 0)) continue;
       judged++;
-      const s = scene.standing(n, usable, { of: 'pixel', reads: reads(n.rect, usable.oriented), glyphs: reads === OCR });
+      const s = scene.standing(n, usable, { of: 'pixel', reads, glyphs: reads === OCR });
       if (s.kind !== 'reachable') misses.push(`${name}: ${nodeText(n)} — ${overIt(s)}`);
     }
   }

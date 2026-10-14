@@ -8,6 +8,7 @@ import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
+import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
 const box = (width: number, height: number) => ({ x: 0, y: 0, width, height });
@@ -294,12 +295,15 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
   });
 });
 
-/** The pixel assert's purposes over `n`: the ocr crop (the whole rect, read as glyphs) and the colour sample (inset 12 % a side, verify/color-parity.ts#colorSampleRect). */
-const OCR = (n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: n.rect, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
-const COLOUR = (n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => {
-  const { x, y, width, height } = n.rect;
-  return { of: 'pixel', reads: { x: x + width * 0.12, y: y + height * 0.12, width: width * 0.76, height: height * 0.76 }, glyphs: false, ...(keyboardTop !== undefined && { keyboardTop }) };
-};
+/** The ocr crop's reader: the whole rect. */
+const WHOLE = (r: Rect): Rect => r;
+/**
+ * The pixel assert's purposes over `n`: the ocr crop (the whole rect, read as glyphs) and the colour sample — the
+ * colour assert's own reader, verify/color-parity.ts#colorSampleRect (clipped to the box, then inset 12 % a side),
+ * imported rather than restated, so these rows judge the region the sampler reads.
+ */
+const OCR = (_n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: WHOLE, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
+const COLOUR = (_n: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: colorSampleRect, glyphs: false, ...(keyboardTop !== undefined && { keyboardTop }) });
 /** A non-edge-to-edge app's screen on the Pixel_3a: its window ends at the navigation bar (2154), a list clipping above a pinned bottom bar that ends there too. */
 const PINNED_BOTTOM_BAR = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2154]">
   <node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="list" bounds="[0,66][1080,2000]"><node class="android.widget.TextView" resource-id="row" text="Row" bounds="[0,1900][1080,2000]" /></node>
@@ -370,7 +374,8 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     const row = byId(t, 'swift_payment.form.value_date_select');
     (row as { rect: Rect }).rect = { ...row.rect, y: 539 };
     const purpose = COLOUR(row, idb(589));
-    expect(purpose.of === 'pixel' && purpose.reads.y + purpose.reads.height).toBeLessThan(589);
+    const sample = purpose.reads(row.rect, box(402, 874));
+    expect(sample.y + sample.height).toBeLessThan(589);
     expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false, band: { x: 0, y: 589, width: 402, height: 285 } });
   });
 
@@ -978,13 +983,13 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
   it('the pixel purpose answers a PixelStanding (its band, bar and reach always there, its own cut at a bar); both stops a Standing; the tap a Standing never `clipped`', () => {
     const root = node({ rect: box(402, 874) });
     const scene = sceneOf(root);
-    expectTypeOf(scene.standing(root, undefined, { of: 'pixel', reads: root.rect, glyphs: true })).toEqualTypeOf<PixelStanding>();
+    expectTypeOf(scene.standing(root, undefined, { of: 'pixel', reads: WHOLE, glyphs: true })).toEqualTypeOf<PixelStanding>();
     expectTypeOf(scene.standing(root, undefined, PLAIN)).toEqualTypeOf<Standing>();
     expectTypeOf(scene.standing(root, undefined, FULLY)).toEqualTypeOf<Standing>();
     expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<TapStanding>();
     // The pixel purpose takes the usable screen: a bare standing screen (no `oriented`) is refused.
     // @ts-expect-error
-    void (() => scene.standing(root, { box: root.rect, boxes: [root.rect] }, { of: 'pixel', reads: root.rect, glyphs: true }));
+    void (() => scene.standing(root, { box: root.rect, boxes: [root.rect] }, { of: 'pixel', reads: WHOLE, glyphs: true }));
     expectTypeOf<TapStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
     expectTypeOf<Extract<TapStanding, { kind: 'reachable' }>>().toEqualTypeOf<Extract<Standing, { kind: 'reachable' }>>();
     expectTypeOf<Extract<PixelStanding, { kind: 'cut' }>['bar']>().toEqualTypeOf<{ readonly edge: 'bottom'; readonly top: number }>();
@@ -1192,17 +1197,11 @@ describe('the presented remedy\'s cover — the node a sentence names for a targ
  * place, as before).
  */
 describe('Scene.standing for the pixel assert — off the screen', () => {
-  const COLOUR_OF = (n: UiNode, screen: Rect): PixelPurpose => {
-    const inset = (r: Rect): Rect => ({ x: r.x + r.width * 0.12, y: r.y + r.height * 0.12, width: r.width * 0.76, height: r.height * 0.76 });
-    const x0 = Math.max(n.rect.x, screen.x), y0 = Math.max(n.rect.y, screen.y);
-    const x1 = Math.min(n.rect.x + n.rect.width, screen.x + screen.width), y1 = Math.min(n.rect.y + n.rect.height, screen.y + screen.height);
-    return { of: 'pixel', reads: x1 > x0 && y1 > y0 ? inset({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 }) : inset(n.rect), glyphs: false };
-  };
 
   it('a row wholly below a 402x874 screen: off the screen, its box quoted — for the colour and the ocr reader alike', () => {
     const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 1209, width: 354, height: 52 } });
     const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'scrollable', rect: box(402, 874), children: [row] })] });
-    for (const purpose of [COLOUR_OF(row, box(402, 874)), { of: 'pixel', reads: row.rect, glyphs: true } as const]) {
+    for (const purpose of [COLOUR(row), OCR(row)]) {
       expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'offScreen', box: box(402, 874) });
     }
   });
@@ -1210,13 +1209,13 @@ describe('Scene.standing for the pixel assert — off the screen', () => {
   it('on a root of no area (no device size): the box is the largest node, and a bar laid past it is measured, not judged off the screen', () => {
     const bar = node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 2000, width: 1080, height: 154 } });
     const t = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'container', rect: { x: 0, y: 66, width: 1080, height: 1934 } }), bar] });
-    expect(sceneOf(t).standing(bar, undefined, { of: 'pixel', reads: bar.rect, glyphs: false }).kind).toBe('reachable');
+    expect(sceneOf(t).standing(bar, undefined, { of: 'pixel', reads: WHOLE, glyphs: false }).kind).toBe('reachable');
   });
 
   it('a rect of no area on the screen is judged by its place: a 926x0 row on the navigation bar\'s top edge in a list flush with it is cut there, not off the screen', () => {
     const row = node({ role: 'other', identifier: 'row', rect: { x: 154, y: 2154, width: 926, height: 0 } });
     const list = node({ role: 'scrollable', clipsDescendants: true, rect: { x: 0, y: 737, width: 1080, height: 1417 }, children: [node({ identifier: 'filler', rect: { x: 0, y: 800, width: 1080, height: 100 } }), row] });
     const t = node({ role: 'container', rect: box(1080, 2220), children: [list] });
-    expect(sceneOf(t).standing(row, PIXEL_NAV, { of: 'pixel', reads: row.rect, glyphs: true }).kind).toBe('cut');
+    expect(sceneOf(t).standing(row, PIXEL_NAV, { of: 'pixel', reads: WHOLE, glyphs: true }).kind).toBe('cut');
   });
 });

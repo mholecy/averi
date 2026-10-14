@@ -15,7 +15,7 @@ the target node itself, geometry-free, so a target wholly off the screen or whol
 presented screen is told "close it first" by every verb (residual 8, its amendment); the pixel assert judges an
 element nothing of which it reads lies on the screen off the screen, and a colour assert's region is clipped to the
 screen before it is inset (residual 8, its amendment); an app-drawn strip with no node at a list's bottom is
-residual 10.
+residual 10; an undimmed partial sheet, where `scroll_until` strokes while the tap says close it first, residual 11.
 Supersedes, in one part, ADR 0016's note that a screen-sized dimming node holding the title whole is excused (see
 "What changes" below).
 
@@ -420,8 +420,18 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    (`verify/capture.ts#clipThenInset`): clipped to the screen, then inset — measured, `payee_street_input 24,869
    354x52` beneath the Fees dim was judged on the inset of its unclipped rect (y 875–915, off the screen, nothing over
    it) while the sampler read its 5-pt sliver, the sheet's grey, and a colour assert expecting that grey PASSED; it
-   now fails closed naming the dim, "close it first". Wider by design: a full-screen pass-through layer (residual 1)
-   over an off-screen target now gives "close it first" too; `scroll_until` already stopped there.
+   now fails closed naming the dim, "close it first". The review of that change found the same false PASS a little
+   lower: moved to y 872–873.7 the field's sliver on the screen (2 pt or less) lies within the 2-unit slack, so the
+   dim's overlap was not counted and the sampler read ~6 px rows of the dim. So a sliver of the element on the screen
+   no thicker than PIXEL_OVERLAP_SLACK, on a side the screen's edge cuts, is the off-screen kind's case too ("only a
+   sliver of the element lies on the screen, too thin to measure"), with the same remedy decision; the slack between
+   neighbours is unchanged, and a whole element thinner than it on the screen (a divider) is measured. The sampler's
+   own off-png sentence ("element rect is outside the screenshot") now states the fact only, with no advice: the
+   standing decides the remedy before any capture, and the sampler meets that case only when the png's rows round a
+   sliver to nothing or the element moved between the read and the capture. Wider by design: a full-screen
+   pass-through layer (residual 1) over an off-screen target now gives "close it first" too; `scroll_until` stops
+   there only when its stroke's touch-down lies on that layer's surface — on a dim filling the screen it does; on an
+   undimmed partial sheet it may not (residual 11).
    docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
    docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
 9. **An in-window overlay with no node is not seen** (owner decision Q7 (a), 2026-10-14). mp-native's Account Detail
@@ -444,6 +454,15 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    assert on it measures — the tree gives no evidence of the strip, so averi cannot judge it. iOS reports no bottom
    band to cut; inventing a 34-pt home-indicator band would refuse real taps elsewhere. The same list took no swipes
    there, also app-side. No code change.
+11. **An undimmed partial presented surface: the verbs' words agree, their behaviour does not** (the review of the
+   amendment above, 2026-10-14). A later screen-sized layer holding only a sheet's scroll view over the screen's
+   lower part (`0,500 402x374`), with no dimming view: for a target the sheet does not lie over — wholly above the
+   screen, or at y 20 under the status bar — the tap and the pixel assert say "close it first" (the presented fact
+   judged of the node, Q1 (a)), while `scroll_until` strokes: it stops only on a surface over the target in its
+   read's frame or at its stroke's touch-down (`presentedAt`), and the touch-down misses the sheet — two strokes,
+   then its bound or the stuck sentence. Kept: the stroke lands on the target's own screen, not on the sheet, and
+   no measured tree holds this shape (every measured sheet and popover lays a dim over the whole screen). Pinned by
+   a row of tests/interact/remedy-agreement.test.ts stating the disagreement.
 
 ## Bug notes
 

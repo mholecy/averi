@@ -731,7 +731,10 @@ export function evaluateColorAssert(
   if (got.absent !== undefined) {
     const reason =
       got.absent === 'off-png' ?
-        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)}) — scroll it on-screen and re-run`
+        // The fact found, no remedy: where the element lies and what to do is the pixel standing's to decide
+        // (ui-tree/standing.ts, `offScreen`, presented first), asked before any capture; the sampler meets this only
+        // when the png's rows round a sliver to nothing, or the element moved between the read and the capture.
+        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)})`
       : 'sample region is empty after inset/clamp';
     return { pass: false, detail: failClosed(reason, 'color') };
   }
