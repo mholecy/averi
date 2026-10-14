@@ -1670,6 +1670,17 @@ export function drawOrder(tree: UiNode): DrawOrder {
     return !flatList && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);
   };
 
+  /**
+   * The last node drawn after `node` that `where` keeps, draws for it as a target and is the surface of a screen
+   * presented over its own — `presentedAt` keeps those holding its point, `presentedOver` every one.
+   */
+  const lastPresentedSurface = (node: UiNode, where: (p: Placed) => boolean = () => true): UiNode | undefined => {
+    const places = placesOf(node);
+    if (places.length === 0) return undefined;
+    const about = asTarget(places[0]);
+    return laterThan(places, (p) => where(p) && drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
+  };
+
   const api: DrawOrder = {
     keyboardBandTop: keyboard?.top,
     ofKeyboardBand: (node) => keyboard?.own.has(node) === true,
@@ -1695,18 +1706,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const about = asTarget(places[0]);
       return laterThan(places, (p) => rectIntersection(p.node.rect, region) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
     },
-    presentedAt(node, point) {
-      const places = placesOf(node);
-      if (places.length === 0) return undefined;
-      const about = asTarget(places[0]);
-      return laterThan(places, (p) => containsPoint(p.node.rect, point) && drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
-    },
-    presentedOver(node) {
-      const places = placesOf(node);
-      if (places.length === 0) return undefined;
-      const about = asTarget(places[0]);
-      return laterThan(places, (p) => drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
-    },
+    presentedAt: (node, point) => lastPresentedSurface(node, (p) => containsPoint(p.node.rect, point)),
+    presentedOver: (node) => lastPresentedSurface(node),
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
