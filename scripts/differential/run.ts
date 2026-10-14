@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, realpathSync, symlinkSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,8 +18,8 @@ import type { CallResult, RecordingResult, ToolName } from './differential.js';
  * OLD is a code root, or a git ref checked out (detached) in a temporary
  * worktree under `--worktrees` (default the OS temp dir) with this
  * checkout's node_modules linked in, and removed afterwards. NEW defaults to
- * this checkout. The corpus is split into `--shards` processes (default the
- * CPU count) by tree; each writes its results, and this process merges them
+ * this checkout. The corpus is run by `--shards` processes (default the CPU
+ * count), each taking the next unclaimed tree, costliest first; each writes its results, and this process merges them
  * into `<out>/report.md` (counts, the diffs grouped by what changed) and
  * `<out>/diffs.jsonl` (every differing call, both outcomes). `--all` also
  * writes `<out>/calls.jsonl`: every call, both outcomes.
@@ -51,19 +51,26 @@ interface ShardOutput {
 }
 
 /**
- * The trees shard `i` of `n` runs: the largest first, each to the shard with the least payload so far — a tree's cost
- * grows with its size (every call reads and parses it), and a round-robin split left one shard with the big WDA trees.
- * Deterministic: the corpus is sorted by id and ties go to the lower shard.
+ * The order the shards take trees in: the costliest first, so the run does not end on one shard still busy with a big
+ * tree. The cost is a guess — the payload's size, an Android tree's times four (three device variants, and its frames
+ * are the larger to decode) — and only the order depends on it: which shard runs a tree is decided at run time.
  */
-function shardOf(corpus: Recording[], i: number, n: number): Recording[] {
-  const load = new Array<number>(n).fill(0);
-  const mine: Recording[] = [];
-  for (const r of [...corpus].sort((a, b) => b.payload.length - a.payload.length || (a.id < b.id ? -1 : 1))) {
-    const k = load.indexOf(Math.min(...load));
-    load[k] += r.payload.length;
-    if (k === i) mine.push(r);
+function byCost(corpus: Recording[]): Recording[] {
+  const cost = (r: Recording) => r.payload.length * (r.platform === 'android' ? 4 : 1);
+  return [...corpus].sort((a, b) => cost(b) - cost(a) || (a.id < b.id ? -1 : 1));
+}
+
+/**
+ * Claim a tree for this shard: `mkdir` is atomic, so of the shards that try one name exactly one succeeds. The shards
+ * share no other state; a shard that finds a tree claimed moves on to the next.
+ */
+async function claim(out: string, k: number): Promise<boolean> {
+  try {
+    await mkdir(join(out, 'claims', String(k)), { recursive: false });
+    return true;
+  } catch {
+    return false;
   }
-  return mine;
 }
 
 // --- a shard: one process, the fake device and the virtual clock installed before either side loads ---
@@ -76,14 +83,15 @@ async function shard(): Promise<void> {
   const { loadSide } = await import('./side.js');
   const { compareRecording } = await import('./differential.js');
   const t0 = wallNow();
-  const [i, n] = values.shard!.split('/').map(Number);
+  const [i] = values.shard!.split('/').map(Number);
   const oldSide = await loadSide(values.old!);
   const newSide = await loadSide(values.new!);
   const only = values.only === undefined ? undefined : new RegExp(values.only);
-  const corpus = shardOf((await loadCorpus(values.corpus!)).filter((r) => only === undefined || only.test(r.id)), i, n);
+  const corpus = byCost((await loadCorpus(values.corpus!)).filter((r) => only === undefined || only.test(r.id)));
   const tools = values.tools === undefined ? undefined : new Set(values.tools.split(',') as ToolName[]);
   const results: RecordingResult[] = [];
-  for (const r of corpus) {
+  for (const [k, r] of corpus.entries()) {
+    if (!(await claim(values.out!, k))) continue;
     results.push(await compareRecording(r, oldSide, newSide, { cap: values.cap === undefined ? undefined : Number(values.cap), tools, keepAll: values.all === true }));
   }
   const out: ShardOutput = { results, ms: wallNow() - t0, sleeps: virtualSleeps() };
@@ -128,6 +136,8 @@ async function parent(): Promise<void> {
   const old = codeRoot(values.old, worktrees);
   const shards = Number(values.shards ?? availableParallelism());
   const corpus: Recording[] = await loadCorpus(resolve(values.corpus));
+  await rm(join(out, 'claims'), { recursive: true, force: true });
+  await mkdir(join(out, 'claims'));
   const t0 = Date.now();
   try {
     const pass = ['cap', 'tools', 'only'].flatMap((k) => (values[k as 'cap'] === undefined ? [] : [`--${k}`, values[k as 'cap']!]));

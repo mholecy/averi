@@ -100,8 +100,9 @@ function frame(screen: Screen): Buffer {
   let png = frames.get(key);
   if (png === undefined) {
     const img = new PNG({ width: screen.width, height: screen.height });
-    img.data.fill(0x80);
-    png = PNG.sync.write(img);
+    for (let i = 0; i < img.data.length; i += 4) img.data.set([0x80, 0x80, 0x80, 0xff], i);
+    // 8-bit greyscale: the same #808080 once decoded, a quarter of the bytes to inflate.
+    png = PNG.sync.write(img, { colorType: 0, inputColorType: 6 });
     frames.set(key, png);
   }
   return png;

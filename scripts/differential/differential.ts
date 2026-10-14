@@ -94,11 +94,11 @@ const DEFAULT_SCREEN: Record<Platform, Screen> = { ios: { width: 402, height: 87
 function variantsOf(recording: Recording, snapshot: Snapshot): Variant[] {
   const screen = recording.screen ?? DEFAULT_SCREEN[recording.platform];
   const p = recording.platform;
+  // Half the screen: a frame's decode (pngjs) is most of a pixel assert's cost — a 1080x2220 frame takes ~100 ms — and
+  // scale 0.5 is inside the pixel asserts' plausible range (verify/scale.ts). No verdict here reads a pixel: the frame
+  // is one grey.
+  const frame = { width: Math.round(screen.width / 2), height: Math.round(screen.height / 2) };
   if (p === 'android') {
-    // Half the screen's pixels: a 1080x2220 PNG takes ~100 ms to decode in pngjs and a pixel assert decodes several;
-    // scale 0.5 is inside the pixel asserts' plausible range (verify/scale.ts) and the pixels themselves are never read
-    // for a verdict here (the frame is one grey).
-    const frame = { width: Math.round(screen.width / 2), height: Math.round(screen.height / 2) };
     return [
       { name: 'keyboard hidden', profile: { platform: p, screen, frame, keyboard: 'hidden' }, tools: EVERY },
       { name: 'keyboard shown', profile: { platform: p, screen, frame, keyboard: 'shown' }, tools: EVERY },
@@ -106,13 +106,13 @@ function variantsOf(recording: Recording, snapshot: Snapshot): Variant[] {
     ];
   }
   const out: Variant[] = [
-    { name: 'screen', profile: { platform: p, screen, frame: screen }, tools: EVERY },
-    { name: 'no screen', profile: { platform: p, screen: undefined, frame: screen }, tools: SCREENLESS },
+    { name: 'screen', profile: { platform: p, screen, frame }, tools: EVERY },
+    { name: 'no screen', profile: { platform: p, screen: undefined, frame }, tools: SCREENLESS },
   ];
   if (snapshot.keyboard) {
-    out.push({ name: 'dismiss accessory', profile: { platform: p, screen, frame: screen }, dismiss: [{ accessory: true }], tools: GUARDED });
+    out.push({ name: 'dismiss accessory', profile: { platform: p, screen, frame }, dismiss: [{ accessory: true }], tools: GUARDED });
     if (snapshot.neutral !== undefined) {
-      out.push({ name: `dismiss tap ${snapshot.neutral}`, profile: { platform: p, screen, frame: screen }, dismiss: [{ tap: { text: snapshot.neutral } }], tools: GUARDED });
+      out.push({ name: `dismiss tap ${snapshot.neutral}`, profile: { platform: p, screen, frame }, dismiss: [{ tap: { text: snapshot.neutral } }], tools: GUARDED });
     }
   }
   return out;

@@ -51,9 +51,10 @@ Per tree:
    hidden; keyboard shown (back hides it); no screen (`wm size` fails). The no-screen variant calls `tap` and `assert`
    only, the dismissal variants `tap` only.
 2. **Targets** — `ui_snapshot` on both sides; every node either side's tree lets a selector address: a unique identifier
-   (`id:"…"`), else a unique label (`text:"…"`, label or value; values holding `"` cannot be written in the grammar).
+   (`id:"…"`), else a unique text (`text:"…"`, label or value), else its role with either (`role:… text:"…"`,
+   `role:… id:"…"`); values holding `"` cannot be written in the grammar.
 3. **Calls**, each on both sides with the same arguments, the device and the clock reset before each: per tree
-   `ui_snapshot` and `swipe` up/down; per target `tap`, `scroll_until` down and up, `assert` element / colour / ocr (a
+   `ui_snapshot` and `swipe` up/down; per target `tap`, `scroll_until` down, up and down `fully`, `assert` element / colour / ocr (a
    1 s budget each — a static tree keeps its verdict, a longer budget only adds rounds), `type_text` on a textfield.
    The outcome of a call is the reply (text blocks, image sizes, `isError`) and the device calls it made.
 
@@ -88,8 +89,9 @@ One directory per capture run, one file per tree, and a `manifest.json` (`corpus
   capture's own `screen` and `app` override the run's.
 
 The corpus of real device trees stays out of git. `convert.ts` builds one from the device-check scratch directories
-(`run<N>-ios`, `run<N>-android`: the `ui_snapshot` JSON a device agent saved, raw WDA `/source` bodies, raw dumps),
-the repository's fixtures and the synthetic trees in `synthetic.ts`:
+(`run<N>-ios`, `run<N>-android`: the `ui_snapshot` JSON a device agent saved, raw WDA `/source` bodies, raw dumps, and
+every unfiltered `ui_snapshot` the averi server logged in the run's `session.log`, de-duplicated by content), the
+repository's fixtures and the synthetic trees in `synthetic.ts`. WDA's XML `/source` is not taken: no parser reads it.
 
 ```sh
 node --import tsx scripts/differential/convert.ts --runs <dir of run<N>-* dirs> --repo . --out <corpus dir>
@@ -118,7 +120,7 @@ tool call can express:
 |---|---|---|
 | TAP | yes — `tap` per addressable target, with/without screen, keyboard shown/hidden | nodes no selector can address (duplicate ids and labels); the "sent" sentence and synthetic keyboard lines over trees without one |
 | PIXEL | yes — `assert` colour and ocr per target | turned and wider devices: the tree and the device would disagree, a pairing no device check produced |
-| ROUNDS | yes — `scroll_until` down/up per target | static plays with a corroborated or vetoed cover, `found` pairs, `fully` and band variants: reducer inputs only a live, moving screen produces |
+| ROUNDS | yes — `scroll_until` down, up and down `fully` per target | static plays with a synthetic keyboard cover (corroborated or vetoed), `found` pairs, the band and two-way-screen variants: reducer inputs only a live, moving screen (or a synthetic one) produces; on a static recorded tree a target already in view is found before any stroke |
 | GUARD / PICK | yes for iOS trees with the keyboard in them (`tap` under the dismissal configs) and Android's oracle (hidden, shown, back hides) | the synthetic WDA band added to keyboard-less trees; the oracle's denied/unknown witness |
 | KEYPOS | no | keyboard-position internals; their effect shows in `tap` and `scroll_until` |
 | SEQ | no | the scroll tests' own `round` sequences are unit tests, not trees |
