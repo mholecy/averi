@@ -102,6 +102,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('ui_snapshot')).not.toMatch(/(?<![\d.])3 s\b/);
   });
 
+  it('ui_snapshot: says what WDA\'s `"hidden": true` and a parked cell\'s content mean (adapters/types.ts#UiNode.hidden, adapters/wda-source.ts#parkedIn)', () => {
+    expect(description('ui_snapshot')).toContain('"hidden": true');
+    expect(description('ui_snapshot')).toContain('at its cell\'s rect');
+  });
+
   it('assert: the tree and the pixel assert budgets (ASSERT_TIMEOUT_MS, PIXEL_ASSERT_TIMEOUT_MS)', () => {
     expect(description('assert')).toContain('waits up to 3.25 s (tree asserts) or 12.25 s (color/ocr');
     expect(description('assert')).not.toMatch(/(?<![\d.])(3|12) s\b/);
