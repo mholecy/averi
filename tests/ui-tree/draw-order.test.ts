@@ -1520,7 +1520,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(window(target, layer), target)).toEqual([overlay]);
     });
 
-    it('`presented` lists the presented screen\'s surfaces — a structural leaf filling the screen, labelled or not (UIKit\'s `PopoverDismissRegion` \'dismiss popup\', the dim of a half sheet and of a popover), a scroll view — never a control of the layer (Safari\'s capsule bar, #158) nor a labelled leaf smaller than the screen, whose sentence stays "scroll_until it first"', () => {
+    it('`presented` lists the presented screen\'s surfaces — a structural leaf filling the screen, labelled or not (UIKit\'s `PopoverDismissRegion` \'dismiss popup\', the dim of a half sheet and of a popover), a scroll view — never a control of the layer (Safari\'s capsule bar, #158, or a backdrop button filling the screen) nor a labelled leaf smaller than the screen, whose sentence stays "scroll_until it first"', () => {
       const target = pay();
       const dim = uiNode({ role: 'other', rect: IPHONE });
       const dismissRegion = uiNode({ role: 'container', label: 'dismiss popup', identifier: 'PopoverDismissRegion', rect: rect(-402, -874, 1206, 2622) });
@@ -1529,7 +1529,11 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       const order = (...surface: UiNode[]) => drawOrder(window(target, uiNode({ role: 'container', rect: IPHONE, children: [...surface, card()] }))).exposure(target, IPHONE);
       expect(order(dim)).toMatchObject({ covers: [dim], presented: [dim] });
       expect(order(dismissRegion)).toMatchObject({ covers: [dismissRegion], presented: [dismissRegion] });
+      const namedDim = uiNode({ role: 'other', label: 'Close dialog', rect: IPHONE }); // any label, not UIKit's only: an RN dim given an accessibilityLabel
+      expect(order(namedDim)).toMatchObject({ covers: [namedDim], presented: [namedDim] });
       expect(order(labelledBanner, button)).toMatchObject({ covers: [labelledBanner, button], presented: [] });
+      const backdrop = uiNode({ role: 'button', label: 'Close', rect: IPHONE }); // a control filling the screen (an RN Pressable backdrop): a cover of its own, not a structural leaf
+      expect(order(backdrop)).toMatchObject({ covers: [backdrop], presented: [] });
     });
 
     it('a labelled screen-filling leaf of the target\'s OWN screen is a cover and no presented surface: the exception asks for a later screen stacked over the target\'s', () => {
