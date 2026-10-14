@@ -6,7 +6,7 @@ import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-positio
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { presentedRemedy, sceneOf, type Remedy, type Scene } from '../ui-tree/standing.js';
+import { presentedRemedy, sceneOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -423,17 +423,20 @@ export async function overElement(
  * adapter's sentence on why and where that dismissal is configured
  * (`advice`, `DeviceAdapter.keyboardAdvice`) — no platform fact of this
  * module's. Both come as the reading's `KeyboardRemedy`
- * (ui-tree/soft-keyboard.ts).
+ * (ui-tree/soft-keyboard.ts). The sentence's head is `keyboardCovers`, its
+ * advice `hideKeyboard`.
  */
-function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: KeyboardRemedy): string {
-  return (
-    `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)}) — ` +
-    (dismissal === 'back'
-      ? 'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run'
-      : 'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the screen title, ' +
-        `before this assert, or \`dismissKeyboard: true\` on a fill that leaves it up); ${cannotHide(advice)}`)
-  );
-}
+const keyboardOver = (rect: Rect, keyboard: Rect, remedy: KeyboardRemedy): string => `${keyboardCovers(rect, keyboard)} — ${hideKeyboard(remedy)}`;
+
+/** The head of every miss under the soft keyboard, quoting both rects (`keyboardOver`; idb's band, `judgeOver`). */
+const keyboardCovers = (rect: Rect, keyboard: Rect): string => `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)})`;
+
+/** How to hide the keyboard over the element, by the adapter's dismissal (`keyboardOver`'s doc). */
+const hideKeyboard = ({ dismissal, advice }: KeyboardRemedy): string =>
+  dismissal === 'back'
+    ? 'dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run'
+    : 'hide it first and re-run (in a flow: a tap: step on an element that hides it, such as the screen title, ' +
+      `before this assert, or \`dismissKeyboard: true\` on a fill that leaves it up); ${cannotHide(advice)}`;
 
 /**
  * The element's standing for the pixel assert (ui-tree/standing.ts
@@ -505,17 +508,17 @@ async function judgeOver(
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
     case 'underKeyboard':
-      // The presented arm is unreachable today: idb's band is found in a flat list alone, which holds no presented
-      // screen (ui-tree/draw-order.ts#holderOf's `parent`). The agreement rows
-      // (tests/interact/remedy-agreement.test.ts) pin only its rendering, should either change.
-      return standing.remedy.of === 'presented' ? `the soft keyboard covers the element ${at}, keyboard ${rectText(standing.band)}) — ${PRESENTED_OVER_THE_ELEMENT}` : keyboardOver(element.rect, standing.band, keyboard.remedy);
+      // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
+      // screen (ui-tree/draw-order.ts#holderOf's `parent`); the type still lets this kind carry it, and the agreement
+      // rows (tests/interact/remedy-agreement.test.ts) pin its rendering.
+      return `${keyboardCovers(element.rect, standing.band)} — ${advice(standing.remedy, () => hideKeyboard(keyboard.remedy))}`;
     case 'systemBar': {
       const bar = systemBarName(standing.bar.edge);
       return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(standing.remedy)}`;
     }
     case 'cut': {
       const cut = `the element may be cut at the navigation bar ${at}, navigation bar from y ${standing.bar.top}): it ends on the bar's top edge, as its scroll container ${rectText(standing.container)} does, so the crop may read only what shows of it`;
-      return standing.remedy.of === 'presented' ? `${cut} — ${PRESENTED_OVER_THE_ELEMENT}` : `${cut} — scroll it up: scroll_until the element with \`fully: true\` first and re-run`;
+      return `${cut} — ${advice(standing.remedy, () => 'scroll it up: scroll_until the element with `fully: true` first and re-run')}`;
     }
     case 'covered': {
       const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
@@ -538,6 +541,15 @@ async function judgeOver(
 export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
 
 /**
+ * The pixel assert's advice for a standing's remedy (ui-tree/standing.ts#Remedy) where the sentence names the keyboard
+ * or the navigation bar's cut: beneath a presented screen, that screen's (`PRESENTED_OVER_THE_ELEMENT`); else
+ * `otherwise`, told the remedy's other case. A bar or a cover words its own (`coverRemedy`).
+ */
+function advice<R extends Exclude<Remedy, { readonly of: 'presented' }>>(remedy: Extract<Remedy, { readonly of: 'presented' }> | R, otherwise: (remedy: R) => string): string {
+  return remedy.of === 'presented' ? PRESENTED_OVER_THE_ELEMENT : otherwise(remedy);
+}
+
+/**
  * What to do about a pixel assert's element under chrome (`judgeOver`) — its standing's remedy
  * (ui-tree/standing.ts#Remedy, which decides the case and its precedence), in this verb's words: `scroll` — scroll it
  * clear; `pinned` and `stuck` — that, or, when a scroll may not cure it, assert something in it that lies clear (in
@@ -548,10 +560,10 @@ export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
  * a full-width surface laid to the screen's bottom edge (`footer`, a bottom sheet, whose content above the bar is what
  * to assert); idb's flat-list root (`root`), whose cover is the app's own content laid on its background;
  * `presented` — a screen is presented over the element, which no scroll moves it out from under: close that screen
- * first. `keyboard` is never worded here: a standing under the keyboard is `keyboardOver`'s, and one here throws.
+ * first. `keyboard` is never worded here: a standing under a bar or a cover cannot carry it (`CoverRemedy`).
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
-const coverRemedy = (remedy: Remedy): string => {
+const coverRemedy = (remedy: CoverRemedy): string => {
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   switch (remedy.of) {
     case 'presented':
@@ -563,12 +575,11 @@ const coverRemedy = (remedy: Remedy): string => {
       return `${scroll} — or, if no scroll moves it out from under that, ${CLEAR_CHILD}`;
     case 'scroll':
       return scroll;
-    case 'keyboard':
-      // Only an element under the keyboard's band has this remedy, and `keyboardOver` words it (`judgeOver`): a
-      // keyboard remedy here is a standing this verb does not word — never measured as "nothing over it".
-      throw new Error('pixel assert: a keyboard remedy for an element under a bar or a cover has no sentence');
   }
 };
+
+/** The remedies of an element under a system bar or a cover — what `coverRemedy` words: every case but `keyboard`. */
+type CoverRemedy = Extract<PixelStanding, { readonly kind: 'systemBar' | 'covered' }>['remedy'];
 
 /** The child to assert instead, when a scroll may not cure the element (`coverRemedy`). */
 const CLEAR_CHILD = 'assert something in it that lies clear of that';
