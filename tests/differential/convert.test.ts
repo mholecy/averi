@@ -101,12 +101,12 @@ describe('DeviceRunConverter', () => {
   });
 
   it('keeps a raw payload saved beside its ui_snapshot as two trees: the raw one under its own name, the normalized one as <name>.snapshot.json, never .xml', async () => {
-    const android = join(dir, 'run16-android');
+    const android = join(dir, 'run-a-android');
     await mkdir(android, { recursive: true });
     await writeFile(join(android, 'acct2.xml'), '<?xml version="1.0"?><hierarchy rotation="0"><node bounds="[0,0][1080,2220]"/></hierarchy>');
     await writeFile(join(android, 'acct2.txt'), `#20 (1.1s)\n${JSON.stringify(tree('', { paddedTouchTargets: true }))}`);
     await writeFile(join(android, 'sticky1.txt'), JSON.stringify(tree('only normalized')));
-    const ios = join(dir, 'run16-ios');
+    const ios = join(dir, 'run-a-ios');
     await mkdir(ios, { recursive: true });
     await writeFile(join(ios, 'contacts-list-wda.json'), JSON.stringify({ value: { type: 'Application', label: 'Contacts' }, sessionId: null }));
     await writeFile(join(ios, 'contacts-list-wda.txt'), `#9 (0.5s)\n${JSON.stringify(tree('Contacts'))}`);

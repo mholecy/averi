@@ -273,11 +273,11 @@ export type TapPurpose = { readonly of: 'tap'; readonly keyboardTop?: KeyboardLi
 /**
  * The pixel assert's purpose (`Scene`'s contract): `reads`, the part of the
  * node's rect its measurement reads, asked of the box the standing judges
- * (`PixelReads`); `glyphs`, whether it reads glyphs (the ocr assert), which a
+ * (`PixelRegionOf`); `glyphs`, whether it reads glyphs (the ocr assert), which a
  * cut at the node's edge garbles where a colour sample of what shows stays
  * true.
  */
-export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelReads; readonly glyphs: boolean; readonly keyboardTop?: KeyboardLine };
+export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelRegionOf; readonly glyphs: boolean; readonly keyboardTop?: KeyboardLine };
 
 /**
  * The part of a node's rect (`rect`) a pixel measurement reads, in tree units, given the box the standing judges in
@@ -287,9 +287,9 @@ export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelReads; r
  * that box is only the tree's largest node), the node's own rect, so nothing is clipped — and so owns the box what
  * the reader reads is clipped to: no caller picks a box of its own.
  */
-export type PixelReads = (rect: Rect, box: Rect) => Rect;
+export type PixelRegionOf = (rect: Rect, box: Rect) => Rect;
 
-/** A pixel purpose with what it reads asked of the box (`PixelReads`): the region judged. */
+/** A pixel purpose with what it reads asked of the box (`PixelRegionOf`): the region judged. */
 type PixelRead = Omit<PixelPurpose, 'reads'> & { readonly reads: Rect };
 
 /** The screen a standing is judged on: the usable screen's boxes and its system bands. */
@@ -363,8 +363,8 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  *    under the status bar (wholly inside the band too), off the screen (wholly too), cut, under the soft keyboard or
  *    under another cover beneath that screen alike. No scroll moves it out from under that screen, and hiding a
  *    keyboard leaves it there: close that screen first. Judged of what of it SHOWS alone, a target wholly below the
- *    fold or wholly inside the status band had no covers, so no presented surface, and was told to scroll while
- *    `scroll_until` stopped on the presented screen (the owner's decision: every non-reachable kind takes it).
+ *    fold or wholly inside the status band has no covers, so no presented surface — it would be told to scroll while
+ *    `scroll_until` stops on the presented screen: so every non-reachable kind takes it.
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
  *    dim), else the last presented surface among its covers, else the last drawn over it.
@@ -620,8 +620,8 @@ interface SystemBand<B extends SystemBar = SystemBar> {
   readonly band: Rect;
 }
 
-/** Where the pixel assert's region lies: on the screen, off it (`off`: nothing of what it reads on the box, or — the element's on-screen part — a sliver too thin to measure), in a system band (with the band's rect), or under the band a keyboard line marks. */
-type RegionPlace = 'on' | { readonly off: Rect | undefined } | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
+/** Where the pixel assert's region lies: on the screen, off it (`wholly`: nothing of what it reads on the box; `sliver`: the element's on-screen part, `on`, too thin to measure), in a system band (with the band's rect), or under the band a keyboard line marks. */
+type RegionPlace = 'on' | { readonly off: 'wholly' } | { readonly off: 'sliver'; readonly on: Rect } | { readonly bar: SystemBar; readonly band: Rect } | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /**
  * The screen a touch (the tap, either stop) is judged on: the one handed
@@ -676,7 +676,7 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * that `failsOpen` (a root of no area: the box is only the tree's largest
  * node, as a touch judges every point on the screen there), and never for a
  * rect of no area (a 926x0 row on the navigation bar's top edge is judged
- * by its place, as before); under the band
+ * by its place); under the band
  * `purpose.keyboardTop` marks on `box` when the node's rect meets it at
  * all; else in the status band, then the navigation band, when what it
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
@@ -684,8 +684,8 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  */
 function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
-  if (on === undefined) return { off: undefined };
-  // idb's keyboard band before a thin sliver, as before the system bands (ADR 0010): the element under the band is a
+  if (on === undefined) return { off: 'wholly' };
+  // idb's keyboard band before a thin sliver, as it comes before the system bands (ADR 0010): the element under the band is a
   // keyboard miss, worded as WDA's and Android's reading words it. Nothing wholly off the box meets the band.
   // docs/adr/0010-pixel-assert-keyboard-first.md
   if (keyboardTop !== undefined) {
@@ -693,7 +693,7 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
   }
   const sliver = on === box ? undefined : thinSliver(rect, on, box);
-  if (sliver !== undefined) return { off: sliver };
+  if (sliver !== undefined) return { off: 'sliver', on: sliver };
   return systemBandOver(reads, box, bands) ?? 'on';
 }
 
@@ -701,11 +701,11 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
  * The element's part on `box` when the screen's EDGE leaves what the pixel assert reads (`on`, its part on the box)
  * no thicker than PIXEL_OVERLAP_SLACK on a side the edge cuts — too thin to measure: what a neighbour laid flush may
  * share with the element without counting as over it (geometry.ts#overlapsPastSlack) is the most such a sliver
- * holds, so a cover reaching over it is never judged, and the sampler reads its few rows — measured by the review of
- * the colour assert's region: `payee_street_input` moved to y 872–873.7 beneath the Fees sheet's dim passed on ~6 px
- * rows of the dim, "clipped 96% off-png". The same at the top edge, under the status band, which a sliver no thicker
+ * holds, so a cover reaching over it is never judged, and the sampler reads its few rows — measured:
+ * `payee_street_input` moved to y 872–873.7 beneath the Fees sheet's dim passed on ~6 px rows of the dim, "clipped
+ * 96% off-png". The same at the top edge, under the status band, which a sliver no thicker
  * than the slack does not overlap past it. Only a side the screen's edge cuts: a whole element thinner than the slack
- * on the screen (a 402x1 divider) is measured, as before. Undefined when the sliver is thicker, or nothing is cut.
+ * on the screen (a 402x1 divider) is measured. Undefined when the sliver is thicker, or nothing is cut.
  */
 function thinSliver(rect: Rect, on: Rect, box: Rect): Rect | undefined {
   const shown = rectIntersection(rect, box) ?? on;
@@ -974,7 +974,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   };
   const placed = ((): PixelJudgement | undefined => {
     if (place === 'on') return undefined;
-    if ('off' in place) return { facts, kind: 'offScreen', box: { ...box }, ...(place.off !== undefined && { sliver: { ...place.off } }) };
+    if ('off' in place) return { facts, kind: 'offScreen', box: { ...box }, ...(place.off === 'sliver' && { sliver: { ...place.on } }) };
     if ('keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
     return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, band: place.band };
   })();

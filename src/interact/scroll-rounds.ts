@@ -539,10 +539,11 @@ interface State {
    * coordinates, and above it is the box's width.
    */
   readonly frame: Frame;
-  /** Some round matched the target, and how many rounds read a tree — the absence rule's evidence. */
+  /** Some round matched the target — the absence rule's evidence. */
   readonly everFound: boolean;
+  /** How many rounds' reads returned a tree — the absence rule's evidence too; not `reads.count`, since a failed read is no evidence of absence. */
   readonly treesRead: number;
-  /** Every round's tree read, failed ones included — for the timeout's sentence. */
+  /** Every round's tree read, failed ones included — for the timeout's sentence, where a failed read's time counts. */
   readonly reads: ReadTime;
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   readonly lastCover: Cover | undefined;
@@ -1233,7 +1234,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // The standing's own remedy decides it (ui-tree/standing.ts#Remedy, presented first, whatever the kind) — when the
     // presented surface lies over it IN this read's frame (`facts.presented`). One the standing judged of the node
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
-    // ask, at its touch-down (`presentedTouchDown`): a stroke that misses that screen is sent, as before.
+    // ask, at its touch-down (`presentedTouchDown`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
     if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a

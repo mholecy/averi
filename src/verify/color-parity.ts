@@ -1,7 +1,7 @@
 import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects, rectText } from '../ui-tree/geometry.js';
-import { clipThenInset, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
+import { clipThenInset, insetBy, pngRegion, type MeasuredFrame, type EdgeBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -69,7 +69,7 @@ export type ColorTheme = 'light' | 'dark';
 export type ColorSampleMode = 'dominant' | 'patches';
 
 /** The frame's bounds (verify/capture.ts) — the sampler's regions carry no clipping of their own. */
-type Region = PngBounds;
+type Region = EdgeBounds;
 
 /** '#RRGGBB(AA)' → '#RRGGBB' uppercase (alpha dropped — see header). */
 export const normalizeHex = (raw: string): string => raw.slice(0, 7).toUpperCase();
@@ -97,11 +97,21 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
  * is, so the standing finds nothing of what it reads on the screen (ui-tree/standing.ts, its `offScreen` kind).
  * `patches` reads inside it too, but for a rect under ~60 png px a side, whose corner patches' 9-px squares reach a
  * few pixels past the 12 % line.
+ *
+ * ONE region assumes `screen` times the png scale IS the png: the judge clips to `screen` in units, the sampler to the
+ * png in pixels. It holds for the usable screen's `oriented` box, the device's screen as the png is, and for the
+ * tree's fallback box (usable-screen.ts#treeScreen, no device screen) while the root is the whole screen. It can
+ * diverge, unmeasured on a device, where the box is not the screen: a root of no area fails open (the standing hands
+ * the node's own rect, so nothing is clipped), and a root that is a crowned child window, or a window short of the
+ * bars, clips the judge where the sampler does not.
  */
 export const colorSampleRect = (rect: Rect, screen: Rect): Rect => {
-  const bounds = (r: Rect): PngBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
-  const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units') ?? clipThenInset(bounds(rect), bounds(rect), EDGE_INSET, 'units');
-  return read === undefined ? { ...rect } : { x: read.x0, y: read.y0, width: read.x1 - read.x0, height: read.y1 - read.y0 };
+  const bounds = (r: Rect): EdgeBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
+  const asRect = (b: EdgeBounds): Rect => ({ x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 });
+  const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units');
+  if (read !== undefined) return asRect(read);
+  // Nothing of it on the screen: the rect inset whole; a rect of no area as it is.
+  return rect.width > 0 && rect.height > 0 ? asRect(insetBy(bounds(rect), EDGE_INSET, 'units')) : { ...rect };
 };
 
 /**

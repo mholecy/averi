@@ -947,8 +947,8 @@ async function readTreeWithRetry(
   throw new Error(`UI tree read failed after ${budget.attempts} attempts: ${last ?? 'unknown error'}`);
 }
 
-/** Pixel bounds in the png, half-open. */
-export interface PngBounds {
+/** A rect by its edges, half-open: png pixels (a region landed in the png) or tree units (`clipThenInset`'s `units`). */
+export interface EdgeBounds {
   x0: number;
   y0: number;
   x1: number;
@@ -956,7 +956,7 @@ export interface PngBounds {
 }
 
 /** A rect landed in the png: its bounds, plus how much of it fell outside. */
-export interface PngRegion extends PngBounds {
+export interface PngRegion extends EdgeBounds {
   /** Share of the rect's scaled area that lay off-png before clamping (0 = fully on-png). */
   clipped: number;
 }
@@ -995,19 +995,20 @@ export function pngRegion(
   const y0 = Math.round(rect.y * scale);
   const x1 = Math.round((rect.x + rect.width) * scale);
   const y1 = Math.round((rect.y + rect.height) * scale);
-  const region = clipThenInset({ x0, y0, x1, y1 }, { x0: 0, y0: 0, x1: png.width, y1: png.height }, inset, 'pixels');
-  if (region === undefined) return undefined;
+  const on = clipTo({ x0, y0, x1, y1 }, { x0: 0, y0: 0, x1: png.width, y1: png.height });
+  if (on === undefined) return undefined;
   const full = (x1 - x0) * (y1 - y0);
-  const clipped = full > 0 ? 1.0 - (Math.min(x1, png.width) - Math.max(x0, 0)) * (Math.min(y1, png.height) - Math.max(y0, 0)) / full : 0.0;
-  return { ...region, clipped };
+  const clipped = full > 0 ? 1.0 - (on.x1 - on.x0) * (on.y1 - on.y0) / full : 0.0;
+  return { ...insetBy(on, inset, 'pixels'), clipped };
 }
 
 /**
  * THE region a reader of an element reads: `rect` CLIPPED to `frame` first, then inset `inset` of the clipped size on
- * each side — one function for the colour sampler, which lands it in the png (`pngRegion`, `in: 'pixels'`, the png as
- * the frame), and for the pixel assert's judge of what lies over what the colour assert reads
- * (verify/color-parity.ts#colorSampleRect, `in: 'units'`, the screen judged as the frame), so the two read ONE region.
- * Undefined when nothing of `rect` lies in `frame` (no width or no height left).
+ * each side — the pixel assert's judge of what lies over what the colour assert reads
+ * (verify/color-parity.ts#colorSampleRect, `unit: 'units'`, the screen judged as the frame). The colour sampler
+ * (`pngRegion`, the png as the frame) asks the same two steps apart — `clipTo`, then `insetBy` with `unit: 'pixels'` —
+ * since it also needs the clip alone for its clipped fraction; the judge and the sampler share `clipTo` and `insetBy`,
+ * so the two read ONE region. Undefined when nothing of `rect` lies in `frame` (no width or no height left).
  *
  * Clip, THEN inset, in that order, both of them: a rect running past the screen's edge is sampled on the part that
  * shows. Measured: the SWIFT form's `payee_street_input 24,869 354x52` beneath the Fees sheet's dim, on a 402x874
@@ -1018,15 +1019,27 @@ export function pngRegion(
  *
  * `pixels`: whole pixels — the inset floored, and never more than leaves one pixel (it stops short of the half-size);
  * `units`: tree units, the inset exact. The two differ by the png mapping's rounding only, a fraction of a unit.
+ * `insetBy` takes the unit, not two functions: the inset's fraction is what the judge and the sampler share, and only
+ * whole pixels need the flooring.
  */
-export function clipThenInset(rect: PngBounds, frame: PngBounds, inset: number, unit: 'pixels' | 'units'): PngBounds | undefined {
+export function clipThenInset(rect: EdgeBounds, frame: EdgeBounds, inset: number, unit: 'pixels' | 'units'): EdgeBounds | undefined {
+  const on = clipTo(rect, frame);
+  return on === undefined ? undefined : insetBy(on, inset, unit);
+}
+
+/** `rect`'s part inside `frame`; undefined when none is (no width or no height left). */
+function clipTo(rect: EdgeBounds, frame: EdgeBounds): EdgeBounds | undefined {
   const x0 = Math.max(rect.x0, frame.x0);
   const y0 = Math.max(rect.y0, frame.y0);
   const x1 = Math.min(rect.x1, frame.x1);
   const y1 = Math.min(rect.y1, frame.y1);
-  if (x1 <= x0 || y1 <= y0) return undefined;
+  return x1 <= x0 || y1 <= y0 ? undefined : { x0, y0, x1, y1 };
+}
+
+/** `bounds` inset `inset` of its size on each side, in `unit` (`clipThenInset` says how the two differ). */
+export function insetBy(bounds: EdgeBounds, inset: number, unit: 'pixels' | 'units'): EdgeBounds {
   const by = (size: number): number => (unit === 'pixels' ? Math.min(Math.floor(size * inset), Math.floor((size - 1) / 2)) : size * inset);
-  const ix = by(x1 - x0);
-  const iy = by(y1 - y0);
-  return { x0: x0 + ix, y0: y0 + iy, x1: x1 - ix, y1: y1 - iy };
+  const ix = by(bounds.x1 - bounds.x0);
+  const iy = by(bounds.y1 - bounds.y0);
+  return { x0: bounds.x0 + ix, y0: bounds.y0 + iy, x1: bounds.x1 - ix, y1: bounds.y1 - iy };
 }

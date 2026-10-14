@@ -1194,7 +1194,7 @@ describe('the presented remedy\'s cover — the node a sentence names for a targ
  * The pixel assert's `offScreen` kind — nothing of what it reads on the box judged — and where it is NOT judged: on a
  * root of no area (usable-screen.ts#treeScreen's `failsOpen`: the box is only the tree's largest node, so content
  * past it is measured, as a touch judges every point on the screen there), and for a rect of no area (judged by its
- * place, as before).
+ * place).
  */
 describe('Scene.standing for the pixel assert — off the screen', () => {
 

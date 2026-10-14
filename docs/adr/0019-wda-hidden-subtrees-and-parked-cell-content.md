@@ -90,7 +90,7 @@ in tests/ui-tree/draw-order-hidden.test.ts).
   rect), a pixel assert reads "element rect is outside the screenshot", and a visibility assert reads it where its row
   is. (Since 2026-10-14 the pixel assert's own standing says it first, "nothing of the element lies on the screen …",
   and beneath a presented screen — Contacts' discard popover — the tap and the pixel assert say "close it first": ADR
-  0018, residual 8's amendment "presented judged of the node".)
+  0018's amendment "presented judged of the node".)
 - **The scroll view's shape** (the review's finding): the cell is not laid out — wholly outside the scroll view it lies
   in — and the element sits inside that scroll view, at its parked frame. As first written ("outside its cell" alone),
   content scrolled out SIDEWAYS read as parked: a carousel row's third chip at x 410, past its own horizontal
