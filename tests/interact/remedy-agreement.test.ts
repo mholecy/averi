@@ -7,6 +7,8 @@ import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
 import { PRESENTED_OVER } from '../../src/interact/target-text.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
+import { colorSampleRect } from '../../src/verify/color-parity.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 import { node } from '../helpers/fake.js';
 
@@ -97,6 +99,10 @@ async function tapSaid(tree: UiNode, target: UiNode, { device, usable }: On = ON
 const pixelSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE): Promise<string | undefined> =>
   overElement({ viewport: async () => device, keyboard: undefined, keyboardAdvice: 'ADV' }, tree, target, { glyphs: true });
 
+/** The pixel assert's miss for `target` as a colour assert reads it: the sample rect (verify/color-parity.ts#colorSampleRect). */
+const colourSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE): Promise<string | undefined> =>
+  overElement({ viewport: async () => device, keyboard: undefined, keyboardAdvice: 'ADV' }, tree, target, { reads: colorSampleRect, glyphs: false });
+
 /** scroll_until's outcome for `target`: two reads of the same tree, the status band known. */
 function stopOf(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE) {
   const row: Row = { tree, found: [target], screen: usable };
@@ -134,7 +140,7 @@ describe('one remedy for a target beneath a presented screen — the tap, the pi
         tap: of(scene.standing(target, USABLE, { of: 'tap' })),
         stop: of(scene.standing(target, USABLE, { of: 'stop' })),
         fully: of(scene.standing(target, USABLE, { of: 'fully' })),
-        pixel: of(scene.standing(target, USABLE, { of: 'pixel', reads: target.rect, glyphs: true })),
+        pixel: of(scene.standing(target, USABLE, { of: 'pixel', reads: (r) => r, glyphs: true })),
       }).toEqual({ name, tap: 'presented', stop: 'presented', fully: 'presented', pixel: 'presented' });
     }
   });
@@ -184,7 +190,7 @@ describe('one remedy for a target beneath a presented screen — the tap, the pi
             scene.standing(target, screen, { of: 'tap' }),
             scene.standing(target, screen, { of: 'stop' }),
             scene.standing(target, screen, { of: 'fully' }),
-            scene.standing(target, screen, { of: 'pixel', reads: target.rect, glyphs: true }),
+            scene.standing(target, screen, { of: 'pixel', reads: (r) => r, glyphs: true }),
           ];
           for (const s of standings) {
             if (s.kind === 'reachable' || s.facts.presented === undefined) continue;
@@ -268,6 +274,187 @@ describe('presented first over a cut and over the soft keyboard — each verb\'s
       expect(await pixelSaid(clear.tree, clear.target)).toMatch(/^the soft keyboard covers the element \(element 20,480 362x100, keyboard 0,524 402x350\) — hide it first and re-run/);
     } finally {
       idbLine.value = undefined;
+    }
+  });
+});
+
+/**
+ * A target NOTHING of which lies in the frame a verb judges — wholly below the screen, or wholly inside the status band
+ * — beneath a presented screen: the presented fact is judged of the node itself, geometry-free
+ * (ui-tree/draw-order.ts#DrawOrder.presentedOver, the rule `scroll_until`'s stroke asks at its touch-down less the
+ * point), so the tap, the colour and ocr asserts and `scroll_until` all say "close it first", where the tap said
+ * "scroll_until it first", the bar's advice, and the colour assert "scroll it on-screen".
+ * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
+ */
+describe('a target wholly out of the judged frame beneath a presented screen — presented judged of the node', () => {
+  /** Contacts' discard popover with the keyboard down: the raw /source capture, its `add instant message` row wholly below the screen. */
+  const popover = async (): Promise<UiNode> => parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8'));
+  /** The Fees sheet's tree with `priority_select` (and its label) moved to `24,-20 354x52`, wholly inside the 62-pt status band — as one stroke flung it on the device. */
+  const inStatusBand = (tree: UiNode): { tree: UiNode; target: UiNode } => {
+    let target: UiNode | undefined;
+    const moved = (n: UiNode, dy?: number): UiNode => {
+      const by = dy ?? (n.identifier === 'swift_payment.form.priority_select' ? -20 - n.rect.y : undefined);
+      const out: UiNode = { ...n, rect: by === undefined ? n.rect : { ...n.rect, y: n.rect.y + by }, children: n.children.map((c) => moved(c, by)) };
+      if (n.identifier === 'swift_payment.form.priority_select') target = out;
+      return out;
+    };
+    const copy = moved(tree);
+    return { tree: copy, target: target! };
+  };
+  const cases = async (): Promise<[string, UiNode, UiNode][]> => {
+    const screens = await stacked();
+    const discard = await popover();
+    const band = inStatusBand(screens.swiftFeesSheet);
+    return [
+      ['the SWIFT form beneath the Fees half sheet: bank_country_select 24,1209 354x52, wholly below the screen', screens.swiftFeesSheet, byRect(screens.swiftFeesSheet, { x: 24, y: 1209, width: 354, height: 52 })],
+      ['the New Contact sheet beneath the discard popover\'s dim: its text `add instant message` 20,1306, wholly below the screen', discard, [...everyNode(discard)].find((n) => n.role === 'text' && n.label === 'add instant message')!],
+      ['the SWIFT form beneath the Fees sheet: priority_select at 24,-20 354x52, wholly inside the status band', band.tree, band.target],
+    ];
+  };
+
+  it('every purpose\'s standing carries the presented remedy — the tap, both stops, the ocr and the colour assert', async () => {
+    for (const [name, tree, target] of await cases()) {
+      const scene = sceneOf(tree);
+      const of = (s: { kind: string; remedy?: { of: string } }) => (s.kind === 'reachable' ? 'reachable' : s.remedy?.of);
+      expect({
+        name,
+        tap: of(scene.standing(target, USABLE, { of: 'tap' })),
+        stop: of(scene.standing(target, USABLE, { of: 'stop' })),
+        fully: of(scene.standing(target, USABLE, { of: 'fully' })),
+        ocr: of(scene.standing(target, USABLE, { of: 'pixel', reads: (r) => r, glyphs: true })),
+        colour: of(scene.standing(target, USABLE, { of: 'pixel', reads: colorSampleRect, glyphs: false })),
+      }).toEqual({ name, tap: 'presented', stop: 'presented', fully: 'presented', ocr: 'presented', colour: 'presented' });
+    }
+  });
+
+  it('each verb says "close it first": the tap refuses, the ocr and colour asserts miss, scroll_until stops before any swipe', async () => {
+    for (const [name, tree, target] of await cases()) {
+      expect({ name, tap: (await tapSaid(tree, target)).endsWith(` — ${PRESENTED_OVER}; nothing was tapped`) }).toEqual({ name, tap: true });
+      expect({ name, ocr: (await pixelSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ name, ocr: true });
+      expect({ name, colour: (await colourSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ name, colour: true });
+      for (const direction of ['down', 'up'] as const) {
+        const row: Row = { tree, found: [target], screen: USABLE };
+        const message = failureOf(play({ direction, fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row, row]), 'id:t').message;
+        expect({ name, direction, stop: message.includes(PRESENTED_OVER) && message.includes('stopped before any swipe') }).toEqual({ name, direction, stop: true });
+      }
+    }
+  });
+
+  it('a colour assert on a sliver beneath a presented sheet never measures the sheet: payee_street_input 24,869 354x52, 5 pt of it on the 402x874 screen beneath the Fees dim, misses with "close it first"', async () => {
+    const screens = await stacked();
+    const target = byRect(screens.swiftFeesSheet, { x: 24, y: 869, width: 354, height: 52 });
+    expect(await colourSaid(screens.swiftFeesSheet, target)).toBe(
+      `container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 24,869 354x52) — the capture would show it, not the element; ${PRESENTED_FOR_THE_ELEMENT}`,
+    );
+  });
+
+  it('word for word, wholly below beneath the Fees sheet: the tap, and the colour assert — off the screen, the presented remedy in place of the scroll', async () => {
+    const screens = await stacked();
+    const target = byRect(screens.swiftFeesSheet, { x: 24, y: 1209, width: 354, height: 52 });
+    expect(await tapSaid(screens.swiftFeesSheet, target)).toBe(`id:t is off screen at (201,1235) on a 402x874 screen (rect 24,1209 354x52) — ${PRESENTED_OVER}; nothing was tapped`);
+    expect(await colourSaid(screens.swiftFeesSheet, target)).toBe(`nothing of the element lies on the screen (element 24,1209 354x52, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`);
+  });
+
+  it('…and with nothing presented, the same row below the screen is scrolled to: the tap "scroll_until it first", the colour and ocr asserts "scroll it on-screen"', async () => {
+    const target = node({ role: 'button', identifier: 't', rect: { x: 24, y: 1209, width: 354, height: 52 } });
+    const tree = beneathDim(BOX, [node({ role: 'scrollable', rect: { ...BOX }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 100, width: 354, height: 52 } }), target] })], false);
+    expect(await tapSaid(tree, target)).toBe('id:t is off screen at (201,1235) on a 402x874 screen (rect 24,1209 354x52) — scroll_until it first; nothing was tapped');
+    const OFF = 'nothing of the element lies on the screen (element 24,1209 354x52, screen 0,0 402x874) — scroll it on-screen: scroll_until the element first and re-run';
+    expect(await colourSaid(tree, target)).toBe(OFF);
+    expect(await pixelSaid(tree, target)).toBe(OFF);
+  });
+});
+
+/**
+ * A sliver of the element on the screen no thicker than the pixel slack (geometry.ts#PIXEL_OVERLAP_SLACK, 2 units):
+ * what a neighbour's edge may share without counting as over it is too thin to measure, so the pixel assert fails
+ * closed as for an element off the screen — the same remedy decision, presented first. Measured by the review:
+ * `payee_street_input` moved to y 872–873.7 beneath the Fees dim passed a colour assert on ~6 px rows of the dim
+ * ("clipped 96% off-png"), while the tap on the same tree said close it first.
+ */
+describe('a sliver of the element on the screen thinner than the slack fails closed — never measured', () => {
+  const movedTo = (tree: UiNode, id: string, y: number): { tree: UiNode; target: UiNode } => {
+    let target: UiNode | undefined;
+    const walk = (n: UiNode, dy?: number): UiNode => {
+      const by = dy ?? (n.identifier === id ? y - n.rect.y : undefined);
+      const out: UiNode = { ...n, rect: by === undefined ? n.rect : { ...n.rect, y: n.rect.y + by }, children: n.children.map((c) => walk(c, by)) };
+      if (n.identifier === id) target = out;
+      return out;
+    };
+    const copy = walk(tree);
+    return { tree: copy, target: target! };
+  };
+
+  it('payee_street_input at y 872 beneath the Fees dim: the colour and the ocr assert fail closed with "close it first", word for word', async () => {
+    const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', 872);
+    const said = `only a sliver of the element lies on the screen, too thin to measure (element 24,872 354x52, on the screen 24,872 354x2, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`;
+    expect(await colourSaid(tree, target)).toBe(said);
+    expect(await pixelSaid(tree, target)).toBe(said);
+  });
+
+  it('the slack\'s edge: at y 871, 3 pt on the screen, the sliver is measurable, and the dim over it is named — close it first', async () => {
+    const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', 871);
+    const said = `container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 24,871 354x52) — the capture would show it, not the element; ${PRESENTED_FOR_THE_ELEMENT}`;
+    expect(await colourSaid(tree, target)).toBe(said);
+    expect(await pixelSaid(tree, target)).toBe(said);
+  });
+
+  it('…at y 872.5, 873 and 873.7: the same, never measured', async () => {
+    for (const y of [872.5, 873, 873.7]) {
+      const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', y);
+      for (const said of [await colourSaid(tree, target), await pixelSaid(tree, target)]) {
+        expect({ y, said: said?.startsWith('only a sliver of the element lies on the screen, too thin to measure') && said.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ y, said: true });
+      }
+    }
+  });
+
+  it('…and with nothing presented, the same sliver at the bottom edge, or at the top edge under the status band: scroll it on-screen', async () => {
+    const SCROLL = 'scroll it on-screen: scroll_until the element first and re-run';
+    const bottom = node({ role: 'button', identifier: 't', rect: { x: 24, y: 873, width: 354, height: 52 } });
+    const top = node({ role: 'button', identifier: 't', rect: { x: 24, y: -50, width: 354, height: 51 } });
+    for (const target of [bottom, top]) {
+      const tree = beneathDim(BOX, [node({ role: 'scrollable', rect: { ...BOX }, children: [node({ role: 'button', identifier: 'mid', rect: { x: 24, y: 300, width: 354, height: 52 } }), target] })], false);
+      for (const said of [await colourSaid(tree, target), await pixelSaid(tree, target)]) {
+        expect({ rect: target.rect, said: said?.startsWith('only a sliver of the element lies on the screen, too thin to measure') && said.endsWith(SCROLL) }).toEqual({ rect: target.rect, said: true });
+      }
+    }
+  });
+
+  it('a whole element thinner than the slack lying on the screen is no sliver: a 402x1 divider is measured', async () => {
+    const divider = node({ role: 'other', identifier: 't', rect: { x: 0, y: 400, width: 402, height: 1 } });
+    const tree = beneathDim(BOX, [node({ role: 'scrollable', rect: { ...BOX }, children: [divider] })], false);
+    expect(await colourSaid(tree, divider)).toBeUndefined();
+    expect(await pixelSaid(tree, divider)).toBeUndefined();
+  });
+});
+
+/**
+ * RESIDUAL (ADR 0018 residual 11): beneath an UNDIMMED partial presented surface — a later screen-sized layer holding
+ * only a sheet's scroll view over the screen's lower part, no dimming view — a target the sheet does not lie over
+ * (wholly above the screen, or under the status bar) is told "close it first" by the tap and the pixel assert, which
+ * judge the presented fact of the node (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it
+ * stops only on a surface in its read's frame or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt),
+ * and the touch-down misses the sheet. The verbs' wording agrees (owner Q1 (a)); their behaviour does not, and this
+ * pins it.
+ */
+describe('residual: an undimmed partial sheet — the tap and the pixel assert say close it first, scroll_until strokes', () => {
+  const undimmed = (y: number): { tree: UiNode; target: UiNode } => {
+    const target = node({ role: 'button', identifier: 't', rect: { x: 24, y, width: 354, height: 52 } });
+    const full = (children: UiNode[]) => node({ role: 'container', rect: { ...BOX }, children });
+    const sheet = node({ role: 'scrollable', rect: { x: 0, y: 500, width: 402, height: 374 }, children: [node({ role: 'button', identifier: 'opt', label: 'Option', rect: { x: 20, y: 520, width: 362, height: 50 } })] });
+    const tree = full([full([full([node({ role: 'scrollable', rect: { ...BOX }, children: [node({ role: 'button', identifier: 'mid', rect: { x: 24, y: 300, width: 354, height: 52 } }), target] })]), full([sheet])])]);
+    return { tree, target };
+  };
+
+  it('wholly above the screen (y -300) and under the status bar (y 20): the tap and the colour assert close it first; scroll_until sends a stroke, never stops `presented`', async () => {
+    for (const y of [-300, 20]) {
+      const { tree, target } = undimmed(y);
+      expect({ y, tap: (await tapSaid(tree, target)).endsWith(` — ${PRESENTED_OVER}; nothing was tapped`) }).toEqual({ y, tap: true });
+      expect({ y, colour: (await colourSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ y, colour: true });
+      const row: Row = { tree, found: [target], screen: USABLE };
+      const played = play({ direction: 'up', fully: false, maxSwipes: 2, timeoutMs: 30_000, screen: IPHONE }, [row, row, row]);
+      expect({ y, stroked: played.steps.some((s) => s.do === 'stroke'), stop: played.outcome?.kind }).toMatchObject({ y, stroked: true });
+      expect(played.outcome?.kind).not.toBe('presented');
     }
   });
 });

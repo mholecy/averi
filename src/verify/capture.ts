@@ -26,7 +26,9 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  *   consumer reads the same number and the same sentence (verify/scale.ts
  *   owns the derivation and its wording; this module owns that it runs once);
  * - a rect lands in the png the same way everywhere (`pngRegion`), with the
- *   clipped fraction computed beside it; the inset is the caller's option.
+ *   clipped fraction computed beside it; the inset is the caller's option,
+ *   applied after the clip (`clipThenInset`, which the pixel assert's judge
+ *   reads the colour sample's region with too).
  *
  * What stays with the consumers is their FALLBACK POLICY: the color table
  * fails closed on a bad scale, the text table drops to tree evidence with a
@@ -993,16 +995,38 @@ export function pngRegion(
   const y0 = Math.round(rect.y * scale);
   const x1 = Math.round((rect.x + rect.width) * scale);
   const y1 = Math.round((rect.y + rect.height) * scale);
-  const cx0 = Math.max(x0, 0);
-  const cy0 = Math.max(y0, 0);
-  const cx1 = Math.min(x1, png.width);
-  const cy1 = Math.min(y1, png.height);
-  if (cx1 - cx0 < 1 || cy1 - cy0 < 1) return undefined;
+  const region = clipThenInset({ x0, y0, x1, y1 }, { x0: 0, y0: 0, x1: png.width, y1: png.height }, inset, 'pixels');
+  if (region === undefined) return undefined;
   const full = (x1 - x0) * (y1 - y0);
-  const clipped = full > 0 ? 1.0 - ((cx1 - cx0) * (cy1 - cy0)) / full : 0.0;
-  const iw = cx1 - cx0;
-  const ih = cy1 - cy0;
-  const ix = Math.min(Math.floor(iw * inset), Math.floor((iw - 1) / 2));
-  const iy = Math.min(Math.floor(ih * inset), Math.floor((ih - 1) / 2));
-  return { x0: cx0 + ix, y0: cy0 + iy, x1: cx1 - ix, y1: cy1 - iy, clipped };
+  const clipped = full > 0 ? 1.0 - (Math.min(x1, png.width) - Math.max(x0, 0)) * (Math.min(y1, png.height) - Math.max(y0, 0)) / full : 0.0;
+  return { ...region, clipped };
+}
+
+/**
+ * THE region a reader of an element reads: `rect` CLIPPED to `frame` first, then inset `inset` of the clipped size on
+ * each side — one function for the colour sampler, which lands it in the png (`pngRegion`, `in: 'pixels'`, the png as
+ * the frame), and for the pixel assert's judge of what lies over what the colour assert reads
+ * (verify/color-parity.ts#colorSampleRect, `in: 'units'`, the screen judged as the frame), so the two read ONE region.
+ * Undefined when nothing of `rect` lies in `frame` (no width or no height left).
+ *
+ * Clip, THEN inset, in that order, both of them: a rect running past the screen's edge is sampled on the part that
+ * shows. Measured: the SWIFT form's `payee_street_input 24,869 354x52` beneath the Fees sheet's dim, on a 402x874
+ * screen — the sampler clipped it to the 5-pt sliver above the bottom edge and read the sheet's grey there, while the
+ * judge inset the UNCLIPPED rect (y 875–915, wholly below the screen) and found nothing over it: a colour assert
+ * expecting the sheet's grey passed on the sheet.
+ * docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
+ *
+ * `pixels`: whole pixels — the inset floored, and never more than leaves one pixel (it stops short of the half-size);
+ * `units`: tree units, the inset exact. The two differ by the png mapping's rounding only, a fraction of a unit.
+ */
+export function clipThenInset(rect: PngBounds, frame: PngBounds, inset: number, unit: 'pixels' | 'units'): PngBounds | undefined {
+  const x0 = Math.max(rect.x0, frame.x0);
+  const y0 = Math.max(rect.y0, frame.y0);
+  const x1 = Math.min(rect.x1, frame.x1);
+  const y1 = Math.min(rect.y1, frame.y1);
+  if (x1 <= x0 || y1 <= y0) return undefined;
+  const by = (size: number): number => (unit === 'pixels' ? Math.min(Math.floor(size * inset), Math.floor((size - 1) / 2)) : size * inset);
+  const ix = by(x1 - x0);
+  const iy = by(y1 - y0);
+  return { x0: x0 + ix, y0: y0 + iy, x1: x1 - ix, y1: y1 - iy };
 }

@@ -4,13 +4,13 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
-import { sceneOf, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { sceneOf, type PixelReads as Reads, type PixelStanding } from '../../src/ui-tree/standing.js';
 import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 
 /** What the pixel assert's round says lies over `element` (verify/pixel-poll.ts#overElement), the measurement reading `reads` (its rect when omitted) — with glyphs for the ocr assert. */
-const over = (adapter: Parameters<typeof overElement>[0], tree: UiNode, element: UiNode, reads?: Rect, glyphs = false): Promise<string | undefined> =>
+const over = (adapter: Parameters<typeof overElement>[0], tree: UiNode, element: UiNode, reads?: Reads, glyphs = false): Promise<string | undefined> =>
   overElement(adapter, tree, element, { ...(reads !== undefined && { reads }), glyphs });
 
 const FIXTURES = new URL('../fixtures/', import.meta.url);
@@ -47,7 +47,7 @@ const overIt = (s: PixelStanding): string => {
  * judges in (the usable screen's `oriented` box, else the tree's own): the misses, one line each, `<fixture>:
  * <element> — <what lies over it>`.
  */
-async function sweep(androidBand?: number, reads: (r: Rect) => Rect = (r) => r, androidNavigation?: number): Promise<{ judged: number; misses: string[] }> {
+async function sweep(androidBand?: number, reads: Reads = (r) => r, androidNavigation?: number): Promise<{ judged: number; misses: string[] }> {
   const misses: string[] = [];
   let judged = 0;
   for (const [name, tree, device] of await fixtureTrees(androidBand, androidNavigation)) {
@@ -56,7 +56,7 @@ async function sweep(androidBand?: number, reads: (r: Rect) => Rect = (r) => r, 
     for (const n of everyNode(tree)) {
       if (n === tree || n.ofKeyboard === true || !(n.rect.width * n.rect.height > 0)) continue;
       judged++;
-      const s = scene.standing(n, usable, { of: 'pixel', reads: reads(n.rect), glyphs: reads === OCR });
+      const s = scene.standing(n, usable, { of: 'pixel', reads, glyphs: reads === OCR });
       if (s.kind !== 'reachable') misses.push(`${name}: ${nodeText(n)} — ${overIt(s)}`);
     }
   }
@@ -79,7 +79,7 @@ const coversNamed = (misses: readonly string[]): Record<string, number> => {
  * a touch and hide no pixel — the element's own content listed beside it, a clickable layer, a 2-pt edge. What is
  * left is chrome: CONTINUE, the floating tab bar, Compose's top bar over a scrolled field, the RN debugger banner.
  */
-const OCR = (r: Rect): Rect => r; // the ocr assert reads the whole rect
+const OCR: Reads = (r: Rect): Rect => r; // the ocr assert reads the whole rect
 
 describe('Scene.standing for the pixel assert over every fixture node (round 8)', () => {
   it('the ocr reader (the whole rect): the covers named are chrome only — nothing that takes a touch and hides no pixel', async () => {
@@ -98,12 +98,13 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'text "Create contact" (154,115 407x77)': 2,
       'text "Phone (Mobile)" (176,1871 233x44)': 1,
       'text "Phone (Mobile)" (176,725 233x44)': 1,
+      offScreen: 105, // nothing of the node on the screen (below the fold, or in a scroll view's content above it): no capture shows any of it
     });
     // Every iOS window and screen-sized root reaches into the band: an ocr crop of it would read the clock.
     expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(190);
   });
 
-  it('the colour reader (the rect inset 12 % a side): the same chrome, and a screen-sized root under the content listed over it', async () => {
+  it('the colour reader (the part of the rect on the screen, inset 12 % a side): the same chrome, and a screen-sized root under the content listed over it', async () => {
     const { misses } = await sweep(undefined, colorSampleRect);
     expect(coversNamed(misses)).toEqual({
       'button "Continue to summary" (24,512 354x44, reaching 24,512 354x77)': 1,
@@ -123,8 +124,11 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'container id:nav.tab_cards (540,1876 219x176)': 1,
       'other "More" (830,1926 77x77)': 9,
       'text "Create contact" (154,115 407x77)': 2,
+      offScreen: 105, // the same nodes as the ocr reader's: the sample is clipped to the screen before it is inset, so nothing of it shows exactly when nothing of the rect does
     });
-    expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(24);
+    // Not the filter sheet's dim `PopoverDismissRegion -402,-874 1206x2622` (twice): its sample is the part of it on the
+    // screen inset — y 105–769, clear of the band — the region the sampler reads (verify/capture.ts#clipThenInset).
+    expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(22);
   });
 
   it('the reviewer\'s false covers stay gone for both readers: own content beside the element, a clickable layer, a 2-pt edge', async () => {
@@ -215,8 +219,7 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
     parseIdbDescribeAll(JSON.stringify(rows.map(([type, label, id, x, y, width, height]) => ({ type, AXLabel: label, AXUniqueId: id, AXValue: null, frame: { x, y, width, height } }))));
   const byId = (tree: UiNode, id: string) => [...everyNode(tree)].find((x) => x.identifier === id)!;
   const ANDROID_66: DeviceScreen = { ...PIXEL_3A, statusBand: 66 };
-  const judge = (screen: DeviceScreen, tree: UiNode, element: UiNode, reads?: (r: Rect) => Rect) =>
-    over({ viewport: async () => screen }, tree, element, reads?.(element.rect));
+  const judge = (screen: DeviceScreen, tree: UiNode, element: UiNode, reads?: Reads) => over({ viewport: async () => screen }, tree, element, reads);
 
   it('A — idb: a sheet listed after a card, lying inside its rect, is no content of the card (it says nothing the card says)', async () => {
     const tree = idb([
@@ -373,7 +376,7 @@ describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () =
   const tree = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 0, 1080, 2220), { children: [bar, list] })] });
 
   it('a colour assert on the bar (0,0 1080x220) fails closed on the band, its advice leading with something in it clear of the band', async () => {
-    expect(await over(adapter, tree, bar, colorSampleRect(bar.rect))).toBe(
+    expect(await over(adapter, tree, bar, colorSampleRect)).toBe(
       'the status bar is drawn over the element (element 0,0 1080x220, status bar 0,0 1080x66) — the capture would show it, not the element — ' +
         'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
     );
@@ -381,7 +384,7 @@ describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () =
   });
 
   it('its title, inside the bar and clear of the band, is judged correctly — nothing over it, for colour and ocr alike', async () => {
-    expect(await over(adapter, tree, title, colorSampleRect(title.rect))).toBeUndefined();
+    expect(await over(adapter, tree, title, colorSampleRect)).toBeUndefined();
     expect(await over(adapter, tree, title)).toBeUndefined();
   });
 
@@ -399,7 +402,7 @@ describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () =
     ].map(([type, label, id, x, y, width, height]) => ({ type, AXLabel: label, AXUniqueId: id, AXValue: null, frame: { x, y, width, height } }))));
     const header = [...everyNode(tree)].find((x) => x.identifier === 'header')!;
     // No band here (an app that hides the status bar): the cover alone is judged.
-    expect(await over({ viewport: async () => ({ width: 402, height: 874 }) }, tree, header, colorSampleRect(header.rect))).toBe(
+    expect(await over({ viewport: async () => ({ width: 402, height: 874 }) }, tree, header, colorSampleRect)).toBe(
       'button "Close" (300,120 80x44) is drawn over the element (element 0,0 402x200) — the capture would show it, not the element — ' +
         'assert something in it that lies clear of that (its title, say); no scroll moves an element laid from the screen\'s top edge out from under it',
     );
@@ -437,11 +440,11 @@ describe('the Android navigation band (D7)', () => {
   const settings = n('container', rect(0, 0, 1080, 2220), { children: [n('container', rect(0, 596, 1080, 1558), { identifier: 'list', clipsDescendants: true, children: [n('container', rect(0, 2072, 1080, 82), { children: [title] })] })] });
 
   it('the Settings title flush with the band: an ocr assert fails closed naming the bar and its scroll container — scroll it up; a colour assert measures', async () => {
-    expect(await over(adapter, settings, title, title.rect, true)).toBe(
+    expect(await over(adapter, settings, title, OCR, true)).toBe(
       'the element may be cut at the navigation bar (element 198,2105 428x49, navigation bar from y 2154): it ends on the bar\'s top edge, as its scroll container ' +
         '0,596 1080x1558 does, so the crop may read only what shows of it — scroll it up: scroll_until the element with `fully: true` first and re-run',
     );
-    expect(await over(adapter, settings, title, colorSampleRect(title.rect))).toBeUndefined();
+    expect(await over(adapter, settings, title, colorSampleRect)).toBeUndefined();
   });
 
   it('a row reaching into the band: the bar named with its rect, the remedy a scroll (it lies in a scroll view); pinned in none, the child too', async () => {
@@ -451,7 +454,7 @@ describe('the Android navigation band (D7)', () => {
       'the navigation bar is drawn over the element (element 66,2152 948x68, navigation bar 0,2154 1080x66) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run',
     );
     const pinned = n('container', rect(0, 0, 1080, 2220), { children: [row] });
-    expect(await over(adapter, pinned, row, colorSampleRect(row.rect))).toMatch(/^the navigation bar is drawn over the element \(element 66,2152 948x68, navigation bar 0,2154 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
+    expect(await over(adapter, pinned, row, colorSampleRect)).toMatch(/^the navigation bar is drawn over the element \(element 66,2152 948x68, navigation bar 0,2154 1080x66\) — .* — or, if no scroll moves it out from under that, assert something in it that lies clear of that$/);
   });
 });
 
@@ -467,7 +470,7 @@ describe('the pixel assert under a presented screen (docs/adr/0018-a-later-stack
   it('the Contacts New Contact sheet over the list: a colour assert on a row\'s photo button names the sheet and says to close it first, not to scroll', async () => {
     const tree = (await screens()).contactsSheet;
     const photo = named(tree, 'Contact photo for Kate Bell');
-    expect(await over(IPHONE_ADAPTER, tree, photo, colorSampleRect(photo.rect))).toBe(
+    expect(await over(IPHONE_ADAPTER, tree, photo, colorSampleRect)).toBe(
       `scrollable (0,62 402x812) is drawn over the element (element ${photo.rect.x},${photo.rect.y} ${photo.rect.width}x${photo.rect.height}) — ` +
         'the capture would show it, not the element; a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen',
     );
@@ -476,7 +479,7 @@ describe('the pixel assert under a presented screen (docs/adr/0018-a-later-stack
   it('the RN modal\'s dimming root over the login screen: the same remedy for lang_sk', async () => {
     const tree = (await screens()).finportalForgot;
     const lang = named(tree, 'lang_sk');
-    expect(await over(IPHONE_ADAPTER, tree, lang, colorSampleRect(lang.rect))).toMatch(
+    expect(await over(IPHONE_ADAPTER, tree, lang, colorSampleRect)).toMatch(
       / is drawn over the element \(element [^)]*\) — the capture would show it, not the element; a screen is presented over the element \(a modal or a sheet\) — close it first; no scroll moves the element out from under that screen$/,
     );
   });

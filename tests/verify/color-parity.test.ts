@@ -1,9 +1,10 @@
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
-import { measuredFrameFor, type MeasuredFrame, type RgbaImage } from '../../src/verify/capture.js';
+import { measuredFrameFor, pngRegion, type MeasuredFrame, type RgbaImage } from '../../src/verify/capture.js';
 import { sizeOnlyPng } from '../helpers/fake.js';
 import {
+  colorSampleRect,
   compareColorParity,
   colorParityVerdict,
   contractHasColorAnchors,
@@ -471,9 +472,16 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
       measured(tree, shot(WHITE)),
     );
     expect(pass).toBe(false);
-    expect(detail).toContain('outside the screenshot');
-    // Recovery step, then the one fail-closed sentence (verify/fail-closed.ts).
-    expect(detail).toMatch(/— scroll it on-screen and re-run; failing closed, color unchecked$/);
+    // The fact the sampler found, and no remedy: where the element lies and what to do is the pixel standing's
+    // decision (ui-tree/standing.ts, its `offScreen` kind, presented first), asked before any capture. The sampler
+    // still meets it when the png's rows round a sliver to nothing, or the element moved between read and capture.
+    expect(detail).toBe('element rect is outside the screenshot (off-screen in this capture; scale 1.000); failing closed, color unchecked');
+  });
+
+  it('fails closed on a rect of no area stating that fact — the main way the sampler meets nothing to sample (Android\'s inverted bounds, idb\'s 0x0 node scrolled off), which the pixel standing leaves to it', () => {
+    const { pass, detail } = evaluateColorAssert({ x: 198, y: 297, width: 126, height: 0 }, { expected: WHITE }, measured(tree, shot(WHITE)));
+    expect(pass).toBe(false);
+    expect(detail).toBe('the element has no area (rect 198,297 126x0): collapsed, or a node listed as 0x0 once scrolled off the screen; failing closed, color unchecked');
   });
 
   it('fails closed when the screen width cannot be inferred (never a vacuous pass)', () => {
@@ -676,5 +684,49 @@ describe('validateColorContract — the read-time diagnosis, without a capture',
     const c = contract({ screen: 's', ...json });
     const readTime = thrownBy(() => compareColorParity(c, capturePair(WHITE, WHITE), opts));
     expect(validateColorContract(c, opts)).toEqual([readTime]);
+  });
+});
+
+/**
+ * The colour assert's judge and its sampler read ONE region (verify/capture.ts#clipThenInset): the rect clipped to
+ * the screen, then inset 12 % a side of what is left. Measured: `payee_street_input 24,869 354x52` beneath the Fees
+ * sheet on a 402x874 screen — the sampler read the 5-pt sliver above the bottom edge (the sheet), the judge the inset
+ * of the unclipped rect (y 875–915, below the screen), so nothing was over it and the sheet's grey passed.
+ * docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
+ */
+describe('colorSampleRect — the region the sampler reads, in tree units', () => {
+  const SCREEN = { x: 0, y: 0, width: 402, height: 874 };
+  /** The sampler's region at the iPhone's 3x, back in tree units. */
+  const sampled = (rect: { x: number; y: number; width: number; height: number }) => {
+    const r = pngRegion(rect, 3, { width: 1206, height: 2622 }, 0.12)!;
+    return { x: r.x0 / 3, y: r.y0 / 3, width: (r.x1 - r.x0) / 3, height: (r.y1 - r.y0) / 3 };
+  };
+
+  it('a sliver at the screen\'s bottom edge: the 5-pt part on the screen, inset — the sliver the sampler reads, not the rect below the screen', () => {
+    const got = colorSampleRect({ x: 24, y: 869, width: 354, height: 52 }, SCREEN);
+    expect(got.y).toBeCloseTo(869.6, 6);
+    expect(got.y + got.height).toBeCloseTo(873.4, 6);
+    expect(got.x).toBeCloseTo(66.48, 6);
+    expect(got.width).toBeCloseTo(269.04, 6);
+  });
+
+  it('agrees with the sampler, to the png mapping\'s rounding, wherever the rect lies: inside, across each edge, past a corner', () => {
+    for (const rect of [
+      { x: 24, y: 300, width: 354, height: 52 },
+      { x: 24, y: 869, width: 354, height: 52 },
+      { x: 24, y: -20, width: 354, height: 52 },
+      { x: -100, y: 400, width: 160, height: 40 },
+      { x: 380, y: 860, width: 100, height: 100 },
+      { x: -402, y: -874, width: 1206, height: 2622 },
+    ]) {
+      const judged = colorSampleRect(rect, SCREEN);
+      const read = sampled(rect);
+      for (const k of ['x', 'y', 'width', 'height'] as const) expect({ rect, k, off: Math.abs(judged[k] - read[k]) < 1 }).toEqual({ rect, k, off: true });
+    }
+  });
+
+  it('a rect with nothing on the screen: its inset, off the screen as the rect is — the pixel assert\'s standing judges it off the screen', () => {
+    const got = colorSampleRect({ x: 24, y: 1209, width: 354, height: 52 }, SCREEN);
+    for (const [k, v] of [['x', 66.48], ['y', 1215.24], ['width', 269.04], ['height', 39.52]] as const) expect(got[k]).toBeCloseTo(v, 6);
   });
 });

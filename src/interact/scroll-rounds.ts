@@ -1230,9 +1230,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
     // then, the read above stops as any other. Without a confirm left, stop on this read.
-    // The standing's own remedy decides it (ui-tree/standing.ts#Remedy, presented first, whatever the kind).
+    // The standing's own remedy decides it (ui-tree/standing.ts#Remedy, presented first, whatever the kind) — when the
+    // presented surface lies over it IN this read's frame (`facts.presented`). One the standing judged of the node
+    // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
+    // ask, at its touch-down (`presentedTouchDown`): a stroke that misses that screen is sent, as before.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented') return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the

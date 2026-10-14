@@ -56,6 +56,9 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   'docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md',
   // Untracked in the main checkout; cited by ADR 0018's amendment "No stroke onto a presented screen".
   'docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md',
+  // Untracked in the main checkout; cited by ADR 0018's amendment "presented judged of the node" and capture.ts#clipThenInset.
+  'docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md',
+  'docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>

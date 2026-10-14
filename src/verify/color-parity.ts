@@ -1,7 +1,7 @@
 import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
-import { collectRects } from '../ui-tree/geometry.js';
-import { pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
+import { collectRects, rectText } from '../ui-tree/geometry.js';
+import { clipThenInset, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -88,17 +88,20 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
   pngRegion(rect, scale, img, EDGE_INSET);
 
 /**
- * The part of an element's rect the sampler reads, in tree units: the rect
- * inset EDGE_INSET a side — what the pixel poll judges chrome over for a
- * colour assert (verify/pixel-poll.ts#overElement). The png
- * mapping's rounding is left out (a fraction of a unit). `patches` reads
- * inside it too, but for a rect under ~60 png px a side, whose corner
- * patches' 9-px squares reach a few pixels past the 12 % line.
+ * The part of an element's rect the sampler reads, in tree units: the part of the rect on `screen` (the screen the
+ * pixel assert judges, verify/pixel-poll.ts#judgeOver), inset EDGE_INSET a side of THAT — the sampler's own region
+ * (`sampleRegion`, capture.ts#pngRegion: clipped to the png, then inset), from the same function
+ * (capture.ts#clipThenInset), so the judge of what lies over what the colour assert reads
+ * (verify/pixel-poll.ts#overElement) and the sampler read one region. The png mapping's rounding is left out (a
+ * fraction of a unit). When nothing of the rect lies on `screen`, the rect inset whole — off the screen as the rect
+ * is, so the standing finds nothing of what it reads on the screen (ui-tree/standing.ts, its `offScreen` kind).
+ * `patches` reads inside it too, but for a rect under ~60 png px a side, whose corner patches' 9-px squares reach a
+ * few pixels past the 12 % line.
  */
-export const colorSampleRect = (rect: Rect): Rect => {
-  const dx = rect.width * EDGE_INSET;
-  const dy = rect.height * EDGE_INSET;
-  return { x: rect.x + dx, y: rect.y + dy, width: rect.width - 2 * dx, height: rect.height - 2 * dy };
+export const colorSampleRect = (rect: Rect, screen: Rect): Rect => {
+  const bounds = (r: Rect): PngBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
+  const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units') ?? clipThenInset(bounds(rect), bounds(rect), EDGE_INSET, 'units');
+  return read === undefined ? { ...rect } : { x: read.x0, y: read.y0, width: read.x1 - read.x0, height: read.y1 - read.y0 };
 };
 
 /**
@@ -691,6 +694,12 @@ export function formatColorParity(r: ColorParityResult): string {
 
 // ------------------------------------------------------- the color assert
 
+/**
+ * The head of the colour assert's miss on an element of no area (`evaluateColorAssert`): there is nothing to sample.
+ * The one sentence head the troubleshooting reference quotes.
+ */
+export const NO_AREA = 'the element has no area';
+
 /** Expected fill for a single element — the `color` assert spec's payload. */
 export interface ColorExpectation {
   /** '#RRGGBB' or '#RRGGBBAA' (alpha dropped). Hex only — token names resolve in the superrepo layer. */
@@ -726,9 +735,15 @@ export function evaluateColorAssert(
   const mode: ColorSampleMode = expectation.sample ?? 'dominant';
   const got = sampleFill(png, rect, scale, mode);
   if (got.absent !== undefined) {
+    // The fact found, no remedy: where the element lies and what to do is the pixel standing's to decide
+    // (ui-tree/standing.ts, `offScreen`, presented first), asked before any capture. The standing leaves a rect of NO
+    // AREA to the sampler (it is judged by its place) — the main way the sampler meets nothing to sample: Android's
+    // inverted bounds clamped flat (a Settings row's title `[198,297][324,58]`, `198,297 126x0`), idb's node listed
+    // as 0x0 once scrolled off the screen (`NO_AREA`). Else it meets an off-png rect only when the png's rows round a
+    // sliver to nothing, or the element moved between the read and the capture.
     const reason =
-      got.absent === 'off-png' ?
-        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)}) — scroll it on-screen and re-run`
+      !(rect.width > 0 && rect.height > 0) ? `${NO_AREA} (rect ${rectText(rect)}): collapsed, or a node listed as 0x0 once scrolled off the screen`
+      : got.absent === 'off-png' ? `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)})`
       : 'sample region is empty after inset/clamp';
     return { pass: false, detail: failClosed(reason, 'color') };
   }

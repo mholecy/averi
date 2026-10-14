@@ -23,9 +23,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Six questions, one per caller, read from two columns of `NOT_DRAWN`
+ * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
- * `coversOf` and `presentedAt` read `exposure`'s):
+ * `coversOf`, `presentedAt` and `presentedOver` read `exposure`'s):
  * - `drawnOver(container)` — `scroll_until`'s stroke box
  *   (interact/scroll-read.ts#TreeFacts, swipe.ts#strokeRoom): what is
  *   drawn over the clipping container a stroke goes over?
@@ -55,6 +55,10 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   stroke for a target not judged in the viewport on a surface of a screen
  *   presented over the target's own (`exposure`'s column, then
  *   `presentedSurface`, ADR 0018)?
+ * - `presentedOver(node)` — the standing's remedy
+ *   (ui-tree/standing.ts#remedied): is a screen presented over the
+ *   target's own at all, wherever the target lies — `presentedAt` less the
+ *   point?
  *
  * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -119,13 +123,30 @@ export interface DrawOrder {
    * last such drawn after it (the one on top there), and one that draws for it as a target (`NOT_DRAWN`'s `target`
    * column, as `exposure` asks before it asks `presentedSurface`); undefined when none, or for a node not in this tree.
    * `exposure` cannot answer it for a node outside the box: it judges only what of the node shows, so a target below
-   * the fold has no covers and no presented surface. One reader: `scroll_until`'s stroke
+   * the fold has no covers and no presented surface (`presentedOver` asks the same less the point). One reader:
+   * `scroll_until`'s stroke
    * (interact/scroll-rounds.ts#round), which asks it at the stroke's touch-down for a target it has not judged in the
    * viewport — a stroke that would touch down on such a screen is not sent (it may dismiss the screen, as one closed
    * Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN screen is
    * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before.
    */
   presentedAt(node: UiNode, point: Point): UiNode | undefined;
+  /**
+   * The SURFACE of a screen presented over `node`'s own, judged of the NODE, geometry-free: `presentedAt`'s rule less
+   * its point — the last node drawn after `node` that draws for it as a target (`NOT_DRAWN`'s `target` column) and is a
+   * presented screen's surface (`presentedSurface`, ADR 0018) — wherever `node` lies: below the fold, wholly inside
+   * the status band, cut, covered. Undefined when none, or for a node not in this tree. Being presented over is a fact
+   * of the two layers (`presentedOver`: stacked screens inside one window, outside scrolled content), not of where the
+   * node shows, so `exposure`'s `presented`, which judges only what of it shows inside the box, is its in-frame part:
+   * a node with nothing in the box has none there. One reader: the standing's remedy (ui-tree/standing.ts#remedied),
+   * which asks it when the frame named no presented surface — so the tap and the pixel assert tell a target wholly
+   * off screen, or wholly under the status bar, beneath a sheet "close that screen first". `scroll_until` stops on it
+   * only where `presentedAt` holds at its stroke's touch-down (or the surface lies over the target in its read's
+   * frame): beneath a dim filling the screen it does, as the others say; beneath an UNDIMMED partial sheet the
+   * touch-down misses, it strokes while they say close it first (ADR 0018's residual 11).
+   * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
+   */
+  presentedOver(node: UiNode): UiNode | undefined;
   /**
    * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
    * node after `node`'s subtree (its first place in the tree, as
@@ -1679,6 +1700,12 @@ export function drawOrder(tree: UiNode): DrawOrder {
       if (places.length === 0) return undefined;
       const about = asTarget(places[0]);
       return laterThan(places, (p) => containsPoint(p.node.rect, point) && drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
+    },
+    presentedOver(node) {
+      const places = placesOf(node);
+      if (places.length === 0) return undefined;
+      const about = asTarget(places[0]);
+      return laterThan(places, (p) => drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
     },
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);

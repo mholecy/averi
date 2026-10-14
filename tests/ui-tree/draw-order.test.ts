@@ -26,6 +26,8 @@ const IPHONE_BOX = rect(0, 0, 402, 874);
 /** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
 const STACKED = JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
 /** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now. */
+/** mp-native's SWIFT form pushed over the tab host, the host's hidden tab bar listed after it (ADR 0019): the raw /source capture. */
+const SWIFT_PUSHED = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-swift-form-pushed.json', import.meta.url), 'utf8'));
 const DISCARD_POPOVER_KEYBOARD_DOWN = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8'));
 
 describe('drawnOver — the nodes drawn over a clipping container (the floating tab bar)', () => {
@@ -1653,6 +1655,52 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
     expect(seen.covers).not.toContain(loginScreen);
     expect(seen.presented).toEqual([]);
     expect(order.presentedAt(background, { x: 540, y: 1776 })).toBeUndefined();
+    expect(order.presentedOver(background)).toBeUndefined();
+  });
+});
+
+/**
+ * `presentedOver(node)` — `presentedAt` less the point: the presented screen's surface over the node wherever the node
+ * lies, which the standing's remedy asks when its frame named none (ui-tree/standing.ts#remedied). The same rule, so
+ * the same rows: what draws for the node as a target (the `target` column) and is a presented screen's surface.
+ */
+describe('presentedOver — the presented screen\'s surface over a node, geometry-free (ADR 0018)', () => {
+  const screen = (key: string) => STACKED.screens[key];
+  const find = (tree: UiNode, keep: (n: UiNode) => boolean) => [...everyNode(tree)].find(keep)!;
+
+  it('measured: a cell wholly below the fold beneath Contacts\' discard popover — the last surface drawn, the popover\'s own scroll view (after its dim); a field wholly below beneath the Fees half sheet — the sheet\'s form, drawn last', () => {
+    const popover = DISCARD_POPOVER_KEYBOARD_DOWN;
+    expect(drawOrder(popover).presentedOver(find(popover, (n) => n.role === 'container' && n.label === 'add instant message'))).toMatchObject({ role: 'scrollable', rect: rect(10, 166, 240, 81) });
+    const fees = screen('swiftFeesSheet');
+    expect(drawOrder(fees).presentedOver(find(fees, (n) => n.identifier === 'swift_payment.form.bank_country_select'))).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
+  });
+
+  it('only what draws for the node as a target: Finportal\'s Android login background, under a later layer holding the `login_screen` scroll view the `target` column excuses — none', () => {
+    const PIXEL = rect(0, 0, 1080, 2220);
+    const full = (children: UiNode[], more: Partial<UiNode> = {}) => uiNode({ role: 'container', rect: PIXEL, children, ...more });
+    const background = uiNode({ role: 'other', rect: PIXEL });
+    const card = uiNode({ role: 'container', identifier: 'login_card', rect: rect(44, 476, 992, 1100), children: [uiNode({ role: 'text', label: 'Login', identifier: 'login_title', rect: rect(99, 696, 882, 66) })] });
+    const loginScreen = uiNode({ role: 'scrollable', identifier: 'login_screen', rect: PIXEL, clipsDescendants: true, children: [full([card])] });
+    const layers = full([full([background]), full([full([uiNode({ role: 'scrollable', rect: PIXEL, children: [full([full([loginScreen])])] })])])]);
+    const tree = full([full([full([full([full([layers], { identifier: 'content' })], { identifier: 'action_bar_root' })])])], { paddedTouchTargets: true });
+    expect(drawOrder(tree).presentedOver(background)).toBeUndefined();
+  });
+
+  it('residual, the Fees half sheet\'s hidden twin `PopoverDismissRegion` in the SWIFT form\'s own layer: the real dim, of the same frame, is excused by the target column (`sameFrame`) and never named — the sheet\'s form is', () => {
+    const tree = screen('swiftFeesSheet');
+    const [twin, dim] = [...everyNode(tree)].filter((n) => n.label === 'dismiss popup');
+    const over = drawOrder(tree).presentedOver(twin);
+    expect(over).not.toBe(dim);
+    expect(over).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
+  });
+
+  it('a hidden subtree (ADR 0019) is no presented screen: the SWIFT form pushed over the tab host, the host\'s hidden tab bar listed after the form — none over its rows; and none with no screen presented, nor for a node not in this tree', () => {
+    const pushed = SWIFT_PUSHED;
+    const row = find(pushed, (n) => n.identifier === 'swift_payment.form.payee_country_select');
+    expect(drawOrder(pushed).presentedOver(row)).toBeUndefined();
+    const login = screen('finportalLogin');
+    expect(drawOrder(login).presentedOver(find(login, (n) => n.identifier === 'lang_sk'))).toBeUndefined();
+    expect(drawOrder(login).presentedOver(uiNode({ role: 'button', label: 'elsewhere', rect: rect(0, 1000, 402, 50) }))).toBeUndefined();
   });
 });
 
