@@ -8,8 +8,8 @@ import { everyNode, type UiNode } from './types.js';
  * message, and the nearest one wins.
  *
  * A design-system component may instead give EVERY field and its title one
- * shared identifier (mp-native's SWIFT form, 2026-10-14: `TextFieldWithComponentStyle`
- * on each field and its floating title). Then the text below a field is the
+ * shared identifier (mp-native's SWIFT form: `TextFieldWithComponentStyle` on
+ * each field and its floating title). Then the text below a field is the
  * NEXT field's title. So a same-identifier text that vertically overlaps a
  * same-identifier field (its floating title, or a label reaching into its top,
  * or a placeholder inside it) is a title and never an error, and a field's

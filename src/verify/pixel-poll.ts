@@ -481,9 +481,10 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * content drawn over the root's background.
  *
  * Beneath a screen PRESENTED over the element (ui-tree/standing.ts#underPresented: a modal's dim, a sheet — ADR 0018),
- * no scroll moves it out from under that screen: under a COVER the remedy is `presentedRemedy('the element')` in place
- * of every other (`coverRemedy`'s `presented`); under a system bar the bar's remedy stands and that one follows it,
- * joined by "and".
+ * no scroll moves it out from under that screen: the remedy is `presentedRemedy('the element')` in place of every
+ * other (`coverRemedy`'s `presented`), under a COVER and under a system bar alike — the sentence still names what is
+ * drawn over the element (the cover, or the bar with its band), and only the advice after " — " is the presented
+ * screen's.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  * docs/adr/0011-no-stuck-clause-at-the-bottom-edge.md
  * docs/adr/0012-pixel-assert-residuals-d4-d6.md
@@ -514,10 +515,13 @@ async function judgeOver(
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
       // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
       // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
-      const surface = pinnedSurface(element, screen, usable, scene.clips);
-      // Beneath a screen presented over it too (ADR 0018): that screen's remedy after the bar's, "and" so its "close it first" never reads as the bar.
-      const presented = underPresented(standing.facts) ? `; and ${presentedRemedy('the element')}` : '';
-      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(surface ?? (pinned || fromTop ? 'stuck' : 'scroll'))}${presented}`;
+      // Beneath a screen presented over it too (ADR 0018): that screen's remedy in place of the bar's, as under a
+      // cover — no scroll moves it out from under that screen, so no scroll advice; the bar stays named as what is
+      // drawn over it.
+      const fixedKind = underPresented(standing.facts)
+        ? 'presented'
+        : pinnedSurface(element, screen, usable, scene.clips);
+      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(fixedKind ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
     }
     case 'cut':
       return (
@@ -528,8 +532,8 @@ async function judgeOver(
       const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
       const named = `${nodeText(standing.cover).slice(0, -1)}${reach})`;
       // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps, whatever else it is — close that screen first.
-      const root = underPresented(standing.facts) ? 'presented' : standing.overRoot === true ? 'root' : never;
-      return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, standing.reach) ? 'stuck' : 'scroll'))}`;
+      const fixedKind = underPresented(standing.facts) ? 'presented' : standing.overRoot === true ? 'root' : never;
+      return `${named} is drawn over the element ${at}) — ${coverRemedy(fixedKind ?? (pinned || rectWithin(element.rect, standing.reach) ? 'stuck' : 'scroll'))}`;
     }
     default: {
       // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).

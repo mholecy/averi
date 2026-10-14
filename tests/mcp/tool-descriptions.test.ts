@@ -179,11 +179,17 @@ describe('tool descriptions on idb\'s keyboard band', () => {
  * with no identifier holding only empty frames.
  */
 describe('tool descriptions on a wrapper counted as a cover', () => {
-  it('tap says when a wrapper with children covers, and what to do beside a FAB', () => {
+  it('tap says when a wrapper with children covers, and that a FAB\'s host can be refused — what to do said once, in the refusal\'s quoted hint', () => {
     expect(description('tap')).toContain(
       'A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over all of its rect, unless, among others, it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames —',
     );
-    expect(description('tap')).toContain('tap the FAB\'s own button when that is the target, or scroll_until the row out of the host\'s band');
+    expect(description('tap')).toContain(
+      'a target beside or under such a FAB can be refused naming the container. When such a wrapper holds one child only, a control of at most a quarter of its area, the refusal says so',
+    );
+    expect(description('tap')).not.toContain('tap the FAB\'s own button');
+    const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+    expect(troubleshooting).toContain('and a `color`/`ocr` assert there fails closed on it. When the wrapper holds one child only');
+    expect(troubleshooting).not.toContain('Tap the FAB\'s own button');
   });
 
   it('tap and troubleshooting say the refusal names the wrapper\'s one small control, and that a tab bar\'s host gets no such line', () => {
@@ -233,10 +239,10 @@ describe('tool descriptions on a screen presented over the target', () => {
 
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', () => {
     expect(description('assert')).toContain(
-      'Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen\' (under the status bar too, after the bar\'s own advice).',
+      'Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen\' (under the status bar too, in place of the bar\'s own advice).',
     );
     expect(TROUBLESHOOTING).toContain(
-      'Under a modal or sheet still up over the element\'s screen the message ends `… a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen` instead (after the status bar\'s own advice, joined by `and`, when the bar lies over it too): close that screen, then assert again.',
+      'Under a modal or sheet still up over the element\'s screen the message ends `… a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen` instead, under the status bar too (the message still names the bar, and this replaces the bar\'s own advice): close that screen, then assert again.',
     );
   });
 });

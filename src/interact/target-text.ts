@@ -14,9 +14,11 @@ import { SIDES } from './swipe.js';
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
  * caller's switch — and the remedy for a target under a screen presented
  * over its own (`PRESENTED_OVER`), whose test is
- * ui-tree/standing.ts#underPresented. Shallow by design, like
- * ui-tree/system-bar.ts: delete it and each shared sentence reappears in
- * its two or three callers.
+ * ui-tree/standing.ts#underPresented and whose words live in
+ * ui-tree/standing.ts#presentedRemedy (the pixel assert says them too, of
+ * "the element"; this module names them for a target, "it"). Shallow by
+ * design, like ui-tree/system-bar.ts: delete it and each shared sentence
+ * reappears in its two or three callers.
  *
  * Its words for a side come from one other interact/ module: swipe.ts#SIDES
  * — `past` and `lies` (where a node past a side lies) and `reveals` (the

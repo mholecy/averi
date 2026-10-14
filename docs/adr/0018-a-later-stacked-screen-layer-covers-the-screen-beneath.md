@@ -189,9 +189,13 @@ sheet and the popover) stopped `presented` already and now name the dim on top a
 form. SEQ: the two new scroll rows only.
 
 The PIXEL 0 above is measured against d407256, before the colour/ocr assert's presented remedy of the same day. With
-that remedy, a pixel assert's refusal on these three trees also reads "a screen is presented over the element … close
-it first", its verdict unchanged: on the merged round branch the review measured 1 405 unique pixel sentences changed,
-24 of them where the remedy joins the status-bar clause ("; and …").
+that remedy, a pixel assert's refusal under a presented screen — on these three trees and on every other tree with
+one — reads "… — the capture would show it, not the element; a screen is presented over the element (a modal or a
+sheet) — close it first; no scroll moves the element out from under that screen", under the status bar too (the bar
+named, its own advice replaced). Measured with the PIXEL section (OLD = d407256, NEW = the round's code-review fixes,
+the same 213 trees): every changed sentence (13 753 cases, on ten trees, each with a presented screen) keeps its
+text before " — " — what is drawn over the element — and changes only its remedy, and no verdict changed (no
+refusal became a measurement or the reverse).
 
 ## Residuals accepted
 
