@@ -465,7 +465,7 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
     expect(asked).toContain('standing');
     expect(walks).toBe(0);
   });
-  it("a centre under the navigation bar: the remedy's scroll view is the look's scene's (its standing decides the remedy), no scene walked", async () => {
+  it("a centre under the navigation bar: refused with the remedy the look's scene's standing carries (in no scroll view) — judgeTap asks the scene's standing, not its clips, and walks no scene", async () => {
     const tree = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'button', label: 'Pay', identifier: 'pay', rect: { x: 0, y: 2160, width: 1080, height: 60 } })] });
     const { scene, asked } = spyScene(tree);
     const { adapter } = viewport(PIXEL);
@@ -475,6 +475,7 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
     expect(refused).toBeInstanceOf(OffScreenRefusal);
     expect(asked).toContain('standing');
     expect((refused as Error).message).toContain('it lies in no scroll view');
+    expect(asked).not.toContain('clips');
     expect(walks.n).toBe(0);
   });
 });
