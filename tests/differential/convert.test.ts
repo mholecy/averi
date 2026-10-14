@@ -32,7 +32,7 @@ describe('classify', () => {
     ['WDA\'s XML /source', '<?xml version="1.0" encoding="UTF-8"?><XCUIElementTypeApplication/>', 'ios', ['skip', 'WDA XML source: no parser reads that format']],
     ['WDA\'s XML /source in its JSON envelope', '{\n  "value" : "<?xml version=\\"1.0\\"?><XCUIElementTypeApplication/>"\n}', 'ios', ['skip', 'WDA XML source: no parser reads that format']],
     ['a flattened text listing', "button id=None lab='add address' val='' 20,969 362x51", 'ios', ['skip', 'not a tree (no JSON in it: a text listing or a log)'], 'a.txt'],
-    ['a .json that holds no tree (a tool listing)', '#1 (0.0s)\n## list_devices\n{"type":"object"}', 'ios', ['skip', 'not a tree'], 'tools.json'],
+    ['a .json that holds no tree (a tool listing)', '#1 (0.0s)\n## list_devices\n{"type":"object"}\n\n## tap\n{"type":"object"}', 'ios', ['skip', 'not a tree'], 'tools.json'],
   ] as const)('%s', (_name, text, platform, want, file?: string) => {
     const c = classify(text, platform, file);
     expect(c.kind === 'capture' ? [c.kind, c.source, c.form] : [c.kind, c.reason]).toEqual(want);

@@ -58,6 +58,10 @@ describe('compareRecording', () => {
     expect(one.new.reply.split('\n')[0]).toBe('All 1 asserts passed');
     expect(verdicts.filter(([pass]) => pass).every(([, what]) => what === 'own colour')).toBe(true);
     expect(new Set(colour.map((r) => (r.call.args.asserts as { color: { expected: string } }[])[0].color.expected)).size).toBe(colour.length);
+    // The costly variants' targets are spread (`spread`): none of them paints 90 % of its frame.
+    const costly = result.all!.filter((r) => r.variant === 'real scale' && r.call.paint !== undefined);
+    expect(costly.length).toBe(3);
+    for (const r of costly) expect(r.call.paint!.rect.width * r.call.paint!.rect.height).toBeLessThan(0.9 * 1206 * 2622);
   });
 
   it('a NEW whose WDA parser moves one node off the screen: the snapshot differs, and every call that targets that node, and nothing else', async () => {
