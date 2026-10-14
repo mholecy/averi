@@ -545,7 +545,7 @@ export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
  * a full-width surface laid to the screen's bottom edge (`footer`, a bottom sheet, whose content above the bar is what
  * to assert); idb's flat-list root (`root`), whose cover is the app's own content laid on its background;
  * `presented` — a screen is presented over the element, which no scroll moves it out from under: close that screen
- * first; `keyboard` — the soft keyboard's band (a standing under the keyboard is worded by `keyboardOver`, never here).
+ * first. `keyboard` is never worded here: a standing under the keyboard is `keyboardOver`'s, and one here throws.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
 const coverRemedy = (remedy: Remedy): string => {
@@ -561,8 +561,9 @@ const coverRemedy = (remedy: Remedy): string => {
     case 'scroll':
       return scroll;
     case 'keyboard':
-      // Never asked: only an element under the keyboard's band has this remedy, and `keyboardOver` words it.
-      return scroll;
+      // Only an element under the keyboard's band has this remedy, and `keyboardOver` words it (`judgeOver`): a
+      // keyboard remedy here is a standing this verb does not word — never measured as "nothing over it".
+      throw new Error('pixel assert: a keyboard remedy for an element under a bar or a cover has no sentence');
   }
 };
 

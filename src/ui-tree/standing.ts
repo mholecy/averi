@@ -351,11 +351,14 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  *    standing's `cut.edge`), under a cover over its centre (the touch purposes: the tap may refine it, its
  *    positioner hint, interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
  *
- * Why one precedence, presented first: each verb used to derive the remedy from the kind with its own order — the
- * tap asked for a presented screen only under a cover, the pixel assert under a cover and a bar, `scroll_until` under
- * any kind — so one target under the status bar beneath a modal's dim was told "scroll_until it first" by the tap,
- * "close it first" by the pixel assert, and the stop stopped `presented`. A target off the screen beneath a sheet was
- * told "scroll_until it with fully: true first" by the tap, which `scroll_until` then refused.
+ * One precedence for every verb: the same target is told the same remedy by the tap, the pixel assert and
+ * `scroll_until`'s stop.
+ *
+ * What comes before any standing, so before this precedence: the pixel assert asks its keyboard READING first
+ * (verify/pixel-poll.ts#overElement, `overlapping`: the oracle's band, or WDA's in-tree band), and an element that
+ * reading finds under the keyboard is a keyboard miss whatever is presented over it — the standing is never asked
+ * (docs/adr/0010-pixel-assert-keyboard-first.md). Only idb's band, a keyboard line of the standing, is judged here,
+ * presented first.
  *
  * Cost: the tree's scroll ancestry (geometry.ts#Clips.inScroller, one walk of the tree, kept by the scene) is asked
  * only for a node under a system bar or — the pixel assert's — a cover with no presented surface, as the verbs asked
@@ -417,6 +420,8 @@ type TouchJudgement = { readonly facts: StandingFacts } & TouchKind;
 type TapJudgement = Exclude<TouchJudgement, { readonly kind: 'clipped' }>;
 /** A pixel standing before its remedy is decided. */
 type PixelJudgement = { readonly facts: StandingFacts } & PixelKind;
+/** A judgement of any kind but `reachable` — the ones a remedy is decided for. */
+type Unreached<J> = Exclude<J, { readonly kind: 'reachable' }>;
 
 /** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
 export function sceneOf(tree: UiNode): Scene {
@@ -441,39 +446,30 @@ export function sceneOf(tree: UiNode): Scene {
       // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
       const single = singleBox(screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree));
       const pixel = pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single), single.box, single, purpose, !listsAncestry(tree));
-      return remedied(pixel, remedyOf(pixel, judged, { box: single.box, bands: single }));
+      return pixel.kind === 'reachable' ? pixel : { ...pixel, remedy: remedyOf(pixel, judged, { box: single.box, bands: single }) };
     }
     const touch = touchScreen(screen, tree);
     if (purpose.of === 'tap') {
       const tap = tapStanding(judged, placeOf(judged.centre, touch?.boxes, touch), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
-      return remedied(tap, remedyOf(tap, judged));
+      return tap.kind === 'reachable' ? tap : { ...tap, remedy: remedyOf(tap, judged) };
     }
     const place = placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch);
     const box = touch?.box ?? node.rect;
     const stop = purpose.of === 'fully' ? fullyStanding(judged, place, box, touch, purpose.keyboardTop) : stopStanding(judged, place, box, touch, purpose.keyboardTop);
-    return remedied(stop, remedyOf(stop, judged));
+    return stop.kind === 'reachable' ? stop : { ...stop, remedy: remedyOf(stop, judged) };
   }
   return scene;
 }
 
-/** A judgement with its remedy: the remedy on every kind but `reachable`, which has none. */
-function remedied(judgement: PixelJudgement, remedy: Remedy | undefined): PixelStanding;
-function remedied(judgement: TapJudgement, remedy: TouchRemedy | undefined): TapStanding;
-function remedied(judgement: TouchJudgement, remedy: TouchRemedy | undefined): Standing;
-function remedied(judgement: TouchJudgement | PixelJudgement, remedy: Remedy | undefined): Standing | PixelStanding {
-  return (judgement.kind === 'reachable' || remedy === undefined ? judgement : { ...judgement, remedy }) as Standing | PixelStanding;
-}
-
 /**
- * THE remedy of a judgement (`Remedy`, whose doc has the cases and THE PRECEDENCE), decided once for every purpose;
- * undefined for `reachable`. `pixel`: the pixel assert's box and bands — the region's purpose, which alone decides
+ * THE remedy of a judgement (`Remedy`, whose doc has the cases and THE PRECEDENCE), decided once for every purpose,
+ * for every kind but `reachable` (the type says so: every non-reachable standing carries one). `pixel`: the pixel assert's box and bands — the region's purpose, which alone decides
  * `fixed`, and `stuck` for a node laid from the box's top edge under the status bar or held whole by its cover's
  * reach.
  */
-function remedyOf(judgement: PixelJudgement, judged: Judged, pixel: { readonly box: Rect; readonly bands: Bands }): Remedy | undefined;
-function remedyOf(judgement: TouchJudgement, judged: Judged): TouchRemedy | undefined;
-function remedyOf(judgement: TouchJudgement | PixelJudgement, { scene, node }: Judged, pixel?: { readonly box: Rect; readonly bands: Bands }): Remedy | undefined {
-  if (judgement.kind === 'reachable') return undefined;
+function remedyOf(judgement: Unreached<PixelJudgement>, judged: Judged, pixel: { readonly box: Rect; readonly bands: Bands }): Remedy;
+function remedyOf(judgement: Unreached<TouchJudgement>, judged: Judged): TouchRemedy;
+function remedyOf(judgement: Unreached<TouchJudgement | PixelJudgement>, { scene, node }: Judged, pixel?: { readonly box: Rect; readonly bands: Bands }): Remedy {
   // 1. Beneath a screen presented over its own, whatever its kind.
   const surface = judgement.facts.presented?.at(-1);
   if (surface !== undefined) return { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface };
