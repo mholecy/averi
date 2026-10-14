@@ -241,6 +241,26 @@ describe('field/error pairing', () => {
       expect(iban.error).toBe('Invalid');
     });
 
+    it('a message starting 1 pt above the field’s bottom is not below it: it pairs with nothing', () => {
+      const iban = input(0, 100); // bottom = 120
+      attachFieldErrors([iban, message(0, 119)]);
+      expect(iban.error).toBeUndefined();
+    });
+
+    it('a field of its column starting exactly at the upper field’s bottom, reaching past the message’s top, lies between them', () => {
+      const first = input(0, 100); // bottom = 120
+      const second = node({ role: 'textfield', identifier: 'Component', rect: { x: 0, y: 120, width: 300, height: 30 } });
+      attachFieldErrors([first, second, message(0, 140)]);
+      expect(first.error).toBeUndefined();
+      expect(second.error).toBeUndefined();
+    });
+
+    it('a field whose horizontal extent only touches the message’s (an overlap of exactly 0) is not in its column', () => {
+      const left = input(0, 100, 150); // right edge at 150
+      attachFieldErrors([left, message(150, 130, 150)]);
+      expect(left.error).toBeUndefined();
+    });
+
     describe('how far below the field it may start', () => {
       // At most 24 pt below the field's bottom, or the field's own height when
       // that is more: the IBAN message starts 16 pt under its 20 pt field.
