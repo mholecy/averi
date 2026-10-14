@@ -36,11 +36,11 @@ describe('a hidden subtree is no cover of a target', () => {
     expect(underTabs).toEqual([]);
   });
 
-  it('Account Detail with the bar SHOWN: nothing is dropped — every node\'s covers, presented surfaces and tap are what they are with the flag stripped (102 nodes there are hidden: the second account card off to the right, the scroll bars)', async () => {
+  it('Account Detail with the bar SHOWN: nothing is dropped — every node\'s covers, presented surfaces and tap are what they are with the flag stripped (98 nodes there are hidden: 94 off screen or of no area — the second account card off to the right, the rows below the fold — and the search icon, the second card\'s 24-pt sliver, the screen\'s full-screen `Toolbar` and its frame)', async () => {
     const tree = await capture('account-detail-bar-shown');
     const stripped = JSON.parse(JSON.stringify(tree), (k, v) => (k === 'hidden' ? undefined : v)) as UiNode;
     const [a, b] = [[...everyNode(tree)], [...everyNode(stripped)]];
-    expect([a.length, a.filter((n) => n.hidden).length, b.filter((n) => n.hidden).length]).toEqual([203, 102, 0]);
+    expect([a.length, a.filter((n) => n.hidden).length, b.filter((n) => n.hidden).length]).toEqual([203, 98, 0]);
     const [oa, ob] = [drawOrder(tree), drawOrder(stripped)];
     const said = (order: ReturnType<typeof drawOrder>, n: UiNode) => {
       const seen = order.exposure(n, IPHONE);
@@ -61,14 +61,18 @@ describe('a hidden subtree is no cover of a target', () => {
     expect(order.exposure(list.children[0], IPHONE).covers).toEqual([]);
   });
 
-  it('nor something a tap at the centre may still press (`centreExcused`, the dismissal picker\'s refusal): a hidden tab button over a title is neither — a tap cannot press what is not drawn', () => {
+  it('…but a hidden control holding a target\'s centre is still something a tap there may press (`centreExcused`, the dismissal picker\'s refusal): WDA\'s isVisible "0" is no proof a node takes no touch', () => {
     const title = node({ role: 'text', identifier: 'title', label: 'SWIFT PAYMENT', rect: rect(100, 700, 200, 30) });
     const tab = node({ role: 'button', identifier: 'nav.tab_cards', rect: rect(170, 690, 66, 52), hidden: true });
-    const shown = node({ role: 'button', identifier: 'shown', rect: tab.rect });
-    const tree = (over: UiNode) => node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE, children: [title] }), over] });
-    expect(drawOrder(tree(tab)).exposure(title, IPHONE)).toMatchObject({ covers: [], centreExcused: [], tapAt: { moved: false } });
-    // The same button drawn: a cover, as before.
-    expect(drawOrder(tree(shown)).exposure(title, IPHONE).centreCover).toBe(shown);
+    const tree = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE, children: [title] }), tab] });
+    expect(drawOrder(tree).exposure(title, IPHONE)).toMatchObject({ covers: [], centreExcused: [tab], tapAt: { moved: false } });
+  });
+
+  it('the SWIFT form: the label "Payee’s name" of `payee_name_input` (drawn, under CONTINUE, WDA 0/0) is no dismissal candidate — its own text field, which a tap at its centre would focus, still holds its centre', async () => {
+    const tree = await capture('swift-form-pushed');
+    const label = [...everyNode(tree)].find((n) => n.role === 'text' && n.label === 'Payee’s name')!;
+    const seen = drawOrder(tree).exposure(label, IPHONE);
+    expect(seen.centreExcused.filter((n) => n.role === 'textfield').map(desc)).toEqual(['textfield TextFieldWithComponentStyle 42,817 318x20']);
   });
 });
 
@@ -81,8 +85,9 @@ describe('…except the surface of a screen presented over the target\'s (ADR 00
     const seen = drawOrder(tree).exposure(row, IPHONE);
     expect(seen.covers).toContain(table);
     expect(seen.presented).toContain(table);
-    // …while the sheet's own hidden controls over the row (close, Done) are no covers.
-    expect(seen.covers.map(desc).filter((d) => /close|Done/.test(d))).toEqual([]);
+    // The sheet layer itself, a structural wrapper, roots no hidden subtree: its accessible controls over the row
+    // (close, Done) are not hidden and cover as before.
+    expect(seen.covers.map(desc).filter((d) => /close|Done/.test(d))).toEqual(['button close 20,82 36x36', 'button Done 346,82 36x36']);
   });
 
   it('a sheet layer over a list, marked hidden, with no other dim: its scroll view still covers the row beneath at its centre — the tap is refused, not sent through the sheet', () => {

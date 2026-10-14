@@ -249,9 +249,9 @@ export interface Exposure {
    * The nodes listed after it that hold its centre (inside `within`, at
    * their reach, as `coverAt` asks) and that the `target` column EXCUSED —
    * drawn there, by the table, as no cover of it — in pre-order; empty when
-   * none, or when the centre lies outside `within` — and never a node of a
-   * hidden subtree (`UiNode.hidden`, the `hidden` row), which is not drawn
-   * and so presses nothing. Not a cover: a tap at
+   * none, or when the centre lies outside `within` — a node of a hidden
+   * subtree (`UiNode.hidden`, the `hidden` row) included: WDA's
+   * `isVisible="0"` is no proof that a node takes no touch. Not a cover: a tap at
    * the centre is still `tapAt`'s, unmoved. What a tap there may still
    * PRESS: a labelled control of exactly the node's frame (`sameFrame`), its
    * own unlabelled control (`ownControl`), a row of a scroll view it is not
@@ -1242,10 +1242,13 @@ const NOT_DRAWN = {
   },
 
   /**
-   * A HIDDEN SUBTREE (`UiNode.hidden`, the WDA parser's mark: a node WDA reports `isVisible="0"` and
-   * `isAccessible="0"` whose every descendant is `isVisible="0"`, and every node under it). `target` only: no cover of
-   * a target — the tap, `scroll_until`'s standing, the pixel assert's covers and the dismissal picker — and nothing a
-   * tap at its centre may still press (`Exposure.centreExcused`: what is not drawn takes no touch). Measured on
+   * A HIDDEN SUBTREE (`UiNode.hidden`, the WDA parser's mark: a node of no structural role that WDA reports
+   * `isVisible="0"` and `isAccessible="0"`, whose every descendant is `isVisible="0"`, and every node under it).
+   * `target` only: no cover of a target — the tap, `scroll_until`'s standing, the pixel assert's covers and the
+   * dismissal picker. Excused, it is still listed in `Exposure.centreExcused` when it holds the target's centre, as
+   * every excused node is: WDA's `isVisible="0"` is no proof a node takes no touch, and the dismissal picker refuses
+   * a candidate whose centre an interactive one of them holds (on the SWIFT form, the label "Payee’s name" whose own
+   * text field, drawn but reported invisible, would be focused by the tap). Measured on
    * mp-native's SWIFT form pushed over the tab host (tests/fixtures/wda-capture-swift-form-pushed.json): WDA lists the
    * host's hidden tab bar after the form at y 711, and its buttons' icons covered the rows beneath — a tap on
    * `payee_country_select` was moved off its centre, a colour assert failed closed naming `Dashboard/icon-browsers`,
@@ -1686,8 +1689,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const centre = tapPoint(node);
       const onCentre = shown !== undefined && containsPoint(shown, centre);
       const centreCover = onCentre ? coverAt(centre) : undefined;
-      // A node of a hidden subtree (the `hidden` row) is not drawn, so a touch there presses nothing of it either.
-      const centreExcused = onCentre ? met.filter((c) => !c.draws && c.node.hidden !== true && containsPoint(c.reach, centre)).map((c) => c.node) : [];
+      const centreExcused = onCentre ? met.filter((c) => !c.draws && containsPoint(c.reach, centre)).map((c) => c.node) : [];
       const tappable = largestRect(pieces.filter((r) => r.width >= minPiece && r.height >= minPiece));
       const tapAt: Exposure['tapAt'] =
         onCentre && centreCover === undefined
