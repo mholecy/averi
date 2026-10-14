@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -12,8 +13,12 @@ import { syntheticIdb, syntheticUiautomator, zeroRootWda } from './synthetic.js'
  *    device agent saved — a `#<call> (<s>)` header line, then the JSON — as a
  *    NORMALIZED capture (idb when its root is idb's flat list, else WDA);
  *    every raw WDA `/source?format=json` body (a JSON object with a `value`
- *    element) and every raw `uiautomator dump` XML as a RAW capture. Skipped,
- *    and listed in the run's manifest `note`: a filtered snapshot (a JSON
+ *    element) and every raw `uiautomator dump` XML as a RAW capture; and
+ *    every unfiltered `ui_snapshot` the device agent's server logged in
+ *    `session.log` (`--- #N … CALL ui_snapshot {…}`, the tree under its
+ *    `--- #N RESULT` line) as a NORMALIZED `session-<N>.json` — most were
+ *    never saved as a file — de-duplicated by content across the runs and
+ *    against the files. Skipped, and listed in the run's manifest `note`: a filtered snapshot (a JSON
  *    array, not a tree), WDA's XML `/source` (no parser reads that format),
  *    and anything that is not a tree.
  *  - FIXTURES (`--repo`, a checkout: its tests/fixtures and tests/helpers):
@@ -55,6 +60,95 @@ function appOf(tree: Json): string | undefined {
   return typeof first?.label === 'string' && first.label.trim() !== '' ? first.label : undefined;
 }
 
+/** A tree's identity for de-duplication: its JSON with the keys sorted. */
+function treeHash(tree: unknown): string {
+  const canon = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(canon) : typeof v === 'object' && v !== null ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Json)[k])])) : v;
+  return createHash('sha1').update(JSON.stringify(canon(tree))).digest('hex');
+}
+
+/** The end of the JSON object that opens `s` (strings and escapes respected), or -1. */
+function objectEnd(s: string): number {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inString) {
+      if (c === '\\') i++;
+      else if (c === '"') inString = false;
+    } else if (c === '"') inString = true;
+    else if (c === '{' || c === '[') depth++;
+    else if (c === '}' || c === ']') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+/** Every unfiltered `ui_snapshot` tree a device agent's server logged, in call order: [call number, tree]. */
+function sessionTrees(log: string): [string, Json][] {
+  const out: [string, Json][] = [];
+  for (const m of log.matchAll(/^--- #(\d+) \S+ CALL ui_snapshot (\{.*\})$/gm)) {
+    const args = JSON.parse(m[2]) as Json;
+    if (typeof args.filter === 'string' && args.filter !== '') continue;
+    const rest = log.slice(m.index + m[0].length);
+    const result = new RegExp(`^--- #${m[1]} RESULT[^\n]*\n`, 'm').exec(rest);
+    if (result === null) continue;
+    const body = rest.slice(result.index + result[0].length).trimStart();
+    if (!body.startsWith('{')) continue;
+    const end = objectEnd(body);
+    if (end === -1) continue;
+    try {
+      const tree = JSON.parse(body.slice(0, end)) as unknown;
+      if (isTree(tree)) out.push([m[1], tree]);
+    } catch {
+      // A result that is not one JSON object (an error text that happens to open with a brace) is no tree.
+    }
+  }
+  return out;
+}
+
+/** Per device run: the session.log trees found, and how many repeated a tree already taken. */
+const sessionCounts = new Map<string, { logged: number; duplicates: number }>();
+/** Every tree taken so far, across the device runs — the runs repeat screens. */
+const seen = new Set<string>();
+/** The distinct trees the session logs hold, saved as a file or not. */
+const uniqueLogged = new Set<string>();
+
+/**
+ * The server's own log of a device run: every tree it answered, most of which no agent saved as a file. Run after
+ * every run's files are taken, so a logged tree that a later run saved as a file is not taken twice.
+ */
+async function addSessions(dir: string, b: Built): Promise<void> {
+  const name = basename(dir);
+  const platform = b.manifest.platform;
+  let logged = 0;
+  let duplicates = 0;
+  try {
+    for (const [call, tree] of sessionTrees(await readFile(join(dir, 'session.log'), 'utf8'))) {
+      logged++;
+      const key = treeHash(tree);
+      uniqueLogged.add(key);
+      if (seen.has(key)) {
+        duplicates++;
+        continue;
+      }
+      seen.add(key);
+      const app = appOf(tree);
+      add(b, `session-${call}.json`, JSON.stringify(tree), {
+        source: platform === 'android' ? 'uiautomator' : tree.flatList === true ? 'idb' : 'wda',
+        form: 'normalized',
+        ...(platform === 'ios' && app !== undefined && { app }),
+        note: `session.log call #${call}`,
+      });
+    }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+  }
+  sessionCounts.set(name, { logged, duplicates });
+}
+
 async function deviceRun(dir: string): Promise<Built> {
   const name = basename(dir);
   const platform = name.endsWith('-android') ? 'android' : 'ios';
@@ -90,6 +184,7 @@ async function deviceRun(dir: string): Promise<Built> {
       skipped.push(`${f} (not a tree)`);
     }
   }
+  for (const [f, body] of Object.entries(b.files)) if (f.endsWith('.json')) seen.add(treeHash(JSON.parse(body)));
   if (skipped.length > 0) b.manifest.note = `skipped: ${skipped.join('; ')}`;
   return b;
 }
@@ -146,10 +241,13 @@ async function main(): Promise<void> {
   const out = resolve(values.out);
   const built: [string, Built][] = [];
   if (values.runs !== undefined) {
-    for (const d of (await readdir(values.runs)).filter((d) => /^run\d+-(ios|android)$/.test(d)).sort()) built.push([d, await deviceRun(join(values.runs, d))]);
+    const runs = (await readdir(values.runs)).filter((d) => /^run\d+-(ios|android)$/.test(d)).sort();
+    for (const d of runs) built.push([d, await deviceRun(join(values.runs, d))]);
+    for (const [d, b] of built) await addSessions(join(values.runs, d), b);
   }
   if (values.repo !== undefined) {
     const repo = resolve(values.repo);
+    console.log(`session.log: ${uniqueLogged.size} distinct trees logged`);
     const fx = await fixtureRuns(repo);
     const syn = await syntheticRuns(repo);
     built.push(['fixtures-ios', fx.ios], ['fixtures-android', fx.android], ['synthetic-ios', syn.ios], ['synthetic-android', syn.android]);
@@ -161,7 +259,15 @@ async function main(): Promise<void> {
     const k = `${b.manifest.platform} ${c.source} ${c.form}`;
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
-  for (const [name, b] of built) console.log(`${name}: ${b.manifest.captures.length}${b.manifest.note?.startsWith('skipped') ? ` — ${b.manifest.note}` : ''}`);
+  for (const [name, b] of built) {
+    const session = sessionCounts.get(name);
+    const fromLog = b.manifest.captures.filter((c) => c.file.startsWith('session-')).length;
+    console.log(
+      `${name}: ${b.manifest.captures.length}` +
+        (session === undefined ? '' : ` (${b.manifest.captures.length - fromLog} files, ${fromLog} from session.log: ${session.logged} logged, ${session.duplicates} repeats)`) +
+        (b.manifest.note?.startsWith('skipped') ? ` — ${b.manifest.note}` : ''),
+    );
+  }
   for (const [k, v] of [...counts].sort()) console.log(`${k}: ${v}`);
   console.log(`total: ${[...counts.values()].reduce((a, b) => a + b, 0)}`);
 }
