@@ -21,7 +21,10 @@ to:
 
 - the pixel covers (`draw-order.ts#DrawOrder.paintsOver`);
 - the system bands under the pixel assert (`ui-tree/standing.ts#Scene`);
-- the keys that tile idb's keyboard band (ADR 0007).
+- the keys that tile idb's keyboard band (ADR 0007);
+- since 2026-10-14, the thin sliver (`ui-tree/standing.ts#thinSliver`): an element the screen's edge leaves no thicker
+  than the slack on the screen is judged off the screen, never measured — a cover over so thin a sliver is never
+  counted, so the sampler would read the cover (ADR 0018, "Amendment: presented judged of the node").
 
 It does not apply to the keyboard's own region. Any overlap there fails the assert (ADR 0010).
 
