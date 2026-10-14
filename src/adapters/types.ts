@@ -445,6 +445,35 @@ export interface UiNode {
    * over a centred text (a card's overlay) stays its cover.
    */
   paddedTouchTargets?: true;
+  /**
+   * Set on every node of a HIDDEN SUBTREE of a WDA tree (adapters/wda-source.ts#hiddenRoots): a node of no structural
+   * role (`STRUCTURAL_ROLES`: not WDA's `Other`, `Cell`, `Window`, … — a control, an image, a text, a scroll view, a
+   * toolbar) that WDA reports `isVisible="0"` AND `isAccessible="0"`, whose every descendant is `isVisible="0"`, roots
+   * one, and the subtree goes as one; a descendant's `isAccessible` is not consulted. Measured on mp-native's SWIFT
+   * form pushed over the tab host (tests/fixtures/wda-capture-swift-form-pushed.json): the host's tab bar, which the
+   * pushed screen hides, is listed AFTER the form at `69…266,711` (the shown bar is at y 755), each `nav.tab_*` button
+   * `0/0` and its icon `Image` `isVisible "0" isAccessible "1"` — so the Image goes with its button. A structural
+   * wrapper never roots one: WDA reports the form's `payee_name_input` row, drawn under CONTINUE, `0/0` with an
+   * invisible subtree too.
+   *
+   * Its readers, all of them:
+   * - ui-tree/draw-order.ts's `hidden` row, in the `target` column only: such a node is no cover of a target unless it
+   *   is the surface of a screen presented over the target's (`presentedSurface`, ADR 0018) — WDA marks the New
+   *   Contact sheet's form `Table` `0/0` while the discard popover is up over it, and that Table still covers the list
+   *   beneath. Through that column it reaches every caller of `exposure`, `paintsOver` and `coversOf`: the tap's aim
+   *   (interact/tap-judgement.ts), `scroll_until`'s standing and the pixel assert's covers (ui-tree/standing.ts), the
+   *   in-tree dismissal picker (interact/keyboard-in-tree.ts, which still sees an excused hidden node in
+   *   `Exposure.centreExcused`), and the uiautomator parser's strip question (never met: only WDA sets the mark).
+   * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees can be swept for it.
+   * Nothing else: a TARGET's own flag is never read (a target under a modal is `isVisible="0"` too), and selectors,
+   * asserts and the stroke box's `drawnOver` column are as before.
+   *
+   * On EVERY node of the subtree, not only its root (unlike `ofKeyboard`): `ui_snapshot` with a filter prints the
+   * matched nodes without their ancestors, and a filtered tab button must still say it is hidden. Absent, never false,
+   * everywhere else — on an idb or Android tree always.
+   * docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md
+   */
+  hidden?: true;
 }
 
 /**

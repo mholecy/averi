@@ -249,7 +249,9 @@ export interface Exposure {
    * The nodes listed after it that hold its centre (inside `within`, at
    * their reach, as `coverAt` asks) and that the `target` column EXCUSED —
    * drawn there, by the table, as no cover of it — in pre-order; empty when
-   * none, or when the centre lies outside `within`. Not a cover: a tap at
+   * none, or when the centre lies outside `within` — a node of a hidden
+   * subtree (`UiNode.hidden`, the `hidden` row) included: WDA's
+   * `isVisible="0"` is no proof that a node takes no touch. Not a cover: a tap at
    * the centre is still `tapAt`'s, unmoved. What a tap there may still
    * PRESS: a labelled control of exactly the node's frame (`sameFrame`), its
    * own unlabelled control (`ownControl`), a row of a scroll view it is not
@@ -1237,6 +1239,34 @@ const NOT_DRAWN = {
   keyboard: {
     drawnOver: ({ inKeyboard }) => inKeyboard,
     target: ({ inKeyboard }) => inKeyboard,
+  },
+
+  /**
+   * A HIDDEN SUBTREE (`UiNode.hidden`, the WDA parser's mark: a node of no structural role that WDA reports
+   * `isVisible="0"` and `isAccessible="0"`, whose every descendant is `isVisible="0"`, and every node under it).
+   * `target` only: no cover of a target — the tap, `scroll_until`'s standing, the pixel assert's covers and the
+   * dismissal picker. Excused, it is still listed in `Exposure.centreExcused` when it holds the target's centre, as
+   * every excused node is: WDA's `isVisible="0"` is no proof a node takes no touch, and the dismissal picker refuses
+   * a candidate whose centre an interactive one of them holds (on the SWIFT form, the label "Payee’s name" whose own
+   * text field, drawn but reported invisible, would be focused by the tap). Measured on
+   * mp-native's SWIFT form pushed over the tab host (tests/fixtures/wda-capture-swift-form-pushed.json): WDA lists the
+   * host's hidden tab bar after the form at y 711, and its buttons' icons covered the rows beneath — a tap on
+   * `payee_country_select` was moved off its centre, a colour assert failed closed naming `Dashboard/icon-browsers`,
+   * and `fully` spent a stroke moving a row off a phantom.
+   * docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md
+   *
+   * Except the SURFACE of a screen presented over the target's (`presentedSurface`, ADR 0018), which covers as before
+   * and stays in `Exposure.presented` — the mirror of `givesWay`: with Contacts' discard popover up, WDA marks the
+   * whole New Contact sheet layer `0/0`, its form `Table 0,62 402x812` included
+   * (tests/fixtures/wda-capture-contacts-discard-popover.json), and that Table is still the presented sheet over the
+   * list's rows. Without the exception a sheet marked so, over a list with no second dim, would let a tap through
+   * to the list. The TARGET's own flag is never read: a target under a modal is `isVisible="0"` too.
+   *
+   * `drawnOver`: not excused — no measurement asked it (no iOS tree has a clipping container, and only WDA sets the
+   * mark). Residuals and the decision: docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md
+   */
+  hidden: {
+    target: (placed, { target, screenArea }) => placed.node.hidden === true && !presentedSurface(placed, target, screenArea),
   },
 } as const satisfies Record<string, Row>;
 

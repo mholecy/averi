@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, type Rect, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -70,9 +70,10 @@ const ROLE_MAP: Record<string, string> = {
  * and `nativeFrame` also exist; ignore them). `isVisible`/`isEnabled` are
  * "1"/"0" strings; invisible nodes are KEPT — iOS keeps off-screen nodes in
  * its tree and the assert layer relies on that (see `absent` in flow/config).
- * `isVisible` is read for ONE purpose (since 2026-10-07): whether a
- * `Keyboard` is on screen (keyboardMarks). Nothing else reads it, and the
- * normalized node does not carry it.
+ * `isVisible` is read for three purposes: whether a `Keyboard` is on screen
+ * (keyboardMarks); with `isAccessible`, which subtrees are
+ * HIDDEN (`hiddenRoots`, `UiNode.hidden`); and whether a cell's content is
+ * PARKED (`parkedIn`). The normalized node carries neither flag itself.
  * `placeholderValue` (since 2026-10-09) is the text XCUITest says the field
  * shows while empty; WDA's `value` of an EMPTY field is that same text
  * (measured 2026-10-09, iPhone 17 / iOS 27.0, Contacts "New Contact":
@@ -88,6 +89,7 @@ interface WdaElement {
   placeholderValue?: string | null;
   rect?: Rect;
   isVisible?: string | number | null;
+  isAccessible?: string | number | null;
   children?: WdaElement[] | null;
 }
 
@@ -106,7 +108,7 @@ export function parseWdaSource(json: string): UiNode {
  */
 export function parseWdaSourceValue(value: unknown): UiNode {
   const root = unwrapEnvelope(value);
-  const tree = toUiNode(root, keyboardMarks(root));
+  const tree = toUiNode(root, { ...keyboardMarks(root), hiddenRoots: hiddenRoots(root) }, { hidden: false, cell: undefined, scroller: undefined });
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
   return tree;
@@ -134,12 +136,41 @@ interface KeyboardMarks {
   roots: ReadonlySet<WdaElement>;
 }
 
-function toUiNode(el: WdaElement, marks: KeyboardMarks): UiNode {
+/** Every raw element the parser singles out, read once per payload: the keyboard's (`keyboardMarks`) and the roots of the hidden subtrees (`hiddenRoots`). */
+interface SourceMarks extends KeyboardMarks {
+  hiddenRoots: ReadonlySet<WdaElement>;
+}
+
+/** What an element's ancestors hand down to it: it lies in a hidden subtree (`UiNode.hidden`); its nearest `Cell` ancestor, as placed, with the scroll view that cell lies in (`parkedIn`); its nearest scroll view. */
+interface Inherited {
+  hidden: boolean;
+  cell: CellPlace | undefined;
+  scroller: Rect | undefined;
+}
+
+/** A `Cell`'s rect, as placed (undefined when WDA gave none), and the rect of the nearest scroll view it lies in (undefined in none) — `parkedIn`'s two facts. */
+interface CellPlace {
+  at: Rect | undefined;
+  in: Rect | undefined;
+}
+
+/** WDA's scroll-view types (`parkedIn`): the ones the role map makes `scrollable`. */
+const SCROLL_TYPES: ReadonlySet<string> = new Set(['Table', 'CollectionView', 'ScrollView']);
+
+/** The role `type` takes (`normalizeIosElement`'s own-key rule over this file's ROLE_MAP), asked of a raw element before it is normalized. */
+const roleOf = (type: string | undefined): string => (type !== undefined && Object.hasOwn(ROLE_MAP, type) ? ROLE_MAP[type] : 'other');
+
+function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiNode {
+  const hidden = inherited.hidden || marks.hiddenRoots.has(el);
+  const rect = parkedIn(el, inherited.cell) ?? el.rect;
+  const cell = el.type === 'Cell' ? { at: rect, in: inherited.scroller } : inherited.cell;
+  const scroller = el.type !== undefined && SCROLL_TYPES.has(el.type) ? rect : inherited.scroller;
   const node = normalizeIosElement(
-    { type: el.type, label: el.label, identifier: el.rawIdentifier, value: el.value, rect: el.rect },
+    { type: el.type, label: el.label, identifier: el.rawIdentifier, value: el.value, rect },
     ROLE_MAP,
-    (el.children ?? []).map((child) => toUiNode(child, marks)),
+    (el.children ?? []).map((child) => toUiNode(child, marks, { hidden, cell, scroller })),
   );
+  if (hidden) node.hidden = true;
   // The band node is an `Other` (or, in the fallback, the `Keyboard` itself)
   // whose measured rect IS the covered band — the role changes, the rect,
   // label, identifier and children stay what WDA reported.
@@ -209,6 +240,105 @@ function isTextEcho(el: WdaElement, node: UiNode): boolean {
     echo.value === node.value &&
     sameRect(echo.rect, node.rect)
   );
+}
+
+/**
+ * The rect a PARKED element of a cell is placed at — its nearest `Cell` ancestor's — or undefined when it is not
+ * parked. Parked — the measured shape, each rect of area, shared area as `rectsOverlap` asks it (an edge in common is
+ * none): the element is `isVisible="0"` and shares no area with its cell, and shares area with the scroll view the
+ * cell lies in (the cell's nearest `Table`, `CollectionView` or `ScrollView` ancestor), while the cell shares none with
+ * that scroll view.
+ *
+ * Measured on stock Contacts' New Contact sheet (iPhone 17 simulator, iOS 27.0, WDA 16.1.7, twice;
+ * tests/fixtures/wda-capture-contacts-new-contact.json): UIKit has not laid out the cells below the
+ * fold, and WDA lists every element of such a cell — its label, its `Insert` button and that button's image, its
+ * separator, the Notes cell's text view — at a PARKED frame, `0,62 286x22` and the like: the element's size, at the
+ * sheet's origin, inside the viewport, while the cell itself lies where it is, `add instant message` at `20,1306
+ * 362x52`, below the screen. The parked element is `isVisible "0"`; its cell's rect is the only true thing about where
+ * it is. Taken at face value, `scroll_until … fully: true` on `text:"add related name"` stopped "fully visible after 0
+ * swipes", and a tap on `text:"add instant message"` was reported tapped at (143,73) — the sheet's grabber strip —
+ * with the row still below the fold.
+ * docs/bugs/2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md
+ *
+ * The decisions (docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md):
+ * - PLACED AT THE CELL, not marked off screen nor given a zero rect: the cell's rect is where the element will be
+ *   once laid out — to within the cell — so a tap is refused off screen with "scroll_until it first",
+ *   `scroll_until` strokes toward it and stops once the cell shows (the next read has the element laid out at its
+ *   real rect), and a visibility assert reads it where its row is. A zero rect would read "no area": the wait's
+ *   zero-area hint, and a `scroll_until` that never finds it on screen.
+ * - EVERY element of the cell, not its text only: the `Insert` button sits at the same parked `0,62` and a tap on it
+ *   would press the same strip.
+ * - A `Cell` only (WDA's type, before the role map, which makes it a `container` like every `Other`): the shape was
+ *   measured in a UIKit table's cells. An RN or SwiftUI view whose child lies outside it — an absolutely positioned
+ *   badge, an overflowing label — is no cell, and its child stays where WDA reports it.
+ * - `isVisible="0"` too: a child drawn outside its cell is drawn where it says, and only a child WDA reports invisible
+ *   is placed anew. On screen, a laid-out cell's content lies inside it (`add phone` and its button).
+ * - THE SCROLL VIEW'S SHAPE: an element outside its cell is parked only when the cell lies wholly outside the scroll
+ *   view it lies in (not laid out) and the element inside it (the parked frame). Without it, content scrolled out
+ *   sideways read as parked: a carousel row's third chip at x 410, past its own horizontal scroller, was moved onto
+ *   the row's cell and tapped, covering the chips beside it; a collection view's card past its edge likewise. A cell
+ *   that is on screen never parks its content (a badge hung off its edge stays where it is). Every one of the 82
+ *   parked elements of the two Contacts captures has this shape. The scroll view is the CELL's — the one that decides
+ *   whether the cell is laid out — not the element's own nearest: a below-the-fold cell holding a scroller of its own
+ *   parks that scroller's content all the same.
+ * - Whatever lies between the element and its cell: the nearest `Cell` ancestor decides, through any wrapper.
+ *
+ * Residuals: a parked element that happens to meet its cell's rect (a cell parked near the sheet's origin) keeps its
+ * parked frame — a part of it may be wrong by up to the cell's size; content parked in a container that is not a
+ * `Cell` (a collection view's cell is a `Cell` too; a SwiftUI `List` row was not measured), or in a cell with no scroll
+ * view around it, is not seen.
+ */
+function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined {
+  if (cell === undefined || !isZero(el.isVisible)) return undefined;
+  const own = usableRect(el.rect);
+  const at = usableRect(cell.at);
+  const view = usableRect(cell.in);
+  if (own === undefined || at === undefined || view === undefined) return undefined;
+  return !rectsOverlap(own, at) && rectsOverlap(own, view) && !rectsOverlap(at, view) ? at : undefined;
+}
+
+/** WDA's "0" — a string in the JSON format, compared as `onScreen` compares `isVisible`; a missing or null flag is never "0". */
+const isZero = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '0';
+
+/**
+ * The roots of the HIDDEN SUBTREES (`UiNode.hidden`): an element of NO STRUCTURAL ROLE (`STRUCTURAL_ROLES` over this
+ * file's role map — not an `Other`, `Cell`, `Window`, `Application` or unmapped type: a control, an image, a text, a
+ * scroll view, a toolbar) that WDA reports `isVisible="0"` and `isAccessible="0"`, every element of whose subtree is
+ * `isVisible="0"`. A descendant's `isAccessible` is not consulted.
+ *
+ * Measured on the iPhone 17 simulator (iOS 27.0, WDA 16.1.7; the raw `/source` captures in
+ * tests/fixtures/wda-capture-*.json):
+ * - mp-native's SWIFT form pushed over the tab host: the host's hidden tab bar is listed after the form at y 711 —
+ *   each `nav.tab_*` Button `0/0`, its icon Image (same rect) `isVisible "0"` but `isAccessible "1"`. So "the whole
+ *   subtree `0/0`" — the rule first proposed — matches none of them, and the Image went on covering the rows beneath
+ *   it (docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md). With the root alone
+ *   asked for `isAccessible`, the button goes with its Image.
+ * - Why every descendant's `isVisible`: Account Detail with the bar SHOWN has the same buttons at y 755 `1/1`, under
+ *   a host `Other 0,0 402x874` that is `0/0` in both states with an `isVisible "1"` content child.
+ * - Why NO STRUCTURAL ROOT: WDA's flags are no proof that nothing is drawn. The SWIFT form's `payee_name_input`
+ *   row, `Other 24,801 354x52`, lies drawn under CONTINUE and is `0/0` with an all-invisible subtree; as a root it
+ *   took its label and its text field (each `isAccessible "1"`) with it, and the text field stopped holding the
+ *   label's centre for the dismissal picker. The screen beneath a modal is reported the same way: Finportal's login
+ *   screen under its RN modal, the Contacts list under the New Contact sheet, the sheet under its discard popover —
+ *   whole layers `0/0`, drawn chrome a wrapper root would have dropped wholesale. A control, an image or a text is
+ *   one thing on screen; a wrapper is a region whose flags say nothing of what it holds. `isAccessible` on the root
+ *   does not tell a drawn node from an undrawn one (the payee row is `0/0`); it only keeps an accessible control from
+ *   rooting one.
+ *
+ * Bottom-up, once per payload, beside `keyboardMarks`: each element's subtree is judged from its children's answers,
+ * so no subtree is walked twice. Roots inside a root are collected too; `toUiNode` hands the flag down either way.
+ */
+function hiddenRoots(root: WdaElement): ReadonlySet<WdaElement> {
+  const roots = new Set<WdaElement>();
+  /** Is every element of `el`'s subtree `isVisible="0"`? Collects the roots on the way. */
+  const invisible = (el: WdaElement): boolean => {
+    const children = (el.children ?? []).map(invisible); // every child judged, so roots below a visible one are found too
+    const whole = isZero(el.isVisible) && children.every(Boolean);
+    if (whole && isZero(el.isAccessible) && !STRUCTURAL_ROLES.has(roleOf(el.type))) roots.add(el);
+    return whole;
+  };
+  invisible(root);
+  return roots;
 }
 
 /**
