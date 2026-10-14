@@ -86,7 +86,8 @@ groups as `device calls only`, and that a colour assert passes on its own painte
 
 ## Corpus format
 
-One directory per capture run, one file per tree, and a `manifest.json` (`corpus.ts`):
+One directory per capture run, one file per tree, and a `manifest.json` (`corpus.ts`). The directory's name is the run —
+the manifest names none — and a tree's id in a report is `<run>/<file>`:
 
 ```json
 {
@@ -115,6 +116,14 @@ repository's fixtures and the synthetic trees in `synthetic.ts` (among them two 
 header beneath a presented screen is given an identifier, so a selector reaches it). Skipped, with the reason in the
 manifest's `note`: WDA's XML `/source` (no parser reads it), filtered snapshots, and files that hold no tree.
 
+**Rebuilt runs are not device captures.** A run may hold raw payloads REBUILT from normalized trees — the corpus's
+`rebuilt-idb-ios` holds an idb `describe-all` list rebuilt from each normalized idb tree (idb's normalization maps
+element by element, so the inverse is exact up to the type within a role, and an OLD parser gives each tree back). Such
+a run says so in its manifest (`device` and `note`, and each capture's `note`), and every tree in it is also in its own
+run as normalized: it lets an idb parser change show where no raw payload was saved (the IBAN `_error` pairing), but
+it is no evidence of what a device sends. `convert.ts` does not build it: the script that does is kept in the run's
+directory, outside the repository like the corpus.
+
 ```sh
 node --import tsx scripts/differential/convert.ts --runs <dir of run<N>-* dirs> --repo . --out <corpus dir>
 ```
@@ -140,7 +149,7 @@ tool call can express:
 
 | section | at the tool level | how, and what not |
 |---|---|---|
-| TAP | **covered** for addressable nodes | `tap` per target, screen / no screen, Android keyboard hidden / docked / floating / API 36, iOS dismissal configs, many-matches texts. Not: nodes no selector addresses (no unique id, text, label, value or role pairing — the unlabelled headers and content containers); the "sent" sentence variant; a synthetic keyboard line over trees without one |
+| TAP | **covered** for addressable nodes | `tap` per target, screen / no screen, Android keyboard hidden / docked / floating / API 36, iOS dismissal configs, many-matches texts. Not: nodes no selector addresses (no unique id, text, label, value or role pairing — the unlabelled headers and content containers); the "sent" sentence variant; a synthetic keyboard line over trees without one. The status-bar sentence beneath a presented screen in particular: the real status-band headers of the device trees (`0,0 402x102`, `0,0 402x116`) carry no identifier or label, so no selector addresses them, and it is covered only on the two synthetic header-id trees |
 | PIXEL | **covered** for addressable nodes | `assert` colour (on a painted target) and ocr per target, with and without a screen, at real scale and on another screen for the first three. Not: the turned device; OCR content (the fake recognizer reads no text) |
 | ROUNDS | **partly** | `scroll_until` down, up and down `fully` on the recorded static tree with real strokes. Not: plays with a synthetic corroborated or vetoed keyboard cover, `found` pairs, the band and two-way-screen variants — reducer inputs a static recorded tree cannot produce |
 | GUARD | **partly** | `tap` under the iOS dismissal configs on trees with an in-tree keyboard; Android's oracle hidden, docked, floating, API 36 (no IME entry), back hides. Not: the synthetic WDA band on keyboard-less iOS trees; a witness that answers unknown |
