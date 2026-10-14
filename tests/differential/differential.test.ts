@@ -52,7 +52,7 @@ describe('compareRecording', () => {
         return tree;
       },
     };
-    const result = await compareRecording(login, side, moved, { cap: 3, tools: new Set(['ui_snapshot', 'tap']) });
+    const result = await compareRecording(login, side, moved, { cap: 5, tools: new Set(['ui_snapshot', 'tap']) });
     const differing = [...new Set(result.diffs.map((d) => `${d.call.tool} ${String(d.call.args.selector ?? '')}`))];
     expect(differing).toEqual(['ui_snapshot ', 'tap text:"Log in"']);
     const tap = result.diffs.find((d) => d.call.tool === 'tap' && d.variant === 'screen')!;

@@ -19,8 +19,9 @@ import { ANDROID_SERIAL, IOS_UDID, recordedAdapter, type Side } from './side.js'
  *     (side.ts#recordedAdapter) — as tests/mcp/tools.test.ts builds one;
  *  2. `ui_snapshot` on both sides; its trees name the TARGETS — every node a
  *     selector can address on either side: a unique identifier (`id:`), else
- *     a unique label (`text:`, label or value; no `"` — the grammar has no
- *     escape for it);
+ *     a unique text (`text:`, label or value), else the role with either
+ *     (`role:… text:` / `role:… id:`); no value holding `"` — the grammar
+ *     has no escape for it;
  *  3. the variant's calls (PLAN below) with the same arguments on each side,
  *     one at a time — the virtual clock and the fake device reset before
  *     each — and per call the reply (text blocks, image sizes, isError) and
@@ -152,20 +153,31 @@ function tally(values: (string | null | undefined)[]): Map<string, number> {
   return m;
 }
 
-/** The targets of one side's tree, in tree order. */
+/**
+ * The targets of one side's tree, in tree order: each node by the first selector that names it alone — its
+ * identifier, else its text (label or value), else its role and text, else its role and identifier.
+ */
 function targetsOf(tree: SnapNode): { targets: Target[]; keyboard: boolean; neutral?: string } {
   const nodes = [...walk(tree)];
+  const textsOf = (n: SnapNode) => (n.label === n.value ? [n.label] : [n.label, n.value]);
   const ids = tally(nodes.map((n) => n.identifier));
-  const texts = tally(nodes.flatMap((n) => (n.label === n.value ? [n.label] : [n.label, n.value])));
+  const texts = tally(nodes.flatMap(textsOf));
+  const roleTexts = tally(nodes.flatMap((n) => textsOf(n).map((t) => (t ? `${n.role} ${t}` : t))));
+  const roleIds = tally(nodes.map((n) => (n.identifier ? `${n.role} ${n.identifier}` : null)));
+  const quotable = (v: string | null | undefined): v is string => !!v && !v.includes('"');
   const targets: Target[] = [];
   let neutral: string | undefined;
   for (const n of nodes) {
     const role = n.role ?? '?';
-    if (neutral === undefined && role === 'text' && n.label && texts.get(n.label) === 1 && !n.label.includes('"')) neutral = n.label;
-    if (n.identifier && ids.get(n.identifier) === 1 && !n.identifier.includes('"')) {
+    if (neutral === undefined && role === 'text' && quotable(n.label) && texts.get(n.label) === 1) neutral = n.label;
+    if (quotable(n.identifier) && ids.get(n.identifier) === 1) {
       targets.push({ selector: `id:"${n.identifier}"`, element: { id: n.identifier }, role });
-    } else if (n.label && texts.get(n.label) === 1 && !n.label.includes('"')) {
+    } else if (quotable(n.label) && texts.get(n.label) === 1) {
       targets.push({ selector: `text:"${n.label}"`, element: { text: n.label }, role });
+    } else if (quotable(n.label) && roleTexts.get(`${role} ${n.label}`) === 1) {
+      targets.push({ selector: `role:${role} text:"${n.label}"`, element: { role, text: n.label }, role });
+    } else if (quotable(n.identifier) && roleIds.get(`${role} ${n.identifier}`) === 1) {
+      targets.push({ selector: `role:${role} id:"${n.identifier}"`, element: { role, id: n.identifier }, role });
     }
   }
   return { targets, keyboard: nodes.some((n) => n.role === 'keyboard'), ...(neutral !== undefined && { neutral }) };
@@ -202,7 +214,10 @@ const ASSERT_BUDGET_MS = 1_000;
 function plan(platform: Platform, t: Target, tools: ReadonlySet<ToolName>): Call[] {
   const calls: Call[] = [];
   if (tools.has('tap')) calls.push({ tool: 'tap', args: { platform, selector: t.selector } });
-  if (tools.has('scroll_until')) for (const direction of ['down', 'up']) calls.push({ tool: 'scroll_until', args: { platform, selector: t.selector, direction } });
+  if (tools.has('scroll_until')) {
+    for (const direction of ['down', 'up']) calls.push({ tool: 'scroll_until', args: { platform, selector: t.selector, direction } });
+    calls.push({ tool: 'scroll_until', args: { platform, selector: t.selector, direction: 'down', fully: true } });
+  }
   if (tools.has('assert')) {
     calls.push({ tool: 'assert', args: { platform, asserts: [{ element: t.element, timeout: ASSERT_BUDGET_MS }] } });
     calls.push({ tool: 'assert', args: { platform, asserts: [{ element: t.element, color: { expected: '#808080' }, timeout: ASSERT_BUDGET_MS }] } });
