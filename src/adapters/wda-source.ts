@@ -1,4 +1,4 @@
-import { IOS_ROLE_MAP, normalizeIosElement } from './ios-node.js';
+import { IOS_ROLE_MAP, iosRoleOf, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
 import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, type Rect, type UiNode } from './types.js';
 
@@ -156,9 +156,6 @@ interface CellPlace {
 
 /** WDA's scroll-view types (`parkedIn`): the ones the role map makes `scrollable`. */
 const SCROLL_TYPES: ReadonlySet<string> = new Set(['Table', 'CollectionView', 'ScrollView']);
-
-/** The role `type` takes (`normalizeIosElement`'s own-key rule over this file's ROLE_MAP), asked of a raw element before it is normalized. */
-const roleOf = (type: string | undefined): string => (type !== undefined && Object.hasOwn(ROLE_MAP, type) ? ROLE_MAP[type] : 'other');
 
 function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiNode {
   const hidden = inherited.hidden || marks.hiddenRoots.has(el);
@@ -334,7 +331,7 @@ function hiddenRoots(root: WdaElement): ReadonlySet<WdaElement> {
   const invisible = (el: WdaElement): boolean => {
     const children = (el.children ?? []).map(invisible); // every child judged, so roots below a visible one are found too
     const whole = isZero(el.isVisible) && children.every(Boolean);
-    if (whole && isZero(el.isAccessible) && !STRUCTURAL_ROLES.has(roleOf(el.type))) roots.add(el);
+    if (whole && isZero(el.isAccessible) && !STRUCTURAL_ROLES.has(iosRoleOf(el.type, ROLE_MAP))) roots.add(el);
     return whole;
   };
   invisible(root);

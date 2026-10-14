@@ -81,9 +81,8 @@ export function normalizeIosElement(
   roles: Record<string, string>,
   children: UiNode[],
 ): UiNode {
-  const type = el.type ?? '';
   return {
-    role: Object.hasOwn(roles, type) ? roles[type] : 'other',
+    role: iosRoleOf(el.type, roles),
     label: emptyToNull(el.label),
     identifier: emptyToNull(el.identifier),
     value: emptyToNull(el.value),
@@ -97,6 +96,17 @@ export function normalizeIosElement(
       : zeroRect(),
     children,
   };
+}
+
+/**
+ * The role a raw element of `type` takes under `roles`: its OWN key's value,
+ * `other` for a type the map does not name or no type at all (the own-key
+ * rule above: a plain-object map answers `constructor` from its prototype).
+ * `normalizeIosElement`'s rule, exported for a parser that asks a raw
+ * element's role before normalizing it (wda-source.ts's hidden-subtree roots).
+ */
+export function iosRoleOf(type: string | undefined, roles: Record<string, string>): string {
+  return type !== undefined && Object.hasOwn(roles, type) ? roles[type] : 'other';
 }
 
 function emptyToNull(value: string | null | undefined): string | null {
