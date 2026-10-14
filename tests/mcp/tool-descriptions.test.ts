@@ -75,6 +75,8 @@ vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   PRESENTED_OVER_THE_ELEMENT: '<the presented remedy, as verify/pixel-poll.ts renders it>',
   OFF_THE_SCREEN: '<the off-screen miss, as verify/pixel-poll.ts renders it>',
   TOO_THIN_ON_THE_SCREEN: '<the thin-sliver miss, as verify/pixel-poll.ts renders it>',
+  OUTSIDE_ITS_SCROLL_VIEW: '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it>',
+  TOO_THIN_IN_ITS_SCROLL_VIEW: '<the scroll view\'s thin-sliver miss, as verify/pixel-poll.ts renders it>',
 }));
 
 vi.mock('../../src/adapters/ios-foreground.js', async (orig) => ({
@@ -239,15 +241,25 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
  * The owners' real presented sentences — the mocks above replace them for the descriptions — for the troubleshooting
  * reference, which quotes them as text: derived from the code, never typed out here.
  */
-async function actualSentences(): Promise<{ PRESENTED_OVER: string; PRESENTED_STOP: string; PRESENTED_OVER_THE_ELEMENT: string; OFF_THE_SCREEN: string; TOO_THIN_ON_THE_SCREEN: string }> {
+async function actualSentences(): Promise<{
+  PRESENTED_OVER: string;
+  PRESENTED_STOP: string;
+  PRESENTED_OVER_THE_ELEMENT: string;
+  OFF_THE_SCREEN: string;
+  TOO_THIN_ON_THE_SCREEN: string;
+  OUTSIDE_ITS_SCROLL_VIEW: string;
+  TOO_THIN_IN_ITS_SCROLL_VIEW: string;
+}> {
   const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
   // The actual scroll-text.ts still imports the MOCKED target-text.ts: its stop sentence is built on the tap's sentinel,
   // which is put back here for the owner's real words.
   const { PRESENTED_OVER: sentinel } = await import('../../src/interact/target-text.js');
   const built = (await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js')).PRESENTED_STOP;
   const PRESENTED_STOP = built.replace(sentinel, PRESENTED_OVER);
-  const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>('../../src/verify/pixel-poll.js');
-  return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN };
+  const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
+    '../../src/verify/pixel-poll.js',
+  );
+  return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW };
 }
 
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
@@ -321,6 +333,16 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(
       `Under a modal or sheet still up over the element's screen the message ends \`… ${PRESENTED_OVER_THE_ELEMENT}\` instead, whatever else lies over it (the status bar, a possible cut at the navigation bar): the message still names what lies over it, and this replaces its own advice. Close that screen, then assert again.`,
     );
+  });
+
+  it('color/ocr and tap: an element on the screen that its scroll view draws none of (WDA) is never measured nor tapped — the description and the troubleshooting entries quote the misses', async () => {
+    const { OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await actualSentences();
+    expect(description('assert')).toContain(
+      "On iOS with treeSource: wda an element on the screen that its scroll view draws none of (listed past the scroll view's frame, as WebDriverAgent lists a scroll view's content) fails closed likewise with '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it> <the scroll view> (element …, screen …)', and one its scroll view's edge leaves a sliver of no thicker than 2 pt with '<the scroll view's thin-sliver miss, as verify/pixel-poll.ts renders it> <the scroll view> (element …, drawn …, screen …)'",
+    );
+    expect(TROUBLESHOOTING).toContain(`- **\`color\`/\`ocr\` fails with \`${OUTSIDE_ITS_SCROLL_VIEW} <scroll view> (element …, screen …)\`** or **\`${TOO_THIN_IN_ITS_SCROLL_VIEW} <scroll view> (element …, drawn …, screen …)\`**`);
+    expect(description('tap')).toContain('is REFUSED as off screen, naming the scroll view, nothing tapped — scroll_until it first — after the keyboard is hidden');
+    expect(TROUBLESHOOTING).toContain('- **`… is outside its scroll view <scroll view> at (x,y): nothing of it is drawn (rect …) — scroll_until it first; nothing was tapped`**');
   });
 
   it('color/ocr: an element nothing of which lies on the screen fails closed saying so — scroll it on-screen, or close the presented screen first — and color is judged over the region its sampler reads', async () => {
