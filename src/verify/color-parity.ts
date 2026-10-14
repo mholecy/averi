@@ -1,6 +1,6 @@
 import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
-import { collectRects } from '../ui-tree/geometry.js';
+import { collectRects, rectText } from '../ui-tree/geometry.js';
 import { clipThenInset, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
@@ -694,6 +694,12 @@ export function formatColorParity(r: ColorParityResult): string {
 
 // ------------------------------------------------------- the color assert
 
+/**
+ * The head of the colour assert's miss on an element of no area (`evaluateColorAssert`): there is nothing to sample.
+ * The one sentence head the troubleshooting reference quotes.
+ */
+export const NO_AREA = 'the element has no area';
+
 /** Expected fill for a single element — the `color` assert spec's payload. */
 export interface ColorExpectation {
   /** '#RRGGBB' or '#RRGGBBAA' (alpha dropped). Hex only — token names resolve in the superrepo layer. */
@@ -729,12 +735,15 @@ export function evaluateColorAssert(
   const mode: ColorSampleMode = expectation.sample ?? 'dominant';
   const got = sampleFill(png, rect, scale, mode);
   if (got.absent !== undefined) {
+    // The fact found, no remedy: where the element lies and what to do is the pixel standing's to decide
+    // (ui-tree/standing.ts, `offScreen`, presented first), asked before any capture. The standing leaves a rect of NO
+    // AREA to the sampler (it is judged by its place) — the main way the sampler meets nothing to sample: Android's
+    // inverted bounds clamped flat (a Settings row's title `[198,297][324,58]`, `198,297 126x0`), idb's node listed
+    // as 0x0 once scrolled off the screen (`NO_AREA`). Else it meets an off-png rect only when the png's rows round a
+    // sliver to nothing, or the element moved between the read and the capture.
     const reason =
-      got.absent === 'off-png' ?
-        // The fact found, no remedy: where the element lies and what to do is the pixel standing's to decide
-        // (ui-tree/standing.ts, `offScreen`, presented first), asked before any capture; the sampler meets this only
-        // when the png's rows round a sliver to nothing, or the element moved between the read and the capture.
-        `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)})`
+      !(rect.width > 0 && rect.height > 0) ? `${NO_AREA} (rect ${rectText(rect)}): collapsed, or a node listed as 0x0 once scrolled off the screen`
+      : got.absent === 'off-png' ? `element rect is outside the screenshot (off-screen in this capture; scale ${scale.toFixed(3)})`
       : 'sample region is empty after inset/clamp';
     return { pass: false, detail: failClosed(reason, 'color') };
   }

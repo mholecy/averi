@@ -1206,6 +1206,14 @@ describe('Scene.standing for the pixel assert — off the screen', () => {
     }
   });
 
+  it('idb\'s keyboard band first, as ADR 0010 orders it: a row at 24,873 354x52, a 1-pt sliver on the screen under idb\'s band from y 590, is under the keyboard — not the thin sliver — for the colour and the ocr reader', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 873, width: 354, height: 52 } });
+    const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'scrollable', rect: box(402, 874), children: [row] })] });
+    for (const purpose of [COLOUR(row, idb(590)), OCR(row, idb(590))]) {
+      expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'underKeyboard', top: 590, witnessed: false, band: { x: 0, y: 590, width: 402, height: 284 } });
+    }
+  });
+
   it('on a root of no area (no device size): the box is the largest node, and a bar laid past it is measured, not judged off the screen', () => {
     const bar = node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 2000, width: 1080, height: 154 } });
     const t = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'container', rect: { x: 0, y: 66, width: 1080, height: 1934 } }), bar] });

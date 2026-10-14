@@ -478,6 +478,12 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
     expect(detail).toBe('element rect is outside the screenshot (off-screen in this capture; scale 1.000); failing closed, color unchecked');
   });
 
+  it('fails closed on a rect of no area stating that fact — the main way the sampler meets nothing to sample (Android\'s inverted bounds, idb\'s 0x0 node scrolled off), which the pixel standing leaves to it', () => {
+    const { pass, detail } = evaluateColorAssert({ x: 198, y: 297, width: 126, height: 0 }, { expected: WHITE }, measured(tree, shot(WHITE)));
+    expect(pass).toBe(false);
+    expect(detail).toBe('the element has no area (rect 198,297 126x0): collapsed, or a node listed as 0x0 once scrolled off the screen; failing closed, color unchecked');
+  });
+
   it('fails closed when the screen width cannot be inferred (never a vacuous pass)', () => {
     const zeroTree = n({ children: [n({ identifier: 'card' })] });
     const { pass, detail } = evaluateColorAssert(rect, { expected: WHITE }, measured(zeroTree, shot(WHITE)));

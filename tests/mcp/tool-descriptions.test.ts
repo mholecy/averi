@@ -333,6 +333,9 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`- **\`color\`/\`ocr\` fails with \`${OFF_THE_SCREEN} (element …, screen …)\`** or`);
     expect(TROUBLESHOOTING).toContain(`the message ends \`… ${PRESENTED_OVER_THE_ELEMENT.slice(0, PRESENTED_OVER_THE_ELEMENT.indexOf(' — close it first') + ' — close it first'.length)}; …\` instead: close that screen first.`);
     expect(TROUBLESHOOTING).toContain('for `color` the part of the rect on the screen, less 12% on each side of it — the region its sampler reads');
+    // The sampler's own fact for a rect of no area, from its owner (verify/color-parity.ts#NO_AREA).
+    const { NO_AREA } = await vi.importActual<typeof import('../../src/verify/color-parity.js')>('../../src/verify/color-parity.js');
+    expect(TROUBLESHOOTING).toContain(`- **\`color\` fails with \`${NO_AREA} (rect …)\`**: the element's rect is collapsed to no width or no height — a node idb lists as 0x0 once scrolled off the screen`);
   });
 });
 

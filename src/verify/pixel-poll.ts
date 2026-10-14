@@ -154,13 +154,6 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * measured, on `Verifier.poll` (verify/assert.ts).
  */
 
-/**
- * The part of an element's rect a pixel measurement reads, asked of the box the standing judges
- * (ui-tree/standing.ts#PixelReads, which says which box) — where chrome over the element counts (`overElement`): the
- * colour assert's sample region (color-parity.ts#colorSampleRect: clipped to the box, then inset, as its sampler
- * reads it); the whole rect for the ocr assert's crop.
- */
-export type Reads = PixelReads;
 
 interface PixelPollSpec {
   element: ElementSpec;
@@ -173,8 +166,8 @@ interface PixelPollSpec {
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
   unchecked: Exclude<Unchecked, 'geometry'>;
-  /** The part of the element's rect the measurement reads (`Reads`); the whole rect when omitted, as the ocr assert crops it. */
-  reads?: Reads;
+  /** The part of the element's rect the measurement reads (ui-tree/standing.ts#PixelReads); the whole rect when omitted, as the ocr assert crops it. */
+  reads?: PixelReads;
   /**
    * The measurement reads glyphs (the ocr assert): an element that may be
    * cut at the navigation bar fails closed, where a colour sample of what
@@ -393,7 +386,7 @@ export async function overElement(
   adapter: Pick<DeviceAdapter, 'viewport' | 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
-  { reads = (rect) => rect, glyphs = false, scene = sceneOf(tree) }: { reads?: Reads; glyphs?: boolean; scene?: Scene } = {},
+  { reads = (rect) => rect, glyphs = false, scene = sceneOf(tree) }: { reads?: PixelReads; glyphs?: boolean; scene?: Scene } = {},
 ): Promise<string | undefined> {
   const keyboard = readKeyboard(adapter, tree);
   const frame = await keyboard.overlapping(element.rect, element);
@@ -501,7 +494,7 @@ async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   tree: UiNode,
   element: UiNode,
-  { reads, glyphs, scene, keyboard }: { reads: Reads; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, scene, keyboard }: { reads: PixelReads; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
   // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelReads).

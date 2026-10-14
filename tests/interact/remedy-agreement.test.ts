@@ -392,6 +392,13 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
     expect(await pixelSaid(tree, target)).toBe(said);
   });
 
+  it('the slack\'s edge: at y 871, 3 pt on the screen, the sliver is measurable, and the dim over it is named — close it first', async () => {
+    const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', 871);
+    const said = `container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 24,871 354x52) — the capture would show it, not the element; ${PRESENTED_FOR_THE_ELEMENT}`;
+    expect(await colourSaid(tree, target)).toBe(said);
+    expect(await pixelSaid(tree, target)).toBe(said);
+  });
+
   it('…at y 872.5, 873 and 873.7: the same, never measured', async () => {
     for (const y of [872.5, 873, 873.7]) {
       const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', y);

@@ -425,10 +425,15 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    dim's overlap was not counted and the sampler read ~6 px rows of the dim. So a sliver of the element on the screen
    no thicker than PIXEL_OVERLAP_SLACK, on a side the screen's edge cuts, is the off-screen kind's case too ("only a
    sliver of the element lies on the screen, too thin to measure"), with the same remedy decision; the slack between
-   neighbours is unchanged, and a whole element thinner than it on the screen (a divider) is measured. The sampler's
-   own off-png sentence ("element rect is outside the screenshot") now states the fact only, with no advice: the
-   standing decides the remedy before any capture, and the sampler meets that case only when the png's rows round a
-   sliver to nothing or the element moved between the read and the capture. Wider by design: a full-screen
+   neighbours is unchanged, and a whole element thinner than it on the screen (a divider) is measured; idb's keyboard
+   band is judged before the thin sliver, as before the system bands (ADR 0010), so an element under it is a
+   keyboard miss as under WDA's and Android's reading. The sampler's own sentences state the fact only, with no
+   advice: the standing decides the remedy before any capture. The standing leaves a rect of NO AREA to the sampler
+   (judged by its place) — the main way the sampler meets nothing to sample, measured by the harness on 432 calls
+   over 72 trees: Android's inverted bounds clamped flat (`[198,297][324,58]`), idb's node listed as 0x0 once
+   scrolled off — and the colour assert now says so ("the element has no area (rect …): collapsed, or a node listed
+   as 0x0 once scrolled off the screen"); else it meets an off-png rect ("element rect is outside the screenshot")
+   only when the png's rows round a sliver to nothing or the element moved between the read and the capture. Wider by design: a full-screen
    pass-through layer (residual 1) over an off-screen target now gives "close it first" too; `scroll_until` stops
    there only when its stroke's touch-down lies on that layer's surface — on a dim filling the screen it does; on an
    undimmed partial sheet it may not (residual 11).

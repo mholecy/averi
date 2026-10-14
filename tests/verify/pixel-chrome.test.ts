@@ -4,9 +4,9 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
-import { sceneOf, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { sceneOf, type PixelReads as Reads, type PixelStanding } from '../../src/ui-tree/standing.js';
 import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
-import { overElement, type Reads } from '../../src/verify/pixel-poll.js';
+import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 
 /** What the pixel assert's round says lies over `element` (verify/pixel-poll.ts#overElement), the measurement reading `reads` (its rect when omitted) — with glyphs for the ocr assert. */

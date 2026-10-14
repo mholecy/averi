@@ -73,10 +73,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * - THE PIXEL ASSERT (`PixelPurpose`) judges a REGION, not a point, in
  *   one box, the usable screen's `oriented` (verify/pixel-poll.ts hands it
  *   the usable screen) — the same order, its place a region's:
- *   - off the screen when nothing of what it `reads` lies on the box, or
- *     the screen's edge leaves of it a sliver no thicker than the pixel
- *     slack (`thinSliver`) — `offScreen`, first (not on a root of no area,
- *     `failsOpen`, nor for a rect of no area): no capture shows any of it (the colour sample's
+ *   - off the screen when nothing of what it `reads` lies on the box —
+ *     `offScreen`, first; after idb's band (next), also when the screen's
+ *     edge leaves of it a sliver no thicker than the pixel slack
+ *     (`thinSliver`) — not on a root of no area (`failsOpen`), nor for a
+ *     rect of no area: no capture shows any of it (the colour sample's
  *     region is clipped to the screen before it is inset,
  *     verify/capture.ts#clipThenInset, so a sliver on the screen is read
  *     as the sliver its sampler reads);
@@ -668,7 +669,8 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
 
 /**
  * Where the pixel assert's region lies (`Scene`'s contract): off the screen
- * when what it reads has area and none of it lies on `box`, or when the
+ * when what it reads has area and none of it lies on `box`; under the band
+ * `purpose.keyboardTop` marks (below); off the screen again when the
  * screen's edge leaves of it a sliver no thicker than PIXEL_OVERLAP_SLACK
  * (`thinSliver`, with the element's part on the screen) — never on a box
  * that `failsOpen` (a root of no area: the box is only the tree's largest
@@ -681,16 +683,17 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * else on the screen.
  */
 function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean): RegionPlace {
-  if (!failsOpen && rectArea(reads) > 0) {
-    const on = rectIntersection(reads, box);
-    if (on === undefined) return { off: undefined };
-    const sliver = thinSliver(rect, on, box);
-    if (sliver !== undefined) return { off: sliver };
-  }
+  const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
+  if (on === undefined) return { off: undefined };
+  // idb's keyboard band before a thin sliver, as before the system bands (ADR 0010): the element under the band is a
+  // keyboard miss, worded as WDA's and Android's reading words it. Nothing wholly off the box meets the band.
+  // docs/adr/0010-pixel-assert-keyboard-first.md
   if (keyboardTop !== undefined) {
     const band = bandRect(keyboardTop, box);
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
   }
+  const sliver = on === box ? undefined : thinSliver(rect, on, box);
+  if (sliver !== undefined) return { off: sliver };
   return systemBandOver(reads, box, bands) ?? 'on';
 }
 
