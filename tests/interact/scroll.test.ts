@@ -97,6 +97,35 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
   });
 });
 
+describe('scrollUntilVisible — a timeout says what spent the budget', () => {
+  // The reads are timed by the driver around each tree read; the device's clock is what Date.now says.
+  function slowReads(readMs: number) {
+    const fake = scrollingFake(50_000, 10);
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const read = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      now += readMs;
+      return read();
+    };
+    return fake;
+  }
+
+  it('a read that outlasts the budget: no swipe was sent, and the read time is quoted', async () => {
+    const error = await scrollUntilVisible(slowReads(38_204), 'id:submit_button', { ...FAST, timeoutMs: 15_000 }).catch((e: unknown) => e);
+    vi.restoreAllMocks();
+    expect((error as Error).message).toMatch(/^scroll_until id:submit_button failed after 15000ms \(timeout; no swipe was sent; 1 tree read took 38204ms\) — /);
+  });
+
+  it('reads that spent it between swipes: the swipes sent, the reads counted, their total and the last', async () => {
+    const fake = slowReads(6_000);
+    const error = await scrollUntilVisible(fake, 'id:submit_button', { ...FAST, timeoutMs: 15_000 }).catch((e: unknown) => e);
+    vi.restoreAllMocks();
+    expect(fake.swipes).toHaveLength(2);
+    expect((error as Error).message).toContain('failed after 15000ms (timeout; 2 swipes sent; 3 tree reads took 18000ms, the last 6000ms)');
+  });
+});
+
 /**
  * 2026-10-08: the one stop that is absence is interact's ElementNotFoundError, so
  * an `optional:` scroll_until to an element not on this screen reads "(not

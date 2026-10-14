@@ -1172,7 +1172,7 @@ describe('scroll_until', () => {
       configPath: missing(),
     });
     expect(result.isError).toBe(true);
-    expect(result.text).toContain('failed after 7ms (timeout)');
+    expect(result.text).toMatch(/failed after 7ms \(timeout; \d+ swipes? sent; \d+ tree reads? took \d+ms/);
     // The settle delays between swipes were recorded, not waited on.
     expect(fake.swipes.length).toBeLessThan(200);
     expect(sleeps.length).toBe(fake.swipes.length);

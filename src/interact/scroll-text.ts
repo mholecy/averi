@@ -8,7 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ReadTime, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
@@ -485,8 +485,16 @@ function boundText(by: BoundBy, swipes: number): string {
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
     case 'timeout':
-      return `after ${by.timeoutMs}ms (timeout)`;
+      return `after ${by.timeoutMs}ms (timeout; ${swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`}; ${readTimeText(by.reads)})`;
   }
+}
+
+/**
+ * What the timeout's tree reads took: `1 tree read took 38204ms`, `3 tree reads took 18000ms, the last 6000ms` — so a
+ * budget the reads spent (a tree source restarting under the scroll) does not read as content that never came.
+ */
+function readTimeText({ count, totalMs, lastMs }: ReadTime): string {
+  return `${countOf(count, 'tree read')} took ${totalMs}ms${count > 1 ? `, the last ${lastMs}ms` : ''}`;
 }
 
 /** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */
