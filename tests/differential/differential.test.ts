@@ -45,7 +45,7 @@ describe('compareRecording', () => {
   });
 
   it('a colour assert samples its target painted its own colour: the visible targets pass, each on its own colour', async () => {
-    const result = await compareRecording(sample[0], side, side, { cap: 6, tools: new Set(['ui_snapshot', 'assert']), keepAll: true });
+    const result = await compareRecording(sample[0], side, side, { cap: 14, tools: new Set(['ui_snapshot', 'assert']), keepAll: true });
     const colour = result.all!.filter((r) => r.variant === 'screen' && JSON.stringify(r.call.args).includes('"color"'));
     const verdicts = colour.map((r) => {
       const expected = (r.call.args.asserts as { color: { expected: string } }[])[0].color.expected;
@@ -53,6 +53,9 @@ describe('compareRecording', () => {
       return [r.new.reply.startsWith('All 1 asserts passed'), sampled === undefined ? 'no sample' : sampled === expected ? 'own colour' : 'another'];
     });
     expect(verdicts.filter(([pass]) => pass).length).toBeGreaterThan(0);
+    // The PIN pad's "1", a 64x65 button in the open: its own colour, where it is.
+    const one = colour.find((r) => (r.call.args.asserts as { element: { text?: string } }[])[0].element.text === '1')!;
+    expect(one.new.reply.split('\n')[0]).toBe('All 1 asserts passed');
     expect(verdicts.filter(([pass]) => pass).every(([, what]) => what === 'own colour')).toBe(true);
     expect(new Set(colour.map((r) => (r.call.args.asserts as { color: { expected: string } }[])[0].color.expected)).size).toBe(colour.length);
   });
