@@ -160,16 +160,19 @@ target on screen was lost.
    nothing now, and its accessible label and text field stay as they were. A CONTROL, image or text so reported
    while drawn would still read as no cover (a false "clear"); none was seen among the D captures' on-screen
    controls, and the four on Account Detail (the search icon, a card's sliver, the screen's `Toolbar`) cover nothing
-   there either way.
+   there either way. The search icon (`Image Dashboard/icon-search 34,81 20x20`, `0/0`, no children) is most likely a
+   drawn image WDA reports hidden — the one shape of this residual the captures show — and it covers nothing.
 3. **The screen beneath a presented one.** WDA reports a screen occluded by a modal or a sheet `0/0` from its scroll
    view down — Finportal's login `ScrollView` under the RN modal (135 nodes), the SWIFT form's under the Fees sheet
    (122), the Contacts list under the New Contact sheet (95), and, under the discard popover, the sheet's form `Table`
-   too (121) — and the scroll view, no wrapper, roots a hidden subtree: the occluded screen's own content and chrome
-   cover none of its targets. A target there is still covered by the presented screen's surface (kept by the guard),
-   so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a medium
-   sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018 residual 2)
-   leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee row's lesson:
-   WDA's flags say "occluded", which the rule takes for "not drawn".
+   too (121) — and the scroll view, no wrapper, roots a hidden subtree; so does a full-screen `Toolbar`, no wrapper
+   either, that holds part of the occluded screen's chrome (on `D-contacts-sheet` a `Toolbar 0,0 402x874`, `0/0`,
+   wraps the Contacts list's search bar, `SearchField 'Search' 28,808 286x28`): the occluded screen's own content and
+   chrome cover none of its targets. A target there is still covered by the presented screen's surface (kept by the
+   guard), so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a
+   medium sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018
+   residual 2) leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee
+   row's lesson: WDA's flags say "occluded", which the rule takes for "not drawn".
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
 5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
    was not measured) is not placed.

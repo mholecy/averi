@@ -239,9 +239,12 @@ then where the swipe would have landed (interact/scroll-text.ts):
   and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is
   presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe
   on it may dismiss it, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport`;
-- under the keyboard: `… — element lies under the soft keyboard: its centre (201,661) is below the keyboard's top edge
-  at y 573, and the next swipe would touch down at (201,459) on container "dismiss popup" (0,0 402x874) — …`
-  (the tap refusal's words for the same point);
+- in the tree but past no side of the viewport — a rect with no area, as the SWIFT form's `TextFieldWithComponentStyle`
+  texts are read at 0,0 0x0: `… — element lies outside the viewport, …` (not "above": a rect with no area lies past
+  no side);
+- under the keyboard: `… — element lies under the soft keyboard: its centre (201,661) lies below the keyboard's top
+  edge at y 573, and the next swipe would touch down at (201,459) on container "dismiss popup" (0,0 402x874) — …`
+  (the tap refusal's words for the same point, one helper: interact/target-text.ts#underKeyboardText);
 - in the viewport but short of the stop: `… — element is in the viewport but <the stuck and bound sentences' words for
   that shortfall: CLIPPED at …, cut at its scroll container's … edge …, its centre stays under the status bar …, under
   <node> … — N% of it shows>, and the next swipe would touch down at …`;
@@ -256,6 +259,12 @@ Not changed: a target judged in the viewport under a presented surface stops as 
 target of the presented screen itself — a row of a sheet below the sheet's fold — is stroked for on its own screen
 (the touch-down lies on its own screen's form: no screen is presented over it there); a stroke whose touch-down lies
 off every presented surface is sent.
+
+The rule is platform-blind: `presentedAt` and the round ask no platform, so a tree from any source that shows a screen
+presented over the target's — by `presentedSurface`'s shapes — stops the same way (the scroll-rounds row "platform-blind,
+a synthetic shape on ANDROID" pins it on a cut-sliver toggle under a presented scroll view). Android is unchanged only
+on the measured trees, because no Android device tree measured has a presented screen; the one Android shape that came
+close (`snapF5`'s RN background leaf under its `login_screen` scroll view of the same frame) is not one, as below.
 
 No blind stroke after a hold (review of the slice, M2): while either presented stop is held for its confirming read,
 a read that does not read is confirmed again while the budget allows, and when none is left the scroll stops as the

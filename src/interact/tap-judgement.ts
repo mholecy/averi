@@ -8,7 +8,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutRemedy, cutSliverText, PRESENTED_OVER } from './target-text.js';
+import { cutRemedy, cutSliverText, PRESENTED_OVER, underKeyboardText } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -320,7 +320,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     case 'underKeyboard':
       throw new CoveredRefusal(
         told.refusal(
-          `under the soft keyboard: its centre (${centre.x},${centre.y}) lies below the keyboard's top edge at y ${standing.line.y}, where a tap presses the keyboard — ` +
+          `${underKeyboardText(centre, standing.line.y)}, where a tap presses the keyboard — ` +
             `scroll_until it first, or ${hideIt(told.remedy)}`,
         ),
       );

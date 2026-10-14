@@ -25,8 +25,9 @@ import { everyNode, type UiNode } from './types.js';
  * `-error` belongs to the nearest field above it in its column, provided it
  * starts close under that field (at most 24 pt, or the field's height when
  * that is more) and no field lies between them (see `fieldAbove`). Any
- * textfield counts here, with an identifier or without. The wrapper's identifier would name the field more directly,
- * but only WDA lists it, as the field's PARENT with the message its SIBLING;
+ * textfield counts here, with an identifier or without. The wrapper's
+ * identifier would name the field more directly, but only WDA lists it, as
+ * the field's PARENT with the message its SIBLING;
  * idb lists no container identifiers, so a rule reading the wrapper would
  * serve one source. Geometry serves both. A field that already has a
  * same-identifier message keeps it, and of several such messages under one

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import type { Edge } from '../../src/ui-tree/geometry.js';
-import { coverName, cutRemedy, cutSliverText, pastSideText, revealText, untriedSideText } from '../../src/interact/target-text.js';
+import { coverName, cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from '../../src/interact/target-text.js';
 
 /**
  * The phrases a cut or a side target is said in, one wording for the tap's
@@ -31,6 +31,12 @@ describe('pastSideText — where a node read wholly past a side lies', () => {
   ] as const)('%s: clipped out vs past the viewport', (edge, clipped, viewport) => {
     expect(pastSideText(edge, true)).toBe(clipped);
     expect(pastSideText(edge, false)).toBe(viewport);
+  });
+});
+
+describe('underKeyboardText — where a target whose centre lies under the soft keyboard stands', () => {
+  it('names the centre and the keyboard\'s top edge, in the words the tap\'s refusal and scroll_until\'s presented stop both say', () => {
+    expect(underKeyboardText({ x: 201, y: 661 }, 573)).toBe("under the soft keyboard: its centre (201,661) lies below the keyboard's top edge at y 573");
   });
 });
 

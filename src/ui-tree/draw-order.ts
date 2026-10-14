@@ -23,9 +23,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * Android may sort by position rather than by Z (not measured) — there a
  * later sibling drawn beneath may read as drawn over, for every question.
  *
- * Five questions, one per caller, read from two columns of `NOT_DRAWN`
+ * Six questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
- * `coversOf` reads `exposure`'s):
+ * `coversOf` and `presentedAt` read `exposure`'s):
  * - `drawnOver(container)` — `scroll_until`'s stroke box
  *   (interact/scroll-read.ts#TreeFacts, swipe.ts#strokeRoom): what is
  *   drawn over the clipping container a stroke goes over?
@@ -50,6 +50,11 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * - `coversOf(node, region)` — the uiautomator parser's widening, through
  *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
  *   drawn over the strip a node cut short of its own content would gain?
+ * - `presentedAt(node, point)` — `scroll_until`'s stroke
+ *   (interact/scroll-rounds.ts#presentedTouchDown): is the touch-down of a
+ *   stroke for a target not judged in the viewport on a surface of a screen
+ *   presented over the target's own (`exposure`'s column, then
+ *   `presentedSurface`, ADR 0018)?
  *
  * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where

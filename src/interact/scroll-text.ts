@@ -1,4 +1,4 @@
-import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
+import { rectArea, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
 import { drawnOverText, frameText, nodeText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, untriedSideText } from './target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
@@ -414,37 +414,46 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
  * down on the presented screen (scroll-rounds.ts#ScrollOutcome's `touchDown`) — one clause per reason, by where it
  * stands (ui-tree/standing.ts#Standing):
  * - wholly outside the frame: `element lies below the viewport` (target-text.ts#pastSideText, the side it lies past);
- * - under the soft keyboard: `element lies under the soft keyboard: its centre (201,661) is below the keyboard's top
- *   edge at y 573` — the tap's refusal's words for the same point (tap-judgement.ts);
+ * - under the soft keyboard: `element lies under the soft keyboard: its centre (201,661) lies below the keyboard's top
+ *   edge at y 573` — the tap's refusal's words for the same point (target-text.ts#underKeyboardText);
  * - in the frame but short of the stop: `element is in the viewport but …`, in the words the stuck and bound
  *   sentences give that shortfall (scroll-read.ts#shortOf: clipped at an edge, cut to a sliver by its scroll
  *   container, its centre under a system bar, or under something of its own screen).
  */
 function notInViewportText(judged: Judged, viewport: Rect): string {
   const { standing, node } = judged;
-  if (standing.kind === 'underKeyboard') {
-    const { x, y } = tapPoint(node);
-    return `element lies under the soft keyboard: its centre (${x},${y}) is below the keyboard's top edge at y ${standing.line.y}`;
-  }
+  if (standing.kind === 'underKeyboard') return `element lies ${underKeyboardText(tapPoint(node), standing.line.y)}`;
   if (standing.facts.visible === 0) {
     const side = wholePast(node.rect, viewport);
     return `element lies ${side === undefined ? 'outside the viewport' : pastSideText(side, node.clippedOut === side)}`;
   }
+  return `element is in the viewport but ${shortClause(judged)}`;
+}
+
+/** What keeps a judged match in the frame short of the stop, in the stuck and bound sentences' words (scroll-read.ts#shortOf). */
+function shortClause(judged: Judged): string {
   const short = shortOf(judged);
   switch (short.of) {
     case 'clipped':
-      return `element is in the viewport but ${describeClip(standing.facts.clipped, standing.facts.visible, judged.under?.topCover)}`;
+      return describeClip(judged.standing.facts.clipped, judged.standing.facts.visible, judged.under?.topCover);
     case 'sliver':
-      return `element is in the viewport but ${sliverText(short)}`;
+      return sliverText(short);
     case 'systemBar':
-      return `element is in the viewport but ${systemBarText(short)}`;
+      return systemBarText(short);
     case 'covered':
-      return `element is in the viewport but ${underText(short)}`;
+      return underText(short);
   }
 }
 
-/** The side of `viewport` a rect lies wholly past — below before above, as a scroll down finds it — or undefined when it lies past none wholly. */
+/**
+ * The side of `viewport` a rect lies wholly past — below before above, as a scroll down finds it — or undefined when it
+ * lies past none wholly. A rect with no area lies past none: it has no extent to lie past a side with, and where a tree
+ * gives one it is most often a placeholder origin, not a place (the SWIFT form's `TextFieldWithComponentStyle` texts,
+ * read at 0,0 0x0 under their fields) — its bottom edge on the viewport's top would read "above the viewport", so it
+ * reads "outside the viewport" instead.
+ */
 function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
+  if (rectArea(rect) === 0) return undefined;
   if (rect.y >= viewport.y + viewport.height) return 'bottom';
   if (rect.y + rect.height <= viewport.y) return 'top';
   if (rect.x >= viewport.x + viewport.width) return 'right';

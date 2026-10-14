@@ -1876,12 +1876,18 @@ describe('round — a cover the target shows past only on its far side (the roun
  * screen-sized layer in the app's Window): no scroll moves it out from under that screen, and a stroke on the screen
  * may dismiss it (a page sheet's pull-to-dismiss, a "Discard Changes?" prompt) — so the round confirms with one more
  * read, sends no stroke, and stops naming the presented screen. On the measured ui_snapshots
- * (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
+ * (tests/fixtures/wda-ui-snapshot-stacked-layers.json) and one raw /source capture
+ * (tests/fixtures/wda-capture-contacts-discard-popover.json).
  */
 describe('round — a target under a screen presented over it (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', async () => {
   const { readFile } = await import('node:fs/promises');
   const { everyNode } = await import('../../src/adapters/types.js');
-  const screens = (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+  const { parseWdaSource } = await import('../../src/adapters/wda-source.js');
+  const screens: Record<string, UiNode> = {
+    ...(JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens,
+    // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now.
+    contactsDiscardPopoverKeyboardDown: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8')),
+  };
   const rowOf = (key: string, id: string): Row => {
     const tree = screens[key];
     return { tree, found: [[...everyNode(tree)].find((x) => x.identifier === id || x.label === id)!] };
@@ -1979,6 +1985,19 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       );
     });
 
+    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the dim at the touch-down (201,699)', () => {
+      const tree = screens.contactsDiscardPopoverKeyboardDown;
+      const text = [...everyNode(tree)].find((x) => x.role === 'text' && x.label === 'add instant message')!;
+      expect(text.rect).toEqual({ x: 20, y: 1306, width: 362, height: 52 });
+      const row: Row = { tree, found: [text] };
+      const played = play(IPHONE, [row, row]);
+      expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(failureOf(played, 'text:"add instant message"').message).toMatch(
+        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
+      );
+    });
+
     it('the SWIFT form under the Fees half sheet: `payee_city_input` below the fold — no stroke (the one measured moved the sheet to another detent), the stop names the sheet\'s form, on top at the touch-down', () => {
       const field = rowOf('swiftFeesSheet', 'swift_payment.form.payee_city_input');
       for (const fully of [false, true]) {
@@ -1990,6 +2009,18 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       }
     });
 
+    it('a zero-area node: the Fees half sheet\'s `TextFieldWithComponentStyle` text read at 0,0 0x0 under the form\'s fields — "outside the viewport", not "above": a rect with no area lies past no side, though its bottom edge 0 is the viewport\'s top', () => {
+      const tree = screens.swiftFeesSheet;
+      const zero = [...everyNode(tree)].find((x) => x.role === 'text' && x.identifier === 'TextFieldWithComponentStyle' && x.rect.width === 0)!;
+      expect(zero.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+      const row: Row = { tree, found: [zero] };
+      const played = play(IPHONE, [row, row]);
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
+      expect(failureOf(played, 'id:TextFieldWithComponentStyle').message).toMatch(
+        /^scroll_until id:TextFieldWithComponentStyle stopped before any swipe — element lies outside the viewport, and the next swipe would touch down at \(201,699\) on /,
+      );
+    });
+
     it('under the soft keyboard (the popover over the sheet, keyboard up): the sheet\'s cell "add field" lies under the keyboard\'s band — the stroke, kept above it, would still touch down on the dim; the stop says the keyboard', () => {
       const field = { ...cellOf('contactsDiscardPopover', 'add field'), cover: coverOver({ x: 0, y: 573, width: 402, height: 301 }, NO_BACK), ofKeyboard: (n: UiNode) => n.ofKeyboard === true };
       const played = play(IPHONE, [field, field]);
@@ -1997,7 +2028,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       // Asked where the stroke would touch down above the keyboard (swipe.ts#strokeRoom's cut), not on its keys at (201,699).
       expect(played.outcome).toMatchObject({ kind: 'presented', touchDown: { x: 201, y: 459 } });
       expect(failureOf(played, 'role:container label:"add field"').message).toMatch(
-        /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) is below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
+        /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
       );
     });
 
@@ -2020,7 +2051,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       );
     });
 
-    it('in the viewport but cut to a sliver by its scroll container (synthetic, Android\'s shape: the SWIFT form\'s "Payment details" toggle 66,1924 948x55 at the form\'s bottom edge), a sheet\'s scroll view presented over the rest of the form — the stroke would touch down on that sheet', () => {
+    it('platform-blind, a synthetic shape on ANDROID (no Android device tree has a presented screen): in the viewport but cut to a sliver by its scroll container (the SWIFT form\'s "Payment details" toggle 66,1924 948x55 at the form\'s bottom edge), a sheet\'s scroll view presented over the rest of the form — the stroke would touch down on that sheet, so the stop is `presented` there as on iOS', () => {
       const SCREEN = { x: 0, y: 0, width: 1080, height: 2220 };
       const toggle = node({ role: 'container', identifier: 'details_toggle', rect: { x: 66, y: 1924, width: 948, height: 55 }, children: [node({ role: 'other', label: 'Payment details', rect: { x: 66, y: 1936, width: 948, height: 42 } })] });
       const form = node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 242, width: 1080, height: 1736 }, children: [toggle] });
@@ -2049,13 +2080,18 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stroke']);
     });
 
+    it('a hold that a read which reads lets go is gone: the popover closed on the confirming read (stroke sent), then a read fails — the failed read strokes on, it does not stop `presented` on the hold the closed popover released', () => {
+      const failed: Row = { error: 'WDA /source returned 500' };
+      const played = play(IPHONE, [BELOW, unpresented, failed]);
+      expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stroke', 'stroke']);
+    });
+
     it('the stuck turn\'s stroke back held for the confirming read is not taken as answered by it — on the Fees half sheet\'s tree, the target its first `dismiss popup` in tree order: a hidden twin `PopoverDismissRegion` of the sheet\'s dim, listed in the SWIFT form\'s own layer, judged either way up. The two strokes up touch down at (201,175) on the sheet\'s REAL dim, of the same frame, which the target column excuses as the target\'s own frame (`sameFrame`; a residual of ADR 0018), so they are sent; the turn down would touch down on the sheet\'s form, a presented surface, so it is held, confirmed and stopped — never "nor does swiping down"', () => {
       const tree = screens.swiftFeesSheet;
       const twin = [...everyNode(tree)].find((x) => x.label === 'dismiss popup')!; // the first in pre-order: the hidden twin in the form's layer
-      const dim = twin;
       const box = { x: 0, y: 0, width: 402, height: 874 };
       const eitherWayUp = { box, boxes: [box, { x: 0, y: 0, width: 874, height: 402 }], oriented: box, from: 'device' as const };
-      const row: Row = { tree, found: [dim], screen: eitherWayUp };
+      const row: Row = { tree, found: [twin], screen: eitherWayUp };
       const played = play({ ...IPHONE, direction: 'up', maxSwipes: 5, timeoutMs: 30_000 }, [row, row, row, row]);
       expect(played.steps.map((st) => (st.do === 'stroke' ? st.toward : st.do))).toEqual(['up', 'up', 'confirm', 'stop']);
       expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 2, touchDown: { x: 201, y: 699 } });
