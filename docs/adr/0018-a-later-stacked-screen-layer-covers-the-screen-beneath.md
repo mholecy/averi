@@ -239,9 +239,12 @@ then where the swipe would have landed (interact/scroll-text.ts):
   and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is
   presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe
   on it may dismiss it, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport`;
-- under the keyboard: `… — element lies under the soft keyboard: its centre (201,661) is below the keyboard's top edge
-  at y 573, and the next swipe would touch down at (201,459) on container "dismiss popup" (0,0 402x874) — …`
-  (the tap refusal's words for the same point);
+- in the tree but past no side of the viewport — a rect with no area, as the SWIFT form's `TextFieldWithComponentStyle`
+  texts are read at 0,0 0x0: `… — element lies outside the viewport, …` (not "above": a rect with no area lies past
+  no side);
+- under the keyboard: `… — element lies under the soft keyboard: its centre (201,661) lies below the keyboard's top
+  edge at y 573, and the next swipe would touch down at (201,459) on container "dismiss popup" (0,0 402x874) — …`
+  (the tap refusal's words for the same point, one helper: interact/target-text.ts#underKeyboardText);
 - in the viewport but short of the stop: `… — element is in the viewport but <the stuck and bound sentences' words for
   that shortfall: CLIPPED at …, cut at its scroll container's … edge …, its centre stays under the status bar …, under
   <node> … — N% of it shows>, and the next swipe would touch down at …`;

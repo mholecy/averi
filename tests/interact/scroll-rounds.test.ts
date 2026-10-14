@@ -1990,6 +1990,18 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       }
     });
 
+    it('a zero-area node: the Fees half sheet\'s `TextFieldWithComponentStyle` text read at 0,0 0x0 under the form\'s fields — "outside the viewport", not "above": a rect with no area lies past no side, though its bottom edge 0 is the viewport\'s top', () => {
+      const tree = screens.swiftFeesSheet;
+      const zero = [...everyNode(tree)].find((x) => x.role === 'text' && x.identifier === 'TextFieldWithComponentStyle' && x.rect.width === 0)!;
+      expect(zero.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+      const row: Row = { tree, found: [zero] };
+      const played = play(IPHONE, [row, row]);
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
+      expect(failureOf(played, 'id:TextFieldWithComponentStyle').message).toMatch(
+        /^scroll_until id:TextFieldWithComponentStyle stopped before any swipe — element lies outside the viewport, and the next swipe would touch down at \(201,699\) on /,
+      );
+    });
+
     it('under the soft keyboard (the popover over the sheet, keyboard up): the sheet\'s cell "add field" lies under the keyboard\'s band — the stroke, kept above it, would still touch down on the dim; the stop says the keyboard', () => {
       const field = { ...cellOf('contactsDiscardPopover', 'add field'), cover: coverOver({ x: 0, y: 573, width: 402, height: 301 }, NO_BACK), ofKeyboard: (n: UiNode) => n.ofKeyboard === true };
       const played = play(IPHONE, [field, field]);
@@ -1997,7 +2009,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       // Asked where the stroke would touch down above the keyboard (swipe.ts#strokeRoom's cut), not on its keys at (201,699).
       expect(played.outcome).toMatchObject({ kind: 'presented', touchDown: { x: 201, y: 459 } });
       expect(failureOf(played, 'role:container label:"add field"').message).toMatch(
-        /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) is below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
+        /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
       );
     });
 

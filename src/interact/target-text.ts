@@ -1,10 +1,11 @@
-import type { Rect, UiNode } from '../adapters/types.js';
+import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { presentedRemedy } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
 /**
- * The phrases a target cut to a sliver, or lying past a side, is said in —
+ * The phrases a target cut to a sliver, lying past a side, or lying under
+ * the soft keyboard, is said in —
  * one wording for every verb that says it: the tap's refusal (tap-judgement.ts),
  * the wait's hint (resolve.ts#zeroAreaHint), `scroll_until`'s failures
  * (scroll-text.ts) and the dismissal picker's skip lines
@@ -36,6 +37,20 @@ import { SIDES } from './swipe.js';
  */
 export function pastSideText(side: Edge, clippedOut: boolean): string {
   return clippedOut ? `clipped out ${SIDES[side].past} its scroll container` : `${SIDES[side].past} the viewport`;
+}
+
+/**
+ * Where a target whose centre lies under the soft keyboard stands —
+ * `under the soft keyboard: its centre (201,661) lies below the keyboard's
+ * top edge at y 573` — the one wording of that point, for the tap's
+ * refusal (tap-judgement.ts#judgeTap, which goes on to say a tap there
+ * presses the keyboard) and `scroll_until`'s presented stop
+ * (scroll-text.ts#notInViewportText, which says it of "element"). `centre`
+ * is the target's tap point, `lineY` the keyboard line's y
+ * (ui-tree/keyboard-position.ts#KeyboardLine).
+ */
+export function underKeyboardText(centre: Point, lineY: number): string {
+  return `under the soft keyboard: its centre (${centre.x},${centre.y}) lies below the keyboard's top edge at y ${lineY}`;
 }
 
 /** The scroll that brings back a node lying past `side`: `scroll_until it with direction: "up"` (swipe.ts#SIDES). */
