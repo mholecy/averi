@@ -233,10 +233,10 @@ describe('tool descriptions on a screen presented over the target', () => {
 
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', () => {
     expect(description('assert')).toContain(
-      'Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen\'.',
+      'Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen\' (under the status bar too, after the bar\'s own advice).',
     );
     expect(TROUBLESHOOTING).toContain(
-      'Under a modal or sheet still up over the element\'s screen the message ends `… a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen` instead: close that screen, then assert again.',
+      'Under a modal or sheet still up over the element\'s screen the message ends `… a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen` instead (after the status bar\'s own advice, joined by `and`, when the bar lies over it too): close that screen, then assert again.',
     );
   });
 });

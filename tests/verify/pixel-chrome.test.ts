@@ -481,6 +481,19 @@ describe('the pixel assert under a presented screen (docs/adr/0018-a-later-stack
     );
   });
 
+  it('under the status bar AND beneath a presented screen: the bar\'s advice, then the presented screen\'s — "and a screen is presented over the element … close it first", never read as the bar', async () => {
+    const PRESENTED = '; and a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen';
+    const sheet = (await screens()).contactsSheet;
+    const top = [...everyNode(sheet)].find((x) => x.rect.x === 0 && x.rect.y === 0 && x.rect.width === 402 && x.rect.height === 156)!;
+    expect(await over(IPHONE_ADAPTER, sheet, top)).toBe(
+      'the status bar is drawn over the element (element 0,0 402x156, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that' +
+        PRESENTED,
+    );
+    const forgot = (await screens()).finportalForgot;
+    const header = [...everyNode(forgot)].find((x) => x.rect.x === 0 && x.rect.y === 0 && x.rect.width === 402 && x.rect.height === 102)!;
+    expect(await over(IPHONE_ADAPTER, forgot, header)).toMatch(new RegExp(`^the status bar is drawn over the element \\(element 0,0 402x102, status bar 0,0 402x62\\) — .*${PRESENTED.replace(/[()]/g, '\\$&')}$`));
+  });
+
   it('a row of the sheet under another of the sheet\'s own rows keeps the scroll remedy: the screen over it is its own, not one presented over it', async () => {
     const tree = (await screens()).contactsSheet;
     const row = named(tree, 'add field');

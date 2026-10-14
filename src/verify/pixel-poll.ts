@@ -479,6 +479,11 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * flat-list root (`covered.overRoot`: its Application node, screen-sized,
  * and never a full-bleed header in a flat list) it says the node named is
  * content drawn over the root's background.
+ *
+ * Beneath a screen PRESENTED over the element (ui-tree/standing.ts#underPresented: a modal's dim, a sheet — ADR 0018),
+ * no scroll moves it out from under that screen: under a COVER the remedy is `presentedRemedy('the element')` in place
+ * of every other (`coverRemedy`'s `presented`); under a system bar the bar's remedy stands and that one follows it,
+ * joined by "and".
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  * docs/adr/0011-no-stuck-clause-at-the-bottom-edge.md
  * docs/adr/0012-pixel-assert-residuals-d4-d6.md
@@ -510,7 +515,9 @@ async function judgeOver(
       // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
       // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
       const surface = pinnedSurface(element, screen, usable, scene.clips);
-      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(surface ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
+      // Beneath a screen presented over it too (ADR 0018): that screen's remedy after the bar's, "and" so its "close it first" never reads as the bar.
+      const presented = underPresented(standing.facts) ? `; and ${presentedRemedy('the element')}` : '';
+      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(surface ?? (pinned || fromTop ? 'stuck' : 'scroll'))}${presented}`;
     }
     case 'cut':
       return (
