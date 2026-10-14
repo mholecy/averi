@@ -38,8 +38,9 @@ const NONE = { dismissal: 'none', advice: 'ADV' } as const;
 
 /**
  * A row at the top of a scroll view, its centre (201,50) in the 62-pt status band, beneath a React Native transparent
- * modal: a screen-filling dimming leaf laid on a later screen-sized layer, the card beside it. The shape the
- * architecture review reproduced the three verbs' disagreement on.
+ * modal: a screen-filling dimming leaf laid on a later screen-sized layer, the card beside it. Two remedies hold of it
+ * at once — a scroll out from under the status bar, and closing the screen presented over it — so it is where the three
+ * verbs would part if each picked its own.
  */
 function probe(): { tree: UiNode; target: UiNode } {
   const target = node({ role: 'text', identifier: 't', label: 'Top row', rect: { x: 0, y: 10, width: 402, height: 80 } });

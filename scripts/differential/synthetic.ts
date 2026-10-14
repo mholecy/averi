@@ -12,7 +12,11 @@ type IdbEl = { type: string; AXLabel: string | null; AXUniqueId: string | null; 
 const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number): IdbEl => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
 const qwerty = (y: number) => ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((k, i) => el('Button', k, 2 + 40 * i, y, 38, 46));
 
-/** idb: the number pad's value-date row moved through the pad's band, Contacts' QWERTY, and three review shapes. */
+/**
+ * idb: the number pad's value-date row moved through the pad's band, Contacts' QWERTY, and three shapes over a QWERTY
+ * band: a tall row straddling the band's line with a key over it, a field and its label at one origin under it, and a
+ * sign-in button under it below two fields.
+ */
 export function syntheticIdb(numberPad: IdbEl[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const y of [500, 545, 560, 565, 575, 581, 600, 640, 700, 760, 840]) {
@@ -25,9 +29,9 @@ export function syntheticIdb(numberPad: IdbEl[]): Record<string, string> {
     el('Button', 'add url', 20, 902, 362, 51), el('Button', 'Gap row', 20, 590, 362, 30),
     ...['Z', 'X', 'C', 'V'].map((k, i) => el('Button', k, 48 + 40 * i, 714, 36, 46)), el('Other', null, 0, 590, 402, 284), el('Button', 'Dictate', 325, 805, 68, 69),
   ]);
-  out['review-a.json'] = JSON.stringify([el('Application', 'App', 0, 0, 402, 874), el('TextField', 'Name', 20, 200, 362, 44), el('Button', 'Row', 20, 520, 362, 160), el('Button', 'Spacer below', 20, 900, 362, 40), el('Button', 'K', 180, 594, 44, 40), ...qwerty(640), el('Other', null, 0, 590, 402, 284)]);
-  out['review-pair.json'] = JSON.stringify([el('Application', 'App', 0, 0, 402, 874), el('TextField', 'Field', 42, 700, 318, 20), el('StaticText', 'Label', 42, 700, 60, 20), ...qwerty(780), el('Other', null, 0, 590, 402, 284)]);
-  out['review-b.json'] = JSON.stringify([el('Application', 'App', 0, 0, 402, 874), el('TextField', 'User', 20, 200, 362, 44), el('TextField', 'Pass', 20, 260, 362, 44), el('Button', 'Sign in', 20, 700, 362, 50), ...qwerty(780), el('Other', null, 0, 590, 402, 284)]);
+  out['band-row-straddles-the-line.json'] = JSON.stringify([el('Application', 'App', 0, 0, 402, 874), el('TextField', 'Name', 20, 200, 362, 44), el('Button', 'Row', 20, 520, 362, 160), el('Button', 'Spacer below', 20, 900, 362, 40), el('Button', 'K', 180, 594, 44, 40), ...qwerty(640), el('Other', null, 0, 590, 402, 284)]);
+  out['band-field-and-label-under-the-line.json'] = JSON.stringify([el('Application', 'App', 0, 0, 402, 874), el('TextField', 'Field', 42, 700, 318, 20), el('StaticText', 'Label', 42, 700, 60, 20), ...qwerty(780), el('Other', null, 0, 590, 402, 284)]);
+  out['band-sign-in-under-the-line.json'] = JSON.stringify([el('Application', 'App', 0, 0, 402, 874), el('TextField', 'User', 20, 200, 362, 44), el('TextField', 'Pass', 20, 260, 362, 44), el('Button', 'Sign in', 20, 700, 362, 50), ...qwerty(780), el('Other', null, 0, 590, 402, 284)]);
   return out;
 }
 
