@@ -274,7 +274,7 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below). ');
     expect(description('tap')).toContain('fully: true when the next step measures it), unless a screen is presented over the target (below); ');
     expect(description('tap')).toContain(
-      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first", the status bar\'s advice or the keyboard\'s, whatever else keeps the target from a tap — its centre under that screen, off the screen, under the status bar or under the soft keyboard, or a cut at its scroll container\'s edge: ' +
+      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar, or a cut at its scroll container\'s edge: ' +
         `'${TAP_SENTINEL}'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.`,
     );
   });
@@ -299,7 +299,7 @@ describe('tool descriptions on a screen presented over the target', () => {
     const { PRESENTED_OVER, PRESENTED_STOP } = await actualSentences();
     expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${PRESENTED_STOP}, so none was sent\` (or \`so no further swipe was sent\`).`);
     expect(TROUBLESHOOTING).toContain(
-      `- **\`… ${PRESENTED_OVER}\`** (tap or \`scroll_until\`): the target lies on the screen beneath a modal or sheet that is still up — whatever else keeps it from a tap (its centre under that screen, off the screen, under the status bar or under the soft keyboard, or a cut at its scroll container's edge), a tap says this in place of that remedy (\`scroll_until it first\`, the status bar's advice, hiding the keyboard); nothing was tapped and no further swipe was sent.`,
+      `- **\`… ${PRESENTED_OVER}\`** (tap or \`scroll_until\`): the target lies on the screen beneath a modal or sheet that is still up — whatever else keeps it from a tap (its centre under that screen, off the screen or under the status bar, or a cut at its scroll container's edge), a tap says this in place of that remedy (\`scroll_until it first\`, the status bar's advice); nothing was tapped and no further swipe was sent.`,
     );
     expect(TROUBLESHOOTING).toContain('A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over its whole rect, unless, among others, it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames:');
     expect(TROUBLESHOOTING).toContain(
@@ -314,10 +314,10 @@ describe('tool descriptions on a screen presented over the target', () => {
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', async () => {
     const { PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
     expect(description('assert')).toContain(
-      `Under a screen presented over the element (a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar, idb's keyboard band — in place of its own advice; a keyboard the device reports is still named first, with its own).`,
+      `Under a screen presented over the element (a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice; a keyboard the device reports is still named first, with its own).`,
     );
     expect(TROUBLESHOOTING).toContain(
-      `Under a modal or sheet still up over the element's screen the message ends \`… ${PRESENTED_OVER_THE_ELEMENT}\` instead, whatever else lies over it (the status bar, a possible cut at the navigation bar, idb's keyboard band): the message still names what lies over it, and this replaces its own advice. Close that screen, then assert again.`,
+      `Under a modal or sheet still up over the element's screen the message ends \`… ${PRESENTED_OVER_THE_ELEMENT}\` instead, whatever else lies over it (the status bar, a possible cut at the navigation bar): the message still names what lies over it, and this replaces its own advice. Close that screen, then assert again.`,
     );
   });
 });

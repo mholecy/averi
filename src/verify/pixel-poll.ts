@@ -505,6 +505,9 @@ async function judgeOver(
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
     case 'underKeyboard':
+      // The presented arm is unreachable today: idb's band is found in a flat list alone, which holds no presented
+      // screen (ui-tree/draw-order.ts#holderOf's `parent`). The agreement rows
+      // (tests/interact/remedy-agreement.test.ts) pin only its rendering, should either change.
       return standing.remedy.of === 'presented' ? `the soft keyboard covers the element ${at}, keyboard ${rectText(standing.band)}) — ${PRESENTED_OVER_THE_ELEMENT}` : keyboardOver(element.rect, standing.band, keyboard.remedy);
     case 'systemBar': {
       const bar = systemBarName(standing.bar.edge);

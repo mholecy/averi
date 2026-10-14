@@ -321,6 +321,9 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':
+      // The presented arm is unreachable today: the only line no guard acts on is idb's band, which draw order finds in
+      // a flat list alone, and a flat list holds no presented screen (ui-tree/draw-order.ts#holderOf's `parent`). The agreement
+      // rows (tests/interact/remedy-agreement.test.ts) pin only its rendering, should either change.
       throw new CoveredRefusal(
         told.refusal(
           `${underKeyboardText(centre, standing.line.y)}, where a tap presses the keyboard — ` +

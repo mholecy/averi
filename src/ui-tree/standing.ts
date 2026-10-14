@@ -463,9 +463,9 @@ export function sceneOf(tree: UiNode): Scene {
 
 /**
  * THE remedy of a judgement (`Remedy`, whose doc has the cases and THE PRECEDENCE), decided once for every purpose,
- * for every kind but `reachable` (the type says so: every non-reachable standing carries one). `pixel`: the pixel assert's box and bands — the region's purpose, which alone decides
- * `fixed`, and `stuck` for a node laid from the box's top edge under the status bar or held whole by its cover's
- * reach.
+ * for every kind but `reachable` (the type says so: every non-reachable standing carries one). `pixel`: the pixel
+ * assert's box and bands — the region's purpose, which alone decides `fixed`, and `stuck` for a node laid from the
+ * box's top edge under the status bar or held whole by its cover's reach.
  */
 function remedyOf(judgement: Unreached<PixelJudgement>, judged: Judged, pixel: { readonly box: Rect; readonly bands: Bands }): Remedy;
 function remedyOf(judgement: Unreached<TouchJudgement>, judged: Judged): TouchRemedy;
