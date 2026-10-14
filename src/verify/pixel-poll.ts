@@ -453,7 +453,10 @@ const hideKeyboard = ({ dismissal, advice }: KeyboardRemedy): string =>
  * navigation bar …` with the band's rect; the cover's role, label, rect
  * and — for a pinned bar — its reach (`covered.reach`, when not its
  * frame); or, at the navigation bar's top edge, that it may be cut there
- * (`cut`: the ocr crop would read only what shows — scroll it up).
+ * (`cut`: the ocr crop would read only what shows — scroll it up). Or that
+ * nothing of it lies on the screen, or nothing of it is drawn there — it lies
+ * outside the scroll view named (`OUTSIDE_ITS_SCROLL_VIEW`) — or only a
+ * sliver too thin to measure, at the screen's edge or the scroll view's.
  *
  * The remedy after " — " is the standing's (ui-tree/standing.ts#Remedy:
  * the case and its precedence are decided there, once for the tap,

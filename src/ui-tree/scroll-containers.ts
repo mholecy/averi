@@ -12,7 +12,8 @@ import type { UiNode } from '../adapters/types.js';
  *   and the container a drawn-over question names
  *   (draw-order.ts#DrawOrder.drawnOver). Only Android supplies it; iOS
  *   frames are unclipped, so no iOS node clips and no iOS clip chain is
- *   invented.
+ *   invented. Its absence from a whole nested tree is what marks the tree's
+ *   frames unclipped (geometry.ts#Clips.drawnIn).
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
  *   (geometry.ts#Clips.inScroller), and, for draw order, a node's nearest
@@ -25,7 +26,11 @@ import type { UiNode } from '../adapters/types.js';
  *   scrolls under its frame. A classic Android list whose content fits
  *   (`scrollable="false"`) is still a scroll view, and a remedy that says
  *   "scroll_until it first" over it is answered honestly by scroll_until's
- *   exhaustion.
+ *   exhaustion. And, on a tree of unclipped frames (WDA's), where a node
+ *   is DRAWN: its frame cut by every ancestor that scrolls
+ *   (geometry.ts#Clips.drawnIn — a scroll view draws none of its content
+ *   outside its frame, while the tree lists that content at its laid-out
+ *   rect).
  *
  * So `clips(n) ⇒ scrolls(n)`, never the other way. One predicate would
  * either give iOS clip chains that do not exist or take scrolling away from

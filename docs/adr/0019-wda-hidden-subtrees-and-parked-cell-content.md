@@ -63,8 +63,11 @@ row beneath. Asking `isAccessible` of the root only fixes that. Why every descen
 alone: the tab host is `0/0` in both states, with visible content.
 
 Why no wrapper root (the review's finding, the owner's decision): WDA's flags do not say what is drawn. The SWIFT
-form's `payee_name_input` row, `Other 24,801 354x52`, is drawn — under CONTINUE — and WDA reports it `0/0` with an
-all-invisible subtree. As a root (the rule as first written) it took its label and its text field (each
+form's `payee_name_input` row, `Other 24,801 354x52`, was taken for drawn — under CONTINUE — and WDA reports it `0/0`
+with an all-invisible subtree. (Corrected 2026-10-14: it is not drawn. It lies below its form's `ScrollView 0,0
+402x780`, which clips it; only its top 23 pt lie under CONTINUE, and the capture shows the bare background from 824
+down. WDA's `0` was truthful there. The rule below stands: a wrapper's flags still do not say what it holds, and the
+undrawn row is now judged by its drawn frame, ADR 0010's "Amendment: the drawn frame".) As a root (the rule as first written) it took its label and its text field (each
 `isAccessible "1"`) with it; with the `centreExcused` filter first shipped beside it, the label "Payee’s name" became a
 dismissal candidate whose tap would focus the field. `isAccessible` on the root does not tell drawn from undrawn — the
 payee row is `0/0` — so the narrowing asks what the node is: a control, an image or a text is one thing on screen,
@@ -157,9 +160,11 @@ target on screen was lost.
 1. **Only eight raw trees.** Every claim above rests on them; the flag in `ui_snapshot` is how later device checks
    grow the evidence. Unmeasured: a pushed screen scrolled so a row lies in the phantom tab band, a medium sheet, a
    SwiftUI menu.
-2. **A drawn node WDA reports `0/0` with an invisible subtree.** Measured: the SWIFT form's `payee_name_input` row,
-   drawn under CONTINUE, is reported so — `isVisible="0"` there means occluded, not undrawn. As a wrapper it roots
-   nothing now, and its accessible label and text field stay as they were. A CONTROL, image or text so reported
+2. **A drawn node WDA reports `0/0` with an invisible subtree.** The SWIFT form's `payee_name_input` row was cited as
+   one, drawn under CONTINUE. Corrected 2026-10-14: it is clipped by its form's `ScrollView` (it lies below 780), so it
+   is not drawn, and WDA's `0` was truthful; the standing's drawn frame now refuses it (ADR 0010, "Amendment: the drawn
+   frame"). As a wrapper it roots nothing, and its accessible label and text field stay as they were. The residual
+   itself stands, unmeasured on a drawn node: `isVisible="0"` may mean occluded rather than undrawn. A CONTROL, image or text so reported
    while drawn would still read as no cover (a false "clear"); none was seen among the D captures' on-screen
    controls, and the four on Account Detail (the search icon, a card's sliver, the screen's `Toolbar`) cover nothing
    there either way. The search icon (`Image Dashboard/icon-search 34,81 20x20`, `0/0`, no children) is most likely a

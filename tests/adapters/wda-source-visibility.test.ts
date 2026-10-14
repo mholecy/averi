@@ -50,7 +50,7 @@ describe('UiNode.hidden — a WDA node that roots a hidden subtree, and every no
     expect([at(host), host.hidden, host.children[0].hidden]).toEqual(['0,0 402x874', undefined, undefined]);
   });
 
-  it('…nor a row WDA reports 0/0 with an invisible subtree that IS drawn: `payee_name_input` under CONTINUE, a structural wrapper, roots no hidden subtree — nor are its label and text field (each isAccessible "1")', async () => {
+  it('…nor a row WDA reports 0/0 with an invisible subtree: `payee_name_input`, listed below its form\'s ScrollView (drawn nowhere: the standing\'s drawn frame judges that, not WDA\'s flags), a structural wrapper, roots no hidden subtree — nor are its label and text field (each isAccessible "1")', async () => {
     const tree = await capture('swift-form-pushed');
     const [row] = byId(tree, 'swift_payment.form.payee_name_input');
     expect([at(row), ...[...everyNode(row)].filter((n) => n.rect.width * n.rect.height > 0).map((n) => `${n.role} ${n.hidden === true}`)]).toEqual([

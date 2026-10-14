@@ -46,6 +46,19 @@ import { cutRemedy, cutSliverText, PRESENTED_OVER, underKeyboardText } from './t
  * only where it can be) — "off screen" would contradict a rect the reader
  * sees on it.
  *
+ * OUTSIDE ITS SCROLL VIEW — a centre on the screen that its scroll view
+ * draws nothing at (ui-tree/standing.ts, the drawn frame: WDA lists a scroll
+ * view's content at its laid-out rect past the scroll view's frame) is
+ * refused as at the screen's edge, naming the scroll view, with the same
+ * remedies (OffScreenRefusal) — but AFTER the guard, by `TapJudge.aim`, with
+ * no fresh read of the screen: a scroll view laid out above the keyboard
+ * (React Native's keyboard-avoiding view, MyPort's login `ScrollView` ending
+ * at the band's top) grows back once the guard hides it, and the target is
+ * judged again on the look the guard hands back. Measured: the at-rest SWIFT
+ * form's `payee_name_input` `24,801 354x52`, below its form's `0,0
+ * 402x780`, was reported tapped at (201,827), 3 pt below CONTINUE on the
+ * bare background.
+ *
  * CLEAR OF THE APP'S CHROME AND THE KEYBOARD — `TapJudge.aim`, applied LAST,
  * to the look the guard hands back (or the first look, when the guard let
  * the tap through), so neither the on-screen rule's judgement nor the

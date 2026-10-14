@@ -68,7 +68,7 @@ describe('a hidden subtree is no cover of a target', () => {
     expect(drawOrder(tree).exposure(title, IPHONE)).toMatchObject({ covers: [], centreExcused: [tab], tapAt: { moved: false } });
   });
 
-  it('the SWIFT form: the label "Payee’s name" of `payee_name_input` (drawn, under CONTINUE, WDA 0/0) is no dismissal candidate — its own text field, which a tap at its centre would focus, still holds its centre', async () => {
+  it('the SWIFT form: the label "Payee’s name" of `payee_name_input` (listed below its form\'s ScrollView, WDA 0/0) is no dismissal candidate — its own text field, which a tap at its centre would focus, still holds its centre', async () => {
     const tree = await capture('swift-form-pushed');
     const label = [...everyNode(tree)].find((n) => n.role === 'text' && n.label === 'Payee’s name')!;
     const seen = drawOrder(tree).exposure(label, IPHONE);

@@ -453,8 +453,8 @@ export interface UiNode {
    * form pushed over the tab host (tests/fixtures/wda-capture-swift-form-pushed.json): the host's tab bar, which the
    * pushed screen hides, is listed AFTER the form at `69…266,711` (the shown bar is at y 755), each `nav.tab_*` button
    * `0/0` and its icon `Image` `isVisible "0" isAccessible "1"` — so the Image goes with its button. A structural
-   * wrapper never roots one: WDA reports the form's `payee_name_input` row, drawn under CONTINUE, `0/0` with an
-   * invisible subtree too.
+   * wrapper never roots one: WDA reports the form's `payee_name_input` row `0/0` with an invisible subtree too (it
+   * lies below its form's ScrollView, undrawn — the standing's drawn frame, not this flag, judges that).
    *
    * Its readers, all of them:
    * - ui-tree/draw-order.ts's `hidden` row, in the `target` column only: such a node is no cover of a target unless it

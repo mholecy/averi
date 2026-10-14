@@ -55,6 +55,23 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   a root of no area (its `failsOpen`) a touch — the tap, either stop —
  *   leaves every point on the screen and judges in the node's own rect,
  *   and the pixel assert judges on the largest node (`treeScreen`'s box).
+ * - THE DRAWN FRAME, every purpose: on a tree of unclipped frames (WDA's)
+ *   a scroll view draws none of its content outside its own frame, while
+ *   the content keeps its laid-out rect (geometry.ts#Clips.drawnIn, the
+ *   frames of every scrolling ancestor intersected). Every frame a purpose
+ *   judges in is cut to it (`drawnFrame`), so `visible`, `shows`, the
+ *   covers and the tap's moved piece count only what is drawn; a centre on
+ *   the screen outside it is `offScreen` with that scroll view (`scroller`,
+ *   `drawnPlace`), its edge judged as the screen's — off the screen first,
+ *   then outside the scroll view, then a system band; the pixel assert's
+ *   region likewise (below). Not a centre under a witnessed keyboard line:
+ *   hiding the keyboard may lay the scroll view out taller. Android's
+ *   trees (rects already cut), idb's flat list (no scroll view listed: a
+ *   residual) and a node under nothing that scrolls have none: unchanged.
+ *   Measured: the at-rest SWIFT form lists `payee_name_input` at `24,801
+ *   354x52`, below its `ScrollView 0,0 402x780`; a tap at its centre was
+ *   reported done on the bare background.
+ *   docs/adr/0010-pixel-assert-keyboard-first.md
  * - THE ORDER, once for every verb — after what only the stops judge first
  *   (nothing of it in its frame: `underKeyboard` when a keyboard line
  *   applies and the node is in the box, else `offScreen`; the `fully`
@@ -77,13 +94,16 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   one box, the usable screen's `oriented` (verify/pixel-poll.ts hands it
  *   the usable screen) — the same order, its place a region's:
  *   - off the screen when nothing of what it `reads` lies on the box —
- *     `offScreen`, first; after idb's band (next), also when the screen's
- *     edge leaves of it a sliver no thicker than the pixel slack
- *     (`thinSliver`) — not on a root of no area (`failsOpen`), nor for a
- *     rect of no area: no capture shows any of it (the colour sample's
- *     region is clipped to the screen before it is inset,
+ *     `offScreen`, first; then nothing of it drawn on the box (the drawn
+ *     frame: `offScreen` with its `scroller`); after idb's band (next),
+ *     also when the screen's edge, or its scroll view's, leaves of it a
+ *     sliver no thicker than the pixel slack (`thinSliver`) — not on a root
+ *     of no area (`failsOpen`), nor for a rect of no area: no capture shows
+ *     any of it (what it `reads` is asked of its drawn part, and the colour
+ *     sample's region is clipped to the screen before it is inset,
  *     verify/capture.ts#clipThenInset, so a sliver on the screen is read
- *     as the sliver its sampler reads);
+ *     as the sliver its sampler reads — the pixel poll measures the same
+ *     drawn part, verify/pixel-poll.ts#pollPixels);
  *   - under the band `keyboardTop` marks (`bandRect`) when the node's rect
  *     meets it at all — `underKeyboard`, before the system bands; its
  *     `keyboardTop` is idb's band only, the reading's frame being the
@@ -108,9 +128,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   band (idb's number pad on a 430x932 device: `0,589 430x343`), and a
  *   node listed between the tree's bottom and the device's (`42,885
  *   318x20`) lies under it.
- * - `facts.screen` is the frame judged, per purpose: the stop's box cut
- *   above its keyboard line; the tap's box less the system bands, cut above
- *   a line no guard acts on; the pixel's box less the status band. The
+ * - `facts.screen` is the frame judged, per purpose, cut to the drawn frame:
+ *   the stop's box cut above its keyboard line; the tap's box less the
+ *   system bands, cut above a line no guard acts on; the pixel's box less
+ *   the status band. The
  *   covers (`facts.covers`, `reaches`, `shows`, `centreCover`) are judged in
  *   it below the status band — the pixel's only where that meets what it
  *   reads, as `exposure`'s touch covers (the kind names the pixel cover).
@@ -319,10 +340,10 @@ export interface StandingFacts {
   /**
    * The frame judged in, per purpose: the stop's box, cut above the keyboard line when one applies (no height when it
    * leaves nothing); the tap's box less the system bands, cut above a line no guard acts on; the pixel's box less the
-   * status band.
+   * status band — each cut to the drawn frame (`drawn`; no area when nothing of it is drawn).
    */
   readonly screen: Rect;
-  /** The fraction of the node inside the frame, covers or not. */
+  /** The fraction of the node inside the frame, covers or not: of what is drawn there. */
   readonly visible: number;
   /** The frame's edges the node extends past (geometry.ts#clippedEdges). */
   readonly clipped: readonly Edge[];
@@ -921,12 +942,14 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
 
 /**
  * What both stops judge first, in their frame (`Scene`'s contract): `box`
- * cut above the keyboard line when one applies, its covers judged below the
- * status band on the box's own shape. `outside` is the answer when nothing
- * of the node lies in that frame — the line at or above the box's top
- * leaves no frame at all; else `underKeyboard` when some of it lies in the
- * box under the line, `offScreen` when none does — and undefined otherwise,
- * the facts then being the frame's for the purpose's own judgement.
+ * cut above the keyboard line when one applies and to the drawn frame, its
+ * covers judged below the status band on the box's own shape. `outside` is
+ * the answer when nothing of the node lies in that frame — the line at or
+ * above the box's top leaves no frame at all; else `offScreen` naming its
+ * scroll view when some of it lies above the line but none is drawn there,
+ * `underKeyboard` when some of it lies in the box under the line,
+ * `offScreen` when none does — and undefined otherwise, the facts then
+ * being the frame's for the purpose's own judgement.
  */
 function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: TouchJudgement } {
   const { scene, node, centre } = judged;

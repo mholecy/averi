@@ -35,6 +35,34 @@ no thicker than the slack on the screen (ADR 0002) — comes after idb's keyboar
 element under the band is a keyboard miss, as under WDA's and Android's reading (`ui-tree/standing.ts#regionPlace`). See
 ADR 0018, "Amendment: presented judged of the node".
 
+## Amendment: the drawn frame (2026-10-14)
+
+The pixel standing's order is now: off the screen → **outside its scroll view** → idb's keyboard band → the thin sliver
+→ the system bands. K1's reading is still asked first, outside standing.
+
+A WDA tree lists a scroll view's content at its laid-out rect even past the scroll view's frame, and the scroll view
+draws none of it there (UIKit's `UIScrollView` clips to its bounds; so do a table, a collection view and SwiftUI's
+`ScrollView`). Measured: the at-rest SWIFT form lists `payee_street_input` at `24,869 354x52`, below its
+`ScrollView 0,0 402x780`; 5 pt of it lie on the 402x874 screen. A colour assert on it passed on the bare background
+the capture shows there (`sampled #DEE0E6 … clipped 90% off-png`), and a tap on `payee_name_input` (`24,801 354x52`)
+was reported done at (201,827), 3 pt below CONTINUE.
+
+- **The drawn frame** (`ui-tree/geometry.ts#Clips.drawnIn`): the intersection of the frames of every ancestor that
+  scrolls, on a tree that lists ancestry and marks no node `clipsDescendants`. Android's rects are already cut to their
+  ancestors, and idb lists no scroll view, so neither has one: both are unchanged by construction.
+- **Outside its scroll view** comes after off the screen: an element nothing of which lies on the screen is off the
+  screen, whatever its scroll view. An element on the screen nothing of which is drawn there is `offScreen` with its
+  scroll view named (`OUTSIDE_ITS_SCROLL_VIEW`), with the off-screen remedies (a scroll; beneath a presented screen,
+  close it first). No new kind.
+- **The thin sliver at the scroll view's edge** as at the screen's (ADR 0002's slack), named with the scroll view
+  (`TOO_THIN_IN_ITS_SCROLL_VIEW`).
+- **What the assert reads** is asked of the element's drawn part, and the pixel poll measures that same part: the judge
+  and the sampler share the scroll view's clip as they share the screen's (`verify/capture.ts#clipThenInset`).
+- Before idb's band: idb is flat, so its band never meets this rule.
+- The same frame cuts the tap's and `scroll_until`'s judgement (`ui-tree/standing.ts#Scene`, "THE DRAWN FRAME"), so the
+  verbs agree: the tap refuses naming the scroll view (after the keyboard guard, since a scroll view laid out above
+  the keyboard grows back once it hides), and `scroll_until` strokes.
+
 ## Residuals accepted
 
 - When the reading cannot see the keyboard, the old behaviour returns silently. Examples: a floating or split IME that
@@ -43,6 +71,13 @@ ADR 0018, "Amendment: presented judged of the node".
 - A multi-display device reads unknown.
 - A stale `shown` costs covered rounds until the window state catches up. Under a short timeout it fails closed with the
   covered wording, never a false pass.
+- **idb lists no scroll view** (a flat list): an element below a short scroll view (the SWIFT form's text field at
+  `42,817` under idb) is judged on the screen alone, so the drawn frame cannot refuse it there: it is refused only
+  where something the flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`),
+  and otherwise tapped, stopped on and measured on what shows.
+- **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
+  `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
+  the safe direction.
 
 ## Bug note
 
