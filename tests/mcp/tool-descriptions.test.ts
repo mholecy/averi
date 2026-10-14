@@ -223,6 +223,15 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
+  it('scroll_until: a target not judged in the viewport whose swipe would touch down on that screen fails without the swipe — the description and the troubleshooting entry say so, and that a target not yet in the tree is still swiped for', () => {
+    expect(description('scroll_until')).toContain(
+      'The same holds, with the same confirming read, for a target in the tree that is NOT judged in the viewport (below the fold, under the soft keyboard, cut, or under a bar of its own screen) when the swipe toward it would touch down on such a screen: it fails without that swipe, saying why the target is not in the viewport and where the swipe would have landed — e.g. "element lies below the viewport, and the swipe toward it would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is presented over it …" — since that swipe would land on the presented screen, not on the target\'s (a popover closed, a sheet moved to another detent). A row of the presented sheet itself is still swiped for on the sheet, and a target not yet in the tree is still swiped for.',
+    );
+    expect(TROUBLESHOOTING).toContain(
+      '`scroll_until` says the same when the target is in the tree but not in the viewport (below the fold, under the soft keyboard, cut) and the swipe toward it would touch down on such a screen: `… — element lies below the viewport, and the swipe toward it would touch down at (x,y) on <that screen\'s dimming view or scroll view> — a screen is presented over it …`, and no swipe was sent, because that swipe would land on the modal or sheet (closing a popover, moving a sheet to another size) and not on the target\'s screen. Close that screen first here too.',
+    );
+  });
+
   it('troubleshooting: the entry, the wrapper sentence as the code has it, and the picker\'s exception over another screen', () => {
     expect(TROUBLESHOOTING).toContain(
       '- **`… a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen`** (tap or `scroll_until`): the target lies on the screen beneath a modal or sheet that is still up; nothing was tapped and no further swipe was sent.',
