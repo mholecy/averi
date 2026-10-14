@@ -168,11 +168,11 @@ target on screen was lost.
    too (121) — and the scroll view, no wrapper, roots a hidden subtree; so does a full-screen `Toolbar`, no wrapper
    either, that holds part of the occluded screen's chrome (on `D-contacts-sheet` a `Toolbar 0,0 402x874`, `0/0`,
    wraps the Contacts list's search bar, `SearchField 'Search' 28,808 286x28`): the occluded screen's own content and
-   chrome cover none of its targets. A target there is still covered by the presented screen's surface (kept by the guard),
-   so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a medium
-   sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018 residual 2)
-   leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee row's lesson:
-   WDA's flags say "occluded", which the rule takes for "not drawn".
+   chrome cover none of its targets. A target there is still covered by the presented screen's surface (kept by the
+   guard), so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a
+   medium sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018
+   residual 2) leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee
+   row's lesson: WDA's flags say "occluded", which the rule takes for "not drawn".
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
 5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
    was not measured) is not placed.
