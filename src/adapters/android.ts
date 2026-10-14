@@ -743,6 +743,15 @@ export class AndroidAdapter implements DeviceAdapter {
    * one, only once this has said shown, for a floating keyboard's panel
    * (keyboardTouchable, below).
    *
+   * The inset's top is the docked keyboard's line, and the right one —
+   * measured with Gboard docked (1080x2220): the window manager's touchable
+   * region started at 1398, as the ITYPE_IME frame did; `dumpsys
+   * input_method`'s own `touchableRegion` started at 1332, over Gboard's
+   * transparent top strip. A guarded tap on a field centred in that strip
+   * judged it clear of the keyboard, pressed no back, sent `input tap 540
+   * 1367`, and the field took focus — the strip routes to the app, so 1332
+   * would be the wrong line.
+   *
    * FAILS OPEN: any failure of the call — adb exit, timeout, offline device —
    * is `unknown`, not a throw. This question exists to make a tap safer; it
    * must never be the reason a tap did not happen. A device that is really

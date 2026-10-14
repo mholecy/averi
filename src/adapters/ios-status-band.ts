@@ -24,6 +24,13 @@
  * and SwiftUI's at `0,62 402x44` in wda-source-skeleton-login.json), the
  * status bar's own items end at y 39–44 (SpringBoard's tree,
  * ui-tree/bare-tree.ts), and a tap at (201,6) was taken by the status bar.
+ * Where the bar's hit area ends, probed in Safari (no header of its own)
+ * with raw taps: at (290,30) the status bar took the tap (scroll to top),
+ * twice; at y 63, 66 and 70 it did not — so it ends at or above 63,
+ * within the 62 band. A tap at y 66 on a SwiftUI form that did scroll to
+ * the top hit that form's navigation header (0 to ~115 pt), not the status
+ * bar: the pinned-app-chrome case, which a band cannot answer. One host and
+ * one device; a SwiftUI screen without a header was not probed.
  * The other sizes are Apple's published insets for the iPhones of those
  * sizes, NOT measured here (where two models share a size and differ — the
  * 375x812 X and 12 mini, 44 and 50; the 414x896 XS Max and XR, 44 and 48 —
