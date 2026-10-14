@@ -260,6 +260,12 @@ target of the presented screen itself — a row of a sheet below the sheet's fol
 (the touch-down lies on its own screen's form: no screen is presented over it there); a stroke whose touch-down lies
 off every presented surface is sent.
 
+The rule is platform-blind: `presentedAt` and the round ask no platform, so a tree from any source that shows a screen
+presented over the target's — by `presentedSurface`'s shapes — stops the same way (the scroll-rounds row "platform-blind,
+a synthetic shape on ANDROID" pins it on a cut-sliver toggle under a presented scroll view). Android is unchanged only
+on the measured trees, because no Android device tree measured has a presented screen; the one Android shape that came
+close (`snapF5`'s RN background leaf under its `login_screen` scroll view of the same frame) is not one, as below.
+
 No blind stroke after a hold (review of the slice, M2): while either presented stop is held for its confirming read,
 a read that does not read is confirmed again while the budget allows, and when none is left the scroll stops as the
 last read that read left it (`presentedHold`) — never a stroke, which would be drawn blind onto the screen that read

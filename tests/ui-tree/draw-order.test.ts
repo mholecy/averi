@@ -25,6 +25,8 @@ const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scroll
 const IPHONE_BOX = rect(0, 0, 402, 874);
 /** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
 const STACKED = JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+/** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now. */
+const DISCARD_POPOVER_KEYBOARD_DOWN = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8'));
 
 describe('drawnOver — the nodes drawn over a clipping container (the floating tab bar)', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
@@ -1591,7 +1593,8 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
  * presented over the target's own (`presentedSurface`, ADR 0018)? `scroll_until` asks it before every stroke for a
  * target it has not judged in the viewport — one below the fold has no covers (`exposure` judges only what shows), so
  * the presented stop of a target in the viewport never sees it, and the stroke lands on the presented screen. Measured
- * on device ui_snapshots (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
+ * on device ui_snapshots (tests/fixtures/wda-ui-snapshot-stacked-layers.json) and one raw /source capture
+ * (tests/fixtures/wda-capture-contacts-discard-popover.json).
  */
 describe('presentedAt — the presented screen\'s surface at a point, asked for a target wherever it lies (ADR 0018)', () => {
   const screen = (key: string) => STACKED.screens[key];
@@ -1600,7 +1603,7 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
   const TOUCH_DOWN = { x: 201, y: 699 };
 
   it('measured, Contacts\' discard popover with the keyboard down: the sheet\'s cell "add instant message" at y 1306, below the fold, has no covers — and the stroke\'s touch-down lies on the popover\'s dim `dismiss popup 0,0 402x874`', () => {
-    const tree = screen('contactsDiscardPopoverKeyboardDown');
+    const tree = DISCARD_POPOVER_KEYBOARD_DOWN;
     const cell = find(tree, (n) => n.role === 'container' && n.label === 'add instant message');
     const order = drawOrder(tree);
     expect(order.exposure(cell, IPHONE_BOX)).toMatchObject({ covers: [], presented: [] });
