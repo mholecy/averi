@@ -5,19 +5,18 @@ that the differential harness's diff is clean and explainable; narrowed the same
 draw their whole rect — after the review of the slice found Safari's measured pass-through layer refused; the owner
 confirmed option (a) and its residual 2, the RN modal whose dimming view is a wrapper with children, 2026-10-13).
 Amended 2026-10-14 (owner decision Q5 (a) on the round-13 device check): a screen-filling structural leaf of a presented
-layer is its surface labelled or not (see "Amendment: a labelled dim" below). Amended again 2026-10-14 (owner
-decision Q-A (a) on the round-14 device check): no stroke is sent that would touch down on a presented screen, for a
-target in the tree wherever it lies (see "Amendment: no stroke onto a presented screen" below; residual 6 narrowed to
-a target not yet in the tree). Amended again 2026-10-14 (owner decision on the architecture review of rounds 13–15):
-the tap under the status bar beneath a presented screen gives the presented screen's remedy (residual 8). Amended
-again 2026-10-14 (owner decisions Q1 (a) and Q2 (a) on the round-16 device check): the presented fact is judged of
-the target node itself, geometry-free, so a target wholly off the screen or wholly inside the status band beneath a
-presented screen is told "close it first" by every verb (residual 8, its amendment); the pixel assert judges an
+layer is its surface labelled or not (see "Amendment: a labelled dim" below). Amended again 2026-10-14 (owner decision
+Q-A (a) on the round-14 device check): no stroke is sent that would touch down on a presented screen, for a target in
+the tree wherever it lies (see "Amendment: no stroke onto a presented screen" below; residual 6 narrowed to a target not
+yet in the tree). Amended again 2026-10-14 (owner decision on the architecture review of rounds 13–15): the tap under
+the status bar beneath a presented screen gives the presented screen's remedy (residual 8). Amended again 2026-10-14
+(owner decisions Q1 (a) and Q2 (a) on the round-16 device check): the presented fact is judged of the target node
+itself, geometry-free, so a target wholly off the screen or wholly inside the status band beneath a presented screen is
+told "close it first" by every verb (see "Amendment: presented judged of the node" below); the pixel assert judges an
 element nothing of which it reads lies on the screen off the screen, and a colour assert's region is clipped to the
-screen before it is inset (residual 8, its amendment); an app-drawn strip with no node at a list's bottom is
-residual 10; an undimmed partial sheet, where `scroll_until` strokes while the tap says close it first, residual 11.
-Supersedes, in one part, ADR 0016's note that a screen-sized dimming node holding the title whole is excused (see
-"What changes" below).
+screen before it is inset (the same amendment); an app-drawn strip with no node at a list's bottom is residual 10; an
+undimmed partial sheet, where `scroll_until` strokes while the tap says close it first, residual 11. Supersedes, in one
+part, ADR 0016's note that a screen-sized dimming node holding the title whole is excused (see "What changes" below).
 
 ## Context
 
@@ -329,6 +328,48 @@ under a node of its own screen (648), clipped (556).
 ROUNDS cannot see a stroke's path, only its steps; it shows the touch-downs asked: (201,175) for strokes up, (201,385)
 above the harness's keyboard band at 481, (201,699) for strokes down.
 
+## Amendment: presented judged of the node, geometry-free (2026-10-14)
+
+Owner decisions Q1 (a) and Q2 (a) on the round-16 device check. "Presented first" held only where the presented surface
+lay over the part of the target the verb judged — its covers in the frame (`Exposure.presented`), and a frame holds
+nothing of a target wholly below the fold or wholly inside the status band. Measured on the raw run16 WDA payloads,
+replayed through the tools: on the Fees half sheet `tap id:…bank_country_select` (`24,1209 354x52`, wholly below) said
+"scroll_until it first"; beneath Contacts' discard popover `tap role:text label:"add instant message"` (`20,1306`) the
+same; on the country sheet `tap priority_select` flung to `24,-20 354x52`, wholly in the band, gave the bar's advice,
+and so did its colour and ocr asserts — while `scroll_until` on each stopped on the presented screen, since it asks
+`presentedAt` at its stroke's touch-down, wherever the target lies. Now
+`ui-tree/draw-order.ts#DrawOrder.presentedOver(node)` — `presentedAt`'s rule less the point: the last node drawn after
+the target that draws for it and is a presented screen's surface — is what the remedy (`ui-tree/standing.ts#remedied`)
+asks when the frame named none, for EVERY non-reachable kind (Q1 (a): off the screen, under a bar, cut, covered, under
+idb's band). Kinds do not change, only remedies. `scroll_until`'s own hold is unchanged: it stops on the standing's
+presented remedy only when the surface lies over it in its read's frame, and otherwise asks its touch-down, as before —
+so a stroke that misses the presented screen is still sent, and no `scroll_until` reply changes. The pixel assert's
+standing gains an `offScreen` kind (Q2 (a)): nothing of what it reads lies on the screen; its remedy is the same
+decision, presented first, else "scroll it on-screen", so no sampler sentence ("element rect is outside the screenshot")
+decides a remedy any more. And the colour assert's region is ONE region for the judge and the sampler
+(`verify/capture.ts#clipThenInset`): clipped to the screen, then inset — measured, `payee_street_input 24,869 354x52`
+beneath the Fees dim was judged on the inset of its unclipped rect (y 875–915, off the screen, nothing over it) while
+the sampler read its 5-pt sliver, the sheet's grey, and a colour assert expecting that grey PASSED; it now fails closed
+naming the dim, "close it first". The review of that change found the same false PASS a little lower: moved to y
+872–873.7 the field's sliver on the screen (2 pt or less) lies within the 2-unit slack, so the dim's overlap was not
+counted and the sampler read ~6 px rows of the dim. So a sliver of the element on the screen no thicker than
+PIXEL_OVERLAP_SLACK, on a side the screen's edge cuts, is the off-screen kind's case too ("only a sliver of the element
+lies on the screen, too thin to measure"), with the same remedy decision; the slack between neighbours is unchanged, and
+a whole element thinner than it on the screen (a divider) is measured; idb's keyboard band is judged before the thin
+sliver, as before the system bands (ADR 0010), so an element under it is a keyboard miss as under WDA's and Android's
+reading. The sampler's own sentences state the fact only, with no advice: the standing decides the remedy before any
+capture. The standing leaves a rect of NO AREA to the sampler (judged by its place) — the main way the sampler meets
+nothing to sample, measured by the harness on 432 calls over 72 trees: Android's inverted bounds clamped flat
+(`[198,297][324,58]`), idb's node listed as 0x0 once scrolled off — and the colour assert now says so ("the element has
+no area (rect …): collapsed, or a node listed as 0x0 once scrolled off the screen"); else it meets an off-png rect
+("element rect is outside the screenshot") only when the png's rows round a sliver to nothing or the element moved
+between the read and the capture. Wider by design: a full-screen pass-through layer (residual 1) over an off-screen
+target now gives "close it first" too; `scroll_until` stops there only when its stroke's touch-down lies on that layer's
+surface — on a dim filling the screen it does; on an undimmed partial sheet it may not (residual 11).
+
+docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
+docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -399,46 +440,8 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    on its uncovered 402x52 — under the status bar. On a medium-detent sheet the area above it is that dim, and a tap
    there may dismiss the sheet.
 
-   **Amendment: presented judged of the node, geometry-free (2026-10-14, owner decisions Q1 (a) and Q2 (a) on the
-   round-16 device check).** "Presented first" held only where the presented surface lay over the part of the target
-   the verb judged — its covers in the frame (`Exposure.presented`), and a frame holds nothing of a target wholly
-   below the fold or wholly inside the status band. Measured on the raw run16 WDA payloads, replayed through the tools:
-   on the Fees half sheet `tap id:…bank_country_select` (`24,1209 354x52`, wholly below) said "scroll_until it first";
-   beneath Contacts' discard popover `tap role:text label:"add instant message"` (`20,1306`) the same; on the country
-   sheet `tap priority_select` flung to `24,-20 354x52`, wholly in the band, gave the bar's advice, and so did its
-   colour and ocr asserts — while `scroll_until` on each stopped on the presented screen, since it asks `presentedAt`
-   at its stroke's touch-down, wherever the target lies. Now `ui-tree/draw-order.ts#DrawOrder.presentedOver(node)` —
-   `presentedAt`'s rule less the point: the last node drawn after the target that draws for it and is a presented
-   screen's surface — is what the remedy (`ui-tree/standing.ts#remedied`) asks when the frame named none, for EVERY
-   non-reachable kind (Q1 (a): off the screen, under a bar, cut, covered, under idb's band). Kinds do not change, only
-   remedies. `scroll_until`'s own hold is unchanged: it stops on the standing's presented remedy only when the surface
-   lies over it in its read's frame, and otherwise asks its touch-down, as before — so a stroke that misses the
-   presented screen is still sent, and no `scroll_until` reply changes. The pixel assert's standing gains an
-   `offScreen` kind (Q2 (a)): nothing of what it reads lies on the screen; its remedy is the same decision, presented
-   first, else "scroll it on-screen", so no sampler sentence ("element rect is outside the screenshot") decides a
-   remedy any more. And the colour assert's region is ONE region for the judge and the sampler
-   (`verify/capture.ts#clipThenInset`): clipped to the screen, then inset — measured, `payee_street_input 24,869
-   354x52` beneath the Fees dim was judged on the inset of its unclipped rect (y 875–915, off the screen, nothing over
-   it) while the sampler read its 5-pt sliver, the sheet's grey, and a colour assert expecting that grey PASSED; it
-   now fails closed naming the dim, "close it first". The review of that change found the same false PASS a little
-   lower: moved to y 872–873.7 the field's sliver on the screen (2 pt or less) lies within the 2-unit slack, so the
-   dim's overlap was not counted and the sampler read ~6 px rows of the dim. So a sliver of the element on the screen
-   no thicker than PIXEL_OVERLAP_SLACK, on a side the screen's edge cuts, is the off-screen kind's case too ("only a
-   sliver of the element lies on the screen, too thin to measure"), with the same remedy decision; the slack between
-   neighbours is unchanged, and a whole element thinner than it on the screen (a divider) is measured; idb's keyboard
-   band is judged before the thin sliver, as before the system bands (ADR 0010), so an element under it is a
-   keyboard miss as under WDA's and Android's reading. The sampler's own sentences state the fact only, with no
-   advice: the standing decides the remedy before any capture. The standing leaves a rect of NO AREA to the sampler
-   (judged by its place) — the main way the sampler meets nothing to sample, measured by the harness on 432 calls
-   over 72 trees: Android's inverted bounds clamped flat (`[198,297][324,58]`), idb's node listed as 0x0 once
-   scrolled off — and the colour assert now says so ("the element has no area (rect …): collapsed, or a node listed
-   as 0x0 once scrolled off the screen"); else it meets an off-png rect ("element rect is outside the screenshot")
-   only when the png's rows round a sliver to nothing or the element moved between the read and the capture. Wider by design: a full-screen
-   pass-through layer (residual 1) over an off-screen target now gives "close it first" too; `scroll_until` stops
-   there only when its stroke's touch-down lies on that layer's surface — on a dim filling the screen it does; on an
-   undimmed partial sheet it may not (residual 11).
-   docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
-   docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
+   The presented fact is judged of the node itself, wherever it lies: see "Amendment: presented judged of the node,
+   geometry-free" above.
 9. **An in-window overlay with no node is not seen** (owner decision Q7 (a), 2026-10-14). mp-native's Account Detail
    `PAY` menu: a SwiftUI card inserted in the screen's own container over a blurred, dimmed Account Detail. Neither WDA
    nor idb lists a node for the blur/dim backdrop, so the rows beneath read uncovered: `tap
@@ -460,7 +463,7 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    band to cut; inventing a 34-pt home-indicator band would refuse real taps elsewhere. The same list took no swipes
    there, also app-side. No code change.
 11. **An undimmed partial presented surface: the verbs' words agree, their behaviour does not** (the review of the
-   amendment above, 2026-10-14). A later screen-sized layer holding only a sheet's scroll view over the screen's
+   amendment "presented judged of the node", 2026-10-14). A later screen-sized layer holding only a sheet's scroll view over the screen's
    lower part (`0,500 402x374`), with no dimming view: for a target the sheet does not lie over — wholly above the
    screen, or at y 20 under the status bar — the tap and the pixel assert say "close it first" (the presented fact
    judged of the node, Q1 (a)), while `scroll_until` strokes: it stops only on a surface over the target in its
