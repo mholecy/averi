@@ -995,11 +995,11 @@ export function pngRegion(
   const y0 = Math.round(rect.y * scale);
   const x1 = Math.round((rect.x + rect.width) * scale);
   const y1 = Math.round((rect.y + rect.height) * scale);
-  const region = clipThenInset({ x0, y0, x1, y1 }, { x0: 0, y0: 0, x1: png.width, y1: png.height }, inset, 'pixels');
-  if (region === undefined) return undefined;
+  const on = clipTo({ x0, y0, x1, y1 }, { x0: 0, y0: 0, x1: png.width, y1: png.height });
+  if (on === undefined) return undefined;
   const full = (x1 - x0) * (y1 - y0);
-  const clipped = full > 0 ? 1.0 - (Math.min(x1, png.width) - Math.max(x0, 0)) * (Math.min(y1, png.height) - Math.max(y0, 0)) / full : 0.0;
-  return { ...region, clipped };
+  const clipped = full > 0 ? 1.0 - (on.x1 - on.x0) * (on.y1 - on.y0) / full : 0.0;
+  return { ...insetBy(on, inset, 'pixels'), clipped };
 }
 
 /**
@@ -1017,16 +1017,28 @@ export function pngRegion(
  * docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
  *
  * `pixels`: whole pixels — the inset floored, and never more than leaves one pixel (it stops short of the half-size);
- * `units`: tree units, the inset exact. The two differ by the png mapping's rounding only, a fraction of a unit.
+ * `units`: tree units, the inset exact. The two differ by the png mapping's rounding only, a fraction of a unit. One
+ * function with a unit, not two: the clip and the inset's fraction are what the judge and the sampler must share, and
+ * only whole pixels need the flooring.
  */
 export function clipThenInset(rect: PngBounds, frame: PngBounds, inset: number, unit: 'pixels' | 'units'): PngBounds | undefined {
+  const on = clipTo(rect, frame);
+  return on === undefined ? undefined : insetBy(on, inset, unit);
+}
+
+/** `rect`'s part inside `frame`; undefined when none is (no width or no height left). */
+function clipTo(rect: PngBounds, frame: PngBounds): PngBounds | undefined {
   const x0 = Math.max(rect.x0, frame.x0);
   const y0 = Math.max(rect.y0, frame.y0);
   const x1 = Math.min(rect.x1, frame.x1);
   const y1 = Math.min(rect.y1, frame.y1);
-  if (x1 <= x0 || y1 <= y0) return undefined;
+  return x1 <= x0 || y1 <= y0 ? undefined : { x0, y0, x1, y1 };
+}
+
+/** `bounds` inset `inset` of its size on each side, in `unit` (`clipThenInset` says how the two differ). */
+export function insetBy(bounds: PngBounds, inset: number, unit: 'pixels' | 'units'): PngBounds {
   const by = (size: number): number => (unit === 'pixels' ? Math.min(Math.floor(size * inset), Math.floor((size - 1) / 2)) : size * inset);
-  const ix = by(x1 - x0);
-  const iy = by(y1 - y0);
-  return { x0: x0 + ix, y0: y0 + iy, x1: x1 - ix, y1: y1 - iy };
+  const ix = by(bounds.x1 - bounds.x0);
+  const iy = by(bounds.y1 - bounds.y0);
+  return { x0: bounds.x0 + ix, y0: bounds.y0 + iy, x1: bounds.x1 - ix, y1: bounds.y1 - iy };
 }
