@@ -44,6 +44,8 @@ processes need a shell that may create them. The run writes `report.md` (counts 
 grouped by what changed — numbers and quoted values blurred so one change on many trees is one group, with an example
 each), `diffs.jsonl` (every differing call, both outcomes) and, with `--all`, `calls.jsonl` (every call).
 
+On 12 cores a corpus of 384 trees (about 184 000 calls, each on both sides) takes four to five minutes.
+
 Per tree:
 
 1. **Device variants** — iOS: the screen; no screen (`idb describe` fails); with the keyboard in the tree, `tap` again
@@ -58,8 +60,8 @@ Per tree:
    1 s budget each — a static tree keeps its verdict, a longer budget only adds rounds), `type_text` on a textfield.
    The outcome of a call is the reply (text blocks, image sizes, `isError`) and the device calls it made.
 
-The frame a screenshot returns is one grey PNG: on iOS the screen in points (scale 1), on Android half the screen's
-pixels (scale 0.5 — a full 1080×2220 frame costs ~100 ms to decode, and no verdict here reads a pixel). OCR reads no
+The frame a screenshot returns is one grey PNG at half the screen (scale 0.5, inside the pixel asserts' plausible range —
+a full 1080×2220 frame costs ~100 ms to decode in pngjs, and no verdict here reads a pixel). OCR reads no
 text in any region. So the pixel asserts are compared on whether they may look and how they refuse, not on what they see.
 
 `tests/differential/` runs the harness on a committed sample (three `tests/fixtures` trees, one per raw source kind):
