@@ -1910,7 +1910,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     );
   });
 
-  it('the Fees sheet\'s LABELLED dim over the SWIFT form\'s From row (#153): no stroke on the sheet (the device\'s moved it to another detent), the stop names the dim', () => {
+  it('the Fees sheet\'s LABELLED dim over the SWIFT form\'s From row: no stroke on the sheet (one would move it to another detent), the stop names the dim', () => {
     const played = play(IPHONE, [rowOf('swiftFeesSheet', 'swift_payment.form.debit_select'), rowOf('swiftFeesSheet', 'swift_payment.form.debit_select')]);
     expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
     expect(failureOf(played, 'id:swift_payment.form.debit_select').message).toBe(
@@ -1919,7 +1919,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     );
   });
 
-  it('Contacts\' discard popover over a row of the New Contact sheet (#93): no stroke (the device\'s closed the popover and was reported "fully visible"), the stop names the popover\'s dim', () => {
+  it('Contacts\' discard popover over a row of the New Contact sheet: no stroke (one would close the popover), the stop is `presented`', () => {
     const played = play(IPHONE, [rowOf('contactsDiscardPopover', 'Insert add instant message'), rowOf('contactsDiscardPopover', 'Insert add instant message')]);
     expect(strokesToward(played)).toEqual([]);
     expect(played.outcome?.kind).toBe('presented');

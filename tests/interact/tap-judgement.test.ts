@@ -291,21 +291,21 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
-  it('the SWIFT form\'s Fees sheet at its half detent (#153): the From row under the sheet\'s LABELLED dim, UIKit\'s `PopoverDismissRegion`, is refused as under a presented screen — close it first (device: "scroll_until it first", whose stroke moved the sheet)', async () => {
+  it('the SWIFT form\'s Fees sheet at its half detent: the From row under the sheet\'s LABELLED dim, UIKit\'s `PopoverDismissRegion`, is refused as under a presented screen — close it first, never "scroll_until it first"', async () => {
     const { outcome } = await judge((await screens()).swiftFeesSheet, 'swift_payment.form.debit_select', { first: IPHONE });
     expect(said(outcome)).toBe(
       'CoveredRefusal: swift_payment.form.debit_select is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,195), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
     );
   });
 
-  it('Contacts\' discard popover over the New Contact sheet (#93): a row of the sheet under the popover\'s labelled `PopoverDismissRegion` is refused as under a presented screen (device: "scroll_until it first", whose stroke closed the popover)', async () => {
+  it('Contacts\' discard popover over the New Contact sheet: a row of the sheet under the popover\'s labelled `PopoverDismissRegion` is refused as under a presented screen — close it first', async () => {
     const { outcome } = await judge((await screens()).contactsDiscardPopover, 'Insert add instant message', { first: IPHONE });
     expect(said(outcome)).toBe(
       'CoveredRefusal: Insert add instant message is under container "dismiss popup" (0,0 402x874) at its centre (52,271), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
     );
   });
 
-  it('…as after the device\'s stroke moved the sheet to Expanded (#158), its dim then unlabelled: the same remedy, labelled dim or not', async () => {
+  it('…and with the sheet Expanded, its dim an unlabelled bare frame and no cover: the sheet\'s form `scrollable 24,105 354x711` gives the same remedy', async () => {
     expect(said((await judge((await screens()).swiftFeesSheetExpanded, 'swift_payment.form.debit_select', { first: IPHONE })).outcome)).toMatch(
       / — a screen is presented over it \(a modal or a sheet\) — close it first; no scroll moves it out from under that screen; nothing was tapped$/,
     );

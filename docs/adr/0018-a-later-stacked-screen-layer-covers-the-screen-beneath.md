@@ -149,7 +149,8 @@ Node by node, no node of a presented layer changed.
 Earlier runs found what this decision now excludes: the RN `ScrollView`'s content layer over its background (the
 scrolled-content condition), Safari's capsule layer refusing every web element (TAP 3 186 and PIXEL 2 170 diffs on its
 four trees — option (a)), the capsule bar's buttons and labelled leaves read as "presented" (the frame-excuse check of
-`presentedSurface`), Android's small leaves of a content layer read as a screen's surface (the full-screen leaf
+`presentedSurface`; since the amendment below its labelled leaves are kept out by the screen-filling-leaf condition
+instead), Android's small leaves of a content layer read as a screen's surface (the full-screen leaf
 condition), and `scroll_until` stroking on a presented page sheet (the `presented` stop).
 
 ## Amendment: a labelled dim (2026-10-14)
@@ -186,6 +187,11 @@ rest of the sentence are unchanged, and no tap became a refusal or the reverse. 
 ended `stuck` now stop `presented` with no stroke; 404 on the popover tree (rows of the Contacts list beneath both the
 sheet and the popover) stopped `presented` already and now name the dim on top at their centre instead of the sheet's
 form. SEQ: the two new scroll rows only.
+
+The PIXEL 0 above is measured against d407256, before the colour/ocr assert's presented remedy of the same day. With
+that remedy, a pixel assert's refusal on these three trees also reads "a screen is presented over the element … close
+it first", its verdict unchanged: on the merged round branch the review measured 1 405 unique pixel sentences changed,
+24 of them where the remedy joins the status-bar clause ("; and …").
 
 ## Residuals accepted
 

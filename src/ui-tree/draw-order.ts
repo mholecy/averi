@@ -406,8 +406,7 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
  * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
  *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
- * Asked of a node a frame row would excuse (`givesWay`), and of a screen-filling structural leaf whatever it carries
- * (`presentedSurface`).
+ * Asked through `givesWay`: of a node a frame row would excuse, and of any structural node (`presentedSurface`).
  */
 const presentedOver = (placed: Placed, target: Placed, screenArea: number): boolean => {
   const both = holderOf(placed, target);
@@ -416,8 +415,8 @@ const presentedOver = (placed: Placed, target: Placed, screenArea: number): bool
 };
 
 /**
- * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses and whose own
- * `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and
+ * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses (or, asked by
+ * `presentedSurface` of `structural`, any structural node, excused or not) and whose own `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and
  * `contentFramed`: a scroll view, drawing only through its rows) covers a target when it lies on a screen presented
  * over the target's (`presentedOver`) and is no bare frame (`emptyFrame` with nothing drawable in it — a spacer of the
  * layer stays excused, so a leaf the app named, the RN Modal's dimming root `forgot_overlay`, covers and an anonymous
@@ -538,8 +537,9 @@ const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
 /**
  * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target — each with
- * the part of it that gives way over a presented screen (`overPresented`, asked of a node `excuses` holds; the rest of
- * the exception is `givesWay`'s, one for the three). The rows (`structural`, `screenSizedHost`, `contentFramed`, whose
+ * the part of it that gives way over a presented screen (`overPresented`, asked of a node `excuses` holds — and, for
+ * `structural`, by `presentedSurface` of any structural node; the rest of the exception is `givesWay`'s, one for the
+ * three). The rows (`structural`, `screenSizedHost`, `contentFramed`, whose
  * docs have the rules and their measurements) ask `frameExcused`; named apart so `Exposure.presented` can tell a
  * presented screen's surface from a cover of the target's own screen (`presentedSurface`).
  */
