@@ -54,10 +54,17 @@ flows:
   fill never destroys existing content (it fails loudly instead). Android types one character per
   `input text` call: bulk injection races Compose's async state and drops most characters
   (measured 3 of 11 landing).
-- **Field errors**: on iOS `ui_snapshot` attaches `error` to an input from a same-identifier text
-  below the field (the SwiftUI convention when titles/errors share the field's
-  `accessibilityIdentifier`) that is not a title of a same-identifier field (a same-identifier
-  text overlapping a field), and lies above the next such field; assert with `{ element: { id: amount_input }, error: "Required" }`.
+- **Field errors**: on iOS `ui_snapshot` attaches `error` to an input by one of two rules, on idb
+  and WDA alike. First, a same-identifier text below the field (the SwiftUI convention when
+  titles/errors share the field's `accessibilityIdentifier`) that is not a title of a
+  same-identifier field (a same-identifier text overlapping a field), and lies above the next such
+  field. Second, for a field the first rule left without one, a text whose own identifier ends in
+  `_error`, `.error` or `-error` (mp-native's `swift_payment.form.iban_input_error`): it pairs
+  with the nearest field above it in its column (the field overlaps it horizontally and ends at or
+  above its top), unless another field of that column starts between them. Of two fields side by
+  side it takes the one it overlaps more; a message with no field above it in its column (a
+  screen-level `accounts.detail.error`) pairs with none. An error named some other way
+  (`IbanError`, `error_iban`) is not seen. Assert with `{ element: { id: amount_input }, error: "Required" }`.
   Android sets no `error`, so there assert the message's `text` instead.
 - **Tap disambiguation**: when a selector matches several nodes and exactly one is interactive
   (button/textfield/switch/…), `tap`/`fill` target that one and say so in the trace. Several
