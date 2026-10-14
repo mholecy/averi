@@ -151,6 +151,15 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(property('scroll_until', 'timeoutMs').description).toBe('Default 15250');
   });
 
+  it('scroll_until: the timeout is checked once a round, so a call can run past it by one swipe, its settle and one more round', () => {
+    expect(description('scroll_until')).toContain(
+      'The timeout is checked once a round, after its tree read (and, on Android, its keyboard queries), so a call can run past it by one swipe, the settle after it and one more such round — the one that shows what that swipe did; the time a failure reports includes all of it. ',
+    );
+    expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(
+      'The budget is checked once a round, after its tree read and keyboard queries, so the time taken can pass `timeoutMs` by one swipe, the settle after it and one more round — its tree read and, on Android, its keyboard queries — and includes them.',
+    );
+  });
+
   it('swipe: how far a direction stroke reaches from the centre (interact/swipe.ts SWIPE_REACH_FRACTION)', () => {
     expect(description('swipe')).toContain('a stroke through the screen centre, 27.5% of the screen either side');
     expect(description('swipe')).not.toMatch(/(?<![\d.])30%/);
