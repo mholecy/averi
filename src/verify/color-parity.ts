@@ -1,7 +1,7 @@
 import type { Platform, Rect } from '../adapters/types.js';
 import { deltaEHex, rgbToHex, type Rgb } from './ciede2000.js';
 import { collectRects, rectText } from '../ui-tree/geometry.js';
-import { clipThenInset, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
+import { clipThenInset, insetBy, pngRegion, type MeasuredFrame, type PngBounds, type PngRegion, type RgbaImage } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { problemsThrownBy, positiveTolerance, type LayoutAnchor, type LayoutContract } from './layout-contract.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -100,8 +100,11 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
  */
 export const colorSampleRect = (rect: Rect, screen: Rect): Rect => {
   const bounds = (r: Rect): PngBounds => ({ x0: r.x, y0: r.y, x1: r.x + r.width, y1: r.y + r.height });
-  const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units') ?? clipThenInset(bounds(rect), bounds(rect), EDGE_INSET, 'units');
-  return read === undefined ? { ...rect } : { x: read.x0, y: read.y0, width: read.x1 - read.x0, height: read.y1 - read.y0 };
+  const asRect = (b: PngBounds): Rect => ({ x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0 });
+  const read = clipThenInset(bounds(rect), bounds(screen), EDGE_INSET, 'units');
+  if (read !== undefined) return asRect(read);
+  // Nothing of it on the screen: the rect inset whole; a rect of no area as it is.
+  return rect.width > 0 && rect.height > 0 ? asRect(insetBy(bounds(rect), EDGE_INSET, 'units')) : { ...rect };
 };
 
 /**
