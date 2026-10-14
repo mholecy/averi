@@ -154,7 +154,6 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * measured, on `Verifier.poll` (verify/assert.ts).
  */
 
-
 interface PixelPollSpec {
   element: ElementSpec;
   timeoutMs: number;
@@ -505,8 +504,8 @@ async function judgeOver(
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
     case 'offScreen': {
-      const where = standing.sliver === undefined ? OFF_THE_SCREEN : `${TOO_THIN_ON_THE_SCREEN} ${at}, on the screen ${rectText(standing.sliver)}`;
-      return `${standing.sliver === undefined ? `${where} ${at}` : where}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
+      const where = standing.sliver === undefined ? `${OFF_THE_SCREEN} ${at}` : `${TOO_THIN_ON_THE_SCREEN} ${at}, on the screen ${rectText(standing.sliver)}`;
+      return `${where}, screen ${rectText(standing.box)}) — ${advice(standing.remedy, () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
