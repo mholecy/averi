@@ -1621,6 +1621,15 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
     expect(drawOrder(tree).presentedAt(cell, TOUCH_DOWN)).toBeUndefined();
   });
 
+  it('residual, measured on the Fees half sheet: a node of the screen beneath with the SAME frame as a presented surface — the hidden twin `PopoverDismissRegion` listed in the SWIFT form\'s own layer — is not asked about the real dim at a point both hold: the target column excuses a node of the target\'s own frame (`sameFrame`), so none is named; the sheet\'s form below the dim still is', () => {
+    const tree = screen('swiftFeesSheet');
+    const [twin, dim] = [...everyNode(tree)].filter((n) => n.label === 'dismiss popup');
+    expect(twin.rect).toEqual(dim.rect);
+    const order = drawOrder(tree);
+    expect(order.presentedAt(twin, { x: 201, y: 175 })).toBeUndefined();
+    expect(order.presentedAt(twin, TOUCH_DOWN)).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
+  });
+
   it('none with no screen presented (Finportal\'s login), and none for a node not in this tree', () => {
     const login = screen('finportalLogin');
     const order = drawOrder(login);
