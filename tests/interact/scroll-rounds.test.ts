@@ -1910,6 +1910,21 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     );
   });
 
+  it('the Fees sheet\'s LABELLED dim over the SWIFT form\'s From row: no stroke on the sheet (one would move it to another detent), the stop names the dim', () => {
+    const played = play(IPHONE, [rowOf('swiftFeesSheet', 'swift_payment.form.debit_select'), rowOf('swiftFeesSheet', 'swift_payment.form.debit_select')]);
+    expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
+    expect(failureOf(played, 'id:swift_payment.form.debit_select').message).toBe(
+      'scroll_until id:swift_payment.form.debit_select stopped before any swipe — element is in the viewport but under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,195), drawn over it — 0% of it shows — ' +
+        `${NONE_SENT} Last rect {"x":42,"y":150,"width":318,"height":89} in a 402x874 viewport`,
+    );
+  });
+
+  it('Contacts\' discard popover over a row of the New Contact sheet: no stroke (one would close the popover), the stop is `presented`', () => {
+    const played = play(IPHONE, [rowOf('contactsDiscardPopover', 'Insert add instant message'), rowOf('contactsDiscardPopover', 'Insert add instant message')]);
+    expect(strokesToward(played)).toEqual([]);
+    expect(played.outcome?.kind).toBe('presented');
+  });
+
   it('the confirm is the presented screen\'s own: a target found clear after a stroke, then under a modal presented meanwhile, gets a confirming read of its own before the stop', () => {
     const login = rowOf('finportalLogin', 'lang_sk');
     const played = play(IPHONE, [{ tree: login.tree, found: [] }, login, rowOf('finportalForgot', 'lang_sk'), rowOf('finportalForgot', 'lang_sk')]);

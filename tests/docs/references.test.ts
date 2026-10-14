@@ -49,6 +49,9 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   // Tracked on docs/device-check-r5-r12 (5f1996e), not yet on this branch's base; cited by ADR 0018.
   'docs/bugs/2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md',
   'docs/bugs/2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md',
+  // Untracked in the main checkout, not yet on this branch's base; cited by ADR 0018's amendment and residual 9.
+  'docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md',
+  'docs/bugs/2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>

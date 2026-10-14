@@ -261,10 +261,10 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
-   * The covers that are the SURFACE of a screen presented over the node (`presentedSurface`: a dimming leaf, a sheet's
-   * scroll view, on a later screen-sized layer stacked over its own — a frame row's excuse the exception took back), in
-   * `covers`' order; empty when none — never a control, a labelled node or a bar the layer carries, which cover anyway
-   * (Safari's capsule bar). What the sentences read: a target under one lies under a
+   * The covers that are the SURFACE of a screen presented over the node (`presentedSurface`: a dimming leaf, labelled or
+   * not, a sheet's scroll view, on a later screen-sized layer stacked over its own), in `covers`' order; empty when
+   * none — never a control, a bar the layer carries or any other labelled node, which cover anyway (Safari's capsule
+   * bar). What the sentences read: a target under one lies under a
    * presented screen no scroll moves it out from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
    */
   readonly presented: readonly UiNode[];
@@ -406,7 +406,7 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
  * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
  *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
- * Asked of a node a frame row would excuse (`givesWay`).
+ * Asked through `givesWay`: of a node a frame row would excuse, and of any structural node (`presentedSurface`).
  */
 const presentedOver = (placed: Placed, target: Placed, screenArea: number): boolean => {
   const both = holderOf(placed, target);
@@ -415,8 +415,8 @@ const presentedOver = (placed: Placed, target: Placed, screenArea: number): bool
 };
 
 /**
- * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses and whose own
- * `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and
+ * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses (or, asked by
+ * `presentedSurface` of `structural`, any structural node, excused or not) and whose own `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and
  * `contentFramed`: a scroll view, drawing only through its rows) covers a target when it lies on a screen presented
  * over the target's (`presentedOver`) and is no bare frame (`emptyFrame` with nothing drawable in it — a spacer of the
  * layer stays excused, so a leaf the app named, the RN Modal's dimming root `forgot_overlay`, covers and an anonymous
@@ -537,10 +537,11 @@ const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
 
 /**
  * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target — each with
- * the part of it that gives way over a presented screen (`overPresented`, asked of a node `excuses` holds; the rest of
- * the exception is `givesWay`'s, one for the three). The rows (`structural`, `screenSizedHost`, `contentFramed`, whose
- * docs have the rules and their measurements) ask `frameExcused`; named apart so `Exposure.presented` can tell a cover
- * the exception un-excused from one that covers anyway.
+ * the part of it that gives way over a presented screen (`overPresented`, asked of a node `excuses` holds — and, for
+ * `structural`, by `presentedSurface` of any structural node; the rest of the exception is `givesWay`'s, one for the
+ * three). The rows (`structural`, `screenSizedHost`, `contentFramed`, whose
+ * docs have the rules and their measurements) ask `frameExcused`; named apart so `Exposure.presented` can tell a
+ * presented screen's surface from a cover of the target's own screen (`presentedSurface`).
  */
 const FRAME_EXCUSES = {
   structural: {
@@ -568,9 +569,17 @@ type FrameRow = keyof typeof FRAME_EXCUSES;
 const frameExcused = (row: FrameRow, placed: Placed, target: Placed, screenArea: number): boolean =>
   FRAME_EXCUSES[row].excuses(placed, target, screenArea) && !givesWay(row, placed, target, screenArea);
 
-/** A cover of `target` only through the exception: a frame row excuses it and gives way, a surface over a presented screen (`Exposure.presented`). */
+/**
+ * A cover of `target` that is the SURFACE of a screen presented over it (`Exposure.presented`): a STRUCTURAL leaf that
+ * fills the screen on a presented layer (`structural`'s `givesWay`), whether that row excuses it or not — labelled or
+ * valued, it covers anyway, so only what the sentences say of it is the exception's: UIKit's `container 'dismiss popup'
+ * id=PopoverDismissRegion`, the dim of a half-height SwiftUI sheet (`-402,-874 1206x2622`) and of Contacts' discard
+ * popover (`0,0 402x874`), each a leaf beside what it dims, whose swipe "out from under" moved the sheet to another
+ * detent and closed the popover; or a scroll view the other two frame rows excuse and that gives way. ADR 0018.
+ */
 const presentedSurface = (placed: Placed, target: Placed, screenArea: number): boolean =>
-  (Object.keys(FRAME_EXCUSES) as FrameRow[]).some((row) => FRAME_EXCUSES[row].excuses(placed, target, screenArea) && givesWay(row, placed, target, screenArea));
+  (STRUCTURAL_ROLES.has(placed.node.role) && givesWay('structural', placed, target, screenArea)) ||
+  (['screenSizedHost', 'contentFramed'] as const).some((row) => FRAME_EXCUSES[row].excuses(placed, target, screenArea) && givesWay(row, placed, target, screenArea));
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
