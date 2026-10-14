@@ -76,3 +76,20 @@ export function zeroRootWda(raw: string): string {
   if (doc.value.frame !== undefined) doc.value.frame = '{{0, 0}, {0, 0}}';
   return JSON.stringify(doc);
 }
+
+/**
+ * A raw WDA capture whose first element at `0,0 402x<height>` — a screen's header, its centre in the status band,
+ * beneath a presented screen — carries `rawIdentifier: id`. Such headers carry no identifier on the captured screens,
+ * so no selector reached them, and the tap under the status bar beneath a presented screen had no tool-level oracle.
+ * An identifier changes nothing else the parser reads of an `Other` (wda-source.ts#hiddenRoots asks the type).
+ */
+export function withHeaderId(raw: string, height: number, id: string): string {
+  type El = { rect?: { x: number; y: number; width: number; height: number }; rawIdentifier?: string | null; children?: El[] | null };
+  const doc = JSON.parse(raw) as { value: El };
+  const find = (el: El): El | undefined =>
+    el.rect?.x === 0 && el.rect.y === 0 && el.rect.width === 402 && el.rect.height === height ? el : (el.children ?? []).map(find).find(Boolean);
+  const header = find(doc.value);
+  if (header === undefined) throw new Error(`withHeaderId: no 0,0 402x${height} element`);
+  header.rawIdentifier = id;
+  return JSON.stringify(doc);
+}

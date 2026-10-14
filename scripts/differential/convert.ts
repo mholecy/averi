@@ -3,24 +3,24 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { CaptureEntry, RunManifest, Screen } from './corpus.js';
-import { syntheticIdb, syntheticUiautomator, zeroRootWda } from './synthetic.js';
+import { syntheticIdb, syntheticUiautomator, withHeaderId, zeroRootWda } from './synthetic.js';
 
 /**
  * Builds a corpus (corpus.ts) from what exists today:
  *
  *  - DEVICE RUNS (`--runs`, a directory of `run<N>-ios` / `run<N>-android`
- *    device-check scratch directories, read only): every `ui_snapshot` tree a
- *    device agent saved — a `#<call> (<s>)` header line, then the JSON — as a
- *    NORMALIZED capture (idb when its root is idb's flat list, else WDA);
- *    every raw WDA `/source?format=json` body (a JSON object with a `value`
- *    element) and every raw `uiautomator dump` XML as a RAW capture; and
- *    every unfiltered `ui_snapshot` the device agent's server logged in
- *    `session.log` (`--- #N … CALL ui_snapshot {…}`, the tree under its
- *    `--- #N RESULT` line) as a NORMALIZED `session-<N>.json` — most were
- *    never saved as a file — de-duplicated by content across the runs and
- *    against the files. Skipped, and listed in the run's manifest `note`: a filtered snapshot (a JSON
- *    array, not a tree), WDA's XML `/source` (no parser reads that format),
- *    and anything that is not a tree.
+ *    device-check scratch directories, read only, subdirectories included):
+ *    every file classified by its content (`classify`) — raw WDA
+ *    `/source?format=json`, raw idb `describe-all`, raw `uiautomator dump`,
+ *    a saved `ui_snapshot` tree (normalized) — and every unfiltered
+ *    `ui_snapshot` the averi server logged in `session.log` (`--- #N …
+ *    CALL ui_snapshot {…}`, the tree under its `--- #N RESULT` line) as a
+ *    normalized `session-<N>.json`. Everything de-duplicated by content
+ *    across the runs (`DeviceRunConverter`). Skipped, and listed in the
+ *    run's manifest `note` with the reason: a filtered snapshot, WDA's XML
+ *    `/source`, and any file that holds no tree.
+ *  - SYNTHETIC FROM DEVICE RUNS (with `--runs`): two raw WDA captures with an
+ *    identifier given to their status-band header (synthetic.ts#withHeaderId).
  *  - FIXTURES (`--repo`, a checkout: its tests/fixtures and tests/helpers):
  *    the raw WDA sources and captures, the raw idb element lists (whole files
  *    and the per-screen lists inside the documented ones), the normalized
@@ -34,7 +34,7 @@ import { syntheticIdb, syntheticUiautomator, zeroRootWda } from './synthetic.js'
 const IPHONE: Screen = { width: 402, height: 874 };
 const PIXEL: Screen = { width: 1080, height: 2220 };
 
-interface Built {
+export interface Built {
   manifest: RunManifest;
   files: Record<string, string>;
 }
@@ -52,6 +52,11 @@ function add(b: Built, file: string, body: string, entry: Omit<CaptureEntry, 'fi
 type Json = Record<string, unknown>;
 const isTree = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as Json).role === 'string';
 const isWdaRaw = (v: unknown): boolean => typeof v === 'object' && v !== null && typeof ((v as Json).value as Json | undefined)?.type === 'string';
+/** idb's `describe-all` element: a `type` and a frame (`frame` object or `AXFrame` string). */
+const isIdbElement = (v: unknown): boolean =>
+  typeof v === 'object' && v !== null && typeof (v as Json).type === 'string' && ((v as Json).frame !== undefined || (v as Json).AXFrame !== undefined);
+/** A ui_snapshot node: a `role` and a `rect` — what a filtered snapshot lists. */
+const isUiNode = (v: unknown): boolean => typeof v === 'object' && v !== null && typeof (v as Json).role === 'string' && (v as Json).rect !== undefined;
 
 /** The app a normalized iOS tree is of: WDA's root label, or idb's Application element (its first child). */
 function appOf(tree: Json): string | undefined {
@@ -60,15 +65,21 @@ function appOf(tree: Json): string | undefined {
   return typeof first?.label === 'string' && first.label.trim() !== '' ? first.label : undefined;
 }
 
-/** A tree's identity for de-duplication: its JSON with the keys sorted. */
-function treeHash(tree: unknown): string {
+/** A payload's identity for de-duplication: parsed JSON with the keys sorted, else the text itself. */
+export function contentHash(body: string): string {
   const canon = (v: unknown): unknown =>
     Array.isArray(v) ? v.map(canon) : typeof v === 'object' && v !== null ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Json)[k])])) : v;
-  return createHash('sha1').update(JSON.stringify(canon(tree))).digest('hex');
+  let text = body;
+  try {
+    text = JSON.stringify(canon(JSON.parse(body)));
+  } catch {
+    // Not JSON (a uiautomator dump): the bytes are the identity.
+  }
+  return createHash('sha1').update(text).digest('hex');
 }
 
-/** The end of the JSON object that opens `s` (strings and escapes respected), or -1. */
-function objectEnd(s: string): number {
+/** The end of the JSON value that opens `s` (strings and escapes respected), or -1. */
+function valueEnd(s: string): number {
   let depth = 0;
   let inString = false;
   for (let i = 0; i < s.length; i++) {
@@ -87,17 +98,17 @@ function objectEnd(s: string): number {
 }
 
 /** Every unfiltered `ui_snapshot` tree a device agent's server logged, in call order: [call number, tree]. */
-function sessionTrees(log: string): [string, Json][] {
+export function sessionTrees(log: string): [string, Json][] {
   const out: [string, Json][] = [];
   for (const m of log.matchAll(/^--- #(\d+) \S+ CALL ui_snapshot (\{.*\})$/gm)) {
     const args = JSON.parse(m[2]) as Json;
     if (typeof args.filter === 'string' && args.filter !== '') continue;
     const rest = log.slice(m.index + m[0].length);
-    const result = new RegExp(`^--- #${m[1]} RESULT[^\n]*\n`, 'm').exec(rest);
+    const result = new RegExp(`^--- #${m[1]} RESULT[^\\n]*\\n`, 'm').exec(rest);
     if (result === null) continue;
     const body = rest.slice(result.index + result[0].length).trimStart();
     if (!body.startsWith('{')) continue;
-    const end = objectEnd(body);
+    const end = valueEnd(body);
     if (end === -1) continue;
     try {
       const tree = JSON.parse(body.slice(0, end)) as unknown;
@@ -109,84 +120,123 @@ function sessionTrees(log: string): [string, Json][] {
   return out;
 }
 
-/** Per device run: the session.log trees found, and how many repeated a tree already taken. */
-const sessionCounts = new Map<string, { logged: number; duplicates: number }>();
-/** Every tree taken so far, across the device runs — the runs repeat screens. */
-const seen = new Set<string>();
-/** The distinct trees the session logs hold, saved as a file or not. */
-const uniqueLogged = new Set<string>();
+/** What a device-run file is: a capture (with the body the corpus keeps) or a reason it is not one. */
+export type Classified =
+  | { kind: 'capture'; source: CaptureEntry['source']; form: CaptureEntry['form']; body: string; app?: string }
+  | { kind: 'skip'; reason: string };
 
 /**
- * The server's own log of a device run: every tree it answered, most of which no agent saved as a file. Run after
- * every run's files are taken, so a logged tree that a later run saved as a file is not taken twice.
+ * Classify one file of a device run by its content, not its name:
+ *  - uiautomator XML (`<hierarchy`) → raw uiautomator; WDA's XML `/source` → skipped (no parser reads it);
+ *  - a JSON object with a `value` element → raw WDA (`/source?format=json`);
+ *  - a JSON array of idb elements (`type` + `frame`/`AXFrame`) → raw idb (`ui describe-all --json`);
+ *  - a UiNode tree (after a `#<call> (<s>)` header line, if any) → normalized, idb when its root is idb's flat list;
+ *  - a JSON array of UiNodes → skipped, a filtered snapshot; anything else → skipped, not a tree.
  */
-async function addSessions(dir: string, b: Built): Promise<void> {
-  const name = basename(dir);
-  const platform = b.manifest.platform;
-  let logged = 0;
-  let duplicates = 0;
-  try {
-    for (const [call, tree] of sessionTrees(await readFile(join(dir, 'session.log'), 'utf8'))) {
-      logged++;
-      const key = treeHash(tree);
-      uniqueLogged.add(key);
-      if (seen.has(key)) {
-        duplicates++;
-        continue;
-      }
-      seen.add(key);
-      const app = appOf(tree);
-      add(b, `session-${call}.json`, JSON.stringify(tree), {
-        source: platform === 'android' ? 'uiautomator' : tree.flatList === true ? 'idb' : 'wda',
-        form: 'normalized',
-        ...(platform === 'ios' && app !== undefined && { app }),
-        note: `session.log call #${call}`,
-      });
-    }
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+export function classify(text: string, platform: 'ios' | 'android'): Classified {
+  if (/^\s*(<\?xml|<hierarchy|\{\s*"value"\s*:\s*"<\?xml)/.test(text)) {
+    if (text.includes('<hierarchy')) return { kind: 'capture', source: 'uiautomator', form: 'raw', body: text };
+    return { kind: 'skip', reason: 'WDA XML source: no parser reads that format' };
   }
-  sessionCounts.set(name, { logged, duplicates });
+  const start = text.search(/[[{]/);
+  let value: unknown;
+  try {
+    value = start === -1 ? undefined : JSON.parse(text.slice(start));
+  } catch {
+    value = undefined;
+  }
+  if (isWdaRaw(value)) {
+    const label = ((value as Json).value as Json).label;
+    return { kind: 'capture', source: 'wda', form: 'raw', body: text, ...(typeof label === 'string' && { app: label }) };
+  }
+  if (Array.isArray(value) && value.length > 0 && value.every(isIdbElement)) {
+    const app = (value as Json[]).find((e) => e.type === 'Application')?.AXLabel;
+    return { kind: 'capture', source: 'idb', form: 'raw', body: JSON.stringify(value), ...(typeof app === 'string' && app.trim() !== '' && { app }) };
+  }
+  if (isTree(value)) {
+    const app = appOf(value);
+    return {
+      kind: 'capture',
+      source: platform === 'android' ? 'uiautomator' : value.flatList === true ? 'idb' : 'wda',
+      form: 'normalized',
+      body: JSON.stringify(value),
+      ...(platform === 'ios' && app !== undefined && { app }),
+    };
+  }
+  if (Array.isArray(value) && value.length > 0 && value.every(isUiNode)) return { kind: 'skip', reason: 'a filtered snapshot: a node list, not a tree' };
+  return { kind: 'skip', reason: value === undefined ? 'not a tree (no JSON tree in it: a text listing or a log)' : 'not a tree' };
 }
 
-async function deviceRun(dir: string): Promise<Built> {
-  const name = basename(dir);
-  const platform = name.endsWith('-android') ? 'android' : 'ios';
-  const b = run(platform, platform === 'ios' ? IPHONE : PIXEL, platform === 'ios' ? 'iPhone 17 simulator, iOS 27.0' : 'Pixel_3a AVD, Android 13 (API 33)');
-  const skipped: string[] = [];
-  for (const f of (await readdir(dir)).sort()) {
-    if (!/\.(json|txt|xml|raw)$/.test(f)) continue;
-    const text = await readFile(join(dir, f), 'utf8');
-    if (/^\s*<\?xml/.test(text) || f.endsWith('.raw')) {
-      if (text.includes('<hierarchy')) add(b, f, text, { source: 'uiautomator', form: 'raw' });
-      else skipped.push(`${f} (WDA XML source: no parser reads that format)`);
-      continue;
+/** Every file under `dir`, subdirectories included, as paths relative to it, sorted. */
+async function filesUnder(dir: string, prefix = ''): Promise<string[]> {
+  const out: string[] = [];
+  for (const e of (await readdir(join(dir, prefix), { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    const rel = prefix === '' ? e.name : `${prefix}/${e.name}`;
+    if (e.isDirectory()) out.push(...(await filesUnder(dir, rel)));
+    else if (e.isFile()) out.push(rel);
+  }
+  return out;
+}
+
+/**
+ * Device runs into corpus runs, de-duplicated by content across all of them: a screen polled sixty times (run12's
+ * F1poll) or logged in a later run's session is taken once. Files first, every run's, then the session logs — so a
+ * logged tree that some run saved as a file is the file.
+ */
+export class DeviceRunConverter {
+  private readonly seen = new Set<string>();
+  /** Per run: files taken, repeats dropped, files skipped (and why), session trees logged and taken. */
+  readonly counts = new Map<string, { files: number; fileRepeats: number; skipped: string[]; logged: number; loggedTaken: number }>();
+  /** The distinct trees the session logs hold, saved as a file or not. */
+  readonly uniqueLogged = new Set<string>();
+
+  private take(b: Built, file: string, c: Extract<Classified, { kind: 'capture' }>, note?: string): boolean {
+    const key = contentHash(c.body);
+    if (this.seen.has(key)) return false;
+    this.seen.add(key);
+    add(b, file, c.body, { source: c.source, form: c.form, ...(c.app !== undefined && { app: c.app }), ...(note !== undefined && { note }) });
+    return true;
+  }
+
+  async files(dir: string): Promise<Built> {
+    const name = basename(dir);
+    const platform = name.endsWith('-android') ? 'android' : 'ios';
+    const b = run(platform, platform === 'ios' ? IPHONE : PIXEL, platform === 'ios' ? 'iPhone 17 simulator, iOS 27.0' : 'Pixel_3a AVD, Android 13 (API 33)');
+    const count = { files: 0, fileRepeats: 0, skipped: [] as string[], logged: 0, loggedTaken: 0 };
+    this.counts.set(name, count);
+    for (const rel of await filesUnder(dir)) {
+      if (!/\.(json|txt|xml|raw)$/.test(rel)) continue;
+      const c = classify(await readFile(join(dir, rel), 'utf8'), platform);
+      if (c.kind === 'skip') {
+        count.skipped.push(`${rel} (${c.reason})`);
+        continue;
+      }
+      // Subdirectories flattened into the name; a .txt or .raw is kept under the extension of what it holds.
+      const file = rel.replaceAll('/', '.').replace(/\.(txt|raw)$/, c.source === 'uiautomator' ? '.xml' : '.json');
+      if (this.take(b, file, c, rel.includes('/') ? `from ${rel}` : undefined)) count.files++;
+      else count.fileRepeats++;
     }
-    const start = text.search(/[[{]/);
-    let value: unknown;
+    if (count.skipped.length > 0) b.manifest.note = `skipped: ${count.skipped.join('; ')}`;
+    return b;
+  }
+
+  async sessions(dir: string, b: Built): Promise<void> {
+    const count = this.counts.get(basename(dir))!;
+    let log: string;
     try {
-      value = start === -1 ? undefined : JSON.parse(text.slice(start));
-    } catch {
-      value = undefined;
+      log = await readFile(join(dir, 'session.log'), 'utf8');
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw e;
     }
-    if (isWdaRaw(value)) {
-      add(b, f, text, { source: 'wda', form: 'raw', ...(typeof ((value as Json).value as Json).label === 'string' && { app: ((value as Json).value as Json).label as string }) });
-    } else if (isTree(value)) {
-      const app = appOf(value);
-      add(b, f.replace(/\.txt$/, '.json'), JSON.stringify(value), {
-        source: platform === 'android' ? 'uiautomator' : value.flatList === true ? 'idb' : 'wda',
-        form: 'normalized',
-        ...(platform === 'ios' && app !== undefined && { app }),
-      });
-    } else if (Array.isArray(value)) {
-      skipped.push(`${f} (a filtered snapshot: a node list, not a tree)`);
-    } else if (value !== undefined || /^#\d+/.test(text)) {
-      skipped.push(`${f} (not a tree)`);
+    for (const [call, tree] of sessionTrees(log)) {
+      count.logged++;
+      const c = classify(JSON.stringify(tree), b.manifest.platform);
+      if (c.kind !== 'capture') continue;
+      this.uniqueLogged.add(contentHash(c.body));
+      if (this.take(b, `session-${call}.json`, c, `session.log call #${call}`)) count.loggedTaken++;
     }
   }
-  for (const [f, body] of Object.entries(b.files)) if (f.endsWith('.json')) seen.add(treeHash(JSON.parse(body)));
-  if (skipped.length > 0) b.manifest.note = `skipped: ${skipped.join('; ')}`;
-  return b;
 }
 
 async function fixtureRuns(repo: string): Promise<{ ios: Built; android: Built }> {
@@ -240,14 +290,21 @@ async function main(): Promise<void> {
   }
   const out = resolve(values.out);
   const built: [string, Built][] = [];
+  const devices = new DeviceRunConverter();
   if (values.runs !== undefined) {
     const runs = (await readdir(values.runs)).filter((d) => /^run\d+-(ios|android)$/.test(d)).sort();
-    for (const d of runs) built.push([d, await deviceRun(join(values.runs, d))]);
-    for (const [d, b] of built) await addSessions(join(values.runs, d), b);
+    for (const d of runs) built.push([d, await devices.files(join(values.runs, d))]);
+    for (const [d, b] of built) await devices.sessions(join(values.runs, d), b);
+    const derived = run('ios', IPHONE, 'synthetic, from run14-ios raw captures');
+    derived.manifest.note = 'raw WDA captures with an identifier given to the status-band header beneath a presented screen (synthetic.ts#withHeaderId)';
+    for (const [f, height] of [['D-swift-fees-sheet.json', 116], ['D-finportal-forgot.json', 102]] as const) {
+      const raw = await readFile(join(values.runs, 'run14-ios', f), 'utf8');
+      add(derived, `header-id.${f}`, withHeaderId(raw, height, 'synthetic.status_band_header'), { source: 'wda', form: 'raw' });
+    }
+    built.push(['synthetic-from-runs-ios', derived]);
   }
   if (values.repo !== undefined) {
     const repo = resolve(values.repo);
-    console.log(`session.log: ${uniqueLogged.size} distinct trees logged`);
     const fx = await fixtureRuns(repo);
     const syn = await syntheticRuns(repo);
     built.push(['fixtures-ios', fx.ios], ['fixtures-android', fx.android], ['synthetic-ios', syn.ios], ['synthetic-android', syn.android]);
@@ -259,13 +316,13 @@ async function main(): Promise<void> {
     const k = `${b.manifest.platform} ${c.source} ${c.form}`;
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
+  if (values.runs !== undefined) console.log(`session.log: ${devices.uniqueLogged.size} distinct trees logged`);
   for (const [name, b] of built) {
-    const session = sessionCounts.get(name);
-    const fromLog = b.manifest.captures.filter((c) => c.file.startsWith('session-')).length;
+    const c = devices.counts.get(name);
     console.log(
       `${name}: ${b.manifest.captures.length}` +
-        (session === undefined ? '' : ` (${b.manifest.captures.length - fromLog} files, ${fromLog} from session.log: ${session.logged} logged, ${session.duplicates} repeats)`) +
-        (b.manifest.note?.startsWith('skipped') ? ` — ${b.manifest.note}` : ''),
+        (c === undefined ? '' : ` (files ${c.files} taken, ${c.fileRepeats} repeats; session.log ${c.loggedTaken} taken of ${c.logged} logged)`) +
+        (c !== undefined && c.skipped.length > 0 ? ` — skipped: ${c.skipped.join('; ')}` : ''),
     );
   }
   for (const [k, v] of [...counts].sort()) console.log(`${k}: ${v}`);
