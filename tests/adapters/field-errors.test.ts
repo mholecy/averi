@@ -55,6 +55,12 @@ describe('field/error pairing', () => {
     expect(target.error).toBe('Required');
   });
 
+  it('a zero-height field is not the next field below itself', () => {
+    const target = field('amount', 100, 0);
+    attachFieldErrors([target, text('amount', 110, 'Required')]);
+    expect(target.error).toBe('Required');
+  });
+
   it('ignores a same-identifier text that has no label', () => {
     const target = field('amount', 100);
     attachFieldErrors([target, text('amount', 130, null)]);
@@ -106,6 +112,30 @@ describe('field/error pairing', () => {
       attachFieldErrors([ibanTitle, iban, bicTitle, bic, required]);
       expect(iban.error).toBeUndefined();
       expect(bic.error).toBe('Required');
+    });
+
+    it('a validation message above a later field with no title of its own still pairs with the field it lies under', () => {
+      const [ibanTitle, iban] = titled(357, 'IBAN*');
+      const invalid = node({ role: 'text', identifier: ID, label: 'Invalid IBAN', rect: { x: 42, y: 380, width: 200, height: 16 } });
+      const untitled = node({ role: 'textfield', identifier: ID, rect: { x: 42, y: 425, width: 318, height: 20 } });
+      attachFieldErrors([ibanTitle, iban, invalid, untitled]);
+      expect(iban.error).toBe('Invalid IBAN');
+      expect(untitled.error).toBeUndefined();
+    });
+
+    it('a field with a label reaching into its top AND a placeholder inside it lends neither to the field above', () => {
+      // The amount field as measured (idb and WDA): "Amount*" y 283 h 16 ends
+      // 3 pt inside the field at y 296, and "Value*" sits inside the field.
+      const above = field(ID, 220);
+      const amount = node({ role: 'textfield', identifier: ID, rect: { x: 42, y: 296, width: 232, height: 21 } });
+      attachFieldErrors([
+        above,
+        node({ role: 'text', identifier: ID, label: 'Amount*', rect: { x: 42, y: 283, width: 51, height: 16 } }),
+        amount,
+        node({ role: 'text', identifier: ID, label: 'Value*', rect: { x: 42, y: 296, width: 49, height: 21 } }),
+      ]);
+      expect(above.error).toBeUndefined();
+      expect(amount.error).toBeUndefined();
     });
 
     it('never takes a text lying past the next same-identifier field', () => {

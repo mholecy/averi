@@ -10,10 +10,14 @@ import { everyNode, type UiNode } from './types.js';
  * A design-system component may instead give EVERY field and its title one
  * shared identifier (mp-native's SWIFT form, 2026-10-14: `TextFieldWithComponentStyle`
  * on each field and its floating title). Then the text below a field is the
- * NEXT field's title. So a text that is another same-identifier field's title —
- * the nearest same-identifier text overlapping or above that field — is never
- * an error, and a field's error lies above the top of the next same-identifier
- * field below it.
+ * NEXT field's title. So a same-identifier text that vertically overlaps a
+ * same-identifier field (its floating title, or a label reaching into its top,
+ * or a placeholder inside it) is a title and never an error, and a field's
+ * error lies above the top of the next same-identifier field below it.
+ *
+ * Not covered: a title stacked wholly above its field, not overlapping it,
+ * still reads as the previous same-identifier field's error; and same-identifier
+ * fields side by side on one row share the message below them.
  *
  * One owner because BOTH iOS tree sources need it and their trees have
  * different shapes: idb returns a flat AX list, WDA a nested XCUIElement tree
@@ -31,12 +35,11 @@ export function attachFieldErrors(nodes: Iterable<UiNode>): void {
   }
   const titles = new Set<UiNode>();
   for (const field of fields) {
-    const title = nearest(texts.filter((t) => t.identifier === field.identifier && t.rect.y < bottom(field)), (t) => -t.rect.y);
-    if (title !== undefined) titles.add(title);
+    for (const t of texts) if (t.identifier === field.identifier && t.rect.y < bottom(field) && bottom(t) > field.rect.y) titles.add(t);
   }
   for (const field of fields) {
     const next = nearest(
-      fields.filter((f) => f.identifier === field.identifier && f.rect.y >= bottom(field)),
+      fields.filter((f) => f !== field && f.identifier === field.identifier && f.rect.y >= bottom(field)),
       (f) => f.rect.y,
     );
     const error = nearest(

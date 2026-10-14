@@ -56,7 +56,8 @@ flows:
   (measured 3 of 11 landing).
 - **Field errors**: on iOS `ui_snapshot` attaches `error` to an input from a same-identifier text
   below the field (the SwiftUI convention when titles/errors share the field's
-  `accessibilityIdentifier`); assert with `{ element: { id: amount_input }, error: "Required" }`.
+  `accessibilityIdentifier`) that is not a title of a same-identifier field (a same-identifier
+  text overlapping a field), and lies above the next such field; assert with `{ element: { id: amount_input }, error: "Required" }`.
   Android sets no `error`, so there assert the message's `text` instead.
 - **Tap disambiguation**: when a selector matches several nodes and exactly one is interactive
   (button/textfield/switch/…), `tap`/`fill` target that one and say so in the trace. Several
