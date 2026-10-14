@@ -99,4 +99,28 @@ describe('DeviceRunConverter', () => {
     expect(convert.counts.get('run12-ios')).toEqual({ files: 3, fileRepeats: 1, skipped: ['a.txt (not a tree (no JSON in it: a text listing or a log))'], logged: 2, loggedTaken: 1 });
     expect(b.manifest.note).toMatch(/a\.txt/);
   });
+
+  it('keeps a raw payload saved beside its ui_snapshot as two trees: the raw one under its own name, the normalized one as <name>.snapshot.json, never .xml', async () => {
+    const android = join(dir, 'run16-android');
+    await mkdir(android, { recursive: true });
+    await writeFile(join(android, 'acct2.xml'), '<?xml version="1.0"?><hierarchy rotation="0"><node bounds="[0,0][1080,2220]"/></hierarchy>');
+    await writeFile(join(android, 'acct2.txt'), `#20 (1.1s)\n${JSON.stringify(tree('', { paddedTouchTargets: true }))}`);
+    await writeFile(join(android, 'sticky1.txt'), JSON.stringify(tree('only normalized')));
+    const ios = join(dir, 'run16-ios');
+    await mkdir(ios, { recursive: true });
+    await writeFile(join(ios, 'contacts-list-wda.json'), JSON.stringify({ value: { type: 'Application', label: 'Contacts' }, sessionId: null }));
+    await writeFile(join(ios, 'contacts-list-wda.txt'), `#9 (0.5s)\n${JSON.stringify(tree('Contacts'))}`);
+    await writeFile(join(ios, 'saved.json'), JSON.stringify(tree('Saved as json')));
+    const convert = new DeviceRunConverter();
+    expect((await convert.files(android)).manifest.captures.map((c) => [c.file, c.form])).toEqual([
+      ['acct2.snapshot.json', 'normalized'],
+      ['acct2.xml', 'raw'],
+      ['sticky1.snapshot.json', 'normalized'],
+    ]);
+    expect((await convert.files(ios)).manifest.captures.map((c) => [c.file, c.form])).toEqual([
+      ['contacts-list-wda.json', 'raw'],
+      ['contacts-list-wda.snapshot.json', 'normalized'],
+      ['saved.json', 'normalized'],
+    ]);
+  });
 });

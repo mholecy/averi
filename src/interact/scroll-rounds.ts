@@ -107,6 +107,11 @@ export interface RoundSeen {
   unlocated?: boolean;
   /** ms since the scroll began (after the device's screen was read), stamped on every call — re-entry included. */
   elapsedMs: number;
+  /**
+   * ms this round's tree read took, whether it read or failed — the driver times the read alone. Summed for the
+   * timeout's sentence (`ReadTime`): a budget the reads spent is not the content's fault.
+   */
+  readMs: number;
 }
 
 /**
@@ -242,7 +247,20 @@ export type Flush =
 export type BoundBy =
   | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn }
   | { of: 'maxSwipes' }
-  | { of: 'timeout'; timeoutMs: number };
+  | { of: 'timeout'; timeoutMs: number; elapsedMs: number; reads: ReadTime };
+
+/**
+ * The tree reads of a scroll that timed out: how many (every round reads once, a failed read included), how long they
+ * took in all and the last one. A WDA restart under the scroll (the Safari case: no swipe sent, one 38 s read against
+ * the 15 s budget) shows here, and not as content that never came into view; the restart itself is reported by the
+ * tree source on stderr, not in the reply. The bound carries the time spent (`elapsedMs`, what the round that stopped
+ * was stamped with) beside the budget: a read that outlasts it ends the scroll well past it.
+ */
+export interface ReadTime {
+  count: number;
+  totalMs: number;
+  lastMs: number;
+}
 
 /** Where a stroke touched down on a node drawn over the container it was drawn in (`touchedOn`): the point, the node, the container. */
 export interface TouchedOn {
@@ -524,6 +542,8 @@ interface State {
   /** Some round matched the target, and how many rounds read a tree — the absence rule's evidence. */
   readonly everFound: boolean;
   readonly treesRead: number;
+  /** Every round's tree read, failed ones included — for the timeout's sentence. */
+  readonly reads: ReadTime;
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   readonly lastCover: Cover | undefined;
   readonly coveredRounds: number;
@@ -674,6 +694,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     frame: { box, boxes: [box] },
     everFound: false,
     treesRead: 0,
+    reads: { count: 0, totalMs: 0, lastMs: 0 },
     lastCover: undefined,
     coveredRounds: 0,
     lastReadEdge: undefined,
@@ -1090,6 +1111,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
   const read = 'error' in seen.read ? undefined : seen.read;
   const readError = 'error' in seen.read ? seen.read.error : undefined;
+  s.reads = { count: s.reads.count + 1, totalMs: s.reads.totalMs + seen.readMs, lastMs: seen.readMs };
   if (read !== undefined) {
     s.treesRead++;
     if (seen.screen !== undefined) s.frame = seen.screen;
@@ -1286,7 +1308,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
-        : { of: 'timeout', timeoutMs: s.rules.timeoutMs };
+        : { of: 'timeout', timeoutMs: s.rules.timeoutMs, elapsedMs: seen.elapsedMs, reads: s.reads };
     return stop(s, {
       kind: 'bound',
       swipes: s.swipes,

@@ -250,8 +250,13 @@ export async function scrollUntilVisible(
   let state: Rounds = startRounds(rules, asBuilt);
   let drawn: Stroke | undefined;
   for (;;) {
-    // A failed read is a miss, not a failure — see readTreeOrError.
+    // A failed read is a miss, not a failure — see readTreeOrError. Timed
+    // alone (`readMs`), failed or not: a timeout says how long the reads took,
+    // so one spent by a tree source restarting under the scroll does not read
+    // as the content's fault.
+    const readStarted = Date.now();
     const read = await readTreeOrError(adapter);
+    const readMs = Date.now() - readStarted;
     const { tree } = read;
     // The round's screen box (swipe.ts#screenBox), read once and handed to
     // the round whole (`RoundSeen.screen`): the frame it judges in and the
@@ -282,7 +287,7 @@ export async function scrollUntilVisible(
       // `tree` is not, but TreeRead's type cannot say so. Its wording is a
       // plain Error's, not the absence one's (ElementNotFoundError): a read
       // that returned nothing is a miss, as every failed read is.
-      seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0 };
+      seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0, readMs };
     } else {
       // The matches the round judges: the one the next tap would act on, when the preference picks one (resolve.ts#matchesToJudge).
       const found = matchesToJudge(tree, target);
@@ -300,6 +305,7 @@ export async function scrollUntilVisible(
           ...(cover !== undefined && { cover }),
         },
         elapsedMs: 0,
+        readMs,
       };
     }
     if (screen !== undefined) seen.screen = screen.usable;
