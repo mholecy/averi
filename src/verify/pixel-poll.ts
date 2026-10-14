@@ -527,8 +527,12 @@ async function judgeOver(
   }
 }
 
-/** The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it (ui-tree/standing.ts#presentedRemedy owns the words). */
-const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
+/**
+ * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it
+ * (ui-tree/standing.ts#presentedRemedy owns the words). The one sentence the `assert` tool's description quotes
+ * (mcp/tools.ts).
+ */
+export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
 
 /**
  * What to do about a pixel assert's element under chrome (`judgeOver`) — its standing's remedy
