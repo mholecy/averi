@@ -236,21 +236,32 @@ The sentence keeps the presented stop's remedy and gives one clause per reason t
 then where the swipe would have landed (interact/scroll-text.ts):
 
 - `scroll_until role:container label:"add instant message" stopped before any swipe — element lies below the viewport,
-  and the swipe toward it would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is
+  and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is
   presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe
   on it may dismiss it, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport`;
 - under the keyboard: `… — element lies under the soft keyboard: its centre (201,661) is below the keyboard's top edge
-  at y 573, and the swipe toward it would touch down at (201,459) on container "dismiss popup" (0,0 402x874) — …`
+  at y 573, and the next swipe would touch down at (201,459) on container "dismiss popup" (0,0 402x874) — …`
   (the tap refusal's words for the same point);
 - in the viewport but short of the stop: `… — element is in the viewport but <the stuck and bound sentences' words for
   that shortfall: CLIPPED at …, cut at its scroll container's … edge …, its centre stays under the status bar …, under
-  <node> … — N% of it shows>, and the swipe toward it would touch down at …`;
-- after strokes: `stopped after N swipes, without swiping further — …, so no further swipe was sent`.
+  <node> … — N% of it shows>, and the next swipe would touch down at …`;
+- after strokes: `stopped after N swipes, without swiping further — …, so no further swipe was sent`;
+- "the next swipe", not "the swipe toward it": the stroke asked about is the one the round would draw next, which a
+  turn, or a caller's direction away from the target, draws the other way;
+- at a bound (maxSwipes, the timeout, content exhausted) whose held-back swipe would have touched down on such a
+  surface, the bound's failure ends `. The next swipe would have touched down at (x,y) on <surface> — a screen is
+  presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen`.
 
 Not changed: a target judged in the viewport under a presented surface stops as before (its sentence unchanged); a
 target of the presented screen itself — a row of a sheet below the sheet's fold — is stroked for on its own screen
 (the touch-down lies on its own screen's form: no screen is presented over it there); a stroke whose touch-down lies
 off every presented surface is sent.
+
+No blind stroke after a hold (review of the slice, M2): while either presented stop is held for its confirming read,
+a read that does not read is confirmed again while the budget allows, and when none is left the scroll stops as the
+last read that read left it (`presentedHold`) — never a stroke, which would be drawn blind onto the screen that read
+saw presented. At e1384aa the in-viewport stop had the same hole: a hold, then three failed reads, then a stroke.
+Stopping, not waiting to the deadline: the reads are failing, and the last one that read is the evidence there is.
 
 One fix the amendment needed: the stuck turn (`round`'s stroke back after two unmoved strokes) is decided before the
 stroke is drawn, so it can now be held for the confirming read; that read — no stroke between — read the target
@@ -266,7 +277,7 @@ and its six raw WDA `/source` captures `D-*.json` parsed by `parseWdaSource`):
 |---|---|
 | ROUNDS (3 478 000 plays, 11 209 126 `round` calls one side) | 68 008, all on the 16 iOS trees with a presented screen |
 | TAP, PIXEL, PICK, GUARD, KEYPOS | 0 |
-| SEQ (300 tests, 1 515 `round` calls) | the 9 new scroll-rounds rows only (compared sorted; OLD fails them) |
+| SEQ (304 tests, 1 531 `round` calls) | the 13 new scroll-rounds rows only (compared sorted; OLD fails them) |
 
 | Tree | Presented surface at the touch-down | ROUNDS |
 |---|---|---|
@@ -284,11 +295,17 @@ Every changed play ends `presented` after exactly one confirming read; none ende
 strokes than before, and none is on an Android tree. 65 984 plays went from strokes and the bound ("content
 exhausted" or "never intersected") to the stop before any swipe; 1 880 from three strokes and `stuck` to the stop
 before any swipe; 144 from three strokes and `stuck` to "stopped after 2 swipes, without swiping further". Those 144
-are all on the four Fees half-sheet trees, all judged either way up with `direction: "up"`, and their target is the
-sheet's own dim `-402,-874 1206x2622` (alone, or the judged one of a pair with a full-screen container): the dim is a
-surface of the presented screen itself, so the two strokes up, touching down at (201,175) on the dim, land on the
-target's own screen and are sent, as for any row of a sheet; the stroke back down would touch down at (201,699) on the
-sheet's form, which the tree lays in a later screen-sized layer over the dim's, and is not sent. Reasons said: the
+are all on the four Fees half-sheet trees, all judged either way up with `direction: "up"`. Their target (alone, or
+the judged one of a pair with a full-screen container) is the tree's FIRST `container 'dismiss popup'
+id=PopoverDismissRegion -402,-874 1206x2622`: a hidden twin of the sheet's dim, listed in the SWIFT form's own layer
+(pre-order #4; the sheet's real dim is #143, in the presented layer). The two strokes up touch down at (201,175) on
+the real dim — a presented surface — and are SENT: the twin has the dim's exact frame, and the target column excuses
+a node of the target's own frame (`sameFrame`), so `presentedAt` names nothing there (residual 6). The stroke back down
+would touch down at (201,699) on the sheet's form and is held. Exempting such a node from `sameFrame` in
+`presentedAt` alone was measured (OLD = this change, the 233 trees): it held those 144 strokes, but also stopped 5 040
+plays that end `stuck` today — 160 on Android's `run12-android/snapF5.txt` (the RN background leaf under the
+`login_screen` scroll view of the same frame, no screen presented: a false stop), 3 680 on `run13-ios/A1-forgot-wda.json`
+and 400 on each of three Contacts page-sheet trees — so it was not taken. Reasons said: the
 target below or above the viewport (45 552), under the soft keyboard (20 432), its centre under the status bar (820),
 under a node of its own screen (648), clipped (556).
 
@@ -324,18 +341,26 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    layer drawn by the root's direct children (one window's top level, on a tree whose root is the window) reads as
    across Windows.
 6. **`scroll_until` stops at a presented screen on its own reads**: two reads with no stroke between (or one, when no
-   confirming read is left), of a target judged in the viewport under a presented surface, or — since the amendment
-   "No stroke onto a presented screen" — of a target in the tree whose next stroke would touch down on one. Closed for
-   the target off screen or under the keyboard that this residual first named (the device check: a stroke for a cell
-   below the fold closed Contacts' discard popover and read "fully visible"). Still stroked for: a target NOT YET IN
-   THE TREE — there is nothing to ask on behalf of; its strokes may land on a presented screen (Q-A option (b), judging
-   the touch-down against surfaces presented over the stroked container's screen, was not taken: a search whose
-   target lies in the presented sheet itself, stroked over a container picked from the screen beneath, would stop); a
-   target whose presented screen the tree does not show as one (residuals 2, 3, 5); a stroke whose touch-down lies off
-   every presented surface, wherever its path goes; a target that is itself a node of the presented screen (its own
-   screen: the Fees sheet's dim as a target was stroked on twice before the stroke back would touch down on the sheet,
-   the harness's 144 plays); and the flush probe of a `fully: true` stop (scroll-rounds.ts#PROBE_REACH, Android's cut
-   bounds), which is not asked. The stroke box (`drawnOver`) is unchanged.
+   confirming read is left; a read that fails meanwhile is confirmed again, never answered with a stroke), of a target
+   judged in the viewport under a presented surface, or — since the amendment "No stroke onto a presented screen" —
+   of a target in the tree whose next stroke would touch down on one. Closed for the target off screen or under the
+   keyboard that this residual first named (the device check: a stroke for a cell below the fold closed Contacts'
+   discard popover and read "fully visible"). Still stroked for:
+   - a target NOT YET IN THE TREE — there is nothing to ask on behalf of; its strokes may land on a presented screen
+     (Q-A option (b), judging the touch-down against surfaces presented over the stroked container's screen, was not
+     taken: a search whose target lies in the presented sheet itself, stroked over a container picked from the screen
+     beneath, would stop); a bound that ends such a scroll says nothing of it either;
+   - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
+     target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
+     hidden twin `PopoverDismissRegion` of the sheet's dim in the form's own layer; scroll_until to it, judged either
+     way up, strokes up twice onto the real dim before the stroke back would touch down on the sheet's form (the
+     harness's 144 plays). Exempting such a node in `presentedAt` alone stopped 5 040 more plays, 160 of them a false
+     stop on Android's RN login (`snapF5`, a background leaf under a scroll view of the same frame), so it was not
+     taken;
+   - a target whose presented screen the tree does not show as one (residuals 2, 3, 5); a stroke whose touch-down lies
+     off every presented surface, wherever its path goes; a row of the presented screen itself, on its own screen; and
+     the flush probe of a `fully: true` stop (scroll-rounds.ts#PROBE_REACH, Android's cut bounds), which is not asked.
+   The stroke box (`drawnOver`) is unchanged.
 7. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
