@@ -515,9 +515,12 @@ async function judgeOver(
       const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
       // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
       // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
-      // Beneath a screen presented over it too (ADR 0018): that screen's remedy in place of the bar's, as under a cover —
-      // no scroll moves it out from under that screen, so no scroll advice; the bar stays named as what is drawn over it.
-      const fixedKind = underPresented(standing.facts) ? 'presented' : pinnedSurface(element, screen, usable, scene.clips);
+      // Beneath a screen presented over it too (ADR 0018): that screen's remedy in place of the bar's, as under a
+      // cover — no scroll moves it out from under that screen, so no scroll advice; the bar stays named as what is
+      // drawn over it.
+      const fixedKind = underPresented(standing.facts)
+        ? 'presented'
+        : pinnedSurface(element, screen, usable, scene.clips);
       return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(fixedKind ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
     }
     case 'cut':

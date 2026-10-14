@@ -416,11 +416,12 @@ const presentedOver = (placed: Placed, target: Placed, screenArea: number): bool
 };
 
 /**
- * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses (`frameExcused`), or
- * one a row would name as a presented surface (`presentedSurface`, through the row's `surfaceCandidate`: for
- * `structural` any structural node, excused or not), whose own `overPresented` holds (`structural`: a LEAF that FILLS
- * THE SCREEN, `fillsScreen`; `screenSizedHost` and `contentFramed`: a scroll view, drawing only through its rows),
- * covers a target when it lies on a screen presented over the target's (`presentedOver`) and is no bare frame
+ * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses (`frameExcused`),
+ * or one a row would name as a presented surface (`presentedSurface`, through the row's `surfaceCandidate`: for
+ * `structural` any structural node, excused or not), whose own `overPresented` holds (`structural`: a LEAF that
+ * FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and `contentFramed`: a scroll view, drawing only through its
+ * rows), covers a target (or, asked by `presentedSurface`, is named a presented surface) when it lies on a screen
+ * presented over the target's (`presentedOver`) and is no bare frame
  * (`emptyFrame` with nothing drawable in it — a spacer of the layer stays excused, so a leaf the app named, the RN
  * Modal's dimming root `forgot_overlay`, covers and an anonymous one does not). Only surfaces that draw their
  * whole rect: a dimming leaf, a sheet's scroll view. A smaller leaf stays excused: every unmapped Android leaf is an
