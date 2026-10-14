@@ -61,7 +61,7 @@ const readOf = (found: UiNode[], extra: { cover?: KeyboardCover } = {}): RoundRe
 describe('round — the protocol', () => {
   it('an ask leaves the state as it came in, and the same seen with the answer goes on', () => {
     const state = startRounds({ ...ANDROID, fully: true }, ANDROID.screen);
-    const seen = { read: readOf([formRow(1906)], { cover: UP_IME }), elapsedMs: 0 };
+    const seen = { read: readOf([formRow(1906)], { cover: UP_IME }), elapsedMs: 0, readMs: 0 };
     const asked = round(state, seen);
     expect(asked).toEqual({ state, step: { do: 'ask', what: 'witness' } });
     expect(round(state, { ...seen, corroborated: true }).step).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
@@ -69,13 +69,13 @@ describe('round — the protocol', () => {
 
   it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
     const state = startRounds(ANDROID, ANDROID.screen);
-    const off = { read: readOf([formRow(2900)]), elapsedMs: 0 };
+    const off = { read: readOf([formRow(2900)]), elapsedMs: 0, readMs: 0 };
     expect(() => round(state, { ...off, drawn: STROKE })).toThrow('none asked for');
     const stroked = round(state, off).state;
     expect(() => round(stroked, off)).toThrow('without the stroke drawn');
-    const stopped = round(stroked, { read: readOf([formRow(500)]), elapsedMs: 0, drawn: STROKE });
+    const stopped = round(stroked, { read: readOf([formRow(500)]), elapsedMs: 0, readMs: 0, drawn: STROKE });
     expect(stopped.step.do).toBe('confirm');
-    const done = round(stopped.state, { read: readOf([formRow(500)]), elapsedMs: 0 });
+    const done = round(stopped.state, { read: readOf([formRow(500)]), elapsedMs: 0, readMs: 0 });
     expect(done.step.do).toBe('stop');
     expect(() => round(done.state, off)).toThrow('after the scroll stopped');
   });
@@ -111,7 +111,17 @@ describe('round — the judgement and the stop', () => {
       /scroll_until id:submit_button failed after 4 swipes \(maxSwipes\) — element in tree but never intersected the 1000x2000 viewport/,
     );
     const timedOut = play({ ...SCROLLING, maxSwipes: 50, timeoutMs: 1 }, [{ found: [button(50_000)], elapsedMs: 1 }]);
-    expect(failureOf(timedOut, describeTarget({ id: 'submit_button' })).message).toMatch(/scroll_until id:"submit_button" failed after 1ms \(timeout\)/);
+    expect(failureOf(timedOut, describeTarget({ id: 'submit_button' })).message).toMatch(/scroll_until id:"submit_button" failed after 1ms \(timeout 1ms; no swipe was sent; 1 tree read took 0ms\)/);
+  });
+
+  it('a timeout says how many swipes it sent and how long the tree reads took, so a budget the reads spent does not read as the content\'s fault', () => {
+    // The Safari case: the one read outlasted the budget (a tree source restarting under it) — no swipe was ever sent, and the time
+    // spent is said beside the budget it ran past.
+    const slow = play(SCROLLING, [{ found: [button(50_000)], elapsedMs: 38_204, readMs: 38_204 }]);
+    expect(failureOf(slow, 'id:submit_button').message).toMatch(/^scroll_until id:submit_button failed after 38204ms \(timeout 2000ms; no swipe was sent; 1 tree read took 38204ms\) — element in tree but never intersected/);
+    // A read that failed took its time too: it is counted with the rest.
+    const failing = play(SCROLLING, [{ error: 'WDA /source timed out', readMs: 1_000 }, { found: [button(49_990)], elapsedMs: 2_500, readMs: 1_500 }]);
+    expect(failureOf(failing, 'id:submit_button').message).toContain('failed after 2500ms (timeout 2000ms; 1 swipe sent; 2 tree reads took 2500ms, the last 1500ms)');
   });
 
   it('a stop at 0 swipes was not stroked: reported on its one read, no confirming read', () => {
@@ -1272,9 +1282,9 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(failureOf(play({ ...IPHONE, maxSwipes: 2 }, moving), 'id:priority').message).toBe(
       `scroll_until id:priority failed after 2 swipes (maxSwipes) — element reached the viewport but stayed under ${COVER} at its centre (201,799), drawn over it — 15% of it shows (last rect {"x":24,"y":773,"width":354,"height":52})`,
     );
-    const late = play({ ...IPHONE, fully: true }, [form(771), { ...form(772), elapsedMs: 2_000 }]);
+    const late = play({ ...IPHONE, fully: true }, [{ ...form(771), readMs: 400 }, { ...form(772), elapsedMs: 2_000, readMs: 1_500 }]);
     expect(failureOf(late, 'id:priority').message).toBe(
-      `scroll_until id:priority failed after 2000ms (timeout) — element reached the viewport but stayed under ${COVER} at its centre (201,798), drawn over it — 15% of it shows (last rect {"x":24,"y":772,"width":354,"height":52})`,
+      `scroll_until id:priority failed after 2000ms (timeout 2000ms; 1 swipe sent; 2 tree reads took 1900ms, the last 1500ms) — element reached the viewport but stayed under ${COVER} at its centre (201,798), drawn over it — 15% of it shows (last rect {"x":24,"y":772,"width":354,"height":52})`,
     );
   });
 
@@ -1663,7 +1673,7 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
     const log: string[] = [];
     for (let i = 0; i < 30; i++) {
       const found = [match({ ...rect, y: rect.y + off }, 't')];
-      const seen: any = { read: { tree: treeOf({ found, rest: `at ${off}` }, ANDROID.screen), found, ofKeyboard: () => false, remedy: { dismissal: 'none' } }, elapsedMs: i * 400, screen: NAV, ...(stroked && { drawn: scrollStroke(stroked) }) };
+      const seen: any = { read: { tree: treeOf({ found, rest: `at ${off}` }, ANDROID.screen), found, ofKeyboard: () => false, remedy: { dismissal: 'none' } }, elapsedMs: i * 400, readMs: 0, screen: NAV, ...(stroked && { drawn: scrollStroke(stroked) }) };
       let next = round(state, seen);
       while (next.step.do === 'ask') {
         if (next.step.what === 'witness') seen.corroborated = true;

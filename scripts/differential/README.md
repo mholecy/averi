@@ -82,7 +82,8 @@ Per tree:
 idb list) and a Compose dump from `tests/helpers/android-dumps.ts` — and checks that the recorded adapters read like the
 live ones, that OLD = NEW differs nowhere, that a parser change shows where a tool reads it, that a device-only change
 groups as `device calls only`, and that a colour assert passes on its own painted target. The converter's tests cover
-`session.log` extraction, the classification of each file, and de-duplication.
+`session.log` extraction, the classification of each file, de-duplication, and the names a raw payload and its saved
+`ui_snapshot` take side by side.
 
 ## Corpus format
 
@@ -97,7 +98,7 @@ the manifest names none — and a tree's id in a report is `<run>/<file>`:
   "note": "optional",
   "captures": [
     { "file": "D-swift-form.json", "source": "wda", "form": "raw", "app": "Skeleton Internal" },
-    { "file": "B2-idb-iban.json", "source": "idb", "form": "normalized" }
+    { "file": "B2-idb-iban.snapshot.json", "source": "idb", "form": "normalized" }
   ]
 }
 ```
@@ -115,6 +116,24 @@ averi server logged in the run's `session.log` — all de-duplicated by content 
 repository's fixtures and the synthetic trees in `synthetic.ts` (among them two raw WDA captures whose status-band
 header beneath a presented screen is given an identifier, so a selector reaches it). Skipped, with the reason in the
 manifest's `note`: WDA's XML `/source` (no parser reads it), filtered snapshots, and files that hold no tree.
+
+A device-run file's name in the corpus (`convert.ts#corpusName`) is its path, subdirectories flattened into it
+(`F1poll/1.json` → `F1poll.1.json`), with an extension that says what it holds:
+
+- a raw payload is `<name>.json` (WDA, idb) or `<name>.xml` (a `uiautomator` dump) — a `.txt` or `.raw` takes the one
+  of its content;
+- a normalized tree saved as `.json` keeps its name; saved under any other extension (`.txt`, `.raw`, `.xml`) it is
+  `<name>.snapshot.json`. So a raw payload saved beside the `ui_snapshot` of the same screen under the same name, as
+  below (`acct2.xml` beside `acct2.txt`, `contacts-list-wda.json` beside `contacts-list-wda.txt`), is kept as two trees
+  — `acct2.xml` and `acct2.snapshot.json` — and a normalized Android tree is never named `.xml`;
+- a tree the server logged is `session-<call>.json`.
+
+The ids of normalized trees saved as `.json` are what they were before this rule; those saved under another extension
+moved, so an id quoted before it now reads `….snapshot.json` (`run14-ios/B1-idb-swift.json` is
+`run14-ios/B1-idb-swift.snapshot.json`; run11–run14 Android's `snap*.xml` are `snap*.snapshot.json`).
+
+A raw payload saved as `.txt` or `.raw` beside a different `.json` of the same name (`x.txt` holding a WDA body
+beside `x.json`) still fails the conversion (`duplicate corpus file x.json`): rename one.
 
 **Rebuilt runs are not device captures.** A run may hold raw payloads REBUILT from normalized trees — the corpus's
 `rebuilt-idb-ios` holds an idb `describe-all` list rebuilt from each normalized idb tree (idb's normalization maps
@@ -142,7 +161,8 @@ check should save, next to each tree it reads, the raw payload the tree source r
 - Android: `adb -s <serial> exec-out uiautomator dump /dev/tty > <name>.xml` (the trailing status line is fine —
   the converter keeps the XML as is and the adapter strips it).
 
-Then add them to a run directory with a manifest (`form: "raw"`), or let `convert.ts` pick them up.
+Then add them to a run directory with a manifest (`form: "raw"`), or let `convert.ts` pick them up — the raw payload
+and the saved `ui_snapshot` under the same name are both kept (the naming rule above).
 
 ## What it does not cover
 

@@ -169,6 +169,24 @@ export function classify(text: string, platform: 'ios' | 'android', file = ''): 
   return { kind: 'skip', reason: value === undefined && !file.endsWith('.json') ? 'not a tree (no JSON in it: a text listing or a log)' : 'not a tree' };
 }
 
+/**
+ * The name a device-run file takes in the corpus: its path with subdirectories flattened into it (`F1poll/1.json` →
+ * `F1poll.1.json`), and an extension that says what it holds.
+ *  - A raw payload is `.json` (WDA, idb) or `.xml` (a uiautomator dump): a `.txt` or `.raw` takes the one of its content.
+ *  - A normalized tree saved as `.json` keeps its name; saved under any other extension (`.txt`, `.raw`, `.xml`) it is
+ *    `<name>.snapshot.json`. A device check saves the raw payload beside the `ui_snapshot` of the same screen under
+ *    the same name (`acct2.xml` beside `acct2.txt`, `contacts-list-wda.json` beside `contacts-list-wda.txt`), so the
+ *    normalized tree cannot take the raw one's extension — and a normalized Android tree is no dump and is never
+ *    named `.xml`. Only a normalized tree saved as `.json` keeps the id it had before this rule; one saved under another
+ *    extension moved, so an id quoted before it now reads `….snapshot.json` (`run14-ios/B1-idb-swift.json` is
+ *    `run14-ios/B1-idb-swift.snapshot.json`).
+ */
+export function corpusName(rel: string, c: Extract<Classified, { kind: 'capture' }>): string {
+  const flat = rel.replaceAll('/', '.');
+  if (c.form === 'normalized') return flat.endsWith('.json') ? flat : flat.replace(/\.(txt|raw|xml)$/, '.snapshot.json');
+  return flat.replace(/\.(txt|raw)$/, c.source === 'uiautomator' ? '.xml' : '.json');
+}
+
 /** Every file under `dir`, subdirectories included, as paths relative to it, sorted. */
 async function filesUnder(dir: string, prefix = ''): Promise<string[]> {
   const out: string[] = [];
@@ -213,9 +231,7 @@ export class DeviceRunConverter {
         count.skipped.push(`${rel} (${c.reason})`);
         continue;
       }
-      // Subdirectories flattened into the name; a .txt or .raw is kept under the extension of what it holds.
-      const file = rel.replaceAll('/', '.').replace(/\.(txt|raw)$/, c.source === 'uiautomator' ? '.xml' : '.json');
-      if (this.take(b, file, c, rel.includes('/') ? `from ${rel}` : undefined)) count.files++;
+      if (this.take(b, corpusName(rel, c), c, rel.includes('/') ? `from ${rel}` : undefined)) count.files++;
       else count.fileRepeats++;
     }
     if (count.skipped.length > 0) b.manifest.note = `skipped: ${count.skipped.join('; ')}`;

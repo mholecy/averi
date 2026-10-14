@@ -75,6 +75,8 @@ export interface Row {
   drawn?: Stroke;
   /** ms since the scroll began; default 0. */
   elapsedMs?: number;
+  /** ms this row's tree read took; default 0. */
+  readMs?: number;
 }
 
 /**
@@ -158,6 +160,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
           ? { error: new Error(row.error) }
           : { tree: treeOf(row, rules.screen), found: row.found ?? [], ofKeyboard: row.ofKeyboard ?? (() => false), remedy: row.remedy ?? row.cover?.remedy ?? { dismissal: 'none' }, ...(row.cover && { cover: row.cover }) },
       elapsedMs: row.elapsedMs ?? 0,
+      readMs: row.readMs ?? 0,
       ...(row.screen !== null && { screen: row.screen ?? asBuilt }),
       ...(stroked !== undefined && { drawn: row.drawn ?? drawnFor(stroked) }),
     };
