@@ -58,6 +58,23 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
   DEFAULT_ENSURE_TIMEOUT_MS: 20_250,
 }));
 
+// The remedy sentences a description quotes have one owner too — the module that renders them: the tap's presented
+// remedy (interact/target-text.ts#PRESENTED_OVER), scroll_until's presented stop (interact/scroll-text.ts#PRESENTED_STOP)
+// and the pixel assert's (verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT). Replaced by sentinels the descriptions must quote; the
+// troubleshooting reference, a file no import reaches, is pinned against the real sentences (`actualSentences`).
+vi.mock('../../src/interact/target-text.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/interact/target-text.js')>()),
+  PRESENTED_OVER: '<the presented remedy, as interact/target-text.ts renders it>',
+}));
+vi.mock('../../src/interact/scroll-text.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/interact/scroll-text.js')>()),
+  PRESENTED_STOP: '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>',
+}));
+vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
+  PRESENTED_OVER_THE_ELEMENT: '<the presented remedy, as verify/pixel-poll.ts renders it>',
+}));
+
 vi.mock('../../src/adapters/ios-foreground.js', async (orig) => ({
   ...(await orig<typeof import('../../src/adapters/ios-foreground.js')>()),
   FOREGROUND_WAIT_MS: 3_250,
@@ -216,20 +233,56 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
   });
 });
 
+/**
+ * The owners' real presented sentences — the mocks above replace them for the descriptions — for the troubleshooting
+ * reference, which quotes them as text: derived from the code, never typed out here.
+ */
+async function actualSentences(): Promise<{ PRESENTED_OVER: string; PRESENTED_STOP: string; PRESENTED_OVER_THE_ELEMENT: string }> {
+  const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
+  // The actual scroll-text.ts still imports the MOCKED target-text.ts: its stop sentence is built on the tap's sentinel,
+  // which is put back here for the owner's real words.
+  const { PRESENTED_OVER: sentinel } = await import('../../src/interact/target-text.js');
+  const built = (await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js')).PRESENTED_STOP;
+  const PRESENTED_STOP = built.replace(sentinel, PRESENTED_OVER);
+  const { PRESENTED_OVER_THE_ELEMENT } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>('../../src/verify/pixel-poll.js');
+  return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT };
+}
+
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
 describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+  const TAP_SENTINEL = '<the presented remedy, as interact/target-text.ts renders it>';
+  const PIXEL_SENTINEL = '<the presented remedy, as verify/pixel-poll.ts renders it>';
+  const STOP_SENTINEL = '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>';
+
+  it('every description quotes the owners\' sentences, never a copy of them', async () => {
+    const { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
+    for (const tool of ['tap', 'scroll_until', 'assert']) {
+      for (const sentence of [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT]) expect(description(tool)).not.toContain(sentence);
+    }
+  });
+
+  it('every elided quote of the presented remedy ("— a screen is presented over it …") in a description or the troubleshooting reference is how the owner\'s sentence begins', async () => {
+    const { PRESENTED_OVER } = await actualSentences();
+    const elided = (text: string): string[] => [...text.matchAll(/— (a screen is presented over [^…"`]*?) …/g)].map((m) => m[1]);
+    const quoted = [...elided(description('scroll_until')), ...elided(TROUBLESHOOTING)];
+    expect(quoted.length).toBeGreaterThanOrEqual(4);
+    for (const head of quoted) expect(PRESENTED_OVER.startsWith(`${head} `)).toBe(true);
+  });
 
   it('tap: the general remedy defers to it, and its refusal says to close the screen first; a host with children is no such screen', () => {
     expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below). ');
+    expect(description('tap')).toContain('fully: true when the next step measures it), unless a screen is presented over the target (below); ');
     expect(description('tap')).toContain(
-      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first": \'a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen\'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.',
+      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar, or a cut at its scroll container\'s edge: ' +
+        `'${TAP_SENTINEL}'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.`,
     );
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
     expect(description('scroll_until')).toContain(
-      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it" — since a swipe there could dismiss a sheet or raise its discard prompt.',
+      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +
+        `${STOP_SENTINEL}" — since a swipe there could dismiss a sheet or raise its discard prompt.`,
     );
   });
 
@@ -242,9 +295,11 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
-  it('troubleshooting: the entry, the wrapper sentence as the code has it, and the picker\'s exception over another screen', () => {
+  it('troubleshooting: the entry, the wrapper sentence as the code has it, and the picker\'s exception over another screen', async () => {
+    const { PRESENTED_OVER, PRESENTED_STOP } = await actualSentences();
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${PRESENTED_STOP}, so none was sent\` (or \`so no further swipe was sent\`).`);
     expect(TROUBLESHOOTING).toContain(
-      '- **`… a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen`** (tap or `scroll_until`): the target lies on the screen beneath a modal or sheet that is still up; nothing was tapped and no further swipe was sent.',
+      `- **\`… ${PRESENTED_OVER}\`** (tap or \`scroll_until\`): the target lies on the screen beneath a modal or sheet that is still up — whatever else keeps it from a tap (its centre under that screen, off the screen or under the status bar, or a cut at its scroll container's edge), a tap says this in place of that remedy (\`scroll_until it first\`, the status bar's advice); nothing was tapped and no further swipe was sent.`,
     );
     expect(TROUBLESHOOTING).toContain('A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over its whole rect, unless, among others, it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames:');
     expect(TROUBLESHOOTING).toContain(
@@ -256,12 +311,13 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
-  it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', () => {
+  it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', async () => {
+    const { PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
     expect(description('assert')).toContain(
-      'Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen\' (under the status bar too, in place of the bar\'s own advice).',
+      `Under a screen presented over the element (a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice; a keyboard the device reports is still named first, with its own).`,
     );
     expect(TROUBLESHOOTING).toContain(
-      'Under a modal or sheet still up over the element\'s screen the message ends `… a screen is presented over the element (a modal or a sheet) — close it first; no scroll moves the element out from under that screen` instead, under the status bar too (the message still names the bar, and this replaces the bar\'s own advice): close that screen, then assert again.',
+      `Under a modal or sheet still up over the element's screen the message ends \`… ${PRESENTED_OVER_THE_ELEMENT}\` instead, whatever else lies over it (the status bar, a possible cut at the navigation bar): the message still names what lies over it, and this replaces its own advice. Close that screen, then assert again.`,
     );
   });
 });

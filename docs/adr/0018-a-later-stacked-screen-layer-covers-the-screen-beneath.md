@@ -8,8 +8,10 @@ Amended 2026-10-14 (owner decision Q5 (a) on the round-13 device check): a scree
 layer is its surface labelled or not (see "Amendment: a labelled dim" below). Amended again 2026-10-14 (owner
 decision Q-A (a) on the round-14 device check): no stroke is sent that would touch down on a presented screen, for a
 target in the tree wherever it lies (see "Amendment: no stroke onto a presented screen" below; residual 6 narrowed to
-a target not yet in the tree). Supersedes, in one part, ADR 0016's note
-that a screen-sized dimming node holding the title whole is excused (see "What changes" below).
+a target not yet in the tree). Amended again 2026-10-14 (owner decision on the architecture review of rounds 13–15):
+the tap under the status bar beneath a presented screen gives the presented screen's remedy (residual 8).
+Supersedes, in one part, ADR 0016's note that a screen-sized dimming node holding the title whole is excused (see
+"What changes" below).
 
 ## Context
 
@@ -375,10 +377,21 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
    unidentified, unlabelled frame). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath
    shows only under the status bar, where no tap goes: with the device's 62-pt status band a target of the list there
-   is refused — under the status bar, or, its centre under the form, as under a presented screen (the harness:
-   Contacts' `container 0,0 402x156`, centre (201,78)). Only with no status band known (a screen read without one, or
-   no screen) is that tap moved above the form, to (201,26) on its uncovered 402x52 — under the status bar. On a
-   medium-detent sheet the area above it is that dim, and a tap there may dismiss the sheet.
+   is refused as under a presented screen — its centre under the form (the harness: Contacts' `container 0,0
+   402x156`, centre (201,78)), or its centre under the status bar: the refusal still names the bar, and its remedy
+   is the presented screen's, "close it first", in place of the bar's (amended 2026-10-14, owner decision on the
+   architecture review of rounds 13–15: presented wins over the bar in every verb — the tap had said "it lies in a
+   scroll view — scroll_until it first" there while the pixel assert said "close it first" and `scroll_until`
+   stopped `presented`; one precedence, presented first, is decided once in `ui-tree/standing.ts#Remedy`, so the tap
+   off the screen beneath a presented screen says it too, in place of "scroll_until it with fully: true first", and so
+   does whatever else keeps a target beneath such a screen from reach — a tap on a sliver its scroll container cuts,
+   or with its centre under idb's keyboard band, and a pixel assert on an element that may be cut at the navigation
+   bar or that idb's band meets: the cut or the keyboard is still named, the presented screen's remedy replaces its
+   own. A keyboard the device reports over a pixel assert's element is still named first, with its own advice (ADR
+   0010): that reading is asked before any standing). Only
+   with no status band known (a screen read without one, or no screen) is that tap moved above the form, to (201,26)
+   on its uncovered 402x52 — under the status bar. On a medium-detent sheet the area above it is that dim, and a tap
+   there may dismiss the sheet.
 9. **An in-window overlay with no node is not seen** (owner decision Q7 (a), 2026-10-14). mp-native's Account Detail
    `PAY` menu: a SwiftUI card inserted in the screen's own container over a blurred, dimmed Account Detail. Neither WDA
    nor idb lists a node for the blur/dim backdrop, so the rows beneath read uncovered: `tap

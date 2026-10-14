@@ -280,6 +280,13 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
         : `, and swiping ${back} was tried earlier in the scroll`;
 
 /**
+ * The `presented` stop's remedy (`scrollFailure`): the presented screen's (target-text.ts#PRESENTED_OVER), and why no
+ * swipe was sent — one on that screen may dismiss it. The one sentence the `scroll_until` description quotes
+ * (mcp/tools.ts).
+ */
+export const PRESENTED_STOP = `${PRESENTED_OVER}, and a swipe on it may dismiss it`;
+
+/**
  * The failure for every outcome but `visible`, and its class: `stuck` and
  * `presented` a plain Error (the element was there and seen); `covered` and `bound`
  * through resolve.ts#absenceError — ElementNotFoundError only when no read
@@ -382,7 +389,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
           ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
           : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${nodeText(cover)}`;
       return new Error(
-        `scroll_until ${describe} stopped ${when} — ${where} — ${PRESENTED_OVER}, and a swipe on it may dismiss it, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+        `scroll_until ${describe} stopped ${when} — ${where} — ${PRESENTED_STOP}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
           `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       );
     }

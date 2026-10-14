@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { farEdgeFrames, pinnedSurface, presentedCover, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -515,7 +515,7 @@ describe('parity — `scroll_until X fully: true` then a pixel assert on X: a `f
           reachable++;
           for (const purpose of [OCR(n), COLOUR(n)]) {
             const pixel = scene.standing(n, screen, purpose);
-            if (pixel.kind === 'systemBar' && pinnedSurface(n, box, screen, scene.clips) !== undefined) {
+            if (pixel.kind === 'systemBar' && pixel.remedy.of === 'fixed') {
               exempt++;
               continue;
             }
@@ -1156,19 +1156,28 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
   });
 });
 
-describe('presentedCover — the cover a sentence names for a node under a screen presented over its own (ADR 0018)', () => {
-  const dim = node({ identifier: 'forgot_overlay', rect: { x: 0, y: 0, width: 402, height: 874 } });
-  const card = node({ identifier: 'card', rect: { x: 20, y: 200, width: 362, height: 300 } });
-  const form = node({ role: 'scrollable', rect: { x: 0, y: 62, width: 402, height: 812 } });
-  const facts = (presented?: UiNode[]) => ({ ...(presented !== undefined && { presented }) }) as unknown as StandingFacts;
-  it('covered: the cover over its centre, whichever surface is presented (the modal\'s card over the dim)', () => {
-    expect(presentedCover({ facts: facts([dim]), kind: 'covered', cover: card, aboveKeyboard: false })).toBe(card);
+describe('the presented remedy\'s cover — the node a sentence names for a target beneath a screen presented over its own (ADR 0018)', () => {
+  const screens = async () =>
+    (JSON.parse(await fixture('wda-ui-snapshot-stacked-layers.json')) as { screens: Record<string, UiNode> }).screens;
+  const at = (tree: UiNode, r: Rect): UiNode => [...everyNode(tree)].find((n) => JSON.stringify(n.rect) === JSON.stringify(r))!;
+  const remedyOf = (s: Standing | PixelStanding) => (s.kind === 'reachable' ? undefined : s.remedy);
+  it('covered: the cover over its centre, whichever surface is presented (the modal\'s card over the dim)', async () => {
+    const tree = (await screens()).finportalForgot;
+    const title = [...everyNode(tree)].find((n) => n.identifier === 'login_title')!;
+    expect(remedyOf(sceneOf(tree).standing(title, IPHONE, TAP))).toEqual({ of: 'presented', cover: [...everyNode(tree)].find((n) => n.identifier === 'forgot_modal') });
   });
-  it('any other kind: the last presented surface among its covers', () => {
-    expect(presentedCover({ facts: facts([dim, form]), kind: 'reachable', at: { x: 1, y: 1 } })).toBe(form);
+  it('any other kind: the last presented surface among its covers — the header under the status bar names the modal\'s dim', async () => {
+    const tree = (await screens()).finportalForgot;
+    const header = at(tree, { x: 0, y: 0, width: 402, height: 102 });
+    const standing = sceneOf(tree).standing(header, IPHONE, TAP);
+    expect(standing.kind).toBe('systemBar');
+    expect(remedyOf(standing)).toEqual({ of: 'presented', cover: [...everyNode(tree)].find((n) => n.identifier === 'forgot_overlay') });
   });
-  it('under no presented screen: none, whatever the kind', () => {
-    expect(presentedCover({ facts: facts(), kind: 'covered', cover: card, aboveKeyboard: false })).toBeUndefined();
-    expect(presentedCover({ facts: facts([]), kind: 'reachable', at: { x: 1, y: 1 } })).toBeUndefined();
+  it('under no presented screen: another remedy, whatever the kind — the same header on the login screen with no modal', async () => {
+    const tree = (await screens()).finportalLogin;
+    const header = at(tree, { x: 0, y: 0, width: 402, height: 102 });
+    const standing = sceneOf(tree).standing(header, IPHONE, TAP);
+    expect(standing.kind).toBe('systemBar');
+    expect(remedyOf(standing)?.of).not.toBe('presented');
   });
 });

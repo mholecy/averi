@@ -1,12 +1,12 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { nodeText, rectText, rectWithin, sameRect } from '../ui-tree/geometry.js';
+import { nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { fullBleedHeader, pinnedSurface, presentedRemedy, sceneOf, screenSized, underPresented, type Scene } from '../ui-tree/standing.js';
+import { presentedRemedy, sceneOf, type Remedy, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -457,18 +457,21 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * frame); or, at the navigation bar's top edge, that it may be cut there
  * (`cut`: the ocr crop would read only what shows — scroll it up).
  *
- * The remedy is `scroll_until … fully: true`; it adds "assert something
- * in it that lies clear of that" when a scroll may not
- * cure it: the element lies in no scroll view as far as the tree says
+ * The remedy after " — " is the standing's (ui-tree/standing.ts#Remedy:
+ * the case and its precedence are decided there, once for the tap,
+ * `scroll_until`'s stop and this assert), worded here (`coverRemedy`).
+ * `scroll_until … fully: true` (`scroll`); it adds "assert something in it
+ * that lies clear of that" when a scroll may not cure it (`pinned`,
+ * `stuck`): the element lies in no scroll view as far as the tree says
  * (`Clips.inScroller` false — or undefined: idb's flat list has no
  * ancestry, so EVERY idb miss carries the clause), it is laid from the
  * screen's top edge under the status bar, or the cover holds the element
  * whole. Not for an element reaching the screen's bottom under the
- * navigation bar (ADR 0011). Under a system bar, for content no scroll
- * lifts out of the band (ui-tree/standing.ts#pinnedSurface: in no scroll
- * view, or screen-sized scroll content taller than the room between the
- * bars) the remedy leads with the child: the screen ITSELF (screen-sized);
- * a full-bleed header — iOS's, or Android 15+'s edge-to-edge app bar
+ * navigation bar (ADR 0011). Where no scroll moves it out (`fixed`) the
+ * remedy leads with the child: under a system bar, content no scroll lifts
+ * out of the band (in no scroll view, or screen-sized scroll content taller
+ * than the room between the bars) — the screen ITSELF (screen-sized); a
+ * full-bleed header — iOS's, or Android 15+'s edge-to-edge app bar
  * (`0,0 1080x220` under the 66-px band fails a colour assert closed, ADR
  * 0001) — with "assert something in it that lies clear of that (its
  * title, say)": the title, below the band, is judged on its own and
@@ -480,11 +483,10 @@ function keyboardOver(rect: Rect, keyboard: Rect, { dismissal, advice }: Keyboar
  * and never a full-bleed header in a flat list) it says the node named is
  * content drawn over the root's background.
  *
- * Beneath a screen PRESENTED over the element (ui-tree/standing.ts#underPresented: a modal's dim, a sheet — ADR 0018),
- * no scroll moves it out from under that screen: the remedy is `presentedRemedy('the element')` in place of every
- * other (`coverRemedy`'s `presented`), under a COVER and under a system bar alike — the sentence still names what is
- * drawn over the element (the cover, or the bar with its band), and only the advice after " — " is the presented
- * screen's.
+ * Beneath a screen PRESENTED over the element (a modal's dim, a sheet — ADR 0018), first of every case: no scroll
+ * moves it out from under that screen, and the remedy is `presentedRemedy('the element')` in place of every other,
+ * whatever lies over it — a cover, a system bar, the navigation bar's cut, idb's keyboard band — the sentence still
+ * naming what is drawn over the element, and only the advice after " — " the presented screen's.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  * docs/adr/0011-no-stuck-clause-at-the-bottom-edge.md
  * docs/adr/0012-pixel-assert-residuals-d4-d6.md
@@ -496,44 +498,29 @@ async function judgeOver(
   { reads, glyphs, scene, keyboard }: { reads: Rect; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
-  const screen = usable.oriented;
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
   const standing = scene.standing(element, usable, purpose);
   if (standing.kind === 'reachable') return undefined;
-  if (standing.kind === 'underKeyboard') return keyboardOver(element.rect, standing.band, keyboard.remedy);
   const at = `(element ${rectText(element.rect)}`;
-  // Undefined under idb (a flat list has no ancestry): every idb miss names the child too.
-  const pinned = scene.clips.inScroller(element) !== true;
-  // No scroll ever moves the screen itself out from under anything — a screen-sized element — nor an element laid
-  // from the screen's top edge at full width (a full-bleed header: iOS's, or Android 15+'s edge-to-edge app bar).
-  const never = screenSized(element.rect, screen) ? 'screen' : fullBleedHeader(element.rect, screen) ? 'header' : undefined;
   switch (standing.kind) {
+    case 'underKeyboard':
+      // The presented arm is unreachable today: idb's band is found in a flat list alone, which holds no presented
+      // screen (ui-tree/draw-order.ts#holderOf's `parent`). The agreement rows
+      // (tests/interact/remedy-agreement.test.ts) pin only its rendering, should either change.
+      return standing.remedy.of === 'presented' ? `the soft keyboard covers the element ${at}, keyboard ${rectText(standing.band)}) — ${PRESENTED_OVER_THE_ELEMENT}` : keyboardOver(element.rect, standing.band, keyboard.remedy);
     case 'systemBar': {
       const bar = systemBarName(standing.bar.edge);
-      // Laid from the screen's top edge, under the status bar: a scroll may not move it (a pinned header's place).
-      const fromTop = standing.bar.edge === 'top' && element.rect.y <= screen.y;
-      // Under a bar, what no scroll lifts out of it is the stop's own exemption (ui-tree/standing.ts#pinnedSurface):
-      // `scroll_until … fully: true` stops on it at once, so its advice leads with the child.
-      // Beneath a screen presented over it too (ADR 0018): that screen's remedy in place of the bar's, as under a
-      // cover — no scroll moves it out from under that screen, so no scroll advice; the bar stays named as what is
-      // drawn over it.
-      const fixedKind = underPresented(standing.facts)
-        ? 'presented'
-        : pinnedSurface(element, screen, usable, scene.clips);
-      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(fixedKind ?? (pinned || fromTop ? 'stuck' : 'scroll'))}`;
+      return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(standing.remedy)}`;
     }
-    case 'cut':
-      return (
-        `the element may be cut at the navigation bar ${at}, navigation bar from y ${standing.bar.top}): it ends on the bar's top edge, as its scroll container ` +
-        `${rectText(standing.container)} does, so the crop may read only what shows of it — scroll it up: scroll_until the element with \`fully: true\` first and re-run`
-      );
+    case 'cut': {
+      const cut = `the element may be cut at the navigation bar ${at}, navigation bar from y ${standing.bar.top}): it ends on the bar's top edge, as its scroll container ${rectText(standing.container)} does, so the crop may read only what shows of it`;
+      return standing.remedy.of === 'presented' ? `${cut} — ${PRESENTED_OVER_THE_ELEMENT}` : `${cut} — scroll it up: scroll_until the element with \`fully: true\` first and re-run`;
+    }
     case 'covered': {
       const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
       const named = `${nodeText(standing.cover).slice(0, -1)}${reach})`;
-      // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps, whatever else it is — close that screen first.
-      const fixedKind = underPresented(standing.facts) ? 'presented' : standing.overRoot === true ? 'root' : never;
-      return `${named} is drawn over the element ${at}) — ${coverRemedy(fixedKind ?? (pinned || rectWithin(element.rect, standing.reach) ? 'stuck' : 'scroll'))}`;
+      return `${named} is drawn over the element ${at}) — ${coverRemedy(standing.remedy)}`;
     }
     default: {
       // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).
@@ -544,25 +531,54 @@ async function judgeOver(
 }
 
 /**
- * What to do about a pixel assert's element under chrome (`judgeOver`): `scroll` — scroll it clear; `stuck` — that, or, when a
- * scroll may not cure it, assert something in it that lies clear; `screen` — the element is the screen itself
- * (screen-sized), which no scroll moves, so the advice LEADS with the child, then says why; `header` — the same
- * for an element laid from the screen's top edge at full width, a full-bleed header, whose title, clear of the band,
- * is what to assert; `footer` — the same for a full-width surface laid to the screen's bottom edge (a bottom sheet),
- * whose content above the bar is what to assert; `root` — the screen, for idb's flat-list root,
- * whose cover is the app's own content laid on its background; `presented` — a screen is presented over the element
- * (ui-tree/standing.ts#underPresented), which no scroll moves it out from under: close that screen first.
+ * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it
+ * (ui-tree/standing.ts#presentedRemedy owns the words). The one sentence the `assert` tool's description quotes
+ * (mcp/tools.ts).
+ */
+export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
+
+/**
+ * What to do about a pixel assert's element under chrome (`judgeOver`) — its standing's remedy
+ * (ui-tree/standing.ts#Remedy, which decides the case and its precedence), in this verb's words: `scroll` — scroll it
+ * clear; `pinned` and `stuck` — that, or, when a scroll may not cure it, assert something in it that lies clear (in
+ * no scroll view, or where the tree cannot say, or laid from the screen's top edge, or held whole by the cover's
+ * reach: one sentence for all, which never promises the scroll away); `fixed` — no scroll moves it, so the advice
+ * LEADS with the child, then says why: the element is the screen itself (`screen`, screen-sized); laid from the
+ * screen's top edge at full width (`header`, a full-bleed header, whose title, clear of the band, is what to assert);
+ * a full-width surface laid to the screen's bottom edge (`footer`, a bottom sheet, whose content above the bar is what
+ * to assert); idb's flat-list root (`root`), whose cover is the app's own content laid on its background;
+ * `presented` — a screen is presented over the element, which no scroll moves it out from under: close that screen
+ * first. `keyboard` is never worded here: a standing under the keyboard is `keyboardOver`'s, and one here throws.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
-const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'footer' | 'root' | 'presented'): string => {
-  const child = 'assert something in it that lies clear of that';
-  if (kind === 'presented') return `the capture would show it, not the element; ${presentedRemedy('the element')}`;
-  if (kind === 'root') return `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${child}`;
-  if (kind === 'screen') return `the capture would show it, not the element — ${child}; no scroll moves the screen itself out from under it`;
-  if (kind === 'header') return `the capture would show it, not the element — ${child} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`;
-  if (kind === 'footer') return `the capture would show it, not the element — ${child} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`;
+const coverRemedy = (remedy: Remedy): string => {
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
-  return kind === 'stuck' ? `${scroll} — or, if no scroll moves it out from under that, ${child}` : scroll;
+  switch (remedy.of) {
+    case 'presented':
+      return `the capture would show it, not the element; ${PRESENTED_OVER_THE_ELEMENT}`;
+    case 'fixed':
+      return FIXED_REMEDY[remedy.what];
+    case 'pinned':
+    case 'stuck':
+      return `${scroll} — or, if no scroll moves it out from under that, ${CLEAR_CHILD}`;
+    case 'scroll':
+      return scroll;
+    case 'keyboard':
+      // Only an element under the keyboard's band has this remedy, and `keyboardOver` words it (`judgeOver`): a
+      // keyboard remedy here is a standing this verb does not word — never measured as "nothing over it".
+      throw new Error('pixel assert: a keyboard remedy for an element under a bar or a cover has no sentence');
+  }
+};
+
+/** The child to assert instead, when a scroll may not cure the element (`coverRemedy`). */
+const CLEAR_CHILD = 'assert something in it that lies clear of that';
+
+/** `coverRemedy`'s `fixed` sentences: the advice leads with the child, then says why no scroll moves it. */
+const FIXED_REMEDY: Record<Extract<Remedy, { of: 'fixed' }>['what'], string> = {
+  root: `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${CLEAR_CHILD}`,
+  screen: `the capture would show it, not the element — ${CLEAR_CHILD}; no scroll moves the screen itself out from under it`,
+  header: `the capture would show it, not the element — ${CLEAR_CHILD} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`,
+  footer: `the capture would show it, not the element — ${CLEAR_CHILD} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`,
 };
 
 /**

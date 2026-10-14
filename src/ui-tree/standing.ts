@@ -7,6 +7,7 @@ import {
   clipsOf,
   containsPoint,
   overlapsPastSlack,
+  rectWithin,
   rectCentre,
   visibleFractionInViewport,
   type Clips,
@@ -22,8 +23,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * (geometry.ts#clipsOf), each derived once, on first use — and the
  * STANDING of a node in it: where the node stands on a screen for what a
  * verb means to do with it, one ordered judgement for the tap,
- * `scroll_until`'s stop and the pixel assert. Facts cross this seam; the
- * sentences, remedies and keyboard actions stay with the callers, and the
+ * `scroll_until`'s stop and the pixel assert. Facts cross this seam, and —
+ * for a node not reachable — its REMEDY, one closed set of cases decided
+ * here with one precedence, presented first (`Remedy`); the sentences that
+ * render a remedy and the keyboard actions stay with the callers, and the
  * keyboard guard (K1) alone acts on the keyboard.
  *
  * Contract of `standing(node, screen, purpose)`:
@@ -309,23 +312,74 @@ export interface StandingFacts {
 }
 
 /**
- * The node lies under a screen PRESENTED over its own — a surface of one (a modal's dimming leaf, a sheet's form) is
- * among its covers (`presented`), whichever cover is on top at its centre: the modal's card over the dim is still the
- * modal's. Read as a yes/no on purpose: which surface it is changes no remedy (close that screen first, ADR 0018).
- */
-export const underPresented = (facts: StandingFacts): boolean => (facts.presented?.length ?? 0) > 0;
-
-/**
- * THE remedy for a node `underPresented`, the node named as `what` — `it` in the tap's refusal and `scroll_until`'s
- * stop (interact/target-text.ts#PRESENTED_OVER), `the element` in the pixel assert's sentence, whose "it" is already
- * the cover (verify/pixel-poll.ts): close that screen first, since no scroll moves the node out from under it. Here, in
- * the UI-tree layer both verbs and the pixel assert may import, as system-bar.ts's words are.
+ * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
+ * `what` — `it` in the tap's refusal and `scroll_until`'s stop (interact/target-text.ts#PRESENTED_OVER), `the element`
+ * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
+ * since no scroll moves the node out from under it. Here, in the UI-tree layer both verbs and the pixel assert may
+ * import, as system-bar.ts's words are; the one owner of these words.
  */
 export const presentedRemedy = (what: 'it' | 'the element'): string =>
   `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 
-/** Where the node stands for a touch (the tap, the stop), and why: `facts`, and one kind with what its sentence quotes. */
-export type Standing = { readonly facts: StandingFacts } & (
+/**
+ * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
+ * decided once, here (`remedyOf`), for every purpose — the verbs only render a case in their own words (the tap's
+ * refusal, interact/tap-judgement.ts; the pixel assert's miss, verify/pixel-poll.ts#coverRemedy; `scroll_until`'s
+ * `presented` stop, interact/scroll-rounds.ts). Every non-reachable standing carries one (`Standing`'s and
+ * `PixelStanding`'s `remedy`).
+ *
+ * The cases, in THE PRECEDENCE, one for every purpose — the first that holds is the remedy:
+ * 1. `presented` — a surface of a screen presented over the node's own (a modal's dimming leaf, a sheet's form,
+ *    draw-order.ts#Exposure.presented) is among its covers (`facts.presented`), whatever its kind: under the status
+ *    bar, off the screen, cut, under the soft keyboard or under another cover beneath that screen alike. No scroll
+ *    moves it out from under that screen, and hiding a keyboard leaves it there: close that screen first.
+ *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
+ *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
+ *    dim), else the last presented surface among its covers.
+ * 2. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
+ *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
+ * 3. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
+ *    — under a system bar, content no scroll lifts out of a band (`pinnedSurface`: the screen itself, a full-bleed
+ *    header or footer); under a cover, idb's flat-list root (`covered.overRoot`, `root`), a screen-sized element
+ *    (`screen`) or a full-bleed header (`header`). Act on something in it clear of that.
+ * 4. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
+ *    (geometry.ts#Clips.inScroller false): no scroll moves it out.
+ * 5. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
+ *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
+ *    the cover's reach holds it whole.
+ * 6. `scroll` — a scroll moves it into reach: off the screen, clipped (a `fully` stop), cut to a sliver (toward the
+ *    standing's `cut.edge`), under a cover over its centre (the touch purposes: the tap may refine it, its
+ *    positioner hint, interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
+ *
+ * One precedence for every verb: the same target is told the same remedy by the tap, the pixel assert and
+ * `scroll_until`'s stop.
+ *
+ * What comes before any standing, so before this precedence: the pixel assert asks its keyboard READING first
+ * (verify/pixel-poll.ts#overElement, `overlapping`: the oracle's band, or WDA's in-tree band), and an element that
+ * reading finds under the keyboard is a keyboard miss whatever is presented over it — the standing is never asked
+ * (docs/adr/0010-pixel-assert-keyboard-first.md). Only idb's band, a keyboard line of the standing, is judged here,
+ * presented first.
+ *
+ * Cost: the tree's scroll ancestry (geometry.ts#Clips.inScroller, one walk of the tree, kept by the scene) is asked
+ * only for a node under a system bar or — the pixel assert's — a cover with no presented surface, as the verbs asked
+ * it before; a touch purpose's cover asks nothing (`scroll`, as the tap always said).
+ */
+export type Remedy =
+  | { readonly of: 'presented'; readonly cover: UiNode }
+  | { readonly of: 'keyboard' }
+  | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
+  | { readonly of: 'pinned' }
+  | { readonly of: 'stuck' }
+  | { readonly of: 'scroll' };
+
+/** The remedies a touch purpose (the tap, the stops) decides: every case but `fixed`, which only the pixel assert's region judges. */
+export type TouchRemedy = Exclude<Remedy, { readonly of: 'fixed' }>;
+
+/** A union of kinds with `remedy: R` added to every kind but `reachable` — a non-reachable standing carries its remedy. */
+type Remedied<K, R extends Remedy> = K extends { readonly kind: 'reachable' } ? K : K & { readonly remedy: R };
+
+/** The touch kinds, before the remedy is decided (`remedyOf`). */
+type TouchKind =
   /** `at`: the point a tap presses — the centre, or (`moved`, the tap's) the centre of the largest uncovered `piece`, `cover` being over the centre, chosen above a keyboard line when one applied. */
   | { readonly kind: 'reachable'; readonly at: Point; readonly moved?: { readonly piece: Rect; readonly cover: UiNode; readonly aboveKeyboard: boolean } }
   /** `visible`: the most of the node inside any box judged. */
@@ -337,24 +391,16 @@ export type Standing = { readonly facts: StandingFacts } & (
   /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
   | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
   /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it). */
-  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine }
-);
+  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine };
 
-/**
- * The cover a sentence names for a node under a screen presented over its own (`underPresented`): the one over its
- * centre when it is `covered` (the modal's card over the dim), else the last presented surface among its covers;
- * undefined when it lies under none.
- */
-export const presentedCover = (standing: Standing): UiNode | undefined => {
-  if (!underPresented(standing.facts)) return undefined;
-  return standing.kind === 'covered' ? standing.cover : standing.facts.presented?.at(-1);
-};
+/** Where the node stands for a touch (the tap, the stop), and why: `facts`, one kind with what its sentence quotes, and — not reachable — its `remedy`. */
+export type Standing = { readonly facts: StandingFacts } & Remedied<TouchKind, TouchRemedy>;
 
 /** Where the node stands for the tap: a `Standing` of every kind but `clipped`, which only a `fully` stop judges. */
 export type TapStanding = Exclude<Standing, { readonly kind: 'clipped' }>;
 
-/** Where the node stands for the pixel assert (`Scene`'s contract: a region, never off the screen, never clipped), and why. */
-export type PixelStanding = { readonly facts: StandingFacts } & (
+/** The pixel assert's kinds, before the remedy is decided (`remedyOf`). */
+type PixelKind =
   | { readonly kind: 'reachable'; readonly at: Point }
   /** `band`: the band's rect on the box, which what it reads overlaps. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band: Rect }
@@ -363,8 +409,19 @@ export type PixelStanding = { readonly facts: StandingFacts } & (
   /** `reach`: where the cover presses (its rect, or a pinned bar's reach); `overRoot`: the node is a flat list's screen-sized root and the cover the app's content listed on it. */
   | { readonly kind: 'covered'; readonly cover: UiNode; readonly reach: Rect; readonly aboveKeyboard: false; readonly overRoot?: true }
   /** `band`: the band the line marks on the box, which the node's rect meets. */
-  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine; readonly band: Rect }
-);
+  | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine; readonly band: Rect };
+
+/** Where the node stands for the pixel assert (`Scene`'s contract: a region, never off the screen, never clipped), and why — and, not reachable, its `remedy`. */
+export type PixelStanding = { readonly facts: StandingFacts } & Remedied<PixelKind, Remedy>;
+
+/** A touch standing before its remedy is decided. */
+type TouchJudgement = { readonly facts: StandingFacts } & TouchKind;
+/** A tap standing before its remedy is decided. */
+type TapJudgement = Exclude<TouchJudgement, { readonly kind: 'clipped' }>;
+/** A pixel standing before its remedy is decided. */
+type PixelJudgement = { readonly facts: StandingFacts } & PixelKind;
+/** A judgement of any kind but `reachable` — the ones a remedy is decided for. */
+type Unreached<J> = Exclude<J, { readonly kind: 'reachable' }>;
 
 /** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
 export function sceneOf(tree: UiNode): Scene {
@@ -388,18 +445,75 @@ export function sceneOf(tree: UiNode): Scene {
     if (purpose.of === 'pixel') {
       // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
       const single = singleBox(screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree));
-      return pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single), single.box, single, purpose, !listsAncestry(tree));
+      const pixel = pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single), single.box, single, purpose, !listsAncestry(tree));
+      return pixel.kind === 'reachable' ? pixel : { ...pixel, remedy: remedyOf(pixel, judged, { box: single.box, bands: single }) };
     }
     const touch = touchScreen(screen, tree);
     if (purpose.of === 'tap') {
-      return tapStanding(judged, placeOf(judged.centre, touch?.boxes, touch), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
+      const tap = tapStanding(judged, placeOf(judged.centre, touch?.boxes, touch), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
+      return tap.kind === 'reachable' ? tap : { ...tap, remedy: remedyOf(tap, judged) };
     }
     const place = placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch);
     const box = touch?.box ?? node.rect;
-    return purpose.of === 'fully' ? fullyStanding(judged, place, box, touch, purpose.keyboardTop) : stopStanding(judged, place, box, touch, purpose.keyboardTop);
+    const stop = purpose.of === 'fully' ? fullyStanding(judged, place, box, touch, purpose.keyboardTop) : stopStanding(judged, place, box, touch, purpose.keyboardTop);
+    return stop.kind === 'reachable' ? stop : { ...stop, remedy: remedyOf(stop, judged) };
   }
   return scene;
 }
+
+/**
+ * THE remedy of a judgement (`Remedy`, whose doc has the cases and THE PRECEDENCE), decided once for every purpose,
+ * for every kind but `reachable` (the type says so: every non-reachable standing carries one). `pixel`: the pixel
+ * assert's box and bands — the region's purpose, which alone decides `fixed`, and `stuck` for a node laid from the
+ * box's top edge under the status bar or held whole by its cover's reach.
+ */
+function remedyOf(judgement: Unreached<PixelJudgement>, judged: Judged, pixel: { readonly box: Rect; readonly bands: Bands }): Remedy;
+function remedyOf(judgement: Unreached<TouchJudgement>, judged: Judged): TouchRemedy;
+function remedyOf(judgement: Unreached<TouchJudgement | PixelJudgement>, { scene, node }: Judged, pixel?: { readonly box: Rect; readonly bands: Bands }): Remedy {
+  // 1. Beneath a screen presented over its own, whatever its kind.
+  const surface = judgement.facts.presented?.at(-1);
+  if (surface !== undefined) return { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface };
+  switch (judgement.kind) {
+    // 2. The keyboard.
+    case 'underKeyboard':
+      return { of: 'keyboard' };
+    // 6. What a scroll brings within reach whatever lies around it.
+    case 'offScreen':
+    case 'clipped':
+    case 'cut':
+      return { of: 'scroll' };
+    case 'systemBar': {
+      // 3. Content no scroll lifts out of a band — the pixel assert's region only.
+      const fixed = pixel === undefined ? undefined : pinnedSurface(node, pixel.box, pixel.bands, scene.clips);
+      if (fixed !== undefined) return { of: 'fixed', what: fixed };
+      // Laid from the box's top edge under the status bar: a scroll may not move it (a pinned header's place).
+      const fromTop = pixel !== undefined && judgement.bar.edge === 'top' && node.rect.y <= pixel.box.y;
+      return scrollable(scene.clips.inScroller(node), fromTop);
+    }
+    case 'covered': {
+      // A touch's cover over the centre: scroll it clear (the stop's stuck sentence names a cover no scroll clears).
+      if (pixel === undefined || !('reach' in judgement)) return { of: 'scroll' };
+      // 3. No scroll ever moves the screen itself out from under anything — idb's flat-list root, a screen-sized
+      // element — nor an element laid from the screen's top edge at full width (a full-bleed header: iOS's, or
+      // Android 15+'s edge-to-edge app bar).
+      if (judgement.overRoot === true) return { of: 'fixed', what: 'root' };
+      if (screenSized(node.rect, pixel.box)) return { of: 'fixed', what: 'screen' };
+      if (fullBleedHeader(node.rect, pixel.box)) return { of: 'fixed', what: 'header' };
+      return scrollable(scene.clips.inScroller(node), rectWithin(node.rect, judgement.reach));
+    }
+    default: {
+      const unhandled: never = judgement;
+      return unhandled;
+    }
+  }
+}
+
+/**
+ * 4.–6. of THE PRECEDENCE for a node under a bar or a cover: `pinned` in no scroll view; `stuck` where the tree
+ * cannot say (idb's flat list), or `held` — a scroll in a scroll view may still not move it out; else `scroll`.
+ */
+const scrollable = (inScroller: boolean | undefined, held: boolean): Remedy =>
+  inScroller === false ? { of: 'pinned' } : inScroller === undefined || held ? { of: 'stuck' } : { of: 'scroll' };
 
 /** A node being judged, and its centre. */
 interface Judged {
@@ -573,17 +687,17 @@ function ordered<S>(placed: S | undefined, cut: S | undefined, cover: () => S | 
 }
 
 /** A touch's place as its answer: off the screen, or its centre in a system band; undefined when on the screen. */
-function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): TapStanding | undefined {
+function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): TapJudgement | undefined {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
   return place === 'on' ? undefined : { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
 }
 
 /** A touch's cut to a sliver as its answer, when the frame left a minimum to judge it by. */
-const sliverCut = (facts: StandingFacts, cut: Cut | undefined): TapStanding | undefined =>
+const sliverCut = (facts: StandingFacts, cut: Cut | undefined): TapJudgement | undefined =>
   cut !== undefined && facts.minPiece !== undefined ? { facts, kind: 'cut', cut, minPiece: facts.minPiece } : undefined;
 
 /** The centre under `line` (one no guard acts on) as its answer, else undefined. */
-const underLine = (facts: StandingFacts, line: KeyboardLine | undefined): TapStanding | undefined =>
+const underLine = (facts: StandingFacts, line: KeyboardLine | undefined): TapJudgement | undefined =>
   line !== undefined && facts.centre.y >= line.y ? { facts, kind: 'underKeyboard', line } : undefined;
 
 /** `box` cut above a keyboard line — the box's width, from its top down to the line (no height for a line at or above its top); `box` itself with no line or one at or below its bottom. */
@@ -620,7 +734,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
  * box under the line, `offScreen` when none does — and undefined otherwise,
  * the facts then being the frame's for the purpose's own judgement.
  */
-function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: Standing } {
+function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: TouchJudgement } {
   const { node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
     const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
@@ -637,8 +751,8 @@ function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefine
 }
 
 /** THE ORDER past the frame, for both stops: where it lies, cut, covered by `cover`, its centre under a line no guard acts on — else `reachable` at its centre. */
-function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: Standing | undefined, cover: UiNode | undefined, line: KeyboardLine | undefined): Standing {
-  return ordered<Standing>(
+function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: TouchJudgement | undefined, cover: UiNode | undefined, line: KeyboardLine | undefined): TouchJudgement {
+  return ordered<TouchJudgement>(
     pointPlaced(facts, placed, facts.visible),
     cut,
     () => (cover === undefined ? undefined : { facts, kind: 'covered', cover, aboveKeyboard: line !== undefined }),
@@ -648,7 +762,7 @@ function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: Standing | u
 }
 
 /** The plain stop's standing (`Scene`'s contract): its centre placed, a sliver cut, a cover over its centre alone. */
-function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
+function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): TouchJudgement {
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
   return stopOrdered(facts, place, sliverCut(facts, facts.sliver), facts.centreCover, line);
@@ -663,7 +777,7 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
  * a REGION past the slack (`systemBandOver`), the band's rect carried —
  * except for content no scroll lifts out of a band (`pinnedSurface`).
  */
-function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): Standing {
+function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): TouchJudgement {
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
   if (facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
@@ -692,7 +806,7 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 }
 
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
-function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): TapStanding {
+function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): TapJudgement {
   const { scene, node } = judged;
   const box = systemBands(chosen, bands).clear;
   const within = aboveLine(box, line);
@@ -700,7 +814,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
   const frame = unwitnessed === undefined ? box : within;
   const { facts, seen } = factsIn(judged, frame);
   const offScreenVisible = boxes.length === 0 ? 0 : Math.max(...boxes.map((b) => visibleFractionInViewport(node.rect, b)));
-  const cover = (): TapStanding | undefined => {
+  const cover = (): TapJudgement | undefined => {
     const over = seen.centreCover;
     if (over === undefined) return undefined;
     const aboveKeyboard = within !== box;
@@ -709,7 +823,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
     if (!piece.tapAt.moved) return { facts, kind: 'reachable', at: piece.tapAt.point };
     return { facts, kind: 'reachable', at: piece.tapAt.point, moved: { piece: piece.tapAt.piece, cover: over, aboveKeyboard } };
   };
-  return ordered<TapStanding>(pointPlaced(facts, place, offScreenVisible), sliverCut(facts, facts.sliver), cover, underLine(facts, unwitnessed), { facts, kind: 'reachable', at: facts.centre });
+  return ordered<TapJudgement>(pointPlaced(facts, place, offScreenVisible), sliverCut(facts, facts.sliver), cover, underLine(facts, unwitnessed), { facts, kind: 'reachable', at: facts.centre });
 }
 
 /**
@@ -720,7 +834,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
  * (draw-order.ts#paintsOver) — the one on top at its centre, else the last
  * drawn. `flat`: the tree lists no ancestry (draw-order.ts#listsAncestry).
  */
-function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: StandingScreen | undefined, purpose: PixelPurpose, flat: boolean): PixelStanding {
+function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: StandingScreen | undefined, purpose: PixelPurpose, flat: boolean): PixelJudgement {
   const { scene, node } = judged;
   const below = belowStatusBand(box, bands);
   // Only the part of the box below the band that the measurement reads: what lies over the rest of the node is never sampled.
@@ -729,7 +843,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
   // docs/adr/0012-pixel-assert-residuals-d4-d6.md
   const { facts } = factsIn(judged, below, read, { sliver: false });
   const flush = purpose.glyphs ? cutAtNavigationBar(node, box, bands, scene) : undefined;
-  const cover = (): PixelStanding | undefined => {
+  const cover = (): PixelJudgement | undefined => {
     const covers = scene.order.paintsOver(node, read);
     const centre = rectCentre(node.rect);
     const over = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
@@ -737,43 +851,43 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Sta
     const overRoot = flat && screenSized(node.rect, box);
     return { facts, kind: 'covered', cover: over.node, aboveKeyboard: false, reach: over.reach, ...(overRoot && { overRoot: true as const }) };
   };
-  const placed = ((): PixelStanding | undefined => {
+  const placed = ((): PixelJudgement | undefined => {
     if (place === 'on') return undefined;
     if ('keyboard' in place) return { facts, kind: 'underKeyboard', line: place.keyboard, band: place.band };
     return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, band: place.band };
   })();
-  const cut: PixelStanding | undefined = flush === undefined ? undefined : { facts, kind: 'cut', ...flush };
-  return ordered<PixelStanding>(placed, cut, cover, undefined, { facts, kind: 'reachable', at: facts.centre });
+  const cut: PixelJudgement | undefined = flush === undefined ? undefined : { facts, kind: 'cut', ...flush };
+  return ordered<PixelJudgement>(placed, cut, cover, undefined, { facts, kind: 'reachable', at: facts.centre });
 }
 
 /**
  * `rect` is the screen itself for the pixel assert: at least
  * SCREEN_SIZED_FRACTION of `box`'s area (adapters/types.ts). No scroll
- * moves it out from under anything — verify/pixel-poll.ts's remedy, and a
- * flat list's root (`covered.overRoot`).
+ * moves it out from under anything — the pixel assert's `fixed` remedy
+ * (`remedyOf`), and a flat list's root (`covered.overRoot`).
  */
-export const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >= rectArea(box) * SCREEN_SIZED_FRACTION;
+const screenSized = (rect: Rect, box: Rect): boolean => rectArea(rect) >= rectArea(box) * SCREEN_SIZED_FRACTION;
 
 /**
  * `rect` is a full-bleed header on `box`: laid from the box's top edge at its
  * full width (iOS's, or Android 15+'s edge-to-edge app bar under the status
  * band). No scroll moves it out from under the status bar — a pinned
- * header's place, verify/pixel-poll.ts's remedy.
+ * header's place, the pixel assert's `fixed` remedy (`remedyOf`).
  */
-export const fullBleedHeader = (rect: Rect, box: Rect): boolean => rect.y <= box.y && rect.x <= box.x && rect.x + rect.width >= box.x + box.width;
+const fullBleedHeader = (rect: Rect, box: Rect): boolean => rect.y <= box.y && rect.x <= box.x && rect.x + rect.width >= box.x + box.width;
 
 /**
  * `rect` is a full-bleed footer on `box`: laid to the box's bottom edge at
  * its full width (a bottom sheet, an edge-to-edge bottom bar under the
  * navigation band) — `fullBleedHeader`'s twin at the bottom edge.
  */
-export const fullBleedFooter = (rect: Rect, box: Rect): boolean =>
+const fullBleedFooter = (rect: Rect, box: Rect): boolean =>
   rect.y + rect.height >= box.y + box.height && rect.x <= box.x && rect.x + rect.width >= box.x + box.width;
 
 /**
  * Content NO scroll lifts out of a system band, and which: a node in no
  * scroll view (`Clips.inScroller` not true — idb's flat list, which cannot
- * tell, counts as none, as the pixel assert's `pinned` does) that is the
+ * tell, counts as none, as the pixel assert's `pinned` and `stuck` do) that is the
  * screen itself (`screenSized`), a full-bleed header (`fullBleedHeader`)
  * or a full-bleed footer (`fullBleedFooter`); and, in a scroll view, the
  * screen itself only when it is taller than the room between the bands
@@ -782,10 +896,11 @@ export const fullBleedFooter = (rect: Rect, box: Rect): boolean =>
  * row at the screen's top edge, a 1080x2000 page that fits between the
  * bands — which a scroll does lift. A `fully`
  * stop judges no band's region over it (`Scene`'s contract), and the pixel
- * assert's advice for it leads with something in it clear of the bar.
+ * assert's remedy for it under a bar is `fixed` (`remedyOf`): its advice
+ * leads with something in it clear of the bar.
  * docs/adr/0009-android-navigation-band.md
  */
-export function pinnedSurface(node: UiNode, box: Rect, bands: Bands, clips: Pick<Clips, 'inScroller'>): 'screen' | 'header' | 'footer' | undefined {
+function pinnedSurface(node: UiNode, box: Rect, bands: Bands, clips: Pick<Clips, 'inScroller'>): 'screen' | 'header' | 'footer' | undefined {
   if (clips.inScroller(node) === true) return screenSized(node.rect, box) && node.rect.height > systemBands(box, bands).clear.height ? 'screen' : undefined;
   if (screenSized(node.rect, box)) return 'screen';
   if (fullBleedHeader(node.rect, box)) return 'header';
