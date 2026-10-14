@@ -93,7 +93,8 @@ target of the screen beneath a presented screen as covered by it.
 
 What the agent reads (review of the slice, M2): `DrawOrder.exposure` lists the presented screen's SURFACES among the
 covers (`Exposure.presented`, `presentedSurface`): the dimming leaf — the one a frame row would excuse and the exception
-takes back, and, since the amendment below, a labelled one too, which covered anyway — and the sheet's form; never a
+takes back, and, since the amendment "a labelled dim" below, a labelled one too, which covered anyway — and the
+sheet's form; never a
 control, a bar the layer carries or any other labelled node, which cover anyway (Safari's capsule bar). Carried as
 `StandingFacts.presented`. When a target has any such surface among its covers,
 whichever cover is on top at its centre (the modal's card over the dim), its sentences say so
@@ -159,7 +160,8 @@ Node by node, no node of a presented layer changed.
 Earlier runs found what this decision now excludes: the RN `ScrollView`'s content layer over its background (the
 scrolled-content condition), Safari's capsule layer refusing every web element (TAP 3 186 and PIXEL 2 170 diffs on its
 four trees — option (a)), the capsule bar's buttons and labelled leaves read as "presented" (the frame-excuse check of
-`presentedSurface`; since the amendment below its labelled leaves are kept out by the screen-filling-leaf condition
+`presentedSurface`; since the amendment "a labelled dim" below its labelled leaves are kept out by the
+screen-filling-leaf condition
 instead), Android's small leaves of a content layer read as a screen's surface (the full-screen leaf
 condition), and `scroll_until` stroking on a presented page sheet (the `presented` stop).
 
@@ -455,22 +457,22 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
    of its own after the screen's, as a sheet's dim is (inserted in the screen's own container, as this menu is, it is
    an ordinary cover: refused, with "scroll_until it first").
    docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
-10. **An app-drawn strip at a list's bottom with no node is not seen** (round-16 device check, 2026-10-14; residual
-   9's class). mp-native's Account Detail: the raw WDA ancestry is `ScrollView transactions.list.container` from y 180
-   to 874 → its content → `row_4` from y 816 to 869, and no node clips at y 839, yet the capture shows an opaque blank strip
-   from about y 839 down. `tap id:transactions.list.row_4` is reported `Tapped` (`idb ui tap 201 843`) and a colour
-   assert on it measures — the tree gives no evidence of the strip, so averi cannot judge it. iOS reports no bottom
-   band to cut; inventing a 34-pt home-indicator band would refuse real taps elsewhere. The same list took no swipes
-   there, also app-side. No code change.
+10. **An app-drawn strip at a list's bottom with no node is not seen** (round-16 device check, 2026-10-14; residual 9's
+   class). mp-native's Account Detail: the raw WDA ancestry is `ScrollView transactions.list.container` from y 180 to
+   874 → its content → `row_4` from y 816 to 869, and no node clips at y 839, yet the capture shows an opaque blank
+   strip from about y 839 down. `tap id:transactions.list.row_4` is reported `Tapped` (`idb ui tap 201 843`) and a
+   colour assert on it measures — the tree gives no evidence of the strip, so averi cannot judge it. iOS reports no
+   bottom band to cut; inventing a 34-pt home-indicator band would refuse real taps elsewhere. The same list took no
+   swipes there, also app-side. No code change.
 11. **An undimmed partial presented surface: the verbs' words agree, their behaviour does not** (the review of the
-   amendment "presented judged of the node", 2026-10-14). A later screen-sized layer holding only a sheet's scroll view over the screen's
-   lower part (`0,500 402x374`), with no dimming view: for a target the sheet does not lie over — wholly above the
-   screen, or at y 20 under the status bar — the tap and the pixel assert say "close it first" (the presented fact
-   judged of the node, Q1 (a)), while `scroll_until` strokes: it stops only on a surface over the target in its
-   read's frame or at its stroke's touch-down (`presentedAt`), and the touch-down misses the sheet — two strokes,
-   then its bound or the stuck sentence. Kept: the stroke lands on the target's own screen, not on the sheet, and
-   no measured tree holds this shape (every measured sheet and popover lays a dim over the whole screen). Pinned by
-   a row of tests/interact/remedy-agreement.test.ts stating the disagreement.
+   amendment "presented judged of the node", 2026-10-14). A later screen-sized layer holding only a sheet's scroll view
+   over the screen's lower part (`0,500 402x374`), with no dimming view: for a target the sheet does not lie over —
+   wholly above the screen, or at y 20 under the status bar — the tap and the pixel assert say "close it first" (the
+   presented fact judged of the node, Q1 (a)), while `scroll_until` strokes: it stops only on a surface over the target
+   in its read's frame or at its stroke's touch-down (`presentedAt`), and the touch-down misses the sheet — two strokes,
+   then its bound or the stuck sentence. Kept: the stroke lands on the target's own screen, not on the sheet, and no
+   measured tree holds this shape (every measured sheet and popover lays a dim over the whole screen). Pinned by a row
+   of tests/interact/remedy-agreement.test.ts stating the disagreement.
 
 ## Bug notes
 

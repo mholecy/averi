@@ -739,10 +739,12 @@ describe('colorSampleRect — the region the sampler reads, in tree units', () =
     for (const k of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(judged[k] - read[k])).toBeLessThan(1);
   });
 
-  it('unmeasured: a root that is not the whole screen (a window short of the bars) clips the judge where the sampler does not', () => {
+  it('known divergence, unmeasured on a device: a root short of the screen clips the judge where the sampler does not (colorSampleRect\'s doc)', () => {
+    // Pins a residual: a fix that makes the judge and the sampler agree here should flip this test.
     const box = treeScreen(n({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 800 } })).oriented;
     const rect = { x: 24, y: 780, width: 354, height: 52 };
-    expect(colorSampleRect(rect, box).y + colorSampleRect(rect, box).height).toBeLessThan(800);
+    const judged = colorSampleRect(rect, box);
+    expect(judged.y + judged.height).toBeLessThan(800);
     const read = sampled(rect);
     expect(read.y + read.height).toBeGreaterThan(800);
   });

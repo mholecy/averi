@@ -363,8 +363,8 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  *    under the status bar (wholly inside the band too), off the screen (wholly too), cut, under the soft keyboard or
  *    under another cover beneath that screen alike. No scroll moves it out from under that screen, and hiding a
  *    keyboard leaves it there: close that screen first. Judged of what of it SHOWS alone, a target wholly below the
- *    fold or wholly inside the status band had no covers, so no presented surface, and was told to scroll while
- *    `scroll_until` stopped on the presented screen: so every non-reachable kind takes it.
+ *    fold or wholly inside the status band has no covers, so no presented surface — it would be told to scroll while
+ *    `scroll_until` stops on the presented screen: so every non-reachable kind takes it.
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
  *    dim), else the last presented surface among its covers, else the last drawn over it.
@@ -676,7 +676,7 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * that `failsOpen` (a root of no area: the box is only the tree's largest
  * node, as a touch judges every point on the screen there), and never for a
  * rect of no area (a 926x0 row on the navigation bar's top edge is judged
- * by its place, as before); under the band
+ * by its place); under the band
  * `purpose.keyboardTop` marks on `box` when the node's rect meets it at
  * all; else in the status band, then the navigation band, when what it
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
@@ -685,7 +685,7 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
 function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
   if (on === undefined) return { off: 'wholly' };
-  // idb's keyboard band before a thin sliver, as before the system bands (ADR 0010): the element under the band is a
+  // idb's keyboard band before a thin sliver, as it comes before the system bands (ADR 0010): the element under the band is a
   // keyboard miss, worded as WDA's and Android's reading words it. Nothing wholly off the box meets the band.
   // docs/adr/0010-pixel-assert-keyboard-first.md
   if (keyboardTop !== undefined) {
@@ -705,7 +705,7 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
  * `payee_street_input` moved to y 872–873.7 beneath the Fees sheet's dim passed on ~6 px rows of the dim, "clipped
  * 96% off-png". The same at the top edge, under the status band, which a sliver no thicker
  * than the slack does not overlap past it. Only a side the screen's edge cuts: a whole element thinner than the slack
- * on the screen (a 402x1 divider) is measured, as before. Undefined when the sliver is thicker, or nothing is cut.
+ * on the screen (a 402x1 divider) is measured. Undefined when the sliver is thicker, or nothing is cut.
  */
 function thinSliver(rect: Rect, on: Rect, box: Rect): Rect | undefined {
   const shown = rectIntersection(rect, box) ?? on;

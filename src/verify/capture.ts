@@ -1004,10 +1004,11 @@ export function pngRegion(
 
 /**
  * THE region a reader of an element reads: `rect` CLIPPED to `frame` first, then inset `inset` of the clipped size on
- * each side — one function for the colour sampler, which lands it in the png (`pngRegion`, `in: 'pixels'`, the png as
- * the frame), and for the pixel assert's judge of what lies over what the colour assert reads
- * (verify/color-parity.ts#colorSampleRect, `in: 'units'`, the screen judged as the frame), so the two read ONE region.
- * Undefined when nothing of `rect` lies in `frame` (no width or no height left).
+ * each side — the pixel assert's judge of what lies over what the colour assert reads
+ * (verify/color-parity.ts#colorSampleRect, `unit: 'units'`, the screen judged as the frame). The colour sampler
+ * (`pngRegion`, the png as the frame) asks the same two steps apart — `clipTo`, then `insetBy` with `unit: 'pixels'` —
+ * since it also needs the clip alone for its clipped fraction; the judge and the sampler share `clipTo` and `insetBy`,
+ * so the two read ONE region. Undefined when nothing of `rect` lies in `frame` (no width or no height left).
  *
  * Clip, THEN inset, in that order, both of them: a rect running past the screen's edge is sampled on the part that
  * shows. Measured: the SWIFT form's `payee_street_input 24,869 354x52` beneath the Fees sheet's dim, on a 402x874
@@ -1017,9 +1018,9 @@ export function pngRegion(
  * docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
  *
  * `pixels`: whole pixels — the inset floored, and never more than leaves one pixel (it stops short of the half-size);
- * `units`: tree units, the inset exact. The two differ by the png mapping's rounding only, a fraction of a unit. One
- * function with a unit, not two: the clip and the inset's fraction are what the judge and the sampler must share, and
- * only whole pixels need the flooring.
+ * `units`: tree units, the inset exact. The two differ by the png mapping's rounding only, a fraction of a unit.
+ * `insetBy` takes the unit, not two functions: the inset's fraction is what the judge and the sampler share, and only
+ * whole pixels need the flooring.
  */
 export function clipThenInset(rect: EdgeBounds, frame: EdgeBounds, inset: number, unit: 'pixels' | 'units'): EdgeBounds | undefined {
   const on = clipTo(rect, frame);
