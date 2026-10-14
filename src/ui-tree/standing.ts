@@ -73,7 +73,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   one box, the usable screen's `oriented` (verify/pixel-poll.ts hands it
  *   the usable screen) — the same order, its place a region's:
  *   - off the screen when nothing of what it `reads` lies on the box —
- *     `offScreen`, first: no capture shows any of it (the colour sample's
+ *     `offScreen`, first (not on a root of no area, `failsOpen`, nor for a
+ *     rect of no area): no capture shows any of it (the colour sample's
  *     region is clipped to the screen before it is inset,
  *     verify/capture.ts#clipThenInset, so a sliver on the screen is read
  *     as the sliver its sampler reads);
@@ -487,8 +488,11 @@ export function sceneOf(tree: UiNode): Scene {
     const judged: Judged = { scene, node, centre: tapPoint(node) };
     if (purpose.of === 'pixel') {
       // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
-      const single = singleBox(screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree));
-      const pixel = pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single), single.box, single, purpose, !listsAncestry(tree));
+      const usable = screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree);
+      const single = singleBox(usable);
+      // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
+      const failsOpen = 'failsOpen' in usable && usable.failsOpen === true;
+      const pixel = pixelStanding(judged, regionPlace(node.rect, purpose, single.box, single, failsOpen), single.box, single, purpose, !listsAncestry(tree));
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
     }
     const touch = touchScreen(screen, tree);
@@ -649,14 +653,18 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
 
 /**
  * Where the pixel assert's region lies (`Scene`'s contract): off the screen
- * when nothing of what it reads lies on `box`; under the band
+ * when what it reads has area and none of it lies on `box` — never on a box
+ * that `failsOpen` (a root of no area: the box is only the tree's largest
+ * node, as a touch judges every point on the screen there), and never for a
+ * rect of no area (a 926x0 row on the navigation bar's top edge is judged
+ * by its place, as before); under the band
  * `purpose.keyboardTop` marks on `box` when the node's rect meets it at
  * all; else in the status band, then the navigation band, when what it
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
  * else on the screen.
  */
-function regionPlace(rect: Rect, { reads, keyboardTop }: PixelPurpose, box: Rect, bands: StandingScreen | undefined): RegionPlace {
-  if (rectIntersection(reads, box) === undefined) return 'off';
+function regionPlace(rect: Rect, { reads, keyboardTop }: PixelPurpose, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean): RegionPlace {
+  if (!failsOpen && rectArea(reads) > 0 && rectIntersection(reads, box) === undefined) return 'off';
   if (keyboardTop !== undefined) {
     const band = bandRect(keyboardTop, box);
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };

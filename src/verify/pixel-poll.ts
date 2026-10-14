@@ -505,8 +505,10 @@ async function judgeOver(
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
   // What the measurement reads, on the box the standing judges (the usable screen's `oriented`, D6): the colour
-  // sample's region clipped to it, then inset — the sampler's own (verify/capture.ts#clipThenInset).
-  const purpose = { of: 'pixel', reads: reads(element.rect, usable.oriented), glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
+  // sample's region clipped to it, then inset — the sampler's own (verify/capture.ts#clipThenInset). Not clipped to
+  // the box of a root of no area (treeScreen's `failsOpen`): that box is the tree's largest node, not the screen.
+  const frame = 'failsOpen' in usable && usable.failsOpen ? element.rect : usable.oriented;
+  const purpose = { of: 'pixel', reads: reads(element.rect, frame), glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
   const standing = scene.standing(element, usable, purpose);
   if (standing.kind === 'reachable') return undefined;

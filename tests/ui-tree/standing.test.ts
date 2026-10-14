@@ -1184,3 +1184,39 @@ describe('the presented remedy\'s cover — the node a sentence names for a targ
     expect(remedyOf(standing)?.of).not.toBe('presented');
   });
 });
+
+/**
+ * The pixel assert's `offScreen` kind — nothing of what it reads on the box judged — and where it is NOT judged: on a
+ * root of no area (usable-screen.ts#treeScreen's `failsOpen`: the box is only the tree's largest node, so content
+ * past it is measured, as a touch judges every point on the screen there), and for a rect of no area (judged by its
+ * place, as before).
+ */
+describe('Scene.standing for the pixel assert — off the screen', () => {
+  const COLOUR_OF = (n: UiNode, screen: Rect): PixelPurpose => {
+    const inset = (r: Rect): Rect => ({ x: r.x + r.width * 0.12, y: r.y + r.height * 0.12, width: r.width * 0.76, height: r.height * 0.76 });
+    const x0 = Math.max(n.rect.x, screen.x), y0 = Math.max(n.rect.y, screen.y);
+    const x1 = Math.min(n.rect.x + n.rect.width, screen.x + screen.width), y1 = Math.min(n.rect.y + n.rect.height, screen.y + screen.height);
+    return { of: 'pixel', reads: x1 > x0 && y1 > y0 ? inset({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 }) : inset(n.rect), glyphs: false };
+  };
+
+  it('a row wholly below a 402x874 screen: off the screen, its box quoted — for the colour and the ocr reader alike', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 1209, width: 354, height: 52 } });
+    const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'scrollable', rect: box(402, 874), children: [row] })] });
+    for (const purpose of [COLOUR_OF(row, box(402, 874)), { of: 'pixel', reads: row.rect, glyphs: true } as const]) {
+      expect(said(sceneOf(t).standing(row, IPHONE, purpose))).toEqual({ kind: 'offScreen', box: box(402, 874) });
+    }
+  });
+
+  it('on a root of no area (no device size): the box is the largest node, and a bar laid past it is measured, not judged off the screen', () => {
+    const bar = node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 2000, width: 1080, height: 154 } });
+    const t = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'container', rect: { x: 0, y: 66, width: 1080, height: 1934 } }), bar] });
+    expect(sceneOf(t).standing(bar, undefined, { of: 'pixel', reads: bar.rect, glyphs: false }).kind).toBe('reachable');
+  });
+
+  it('a rect of no area on the screen is judged by its place: a 926x0 row on the navigation bar\'s top edge in a list flush with it is cut there, not off the screen', () => {
+    const row = node({ role: 'other', identifier: 'row', rect: { x: 154, y: 2154, width: 926, height: 0 } });
+    const list = node({ role: 'scrollable', clipsDescendants: true, rect: { x: 0, y: 737, width: 1080, height: 1417 }, children: [node({ identifier: 'filler', rect: { x: 0, y: 800, width: 1080, height: 100 } }), row] });
+    const t = node({ role: 'container', rect: box(1080, 2220), children: [list] });
+    expect(sceneOf(t).standing(row, PIXEL_NAV, { of: 'pixel', reads: row.rect, glyphs: true }).kind).toBe('cut');
+  });
+});
