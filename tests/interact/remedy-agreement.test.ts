@@ -368,7 +368,7 @@ describe('a target wholly out of the judged frame beneath a presented screen —
 /**
  * A sliver of the element on the screen no thicker than the pixel slack (geometry.ts#PIXEL_OVERLAP_SLACK, 2 units):
  * what a neighbour's edge may share without counting as over it is too thin to measure, so the pixel assert fails
- * closed as for an element off the screen — the same remedy decision, presented first. Measured by the review:
+ * closed as for an element off the screen — the same remedy decision, presented first. Measured:
  * `payee_street_input` moved to y 872–873.7 beneath the Fees dim passed a colour assert on ~6 px rows of the dim
  * ("clipped 96% off-png"), while the tap on the same tree said close it first.
  */
@@ -434,7 +434,7 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
  * (wholly above the screen, or under the status bar) is told "close it first" by the tap and the pixel assert, which
  * judge the presented fact of the node (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it
  * stops only on a surface in its read's frame or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt),
- * and the touch-down misses the sheet. The verbs' wording agrees (owner Q1 (a)); their behaviour does not, and this
+ * and the touch-down misses the sheet. The verbs' wording agrees; their behaviour does not, and this
  * pins it.
  */
 describe('residual: an undimmed partial sheet — the tap and the pixel assert say close it first, scroll_until strokes', () => {

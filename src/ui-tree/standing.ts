@@ -364,7 +364,7 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  *    under another cover beneath that screen alike. No scroll moves it out from under that screen, and hiding a
  *    keyboard leaves it there: close that screen first. Judged of what of it SHOWS alone, a target wholly below the
  *    fold or wholly inside the status band had no covers, so no presented surface, and was told to scroll while
- *    `scroll_until` stopped on the presented screen (the owner's decision: every non-reachable kind takes it).
+ *    `scroll_until` stopped on the presented screen: so every non-reachable kind takes it.
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
  *    dim), else the last presented surface among its covers, else the last drawn over it.
@@ -701,9 +701,9 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
  * The element's part on `box` when the screen's EDGE leaves what the pixel assert reads (`on`, its part on the box)
  * no thicker than PIXEL_OVERLAP_SLACK on a side the edge cuts — too thin to measure: what a neighbour laid flush may
  * share with the element without counting as over it (geometry.ts#overlapsPastSlack) is the most such a sliver
- * holds, so a cover reaching over it is never judged, and the sampler reads its few rows — measured by the review of
- * the colour assert's region: `payee_street_input` moved to y 872–873.7 beneath the Fees sheet's dim passed on ~6 px
- * rows of the dim, "clipped 96% off-png". The same at the top edge, under the status band, which a sliver no thicker
+ * holds, so a cover reaching over it is never judged, and the sampler reads its few rows — measured:
+ * `payee_street_input` moved to y 872–873.7 beneath the Fees sheet's dim passed on ~6 px rows of the dim, "clipped
+ * 96% off-png". The same at the top edge, under the status band, which a sliver no thicker
  * than the slack does not overlap past it. Only a side the screen's edge cuts: a whole element thinner than the slack
  * on the screen (a 402x1 divider) is measured, as before. Undefined when the sliver is thicker, or nothing is cut.
  */
