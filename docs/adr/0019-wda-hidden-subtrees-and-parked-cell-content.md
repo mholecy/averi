@@ -2,7 +2,9 @@
 
 Status: accepted, 2026-10-14 (owner decisions on the round-14 device check's triage: Q-C (b), the hidden-subtree rule
 in the form the captures support, with the presented-surface guard and the `hidden` flag printed by `ui_snapshot`; Q-E
-(a), the parked off-screen cell content fixed alongside it).
+(a), the parked off-screen cell content fixed alongside it). Narrowed the same day on the slice's review: a hidden
+subtree's root is no structural wrapper (owner decision); a parked element needs the measured scroll-view shape; a
+hidden node excused at a target's centre is still listed in `Exposure.centreExcused`.
 
 ## Context
 
@@ -34,20 +36,23 @@ unedited as `tests/fixtures/wda-capture-*.json`:
 | the New Contact sheet layer and its `Table 0,62 402x812`, discard popover up | **0** | **0** | its cells `isAccessible 1` |
 | a cell below the fold, `add instant message` | 0 | 1 | its content parked at `0,62 …`, `isVisible 0` |
 
-## Decision 1: the hidden subtree (Q-C (b))
+## Decision 1: the hidden subtree (Q-C (b), narrowed to non-wrapper roots)
 
-> In a WDA tree, a node roots a **hidden subtree** when it is `isVisible="0"` and `isAccessible="0"` and every node of
-> its subtree is `isVisible="0"`. A descendant's `isAccessible` is not consulted. Every node of a hidden subtree is no
-> cover in draw order's `target` column (the tap, `scroll_until`'s standing, the pixel assert's covers, the dismissal
-> picker), **except** a node that is the surface of a screen presented over the target's (`presentedSurface`, ADR
-> 0018), which covers as before. A target's own flags are never read.
+> In a WDA tree, a node roots a **hidden subtree** when it is of no structural role (not a wrapper: WDA's `Other`,
+> `Cell`, `Window`, `Application` and every unmapped type are `container`/`other`, `STRUCTURAL_ROLES`), is
+> `isVisible="0"` and `isAccessible="0"`, and every node of its subtree is `isVisible="0"`. A descendant's
+> `isAccessible` is not consulted. Every node of a hidden subtree is no cover in draw order's `target` column (the tap,
+> `scroll_until`'s standing, the pixel assert's covers, the dismissal picker), **except** a node that is the surface of
+> a screen presented over the target's (`presentedSurface`, ADR 0018), which covers as before. A target's own flags
+> are never read.
 
 - The parser (`wda-source.ts#hiddenRoots`, one bottom-up pass beside `keyboardMarks`) finds the roots, and `toUiNode`
   sets `UiNode.hidden: true` on every node of each such subtree. idb and Android trees never carry it.
 - Draw order (`draw-order.ts#NOT_DRAWN`, the `hidden` row) excuses such a node in the `target` column unless
-  `presentedSurface` names it — the mirror of `givesWay`. It is also left out of `Exposure.centreExcused`: what is not
-  drawn takes no touch, so the dismissal picker does not refuse a candidate whose centre a hidden button holds. The
-  `drawnOver` column (the stroke box) is unchanged: no measurement asked it.
+  `presentedSurface` names it — the mirror of `givesWay`. Excused, it is listed in `Exposure.centreExcused` when it
+  holds the target's centre, as every excused node is, so the dismissal picker still refuses a candidate whose centre
+  a hidden control holds: WDA's `isVisible="0"` is no proof a node takes no touch. The `drawnOver` column (the stroke
+  box) is unchanged: no measurement asked it.
 - `ui_snapshot` prints the flag (`"hidden": true`) on every node of the subtree, so later device trees carry it and the
   differential harness, whose corpus is `ui_snapshot` output, can sweep the rule; a filtered snapshot shows it on each
   match.
@@ -55,88 +60,119 @@ unedited as `tests/fixtures/wda-capture-*.json`:
 Why this form and not the owner's first one, "a subtree wholly `0/0` is no cover" (Q-C (a)): the tab buttons' icon
 Images are `isAccessible "1"`, so the literal rule drops nothing on the SWIFT form and the Image goes on covering the
 row beneath. Asking `isAccessible` of the root only fixes that. Why every descendant's `isVisible` and not the root's
-alone: the tab host is `0/0` in both states, with visible content — the root alone would drop the whole Account
-Detail screen. Why `isAccessible` on the root at all (Q-C (c), `isVisible` alone, gives the same drops as this rule
-for the labelled targets the triage measured): WDA's `isVisible` is 0 for nodes really drawn but occluded too (the
-SWIFT form's `payee_name_input` under CONTINUE), and an occluded control is still accessible. Over every node, the two
-differ: on Account Detail with the bar shown `isVisible` alone calls 114 of 203 nodes hidden where this rule calls
-102 (no cover there changes either way).
+alone: the tab host is `0/0` in both states, with visible content.
 
-Why the guard: with the discard popover up, WDA marks the whole New Contact sheet layer `0/0`, its form `Table`
-included. That Table is the presented sheet over the contacts list (ADR 0018). Unguarded, the rule would stop it
-covering the list's rows; on that capture the popover's own dim still covers them, but a sheet so marked over a list
-with no second dim would let a tap through (pinned on a synthetic tree in tests/ui-tree/draw-order-hidden.test.ts).
+Why no wrapper root (the review's finding, the owner's decision): WDA's flags do not say what is drawn. The SWIFT
+form's `payee_name_input` row, `Other 24,801 354x52`, is drawn — under CONTINUE — and WDA reports it `0/0` with an
+all-invisible subtree. As a root (the rule as first written) it took its label and its text field (each
+`isAccessible "1"`) with it; with the `centreExcused` filter first shipped beside it, the label "Payee’s name" became a
+dismissal candidate whose tap would focus the field. `isAccessible` on the root does not tell drawn from undrawn — the
+payee row is `0/0` — so the narrowing asks what the node is: a control, an image or a text is one thing on screen,
+which WDA either shows or not; a wrapper is a region whose flags say nothing of what it holds. The measured motivating
+case keeps working: the tab buttons are `Button`s.
 
-## Decision 2: parked cell content (Q-E (a))
+Why the guard: with the discard popover up, WDA marks the New Contact sheet layer `0/0`, its form `Table` included —
+the Table (a scroll view, no wrapper) roots a hidden subtree. That Table is the presented sheet over the contacts list
+(ADR 0018). Unguarded, the rule would stop it covering the list's rows; on that capture the popover's own dim still
+covers them, but a sheet so marked over a list with no second dim would let a tap through (pinned on a synthetic tree
+in tests/ui-tree/draw-order-hidden.test.ts).
 
-> In a WDA tree, an element with `isVisible="0"` whose rect (of area) shares no area with its nearest `Cell`
-> ancestor's rect is PARKED, and is placed at that cell's rect.
+## Decision 2: parked cell content (Q-E (a), narrowed to the measured shape)
+
+> In a WDA tree, an element with `isVisible="0"` is PARKED, and placed at its nearest `Cell` ancestor's rect, when its
+> rect shares no area with that cell's, shares area with the scroll view the cell lies in (the cell's nearest `Table`,
+> `CollectionView` or `ScrollView` ancestor), and the cell shares no area with that scroll view. (Each rect of area;
+> an edge in common is no shared area.)
 
 - Implemented in the parser (`wda-source.ts#parkedIn`), before the role map, so every reader above sees the placed
   rect: a tap on Contacts' `add instant message` below the fold is refused off screen with "scroll_until it first",
   `scroll_until` strokes toward it (and stops once the cell shows: the next read has the content laid out at its real
   rect), a pixel assert reads "element rect is outside the screenshot", and a visibility assert reads it where its row
   is.
+- **The scroll view's shape** (the review's finding): the cell is not laid out — wholly outside the scroll view it lies
+  in — and the element sits inside that scroll view, at its parked frame. As first written ("outside its cell" alone),
+  content scrolled out SIDEWAYS read as parked: a carousel row's third chip at x 410, past its own horizontal
+  scroller, was moved onto the row's cell at `0,300`, tapped there, and covered the two chips beside it. Every one of
+  the 82 parked elements of the two Contacts captures (41 each) has the shape. The scroll view is the CELL's — the one
+  that decides whether the cell is laid out — not the element's own nearest: a below-the-fold cell holding a scroller
+  of its own (a row of chips) parks that scroller's content all the same. Pinned as negatives: the carousel's chip,
+  a collection view's card past its edge (a cell nested in a row's cell), and an on-screen cell's badge hung off its
+  edge — each keeps its rect.
 - **Placed at the cell, not marked off screen.** A zero rect (what idb gives an unlaid node) would read "no area": the
   wait's zero-area hint, and a `scroll_until` that never finds it on screen. A flag would need every reader taught it.
   The cell's rect is where the content will be, to within the cell.
 - **Every element of the cell, not its text only.** The `Insert` button and its image sit at the same parked `0,62`;
   a tap on them would press the same strip.
 - **A `Cell` only** (WDA's type: the role map makes it a `container`, like every `Other`). The shape was measured in a
-  UIKit table's cells. An RN or SwiftUI view whose child lies outside it — an absolutely positioned badge, an
-  overflowing label — is no cell, and its child stays where WDA reports it.
+  UIKit table's cells. An RN or SwiftUI view whose child lies outside it is no cell, and its child stays where WDA
+  reports it.
 - **`isVisible="0"` too.** A child drawn outside its cell is drawn where it says; on screen, a laid-out cell's content
   lies inside it (`add phone` and its button).
-- **No "the cell is off screen" condition** (the triage's draft named one): whether a cell is laid out depends on its
-  scroll view's bounds, not the screen's (a medium sheet's cell below the sheet but inside the screen is not laid out
-  either), and the parser knows neither reliably; the parked frame itself is the evidence.
 
 ## Measured
 
-Tests (red first, each mutation-checked; 13 mutants, all killed — among them the rule without the guard, the literal
-rule, `isVisible` alone, the root alone, the hidden flag on the root only, the parked rule on text only, on any
-parent, with a zero rect):
-`tests/adapters/wda-source-visibility.test.ts`, `tests/ui-tree/draw-order-hidden.test.ts`,
-`tests/interact/parked-cell-content.test.ts`.
+Tests (red first, each mutation-checked; 18 mutants, all killed — among them the rule without the guard, the literal
+rule, `isVisible` alone, a wrapper allowed to root (the rule as first shipped), only `Other` excluded, the
+`centreExcused` filter, the parked rule without the scroll-view shape (as first shipped), with the element's own
+scroll view, on text only, on any parent, with a zero rect): `tests/adapters/wda-source-visibility.test.ts`,
+`tests/ui-tree/draw-order-hidden.test.ts`, `tests/interact/parked-cell-content.test.ts`.
 
 - SWIFT form pushed: the "Standard" value under the phantom Home icon is clear (tap at its centre, unmoved; before,
-  refused: "only a 71x7 part of it shows"), and no row is covered by a tab button or icon.
+  refused: "only a 71x7 part of it shows"), and no row is covered by a tab button or icon. `payee_name_input`, its
+  label and its text field are not hidden, and the label stays no dismissal candidate (its text field holds its
+  centre).
 - Contacts New Contact under the discard popover: the sheet's `Table` stays a cover, and a presented surface, of the
-  list's rows.
+  list's rows; the sheet's own accessible controls (close, Done) are not hidden and cover as before.
 - Account Detail with the bar shown: nothing is dropped — every node's covers, presented surfaces and tap equal those
-  of the same tree with the flag stripped (102 of its 203 nodes are hidden: the second account card off to the
-  right, the scroll bars).
+  of the same tree with the flag stripped. 98 of its 203 nodes are hidden: 94 off screen or of no area (the second
+  account card off to the right, the transaction rows below the fold, each a `Button` root), and on screen the search
+  field's icon `34,81 20x20`, the second card's header button at `378,138` (a 24-pt sliver), the screen's full-screen
+  `Toolbar` and the frame inside it.
+- Hidden nodes per raw capture (of all nodes): Account Detail 98/203, SWIFT form 26/138, Fees sheet 128/185,
+  Finportal forgot 137/179, Contacts sheet 144/321, discard popover 236/363. The large counts are whole screens beneath
+  a presented one, each rooted at that screen's scroll view (residual 3).
 
 **The sweep's limit.** The differential harness's corpus is normalized `ui_snapshot` output, built through the old
 parser; it carries no visibility flags, so it shows 0 diffs by construction for both rules and proves nothing about
 them. Only eight raw trees carry the flags: the six D captures and two older fixtures (`wda-source-rn-myport`,
 `wda-source-skeleton-login`; the five MyPort fixtures carry `isVisible` only). A raw-tree differential over those
-eight, each parsed by each side's own parser, tap and pixel on every node, two status bands, with and without a
-keyboard band (5 572 taps, 5 572 pixel judgements), changed:
+eight — each parsed by each side's own parser, tap (`judgeTap(…).aim()`) and pixel (`overElement`) on every node,
+with and without the 62-pt status band and a keyboard band (5 572 taps, 5 572 pixel judgements) — against e1384aa:
 
-- verdicts the rules mean to change: the SWIFT form's "Standard" (refused → tapped, 4 taps; 4 pixel), the
-  Priority row, "PAYMENT DETAILS" (pixel refused → measured); the parked content of 41 Contacts nodes per tree
-  (refused under another parked text or tapped at `0,62` → refused off screen; pixel → "outside the screenshot");
-  the sheet's `Poster` image at `0,62`, no longer covered by parked texts;
-- covers named, with the same verdict: screen-sized wrappers as targets (the popover tree's list and sheet
-  layers, Finportal's and the Fees sheet's full-screen frames, the form's scroll container), whose moved tap or named
-  cover changes as hidden nodes listed after them drop — under the popover, the named cover becomes the guarded
-  `Table`;
-- nothing on Account Detail, `wda-source-rn-myport` or `wda-source-skeleton-login`.
+| tree | taps changed | pixel changed | what |
+|---|---|---|---|
+| SWIFT form pushed | 6 | 34 | "Standard" refused → tapped (4); the Priority row, "PAYMENT DETAILS", "Standard" and screen frames: pixel refused → measured; the form's scroll container: moved tap, larger piece (2) |
+| Contacts sheet | 172 | 127 | 41 parked nodes: refused under a parked text or tapped at `0,62` → refused off screen (164 taps), pixel → off screen (120); the sheet's `Poster` image at `0,62`, no longer under parked texts: refused → tapped (4 taps, 4 pixel); the frame `0,0 402x156` and one above the screen: same verdict, another cover named (4 taps, 3 pixel) |
+| discard popover | 256 | 193 | 41 parked nodes as above (164 taps, 124 pixel); screen-sized frames as targets: same verdict, the named cover becomes the guarded `Table` (92 taps, 69 pixel) |
+| Finportal forgot | 8 | 0 | two full-screen frames as targets: same verdict (moved), a larger uncovered piece |
+| Fees sheet, Account Detail, `wda-source-rn-myport`, `wda-source-skeleton-login` | 0 | 0 | — |
 
-The full report: the round's `c-diff-report.md` (scratch).
+No target that was tapped is refused now but the parked ones (refused off screen), and no presented surface of a
+target on screen was lost.
 
 ## Residuals accepted
 
 1. **Only eight raw trees.** Every claim above rests on them; the flag in `ui_snapshot` is how later device checks
    grow the evidence. Unmeasured: a pushed screen scrolled so a row lies in the phantom tab band, a medium sheet, a
    SwiftUI menu.
-2. **A drawn node WDA reports `0/0` with an invisible subtree** reads as no cover (a false "clear"). None was seen;
-   the occluded-but-drawn nodes measured are accessible.
-3. **A presented screen's surface that `presentedSurface` does not name** (a medium sheet under 90 % of the screen,
-   ADR 0018 residual 2) loses its cover if WDA marks it hidden.
+2. **A drawn node WDA reports `0/0` with an invisible subtree.** Measured: the SWIFT form's `payee_name_input` row,
+   drawn under CONTINUE, is reported so — `isVisible="0"` there means occluded, not undrawn. As a wrapper it roots
+   nothing now, and its accessible label and text field stay as they were. A CONTROL, image or text so reported
+   while drawn would still read as no cover (a false "clear"); none was seen among the D captures' on-screen
+   controls, and the four on Account Detail (the search icon, a card's sliver, the screen's `Toolbar`) cover nothing
+   there either way.
+3. **The screen beneath a presented one.** WDA reports a screen occluded by a modal or a sheet `0/0` from its scroll
+   view down — Finportal's login `ScrollView` under the RN modal (135 nodes), the SWIFT form's under the Fees sheet
+   (122), the Contacts list under the New Contact sheet (95), and, under the discard popover, the sheet's form `Table`
+   too (121) — and the scroll view, no wrapper, roots a hidden subtree: the occluded screen's own content and chrome
+   cover none of its targets. A target there is still covered by the presented screen's surface (kept by the guard),
+   so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a medium
+   sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018 residual 2)
+   leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee row's lesson:
+   WDA's flags say "occluded", which the rule takes for "not drawn".
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
-5. **Content parked in a container that is not a `Cell`** (a SwiftUI `List` row was not measured) is not placed.
+5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
+   was not measured) is not placed.
 
 ## Bug notes
 
