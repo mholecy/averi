@@ -6,7 +6,7 @@ import type { CaptureEntry, RunManifest, Screen } from './corpus.js';
 import { syntheticIdb, syntheticUiautomator, withHeaderId, zeroRootWda } from './synthetic.js';
 
 /**
- * Builds a corpus (corpus.ts) from what exists today:
+ * Builds a corpus (corpus.ts) from these sources:
  *
  *  - DEVICE RUNS (`--runs`, a directory of `run<N>-ios` / `run<N>-android`
  *    device-check scratch directories, read only, subdirectories included):
@@ -256,10 +256,12 @@ async function fixtureRuns(repo: string): Promise<{ ios: Built; android: Built }
   add(ios, 'idb-ui-snapshot-account-detail-error.json', JSON.stringify((await j('idb-ui-snapshot-account-detail-error.json')).screen), { source: 'idb', form: 'normalized' });
   for (const [k, v] of Object.entries((await j('ios-ui-snapshot-swift-iban-error.json')).screens as Json)) add(ios, `ios-ui-snapshot-swift-iban-error.${k}.json`, JSON.stringify(v), { source: k === 'idb' ? 'idb' : 'wda', form: 'normalized' });
   for (const [k, v] of Object.entries((await j('wda-ui-snapshot-stacked-layers.json')).screens as Json)) add(ios, `wda-ui-snapshot-stacked-layers.${k}.json`, JSON.stringify(v), { source: 'wda', form: 'normalized' });
-  // Captured before AndroidAdapter marked its root `paddedTouchTargets` (it always does now) — added, as the scratch harness did.
+  // The fixture's root lacks `paddedTouchTargets`, which AndroidAdapter marks on every root it reads — added, as the scratch harness did.
   for (const [k, v] of Object.entries((await j('android-ui-snapshot-compose.json')).screens as Json)) {
     add(android, `android-ui-snapshot-compose.${k}.json`, JSON.stringify({ ...(v as Json), paddedTouchTargets: true }), { source: 'uiautomator', form: 'normalized', note: 'paddedTouchTargets added to the root (captured before the parser marked it)' });
   }
+  // The dumps exist only as constants in the checkout's tests/helpers (no fixture file holds them), so they are imported
+  // from there — the strings the tests read, not a copy that could drift from them.
   const dumps = (await import(join(repo, 'tests/helpers/android-dumps.ts'))) as { COMPOSE: Record<string, string> };
   const classic = (await import(join(repo, 'tests/helpers/synthetic-android-trees.ts'))) as { CLASSIC_VIEWS: Record<string, string>; SETTINGS_ROW_SLIVER: string };
   for (const [k, xml] of Object.entries({ ...dumps.COMPOSE, ...classic.CLASSIC_VIEWS, settingsRowSliver: classic.SETTINGS_ROW_SLIVER })) add(android, `helpers.${k}.xml`, xml, { source: 'uiautomator', form: 'raw' });
