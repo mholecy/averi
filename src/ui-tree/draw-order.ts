@@ -109,6 +109,19 @@ export interface DrawOrder {
    */
   exposure(node: UiNode, within: Rect): Exposure;
   /**
+   * The SURFACE of a screen presented over `node`'s own (`presentedSurface`, ADR 0018: a modal's dimming leaf, a
+   * popover's or a half sheet's `dismiss popup`, a sheet's scroll view) that holds `point`, wherever `node` lies — the
+   * last such drawn after it (the one on top there), and one that draws for it as a target (`NOT_DRAWN`'s `target`
+   * column, as `exposure` asks before it asks `presentedSurface`); undefined when none, or for a node not in this tree.
+   * `exposure` cannot answer it for a node outside the box: it judges only what of the node shows, so a target below
+   * the fold has no covers and no presented surface. One reader: `scroll_until`'s stroke
+   * (interact/scroll-rounds.ts#round), which asks it at the stroke's touch-down for a target it has not judged in the
+   * viewport — a stroke that would touch down on such a screen is not sent (it may dismiss the screen, as one closed
+   * Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN screen is
+   * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before.
+   */
+  presentedAt(node: UiNode, point: Point): UiNode | undefined;
+  /**
    * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
    * node after `node`'s subtree (its first place in the tree, as
    * `exposure`) whose rect meets `region` with area and that draws for a
@@ -1625,6 +1638,12 @@ export function drawOrder(tree: UiNode): DrawOrder {
       if (places.length === 0) return [];
       const about = asTarget(places[0]);
       return laterThan(places, (p) => rectIntersection(p.node.rect, region) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
+    },
+    presentedAt(node, point) {
+      const places = placesOf(node);
+      if (places.length === 0) return undefined;
+      const about = asTarget(places[0]);
+      return laterThan(places, (p) => containsPoint(p.node.rect, point) && drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
     },
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
