@@ -176,7 +176,8 @@ interface SnapNode {
 
 interface Target {
   selector: string;
-  element: Record<string, string>;
+  /** The assert's element spec — none for a `value:` target: an element spec names no value (verify/element-assert.ts). */
+  element?: Record<string, string>;
   role: string;
   /** The node's rect in the tree that named it (NEW's when both did) — where its colour is painted. */
   rect: Rect;
@@ -223,12 +224,12 @@ function targetsOf(tree: SnapNode): { targets: Target[]; shared: string[]; keybo
   for (const n of nodes) {
     const role = n.role ?? '?';
     const rect = n.rect ?? { x: 0, y: 0, width: 0, height: 0 };
-    const push = (selector: string, element: Record<string, string>) => targets.push({ selector, element, role, rect });
+    const push = (selector: string, element?: Record<string, string>) => targets.push({ selector, ...(element !== undefined && { element }), role, rect });
     if (neutral === undefined && role === 'text' && quotable(n.label) && texts.get(n.label) === 1) neutral = n.label;
     if (quotable(n.identifier) && ids.get(n.identifier) === 1) push(`id:"${n.identifier}"`, { id: n.identifier });
     else if (quotable(n.label) && texts.get(n.label) === 1) push(`text:"${n.label}"`, { text: n.label });
     else if (quotable(n.label) && labels.get(n.label) === 1) push(`label:"${n.label}"`, { label: n.label });
-    else if (quotable(n.value) && values.get(n.value) === 1) push(`value:"${n.value}"`, { value: n.value });
+    else if (quotable(n.value) && values.get(n.value) === 1) push(`value:"${n.value}"`);
     else if (quotable(n.label) && roleTexts.get(`${role} ${n.label}`) === 1) push(`role:${role} text:"${n.label}"`, { role, text: n.label });
     else if (quotable(n.identifier) && roleIds.get(`${role} ${n.identifier}`) === 1) push(`role:${role} id:"${n.identifier}"`, { role, id: n.identifier });
   }
@@ -282,7 +283,7 @@ function plan(platform: Platform, t: Target, i: number, tools: ReadonlySet<ToolN
     for (const direction of ['down', 'up']) calls.push({ tool: 'scroll_until', args: { platform, selector: t.selector, direction } });
     calls.push({ tool: 'scroll_until', args: { platform, selector: t.selector, direction: 'down', fully: true } });
   }
-  if (tools.has('assert')) {
+  if (tools.has('assert') && t.element !== undefined) {
     if (asserts.includes('element')) calls.push({ tool: 'assert', args: { platform, asserts: [{ element: t.element, timeout: ASSERT_BUDGET_MS }] } });
     if (asserts.includes('color')) {
       const { hex, rgb } = colourOf(i);
