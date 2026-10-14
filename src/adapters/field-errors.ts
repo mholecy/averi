@@ -22,8 +22,10 @@ import { everyNode, type UiNode } from './types.js';
  * (`swift_payment.form.iban_input_error` under the IBAN input, which itself
  * reads `TextFieldWithComponentStyle`). Such a message names no field, so it
  * is placed by geometry: a text whose identifier ends in `_error`, `.error` or
- * `-error` belongs to the nearest field above it in its column (see
- * `fieldAbove`). The wrapper's identifier would name the field more directly,
+ * `-error` belongs to the nearest field above it in its column, provided it
+ * starts close under that field (at most 24 pt, or the field's height when
+ * that is more) and no field lies between them (see `fieldAbove`). Any
+ * textfield counts here, with an identifier or without. The wrapper's identifier would name the field more directly,
  * but only WDA lists it, as the field's PARENT with the message its SIBLING;
  * idb lists no container identifiers, so a rule reading the wrapper would
  * serve one source. Geometry serves both. A field that already has a
@@ -34,8 +36,12 @@ import { everyNode, type UiNode } from './types.js';
  * still reads as the previous same-identifier field's error; same-identifier
  * fields side by side on one row share the message below them; a message whose
  * identifier names it an error some other way (`IbanError`, `error_iban`) is
- * not seen; and an own-identifier message under a field of another column,
- * with no field above it in its own, pairs with nothing.
+ * not seen; an own-identifier message under a field of another column, with
+ * no field above it in its own, pairs with nothing; and one that sits further
+ * below its field than the gap allows (a message spaced well clear of a short
+ * field) pairs with nothing, which is what keeps a screen-level error state
+ * (`accounts.detail.error`, far under the screen's search field) from being
+ * read as that field's.
  *
  * One owner because BOTH iOS tree sources need it and their trees have
  * different shapes: idb returns a flat AX list, WDA a nested XCUIElement tree
@@ -45,12 +51,13 @@ import { everyNode, type UiNode } from './types.js';
  */
 
 export function attachFieldErrors(nodes: Iterable<UiNode>): void {
-  const fields: UiNode[] = [];
+  const inputs: UiNode[] = [];
   const texts: UiNode[] = [];
   for (const n of nodes) {
-    if (n.role === 'textfield' && n.identifier !== null) fields.push(n);
+    if (n.role === 'textfield') inputs.push(n);
     else if (n.role === 'text' && n.identifier !== null && n.label !== null) texts.push(n);
   }
+  const fields = inputs.filter((f) => f.identifier !== null);
   const titles = new Set<UiNode>();
   for (const field of fields) {
     for (const t of texts) if (t.identifier === field.identifier && t.rect.y < bottom(field) && bottom(t) > field.rect.y) titles.add(t);
@@ -75,7 +82,7 @@ export function attachFieldErrors(nodes: Iterable<UiNode>): void {
   const messages = new Map<UiNode, UiNode>();
   for (const t of texts) {
     if (!ERROR_IDENTIFIER.test(t.identifier!)) continue;
-    const field = fieldAbove(t, fields);
+    const field = fieldAbove(t, inputs);
     if (field === undefined || field.error !== undefined) continue;
     const held = messages.get(field);
     if (held === undefined || t.rect.y < held.rect.y) messages.set(field, t);
@@ -85,7 +92,10 @@ export function attachFieldErrors(nodes: Iterable<UiNode>): void {
 
 /**
  * The field a message with an error identifier belongs to: the nearest field
- * above it in its column, provided no other field of that column lies between.
+ * above it in its column, close enough above it, with no other field of that
+ * column between them. Every textfield counts, with an identifier or without:
+ * the message's own identifier names it an error, so the field needs none to
+ * be the one it lies under, or to stand between them.
  *
  * A field is in the message's COLUMN when their horizontal extents overlap;
  * the message is drawn under the field it describes, starting at or near the
@@ -97,6 +107,14 @@ export function attachFieldErrors(nodes: Iterable<UiNode>): void {
  * near; the message belongs to the one it overlaps more, and on a further tie
  * to the first in document order.
  *
+ * CLOSE ENOUGH: the message starts at most `MAX_GAP` below the field's bottom,
+ * or the field's own height when that is more. A validation message sits right
+ * under its field (the IBAN message 16 pt under its 20 pt field); a screen's
+ * own error state laid out in the middle of the screen does not (Account
+ * Detail's `accounts.detail.error` "That's an error", 337 pt under the search
+ * field at the top). The field's height lets a tall field (a 48 pt search box,
+ * a multi-line input) keep a message spaced in proportion to it.
+ *
  * A field of the column BETWEEN them is one that starts at or below the chosen
  * field's bottom and above the message's top. Any such field ending above the
  * message would itself be nearer, so what remains is a field reaching past the
@@ -104,21 +122,26 @@ export function attachFieldErrors(nodes: Iterable<UiNode>): void {
  * neither the field above's nor below the one it lies in. It pairs with none.
  */
 function fieldAbove(message: UiNode, fields: UiNode[]): UiNode | undefined {
+  const top = message.rect.y;
   const column = fields.filter((f) => overlapX(f, message) > 0);
   let field: UiNode | undefined;
   for (const f of column) {
-    if (bottom(f) > message.rect.y) continue;
-    const nearer = field === undefined || bottom(f) > bottom(field);
-    const tiedButOverlapsMore = field !== undefined && bottom(f) === bottom(field) && overlapX(f, message) > overlapX(field, message);
-    if (nearer || tiedButOverlapsMore) field = f;
+    if (bottom(f) > top) continue;
+    if (field === undefined || bottom(f) > bottom(field)) field = f;
+    else if (bottom(f) === bottom(field) && overlapX(f, message) > overlapX(field, message)) field = f;
   }
   if (field === undefined) return undefined;
   const above = field;
-  return column.some((f) => f !== above && f.rect.y >= bottom(above) && f.rect.y < message.rect.y) ? undefined : above;
+  if (top - bottom(above) > Math.max(MAX_GAP, above.rect.height)) return undefined;
+  const between = column.some((f) => f !== above && f.rect.y >= bottom(above) && f.rect.y < top);
+  return between ? undefined : above;
 }
 
 /** An identifier naming its text an error: `<…>_error`, `<…>.error` or `<…>-error`, in any case. */
 const ERROR_IDENTIFIER = /[._-]error$/i;
+
+/** How far below its field's bottom, in pt, a message may start and still be that field's (see `fieldAbove`). */
+const MAX_GAP = 24;
 
 /** How far two nodes' horizontal extents overlap; zero or less when they do not. */
 const overlapX = (a: UiNode, b: UiNode): number =>
