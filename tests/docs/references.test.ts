@@ -52,6 +52,8 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   // Untracked in the main checkout, not yet on this branch's base; cited by ADR 0018's amendment and residual 9.
   'docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md',
   'docs/bugs/2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md',
+  // Untracked in the main checkout; cited by ADR 0018's amendment "No stroke onto a presented screen".
+  'docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>
