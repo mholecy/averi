@@ -239,7 +239,11 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
  */
 async function actualSentences(): Promise<{ PRESENTED_OVER: string; PRESENTED_STOP: string; PRESENTED_OVER_THE_ELEMENT: string }> {
   const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
-  const { PRESENTED_STOP } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+  // The actual scroll-text.ts still imports the MOCKED target-text.ts: its stop sentence is built on the tap's sentinel,
+  // which is put back here for the owner's real words.
+  const { PRESENTED_OVER: sentinel } = await import('../../src/interact/target-text.js');
+  const built = (await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js')).PRESENTED_STOP;
+  const PRESENTED_STOP = built.replace(sentinel, PRESENTED_OVER);
   const { PRESENTED_OVER_THE_ELEMENT } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>('../../src/verify/pixel-poll.js');
   return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT };
 }
@@ -292,7 +296,8 @@ describe('tool descriptions on a screen presented over the target', () => {
   });
 
   it('troubleshooting: the entry, the wrapper sentence as the code has it, and the picker\'s exception over another screen', async () => {
-    const { PRESENTED_OVER } = await actualSentences();
+    const { PRESENTED_OVER, PRESENTED_STOP } = await actualSentences();
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${PRESENTED_STOP}, so none was sent\` (or \`so no further swipe was sent\`).`);
     expect(TROUBLESHOOTING).toContain(
       `- **\`… ${PRESENTED_OVER}\`** (tap or \`scroll_until\`): the target lies on the screen beneath a modal or sheet that is still up — whatever else keeps it from a tap (its centre under that screen, off the screen, under the status bar or under the soft keyboard, or a cut at its scroll container's edge), a tap says this in place of that remedy (\`scroll_until it first\`, the status bar's advice, hiding the keyboard); nothing was tapped and no further swipe was sent.`,
     );
