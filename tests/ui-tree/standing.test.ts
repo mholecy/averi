@@ -1312,6 +1312,13 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(sceneOf(tree).standing(byId(tree, 'Uganda'), IPHONE, TAP).kind).toBe('reachable');
   });
 
+  it('a scroll view laid out above the keyboard (ending at its line, 566): a covered field\'s tap is moved to a piece still said to lie above the soft keyboard', () => {
+    const field = node({ role: 'textfield', identifier: 'code', rect: r(36, 300, 330, 100) });
+    const scroll = node({ role: 'scrollable', rect: r(0, 0, 402, 566), children: [field, node({ role: 'button', label: 'Show', rect: r(36, 340, 330, 52) })] });
+    const tree = node({ role: 'container', rect: box(402, 874), children: [scroll] });
+    expect(said(sceneOf(tree).standing(field, IPHONE, { of: 'tap', keyboardTop: wda(566) }))).toMatchObject({ kind: 'reachable', moved: { aboveKeyboard: true } });
+  });
+
   it('unchanged where frames are already cut or nothing scrolls: the same rows on a tree with nothing that scrolls, on Android (a clipsDescendants scroller) and on idb\'s flat list', () => {
     const { tree, name, street } = atRest();
     const [form, bar] = tree.children;

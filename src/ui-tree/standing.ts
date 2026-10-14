@@ -1044,8 +1044,11 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): TapJudgement {
   const { scene, node } = judged;
   // Less the system bands, and only what its scroll views draw (the drawn frame).
-  const box = drawnFrame(judged, systemBands(chosen, bands).clear);
+  const clear = systemBands(chosen, bands).clear;
+  const box = drawnFrame(judged, clear);
   const within = aboveLine(box, line);
+  // Whether the line cuts the screen, not the drawn frame: a scroll view laid out above the keyboard ends at its line.
+  const aboveKeyboard = aboveLine(clear, line) !== clear;
   const unwitnessed = line?.witnessed === false ? line : undefined;
   const frame = unwitnessed === undefined ? box : within;
   const { facts, seen } = factsIn(judged, frame);
@@ -1053,7 +1056,6 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
   const cover = (): TapJudgement | undefined => {
     const over = seen.centreCover;
     if (over === undefined) return undefined;
-    const aboveKeyboard = within !== box;
     const piece = within === frame ? seen : scene.order.exposure(node, within);
     if (piece.tapAt === undefined) return { facts, kind: 'covered', cover: over, ...(piece.largest !== undefined && { largest: piece.largest }), aboveKeyboard };
     if (!piece.tapAt.moved) return { facts, kind: 'reachable', at: piece.tapAt.point };
