@@ -71,7 +71,7 @@ const ROLE_MAP: Record<string, string> = {
  * "1"/"0" strings; invisible nodes are KEPT — iOS keeps off-screen nodes in
  * its tree and the assert layer relies on that (see `absent` in flow/config).
  * `isVisible` is read for three purposes: whether a `Keyboard` is on screen
- * (keyboardMarks, since 2026-10-07); with `isAccessible`, which subtrees are
+ * (keyboardMarks); with `isAccessible`, which subtrees are
  * HIDDEN (`hiddenRoots`, `UiNode.hidden`); and whether a cell's content is
  * PARKED (`parkedIn`). The normalized node carries neither flag itself.
  * `placeholderValue` (since 2026-10-09) is the text XCUITest says the field
@@ -233,8 +233,8 @@ function isTextEcho(el: WdaElement, node: UiNode): boolean {
  * parked. Parked: `isVisible="0"`, with a rect of area that shares none with that cell's (an edge in common is none,
  * `rectsOverlap`).
  *
- * Measured on stock Contacts' New Contact sheet (iPhone 17 simulator, iOS 27.0, WDA 16.1.7; on 2026-10-09 and again
- * on 2026-10-14, tests/fixtures/wda-capture-contacts-new-contact.json): UIKit has not laid out the cells below the
+ * Measured on stock Contacts' New Contact sheet (iPhone 17 simulator, iOS 27.0, WDA 16.1.7, twice;
+ * tests/fixtures/wda-capture-contacts-new-contact.json): UIKit has not laid out the cells below the
  * fold, and WDA lists every element of such a cell — its label, its `Insert` button and that button's image, its
  * separator, the Notes cell's text view — at a PARKED frame, `0,62 286x22` and the like: the element's size, at the
  * sheet's origin, inside the viewport, while the cell itself lies where it is, `add instant message` at `20,1306
@@ -277,7 +277,7 @@ const isZero = (flag: string | number | null | undefined): boolean => flag !== u
  * The roots of the HIDDEN SUBTREES (`UiNode.hidden`): an element WDA reports `isVisible="0"` and `isAccessible="0"`,
  * every element of whose subtree is `isVisible="0"`. A descendant's `isAccessible` is not consulted.
  *
- * Measured 2026-10-14 (iPhone 17 simulator, iOS 27.0, WDA 16.1.7; the raw `/source` captures in
+ * Measured on the iPhone 17 simulator (iOS 27.0, WDA 16.1.7; the raw `/source` captures in
  * tests/fixtures/wda-capture-*.json):
  * - mp-native's SWIFT form pushed over the tab host: the host's hidden tab bar is listed after the form at y 711 —
  *   each `nav.tab_*` Button `0/0`, its icon Image (same rect) `isVisible "0"` but `isAccessible "1"`. So "the whole
@@ -287,10 +287,11 @@ const isZero = (flag: string | number | null | undefined): boolean => flag !== u
  * - Account Detail with the bar SHOWN: the same buttons at y 755 are `1/1`. Their host `Other 0,0 402x874` is `0/0`
  *   in BOTH states, but its content child is `isVisible "1"` — so the host is no root, and its visible content is
  *   never dropped. That is why every descendant's `isVisible` is asked, not the root's alone.
- * - Why `isAccessible` on the root at all, when `isVisible` alone would give the same roots on these captures: WDA's
- *   `isVisible` is 0 for nodes really drawn but occluded too (the SWIFT form's `payee_name_input` under CONTINUE, the
- *   screen's full-screen `Toolbar`), and an occluded control is still accessible; asking both on the root keeps a
- *   drawn, accessible node from being called hidden on visibility alone (the owner's choice between the two).
+ * - Why `isAccessible` on the root at all: WDA's `isVisible` is 0 for nodes really drawn but occluded too (the SWIFT
+ *   form's `payee_name_input` under CONTINUE, the screen's full-screen `Toolbar`), and an occluded control is still
+ *   accessible; asking both on the root keeps a drawn, accessible node from being called hidden on visibility alone
+ *   (the owner's choice between the two). On Account Detail with the bar shown, `isVisible` alone would call 114 of
+ *   the 203 nodes hidden where this rule calls 102.
  *
  * Bottom-up, once per payload, beside `keyboardMarks`: each element's subtree is judged from its children's answers,
  * so no subtree is walked twice. Roots inside a root are collected too; `toUiNode` hands the flag down either way.
