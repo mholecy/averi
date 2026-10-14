@@ -188,10 +188,10 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
 
   it('tap and troubleshooting say the refusal names the wrapper\'s one small control, and that a tab bar\'s host gets no such line', () => {
     const SENTENCE =
-      'When such a wrapper holds one child only, a control of at most a quarter of its area, the refusal says so in place of "scroll_until it first": \'the wrapper may only position its one child, <child>: tap that child when it is the target, or scroll_until it out of the wrapper\'s band first\'; a wrapper of several children (a tab bar\'s host) gets no such line.';
+      'When such a wrapper holds one child only, a control of at most a quarter of its area, the refusal says so in place of "scroll_until it first": \'the wrapper may only position its one child, <child>: tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first\'; a wrapper of several children (a tab bar\'s host) gets no such line.';
     expect(description('tap')).toContain(SENTENCE);
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(
-      'When the wrapper holds one child only, a control of at most a quarter of its area, the refusal ends `… — the wrapper may only position its one child, <child>: tap that child when it is the target, or scroll_until it out of the wrapper\'s band first` instead; a wrapper of several children (a tab bar\'s host) gets no such line.',
+      'When the wrapper holds one child only, a control of at most a quarter of its area, the refusal ends `… — the wrapper may only position its one child, <child>: tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first` instead; a wrapper of several children (a tab bar\'s host) gets no such line.',
     );
   });
 

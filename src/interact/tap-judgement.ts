@@ -347,7 +347,7 @@ function positionerRemedy(cover: UiNode): string | undefined {
   if (!STRUCTURAL_ROLES.has(cover.role) || cover.children.length !== 1) return undefined;
   const [child] = cover.children;
   if (!isInteractive(child) || !(rectArea(child.rect) <= rectArea(cover.rect) * SMALL_CHILD_FRACTION)) return undefined;
-  return `the wrapper may only position its one child, ${nodeText(child)}: tap that child when it is the target, or scroll_until it out of the wrapper's band first`;
+  return `the wrapper may only position its one child, ${nodeText(child)}: tap that child when it is the target; otherwise scroll_until this element out of the wrapper's band first`;
 }
 
 /** The on-screen rule's refusal of a centre off the screen or under a system bar (the module's doc). */

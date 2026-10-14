@@ -339,14 +339,14 @@ describe('judgeTap(…).aim() — a wrapper over the target holding one small co
       ],
     });
 
-  it('Clock\'s chevron beside the FAB: refused naming the host, and the refusal says the host may only position its FAB — tap that when it is the target, or scroll_until it out of the host\'s band', async () => {
+  it('Clock\'s chevron beside the FAB: refused naming the host, and the refusal says the host may only position its FAB — tap that when it is the target, otherwise scroll_until the target out of the host\'s band', async () => {
     expect(said((await judge(clock(), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toBe(
       'CoveredRefusal: Expand 9:00 AM alarm is under container id:fab_container (0,1582 1080x352) at its centre (937,1599), drawn over it; only a 110x49 part of it shows, under the 65x65 a tap may be moved to — ' +
-        'the wrapper may only position its one child, button "Add alarm" (408,1626 264x264): tap that child when it is the target, or scroll_until it out of the wrapper\'s band first; nothing was tapped',
+        'the wrapper may only position its one child, button "Add alarm" (408,1626 264x264): tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first; nothing was tapped',
     );
     expect(said((await judge(clock(), 'onoff', { first: PIXEL })).outcome)).toBe(
       'CoveredRefusal: onoff is under container id:fab_container (0,1582 1080x352) at its centre (921,1834), drawn over it; nothing of it shows — ' +
-        'the wrapper may only position its one child, button "Add alarm" (408,1626 264x264): tap that child when it is the target, or scroll_until it out of the wrapper\'s band first; nothing was tapped',
+        'the wrapper may only position its one child, button "Add alarm" (408,1626 264x264): tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first; nothing was tapped',
     );
   });
 
