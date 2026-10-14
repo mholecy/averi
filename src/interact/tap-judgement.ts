@@ -336,7 +336,7 @@ const SMALL_CHILD_FRACTION = 0.25;
 
 /**
  * The remedy for a target under a WRAPPER that may only position its one child: a structural node (`container`,
- * `other`) whose only child is a control (selectors.ts#isInteractive) of at most `SMALL_CHILD_FRACTION` of its area —
+ * `other`) whose only child is a control (selectors.ts#isInteractive) of some area, at most `SMALL_CHILD_FRACTION` of its own —
  * Android's floating action button host (Clock's `fab_container` 1080x352 holding its 264x264 FAB, 18 % of it). Such a
  * wrapper still counts as drawn over its whole rect (draw-order.ts's `structural` row: the tree cannot tell it from a
  * tab bar's host that swallows touches), so the refusal stands; this says what to do instead of only scrolling. A host
@@ -346,7 +346,8 @@ const SMALL_CHILD_FRACTION = 0.25;
 function positionerRemedy(cover: UiNode): string | undefined {
   if (!STRUCTURAL_ROLES.has(cover.role) || cover.children.length !== 1) return undefined;
   const [child] = cover.children;
-  if (!isInteractive(child) || !(rectArea(child.rect) <= rectArea(cover.rect) * SMALL_CHILD_FRACTION)) return undefined;
+  const area = rectArea(child.rect);
+  if (!isInteractive(child) || !(area > 0 && area <= rectArea(cover.rect) * SMALL_CHILD_FRACTION)) return undefined;
   return `the wrapper may only position its one child, ${nodeText(child)}: tap that child when it is the target; otherwise scroll_until this element out of the wrapper's band first`;
 }
 

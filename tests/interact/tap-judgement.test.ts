@@ -364,6 +364,20 @@ describe('judgeTap(…).aim() — a wrapper over the target holding one small co
     expect(said((await judge(clock(label), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
   });
 
+  it('a screen presented over the target wins over the hint: the RN modal\'s card made a wrapper of one small button still says close it first', async () => {
+    const tree = structuredClone((JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens.finportalForgot);
+    const modal = find(tree, 'forgot_modal');
+    modal.children = [node({ role: 'button', identifier: 'forgot_send', label: 'Send', rect: rect(32, 317, 80, 40) })];
+    expect(said((await judge(tree, 'login_title', { first: IPHONE })).outcome)).toBe(
+      'CoveredRefusal: login_title is under container id:forgot_modal (16,301 370x220) at its centre (201,303), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
+    );
+  });
+
+  it('a child of no area is no control to point at: no hint', async () => {
+    const empty = node({ role: 'button', label: 'Add alarm', identifier: 'fab', rect: rect(408, 1626, 0, 0) });
+    expect(said((await judge(clock(empty), 'Expand 9:00 AM alarm', { first: PIXEL })).outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
+  });
+
   it('a tab bar\'s host (several tabs, mp-native\'s Compose host 66,1840 948x248) gets no hint: it may swallow touches — scroll_until it first', async () => {
     const tab = (i: number, id: string): UiNode => node({ role: 'button', identifier: id, rect: rect(102 + 219 * i, 1876, 219, 176) });
     const tree = node({
