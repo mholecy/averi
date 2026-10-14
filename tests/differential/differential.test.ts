@@ -32,7 +32,9 @@ beforeAll(async () => {
   ];
 });
 
-describe('compareRecording', () => {
+// Each test replays the sample through both sides — about a second alone, past the default 5 s on a loaded machine (a
+// harness run beside it), and a test cut off at 5 s keeps running into the next one's fake device. 30 s is the budget.
+describe('compareRecording', { timeout: 30_000 }, () => {
   it('the same code on both sides: every call of every variant answers alike on the sample', async () => {
     for (const r of sample) {
       const result = await compareRecording(r, side, side, { cap: 3 });

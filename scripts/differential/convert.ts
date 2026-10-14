@@ -177,7 +177,9 @@ export function classify(text: string, platform: 'ios' | 'android', file = ''): 
  *    `<name>.snapshot.json`. A device check saves the raw payload beside the `ui_snapshot` of the same screen under
  *    the same name (`acct2.xml` beside `acct2.txt`, `contacts-list-wda.json` beside `contacts-list-wda.txt`), so the
  *    normalized tree cannot take the raw one's extension — and a normalized Android tree is no dump and is never
- *    named `.xml`. A normalized `.json` keeps its name so the tree ids of earlier runs stay what their reports quote.
+ *    named `.xml`. Only a normalized tree saved as `.json` keeps the id it had before this rule; one saved under another
+ *    extension moved, so an id quoted before it now reads `….snapshot.json` (`run14-ios/B1-idb-swift.json` is
+ *    `run14-ios/B1-idb-swift.snapshot.json`).
  */
 export function corpusName(rel: string, c: Extract<Classified, { kind: 'capture' }>): string {
   const flat = rel.replaceAll('/', '.');

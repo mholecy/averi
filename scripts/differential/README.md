@@ -98,7 +98,7 @@ the manifest names none — and a tree's id in a report is `<run>/<file>`:
   "note": "optional",
   "captures": [
     { "file": "D-swift-form.json", "source": "wda", "form": "raw", "app": "Skeleton Internal" },
-    { "file": "B2-idb-iban.json", "source": "idb", "form": "normalized" }
+    { "file": "B2-idb-iban.snapshot.json", "source": "idb", "form": "normalized" }
   ]
 }
 ```
@@ -127,6 +127,10 @@ A device-run file's name in the corpus (`convert.ts#corpusName`) is its path, su
   below (`acct2.xml` beside `acct2.txt`, `contacts-list-wda.json` beside `contacts-list-wda.txt`), is kept as two trees
   — `acct2.xml` and `acct2.snapshot.json` — and a normalized Android tree is never named `.xml`;
 - a tree the server logged is `session-<call>.json`.
+
+The ids of normalized trees saved as `.json` are what they were before this rule; those saved under another extension
+moved, so an id quoted before it now reads `….snapshot.json` (`run14-ios/B1-idb-swift.json` is
+`run14-ios/B1-idb-swift.snapshot.json`; run11–run14 Android's `snap*.xml` are `snap*.snapshot.json`).
 
 A raw payload saved as `.txt` or `.raw` beside a different `.json` of the same name (`x.txt` holding a WDA body
 beside `x.json`) still fails the conversion (`duplicate corpus file x.json`): rename one.
