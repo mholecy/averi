@@ -694,7 +694,7 @@ export async function pollPixels(
     const { shot, measured } = frame;
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
-    // Measured on the part its scroll views draw — the rect the standing asked what it reads of (the drawn frame).
+    // Measured on the part its scroll views draw (the drawn frame) — what the capture shows of it there.
     const verdict = await measure({ rect: drawnPart(rect, scene.clips.drawnIn(found[0])) ?? rect, shot, measured });
     // A failure no later round can change leaves the poll at once, as a refused capture does.
     if (verdict.final) throw new FinalMiss(verdict.detail);

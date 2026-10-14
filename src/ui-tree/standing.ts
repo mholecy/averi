@@ -99,11 +99,14 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     also when the screen's edge, or its scroll view's, leaves of it a
  *     sliver no thicker than the pixel slack (`thinSliver`) — not on a root
  *     of no area (`failsOpen`), nor for a rect of no area: no capture shows
- *     any of it (what it `reads` is asked of its drawn part, and the colour
- *     sample's region is clipped to the screen before it is inset,
- *     verify/capture.ts#clipThenInset, so a sliver on the screen is read
- *     as the sliver its sampler reads — the pixel poll measures the same
- *     drawn part, verify/pixel-poll.ts#pollPixels);
+ *     any of it (the sliver is measured on what it `reads` of its drawn
+ *     part, the region the pixel poll samples, verify/pixel-poll.ts
+ *     #pollPixels; and the colour sample's region is clipped to the screen
+ *     before it is inset, verify/capture.ts#clipThenInset, so a sliver on
+ *     the screen is read as the sliver its sampler reads). The bands and
+ *     the covers below are judged over what it reads of its WHOLE rect: a
+ *     cover over its undrawn part still fails it closed (the safe
+ *     direction, wider than the sampler's region);
  *   - under the band `keyboardTop` marks (`bandRect`) when the node's rect
  *     meets it at all — `underKeyboard`, before the system bands; its
  *     `keyboardTop` is idb's band only, the reading's frame being the
@@ -313,8 +316,12 @@ export type PixelPurpose = { readonly of: 'pixel'; readonly reads: PixelRegionOf
  */
 export type PixelRegionOf = (rect: Rect, box: Rect) => Rect;
 
-/** A pixel purpose with what it reads asked of the box (`PixelRegionOf`): the region judged. */
-type PixelRead = Omit<PixelPurpose, 'reads'> & { readonly reads: Rect };
+/**
+ * A pixel purpose with what it reads asked of the box (`PixelRegionOf`): `reads`, of the node's whole rect — the
+ * region its covers and the system bands are judged over; `drawnReads`, of the part of it its scroll views draw (the
+ * drawn frame) — the region the sampler reads, and a thin sliver's measure.
+ */
+type PixelRead = Omit<PixelPurpose, 'reads'> & { readonly reads: Rect; readonly drawnReads: Rect };
 
 /** The screen a standing is judged on: the usable screen's boxes and its system bands. */
 export type StandingScreen = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand' | 'navigationBand'>;
@@ -542,10 +549,15 @@ export function sceneOf(tree: UiNode): Scene {
       const single = singleBox(usable);
       // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
       const failsOpen = 'failsOpen' in usable && usable.failsOpen === true;
-      // What it reads is asked of the part of the node its scroll views draw (the drawn frame), the sampler's rect too.
+      // Covers and bands are judged over what it reads of its whole rect; a sliver and the sampler, of its drawn part
+      // (the drawn frame) — what lies over the undrawn rest still fails it closed, the safe direction.
       const drawn = failsOpen ? undefined : scene.clips.drawnIn(node);
       const rect = drawnPart(node.rect, drawn) ?? node.rect;
-      const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
+      const read: PixelRead = {
+        ...purpose,
+        reads: purpose.reads(node.rect, failsOpen ? node.rect : single.box),
+        drawnReads: purpose.reads(rect, failsOpen ? rect : single.box),
+      };
       const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, drawn), single.box, single, read, !listsAncestry(tree));
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
     }
@@ -765,7 +777,7 @@ function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
  * else on the screen.
  */
-function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean, drawn: Drawn | undefined): RegionPlace {
+function regionPlace(rect: Rect, { reads, drawnReads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean, drawn: Drawn | undefined): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
   if (on === undefined) return { off: 'wholly' };
   // Outside its scroll view next: on the box, but nothing of it drawn there — what lies there is not the element.
@@ -780,7 +792,7 @@ function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, b
     const band = bandRect(keyboardTop, box);
     if (rectsOverlap(rect, band)) return { keyboard: keyboardTop, band };
   }
-  const sliver = on === box ? undefined : thinSliver(rect, shown ?? on, on);
+  const sliver = on === box ? undefined : thinSliver(rect, shown ?? on, rectIntersection(drawnReads, box) ?? on);
   // The sliver its scroll view's edge leaves, that scroll view named; the screen's edge's, none.
   const cutBy = drawn === undefined || shown === undefined || sameRect(shown, onBox) ? undefined : scrollerOf(drawn, (frame) => !rectWithin(onBox, frame));
   if (sliver !== undefined) return { off: 'sliver', on: sliver, ...(cutBy !== undefined && { scroller: cutBy }) };

@@ -56,8 +56,10 @@ was reported done at (201,827), 3 pt below CONTINUE.
   close it first). No new kind.
 - **The thin sliver at the scroll view's edge** as at the screen's (ADR 0002's slack), named with the scroll view
   (`TOO_THIN_IN_ITS_SCROLL_VIEW`).
-- **What the assert reads** is asked of the element's drawn part, and the pixel poll measures that same part: the judge
-  and the sampler share the scroll view's clip as they share the screen's (`verify/capture.ts#clipThenInset`).
+- **The sampler reads the element's drawn part**, and the thin sliver is judged on what the assert reads of it. What
+  lies over the element — the system bands and the covers — is still judged over what the assert reads of its WHOLE
+  rect: a cover over its undrawn part (CONTINUE over a row running past its form's edge) fails it closed, as before.
+  The judged region holds the sampled one, the safe direction: no element that failed for a cover now passes.
 - Before idb's band: idb is flat, so its band never meets this rule.
 - The same frame cuts the tap's and `scroll_until`'s judgement (`ui-tree/standing.ts#Scene`, "THE DRAWN FRAME"), so the
   verbs agree: the tap refuses naming the scroll view (after the keyboard guard, since a scroll view laid out above

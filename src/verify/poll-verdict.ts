@@ -51,8 +51,8 @@ export interface FinalVerdict {
 export interface PixelMeasureInput {
   /**
    * The first `findBySpec` match's rect — the same duplicate-id rule as rect-parity — from the tree handed to the
-   * capture, cut to what its scroll views draw (ui-tree/geometry.ts#Clips.drawnIn: a WDA tree's drawn frame), the rect
-   * the pixel standing asked what the measurement reads of.
+   * capture, cut to what its scroll views draw (ui-tree/geometry.ts#Clips.drawnIn: a WDA tree's drawn frame) — what
+   * the capture shows of it.
    */
   rect: Rect;
   /** The settled screenshot bytes. */

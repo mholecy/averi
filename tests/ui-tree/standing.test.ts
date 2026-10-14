@@ -1283,11 +1283,13 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(sceneOf(t2).standing(inside, IPHONE, PLAIN).facts.visible).toBeCloseTo(60 / 70);
   });
 
-  it('a cover over the undrawn part is over nothing drawn: a row 700–800 with CONTINUE over its undrawn 780–800 is measured on its drawn part', () => {
+  it('a cover over the undrawn part still fails the pixel assert closed — the safe direction: a row 700–800 with CONTINUE over its undrawn 780–800; with nothing over it, measured', () => {
     const tall = node({ role: 'button', identifier: 'tall', rect: r(24, 700, 354, 100) });
     const { tree } = atRest(tall);
-    expect(sceneOf(tree).standing(tall, IPHONE, COLOUR(tall)).kind).toBe('reachable');
-    expect(sceneOf(tree).standing(tall, IPHONE, OCR(tall)).kind).toBe('reachable');
+    expect(said(sceneOf(tree).standing(tall, IPHONE, COLOUR(tall)))).toMatchObject({ kind: 'covered', cover: 'continue' });
+    expect(said(sceneOf(tree).standing(tall, IPHONE, OCR(tall)))).toMatchObject({ kind: 'covered', cover: 'continue' });
+    const bare = { ...tree, children: [tree.children[0]] };
+    expect(sceneOf(bare).standing(tall, IPHONE, COLOUR(tall)).kind).toBe('reachable');
   });
 
   it('the thin sliver at the scroll view\'s edge as at the screen\'s (ADR 0002\'s slack): 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
@@ -1297,8 +1299,8 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     const sliver = sceneOf(tree).standing(two, IPHONE, OCR(two));
     expect(said(sliver)).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
     expect(sliver.kind === 'offScreen' && 'sliver' in sliver && sliver.sliver).toEqual(r(24, 778, 354, 2));
-    // 3 pt drawn: measured — CONTINUE lies over the undrawn rest only.
-    expect(sceneOf(tree).standing(three, IPHONE, OCR(three)).kind).toBe('reachable');
+    // 3 pt drawn: no sliver — judged on, here under CONTINUE, which lies over its undrawn rest.
+    expect(said(sceneOf(tree).standing(three, IPHONE, OCR(three)))).toMatchObject({ kind: 'covered', cover: 'continue' });
   });
 
   it('the country sheet\'s list ending at 811: its row `Ukraine` 31,825 340x43 is judged outside the list by every verb', () => {
