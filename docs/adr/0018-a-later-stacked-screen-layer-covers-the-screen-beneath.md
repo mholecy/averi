@@ -383,7 +383,12 @@ above the harness's keyboard band at 481, (201,699) for strokes down.
    architecture review of rounds 13–15: presented wins over the bar in every verb — the tap had said "it lies in a
    scroll view — scroll_until it first" there while the pixel assert said "close it first" and `scroll_until`
    stopped `presented`; one precedence, presented first, is decided once in `ui-tree/standing.ts#Remedy`, so the tap
-   off the screen beneath a presented screen says it too, in place of "scroll_until it with fully: true first"). Only
+   off the screen beneath a presented screen says it too, in place of "scroll_until it with fully: true first", and so
+   does whatever else keeps a target beneath such a screen from reach — a tap on a sliver its scroll container cuts,
+   or with its centre under idb's keyboard band, and a pixel assert on an element that may be cut at the navigation
+   bar or that idb's band meets: the cut or the keyboard is still named, the presented screen's remedy replaces its
+   own. A keyboard the device reports over a pixel assert's element is still named first, with its own advice (ADR
+   0010): that reading is asked before any standing). Only
    with no status band known (a screen read without one, or no screen) is that tap moved above the form, to (201,26)
    on its uncovered 402x52 — under the status bar. On a medium-detent sheet the area above it is that dim, and a tap
    there may dismiss the sheet.
