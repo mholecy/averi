@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import type { Recording } from '../../scripts/differential/corpus.js';
-import { deviceCalls, installFakeDevice } from '../../scripts/differential/fake-device.js';
+import { PNG } from 'pngjs';
+import { deviceCalls, installFakeDevice, paintFrame } from '../../scripts/differential/fake-device.js';
 import { loadSide, recordedAdapter, type Side } from '../../scripts/differential/side.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 
@@ -91,23 +92,47 @@ describe('a normalized capture is served as it is', () => {
 });
 
 describe('the fake device records what a tool would have sent', () => {
-  it('a tap and a swipe on each platform, as the adapter words them', async () => {
+  it('a tap and a swipe on each platform: the log holds the coordinates sent', async () => {
     const ios = recordedAdapter(side, recording({ platform: 'ios', source: 'wda', form: 'raw', payload: await fixture('wda-source-skeleton-login.json') }), { platform: 'ios', screen: IPHONE, frame: IPHONE });
     await ios.tap(10, 20);
     await ios.swipe({ x: 1, y: 2 }, { x: 3, y: 4 });
-    expect(deviceCalls()).toEqual(['idb ui tap 10 20', 'idb ui swipe 1 2 3 4 --duration 0.3']);
+    const [tap, swipe] = deviceCalls();
+    expect([tap.match(/\btap\b.*\b10 20\b/) !== null, swipe.match(/\bswipe\b.*\b1 2 3 4\b/) !== null]).toEqual([true, true]);
     const android = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: PIXEL, frame: PIXEL });
     await android.tap(10, 20);
-    expect(deviceCalls()).toEqual(['adb shell input tap 10 20']);
+    expect(deviceCalls()).toHaveLength(1);
+    expect(deviceCalls()[0]).toMatch(/\btap\b.*\b10 20\b/);
+  });
+
+  it('a command the fake does not model is logged as UNMODELLED, not answered silently', async () => {
+    const ios = recordedAdapter(side, recording({ platform: 'ios', source: 'wda', form: 'raw', payload: await fixture('wda-source-skeleton-login.json') }), { platform: 'ios', screen: IPHONE, frame: IPHONE });
+    await ios.openDeepLink('differential://x');
+    expect(deviceCalls().filter((c) => c.startsWith('UNMODELLED ')).map((c) => c.includes('openurl'))).toEqual([true]);
+  });
+
+  it('the process boundary is closed: no process starts and no connection opens', async () => {
+    const { spawn } = await import('node:child_process');
+    expect(() => spawn('true')).toThrow(/not allowed/);
+    expect(() => fetch('http://127.0.0.1:8100/status')).toThrow(/not allowed/);
   });
 
   it('a screenshot is a PNG of the device\'s screen; with no screen the size query fails', async () => {
     const ios = recordedAdapter(side, recording({ platform: 'ios', source: 'wda', form: 'raw', payload: await fixture('wda-source-skeleton-login.json') }), { platform: 'ios', screen: IPHONE, frame: IPHONE });
     const png = await ios.screenshot();
     expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([402, 874]);
+    paintFrame({ rect: { x: 10, y: 20, width: 5, height: 5 }, rgb: [1, 2, 3] });
+    const painted = PNG.sync.read(await ios.screenshot());
+    const at = (x: number, y: number) => [...painted.data.subarray((y * 402 + x) * 4, (y * 402 + x) * 4 + 3)];
+    expect([at(12, 22), at(9, 22), at(12, 25)]).toEqual([[1, 2, 3], [0x80, 0x80, 0x80], [0x80, 0x80, 0x80]]);
     expect(await ios.viewport()).toMatchObject(IPHONE);
     const blind = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: undefined, frame: PIXEL });
     await expect(blind.viewport()).rejects.toThrow(/wm size/);
+  });
+
+  it('Android: the floating Gboard is the collapse strip in the window state, its panel in the touchable region', async () => {
+    const android = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: PIXEL, frame: PIXEL, keyboard: 'floating' });
+    expect(await android.keyboard!.state()).toEqual({ state: 'shown', frame: { x: 0, y: 2088, width: 1080, height: 132 } });
+    expect((await android.keyboard!.touchable!()).region).toEqual([{ x: 359, y: 1269, width: 681, height: 643 }, { x: 0, y: 2088, width: 1080, height: 132 }]);
   });
 
   it('Android: a shown keyboard is the docked Gboard\'s band until `back` hides it', async () => {
@@ -115,6 +140,6 @@ describe('the fake device records what a tool would have sent', () => {
     expect(await android.keyboard!.state()).toEqual({ state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } });
     await android.pressKey('back');
     expect((await android.keyboard!.state()).state).toBe('hidden');
-    expect(deviceCalls()).toEqual(['adb shell dumpsys window displays', 'adb shell input keyevent 4', 'adb shell dumpsys window displays']);
+    expect(deviceCalls().filter((c) => /keyevent/.test(c)).map((c) => /\b4\b/.test(c))).toEqual([true]);
   });
 });

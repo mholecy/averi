@@ -33,20 +33,25 @@ export interface Side {
 }
 
 export async function loadSide(root: string): Promise<Side> {
-  const at = (path: string) => import(pathToFileURL(resolve(root, path)).href);
+  const at = async (path: string, names: readonly string[]): Promise<Record<string, unknown>> => {
+    const mod = (await import(pathToFileURL(resolve(root, path)).href)) as Record<string, unknown>;
+    // A side that renamed or dropped one of the four is refused here, by name — not later as "x is not a function".
+    for (const name of names) if (typeof mod[name] !== 'function') throw new Error(`side ${root}: ${path} has no export ${name}`);
+    return mod;
+  };
   const [tools, registry, ios, wda] = await Promise.all([
-    at('src/mcp/tools.ts'),
-    at('src/mcp/registry.ts'),
-    at('src/adapters/ios.ts'),
-    at('src/adapters/wda-source.ts'),
+    at('src/mcp/tools.ts', ['createAveriServer']),
+    at('src/mcp/registry.ts', ['AdapterRegistry', 'defaultFactory']),
+    at('src/adapters/ios.ts', ['IosAdapter']),
+    at('src/adapters/wda-source.ts', ['parseWdaSourceValue']),
   ]);
   return {
     root: resolve(root),
-    createAveriServer: tools.createAveriServer,
-    AdapterRegistry: registry.AdapterRegistry,
-    defaultFactory: registry.defaultFactory,
-    IosAdapter: ios.IosAdapter,
-    parseWdaSourceValue: wda.parseWdaSourceValue,
+    createAveriServer: tools.createAveriServer as Side['createAveriServer'],
+    AdapterRegistry: registry.AdapterRegistry as Side['AdapterRegistry'],
+    defaultFactory: registry.defaultFactory as Side['defaultFactory'],
+    IosAdapter: ios.IosAdapter as Side['IosAdapter'],
+    parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
   };
 }
 

@@ -6,19 +6,20 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadCorpus, type Recording } from './corpus.js';
-import type { CallResult, RecordingResult, ToolName } from './differential.js';
+import { groupDiffs, type RecordingResult, type ToolName } from './differential.js';
 
 /**
  * The differential harness's command line (README.md beside this file).
  *
- *   node --import tsx scripts/differential/run.ts --old <git ref | path> [--new <path>] --corpus <dir>
+ *   node --import tsx scripts/differential/run.ts --old <git ref | path> [--new <git ref | path>] --corpus <dir>
  *        [--out <dir>] [--shards N] [--cap N] [--tools tap,scroll_until,…] [--only <regex on tree id>]
  *        [--worktrees <dir>] [--all]
  *
- * OLD is a code root, or a git ref checked out (detached) in a temporary
- * worktree under `--worktrees` (default the OS temp dir) with this
- * checkout's node_modules linked in, and removed afterwards. NEW defaults to
- * this checkout. The corpus is run by `--shards` processes (default the CPU
+ * OLD and NEW are each a code root or a git ref checked out (detached) in a
+ * temporary worktree under `--worktrees` (default the OS temp dir) with
+ * this checkout's node_modules linked in, and removed afterwards. NEW
+ * defaults to this checkout. One checkout on both sides is refused: its
+ * modules would be compared with themselves. The corpus is run by `--shards` processes (default the CPU
  * count), each taking the next unclaimed tree, costliest first; each writes its results, and this process merges them
  * into `<out>/report.md` (counts, the diffs grouped by what changed) and
  * `<out>/diffs.jsonl` (every differing call, both outcomes). `--all` also
@@ -100,31 +101,19 @@ async function shard(): Promise<void> {
 
 // --- the parent: resolve OLD, run the shards, merge ---
 
-function codeRoot(spec: string, worktrees: string): { root: string; cleanup?: () => void } {
+/**
+ * A side's code root: a path that holds averi's src/, or a git ref checked out detached in a worktree under
+ * `worktrees` (named for its role, so OLD and NEW at one commit are two checkouts), node_modules linked in. Only a
+ * worktree this run created is removed afterwards — one found in place is someone's, and stays.
+ */
+function codeRoot(spec: string, role: 'old' | 'new', worktrees: string): { root: string; cleanup?: () => void } {
   if (existsSync(join(spec, 'src/mcp/tools.ts'))) return { root: resolve(spec) };
   const sha = execFileSync('git', ['-C', REPO, 'rev-parse', '--short', `${spec}^{commit}`], { encoding: 'utf8' }).trim();
-  const root = join(worktrees, `differential-old-${sha}`);
-  if (!existsSync(root)) {
-    execFileSync('git', ['-C', REPO, 'worktree', 'add', '--detach', root, sha], { stdio: 'ignore' });
-    symlinkSync(realpathSync(join(REPO, 'node_modules')), join(root, 'node_modules'));
-  }
+  const root = join(worktrees, `differential-${role}-${sha}`);
+  if (existsSync(root)) return { root };
+  execFileSync('git', ['-C', REPO, 'worktree', 'add', '--detach', root, sha], { stdio: 'ignore' });
+  symlinkSync(realpathSync(join(REPO, 'node_modules')), join(root, 'node_modules'));
   return { root, cleanup: () => execFileSync('git', ['-C', REPO, 'worktree', 'remove', '--force', root], { stdio: 'ignore' }) };
-}
-
-/** A reply with its numbers and quoted selector values blurred — so one change seen on many trees groups as one. */
-const blur = (s: string) => s.replace(/"[^"]*"/g, '"…"').replace(/-?\d+(\.\d+)?/g, '#');
-
-function group(diffs: CallResult[]): [string, { count: number; trees: Set<string>; example: CallResult }][] {
-  const groups = new Map<string, { count: number; trees: Set<string>; example: CallResult }>();
-  for (const d of diffs) {
-    const what = d.old.reply === d.new.reply ? 'device calls only' : `OLD ${blur(d.old.reply).slice(0, 400)}\n   NEW ${blur(d.new.reply).slice(0, 400)}`;
-    const key = `${d.call.tool} — ${what}`;
-    const g = groups.get(key) ?? { count: 0, trees: new Set(), example: d };
-    g.count++;
-    g.trees.add(d.recording);
-    groups.set(key, g);
-  }
-  return [...groups].sort((a, b) => b[1].count - a[1].count);
 }
 
 async function parent(): Promise<void> {
@@ -132,8 +121,15 @@ async function parent(): Promise<void> {
   const worktrees = resolve(values.worktrees ?? tmpdir());
   const out = resolve(values.out ?? join(tmpdir(), `averi-differential-${Date.now()}`));
   await mkdir(out, { recursive: true });
-  const newRoot = resolve(values.new ?? REPO);
-  const old = codeRoot(values.old, worktrees);
+  const old = codeRoot(values.old, 'old', worktrees);
+  const neu = codeRoot(values.new ?? REPO, 'new', worktrees);
+  const newRoot = neu.root;
+  // One checkout on both sides shares its modules: the run would compare a module with itself, and say nothing.
+  if (realpathSync(old.root) === realpathSync(newRoot)) {
+    old.cleanup?.();
+    neu.cleanup?.();
+    throw new Error(`OLD and NEW are the same checkout (${realpathSync(newRoot)}): give one of them as a git ref or another path`);
+  }
   const shards = Number(values.shards ?? availableParallelism());
   const corpus: Recording[] = await loadCorpus(resolve(values.corpus));
   await rm(join(out, 'claims'), { recursive: true, force: true });
@@ -151,6 +147,7 @@ async function parent(): Promise<void> {
     );
   } finally {
     old.cleanup?.();
+    neu.cleanup?.();
   }
   const wall = Date.now() - t0;
   const parts: ShardOutput[] = [];
@@ -169,6 +166,13 @@ async function parent(): Promise<void> {
     byTool.set(tool, t);
   }
   const calls = results.reduce((a, r) => a + r.calls, 0);
+  const sleeps = parts.reduce((a, p) => a + p.sleeps, 0);
+  const unmodelled = new Map<string, number>();
+  for (const r of results) for (const [k, v] of Object.entries(r.unmodelled)) unmodelled.set(k, (unmodelled.get(k) ?? 0) + v);
+  const warnings = [
+    ...(sleeps === 0 && calls > 0 ? [`WARNING: ${calls} calls and no virtual sleep — the sleep owner (src/util/sleep.ts, clock.ts) may have moved: waits ran in real time`] : []),
+    ...(unmodelled.size > 0 ? [`WARNING: ${[...unmodelled.values()].reduce((a, b) => a + b, 0)} device commands the fake does not model (below)`] : []),
+  ];
   const parsed = results.filter((r) => r.parser === 'exercised').length;
   const lines = [
     `# Differential: ${values.old} → ${values.new ?? 'this checkout'}`,
@@ -177,11 +181,16 @@ async function parent(): Promise<void> {
     `NEW ${newRoot}  `,
     `corpus ${resolve(values.corpus)}: ${corpus.length} trees; this run ${results.length} (${parsed} raw — parser exercised; ${results.length - parsed} normalized — parser not exercised)  `,
     `${calls} calls, ${diffs.length} differing, on ${new Set(diffs.map((d) => d.recording)).size} trees  `,
-    `wall ${(wall / 1000).toFixed(1)} s over ${shards} shards (slowest shard ${(Math.max(...parts.map((p) => p.ms)) / 1000).toFixed(1)} s); ${parts.reduce((a, p) => a + p.sleeps, 0)} virtual sleeps`,
+    `wall ${(wall / 1000).toFixed(1)} s over ${shards} shards (slowest shard ${(Math.max(...parts.map((p) => p.ms)) / 1000).toFixed(1)} s); ${sleeps} virtual sleeps`,
+    ...warnings.map((w) => `${w}  `),
     '',
     '| tool | calls (each on both sides) | diffs | ms, both sides |',
     '|---|---|---|---|',
     ...[...byTool].sort().map(([t, c]) => `| ${t} | ${c.calls} | ${c.diffs} | ${Math.round(c.ms)} |`),
+    '',
+    '## Device commands the fake does not model',
+    '',
+    ...(unmodelled.size === 0 ? ['none'] : [...unmodelled].sort((a, b) => b[1] - a[1]).map(([k, v]) => `- ${v} × \`${k.slice('UNMODELLED '.length)}\``)),
     '',
     '## Trees with diffs',
     '',
@@ -190,11 +199,11 @@ async function parent(): Promise<void> {
     '## Diffs grouped (numbers and quoted values blurred)',
     '',
   ];
-  for (const [key, g] of group(diffs)) {
+  for (const [key, g] of groupDiffs(diffs)) {
     lines.push(`### ${g.count} × on ${g.trees.size} trees — ${key.split('\n')[0].slice(0, 200)}`, '', '```', key, '', `e.g. ${g.example.recording} [${g.example.variant}] ${JSON.stringify(g.example.call.args)}`, `   OLD ${g.example.old.reply}`, `       ${g.example.old.device.join(' | ')}`, `   NEW ${g.example.new.reply}`, `       ${g.example.new.device.join(' | ')}`, '```', '');
   }
   await writeFile(join(out, 'report.md'), lines.join('\n'));
-  console.log(lines.slice(0, 7).join('\n'));
+  console.log(lines.slice(0, 7 + warnings.length).join('\n'));
   console.log(`report: ${join(out, 'report.md')}`);
 }
 

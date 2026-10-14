@@ -16,26 +16,36 @@ import type { Platform, Screen } from './corpus.js';
  * the device between calls.
  *
  * It is also the guarantee that a differential run touches no device: every
- * other way to start a process (`spawn`, `exec`, the sync forms, `fork`)
- * throws, and an `execFile` of an unknown command fails as a missing binary.
+ * other way to start a process (`spawn`, `exec`, the sync forms, `fork`) and
+ * `fetch` throw, and an `execFile` of an unknown binary fails as a missing one.
+ * A command of a known binary this fake does not model is answered with
+ * nothing and logged as `UNMODELLED <command>` — the run counts them, so a
+ * tool that starts asking something new shows up instead of reading a silent
+ * empty answer.
  *
  * What it answers:
  *  - iOS: `idb describe --json` the screen in points (no screen: it fails),
  *    `idb ui describe-all --json` the recording's raw idb payload, `xcrun
- *    simctl io … screenshot <file>` a grey PNG written to the file, every
- *    `idb ui` input accepted, the app running (`launchctl list`), no log.
+ *    simctl io … screenshot <file>` the frame written to the file, every `idb
+ *    ui` input accepted; `simctl launch`, `terminate`, the accessibility
+ *    `defaults write`, `appinfo` (the recording's app as its display name),
+ *    the app running (`launchctl list`), no log.
  *  - Android: `uiautomator dump` the recording's raw XML, `wm size` the
- *    screen (no screen: it fails), `dumpsys window displays` the API 33
- *    Pixel_3a captures in tests/fixtures (keyboard hidden or shown), the
- *    `mInputShown` witness and the touchable region the docked Gboard's,
- *    `screencap -p` a grey PNG, every `input` accepted — and `input keyevent
- *    4` (back) hides a shown keyboard, as Gboard does; the app running
- *    (`pidof`), no log.
+ *    screen (no screen: it fails), `dumpsys window displays` a captured
+ *    device in tests/fixtures (API 33 Pixel_3a, keyboard hidden or shown; API
+ *    36 without an IME source), the `mInputShown` witness and the touchable
+ *    region (docked or floating Gboard, tests/helpers/android-dumps.ts's
+ *    measurements), `screencap -p` the frame, every `input` accepted — and
+ *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
+ *    running (`pidof`), no log.
+ *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
+ *    caller asks — what a colour assert on that rect must sample.
  *  - `swiftc` compiles nothing (an empty file where the binary goes), and
  *    the "recognizer" reads no text in any region.
  */
 
-export type KeyboardState = 'hidden' | 'shown';
+/** The soft keyboard: hidden, docked (the API 33 band), or floating (Gboard's panel over a collapsed strip). */
+export type KeyboardState = 'hidden' | 'shown' | 'floating';
 
 export interface DeviceProfile {
   platform: Platform;
@@ -49,22 +59,38 @@ export interface DeviceProfile {
   dumpXml?: string;
   /** Android: the soft keyboard at the start of each call. */
   keyboard?: KeyboardState;
+  /** Android: whose `dumpsys window displays` — the API 33 Pixel_3a (default) or the API 36 device with no IME source. */
+  displays?: 'api33' | 'api36';
+  /** iOS: the app's display name `simctl appinfo` answers. */
+  app?: string;
+}
+
+/** A rect of the frame, in its pixels, painted one colour. */
+export interface Paint {
+  rect: { x: number; y: number; width: number; height: number };
+  rgb: readonly [number, number, number];
 }
 
 interface DeviceState {
   profile: DeviceProfile;
   keyboard: KeyboardState;
+  paint?: Paint;
   calls: string[];
 }
 
 let current: DeviceState | undefined;
 
-/** Point the fake at a device for the calls that follow; the call log and the keyboard start over. */
+/** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
   current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [] };
 }
 
-/** The device calls made since `useDevice` (or the last `resetCalls`), consecutive repeats folded as `×N`. */
+/** Paint `paint.rect` of every frame until the next reset (one call). */
+export function paintFrame(paint: Paint): void {
+  if (current !== undefined) current.paint = paint;
+}
+
+/** The device calls made since `useDevice` (or the last `resetDevice`), consecutive repeats folded as `×N`. */
 export function deviceCalls(): string[] {
   const out: string[] = [];
   let last: string | undefined;
@@ -87,36 +113,58 @@ export function logCall(line: string): void {
   current?.calls.push(line);
 }
 
-/** A new call: an empty log, the profile's keyboard again. */
+/** A new call: an empty log, the profile's keyboard again, no paint. */
 export function resetDevice(): void {
   if (current !== undefined) useDevice(current.profile);
 }
 
-// --- PNG frames, one per size, built once ---
+// --- PNG frames, built once per size and paint ---
 
 const frames = new Map<string, Buffer>();
-function frame(screen: Screen): Buffer {
-  const key = `${screen.width}x${screen.height}`;
+function frame(screen: Screen, paint: Paint | undefined): Buffer {
+  const key = `${screen.width}x${screen.height} ${JSON.stringify(paint ?? null)}`;
   let png = frames.get(key);
   if (png === undefined) {
     const img = new PNG({ width: screen.width, height: screen.height });
     for (let i = 0; i < img.data.length; i += 4) img.data.set([0x80, 0x80, 0x80, 0xff], i);
-    // 8-bit greyscale: the same #808080 once decoded, a quarter of the bytes to inflate.
-    png = PNG.sync.write(img, { colorType: 0, inputColorType: 6 });
+    if (paint !== undefined) {
+      const x0 = Math.max(0, Math.round(paint.rect.x)), y0 = Math.max(0, Math.round(paint.rect.y));
+      const x1 = Math.min(screen.width, Math.round(paint.rect.x + paint.rect.width)), y1 = Math.min(screen.height, Math.round(paint.rect.y + paint.rect.height));
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) img.data.set([...paint.rgb, 0xff], (y * screen.width + x) * 4);
+    }
+    // 8-bit RGB (no alpha): a quarter less to inflate than RGBA, the same pixels once decoded.
+    png = PNG.sync.write(img, { colorType: 2, inputColorType: 6 });
     frames.set(key, png);
   }
   return png;
 }
 
-// --- the Android device profile: the API 33 Pixel_3a captures ---
+// --- the Android device profiles ---
 
 const FIXTURES = new URL('../../tests/fixtures/', import.meta.url);
-const displays = {
-  hidden: readFileSync(new URL('dumpsys-window-displays-api33-keyboard-hidden.txt', FIXTURES), 'utf8'),
-  shown: readFileSync(new URL('dumpsys-window-displays-api33-keyboard-shown.txt', FIXTURES), 'utf8'),
-};
+const fixture = (name: string) => readFileSync(new URL(name, FIXTURES), 'utf8');
+const API33 = { hidden: fixture('dumpsys-window-displays-api33-keyboard-hidden.txt'), shown: fixture('dumpsys-window-displays-api33-keyboard-shown.txt') };
+/** Floating Gboard (tests/helpers/android-dumps.ts GBOARD.floating): the IME inset is only the 132-px collapse strip. */
+const API33_FLOATING = API33.hidden
+  .replaceAll(
+    'InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false',
+    'InsetsSource type=ITYPE_IME frame=[0,2088][1080,2220] visibleFrame=[0,2088][1080,2220] visible=true',
+  )
+  .replaceAll('mIsImeShowing=false', 'mIsImeShowing=true');
+const API36 = fixture('dumpsys-window-displays-api36-no-ime-source.txt');
 const inputShown = (shown: boolean) => `  mShowRequested=${shown} mShowExplicitlyRequested=false mShowForced=false mInputShown=${shown}\n`;
-const touchable = (shown: boolean) => `  touchable region=SkRegion((0,${shown ? 1398 : 2088},1080,2220))\n`;
+const TOUCHABLE: Record<KeyboardState, string> = {
+  hidden: '  touchable region=SkRegion((0,2088,1080,2220))\n',
+  shown: '  touchable region=SkRegion((0,1398,1080,2220))\n',
+  floating: '  touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))\n',
+};
+
+function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
+  if (profile.displays === 'api36') return API36;
+  return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;
+}
+
+const appinfo = (name: string) => `{\n    CFBundleDisplayName = "${name}";\n    CFBundleIdentifier = "differential.app";\n    CFBundleName = "${name}";\n}\n`;
 
 // --- answering a command ---
 
@@ -142,31 +190,46 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
   const device = current;
   if (device === undefined) throw new CommandError(`differential: no device for ${cmd} ${args.join(' ')}`, 1);
   const { profile } = device;
+  const unmodelled = (line: string): string => {
+    device.calls.push(`UNMODELLED ${line}`);
+    return '';
+  };
   if (cmd === 'xcrun') {
     if (args[0] === '--find') return '/fake/simctl\n';
-    if (args[0] === 'simctl' && args[1] === 'io' && args[3] === 'screenshot') {
+    if (args[0] !== 'simctl') return unmodelled(`xcrun ${args.join(' ')}`);
+    const [, verb, , ...rest] = args;
+    if (verb === 'io' && rest[0] === 'screenshot') {
       device.calls.push('simctl screenshot');
-      writeFileSync(args[4], frame(profile.frame));
+      writeFileSync(rest[1], frame(profile.frame, device.paint));
       return '';
     }
-    // The app named in averi.yaml (differential.app) is running; its log is empty.
-    if (args[0] === 'simctl' && args[1] === 'spawn' && args[3] === 'launchctl') return 'PID\tStatus\tLabel\n1\t0\tUIKitApplication:differential.app[1][rb-legacy]\n';
-    device.calls.push(`xcrun ${args.join(' ')}`);
-    return '';
+    if (verb === 'spawn' && rest[0] === 'launchctl') return 'PID\tStatus\tLabel\n1\t0\tUIKitApplication:differential.app[1][rb-legacy]\n';
+    device.calls.push(`simctl ${verb} ${rest.join(' ')}`);
+    if (verb === 'spawn' && rest[0] === 'log') return '';
+    if (verb === 'spawn' && rest[0] === 'defaults') return '';
+    if (verb === 'launch') return `${rest[0]}: 4242\n`;
+    if (verb === 'terminate') return '';
+    if (verb === 'appinfo') return appinfo(profile.app ?? 'Differential');
+    return unmodelled(`simctl ${verb} ${rest.join(' ')}`);
   }
   if (cmd === 'idb') {
     const argv = args.slice(0, args.indexOf('--udid') === -1 ? undefined : args.indexOf('--udid'));
     const line = argv.join(' ');
-    device.calls.push(`idb ${line}`);
     if (line === 'describe --json') {
+      device.calls.push(`idb ${line}`);
       if (profile.screen === undefined) throw new CommandError('differential: idb describe answered nothing', 1);
       return JSON.stringify({ screen_dimensions: { width_points: profile.screen.width, height_points: profile.screen.height } });
     }
     if (line === 'ui describe-all --json') {
+      device.calls.push(`idb ${line}`);
       if (profile.idbPayload === undefined) throw new CommandError('differential: no idb payload recorded', 1);
       return profile.idbPayload;
     }
-    return '';
+    if (argv[0] === 'ui' && ['tap', 'swipe', 'text', 'key', 'key-sequence', 'button'].includes(argv[1])) {
+      device.calls.push(`idb ${line}`);
+      return '';
+    }
+    return unmodelled(`idb ${line}`);
   }
   if (cmd === 'adb') {
     const argv = args[0] === '-s' ? args.slice(2) : args;
@@ -178,22 +241,36 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     }
     if (argv[0] === 'exec-out' && argv[1] === 'screencap') {
       device.calls.push('adb screencap');
-      return frame(profile.frame);
+      return frame(profile.frame, device.paint);
     }
-    device.calls.push(`adb ${line}`);
-    if (argv[0] === 'get-state') return 'device\n';
-    if (argv[0] !== 'shell') return '';
-    if (argv[1]?.includes('pidof')) return '4242\n';
+    if (argv[0] === 'get-state') {
+      device.calls.push(`adb ${line}`);
+      return 'device\n';
+    }
+    if (argv[0] === 'logcat') {
+      device.calls.push(`adb ${line}`);
+      return '';
+    }
+    if (argv[0] !== 'shell') return unmodelled(`adb ${line}`);
     const shell = argv.slice(1).join(' ');
-    const shown = device.keyboard === 'shown';
+    device.calls.push(`adb shell ${shell}`);
+    const keyboard = device.keyboard;
+    if (shell.includes('pidof')) return '4242\n';
     if (shell === 'wm size') {
       if (profile.screen === undefined) throw new CommandError('differential: wm size answered nothing', 1);
       return `Physical size: ${profile.screen.width}x${profile.screen.height}\n`;
     }
-    if (shell === 'dumpsys window displays') return shown ? displays.shown : displays.hidden;
-    if (shell.startsWith('dumpsys input_method')) return shell.includes('touchable region') ? inputShown(shown) + touchable(shown) : inputShown(shown);
-    if (shell === 'input keyevent 4') device.keyboard = 'hidden';
-    return '';
+    if (shell === 'dumpsys window displays') return displays(profile, keyboard);
+    if (shell.startsWith('dumpsys input_method')) {
+      const shown = keyboard !== 'hidden';
+      return shell.includes('touchable region') ? inputShown(shown) + TOUCHABLE[keyboard] : inputShown(shown);
+    }
+    if (argv[1] === 'input') {
+      if (shell === 'input keyevent 4') device.keyboard = 'hidden';
+      return '';
+    }
+    device.calls.pop();
+    return unmodelled(`adb shell ${shell}`);
   }
   throw new CommandError(`spawn ${cmd} ENOENT`, 'ENOENT');
 }
@@ -226,7 +303,7 @@ function fakeExecFile(cmd: string, args: readonly string[] | undefined, opts: un
 }
 
 const refuse = (name: string) => () => {
-  throw new Error(`differential: ${name} is not allowed — the harness runs no process`);
+  throw new Error(`differential: ${name} is not allowed — the harness runs no process and opens no connection`);
 };
 
 let installed = false;
@@ -234,8 +311,9 @@ let installed = false;
 /**
  * Replace the process functions — before either side is imported, so their
  * `import { execFile } from 'node:child_process'` binds the fake
- * (syncBuiltinESMExports updates the ESM view of the builtin). Idempotent.
- * DEVELOPER_DIR is set so xcode-env.ts skips its `xcrun --find` probe.
+ * (syncBuiltinESMExports updates the ESM view of the builtin) — and `fetch`
+ * (WdaServer's transport). Idempotent. DEVELOPER_DIR is set so xcode-env.ts
+ * skips its `xcrun --find` probe.
  */
 export function installFakeDevice(): void {
   if (installed) return;
@@ -244,5 +322,6 @@ export function installFakeDevice(): void {
   cp.execFile = fakeExecFile;
   for (const name of ['spawn', 'exec', 'execSync', 'execFileSync', 'spawnSync', 'fork']) cp[name] = refuse(name);
   syncBuiltinESMExports();
+  globalThis.fetch = refuse('fetch') as unknown as typeof fetch;
   process.env.DEVELOPER_DIR = '/differential/fake/Developer';
 }
