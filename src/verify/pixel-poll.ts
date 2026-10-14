@@ -6,7 +6,7 @@ import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-positio
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { fullBleedHeader, pinnedSurface, sceneOf, screenSized, type Scene } from '../ui-tree/standing.js';
+import { fullBleedHeader, pinnedSurface, presentedRemedy, sceneOf, screenSized, underPresented, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -520,7 +520,8 @@ async function judgeOver(
     case 'covered': {
       const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
       const named = `${nodeText(standing.cover).slice(0, -1)}${reach})`;
-      const root = standing.overRoot === true ? 'root' : never;
+      // Under a screen presented over it (a modal, a sheet: ADR 0018) no scroll helps, whatever else it is — close that screen first.
+      const root = underPresented(standing.facts) ? 'presented' : standing.overRoot === true ? 'root' : never;
       return `${named} is drawn over the element ${at}) — ${coverRemedy(root ?? (pinned || rectWithin(element.rect, standing.reach) ? 'stuck' : 'scroll'))}`;
     }
     default: {
@@ -538,11 +539,13 @@ async function judgeOver(
  * for an element laid from the screen's top edge at full width, a full-bleed header, whose title, clear of the band,
  * is what to assert; `footer` — the same for a full-width surface laid to the screen's bottom edge (a bottom sheet),
  * whose content above the bar is what to assert; `root` — the screen, for idb's flat-list root,
- * whose cover is the app's own content laid on its background.
+ * whose cover is the app's own content laid on its background; `presented` — a screen is presented over the element
+ * (ui-tree/standing.ts#underPresented), which no scroll moves it out from under: close that screen first.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  */
-const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'footer' | 'root'): string => {
+const coverRemedy = (kind: 'scroll' | 'stuck' | 'screen' | 'header' | 'footer' | 'root' | 'presented'): string => {
   const child = 'assert something in it that lies clear of that';
+  if (kind === 'presented') return `the capture would show it, not the element; ${presentedRemedy('the element')}`;
   if (kind === 'root') return `that is content drawn over the root's background, which the capture would show, not the root; no scroll moves it — ${child}`;
   if (kind === 'screen') return `the capture would show it, not the element — ${child}; no scroll moves the screen itself out from under it`;
   if (kind === 'header') return `the capture would show it, not the element — ${child} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`;
