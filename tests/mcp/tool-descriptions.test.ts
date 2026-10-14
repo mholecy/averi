@@ -107,6 +107,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('ui_snapshot')).toContain('at its cell\'s rect');
   });
 
+  it('ui_snapshot: a hidden subtree\'s root is any element but a structural wrapper — a scroll view and a toolbar too, as adapters/wda-source.ts#hiddenRoots asks (STRUCTURAL_ROLES), not only a control, an image or a text', () => {
+    expect(description('ui_snapshot')).toContain('a subtree whose ROOT — any element but a structural wrapper —');
+    expect(description('ui_snapshot')).not.toContain('a control, an image or a text, never a wrapper');
+  });
+
   it('assert: the tree and the pixel assert budgets (ASSERT_TIMEOUT_MS, PIXEL_ASSERT_TIMEOUT_MS)', () => {
     expect(description('assert')).toContain('waits up to 3.25 s (tree asserts) or 12.25 s (color/ocr');
     expect(description('assert')).not.toMatch(/(?<![\d.])(3|12) s\b/);
