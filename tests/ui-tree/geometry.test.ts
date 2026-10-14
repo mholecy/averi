@@ -714,6 +714,53 @@ describe('clipsOf(tree).inScroller — some ancestor scrolls (scroll-containers.
   });
 });
 
+describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every ancestor that scrolls, on a tree of unclipped frames', () => {
+  const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+  const SCREEN_RECT = r(0, 0, 402, 874);
+  /** The at-rest SWIFT form's shape: a ScrollView ending at 780 above the pinned CONTINUE, a payee row listed below it. */
+  const form = () => {
+    const field = fakeNode({ role: 'textfield', identifier: 'payee_name_input', rect: r(24, 801, 354, 52) });
+    const row = fakeNode({ role: 'other', rect: r(24, 801, 354, 52), children: [field] });
+    const scroll = fakeNode({ role: 'scrollable', rect: r(0, 0, 402, 780), children: [fakeNode({ role: 'button', label: 'Top', rect: r(24, 120, 354, 52) }), row] });
+    const tree = fakeNode({ role: 'container', rect: SCREEN_RECT, children: [scroll, fakeNode({ role: 'button', label: 'Continue to summary', rect: r(24, 780, 354, 44) })] });
+    return { tree, scroll, row, field };
+  };
+
+  it("a row listed below its scroll view: drawn only in the scroll view's frame, the scroll view named", () => {
+    const { tree, scroll, row, field } = form();
+    const clips = clipsOf(tree, NESTED);
+    expect(clips.drawnIn(row)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll] });
+    expect(clips.drawnIn(field)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll] });
+  });
+
+  it('nested scrollers: the frames intersected, the nearest named first; scrollers that share nothing leave no frame', () => {
+    const card = fakeNode({ role: 'button', rect: r(378, 138, 354, 120) });
+    const carousel = fakeNode({ role: 'scrollable', rect: r(0, 100, 402, 200), children: [card] });
+    const page = fakeNode({ role: 'scrollable', rect: r(0, 116, 402, 664), children: [carousel] });
+    const clips = clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [page] }), NESTED);
+    expect(clips.drawnIn(card)).toEqual({ frame: r(0, 116, 402, 184), scrollers: [carousel, page] });
+    const below = fakeNode({ role: 'button', rect: r(0, 900, 402, 50) });
+    const lower = fakeNode({ role: 'scrollable', rect: r(0, 880, 402, 200), children: [below] });
+    const list = fakeNode({ role: 'scrollable', rect: r(0, 0, 402, 780), children: [lower] });
+    expect(clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [list] }), NESTED).drawnIn(below)).toEqual({ frame: undefined, scrollers: [lower, list] });
+  });
+
+  it('undefined for a node under nothing that scrolls, the scroller itself, a node of another tree', () => {
+    const { tree, scroll } = form();
+    const clips = clipsOf(tree, NESTED);
+    expect(clips.drawnIn(tree.children[1])).toBeUndefined();
+    expect(clips.drawnIn(scroll)).toBeUndefined();
+    expect(clips.drawnIn(fakeNode({}))).toBeUndefined();
+  });
+
+  it("undefined on a tree whose source cut its rects already (Android's, any node clipsDescendants) and on a flat list (idb's)", () => {
+    const { tree, row } = form();
+    const android = { ...tree, children: [...tree.children, { ...fakeNode({ role: 'container', rect: r(0, 0, 402, 10) }), clipsDescendants: true as const }] };
+    expect(clipsOf(android, NESTED).drawnIn(row)).toBeUndefined();
+    expect(clipsOf(tree, { ancestry: false }).drawnIn(row)).toBeUndefined();
+  });
+});
+
 describe('subtract, largestRect, rectCentre — the cover arithmetic draw-order.ts#exposure asks (code review S3, S5)', () => {
   const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 

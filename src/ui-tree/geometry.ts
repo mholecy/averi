@@ -706,6 +706,35 @@ export interface Clips {
    * pixel assert's remedy). Cost: one walk of the tree, on the first ask.
    */
   inScroller(node: UiNode): boolean | undefined;
+  /**
+   * Where the node can be DRAWN as far as what scrolls above it says (`Drawn`): the frames of every ancestor that
+   * scroll-containers.ts#scrolls, intersected — on a tree of UNCLIPPED frames only, one that lists ancestry and marks
+   * no node `clipsDescendants` (WDA's). There a scroll view's content keeps its laid-out rect wherever it lies, and the
+   * scroll view draws none of it outside its own frame (UIKit's `UIScrollView` clips to its bounds, so do a table, a
+   * collection view and SwiftUI's `ScrollView`). Measured: the at-rest SWIFT form lists `payee_name_input` at
+   * `24,801 354x52`, below its `ScrollView 0,0 402x780`; the capture shows the bare background from CONTINUE's bottom
+   * (824) down, and a tap at its centre was reported done on it. Undefined for a node under nothing that scrolls, a
+   * node of another tree, on Android's trees (uiautomator has cut every rect to its ancestors already: nothing is
+   * left to cut) and on idb's flat list, which lists no scroll view (a residual: its rows below a short scroll view
+   * are judged on the screen alone). Rects stay unclipped (`scroll_until`'s far edge, interact/scroll-rounds.ts
+   * #beyondFarEdge, reads a row's rect past the frame); the standing cuts what it judges by this frame
+   * (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first ask; the answer is shared along a branch.
+   */
+  drawnIn(node: UiNode): Drawn | undefined;
+}
+
+/** What of `rect` the drawn frame `drawn` holds (`Clips.drawnIn`): `rect` itself when nothing cuts it; undefined when nothing of it can be drawn. */
+export function drawnPart(rect: Rect, drawn: Drawn | undefined): Rect | undefined {
+  if (drawn === undefined) return rect;
+  return drawn.frame === undefined ? undefined : rectIntersection(rect, drawn.frame);
+}
+
+/** Where a node can be drawn, as its scrolling ancestors cut it (`Clips.drawnIn`). */
+export interface Drawn {
+  /** The ancestors' frames intersected; undefined when they share no area — nothing of the node can be drawn. */
+  readonly frame: Rect | undefined;
+  /** The ancestors that scroll, nearest first: the scroll view a sentence names is one of them. */
+  readonly scrollers: readonly UiNode[];
 }
 
 /**
@@ -769,7 +798,27 @@ export function clipsOf(tree: UiNode, { ancestry }: { readonly ancestry: boolean
     }
     return scrolled.get(node);
   };
-  return { scrollersOf, cutSliver, inScroller };
+  let drawn: Map<UiNode, Drawn> | undefined;
+  const drawnIn = (node: UiNode): Drawn | undefined => {
+    if (drawn === undefined) {
+      const found = new Map<UiNode, Drawn>();
+      if (ancestry && ![...everyNode(tree)].some(clips)) {
+        const mark = (n: UiNode, within: Drawn | undefined): void => {
+          if (within !== undefined) found.set(n, within);
+          const below = !scrolls(n)
+            ? within
+            : within === undefined
+              ? { frame: { ...n.rect }, scrollers: [n] }
+              : { frame: within.frame === undefined ? undefined : rectIntersection(within.frame, n.rect), scrollers: [n, ...within.scrollers] };
+          for (const child of n.children) mark(child, below);
+        };
+        mark(tree, undefined);
+      }
+      drawn = found;
+    }
+    return drawn.get(node);
+  };
+  return { scrollersOf, cutSliver, inScroller, drawnIn };
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
@@ -969,6 +1018,14 @@ export function largestScroller(tree: UiNode): Rect | undefined {
 export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;
 }
+
+/**
+ * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
+ * 402x780)` — when nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame,
+ * `Clips.drawnIn`). One spelling for the tap's refusal, `scroll_until`'s sentences, the dismissal picker's skip line
+ * and the pixel assert's miss.
+ */
+export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string => `outside its scroll view ${nodeText(scroller)}`;
 
 /**
  * How a sentence names a NODE drawn over another — `button "Continue to
