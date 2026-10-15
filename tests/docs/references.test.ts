@@ -32,6 +32,8 @@ const ROOT = join(import.meta.dirname, '..', '..');
  * (the test then says so) or its references are gone.
  */
 const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
+  // Untracked in the main checkout; cited by the decision record's amendment "a layer holding an alert".
+  'docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md',
   'docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md',
   'docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md',
   'docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md',

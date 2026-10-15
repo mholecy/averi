@@ -179,7 +179,11 @@ target on screen was lost.
    guard), so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a
    medium sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018
    residual 2) leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee
-   row's lesson: WDA's flags say "occluded", which the rule takes for "not drawn".
+   row's lesson: WDA's flags say "occluded", which the rule takes for "not drawn". An ALERT is no longer such a
+   screen (2026-10-15, ADR 0018 "Amendment: a layer holding an alert"): the SwiftUI exit alert over the SWIFT form
+   has a bare dim `presentedSurface` does not name, and its form's targets read clear (a tap reported done); the
+   parser now marks the `Alert` (`UiNode.presentation`), whose layer covers the whole screen beneath it. The
+   target's own flag is still never read.
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
 5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
    was not measured) is not placed.
