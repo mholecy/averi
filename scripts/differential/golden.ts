@@ -35,9 +35,11 @@ export interface GoldenCheck {
   /** undefined: as the truth implies. */
   mismatch?: string;
   reply: string;
-  /** What kind of reply it is (golden-spec.ts#replyKind): the ratchet pins it for a known mismatch. */
+  /** What kind of reply it is (golden-spec/judges.ts#replyKind): the ratchet pins it for a known mismatch. */
   kind: ReplyKind;
-  /** The taps and swipes the device was sent (golden-spec.ts#sent): the ratchet pins them for a known mismatch. */
+  /**
+   * The taps and swipes the device was sent (golden-spec/judges.ts#sent): the ratchet pins them for a known mismatch.
+   */
   calls: string[];
   /** What says the HARNESS failed, not the tool (`faultsOf`): absent when none. */
   faults?: string[];
@@ -94,7 +96,8 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
         result.broken.push(`${t.tag}: ${why}`);
         continue;
       }
-      // A live-only row (its truth a dynamic: golden-spec.ts#Expectation.live) is the live golden's, never asked here.
+      // A live-only row (its truth a dynamic: golden-spec/judges.ts#Expectation.live) is the live golden's, never asked
+      // here.
       for (const e of expectations(recording.platform, t, truth).filter((x) => x.live === undefined)) {
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));

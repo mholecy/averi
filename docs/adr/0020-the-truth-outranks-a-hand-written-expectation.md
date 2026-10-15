@@ -22,7 +22,8 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    frame and a tree's rect is a finding about the tree, not about the truth.
 2. **Golden judges classes, not wording.** Tapped or refused and the remedy named; passed or failed; reached or stopped;
    a tap or a stroke sent or not. The table that maps a truth to its classes lives in code
-   (scripts/differential/golden-spec.ts), each row citing the rule or ADR that decides it. A reply saying the target is
+   (scripts/differential/golden-spec/*.ts — per cell family and phase 3's row types, behind the façade
+   golden-spec.ts), each row citing the rule or ADR that decides it. A reply saying the target is
    not in the tree is judged by its effect first: where the row rejects it (a tap refused without its remedy, a stroke
    beneath the presented layer), the mismatch is the row's own reason; where the row would accept it, it is no evidence
    either way — the "not in the tree" mismatch, never a pass — unless the row's truth allows the target to be absent (a
@@ -35,7 +36,7 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch — filed per cell
    family in tests/differential/golden/<family>.known.ts and aggregated there — by `<run>/<file> <target> <verb>` with
    its class (what its mismatch says first), its reply's kind (one of a closed set: not found, Tapped, visible, PASS,
-   FAIL, refused, other — `replyKind` in scripts/differential/golden-spec.ts), the taps and swipes it sent, and its note
+   FAIL, refused, other — `replyKind` in scripts/differential/golden-spec/judges.ts), the taps and swipes it sent, and its note
    (the bug note, or why). A listed mismatch that stops occurring fails the test until it is struck off; a new one fails
    it until it is fixed or listed with its note; a listed one whose class, reply kind or device calls change fails it
    too — it still mismatches, but differently (a timeout turned into a refusal with the wrong remedy keeps its class and

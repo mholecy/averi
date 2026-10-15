@@ -3,9 +3,9 @@ import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, pairingOf, replyKind, taps, touchDowns, type Expectation } from '../../scripts/differential/golden-spec.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
-// The golden spec's judges (scripts/differential/golden-spec.ts), each on the replies that decide it — the real ones,
-// as the committed captures produce them (tests/differential/golden.test.ts runs those), and the ones a fix must not
-// slip past.
+// The golden spec's judges (scripts/differential/golden-spec/*.ts, behind the façade golden-spec.ts), each on the
+// replies that decide it — the real ones, as the committed captures produce them (tests/differential/golden.test.ts
+// runs those), and the ones a fix must not slip past.
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
 const out = (reply: string, device: string[] = []): Outcome => ({ reply, device });

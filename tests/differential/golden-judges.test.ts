@@ -3,11 +3,11 @@ import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, type Expectation, type FormExpectation } from '../../scripts/differential/golden-spec.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
-// Every judge of the golden spec (scripts/differential/golden-spec.ts), each on replies it must accept and replies it
-// must reject — including the "not in the tree" replies: judged by their effect where the row's judge rejects them
-// (its own reason), vacuous (`not in the tree:`) where it would accept them, and accepted only by a row whose truth
-// allows the target to be absent. The ratchet (golden.test.ts) guards only the judges that mismatch today; this table
-// pins the rest, so a judge gone vacuous (`() => undefined`) fails here.
+// Every judge of the golden spec (scripts/differential/golden-spec/*.ts, behind the façade golden-spec.ts), each on
+// replies it must accept and replies it must reject — including the "not in the tree" replies: judged by their effect
+// where the row's judge rejects them (its own reason), vacuous (`not in the tree:`) where it would accept them, and
+// accepted only by a row whose truth allows the target to be absent. The ratchet (golden.test.ts) guards only the
+// judges that mismatch today; this table pins the rest, so a judge gone vacuous (`() => undefined`) fails here.
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
 type Case = readonly [reply: string, device: readonly string[], verdict: 'ok' | RegExp];

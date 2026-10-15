@@ -21,12 +21,12 @@ import { presented } from './golden/presented.known.js';
 // mismatches this checkout is known to have are listed in KNOWN — one file per cell family,
 // tests/differential/golden/<family>.known.ts, aggregated here — a ratchet (docs/adr/0020): one fixed fails this test
 // until it is struck off, and a new one fails it until it is fixed or listed with its note. A known mismatch is pinned
-// by what the reply DID: its class (what the judge's reason says first — golden-spec.ts#classed: the judge's own
+// by what the reply DID: its class (what the judge's reason says first — golden-spec/judges.ts#classed: the judge's own
 // reason where it rejects the reply, `not in the tree` only where it would accept a reply that is no evidence), its
-// kind (golden-spec.ts#replyKind: not found, Tapped, visible, PASS, FAIL, refused, other) and the taps and swipes the
-// device was sent. A known row that changes any of them — a stroke moved under the keyboard, a swipe fewer, a timeout
-// turned into a refusal with the wrong remedy, a stop turned into `fully visible` — fails here, though it still
-// mismatches.
+// kind (golden-spec/judges.ts#replyKind: not found, Tapped, visible, PASS, FAIL, refused, other) and the taps and
+// swipes the device was sent. A known row that changes any of them — a stroke moved under the keyboard, a swipe fewer,
+// a timeout turned into a refusal with the wrong remedy, a stop turned into `fully visible` — fails here, though it
+// still mismatches.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TRUTH = fileURLToPath(new URL('../fixtures/truth/', import.meta.url));

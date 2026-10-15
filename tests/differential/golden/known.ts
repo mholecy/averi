@@ -11,7 +11,9 @@ export const ANDROID = 'android-averi_lab-api33';
 export interface Known {
   /** What the mismatch says first, up to its `: ` — the judge's reason, or `not in the tree` (vacuous). */
   cls: string;
-  /** What kind of reply it is (GoldenCheck.kind, golden-spec.ts#replyKind): a timeout turned refusal fails here. */
+  /**
+   * What kind of reply it is (GoldenCheck.kind, golden-spec/judges.ts#replyKind): a timeout turned refusal fails here.
+   */
   kind: ReplyKind;
   /** The taps and swipes the device was sent (GoldenCheck.calls), in order. */
   calls: readonly string[];

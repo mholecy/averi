@@ -124,7 +124,7 @@ device's `differential:`) or whose call sent a command the fake does not model (
 (`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault.
 `tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, the checks per
 capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their class, their reply's kind
-(`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they sent and
+(`golden-spec/judges.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they sent and
 their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or listed; one whose
 class, reply kind or device calls change fails until re-noted). The ratchet is kept per cell family,
 `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's cells only, aggregated by
@@ -135,7 +135,7 @@ The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, 
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
 the identifier it shows it under, the keyboard's frame, the submits — and per control (field, submit, picker row) where
 its frame lies (open, under the keyboard, partly covered, under the sheet, off the screen, not laid out — measured from
-the app's frames by scripts/truth/truth.ts#situationOf, not declared) and what a raw tap at its centre did. `golden-spec.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
+the app's frames by scripts/truth/truth.ts#situationOf, not declared) and what a raw tap at its centre did. `golden-spec/forms.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
 docs/verification.md (each row names the rule it relies on, applied to the app's frames), titles and prefilled values
 read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a secure value never read back, a tap under the
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the

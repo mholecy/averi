@@ -297,11 +297,11 @@ export interface CellTruth {
 }
 
 /**
- * Where a form control is, measured from the app's frames (truth.ts#situationOf), not declared: `open` its centre
- * on the screen, clear of the keyboard and of the pinned bar; `under-keyboard` all of it below the keyboard's top;
+ * Where a form control is, measured from the app's frames (truth.ts#situationOf), not declared: `open` its centre on
+ * the screen, clear of the keyboard and of the pinned bar; `under-keyboard` all of it below the keyboard's top;
  * `covered` its centre under the pinned submit bar, or straddling the keyboard's top (judged when its probe fired
- * another control — golden-spec.ts#controlRows); `presented-over` under the picker sheet; `off-screen` its centre off
- * the screen; `not-rendered` the app laid out no frame for it (a lazy list's row far down).
+ * another control — golden-spec/forms.ts#controlRows); `presented-over` under the picker sheet; `off-screen` its centre
+ * off the screen; `not-rendered` the app laid out no frame for it (a lazy list's row far down).
  */
 export type Situation = 'open' | 'under-keyboard' | 'covered' | 'presented-over' | 'off-screen' | 'not-rendered';
 

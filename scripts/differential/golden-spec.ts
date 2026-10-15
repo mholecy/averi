@@ -25,8 +25,9 @@ import type { Expectation } from './golden-spec/judges.js';
  * — and the judge overruled: a mismatch of one class, said first — `not in the tree:`. A row whose truth says the
  * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply.
  *
- * The form cells (phase 1b) add rows a replayed tree CAN judge — see formExpectations. What it cannot judge (a fill, a
- * clear: typing changes nothing in a recorded tree) is the live golden's (scripts/truth/live.ts).
+ * The form cells (phase 1b) add rows a replayed tree CAN judge — see golden-spec/forms.ts#formExpectations. What it
+ * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's
+ * (scripts/truth/live.ts).
  *
  * The rows live per cell family (scripts/differential/golden-spec/<family>.ts, the families of
  * fixtures/apps/cells/), the judges they share in golden-spec/judges.ts; this module is what the golden mode and the

@@ -18,7 +18,7 @@ The app's own frames (`form-keyboard.truth.json`): the keyboard `0,573 402x301`;
 The capture's probe relaunched the cell and sent a raw `idb ui tap 201 547` at the phone field's centre. The app logged
 `touch 201.0,547.0` (the tap reached the app — the positive control) and `submit invalid`: the tap pressed `Continue`
 and submitted the form. The phone field never took the focus. `situationOf` measures it `covered` (centre in the pinned
-bar's band); golden-spec.ts#controlRows judges a covered control whose probe fired another control: `tap` must not
+bar's band); golden-spec/forms.ts#controlRows judges a covered control whose probe fired another control: `tap` must not
 answer `Tapped` and must send no tap; `scroll_until` must not answer "reached" without a swipe.
 
 ## Observed (replayed)
