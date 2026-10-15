@@ -130,7 +130,7 @@ export interface NoteResult {
   after?: SideRun;
 }
 
-/** docs/truth/calibration.md: the summary table, then per note its rows' replies at both sides. */
+/** docs/truth/calibration.md: the summary table, then per note its rows at both sides — a red row's mismatch, a green row's reply. */
 export function calibrationReport(results: readonly NoteResult[]): string {
   const lines = [
     '# Calibration on the bug notes',
@@ -164,7 +164,7 @@ export function calibrationReport(results: readonly NoteResult[]): string {
       lines.push(`- ${label}:`);
       for (const k of e.checks ?? []) {
         const c = run.checks.get(k);
-        lines.push(c === undefined ? `  - ${k}: not asked` : `  - ${c.mismatch === undefined ? 'ok' : 'RED'} ${k} — ${cell(firstLine(c.reply))}`);
+        lines.push(c === undefined ? `  - ${k}: not asked` : c.mismatch === undefined ? `  - ok ${k} — ${cell(firstLine(c.reply))}` : `  - RED ${k} — ${cell(c.mismatch.slice(0, 260))}`);
       }
     }
     if (e.needs !== undefined) lines.push('', `Needs: ${e.needs}`);
