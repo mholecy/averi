@@ -2315,6 +2315,15 @@ describe('round — a sheet whose detent the swipes changed', () => {
     expect(message.endsWith(MOVED)).toBe(true);
   });
 
+  it('a failure judged by absence keeps its class with the clause attached: a target no read held is ElementNotFoundError', () => {
+    const empty = (detent: string): Row => ({ tree: node({ role: 'container', rect: IPHONE_BOX, children: [node({ role: 'button', label: 'Sheet Grabber', value: detent, rect: { x: 152, y: 58, width: 98, height: 24 } })] }), found: [] });
+    const played = play(IPHONE, [empty('Half screen'), empty('Expanded'), empty('Expanded'), empty('Expanded')]);
+    expect(played.outcome?.kind).toBe('bound');
+    const error = failureOf(played, 'id:row_7');
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message.endsWith(MOVED)).toBe(true);
+  });
+
   it('a detent the same at the first and last read is not mentioned, whatever it was between', () => {
     const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Half screen', 300)])));
     expect(reply).toBe('fully visible after 1 swipe');
