@@ -10,13 +10,22 @@ struct AveriLabApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let cell = lab.cell {
+                if let cell = lab.cell, let form = cell.form {
+                    FormScreen(cell: cell, form: form).id(cell.id)
+                } else if let cell = lab.cell {
                     CellScreen(cell: cell).id(cell.id)
                 } else {
                     CellList()
                 }
             }
             .environmentObject(lab)
+            // The keyboard's frame for the form oracle: its end frame, screen coordinates (a hide ends below the screen).
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { n in
+                if let end = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect { lab.keyboard(end) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { n in
+                if let end = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect { lab.keyboard(end) }
+            }
             .onOpenURL { url in
                 if url.host() == "cell", let id = url.pathComponents.dropFirst().first { lab.show(id) }
             }

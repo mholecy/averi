@@ -1,0 +1,171 @@
+{
+  "cell": "form-errors",
+  "events": [
+    {
+      "at": 1792063579.352706,
+      "kind": "submit",
+      "tag": "invalid"
+    }
+  ],
+  "fields": {
+    "amount": {
+      "error": {
+        "id": "lab.form-errors.amount",
+        "text": "Amount must be 0,01 – 10 000 €"
+      },
+      "focused": false,
+      "value": ""
+    },
+    "email": {
+      "error": {
+        "id": "lab.form-errors.email_error",
+        "text": "That’s not an e-mail – check the “@”"
+      },
+      "focused": false,
+      "value": ""
+    },
+    "iban": {
+      "error": {
+        "id": "IbanError",
+        "text": "IBAN “SK00…” isn’t valid"
+      },
+      "focused": false,
+      "value": ""
+    },
+    "name": {
+      "error": {
+        "id": "lab.form-errors.name",
+        "text": "Enter the recipient’s name"
+      },
+      "focused": false,
+      "value": ""
+    },
+    "pin": {
+      "error": {
+        "id": "lab.form-errors.pin-error",
+        "text": "PIN must have 4 digits…"
+      },
+      "focused": false,
+      "value": ""
+    }
+  },
+  "frames": {
+    "amount": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 351.33333333333337
+    },
+    "amount.error": {
+      "height": 15.666666666666686,
+      "width": 196.66666666666666,
+      "x": 20,
+      "y": 391.33333333333337
+    },
+    "amount.title": {
+      "height": 18,
+      "width": 197.66666666666666,
+      "x": 20,
+      "y": 327.33333333333337
+    },
+    "email": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 255.66666666666669
+    },
+    "email.error": {
+      "height": 15.666666666666686,
+      "width": 222,
+      "x": 20,
+      "y": 295.6666666666667
+    },
+    "email.title": {
+      "height": 18,
+      "width": 138.66666666666666,
+      "x": 20,
+      "y": 231.66666666666669
+    },
+    "iban": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 542.6666666666667
+    },
+    "iban.error": {
+      "height": 15.666666666666629,
+      "width": 147.66666666666666,
+      "x": 20,
+      "y": 582.6666666666667
+    },
+    "iban.title": {
+      "height": 18,
+      "width": 162.66666666666666,
+      "x": 20,
+      "y": 518.6666666666667
+    },
+    "name": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 160
+    },
+    "name.error": {
+      "height": 15.666666666666686,
+      "width": 158.33333333333331,
+      "x": 20,
+      "y": 200
+    },
+    "name.title": {
+      "height": 18,
+      "width": 194.66666666666666,
+      "x": 20,
+      "y": 136
+    },
+    "pin": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 447
+    },
+    "pin.error": {
+      "height": 15.666666666666686,
+      "width": 146,
+      "x": 20,
+      "y": 487
+    },
+    "pin.title": {
+      "height": 18,
+      "width": 36,
+      "x": 20,
+      "y": 423
+    },
+    "screenError": {
+      "height": 19.33333333333337,
+      "width": 343.3333333333333,
+      "x": 20,
+      "y": 724.6666666666667
+    },
+    "submit": {
+      "height": 46.33333333333337,
+      "width": 362,
+      "x": 20,
+      "y": 622.3333333333334
+    }
+  },
+  "ready": true,
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  },
+  "submits": [
+    {
+      "at": 1792063579.352706,
+      "valid": false,
+      "values": {}
+    }
+  ]
+}

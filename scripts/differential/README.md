@@ -99,13 +99,34 @@ node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [
 ```
 
 `tests/differential/golden.test.ts` runs it over the committed truth on this checkout, with the known mismatches
-listed. Recapturing (a simulator, not the device-check one; WDA on its own port):
+listed.
+
+The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
+targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
+the identifier it shows it under, the keyboard's frame, the submits — and per control (field, submit, picker row) where
+its frame lies (open, under the keyboard, under the sheet, off the screen, not laid out) and whether a raw tap reached
+it. `golden-spec.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
+docs/verification.md (each row names the rule it relies on, applied to the app's frames), titles and prefilled values
+read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a secure value never read back, a tap under the
+keyboard refused naming it, the submit pinned above the keyboard tapped and reached with no swipe, `scroll_until`
+touching down above the keyboard, and a lazy picker row swiped for on the sheet.
+
+What a replayed tree cannot judge — a fill, a clear, typing into the focused field, a dismissal — the live golden runs
+on the lab simulator through averi's MCP tools, the app's model as the oracle (not a vitest test; it needs the
+simulator; HID typing hides the soft keyboard, which `lab-device.ts` restores per launch through the simulator's own
+keyboard preferences):
+
+```sh
+node --import tsx scripts/truth/live.ts --udid <lab udid> [--wda-port 8120] [--sources idb,wda] [--cases k1,b1]
+``` Recapturing (a simulator, not the device-check one; WDA on its own port):
 
 ```sh
 cd fixtures/apps/ios && xcodegen generate && xcodebuild -scheme AveriLab -destination 'id=<udid>' -derivedDataPath build build
 xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app
-node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run>
+node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run> [--cells form-basic,…]
 ```
+
+A run of `--cells` adds to (or replaces those cells in) the run's manifest; the other cells keep their captures.
 
 ## Corpus format
 

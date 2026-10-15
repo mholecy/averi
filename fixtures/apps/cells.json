@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "note": "The lab apps' cell catalog (docs/plans/2026-10-15-ground-truth-lab-app.md). Both apps bundle this file. A target is a solid rectangle of its own colour with no visible text, identified as lab.<cell>.<tag>; `declared` is what the cell builds, the truth's first source (scripts/truth/schema.ts).",
+  "version": 2,
+  "note": "The lab apps' cell catalog (docs/plans/2026-10-15-ground-truth-lab-app.md). Both apps bundle this file. A target is a solid rectangle of its own colour with no visible text, identified as lab.<cell>.<tag>; `declared` is what the cell builds, the truth's first source (scripts/truth/schema.ts). A form cell (`form`) has no coloured targets: its fields, submit and picker rows are identified as lab.<cell>.<tag> (a picker row lab.<cell>.<field>.<code>), and its truth is the app's own model of each field (value, focus, the error it shows), the keyboard's frame and every submit (scripts/truth/schema.ts#FormState).",
   "cells": [
     {
       "id": "open",
@@ -32,6 +32,147 @@
         { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
         { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" }
       ]
+    },
+    {
+      "id": "form-basic",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "name", "kind": "text", "title": "Recipient’s name & surname", "placeholder": "e.g. Jan Šťastný" },
+          { "tag": "email", "kind": "email", "title": "E-mail for “receipts”", "placeholder": "jan@example.com" },
+          { "tag": "iban", "kind": "iban", "title": "IBAN – account number", "placeholder": "SK00 0000 0000 …" },
+          { "tag": "amount", "kind": "amount", "title": "Amount in EUR (max 10 000)", "placeholder": "0,00" },
+          { "tag": "pin", "kind": "pin", "title": "PIN…", "placeholder": "4 digits" }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" }
+      }
+    },
+    {
+      "id": "form-errors",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "name", "kind": "text", "title": "Recipient’s name & surname", "placeholder": "e.g. Jan Šťastný", "titleId": "lab.form-errors.name", "error": { "text": "Enter the recipient’s name", "id": "lab.form-errors.name" } },
+          { "tag": "email", "kind": "email", "title": "E-mail for “receipts”", "placeholder": "jan@example.com", "error": { "text": "That’s not an e-mail – check the “@”", "id": "lab.form-errors.email_error" } },
+          { "tag": "amount", "kind": "amount", "title": "Amount in EUR (max 10 000)", "placeholder": "0,00", "error": { "text": "Amount must be 0,01 – 10 000 €", "id": "lab.form-errors.amount" } },
+          { "tag": "pin", "kind": "pin", "title": "PIN…", "placeholder": "4 digits", "error": { "text": "PIN must have 4 digits…", "id": "lab.form-errors.pin-error" } },
+          { "tag": "iban", "kind": "iban", "title": "IBAN – account number", "placeholder": "SK00 0000 0000 …", "error": { "text": "IBAN “SK00…” isn’t valid", "id": "IbanError" } }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" },
+        "screenError": { "text": "Payment wasn’t sent — fix the fields & try again", "id": "lab.form-errors.banner_error" },
+        "submitOnAppear": true
+      }
+    },
+    {
+      "id": "form-keyboard",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "Transfer details",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue", "pinned": true },
+        "focus": "postcode"
+      }
+    },
+    {
+      "id": "form-prefilled",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "name", "kind": "text", "title": "Recipient’s name & surname", "placeholder": "e.g. Jan Šťastný", "prefill": "Jan Šťastný" },
+          { "tag": "email", "kind": "email", "title": "E-mail for “receipts”", "placeholder": "jan@example.com", "prefill": "jan.stastny@example.com" },
+          { "tag": "iban", "kind": "iban", "title": "IBAN – account number", "placeholder": "SK00 0000 0000 …", "prefill": "SK31 1200 0000 1987 4263 7541" },
+          { "tag": "amount", "kind": "amount", "title": "Amount in EUR (max 10 000)", "placeholder": "0,00", "prefill": "1 234,56" },
+          { "tag": "pin", "kind": "pin", "title": "PIN…", "placeholder": "4 digits", "prefill": "2580" }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" }
+      }
+    },
+    {
+      "id": "form-picker",
+      "layer": "sheet-large",
+      "targets": [],
+      "form": {
+        "title": "Beneficiary bank",
+        "fields": [
+          { "tag": "name", "kind": "text", "title": "Bank name", "placeholder": "e.g. Tatra banka" },
+          { "tag": "country", "kind": "country", "title": "Bank’s country", "placeholder": "Choose a country…" }
+        ],
+        "submit": { "tag": "submit", "title": "Save" },
+        "picker": {
+          "field": "country",
+          "title": "Country",
+          "open": true,
+          "rows": [
+            { "code": "AL", "name": "Albania" },
+            { "code": "AX", "name": "Åland Islands" },
+            { "code": "AD", "name": "Andorra" },
+            { "code": "AT", "name": "Austria" },
+            { "code": "BE", "name": "Belgium" },
+            { "code": "BA", "name": "Bosnia & Herzegovina" },
+            { "code": "BG", "name": "Bulgaria" },
+            { "code": "CI", "name": "Côte d’Ivoire" },
+            { "code": "HR", "name": "Croatia" },
+            { "code": "CY", "name": "Cyprus" },
+            { "code": "CZ", "name": "Czechia" },
+            { "code": "DK", "name": "Denmark" },
+            { "code": "EE", "name": "Estonia" },
+            { "code": "FO", "name": "Faroe Islands" },
+            { "code": "FI", "name": "Finland" },
+            { "code": "FR", "name": "France" },
+            { "code": "DE", "name": "Germany" },
+            { "code": "GR", "name": "Greece" },
+            { "code": "HU", "name": "Hungary" },
+            { "code": "IS", "name": "Iceland" },
+            { "code": "IE", "name": "Ireland" },
+            { "code": "IT", "name": "Italy" },
+            { "code": "LV", "name": "Latvia" },
+            { "code": "LI", "name": "Liechtenstein" },
+            { "code": "LT", "name": "Lithuania" },
+            { "code": "LU", "name": "Luxembourg" },
+            { "code": "MT", "name": "Malta" },
+            { "code": "MC", "name": "Monaco" },
+            { "code": "ME", "name": "Montenegro" },
+            { "code": "NL", "name": "Netherlands" },
+            { "code": "MK", "name": "North Macedonia" },
+            { "code": "NO", "name": "Norway" },
+            { "code": "PL", "name": "Poland" },
+            { "code": "PT", "name": "Portugal" },
+            { "code": "RO", "name": "Romania" },
+            { "code": "SM", "name": "San Marino" },
+            { "code": "ST", "name": "São Tomé & Príncipe" },
+            { "code": "RS", "name": "Serbia" },
+            { "code": "SK", "name": "Slovakia" },
+            { "code": "SI", "name": "Slovenia" },
+            { "code": "ES", "name": "Spain" },
+            { "code": "SE", "name": "Sweden" },
+            { "code": "CH", "name": "Switzerland" },
+            { "code": "TR", "name": "Türkiye" },
+            { "code": "GB", "name": "United Kingdom" }
+          ],
+          "probe": [
+            "AL",
+            "ST"
+          ]
+        }
+      }
     }
   ]
 }
