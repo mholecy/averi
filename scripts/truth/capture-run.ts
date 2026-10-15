@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
+import { consistency, controlConsistency, outOfProcessKeyboard, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -153,7 +153,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     }
     const c: ControlTruth = { tag: w.tag, id: w.id, kind: w.kind, ...(frame !== undefined && { frame }), situation, ...read };
     controls.push(c);
-    const bad = controlConsistency(c, keyboard?.frame);
+    const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
     log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${described(c.probe)}`);
   }

@@ -249,7 +249,8 @@ final class Lab: ObservableObject {
 
 /// Every touch any window of the app receives, before anything handles it: UIApplication.sendEvent, swapped once for
 /// a version that logs each touch's start and then sends the event on unchanged. A sheet, an alert and the keyboard's
-/// host window are all the app's windows; a touch the system keeps (the keyboard's own process) is not seen.
+/// host window are all the app's windows: a tap on a key is logged too (the form-keyboard probes of vs, ks, ss and
+/// note hold their touch), so the truth exempts no keyboard from the positive control on iOS (truth.ts).
 enum TouchRecorder {
     @MainActor static func install() {
         guard !installed,

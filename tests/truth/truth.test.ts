@@ -10,6 +10,7 @@ import {
   consistency,
   controlConsistency,
   otherControlsFired,
+  outOfProcessKeyboard,
   probePoint,
   readControlProbe,
   readTargetProbe,
@@ -155,10 +156,16 @@ const control = (over: Partial<ControlTruth>): ControlTruth => ({
 const KEYBOARD = rect(0, 573, 402, 301);
 
 describe('controlConsistency', () => {
-  it('a probe tap with no touch is broken — but where the keyboard lies (its window is not the app\'s)', () => {
+  it('a probe tap with no touch is broken — but on an out-of-process keyboard (Android\'s IME: its touches are not the app\'s)', () => {
     expect(controlConsistency(control({ probe: [] }), KEYBOARD)).toBeUndefined();
     expect(controlConsistency(control({ probe: [] }), undefined)).toMatch(/no touch/);
     expect(controlConsistency(control({ situation: 'open', reached: true, frame: rect(20, 456, 362, 34), probe: [] }), KEYBOARD)).toMatch(/no touch/);
+  });
+
+  it('only Android\'s keyboard is out of process; iOS\'s touches are the app\'s', () => {
+    expect(outOfProcessKeyboard('android', KEYBOARD)).toEqual(KEYBOARD);
+    expect(outOfProcessKeyboard('ios', KEYBOARD)).toBeUndefined();
+    expect(controlConsistency(control({ probe: [] }), outOfProcessKeyboard('ios', KEYBOARD))).toMatch(/no touch/);
   });
 
   it('a control never probed (off the screen, not laid out) holds no probe', () => {
@@ -432,5 +439,15 @@ describe('capture of a form cell (iOS)', () => {
     expect(truth.form!.keyboard).toBeNull();
     expect(truth.form!.screenError).toBeNull();
     expect(truth.form!.sheet).toEqual(rect(0, 300, 402, 574));
+  }, 15_000);
+
+  it('a control whose probe left no touch is broken — on iOS under the keyboard too, where its touches are logged', async () => {
+    const { broken } = await runForm(new FakeIosFormLab(false), [FORM_KEYBOARD]);
+    expect(broken).toEqual([
+      expect.stringMatching(/^form-k\/name: the probe tap left no touch/),
+      expect.stringMatching(/^form-k\/phone: the probe tap left no touch/),
+      expect.stringMatching(/^form-k\/vs: the probe tap left no touch/),
+      expect.stringMatching(/^form-k\/submit: the probe tap left no touch/),
+    ]);
   }, 15_000);
 });

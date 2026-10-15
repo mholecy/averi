@@ -9,7 +9,7 @@ import { configFor, connect } from './differential.js';
 import { expectations, formExpectations, type Verb } from './golden-spec.js';
 import type { Side } from './side.js';
 import { pct, type CellTruth } from '../truth/schema.js';
-import { consistency, controlConsistency } from '../truth/truth.js';
+import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -69,7 +69,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
     const brokenControls = (truth.form?.controls ?? []).flatMap((c) => {
-      const why = controlConsistency(c, truth.form?.keyboard?.frame);
+      const why = controlConsistency(c, outOfProcessKeyboard(recording.platform, truth.form?.keyboard?.frame));
       return why === undefined ? [] : [`${c.tag}: ${why}`];
     });
     result.broken.push(...brokenControls);

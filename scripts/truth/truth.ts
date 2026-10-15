@@ -101,15 +101,24 @@ export function consistency(t: TargetTruth): string | undefined {
 }
 
 /**
- * Whether a control's probe agrees with where its frame puts it: a probed tap was delivered (but where the keyboard
- * lies: its window is not the app's), an open control is reached, a hidden one not. A `covered` control is not held to
- * either: partly hidden, its centre may or may not be.
+ * The keyboard whose touches the app cannot log: Android's IME draws in a window of its own process, so a probe tap
+ * on it leaves no touch in the app (phase 2b's form cells). iOS's keyboard host window is the app's — its touches are
+ * logged (the committed form-keyboard probes of vs, ks, ss and note hold their touch) — so it has none.
  */
-export function controlConsistency(c: ControlTruth, keyboard: Rect | undefined): string | undefined {
+export function outOfProcessKeyboard(platform: 'ios' | 'android', keyboard: Rect | undefined): Rect | undefined {
+  return platform === 'android' ? keyboard : undefined;
+}
+
+/**
+ * Whether a control's probe agrees with where its frame puts it: a probed tap was delivered (but on an out-of-process
+ * keyboard, outOfProcessKeyboard: the app cannot see that touch), an open control is reached, a hidden one not. A
+ * `covered` control is not held to either: partly hidden, its centre may or may not be.
+ */
+export function controlConsistency(c: ControlTruth, outOfProcess: Rect | undefined): string | undefined {
   const probed = c.frame !== undefined && c.situation !== 'off-screen' && c.situation !== 'not-rendered';
   if (probed) {
     const at = probePoint(c.frame!);
-    if (touchesAt(c.probe, at).length === 0 && !(keyboard !== undefined && inside(at, keyboard))) return NOT_DELIVERED;
+    if (touchesAt(c.probe, at).length === 0 && !(outOfProcess !== undefined && inside(at, outOfProcess))) return NOT_DELIVERED;
   } else if (c.reached || c.probe.length > 0) {
     return `${c.situation}, never probed, but the truth holds a probe`;
   }
