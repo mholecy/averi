@@ -1230,12 +1230,14 @@ const NOT_DRAWN = {
    * and `fully` spent a stroke moving a row off a phantom.
    * docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md
    *
-   * Except the SURFACE of a screen presented over the target's (presented-by-shape.ts#presentedSurface, ADR 0018),
-   * which covers as before and stays in `Exposure.presented` — the mirror of `givesWay`: with Contacts' discard
-   * popover up, WDA marks the whole New Contact sheet layer `0/0`, its form `Table 0,62 402x812` included
-   * (tests/fixtures/wda-capture-contacts-discard-popover.json), and that Table is still the presented sheet over the
-   * list's rows. Without the exception a sheet marked so, over a list with no second dim, would let a tap through
-   * to the list. The TARGET's own flag is never read: a target under a modal is `isVisible="0"` too.
+   * Except, on a tree whose source did not judge presented layers, the SURFACE of a screen presented over the target's
+   * by shape (presented-by-shape.ts#presentedSurface, the mirror of `givesWay`), which covers as before and stays in
+   * `Exposure.presented`: a sheet layer WDA reports `0/0` whole, over a list with no second dim, would otherwise let a
+   * tap through to the list. On a tree whose source judged, no shape is asked and the guard holds of no node: a layer
+   * it marks covers through its cover, which no row excuses, and a hidden node of a marked `screen` layer stays
+   * excused (Contacts' discard popover over the New Contact sheet, whose form `Table 0,62 402x812` and photo buttons
+   * WDA reads `0/0`: tests/fixtures/wda-capture-contacts-discard-popover.json). The TARGET's own flag is never read: a
+   * target under a modal is `isVisible="0"` too.
    *
    * `drawnOver`: not excused — no measurement asked it (no iOS tree has a clipping container, and only WDA sets the
    * mark). Residuals and the decision: docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md
