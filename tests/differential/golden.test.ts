@@ -32,8 +32,10 @@ const KNOWN: Record<string, string> = Object.fromEntries([
   // The form beneath the country picker sheet: the same class, a form's fields and its submit.
   ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap', 'scroll_until'], `${NOT_IN_TREE}: idb lists only the presented layer`),
   // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the tap
-  // timed out waiting for it to appear"): the tap answers "not found" — no false Tapped, but no keyboard advice.
-  ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], `${NOT_IN_TREE}: idb lists nothing under the keyboard`),
+  // timed out waiting for it to appear"): the tap answers "not found" — no false Tapped, but no keyboard advice; and
+  // scroll_until swipes above the keyboard and stops "never appeared in the tree" — its touch-downs are right, but a
+  // replayed tree cannot show whether the swipes would bring the field out, so the reply is no evidence (classed).
+  ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap', 'scroll_until'], `${NOT_IN_TREE}: idb lists nothing under the keyboard`),
   // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under idb
   // the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers Tapped and
   // sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0 swipes.

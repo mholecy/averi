@@ -13,9 +13,12 @@ import { otherControlsFired } from '../truth/truth.js';
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
  * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
  *
- * A row is added with the cells that need it. Wherever a reply says the target is not in the tree (a tap timing out
- * "waiting for element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within"), the
- * mismatch is of one class, said first — `not in the tree:` — so the known list names one cause for all of them.
+ * A row is added with the cells that need it. Every row's judge goes through one classification (classed): wherever a
+ * reply says the target is not in the tree (a tap timing out "waiting for element … to appear", scroll_until's "never
+ * appeared in the tree", an assert's "not found within"), the reply is no evidence of what the truth implies — a judge
+ * that would accept it (a refusal, a FAIL) is overruled, and the mismatch is of one class, said first — `not in the
+ * tree:` — so the known list names one cause for all of them. Only a row whose truth says the target may be missing
+ * from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply.
  *
  * The form cells (phase 1b) add rows a replayed tree CAN judge — see formExpectations. What it cannot judge (a fill, a
  * clear: typing changes nothing in a recorded tree) is the live golden's (scripts/truth/live.ts).
@@ -28,8 +31,10 @@ export interface Expectation {
   /** What the verb must answer, in a few words — the report's "expected". */
   says: string;
   call: Call;
-  /** undefined: the outcome is what the truth implies; else why it is not. */
+  /** undefined: the outcome is what the truth implies; else why it is not. Already classed (see classed). */
   judge(outcome: Outcome): string | undefined;
+  /** Why the truth allows the target to be missing from the tree; unset, a "not in the tree" reply is a mismatch. */
+  absent?: string;
 }
 
 const BUDGET_MS = 1_000;
@@ -55,8 +60,25 @@ const first = (o: Outcome) => {
 export const ownWords = (o: Outcome) => o.reply.replace(/\b[a-z]+:"(?:[^"\\]|\\.)*"/gi, '<selector>');
 /** The reply says the element is not in the tree — no evidence of what covers it (see the table above). */
 export const notInTree = (o: Outcome) => /waiting for element .* to appear|never appeared in the tree|not found within/.test(o.reply);
-/** The first words of a mismatch: its class when the target is not in the tree, then the reply's first line. */
-const said = (o: Outcome, what: string) => `${notInTree(o) ? 'not in the tree: ' : ''}${what}: ${first(o)}`;
+const said = (o: Outcome, what: string) => `${what}: ${first(o)}`;
+const NOT_IN_TREE = 'not in the tree: ';
+/**
+ * The one classification every row's judge goes through: a reply that says the target is not in the tree is a
+ * mismatch of that class, said first — even where the row's own judge would accept it (a refusal, an expected FAIL:
+ * no evidence either way) — unless the row's truth allows the target to be absent.
+ */
+export function classed<E extends Expectation>(e: E): E {
+  const judge = e.judge;
+  return {
+    ...e,
+    judge: (o: Outcome) => {
+      const why = judge(o);
+      if (!notInTree(o)) return why;
+      if (why === undefined) return e.absent === undefined ? `${NOT_IN_TREE}${first(o)}` : undefined;
+      return `${NOT_IN_TREE}${why}`;
+    },
+  };
+}
 /** A tap that must not land: not `Tapped`, and no tap sent. */
 export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
@@ -65,7 +87,7 @@ export function expectations(platform: Platform, t: TargetTruth): Expectation[] 
   const selector = `id:"${t.id}"`;
   const element = { id: t.id };
   if (t.declared === 'open' && t.reached && t.drawn >= DRAWN) {
-    return [
+    return ([
       {
         verb: 'tap',
         says: 'Tapped',
@@ -84,10 +106,10 @@ export function expectations(platform: Platform, t: TargetTruth): Expectation[] 
         call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
         judge: (o) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined),
       },
-    ];
+    ] satisfies Expectation[]).map(classed);
   }
   if (t.declared === 'presented-over' && !t.reached) {
-    return [
+    return ([
       {
         verb: 'tap',
         says: 'refused: close it first, nothing tapped',
@@ -98,7 +120,7 @@ export function expectations(platform: Platform, t: TargetTruth): Expectation[] 
         verb: 'colour',
         says: `fails, even asked for the colour the screen shows there (${t.seen}), with the element in the tree`,
         call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: t.seen }, timeout: BUDGET_MS }] } },
-        judge: (o) => (passed(o) ? `passed on ${t.seen}: it measured the layer over the target as the target` : notInTree(o) ? `not in the tree: ${first(o)}` : undefined),
+        judge: (o) => (passed(o) ? `passed on ${t.seen}: it measured the layer over the target as the target` : undefined),
       },
       {
         verb: 'scroll_until',
@@ -106,7 +128,7 @@ export function expectations(platform: Platform, t: TargetTruth): Expectation[] 
         call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
         judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath a presented layer`) : !closeFirst(o) ? said(o, 'no "close it first"') : undefined),
       },
-    ];
+    ] satisfies Expectation[]).map(classed);
   }
   return [];
 }
@@ -222,7 +244,7 @@ export function formExpectations(platform: Platform, truth: CellTruth): FormExpe
     }
   }
   for (const c of form.controls) out.push(...controlRows(platform, c, truth));
-  return out;
+  return out.map(classed);
 }
 
 function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): FormExpectation[] {
@@ -289,14 +311,16 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
         },
       ];
     case 'off-screen':
-    case 'not-rendered':
+    case 'not-rendered': {
+      const absent = `${c.situation}: a row of a lazy list need not be in the tree until it is scrolled to`;
       return [
-        { target, verb: 'tap', says: 'not tapped, nothing sent', call: tap, judge: notTapped },
+        { target, verb: 'tap', says: 'not tapped, nothing sent', call: tap, judge: notTapped, absent },
         {
           target,
           verb: 'scroll_until',
           says: 'swipes for it on the sheet',
           call: scroll,
+          absent,
           judge: (o) => {
             const downs = touchDowns(o);
             if (downs.length === 0) return `no swipe: ${first(o)}`;
@@ -305,6 +329,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           },
         },
       ];
+    }
     case 'covered': {
       // Partly hidden. Judged when the probe shows what a tap at its centre does: it fires ANOTHER control (the pinned
       // submit over the field) — so a tap must not be sent, and scroll_until must not call it reached where it is.
