@@ -778,6 +778,35 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(r).toEqual({ pass: false, detail: `read "Payee's game"; vs expected "Payee’s name" ≠` });
   });
 
+  it('a match pattern written with typographic punctuation matches the reading under the fold, saying so', () => {
+    const r = evaluateOcrAssert({ match: 'Payee’s' }, [line("Payee's name", 30)], 1080);
+    expect(r).toEqual({
+      pass: true,
+      detail:
+        `read "Payee's name"; vs /Payee’s/ matches (only with ’ vs ' folded — ` +
+        'the recognizer reads typographic punctuation as ASCII and drops diacritics)',
+    });
+  });
+
+  it('a match that holds on the reading as read carries no fold note', () => {
+    expect(evaluateOcrAssert({ match: "Payee's" }, [line("Payee's name", 30)], 1080).detail).toBe(
+      `read "Payee's name"; vs /Payee's/ matches`,
+    );
+  });
+
+  it('the pattern fold stays literal — it never widens the pattern', () => {
+    // A folded dash inside a class stays a literal hyphen, not a range.
+    expect(evaluateOcrAssert({ match: '^[0–9]$' }, [line('5', 30)], 1080).pass).toBe(false);
+    expect(evaluateOcrAssert({ match: '^1[0–9]$' }, [line('1-', 30)], 1080).pass).toBe(true);
+    // A folded ellipsis is three dots, not three of anything.
+    expect(evaluateOcrAssert({ match: 'Loading…$' }, [line('Loading...', 30)], 1080).pass).toBe(true);
+    expect(evaluateOcrAssert({ match: 'Loading…$' }, [line('Loadingabc', 30)], 1080).pass).toBe(false);
+    // Outside the fold the pattern still fails.
+    expect(evaluateOcrAssert({ match: 'Payee’s name' }, [line("Payee's game", 30)], 1080).detail).toBe(
+      `read "Payee's game"; vs /Payee’s name/ NO MATCH`,
+    );
+  });
+
   it('case is not folded', () => {
     expect(evaluateOcrAssert({ text: 'Payee’s Name' }, [line("Payee's name", 30)], 1080).pass).toBe(false);
     expect(evaluateOcrAssert({ text: 'CONTINUE' }, [line('Continue', 30)], 1080).pass).toBe(false);

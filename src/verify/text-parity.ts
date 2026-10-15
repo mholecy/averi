@@ -15,7 +15,15 @@ import {
   type OcrRegionResult,
 } from './ocr.js';
 import { failClosed } from './fail-closed.js';
-import { differsOnlyByOcrFold, differsOnlyIn, foldMarks, RECOGNIZER_DIFFERENCE } from './ocr-fold.js';
+import {
+  differsOnlyByOcrFold,
+  differsOnlyIn,
+  foldedPairs,
+  foldMarks,
+  ocrFold,
+  ocrFoldPattern,
+  RECOGNIZER_DIFFERENCE,
+} from './ocr-fold.js';
 import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -1078,9 +1086,16 @@ export function evaluateOcrAssert(
     );
   }
   if (expectation.match !== undefined) {
-    const ok = new RegExp(expectation.match).test(seen);
+    // The reading as read first; failing that, the folded reading against the
+    // folded pattern (ocr-fold.ts) — a pass that names what it folded.
+    const exact = new RegExp(expectation.match).test(seen);
+    const folded = !exact && new RegExp(ocrFoldPattern(expectation.match)).test(ocrFold(seen));
+    const ok = exact || folded;
     if (!ok) pass = false;
-    parts.push(`vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}`);
+    parts.push(
+      `vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}` +
+        (folded ? ` (only with ${foldedPairs(expectation.match, seen).join(', ')} folded — ${RECOGNIZER_DIFFERENCE})` : ''),
+    );
   }
   let heightUnchecked: string | undefined;
   if (expectation.heightPct !== undefined) {

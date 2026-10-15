@@ -47,6 +47,21 @@ const charsOf = (s: string): string[] => [...s.normalize('NFC')];
 export const ocrFold = (s: string): string => charsOf(s).map(foldChar).join('');
 
 /**
+ * A `match` pattern's source folded the same way, every folded character
+ * kept LITERAL: a dash becomes `\-` (a hyphen inside a class, never a range)
+ * and an ellipsis `\.\.\.` (three dots, never three of anything). Only
+ * look-alike punctuation and combining marks change, so the folded pattern
+ * accepts the folded forms of what the pattern accepted, and nothing else.
+ */
+export const ocrFoldPattern = (source: string): string =>
+  charsOf(source)
+    .map((c) => {
+      const f = foldChar(c);
+      return f === c ? c : f.replace(/[-.]/g, '\\$&');
+    })
+    .join('');
+
+/**
  * Equal under the fold but not exactly: the two differ ONLY in what the
  * recognizer cannot tell apart.
  */
