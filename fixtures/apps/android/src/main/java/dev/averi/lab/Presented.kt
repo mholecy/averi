@@ -60,9 +60,9 @@ private class TouchLog(private val original: Window.Callback, private val lab: L
 }
 
 /**
- * The cell's layer, raised after the screen beneath has appeared, and the state marked ready once it has settled — a cell
- * with layer `none` (base's `open`) raises nothing and is ready after 300 ms. Composed after the host's Box, as one
- * composable before the split.
+ * The cell's layer, raised after the screen beneath has appeared, and the state marked ready once it has settled — a
+ * cell with layer `none` (base's `open`) raises nothing and is ready after 300 ms. Composed after the host's Box, as
+ * one composable before the split.
  */
 @Composable
 internal fun PresentedLayer(cell: Cell, lab: Lab) {

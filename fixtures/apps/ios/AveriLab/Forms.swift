@@ -1,10 +1,10 @@
 import SwiftUI
 
 // The forms family (fixtures/apps/cells/forms.json). A form cell (phase 1b of
-// docs/plans/2026-10-15-ground-truth-lab-app.md): the fields of a payment form, a submit, maybe a country picker sheet —
-// laid out as a banking app lays them out (a navigation bar, a scroll view, titles above
-// the fields, errors under them), every one reporting to the oracle (Lab.swift#FieldState): the value the MODEL holds,
-// the focus, the error it shows and the identifier it shows it under. A fill is judged by that, never by a tree.
+// docs/plans/2026-10-15-ground-truth-lab-app.md): the fields of a payment form, a submit, maybe a country picker sheet
+// — laid out as a banking app lays them out (a navigation bar, a scroll view, titles above the fields, errors under
+// them), every one reporting to the oracle (Lab.swift#FieldState): the value the MODEL holds, the focus, the error it
+// shows and the identifier it shows it under. A fill is judged by that, never by a tree.
 //
 // Nothing here transforms what is typed (no autocapitalisation, no autocorrection, no mask): a value that does not land
 // as typed is averi's or idb's doing, not the app's — the one exception is iOS's own, a secure field that clears itself

@@ -32,8 +32,9 @@ import androidx.compose.ui.unit.dp
 
 // The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2): the iOS app's cells
 // (fixtures/apps/ios/AveriLab) in Compose. One cell per launch — the intent extra `cell` or averilab://cell/<id>; with
-// neither, the catalog as a list, for a person poking at the app. One file per cell family (fixtures/apps/cells/<family>.json):
-// Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt; CellRouter below sends a cell to its family's.
+// neither, the catalog as a list, for a person poking at the app. One file per cell family
+// (fixtures/apps/cells/<family>.json): Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt; CellRouter
+// below sends a cell to its family's screen.
 
 class MainActivity : ComponentActivity() {
     private lateinit var lab: Lab
@@ -109,7 +110,9 @@ private fun Unsupported(cell: Cell) {
 
 /**
  * A cell's screen, by its family (the catalog stamps each cell with it, scripts/truth/catalog.ts). A family adds its
- * cells in its own file; this `when` names every family once, so no batch of phase 3 edits it.
+ * cells in its own file; this `when` names every family of scripts/truth/schema.ts#FAMILIES once, so no batch of phase 3
+ * edits it. A family it does not name (or none) shows an UnbuiltCell, never ready: a capture of it times out naming the
+ * cell.
  */
 @Composable
 private fun CellRouter(cell: Cell, lab: Lab) {
@@ -118,8 +121,9 @@ private fun CellRouter(cell: Cell, lab: Lab) {
         "edges" -> EdgesScreen(cell, lab)
         "bars" -> BarsScreen(cell, lab)
         "false-covers" -> FalseCoversScreen(cell, lab)
-        // base and presented: the coloured-target host (Base.kt) with the cell's layer (Presented.kt).
-        else -> CellScreen(cell, lab)
+        // The coloured-target host (Base.kt) with the cell's layer (Presented.kt).
+        "base", "presented" -> CellScreen(cell, lab)
+        else -> UnbuiltCell(cell)
     }
 }
 
