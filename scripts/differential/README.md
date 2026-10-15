@@ -115,11 +115,12 @@ node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [
 a token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. A check
 whose reply is a harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake
 device's `differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
-(`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault. `tests/differential/golden.test.ts` runs it over the committed truth on
-this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
-<verb>` with their class, their reply's kind (`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL,
-refused, other), the taps and swipes they sent and their notes — a ratchet both ways (one fixed fails until struck off;
-a new one fails until fixed or listed; one whose class, reply kind or device calls change fails until re-noted).
+(`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault.
+`tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, the checks per
+capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their class, their reply's kind
+(`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they sent and
+their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or listed; one whose
+class, reply kind or device calls change fails until re-noted).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
