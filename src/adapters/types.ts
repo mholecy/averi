@@ -486,6 +486,25 @@ export interface UiNode {
    * docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md
    */
   hidden?: true;
+  /**
+   * Set on the ELEMENT OF A PRESENTED LAYER, by the tree source that says so itself: the WDA parser marks an element
+   * of a type that is a presentation (adapters/wda-source.ts#PRESENTATIONS) — `Alert`, `alert`, today; nothing else.
+   * The source's fact, not a shape draw order infers: a layer holding such an element is presented over every screen
+   * drawn before it, the WHOLE screen whatever the frames of the nodes around it (an alert is modal: UIKit's and
+   * SwiftUI's alike). Measured on mp-native's SWIFT form with its exit alert up (WDA, iPhone 17, iOS 27): the alert's
+   * layer is a bare dimming leaf `0,0 402x874`, an empty frame and `Alert 'Exit confirmation' 41,365 320x172`, whose
+   * own backdrop leaves lie at `41,365 402x874` — no shape there told it from a sheet's leftover dim, and a tap on the
+   * form beneath was reported done.
+   *
+   * Its readers, all of them:
+   * - ui-tree/draw-order.ts (`presentedLayerOf`): the marked element covers every node drawn before it — not its
+   *   ancestors, nor its own subtree — through the whole screen, as the one cover of its layer and the surface of a
+   *   screen presented over the target (`Exposure.presented`, `presentedAt`, `presentedOver`).
+   * - ui-tree/standing.ts#presentedRemedy, which names it ("an alert is presented over it ("Exit confirmation")").
+   * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
+   * Absent everywhere else — on an idb or Android tree always.
+   */
+  presentation?: 'alert';
 }
 
 /**
