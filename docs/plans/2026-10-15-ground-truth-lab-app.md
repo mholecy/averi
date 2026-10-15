@@ -114,6 +114,15 @@ over the keyboard) are captured and replayed like the visibility cells.
 The tap log is a `Modifier.clickable` per target; state file read with `adb exec-out run-as`. Emulator use only with
 the owner's go (device-check rules: no adb server commands without it).
 
+### Phase 2b — Android forms (Compose)
+
+Phase 1b's form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`) in the Compose
+app: the same catalog entries, the same oracle in the state file (field values, focus, shown errors, the IME's
+frame from `WindowInsets.ime`, submits), captured through uiautomator, the static golden rows, and the live golden
+(`live.ts` against the `averi_lab` emulator: `fill` / `type_text` / `clear`, Android's one-character-per-`input
+text` typing). Android sets no `error` on a field (docs/verification.md): its error rows assert the message's text.
+Owner request 2026-10-15.
+
 ### Phase 3 — calibration on the bug notes
 
 Every visibility note (36 of 72) gets a cell. Golden must fail on the commit before its fix and pass after. A note
