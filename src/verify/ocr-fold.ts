@@ -34,8 +34,13 @@ const PUNCTUATION: Readonly<Record<string, string>> = {
   '…': '...',
 };
 
-/** Strip combining marks only (NFD, then U+0300–U+036F): `ť` → `t`, case and spacing untouched. */
-const foldMarks = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+/**
+ * Strip Latin combining marks only (NFD, drop U+0300–U+036F, recompose):
+ * `ť` → `t`, case and spacing untouched. Recomposing keeps every letter that
+ * has no such mark as it was — a Hangul syllable, a kana with its voicing
+ * mark — rather than leaving it in pieces.
+ */
+const foldMarks = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC');
 
 /** One character's fold: its ASCII look-alike, or itself without combining marks. */
 const foldChar = (c: string): string => PUNCTUATION[c] ?? foldMarks(c);

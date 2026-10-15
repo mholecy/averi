@@ -1046,6 +1046,21 @@ export async function measureOcrAssert(
 }
 
 /**
+ * The folded pattern against the folded reading. A pattern the fold leaves
+ * uncompilable is not folded: the assert fails on the reading as read, it
+ * never throws.
+ */
+function foldedMatch(pattern: string, seen: string): boolean {
+  let folded: RegExp;
+  try {
+    folded = new RegExp(ocrFoldPattern(pattern));
+  } catch {
+    return false;
+  }
+  return folded.test(ocrFold(seen));
+}
+
+/**
  * Single-element rendered-text check over one region's recognizer output.
  * Pure: `measureOcrAssert` does the cropping and recognizing, this decides
  * the verdict, so the whole decision is testable without a Swift toolchain.
@@ -1088,7 +1103,7 @@ export function evaluateOcrAssert(
     // The reading as read first; failing that, the folded reading against the
     // folded pattern (ocr-fold.ts) — a pass that names what it folded.
     const exact = new RegExp(expectation.match).test(seen);
-    const folded = !exact && new RegExp(ocrFoldPattern(expectation.match)).test(ocrFold(seen));
+    const folded = !exact && foldedMatch(expectation.match, seen);
     const ok = exact || folded;
     if (!ok) pass = false;
     parts.push(

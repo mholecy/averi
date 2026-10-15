@@ -848,6 +848,22 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(r.detail).toContain('= (differs only in composed vs decomposed characters — ');
   });
 
+  it.each([
+    ['^[가-힣]+$', 'abc'],
+    ['^[z-é]$', 'q'],
+    ['^[a-–]$', '!'],
+  ])('a valid pattern %j never throws under the fold — it fails against %j', (match, read) => {
+    expect(() => evaluateOcrAssert({ match }, [line(read, 30)], 1080)).not.toThrow();
+    expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(false);
+  });
+
+  it('letters without Latin combining marks are not folded: a Hangul or kana pattern still matches its reading', () => {
+    expect(evaluateOcrAssert({ match: '^[가-힣]+$' }, [line('합계', 30)], 1080).pass).toBe(true);
+    expect(evaluateOcrAssert({ match: '^が$' }, [line('か', 30)], 1080).pass).toBe(false);
+    // A Hangul range kept whole while the ellipsis beside it folds.
+    expect(evaluateOcrAssert({ match: '^[가-힣]+…$' }, [line('합계...', 30)], 1080).pass).toBe(true);
+  });
+
   it('case is not folded', () => {
     expect(evaluateOcrAssert({ text: 'Payee’s Name' }, [line("Payee's name", 30)], 1080).pass).toBe(false);
     expect(evaluateOcrAssert({ text: 'CONTINUE' }, [line('Continue', 30)], 1080).pass).toBe(false);
