@@ -3,8 +3,8 @@ import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf } from '../../truth/truth.js';
 
 /**
- * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an expectation's
- * shape, what a reply sent and said, and the one classification every row goes through (classed).
+ * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an
+ * expectation's shape, what a reply sent and said, and the one classification every row goes through (classed).
  */
 
 export type Verb = 'tap' | 'colour' | 'scroll_until' | 'error' | 'text';
@@ -23,8 +23,8 @@ export interface Expectation {
   absent?: string;
   /**
    * Why only the live golden (scripts/truth/live.ts, phase 5) can judge it — a dynamic a replayed tree cannot show (a
-   * stroke's effect, a turn back). Set, the golden mode never asks the row (golden.ts); it is declared here so the table
-   * is whole.
+   * stroke's effect, a turn back). Set, the golden mode never asks the row (golden.ts); it is declared here so the
+   * table is whole.
    */
   live?: string;
 }
@@ -123,9 +123,9 @@ export function strokesOff(o: Outcome, cell: Pick<CellTruth, 'screen' | 'safeAre
 }
 
 /**
- * R-land's judge: a `Tapped` reply landed — every tap sent lies in `where` (what of the target shows, or its piece clear
- * of chrome), and a probe there fired its action (`fired`). `mustTap`: the target is plainly reachable, so a refusal
- * is a mismatch too; else a refusal that sent nothing is as good (a cut target averi may refuse, ADR 0005).
+ * R-land's judge: a `Tapped` reply landed — every tap sent lies in `where` (what of the target shows, or its piece
+ * clear of chrome), and a probe there fired its action (`fired`). `mustTap`: the target is plainly reachable, so a
+ * refusal is a mismatch too; else a refusal that sent nothing is as good (a cut target averi may refuse, ADR 0005).
  */
 export function landed(o: Outcome, where: Rect | null | undefined, fired: boolean, mustTap: boolean): string | undefined {
   if (!o.reply.startsWith('Tapped')) return mustTap ? `not tapped: ${first(o)}` : notTapped(o);

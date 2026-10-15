@@ -8,10 +8,10 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, typ
  */
 
 /**
- * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it (Forms.swift).
- * iOS's, in points: Android's forms (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2b) need the bar in pixels —
- * deferred to phase 2b, where the app should report its bar's frame (e.g. `frames["submit.bar"]`) for situationOf to
- * read instead of this guess (round-2 review, MINOR-4).
+ * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it
+ * (Forms.swift). iOS's, in points: Android's forms (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2b) need the
+ * bar in pixels — deferred to phase 2b, where the app should report its bar's frame (e.g. `frames["submit.bar"]`) for
+ * situationOf to read instead of this guess (round-2 review, MINOR-4).
  */
 export const PINNED_BAR_PADDING = 10;
 
@@ -68,8 +68,8 @@ export function readTargetProbe(events: readonly ProbeEvent[], tag: string): { r
 
 /**
  * A form control's probe: a field is reached when it took the focus (a country field, a button: when its tap fired;
- * a field the cell focuses on appear: when the tap leaves the focus on it), the submit when a submit fired, a picker row
- * when it was chosen.
+ * a field the cell focuses on appear: when the tap leaves the focus on it), the submit when a submit fired, a picker
+ * row when it was chosen.
  */
 export function readControlProbe(
   events: readonly ProbeEvent[],
@@ -95,7 +95,9 @@ export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): P
   return probe.filter((e) => e.kind === 'submit' || e.kind === 'select' || e.kind === 'button' || e.kind === 'tab' || (e.kind === 'tap' && e.tag !== tag));
 }
 
-/** Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (capture-run.ts). */
+/**
+ * Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (capture-run.ts).
+ */
 export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => inside(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
 const at = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
 
@@ -137,8 +139,8 @@ export function consistency(t: TargetTruth, platform?: 'ios' | 'android', screen
  * Android's status bar is the system's window: a raw tap in it never reaches the app (calibration.json #21, the status
  * bar — "the swallowed probe accepted"). Only the status bar: that is what #21 is about. iOS's status bar passes a tap
  * through to the app's window (its touch is logged), so it swallows nothing — though the tap may also scroll a scroll
- * view to its top (UIKit's scroll-to-top); the probe is still taken: the capture relaunches the cell before every probe,
- * so that scroll cannot reach the next one, and the touch it logs is the evidence the rows need.
+ * view to its top (UIKit's scroll-to-top); the probe is still taken: the capture relaunches the cell before every
+ * probe, so that scroll cannot reach the next one, and the touch it logs is the evidence the rows need.
  */
 export const systemBarSwallows = (platform: 'ios' | 'android' | undefined, g: Geometry) => platform === 'android' && g === 'status-band';
 
@@ -182,7 +184,10 @@ export interface GeometryContext {
   chrome?: Record<string, Rect>;
 }
 
-/** The system bands as rects — the status band over the top inset, the navigation band over the bottom one; none for a zero inset. */
+/**
+ * The system bands as rects — the status band over the top inset, the navigation band over the bottom one; none for a
+ * zero inset.
+ */
 export function bandsOf(screen: Rect, safeArea: Insets | undefined): { status?: Rect; nav?: Rect } {
   if (safeArea === undefined) return {};
   return {
@@ -242,7 +247,9 @@ export function visibleOf(frame: Rect, ctx: GeometryContext): Rect | null {
   return on === null || ctx.clip === undefined ? on : intersect(on, ctx.clip);
 }
 
-/** The largest part of what shows clear of the system bands and the app's chrome — where a tap can land on the target. */
+/**
+ * The largest part of what shows clear of the system bands and the app's chrome — where a tap can land on the target.
+ */
 export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
   const visible = visibleOf(frame, ctx);
   if (visible === null) return null;
@@ -287,9 +294,9 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   if (intersect(frame, ctx.screen) === null) return 'off-screen';
   const visible = visibleOf(frame, ctx);
   if (visible === null) return 'outside-scroll-view';
-  // The point the probe taps (probePoint, rounded as the raw tools take it), not the float centre: what lies there is what
-  // the probe meets — and averi's tap and plain stop judge the rounded centre too (ui-tree/standing.ts, "its ROUNDED
-  // centre lies below the band").
+  // The point the probe taps (probePoint, rounded as the raw tools take it), not the float centre: what lies there is
+  // what the probe meets — and averi's tap and plain stop judge the rounded centre too (ui-tree/standing.ts, "its
+  // ROUNDED centre lies below the band").
   const c = probePoint(frame);
   const bands = bandsOf(ctx.screen, ctx.safeArea);
   if (bands.status !== undefined && inside(c, bands.status)) return 'status-band';
@@ -304,7 +311,10 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   return underChrome ?? regionOverlap(visible, ctx) ?? 'whole';
 }
 
-/** Whether a state reports anything a geometry is measured from — else the targets carry none (every capture before phase 3). */
+/**
+ * Whether a state reports anything a geometry is measured from — else the targets carry none (every capture before
+ * phase 3).
+ */
 export const measuresGeometry = (s: Pick<LabState, 'safeArea' | 'scrollViews' | 'chrome'>) => s.safeArea !== undefined || s.scrollViews !== undefined || s.chrome !== undefined;
 
 /** A target's measured geometry from the state, or nothing when the state reports none of what it is measured from. */
@@ -316,7 +326,10 @@ export function measuredGeometry(frame: Rect, s: LabState, scrollView: string | 
   return { geometry: geometryOf(frame, ctx), visible: visibleOf(frame, ctx), piece: pieceOf(frame, ctx) };
 }
 
-/** Where the second probe taps (TargetTruth.reachedAtPiece): the piece's centre, when it is more than TOUCH_SLACK from the frame's. */
+/**
+ * Where the second probe taps (TargetTruth.reachedAtPiece): the piece's centre, when it is more than TOUCH_SLACK from
+ * the frame's.
+ */
 export function pieceProbePoint(frame: Rect, piece: Rect | null | undefined): { x: number; y: number } | undefined {
   if (piece === null || piece === undefined) return undefined;
   const a = probePoint(frame);

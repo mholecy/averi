@@ -102,7 +102,8 @@ struct Frame: Codable, Equatable {
 struct LabEvent: Codable {
     /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button); on a form
     /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row);
-    /// "touch" (a touch began in one of the app's windows, `tag` "x,y" in screen points — the probe's positive control).
+    /// "touch" (a touch began in one of the app's windows, `tag` "x,y" in screen points — the probe's positive
+    /// control).
     let kind: String
     let tag: String
     let at: Double

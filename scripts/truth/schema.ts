@@ -39,18 +39,20 @@ export interface CatalogTarget {
 
 /**
  * The cell families (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3): one catalog file
- * (fixtures/apps/cells/<family>.json), one app file per platform, one golden-spec file and one KNOWN file each, so cells
- * of different families are written apart. `base` the open control; `presented` a layer presented over the targets
- * (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the screen's edge;
- * `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar that is no cover.
- * In this order in the generated catalog (scripts/truth/catalog.ts).
+ * (fixtures/apps/cells/<family>.json), one app file per platform, one golden-spec file and one KNOWN file each, so
+ * cells of different families are written apart. `base` the open control; `presented` a layer presented over the
+ * targets (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the
+ * screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar
+ * that is no cover. In this order in the generated catalog (scripts/truth/catalog.ts).
  */
 export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers'] as const;
 export type Family = (typeof FAMILIES)[number];
 
 export interface CatalogCell {
   id: string;
-  /** The family whose file holds it — set by the generator (scripts/truth/catalog.ts), never written in a family file. */
+  /**
+   * The family whose file holds it — set by the generator (scripts/truth/catalog.ts), never written in a family file.
+   */
   family?: Family;
   /** `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`. */
   layer: string;
@@ -89,7 +91,9 @@ export interface CatalogField {
   placeholder?: string;
   /** What a dev flavour puts in the field before the user does. */
   prefill?: string;
-  /** What the field shows when a submit finds it invalid; without it, `Required` identified `lab.<cell>.<tag>_error`. */
+  /**
+   * What the field shows when a submit finds it invalid; without it, `Required` identified `lab.<cell>.<tag>_error`.
+   */
   error?: Message;
 }
 
@@ -167,9 +171,15 @@ export interface LabState {
   // measured geometry, and its targets are judged by `declared` alone, as before.
   /** The window's safe-area insets — the system bands: iOS's status bar and home indicator, Android's system bars. */
   safeArea?: Insets;
-  /** Each scroll view of the cell by id, its clip on the screen: what of its content can show (CatalogTarget.scrollView). */
+  /**
+   * Each scroll view of the cell by id, its clip on the screen: what of its content can show
+   * (CatalogTarget.scrollView).
+   */
   scrollViews?: Record<string, Rect>;
-  /** The app's chrome by name, each frame on the screen: `tabBar`, `navBar`, `toolbar`, `fab`, a pinned bar — app UI drawn over content. */
+  /**
+   * The app's chrome by name, each frame on the screen: `tabBar`, `navBar`, `toolbar`, `fab`, a pinned bar — app UI
+   * drawn over content.
+   */
   chrome?: Record<string, Rect>;
 }
 
@@ -218,13 +228,16 @@ export interface TargetTruth {
   drawn: number;
   /** The colour most of the frame shows in the screenshot, `#RRGGBB` — what the user sees there. */
   seen: string;
-  // Measured from the app's frames when the state reports the screen's bands, scroll views or chrome (truth.ts#geometryOf);
-  // absent on every capture before phase 3, whose targets are judged by `declared` alone.
+  // Measured from the app's frames when the state reports the screen's bands, scroll views or chrome
+  // (truth.ts#geometryOf); absent on every capture before phase 3, whose targets are judged by `declared` alone.
   /** Where the frame lies against the screen, its scroll view's clip, the system bands and the app's chrome. */
   geometry?: Geometry;
   /** The frame clipped by the screen and its scroll view's clip — what of it can be drawn; null when nothing. */
   visible?: Rect | null;
-  /** The largest part of `visible` clear of the system bands and the app's chrome — where a tap can land on it; null when none. */
+  /**
+   * The largest part of `visible` clear of the system bands and the app's chrome — where a tap can land on it; null
+   * when none.
+   */
   piece?: Rect | null;
   /** The scroll view the target lies in (CatalogTarget.scrollView). */
   scrollView?: string;
@@ -301,7 +314,10 @@ export interface ControlTruth {
   situation: Situation;
   /** A raw tap at the frame's centre focused the field / fired the button / chose the row. */
   reached: boolean;
-  /** Everything else the probe tap made the app log (its touch first); empty for a control never probed (off the screen, not laid out). */
+  /**
+   * Everything else the probe tap made the app log (its touch first); empty for a control never probed (off the screen,
+   * not laid out).
+   */
   probe: ProbeEvent[];
 }
 

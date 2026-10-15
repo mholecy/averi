@@ -5,11 +5,11 @@ import { regionOverlap, sampleOf } from '../../truth/truth.js';
 import { BUDGET_MS, first, landed, notTapped, passed, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
 
 /**
- * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an open
- * target whose MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's direction.
- * Shared by the families: edges.ts and bars.ts map a geometry to its rows; B2–B5 wire them to their cells. A target
- * carries a geometry only when its capture's state reported the bands, scroll views or chrome — no capture before
- * phase 3 does — so none of them asks anything of the existing corpus.
+ * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
+ * open target whose MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's
+ * direction. Shared by the families: edges.ts and bars.ts map a geometry to its rows; B2–B5 wire them to their cells. A
+ * target carries a geometry only when its capture's state reported the bands, scroll views or chrome — no capture
+ * before phase 3 does — so none of them asks anything of the existing corpus.
  *
  * | row | truth | verb | expected | decided by |
  * |---|---|---|---|---|
@@ -43,7 +43,10 @@ const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id'>, direction: '
   args: { platform, selector: `id:"${t.id}"`, direction, ...(fully && { fully: true }) },
 });
 
-/** Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the screen), else `up`. */
+/**
+ * Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the
+ * screen), else `up`.
+ */
 export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pick<CellTruth, 'screen'>): 'up' | 'down' {
   const shown = t.visible ?? { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
   return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
@@ -74,7 +77,10 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string): Ex
   };
 }
 
-/** R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable (judges.ts#strokeable). */
+/**
+ * R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable
+ * (judges.ts#strokeable).
+ */
 export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
   const direction = directionOf(t, cell);
   return {
@@ -99,7 +105,10 @@ export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTr
   };
 }
 
-/** R-fully: `fully: true` never calls it "visible" where it is — after no swipe, or after swipes that move nothing in a replayed tree. */
+/**
+ * R-fully: `fully: true` never calls it "visible" where it is — after no swipe, or after swipes that move nothing in a
+ * replayed tree.
+ */
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   return {
     verb: 'scroll_until',
@@ -111,8 +120,9 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): E
 
 /**
  * R-land: the tap lands on what shows of the target. Reached at its centre (`partly-centre-in`, and a whole target
- * overlapped at its edge, `band-overlap:<band>` / `chrome-overlap:<name>`): `Tapped`, inside `visible`. Else (`centre-out`, `under-chrome:<name>`): refused with nothing sent, or `Tapped` inside its piece where
- * the second probe fired (`reachedAtPiece`).
+ * overlapped at its edge, `band-overlap:<band>` / `chrome-overlap:<name>`): `Tapped`, inside `visible`. Else
+ * (`centre-out`, `under-chrome:<name>`): refused with nothing sent, or `Tapped` inside its piece where the second probe
+ * fired (`reachedAtPiece`).
  */
 export function landRow(platform: Platform, t: TargetTruth): Expectation {
   const atCentre = (t.geometry === 'partly-centre-in' || isOverlap(t)) && t.reached;
@@ -142,7 +152,9 @@ export function dismissRow(platform: Platform, control: { tag: string; id: strin
   };
 }
 
-/** R-direction: LIVE ONLY — whether each stroke brings the target closer is a dynamic; declared so the table is whole. */
+/**
+ * R-direction: LIVE ONLY — whether each stroke brings the target closer is a dynamic; declared so the table is whole.
+ */
 export function directionRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   const direction = directionOf(t, cell);
   return {

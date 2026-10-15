@@ -177,7 +177,9 @@ interface SnapNode {
 
 interface Target {
   selector: string;
-  /** The assert's element spec — none for a `value:` target: an element spec names no value (verify/element-assert.ts). */
+  /**
+   * The assert's element spec — none for a `value:` target: an element spec names no value (verify/element-assert.ts).
+   */
   element?: Record<string, string>;
   role: string;
   /** The node's rect in the tree that named it (NEW's when both did) — where its colour is painted. */
@@ -321,7 +323,10 @@ function plan(platform: Platform, t: Target, i: number, tools: ReadonlySet<ToolN
   return calls;
 }
 
-/** Per tree: the swipes, the many-matches taps, and on a raw iOS tree the launch (its foreground wait asks the source which app it reads). */
+/**
+ * Per tree: the swipes, the many-matches taps, and on a raw iOS tree the launch (its foreground wait asks the source
+ * which app it reads).
+ */
 function treeCalls(recording: Recording, tools: ReadonlySet<ToolName>, shared: readonly string[]): Call[] {
   const platform = recording.platform;
   const calls: Call[] = [];

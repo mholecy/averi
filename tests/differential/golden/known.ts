@@ -20,7 +20,8 @@ export interface Known {
    * What the row is, beside `cls` (which stays the judge's reason, matched against the mismatch): `bug:<file>` a bug
    * note under docs/bugs that the row reproduces — red until its fix; `residual:<decision>` a mismatch accepted by a
    * decision (an ADR, an owner's ruling: calibration.json's `residual:` statuses) — red by design. Absent: neither
-   * filed yet (a tree source's limit, described in `note`). golden.test.ts checks that a `bug:` names a note that exists.
+   * filed yet (a tree source's limit, described in `note`). golden.test.ts checks that a `bug:` names a note that
+   * exists.
    */
   as?: Classed;
 }

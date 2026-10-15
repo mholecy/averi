@@ -20,15 +20,16 @@ import type { LabState } from './schema.js';
  * scroll_until — run through averi's MCP tools against the REAL lab simulator, and the app's own model (the state
  * file, Forms.swift) is the oracle. A replayed tree cannot judge these: typing changes nothing in it.
  *
- *   node --import tsx scripts/truth/live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--cases b1,p4] [--shots <dir>]
+ *   node --import tsx scripts/truth/live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda]
+ *     [--cases b1,p4] [--shots <dir>]
  *
  * The server is built as tests/mcp/tools.test.ts builds one (createAveriServer over the SDK's in-memory transport and
  * a real Client), over a REAL AdapterRegistry whose factory constructs the iOS adapter itself: averi gives WDA port
  * 8100 to the first simulator a process asks for, and 8100/8101 may belong to another session's WebDriverAgent — here
  * the WDA source takes `--wda-port` (default 8120, capture.ts's) and builds into the lab's own derived data
- * (lab-device.ts#LAB_WDA_DERIVED_DATA), never device-check's `averi-wda`. Discovery lists the lab simulator only, so no tool
- * call can bind another booted device. Each case launches its cell in a fresh process (simctl, as the capture does —
- * not averi's launch_app, which is not under test here), runs its calls, waits for the app to write, and reads the
+ * (lab-device.ts#LAB_WDA_DERIVED_DATA), never device-check's `averi-wda`. Discovery lists the lab simulator only, so no
+ * tool call can bind another booted device. Each case launches its cell in a fresh process (simctl, as the capture does
+ * — not averi's launch_app, which is not under test here), runs its calls, waits for the app to write, and reads the
  * model.
  *
  * Outcome per case:

@@ -19,7 +19,8 @@ struct AveriLabApp: App {
                 }
             }
             .environmentObject(lab)
-            // The keyboard's frame for the form oracle: its end frame, screen coordinates (a hide ends below the screen).
+            // The keyboard's frame for the form oracle: its end frame, screen coordinates (a hide ends below the
+            // screen).
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { n in
                 if let end = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect { lab.keyboard(end) }
             }

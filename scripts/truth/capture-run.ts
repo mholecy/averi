@@ -11,11 +11,11 @@ import { centreOnScreen, consistency, controlConsistency, measuredGeometry, outO
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
  * LabDevice (lab-device.ts), the command lines thin (capture.ts: iOS, capture-android.ts: Android):
  *
- * Per cell: launch it in a fresh process, wait for the app's `ready`, save every raw tree the platform has (WDA and idb;
- * uiautomator), the screenshot and the app's state; then per target, and per control of a form cell, relaunch the cell
- * and tap its centre with a raw tap — the probe: did its action fire, and (the positive control) did the tap reach the
- * app at all? — and, for a target, measure from the screenshot how much of it is drawn as itself. Writes a differential
- * corpus run: one capture per tree, sharing the cell's screenshot and truth.
+ * Per cell: launch it in a fresh process, wait for the app's `ready`, save every raw tree the platform has (WDA and
+ * idb; uiautomator), the screenshot and the app's state; then per target, and per control of a form cell, relaunch the
+ * cell and tap its centre with a raw tap — the probe: did its action fire, and (the positive control) did the tap reach
+ * the app at all? — and, for a target, measure from the screenshot how much of it is drawn as itself. Writes a
+ * differential corpus run: one capture per tree, sharing the cell's screenshot and truth.
  *
  * When the state reports the screen's bands, scroll views or chrome (phase 3's cells), each target also carries its
  * measured geometry (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not
@@ -23,12 +23,13 @@ import { centreOnScreen, consistency, controlConsistency, measuredGeometry, outO
  * — every cell before phase 3 — captures as before. On any cell, a target whose probe point (probePoint, its rounded
  * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
  * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
- * phase 3: truth.ts#consistency); so is an Android target whose centre lies in the navigation band (truth.ts#unprobedBand:
- * what a tap there does is unmeasured, and on three-button navigation it would leave the app).
+ * phase 3: truth.ts#consistency); so is an Android target whose centre lies in the navigation band
+ * (truth.ts#unprobedBand: what a tap there does is unmeasured, and on three-button navigation it would leave the app).
  *
- * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown and
- * its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus per
- * control (field, submit, the picker's probe rows) where its frame lies (truth.ts#situationOf) and what its probe did.
+ * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown
+ * and its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus
+ * per control (field, submit, the picker's probe rows) where its frame lies (truth.ts#situationOf) and what its probe
+ * did.
  *
  * averi judges nothing here: the trees are read with the raw tools, so the truth does not depend on the code it will
  * test. Run it against a device that holds nothing else of value: the lab app's data is replaced per launch.
@@ -98,10 +99,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
       const { drawn, seen } = measure(png, frame, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
-      // The centre is never tapped where it lies off the screen (an off-screen target, or one the screen's edge cuts with
-      // its centre past it): a raw tap there reaches no window of the app — no touch, so its "not reached" says nothing.
-      // Nor in Android's navigation band: unmeasured whether a tap there reaches the app or presses Back, Home or Recents
-      // (truth.ts#unprobedBand, B4's to measure).
+      // The centre is never tapped where it lies off the screen (an off-screen target, or one the screen's edge cuts
+      // with its centre past it): a raw tap there reaches no window of the app — no touch, so its "not reached" says
+      // nothing. Nor in Android's navigation band: unmeasured whether a tap there reaches the app or presses Back, Home
+      // or Recents (truth.ts#unprobedBand, B4's to measure).
       const off = geometry.geometry === 'off-screen' || !centreOnScreen(frame, s.screen);
       const unprobed = off
         ? `its centre (${probePoint(frame).x},${probePoint(frame).y}) lies off the ${s.screen.width}x${s.screen.height} screen`

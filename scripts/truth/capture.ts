@@ -6,15 +6,16 @@ import { loadCatalog, selectCells } from './catalog.js';
 import { AndroidLab, IosLab, type LabDevice } from './lab-device.js';
 
 /**
- * The truth capture's command lines (capture-run.ts does the work; README.md beside scripts/differential, "Golden mode"):
+ * The truth capture's command lines (capture-run.ts does the work; README.md beside scripts/differential, "Golden
+ * mode"):
  *
  *   node --import tsx scripts/truth/capture.ts --udid <lab simulator> --out tests/fixtures/truth/<run>
  *        [--wda-port 8120] [--family presented,edges] [--cells open,alert-dim]
  *   node --import tsx scripts/truth/capture-android.ts --serial <lab emulator> --out tests/fixtures/truth/<run>
  *        [--family presented] [--cells open,alert-dim]
  *
- * iOS: the raw WDA `/source?format=json` body (averi's own WdaServer, only its process lifecycle, on a port of its own —
- * never 8100/8101, the device-check simulator's — and a derived-data directory of its own) and the raw idb `ui
+ * iOS: the raw WDA `/source?format=json` body (averi's own WdaServer, only its process lifecycle, on a port of its own
+ * — never 8100/8101, the device-check simulator's — and a derived-data directory of its own) and the raw idb `ui
  * describe-all --json` list; probes with `idb ui tap`. Android: the raw `uiautomator dump /dev/tty` output; probes with
  * `adb -s <serial> shell input tap`; never restarts the adb server. The device must be the lab's — a simulator named
  * `averi-lab …` (never the device-check simulator), the `averi_lab` AVD — or the capture refuses before touching it

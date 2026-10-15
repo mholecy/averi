@@ -9,15 +9,16 @@ import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
  * note's fix and pass after it. Golden runs (`--json`, the whole truth corpus) with THIS checkout's harness and truth
- * over the src of every before and after commit the notes of scripts/truth/calibration.json name (side.ts loads an older
- * src as it is), and each note that names golden rows gets a verdict from its rows:
+ * over the src of every before and after commit the notes of scripts/truth/calibration.json name (side.ts loads an
+ * older src as it is), and each note that names golden rows gets a verdict from its rows:
  *
  *   CALIBRATED            every named row red before WITH the note's defect (`defect`: the note's own symptom, a
  *                         pattern of the row's mismatch or of its reply where the mismatch quotes only its start),
  *                         green after
  *   CALIBRATED-ON-DEFECT  red before with the defect; after, the defect is gone but a row stays red for another class
  *                         (e.g. "not in the tree")
- *   DOES-NOT-FAIL         a row green before, or red without the defect: a hole in the truth, the spec table or the cells
+ *   DOES-NOT-FAIL         a row green before, or red without the defect: a hole in the truth, the spec table or
+ *                         the cells
  *   STILL-RED-AFTER       a row still red after with the defect
  *   OPEN-RED              an open note (no fix): every row red with the defect in the working tree
  *   OPEN-NOT-REPRODUCED   an open note with a row green, or red without the defect, in the working tree
@@ -30,13 +31,14 @@ import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
  * ELSEWHERE at the fix — reported with the verdict, and unexpected unless the note's `regressions` records it (`broke`
  * the after commit, the row in `rows`).
  *
- *   node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]] [--out docs/truth/calibration.md] [--remove]
+ *   node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]]
+ *     [--out docs/truth/calibration.md] [--remove]
  *
  * The checkouts (checkout.ts, `differential-cal-<sha>` under --worktrees) are kept for the next run; --remove removes
  * the checkouts THIS run created (one found in place stays). An open note is judged on the working tree — this checkout
  * as it is on disk, uncommitted changes included.
- * Exit code 1 when a note's verdict is not the one it expects (`expect`; CALIBRATED, or OPEN-RED for an open note), or a
- * note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more (runSide;
+ * Exit code 1 when a note's verdict is not the one it expects (`expect`; CALIBRATED, or OPEN-RED for an open note), or
+ * a note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more (runSide;
  * said on the console only, so the report stays the same); a side that still does not load carries why — the exit code
  * or signal and the last lines of stderr, or git's own stderr for a checkout that failed. While a side does not load
  * where its note does not expect it, --out leaves its file as it is and writes `<out>.failed`; with --note, which runs
@@ -85,7 +87,9 @@ export interface CalibrationEntry {
   /** The commit judged green: a fix commit (usually the first). */
   after?: string;
   verified?: 'golden' | 'merge-subject' | 'unverified';
-  /** Golden rows, `<run>/<file> <target> <verb>` as the ratchet keys them (tests/differential/golden/<family>.known.ts). */
+  /**
+   * Golden rows, `<run>/<file> <target> <verb>` as the ratchet keys them (tests/differential/golden/<family>.known.ts).
+   */
   checks?: string[];
   /**
    * The note's own symptom, a pattern of a red row's mismatch or reply (the mismatch quotes the reply's first line
@@ -109,7 +113,9 @@ export interface Calibration {
 /** The side an open note is judged on: this checkout as it is on disk, not its committed HEAD. */
 export const WORKING_TREE = 'working tree';
 
-/** A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it. */
+/**
+ * A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it.
+ */
 export const keyOf = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
 /** The capture a row key names (`<run>/<file>`). */
 export const captureOf = (key: string) => key.slice(0, key.indexOf(' '));
@@ -160,7 +166,10 @@ export interface ProcessError {
   message: string;
 }
 
-/** Why a golden process failed: killed by a signal, its exit code or its spawn error — and the last 3 lines of its stderr. */
+/**
+ * Why a golden process failed: killed by a signal, its exit code or its spawn error — and the last 3 lines of its
+ * stderr.
+ */
 export function failureOf(err: ProcessError): string {
   const how =
     err.signal != null
@@ -230,7 +239,10 @@ export const sideLine = (side: string, o: SideOutcome, seconds: number): string 
 
 export const expected = (e: CalibrationEntry): Verdict => e.expect ?? (e.status === 'open' ? 'OPEN-RED' : 'CALIBRATED');
 
-/** The verdict for one note from its rows at before and after (or in the working tree, `after` unused, for an open note). */
+/**
+ * The verdict for one note from its rows at before and after (or in the working tree, `after` unused, for an open
+ * note).
+ */
 export function verdictOf(e: CalibrationEntry, before: SideRun, after?: SideRun): Verdict {
   const rows = e.checks ?? [];
   if ('error' in before || (after !== undefined && 'error' in after)) return 'SIDE-DOES-NOT-LOAD';
@@ -336,7 +348,10 @@ export function verdictCell(r: NoteResult): string {
   return v;
 }
 
-/** docs/truth/calibration.md: the summary table, then per note its rows at both sides — a red row's mismatch, a green row's reply. */
+/**
+ * docs/truth/calibration.md: the summary table, then per note its rows at both sides — a red row's mismatch, a green
+ * row's reply.
+ */
 export function calibrationReport(rs: readonly NoteResult[]): string {
   const lines = [
     '# Calibration on the bug notes',

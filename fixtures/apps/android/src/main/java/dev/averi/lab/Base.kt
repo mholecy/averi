@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-/** A slot's target, as on iOS (Slot in Base.swift): 300×64 dp, centred horizontally, its centre 142 + 180·slot dp down. */
+/**
+ * A slot's target, as on iOS (Slot in Base.swift): 300×64 dp, centred horizontally, its centre 142 + 180·slot dp down.
+ */
 private val SLOT_WIDTH = 300.dp
 private val SLOT_HEIGHT = 64.dp
 private fun slotTop(slot: Int): Dp = (142 + 180 * slot).dp - SLOT_HEIGHT / 2
@@ -60,7 +62,10 @@ internal fun TargetBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Mod
     )
 }
 
-/** The targets beneath the layer, each at its slot; the cell's layer (none for `open`) raised by PresentedLayer (Presented.kt). */
+/**
+ * The targets beneath the layer, each at its slot; the cell's layer (none for `open`) raised by PresentedLayer
+ * (Presented.kt).
+ */
 @Composable
 internal fun CellScreen(cell: Cell, lab: Lab) {
     // testTagsAsResourceId per composition root: the screen, and the sheet's own window below.

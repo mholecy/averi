@@ -12,8 +12,8 @@ import type { CellTruth, TargetTruth } from '../../scripts/truth/schema.js';
 
 // The golden mode's wiring of phase 3's truth (golden.ts#goldenRecording), on a synthetic capture: the committed
 // Android `open` capture (its tree and screenshot) with a truth whose targets carry a measured geometry — none of the
-// committed corpus does, so golden.test.ts cannot see whether golden hands expectations() the cell's truth, consistency()
-// the platform and the screen, or drops the live-only rows.
+// committed corpus does, so golden.test.ts cannot see whether golden hands expectations() the cell's truth,
+// consistency() the platform and the screen, or drops the live-only rows.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RUN = fileURLToPath(new URL('../fixtures/truth/android-averi_lab-api33/', import.meta.url));
@@ -34,7 +34,8 @@ beforeAll(async () => {
     { ...a, geometry: 'status-band', reached: false, probe: [], visible: a.frame, piece: null },
     // Off the screen: R-off's three rows and R-direction, live only — never asked.
     { ...b, frame: { ...b.frame, y: 2300 }, geometry: 'off-screen', reached: false, probe: [], visible: null, piece: null, unprobed: 'its centre (540,2388) lies off the 1080x2220 screen' },
-    // Cut by the screen's bottom with its centre (540,2238) past it: never probed there — consistent only told the screen.
+    // Cut by the screen's bottom with its centre (540,2238) past it: never probed there — consistent only told the
+    // screen.
     {
       ...c,
       frame: { ...c.frame, y: 2150 },

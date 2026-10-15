@@ -7,9 +7,9 @@ import { FAMILIES, type Catalog, type CatalogCell, type Family } from './schema.
 /**
  * The cell catalog, one file per family (fixtures/apps/cells/<family>.json, schema.ts#FAMILIES), and the one catalog
  * both lab apps bundle (fixtures/apps/cells.json) GENERATED from them: the families in FAMILIES's order, each cell
- * stamped with its `family` (the apps route a cell to their family's file by it). Families are written apart — phase 3's
- * batches each own one file — and the generated file is never edited by hand: tests/truth/catalog.test.ts fails while
- * the committed cells.json is not what the family files generate.
+ * stamped with its `family` (the apps route a cell to their family's file by it). Families are written apart — phase
+ * 3's batches each own one file — and the generated file is never edited by hand: tests/truth/catalog.test.ts fails
+ * while the committed cells.json is not what the family files generate.
  *
  *   node --import tsx scripts/truth/catalog.ts           # rewrite fixtures/apps/cells.json
  *   node --import tsx scripts/truth/catalog.ts --check   # exit 1 when it is stale
@@ -99,7 +99,8 @@ export async function loadCatalog(file = CATALOG_FILE): Promise<Catalog> {
 
 /**
  * The cells a capture asks for: those of the named families, then (both given: of those) the named cells, in catalog
- * order; all of them when neither is given. Strict, as golden's --only: a family or cell that names nothing is an error.
+ * order; all of them when neither is given. Strict, as golden's --only: a family or cell that names nothing is an
+ * error.
  */
 export function selectCells(catalog: Catalog, opts: { families?: readonly string[]; cells?: readonly string[] }): CatalogCell[] {
   const badFamily = (opts.families ?? []).filter((f) => !(FAMILIES as readonly string[]).includes(f));

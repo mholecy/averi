@@ -32,7 +32,9 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TRUTH = fileURLToPath(new URL('../fixtures/truth/', import.meta.url));
 const BUGS = fileURLToPath(new URL('../../docs/bugs/', import.meta.url));
 
-/** Every family's ratchet (tests/differential/golden/<family>.known.ts), one file per family of fixtures/apps/cells/. */
+/**
+ * Every family's ratchet (tests/differential/golden/<family>.known.ts), one file per family of fixtures/apps/cells/.
+ */
 const FILES: readonly KnownFile[] = [base, presented, forms, edges, bars, falseCovers];
 const KNOWN: Record<string, Known> = Object.assign({}, ...FILES.map((f) => f.known));
 const COUNTS: Record<string, number> = Object.assign({}, ...FILES.map((f) => f.counts));

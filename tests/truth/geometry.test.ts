@@ -35,7 +35,7 @@ const LIST = rect(0, 100, 402, 600);
 const TAB = rect(0, 790, 402, 84);
 /** A horizontal carousel's clip: 300 pt wide, ending inside the screen. */
 const CAROUSEL = rect(0, 250, 300, 100);
-/** A carousel's clip inset 100 pt from the screen's left edge: what cuts a target at its left is the clip, not the screen. */
+/** A carousel's clip inset 100 pt from the left: what cuts a target at its left is the clip, not the screen. */
 const INSET = rect(100, 250, 300, 100);
 const ctx = (over: Partial<GeometryContext> = {}): GeometryContext => ({ screen: SCREEN, safeArea: SAFE, ...over });
 
@@ -217,7 +217,10 @@ describe('consistency with a measured geometry', () => {
 // --- the capture, measuring the geometry when the state reports it ---
 
 const GREEN = '#43A047';
-/** A 40×40 screen at scale 1: A at 10,10 20×20; B half off the bottom (30..50); C below it (50..70); a 4-unit status band. */
+/**
+ * A 40×40 screen at scale 1: A at 10,10 20×20; B half off the bottom (30..50); C below it (50..70); a 4-unit status
+ * band.
+ */
 class GeometryLab implements LabDevice {
   readonly platform = 'android';
   taps: [number, number][] = [];

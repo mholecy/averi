@@ -17,14 +17,14 @@ import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/
  * against what the truth implies (golden-spec.ts) — not against another checkout. A mismatch is a bug found without a
  * device round; a target whose truth's sources disagree is a broken cell, reported and not judged.
  *
- *   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>]
- *     [--only <cell>[,<cell>…]] [--json]
+ *   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>]
+ *     [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json]
  *
  * The side defaults to this checkout; an older commit's src is loaded by this checkout's harness (side.ts). `--only`
  * keeps the captures a token names (selectRecordings); `--json` prints the results as data (GoldenJson) in place of the
- * report — scripts/truth/calibrate.ts reads it. A check whose reply is a harness or JavaScript error, or whose call sent a
- * command the fake device does not model, carries it as `faults` (faultsOf), in the JSON and the report. Exit code 1 on a
- * mismatch, a broken target or a fault.
+ * report — scripts/truth/calibrate.ts reads it. A check whose reply is a harness or JavaScript error, or whose call
+ * sent a command the fake device does not model, carries it as `faults` (faultsOf), in the JSON and the report. Exit
+ * code 1 on a mismatch, a broken target or a fault.
  */
 
 export interface GoldenCheck {
@@ -143,7 +143,10 @@ export { pct };
 
 /** A capture's cell: its file name up to the first dot (`form-keyboard.wda.json` → `form-keyboard`). */
 export const cellOf = (r: Pick<Recording, 'file'>) => r.file.slice(0, r.file.indexOf('.') < 0 ? undefined : r.file.indexOf('.'));
-/** A capture's file name without its extension (`form-keyboard.wda.json` → `form-keyboard.wda`, `alert-dim.xml` → `alert-dim`). */
+/**
+ * A capture's file name without its extension (`form-keyboard.wda.json` → `form-keyboard.wda`, `alert-dim.xml` →
+ * `alert-dim`).
+ */
 const stemOf = (r: Pick<Recording, 'file'>) => r.file.replace(/\.(json|xml)$/, '');
 
 /** `--only`'s value: comma-separated tokens, blanks dropped. */
