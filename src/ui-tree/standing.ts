@@ -1,5 +1,5 @@
 import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure, type MarkedLayer } from './draw-order.js';
+import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure, type MarkedLayer, type PresentedPress } from './draw-order.js';
 import {
   aboveNavigationBand,
   belowStatusBand,
@@ -281,6 +281,16 @@ export interface Scene {
    * so the two cannot diverge.
    */
   pixelRegion(node: UiNode, screen: UsableScreen | undefined): Rect;
+  /**
+   * THE presented question a stroke asks at its touch-down (`point`), as a sentence quotes the answer
+   * (draw-order.ts#PresentedPress): on behalf of `target`, the surface of a screen presented over the target's own
+   * that holds the point (draw-order.ts#DrawOrder.presentedAt) — or, with NO target (one not in the tree), the
+   * element of a marked presented layer the point lands on (draw-order.ts#DrawOrder.markedAt: a screen presented by
+   * shape alone is not asked of no target). Undefined when none. The point is kept: a surface judged by shape only
+   * where it lies is not one at every touch-down (a dismissed sheet parked off screen is no stop). One reader:
+   * `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
+   */
+  presentedAt(point: Point, target?: UiNode): PresentedPress | undefined;
 }
 
 /**
@@ -580,6 +590,10 @@ export function sceneOf(tree: UiNode): Scene {
     },
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
+    presentedAt(point, target) {
+      const surface = target === undefined ? scene.order.markedAt(point) : scene.order.presentedAt(target, point);
+      return surface === undefined ? undefined : scene.order.presentedPress(surface);
+    },
   };
   /** The usable screen the pixel purpose judges on: `screen` when it has `oriented`, else the tree's own. */
   function pixelScreen(screen: StandingScreen | UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {

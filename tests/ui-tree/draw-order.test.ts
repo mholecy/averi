@@ -4,6 +4,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { sceneOf } from '../../src/ui-tree/standing.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -1634,6 +1635,17 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
     const order = drawOrder(tree);
     expect(order.presentedAt(twin, { x: 201, y: 175 })).toBeUndefined();
     expect(order.presentedAt(twin, TOUCH_DOWN)).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
+  });
+
+  it('the scene asks it at a point (`Scene.presentedAt`): under the Fees half sheet the surface at the touch-down presses its own rect and names no layer; asked for no target, a screen presented by shape alone is no stop — none', () => {
+    const tree = screen('swiftFeesSheet');
+    const field = find(tree, (n) => n.identifier === 'swift_payment.form.payee_city_input');
+    const scene = sceneOf(tree);
+    const atTouchDown = scene.presentedAt(TOUCH_DOWN, field);
+    expect(atTouchDown).toMatchObject({ surface: { role: 'scrollable', rect: rect(31, 456, 340, 355) }, reach: rect(31, 456, 340, 355) });
+    expect(atTouchDown?.layer).toBeUndefined();
+    expect(scene.presentedAt({ x: 201, y: 175 }, field)).toMatchObject({ surface: { label: 'dismiss popup' }, reach: rect(-402, -874, 1206, 2622) });
+    expect(scene.presentedAt(TOUCH_DOWN)).toBeUndefined();
   });
 
   it('none with no screen presented (Finportal\'s login), and none for a node not in this tree', () => {
