@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, iosRoleOf, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type PresentationKind, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type PresentationKind, type Rect, type TypedPresentationKind, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -69,7 +69,7 @@ const ROLE_MAP: Record<string, string> = {
  * its message. Roles stay what ROLE_MAP says (`container`); the mark says the rest. Measured: mp-native's SwiftUI exit
  * alert (`Alert`), Contacts' discard prompt (`Popover` → `Sheet "Are you sure…"`), iPhone 17, iOS 27.
  */
-const PRESENTATIONS: readonly (readonly [string, Exclude<PresentationKind, 'screen'>])[] = [
+const PRESENTATIONS: readonly (readonly [string, TypedPresentationKind])[] = [
   ['Alert', 'alert'],
   ['Sheet', 'actionSheet'],
   ['Popover', 'popover'],

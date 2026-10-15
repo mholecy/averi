@@ -1,4 +1,4 @@
-import { INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
+import { INPUT_ROLE, isTyped, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { CONTENT_FRAMED_ROLES, fillsScreen, framesOnly, itemless, stackedScreens, within, type Placed } from './placed.js';
 import { presentedByShape, type FrameRow, type PresentedByShape } from './presented-by-shape.js';
@@ -49,7 +49,7 @@ interface PresentedLayer {
 const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undefined => {
   const kind = layer.node.presentation;
   if (kind === undefined) return undefined;
-  const element = kind === 'screen' ? undefined : order.slice(layer.at, layer.end).find((p) => p.node.presentationElement === true);
+  const element = isTyped(kind) ? order.slice(layer.at, layer.end).find((p) => p.node.presentationElement === true) : undefined;
   const cover = element ?? layer;
   return { layer, kind, ...(element !== undefined && { element }), cover, marked: { kind, ...(cover.node.label ? { label: cover.node.label } : {}) } };
 };
@@ -1662,8 +1662,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
     const layers = markedLayers(places);
     if (layers.length === 0) return { later: laterThan(places, () => true), marks: () => false, inScreen: () => false };
     const covers = new Set(layers.map(({ cover }) => cover));
-    const typed = layers.filter(({ kind }) => kind !== 'screen');
-    const screens = layers.filter(({ kind }) => kind === 'screen');
+    const typed = layers.filter(({ kind }) => isTyped(kind));
+    const screens = layers.filter(({ kind }) => !isTyped(kind));
     return {
       later: laterThan(places, (p) => covers.has(p) || !typed.some(({ layer }) => within(p, layer))),
       marks: (p) => covers.has(p),
@@ -1724,7 +1724,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       // scrolls it, and no layer beneath is asked.
       const on = marked.at(-1);
       if (on === undefined || scrolledAt(on.layer)) return undefined;
-      if (on.kind !== 'screen') return on.cover.node;
+      if (isTyped(on.kind)) return on.cover.node;
       // No target to judge a cover for: what of the layer draws at the point by the column that needs none
       // (`drawnOver`'s), the layer itself where nothing of it does.
       return own(on.layer).filter((p) => containsPoint(p.node.rect, point) && draws(p)).at(-1)?.node ?? on.cover.node;

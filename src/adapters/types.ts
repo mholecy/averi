@@ -262,6 +262,12 @@ export const SCREEN_SIZED_FRACTION = 0.9;
  */
 export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'screen';
 
+/** A kind a source TYPES by an element the layer holds (`UiNode.presentationElement`) — every kind but `screen`. */
+export type TypedPresentationKind = Exclude<PresentationKind, 'screen'>;
+
+/** `kind` is typed by an element (`TypedPresentationKind`), not a `screen` the source shows by its visibility flags. */
+export const isTyped = (kind: PresentationKind): kind is TypedPresentationKind => kind !== 'screen';
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, keyboard (KEYBOARD_ROLE), ...

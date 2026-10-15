@@ -1,4 +1,4 @@
-import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { isTyped, rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type TypedPresentationKind, type UiNode } from '../adapters/types.js';
 import {
   drawOrder,
   listsAncestry,
@@ -397,13 +397,13 @@ export interface StandingFacts {
 }
 
 /** A presented layer the source TYPES, as the words name it (`presentedRemedy`): its article and its noun. */
-const TYPED_WORDS: Readonly<Record<Exclude<MarkedLayer['kind'], 'screen'>, readonly [string, string]>> = {
+const TYPED_WORDS: Readonly<Record<TypedPresentationKind, readonly [string, string]>> = {
   alert: ['an', 'alert'],
   actionSheet: ['an', 'action sheet'],
   popover: ['a', 'popover'],
 };
 /** The words for `layer` when the source typed it; undefined for a `screen` layer, or none. */
-const typedWords = (layer: MarkedLayer | undefined): readonly [string, string] | undefined => (layer === undefined || layer.kind === 'screen' ? undefined : TYPED_WORDS[layer.kind]);
+const typedWords = (layer: MarkedLayer | undefined): readonly [string, string] | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
 
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
