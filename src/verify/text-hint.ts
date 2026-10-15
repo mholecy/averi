@@ -1,4 +1,5 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
+import { differsOnlyByOcrFold, foldDifference } from './ocr-fold.js';
 
 /**
  * Why an exact-text expectation missed when the string is nonetheless ON the
@@ -75,7 +76,12 @@ export function flattenTree(root: UiNode): UiNode[] {
  * by an unrelated node elsewhere on screen — and the whole tree only when the
  * spec found nothing at all.
  */
-export function containsTextHint(candidates: UiNode[], expected: string): string | undefined {
+export function textHint(candidates: UiNode[], expected: string): string | undefined {
+  return containsTextHint(candidates, expected) ?? foldedTextHint(candidates, expected);
+}
+
+/** A node whose text CONTAINS the expected string as a whole segment (a combined label). */
+function containsTextHint(candidates: UiNode[], expected: string): string | undefined {
   if (expected === '') return undefined;
   const hits = candidates.filter((n) =>
     [n.label, n.value]
@@ -93,6 +99,37 @@ export function containsTextHint(candidates: UiNode[], expected: string): string
     `no node has this exact text, but ${hits.length} node(s) CONTAIN it as a whole segment:\n${shown}\n` +
     `    (iOS combines a container's children into one accessibility element — ` +
     `use match: ${JSON.stringify(escapeRegExp(expected))} for a cross-platform assert)`
+  );
+}
+
+/**
+ * A node whose text differs from the expected string only in what a text
+ * recognizer cannot tell apart — typographic punctuation vs its ASCII
+ * look-alike, a letter with or without its diacritics (ocr-fold.ts): an
+ * expectation copied from an ocr reading, or typed on an ASCII keyboard. The
+ * tree carries the app's characters exactly, so the assert stays exact and
+ * still fails — a `’` → `'` change in the app is a copy change the tree can
+ * see; the hint only names the node, so the reader need not dump the tree.
+ */
+function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
+  const hits: { node: UiNode; field: 'label' | 'value'; text: string }[] = [];
+  for (const node of candidates) {
+    const field = (['label', 'value'] as const).find((f) => {
+      const v = node[f];
+      return v !== null && differsOnlyByOcrFold(expected, v);
+    });
+    if (field !== undefined) hits.push({ node, field, text: node[field] as string });
+  }
+  if (hits.length === 0) return undefined;
+  const pairs = [...new Set(hits.flatMap(({ text }) => foldDifference(expected, text).characters.split(', ')))];
+  const shown = hits
+    .slice(0, 3)
+    .map(({ node, field, text }) => `    id=${node.identifier ?? '(none)'} ${field}=${JSON.stringify(text)}`)
+    .join('\n');
+  return (
+    `no node has this exact text, but ${hits.length} node(s) differ from it only in ${pairs.join(', ')}:\n${shown}\n` +
+    "    (the tree carries the app's characters exactly, so the assert compares them exactly — " +
+    'expect the text as the node has it)'
   );
 }
 
