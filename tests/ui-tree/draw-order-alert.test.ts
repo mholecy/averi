@@ -6,8 +6,8 @@ import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { node } from '../helpers/fake.js';
 
 // A layer the tree source marks as an alert's (`UiNode.presentation` on the layer, its `Alert` the element naming it)
-// is presented over every screen drawn before it, the WHOLE screen — whatever the frames of the nodes around it: its dim
-// a bare frame, a full-screen toolbar of the form beneath with the dim's exact frame. Its alert is the layer's one
+// is presented over every screen drawn before it, the WHOLE screen — whatever the frames of the nodes around it: its
+// dim a bare frame, a full-screen toolbar of the form beneath with the dim's exact frame. Its alert is the layer's one
 // cover, named; the alert's own buttons and texts are reached as before. (A hand-built layer marked with no element
 // marked in it is its own cover.)
 

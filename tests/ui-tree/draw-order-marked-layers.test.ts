@@ -28,7 +28,9 @@ const list = () => {
   return { title, row, layer: node({ role: 'container', rect: IPHONE, children: [title, row] }) };
 };
 
-/** A page sheet's layer marked `screen`: its nav bar's Cancel, and its form with a field and a row over the list's row. */
+/**
+ * A page sheet's layer marked `screen`: its nav bar's Cancel, and its form with a field and a row over the list's row.
+ */
 const sheet = () => {
   const cancel = node({ role: 'button', label: 'Cancel', rect: rect(16, 72, 70, 36) });
   const field = node({ role: 'textfield', identifier: 'first_name', rect: rect(20, 300, 362, 44) });
@@ -38,7 +40,10 @@ const sheet = () => {
   return { cancel, field, addPhone, form, layer };
 };
 
-/** A popover's layer typed `actionSheet`: its dim `dismiss popup`, then the popover holding the action sheet, the element. */
+/**
+ * A popover's layer typed `actionSheet`: its dim `dismiss popup`, then the popover holding the action sheet, the
+ * element.
+ */
 const popover = () => {
   const dim = node({ role: 'container', identifier: 'PopoverDismissRegion', label: 'dismiss popup', rect: IPHONE });
   const discard = node({ role: 'button', label: 'Discard Changes', rect: rect(10, 160, 240, 44) });
@@ -60,7 +65,8 @@ describe('a layer typed by its element: the element is its one cover, outside th
     const { row, layer: beneath } = list();
     const { dim, discard, layer } = popover();
     const tree = judged(beneath, layer);
-    // The popover's own button lies on its dim as on any node drawn before it — an ordinary cover, no presented surface.
+    // The popover's own button lies on its dim as on any node drawn before it — an ordinary cover, no presented
+    // surface.
     expect(exposed(tree, dim)).toMatchObject({ covers: ['button Discard Changes 10,160 240x44'], presented: [], tapAt: { point: { x: 201, y: 437 }, moved: false } });
     expect(exposed(tree, discard)).toMatchObject({ covers: [], presented: [], tapAt: { moved: false } });
     expect(drawOrder(tree).presentedOver(dim)).toBeUndefined();

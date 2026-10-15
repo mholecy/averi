@@ -509,9 +509,9 @@ export interface UiNode {
    * it, through the whole screen, whatever the frames around it.
    *
    * Its readers, all of them:
-   * - ui-tree/draw-order.ts#markOf, the one reading of it in code (with `presentationElement`): a typed layer's element,
-   *   when its rect has area on the screen (never judged by `hidden`), is that layer's ONE cover through the whole
-   *   screen; a `screen` layer reaches the whole screen and its own nodes stay covers, each a presented surface
+   * - ui-tree/draw-order.ts#markOf, the one reading of it in code (with `presentationElement`): a typed layer's
+   *   element, when its rect has area on the screen (never judged by `hidden`), is that layer's ONE cover through the
+   *   whole screen; a `screen` layer reaches the whole screen and its own nodes stay covers, each a presented surface
    *   (`markedLayers`: `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); draw order hands the mark on
    *   as `MarkedLayer` (its kind and label, `DrawOrder.presentedPress`) — to the standing's remedy
    *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to

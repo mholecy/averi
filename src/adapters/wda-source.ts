@@ -160,7 +160,10 @@ interface KeyboardMarks {
   roots: ReadonlySet<WdaElement>;
 }
 
-/** Every raw element the parser singles out, read once per payload: the keyboard's (`keyboardMarks`), the roots of the hidden subtrees (`hiddenRoots`) and the presented layers (`presentedLayers`). */
+/**
+ * Every raw element the parser singles out, read once per payload: the keyboard's (`keyboardMarks`), the roots of the
+ * hidden subtrees (`hiddenRoots`) and the presented layers (`presentedLayers`).
+ */
 interface SourceMarks extends KeyboardMarks {
   hiddenRoots: ReadonlySet<WdaElement>;
   presented: PresentedLayers;
@@ -325,13 +328,19 @@ function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined
 /** WDA's "0" — a string in the JSON format, compared as `onScreen` compares `isVisible`; a missing or null flag is never "0". */
 const isZero = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '0';
 
-/** The presented layers of a payload (`presentedLayers`): each marked layer with its kind, and the elements naming the typed ones. */
+/**
+ * The presented layers of a payload (`presentedLayers`): each marked layer with its kind, and the elements naming the
+ * typed ones.
+ */
 interface PresentedLayers {
   layers: ReadonlyMap<WdaElement, PresentationKind>;
   elements: ReadonlySet<WdaElement>;
 }
 
-/** The payload carries WDA's visibility flags (the root's `isVisible`): its source judged presented layers (`UiNode.presentationsJudged`). */
+/**
+ * The payload carries WDA's visibility flags (the root's `isVisible`): its source judged presented layers
+ * (`UiNode.presentationsJudged`).
+ */
 const carriesFlags = (root: WdaElement): boolean => root.isVisible !== undefined && root.isVisible !== null;
 
 /** `el` or some element of its subtree passes `test`. */
@@ -397,11 +406,11 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
  * `0`, or visible content parked off the screen: a dismissed sheet's leftover).
  *
  * Measured (iPhone 17 simulator, iOS 27.0, WDA): over every raw capture of a page sheet, a SwiftUI half or expanded
- * sheet, an RN transparent modal, an alert and a popover, the screen beneath reads wholly `0` while the presented
- * layer shows; over every capture with nothing presented (a pushed form, Account Detail, Safari with its capsule
- * layer, Settings, a dismissed sheet), the first content layer shows. It reads a whole LAYER's flags and a visible later
- * layer beside it — never one node's flag, never a target's own (a node's `isVisible` alone is no geometric truth:
- * the pushed form's phantom tab bar reads `0` on screen).
+ * sheet, an RN transparent modal, an alert and a popover, the screen beneath reads wholly `0` while the presented layer
+ * shows; over every capture with nothing presented (a pushed form, Account Detail, Safari with its capsule layer,
+ * Settings, a dismissed sheet), the first content layer shows. It reads a whole LAYER's flags and a visible later layer
+ * beside it — never one node's flag, never a target's own (a node's `isVisible` alone is no geometric truth: the pushed
+ * form's phantom tab bar reads `0` on screen).
  */
 function presentedScreen(window: WdaElement): WdaElement | undefined {
   const screen = usableRect(window.rect);
