@@ -321,6 +321,13 @@ describe('calibrate.ts — a side that fails (runSide, failureOf, disposition)',
     expect(sideLine('aaaaaaa', o, 2)).toBe('calibrate: aaaaaaa ran in 2.0 s (run twice: the first golden process failed — killed by SIGKILL; stderr: fork: Resource temporarily unavailable)');
   });
 
+  it('killed though its JSON was out: run once more all the same', async () => {
+    const { d, calls } = deps([{ ...killed, stdout: `${GOOD}\n` }, GOOD]);
+    const o = await runSide('aaaaaaa', '/repo', d);
+    expect(calls).toHaveLength(2);
+    expect('checks' in o.run).toBe(true);
+  });
+
   it('a non-zero exit with no JSON: run twice, its exit code and stderr tail are the reason', async () => {
     const { d } = deps([exited, exited]);
     const o = await runSide(WORKING_TREE, '/repo', d);

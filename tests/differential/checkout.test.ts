@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,5 +52,13 @@ describe('codeRoot — a directory in place inside another checkout', () => {
 describe('codeRoot — a git command that fails', () => {
   it("throws with git's own stderr: a side that cannot be checked out says why", () => {
     expect(() => codeRoot(ROOT, 'no-such-ref-at-all', 'cal', tmpdir())).toThrow(/^git -C .* rev-parse no-such-ref-at-all\^\{commit\}: .*no-such-ref-at-all/);
+    // a worktree git cannot create (its directory under a plain file): git's reason, not a bare "Command failed"
+    const dir = mkdtempSync(join(tmpdir(), 'averi-checkout-'));
+    try {
+      writeFileSync(join(dir, 'file'), '');
+      expect(() => codeRoot(ROOT, 'HEAD', 'cal', join(dir, 'file'))).toThrow(/^git -C .* worktree add --detach .*: .*file/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
