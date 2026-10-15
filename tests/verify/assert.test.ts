@@ -775,6 +775,22 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     expect(result.pass).toBe(true);
   });
 
+  it('on a root of no area WITH a device screen, the sampler reads the region of the screen the judge judged on: the card\'s part its list draws, not the whole card', async () => {
+    resetLayout();
+    const list = node({ role: 'scrollable', identifier: 'list', rect: { x: 0, y: 0, width: 1000, height: 240 }, children: [node({ identifier: 'card', rect: { ...CARD } })] });
+    const root = node({ role: 'application', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [list] });
+    const fake = new FakeAdapter({ detail: { ...root, unclippedFrames: true } }, 'detail');
+    fake.viewportSize = { width: 1000, height: 320 };
+    // The list's part (200–240) light, the rest (240–300) dark: judged on the device's screen, only the light part is drawn.
+    fake.nextScreenshot = png(1000, 320, (p) => {
+      fill(p, '#FDFDFD', { ...CARD, height: 40 });
+      fill(p, '#20242C', { ...CARD, y: 240, height: 60 });
+    });
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.detail).toContain('sampled #FDFDFD');
+    expect(result.pass).toBe(true);
+  });
+
   it('measures the FIRST of duplicate matches — the rect-parity duplicate-id rule, owned by the pixel poll', async () => {
     resetLayout();
     const second = { x: 100, y: 20, width: 800, height: 100 };
