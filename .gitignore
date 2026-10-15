@@ -7,3 +7,7 @@ dist/
 coverage/
 *.tsbuildinfo
 .averi/
+
+# calibrate.ts: a partial (--note) or failed run writes beside the report, never over it
+docs/truth/*.md.partial
+docs/truth/*.md.failed
