@@ -145,6 +145,10 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
   return { source: out, folded };
 }
 
+/** The character a class member lists: `\-` lists `-`; a letter escape (`\d`) lists no one character. */
+const memberChar = (m: string): string | undefined =>
+  m.startsWith('\\') ? (m.length === 2 && !/[A-Za-z0-9]/.test(m[1]) ? m[1] : undefined) : m;
+
 /**
  * The class opening at `cps[start]`, with the fold of each lone member added.
  * Members are read the way the pattern's class syntax reads them: an escape is
@@ -176,7 +180,7 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
     const c = m.length > 1 && m.startsWith('\\') ? escapedLiteral(m.slice(1)) : m;
     if (c === undefined) continue;
     const f = foldChar(c);
-    const listed = members.includes(f) || added.some(([, g]) => g === f);
+    const listed = members.some((other) => memberChar(other) === f) || added.some(([, g]) => g === f);
     if (f !== c && [...f].length === 1 && !listed) added.push([c, f]);
   }
   if (added.length === 0) return { text, end, added };

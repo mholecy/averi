@@ -6,6 +6,7 @@ import { measuredFrameFor, type MeasuredFrame, type TreeFrame, type Undecoded } 
 import { sizeOnlyPng } from '../helpers/fake.js';
 import type { PollVerdict } from '../../src/verify/poll-verdict.js';
 import { windowWidth } from '../../src/verify/scale.js';
+import { ocrFoldPattern } from '../../src/verify/ocr-fold.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { OcrUnavailableError, ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
 import {
@@ -966,6 +967,11 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ['ﬁle', 'file'],
   ])('%j read as %j is outside the fold and fails', (want, read) => {
     expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).pass).toBe(false);
+  });
+
+  it('a class that already lists a fold, escaped or not, gains nothing', () => {
+    expect(ocrFoldPattern('^x[–\\-a]y$')).toBeUndefined();
+    expect(ocrFoldPattern('^x[–-]y$')).toBeUndefined();
   });
 
   it('the note on a lone combining mark in a pattern shows the mark on a dotted circle', () => {
