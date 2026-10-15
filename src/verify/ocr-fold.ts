@@ -72,18 +72,26 @@ const escapedLiteral = (c: string | undefined): string | undefined =>
  * safely.
  *
  * What holds: the folded pattern accepts a folded reading only if the pattern
- * itself accepts some string that folds to it. So:
+ * itself accepts some string that folds to it. Only the pattern's own
+ * typographic and accented characters are folded — an ASCII pattern is never
+ * widened to a typographic reading. So:
  * - a literal character outside a class — bare or as an identity escape (`\–`)
  *   — becomes its fold as one unit, `(?:…)`, so a quantifier after it still
  *   binds to the whole fold (`…?` is `(?:\.\.\.)?`, never `\.\.\.?`);
  * - in a class, a character listed on its own (not a range endpoint) whose
- *   fold is one character gains that character as a further member (`[–—]`
- *   also lists `-`); ranges, negated classes and multi-character folds (`[…]`)
- *   stay as written, so no range endpoint ever moves;
+ *   fold is one character and not already listed adds that fold as a class of
+ *   its own beside the class as written — `[’ -]` is `(?:[’ -]|['])`, so no
+ *   trailing `-` becomes a range — and a negated class refuses it too:
+ *   `[^’]` is `(?:(?![\'])[^’])`; range endpoints and multi-character folds
+ *   (`[…]`) stay as written;
  * - other escapes (`\u2019`, `\d`), group names and backreference names stay
  *   as written;
- * - a pattern with a word boundary (`\b`, `\B`) is not folded: a folded
- *   letter is a word character its original is not, so the boundary would move.
+ * - a pattern with a lookaround is not folded: the lookaround would see the
+ *   characters a folded literal stands for (`’(?<=')` accepts nothing, its
+ *   fold `'(?<=')` would accept `'`);
+ * - a pattern with a word boundary (`\b`, `\B`) is not folded when the fold
+ *   turns a letter into a word character (`é` → `e`), which would move the
+ *   boundary; a punctuation fold keeps a non-word character non-word.
  */
 export function ocrFoldPattern(source: string): { source: string; folded: [string, string][] } | undefined {
   const cps = [...source];
