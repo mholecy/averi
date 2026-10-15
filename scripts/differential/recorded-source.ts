@@ -20,9 +20,10 @@ import type { Recording } from './corpus.js';
  *    at: below WdaTreeSource is WdaServer's process lifecycle.
  *  - a NORMALIZED capture of either kind (a `ui_snapshot` tree): served as
  *    it is; the parser is not exercised — but a WDA tree's root is given the
- *    mark the WDA parser sets on every tree now (UiNode.unclippedFrames,
- *    which a `ui_snapshot` saved before it lacks), so the sweep judges it as
- *    the live source's tree; an OLD side ignores a field it does not know.
+ *    mark the WDA parser sets on every tree (UiNode.unclippedFrames, with
+ *    this checkout's src/adapters/wda-source.ts#markUnclippedFrames; older
+ *    `ui_snapshot` captures lack it), so the sweep judges it as the live
+ *    source's tree; a side that does not know the field ignores it.
  * A RAW idb capture does not: idb's source has a narrower seam already — its
  * `exec` — so it is replayed by the side's own IdbTreeSource over the fake
  * device (fake-device.ts answers `ui describe-all`), empty-tree error and
