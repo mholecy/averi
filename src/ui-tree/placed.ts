@@ -1,9 +1,11 @@
 import { everyNode, rectArea, SCREEN_SIZED_FRACTION, type Rect, type UiNode } from '../adapters/types.js';
 
 /**
- * WHERE A NODE LIES in draw order's walk (draw-order.ts#drawOrder), and the questions of frame and layer asked of it
- * both by draw order's rows (draw-order.ts#NOT_DRAWN) and by the shape fallback for presented screens
- * (presented-by-shape.ts). Knows no row and no presented layer; one home, so neither module asks the other.
+ * WHERE A NODE LIES in draw order's walk (draw-order.ts#drawOrder, `Placed`), and the predicates asked of it both by
+ * draw order's rows (draw-order.ts#NOT_DRAWN) and by the shape fallback for presented screens (presented-by-shape.ts):
+ * the frame predicates (`fillsScreen`, `CONTENT_FRAMED_ROLES`, `emptyFrame`, `framesOnly`, `itemless`) and the layer
+ * ones (`within`, `holderOf`, `stackedScreens`). Knows no row and no presented layer; one home for both readers, so
+ * the fallback imports nothing of draw order.
  */
 
 /** One node in pre-order, with what a row may ask of where it is. */
@@ -64,7 +66,10 @@ export const stackedScreens = (scroller: Placed, target: Placed, screenArea: num
  */
 export const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 
-/** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see draw-order.ts's `itemlessToolbar` row). */
+/**
+ * A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see
+ * draw-order.ts's `itemlessToolbar` row).
+ */
 export const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
 
 /** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */

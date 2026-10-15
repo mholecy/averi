@@ -225,13 +225,13 @@ export interface DrawOrder {
    * The presented layer the tree source marks (`markedLayers`, on the screen) a touch-down at `point` lands on, asked
    * for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the last such
    * layer, whose reach is the whole screen — none when the point lies on a scroll view of that layer's own (a stroke
-   * scrolling the alert's own content, a search inside a sheet's own list; no layer beneath it is asked). Named by its cover: a typed layer's
-   * element (an alert, an action sheet, a popover); for a `screen` layer, the last node of it at the point that
-   * draws by the column that needs no target (`drawnOver`'s), else the layer itself. A node the source says is not
-   * shown (`UiNode.hidden`) is neither such a scroll view nor named, as the `target` column's `hidden` row judges it.
-   * A screen presented by shape alone is not asked here. Undefined when none. One reader: `scroll_until`'s stroke
-   * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no stroke that would land on
-   * it.
+   * scrolling the alert's own content, a search inside a sheet's own list; no layer beneath it is asked). Named by
+   * its cover: a typed layer's element (an alert, an action sheet, a popover); for a `screen` layer, the last node of
+   * it at the point that draws by the column that needs no target (`drawnOver`'s), else the layer itself. A node the
+   * source says is not shown (`UiNode.hidden`) is neither such a scroll view nor named, as the `target` column's
+   * `hidden` row judges it. A screen presented by shape alone is not asked here. Undefined when none. One reader:
+   * `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no
+   * stroke that would land on it.
    */
   markedAt(point: Point): UiNode | undefined;
   /**
@@ -392,10 +392,10 @@ export interface Exposure {
    * The covers that are the SURFACE of a screen presented over the node (presented-by-shape.ts: a dimming leaf,
    * labelled or not, a sheet's scroll view, on a later screen-sized layer stacked over its own, on a tree whose source
    * did not judge presented layers; or a marked presented layer's cover, reaching the whole screen, or a node of a
-   * marked `screen` layer, `markedLayers`), in `covers`' order; empty when none — never a control, a bar the layer carries or
-   * any other labelled node, which cover anyway (Safari's capsule bar). What the sentences read: a target under one
-   * lies under a presented screen no scroll moves it out from under — close it first
-   * (ui-tree/standing.ts#presentedRemedy; ADR 0018).
+   * marked `screen` layer, `markedLayers`), in `covers`' order; empty when none — never a control, a bar the layer
+   * carries or any other labelled node, which cover anyway (Safari's capsule bar). What the sentences read: a target
+   * under one lies under a presented screen no scroll moves it out from under — close it first
+   * (ui-tree/standing.ts#presentedRemedy; docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md).
    */
   readonly presented: readonly UiNode[];
   /**
