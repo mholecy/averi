@@ -127,7 +127,6 @@ export const systemBarSwallows = (platform: 'ios' | 'android' | undefined, g: Ge
 // --- the measured geometry (phase 3) ---
 
 export const area = (r: Rect) => Math.max(0, r.width) * Math.max(0, r.height);
-export const centreOf = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 /** The overlap of two rects, or null when they share no area. */
 export function intersect(a: Rect, b: Rect): Rect | null {
   const x = Math.max(a.x, b.x);
@@ -223,7 +222,10 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   if (intersect(frame, ctx.screen) === null) return 'off-screen';
   const visible = visibleOf(frame, ctx);
   if (visible === null) return 'outside-scroll-view';
-  const c = centreOf(frame);
+  // The point the probe taps (probePoint, rounded as the raw tools take it), not the float centre: what lies there is what
+  // the probe meets — and averi's tap and plain stop judge the rounded centre too (ui-tree/standing.ts, "its ROUNDED
+  // centre lies below the band").
+  const c = probePoint(frame);
   const bands = bandsOf(ctx.screen, ctx.safeArea);
   if (bands.status !== undefined && inside(c, bands.status)) return 'status-band';
   if (bands.nav !== undefined && inside(c, bands.nav)) return 'nav-band';
