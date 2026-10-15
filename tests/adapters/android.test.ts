@@ -418,22 +418,30 @@ describe('parseUiautomatorXml — character references in attribute values', () 
     <node index="0" text="Welcome.&#10;&#10;Sign in to continue." resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,100][1080,300]"/>
     <node index="1" text="" resource-id="app:id/account" class="android.widget.FrameLayout" package="app" content-desc="Signed in as Jane Doe&#10;Account and settings." clickable="true" bounds="[900,100][1040,200]"/>
     <node index="2" text="Name&#9;Value" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,300][1080,350]"/>
-    <node index="3" text="&#x1F1FA;&#x1F1F8; +1" resource-id="" class="android.widget.TextView" package="app" content-desc="&#127482;&#127480;" bounds="[0,350][1080,400]"/>
-    <node index="4" text="&amp;#10; is how XML spells a newline" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,400][1080,450]"/>
-    <node index="5" text="Wallpaper &amp; style &lt;new&gt;" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,450][1080,500]"/>
-    <node index="6" text="" hint="Line one&#10;line two" resource-id="app:id/notes&#46;input" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,600]"/>
+    <node index="3" text="&#x1F1FA;&#x1F1F8; +1" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,350][1080,375]"/>
+    <node index="4" text="" resource-id="" class="android.widget.ImageView" package="app" content-desc="&#127482;&#127480;" bounds="[0,375][1080,400]"/>
+    <node index="5" text="&amp;#10; is how XML spells a newline" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,400][1080,450]"/>
+    <node index="6" text="Wallpaper &amp; style &lt;new&gt;" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,450][1080,500]"/>
+    <node index="7" text="" hint="Line one&#10;line two" resource-id="app:id/notes&#46;input" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,600]"/>
   </node>
 </hierarchy>`;
-  const [welcome, account, tabbed, flag, literal, named, notes] = parseDump(xml).children;
+  const [welcome, account, tabbed, hexFlag, decimalFlag, literal, named, notes] = parseDump(xml).children;
 
   it('a newline in text and in content-desc is the newline itself', () => {
     expect(welcome.label).toBe('Welcome.\n\nSign in to continue.');
     expect(account.label).toBe('Signed in as Jane Doe\nAccount and settings.');
   });
 
-  it('a tab, a hex and a decimal reference to an emoji decode alike', () => {
+  it('a tab', () => {
     expect(tabbed.label).toBe('Name\tValue');
-    expect(flag.label).toBe('\u{1F1FA}\u{1F1F8}');
+  });
+
+  it('an emoji spelled as hex references, in text', () => {
+    expect(hexFlag.label).toBe('\u{1F1FA}\u{1F1F8} +1');
+  });
+
+  it('the same emoji spelled as decimal references, in content-desc', () => {
+    expect(decimalFlag.label).toBe('\u{1F1FA}\u{1F1F8}');
   });
 
   it('every attribute: resource-id and hint too', () => {
