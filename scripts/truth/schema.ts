@@ -233,17 +233,23 @@ export interface TargetTruth {
    * Absent when not probed — the piece's centre is the frame's, or there is no piece.
    */
   reachedAtPiece?: boolean;
+  /**
+   * Why the probe at the frame's centre was not tapped: the point (probePoint) lies off the screen — an off-screen
+   * target, or one cut by the screen's edge with its centre past it. `reached` is false and `probe` empty; a raw tap
+   * there would reach no window of the app (and log no touch), so it would say nothing.
+   */
+  unprobed?: string;
 }
 
 /**
  * Where a target's frame lies, measured (truth.ts#geometryOf), in averi's judging order (ADR 0005: off the screen, the
- * system bands, cut, covered): `off-screen` none of it on the screen; `outside-scroll-view` on the screen but none of
- * it in its scroll view's clip; `status-band` / `nav-band` its centre in the top / bottom system band; `sliver` cut by
- * its scroll view's clip, what shows across that edge under the tap minimum (ADR 0013; truth.ts#clipCuts);
- * `partly-centre-in` / `centre-out` cut, its centre inside / outside what shows; `under-chrome:<name>` whole, or cut
- * with its centre showing, its centre under the app's chrome of that name; `band-overlap:<status|nav>` /
- * `chrome-overlap:<name>` whole, its centre clear, but what shows of it overlapped past ADR 0002's slack by that band
- * or chrome (truth.ts#regionOverlap); `whole`.
+ * system bands, cut, covered): `off-screen` none of it on the screen (a frame of no area too, wherever it lies: nothing
+ * of it can be drawn, and it is never probed); `outside-scroll-view` on the screen but none of it in its scroll view's
+ * clip; `status-band` / `nav-band` its centre in the top / bottom system band; `sliver` cut by its scroll view's clip,
+ * what shows across that edge under the tap minimum (ADR 0013; truth.ts#clipCuts); `partly-centre-in` / `centre-out`
+ * cut, its centre inside / outside what shows; `under-chrome:<name>` whole, or cut with its centre showing, its centre
+ * under the app's chrome of that name; `band-overlap:<status|nav>` / `chrome-overlap:<name>` whole, its centre clear,
+ * but what shows of it overlapped past ADR 0002's slack by that band or chrome (truth.ts#regionOverlap); `whole`.
  */
 export type Geometry =
   | 'whole'

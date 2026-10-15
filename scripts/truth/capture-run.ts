@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
+import { centreOnScreen, consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -20,7 +20,9 @@ import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard
  * When the state reports the screen's bands, scroll views or chrome (phase 3's cells), each target also carries its
  * measured geometry (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not
  * centred where its frame is gets a second probe at the piece's centre (`reachedAtPiece`). A state reporting none of it
- * — every cell before phase 3 — captures as before.
+ * — every cell before phase 3 — captures as before. On any cell, a target whose probe point (probePoint, its rounded
+ * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
+ * no touch — and records why (`unprobed`), `reached` false.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown and
  * its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus per
@@ -94,7 +96,11 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
       const { drawn, seen } = measure(png, frame, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
-      const read = geometry.geometry === 'off-screen' ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
+      // The centre is never tapped where it lies off the screen (an off-screen target, or one the screen's edge cuts with
+      // its centre past it): a raw tap there reaches no window of the app — no touch, so its "not reached" says nothing.
+      const off = geometry.geometry === 'off-screen' || !centreOnScreen(frame, s.screen);
+      const unprobed = off ? `its centre (${probePoint(frame).x},${probePoint(frame).y}) lies off the ${s.screen.width}x${s.screen.height} screen` : undefined;
+      const read = off ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
       const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;
       const target: TargetTruth = {
@@ -109,11 +115,12 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         ...geometry,
         ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
         ...(reachedAtPiece !== undefined && { reachedAtPiece }),
+        ...(unprobed !== undefined && { unprobed }),
       };
       truth.targets.push(target);
-      const bad = consistency(target, lab.platform);
+      const bad = consistency(target, lab.platform, s.screen);
       if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
-      log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
+      log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
     }
     if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, broken, log);
     await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');

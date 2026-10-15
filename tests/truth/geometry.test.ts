@@ -40,6 +40,7 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['whole: on the screen, in its clip, clear of bands and chrome', rect(51, 200, 300, 64), ctx({ clip: LIST, chrome: { tabBar: TAB } }), 'whole'],
     ['off-screen: below the screen', rect(51, 900, 300, 64), ctx(), 'off-screen'],
     ['off-screen: right of the screen, though its y is on it', rect(410, 200, 300, 64), ctx(), 'off-screen'],
+    ['off-screen: a frame of no area, though it lies on the screen — nothing of it can be drawn, never probed', rect(51, 200, 0, 64), ctx(), 'off-screen'],
     ['off-screen before outside its scroll view', rect(51, 900, 300, 64), ctx({ clip: LIST }), 'off-screen'],
     ['outside-scroll-view: on the screen, below its clip', rect(51, 720, 300, 64), ctx({ clip: LIST }), 'outside-scroll-view'],
     ['outside-scroll-view: flush under the clip\'s bottom edge', rect(51, 700, 300, 64), ctx({ clip: LIST }), 'outside-scroll-view'],
@@ -153,6 +154,14 @@ describe('consistency with a measured geometry', () => {
     expect(consistency(T({ geometry: 'off-screen', reached: false, probe: [] }))).toBeUndefined();
     expect(consistency(T({ geometry: 'off-screen', reached: false, probe: [ev('touch', '201,900')] }))).toMatch(/never probed/);
   });
+  it('a centre the screen\'s edge leaves off it: never probed (the capture taps only its piece), given the screen', () => {
+    const cut = T({ frame: rect(51, 850, 300, 64), geometry: 'centre-out', reached: false, probe: [], reachedAtPiece: true });
+    expect(consistency(cut, 'ios', { width: 402, height: 874 })).toBeUndefined();
+    expect(consistency(cut, 'ios')).toMatch(/left no touch/);
+    expect(consistency({ ...cut, probe: [ev('touch', '201,882')] }, 'ios', { width: 402, height: 874 })).toBe('its centre (201,882) off the screen, never probed, but the truth holds a probe');
+    // Its rounded centre on the screen's last row is on it: probed as ever.
+    expect(consistency(T({ frame: rect(51, 810, 300, 127), geometry: 'partly-centre-in', reached: true, probe: [ev('touch', '201,874')] }), 'ios', { width: 402, height: 875 })).toBeUndefined();
+  });
   it('a system band on Android swallows the probe (no touch, not reached); on iOS the touch is the app\'s', () => {
     const band = T({ frame: rect(51, 10, 300, 64), geometry: 'status-band', reached: false, probe: [] });
     expect(consistency(band, 'android')).toBeUndefined();
@@ -201,6 +210,8 @@ class GeometryLab implements LabDevice {
   }
   async tap(x: number, y: number) {
     this.taps.push([x, y]);
+    // A raw tap off the screen reaches no window of the app: nothing logged.
+    if (x < 0 || x >= 40 || y < 0 || y >= 40) return;
     this.events.push({ kind: 'touch', tag: `${x},${y}`, at: 0 }, ...(x >= 10 && x < 30 && y >= 10 && y < 40 ? [{ kind: 'tap' as const, tag: y < 30 ? 'A' : 'B', at: 0 }] : []));
   }
   async screenshot() {
@@ -234,11 +245,10 @@ describe('capture with a measured geometry', () => {
     const lab = new GeometryLab({ safeArea: { top: 4, left: 0, bottom: 0, right: 0 }, chrome: { bar: rect(0, 34, 40, 6) } });
     const { broken } = await capture(lab, [CELL], { out, note: 't', catalog: [CELL], log: () => undefined });
     expect(broken).toEqual([]);
-    // A at its centre; B at its centre (40: off the 40-unit screen's last row — the fake still logs it) and its piece's
-    // (30..34: clear of the bar, centred at 32); C never.
+    // A at its centre; B never at its centre ((20,40): off the 40-unit screen, where a raw tap reaches no window of the
+    // app), only at its piece's (30..34: clear of the bar, centred at 32); C never.
     expect(lab.taps).toEqual([
       [20, 20],
-      [20, 40],
       [20, 32],
     ]);
     const t = await truthOf();
@@ -251,6 +261,8 @@ describe('capture with a measured geometry', () => {
       ['C', 'off-screen', null, null, false, undefined],
     ]);
     expect(t.targets[2].probe).toEqual([]);
+    expect(t.targets.map((x) => x.unprobed)).toEqual([undefined, 'its centre (20,40) lies off the 40x40 screen', 'its centre (20,60) lies off the 40x40 screen']);
+    expect(t.targets[1].probe).toEqual([]);
   });
 
   it('a state reporting none of it captures as before: no geometry, no second probe', async () => {

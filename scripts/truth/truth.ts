@@ -95,20 +95,29 @@ export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): P
   return probe.filter((e) => e.kind === 'submit' || e.kind === 'select' || e.kind === 'button' || e.kind === 'tab' || (e.kind === 'tap' && e.tag !== tag));
 }
 
+/** Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (capture-run.ts). */
+export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => inside(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
+const at = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
+
 const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive control): it was not delivered, so "not reached" says nothing';
 
 /**
  * Whether a target's sources tell one story: the tap was delivered; an `open` target is reached and drawn; a covered
  * one is not reached. With a measured geometry (phase 3; `whole` or absent is the rule above): an `off-screen` target
- * is never probed; on Android a probe in a system band is swallowed by the system bar — no touch reaches the app, and
- * it must not be reached (systemBarSwallows); an open target cut with its centre in what shows is reached, and so is
- * one overlapped at its edge by a band or the chrome (its centre clear; what of it is drawn is not held to DRAWN); one
- * whose centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a sliver and a centre under chrome
- * may be either (what fires there is the truth the rows read).
+ * is never probed, nor the centre of one cut by the screen's edge with its probe point past it (given the `screen`:
+ * centreOnScreen — a raw tap there reaches no window of the app, so it would leave no touch and say nothing); on
+ * Android a probe in a system band is swallowed by the system bar — no touch reaches the app, and it must not be
+ * reached (systemBarSwallows); an open target cut with its centre in what shows is reached, and so is one overlapped at
+ * its edge by a band or the chrome (its centre clear; what of it is drawn is not held to DRAWN); one whose centre lies
+ * outside what shows (`centre-out`, `outside-scroll-view`) is not; a sliver, a centre under chrome and, on iOS, a
+ * centre in a band (the touch is the app's window's) may be either (what fires there is the truth the rows read).
  */
-export function consistency(t: TargetTruth, platform?: 'ios' | 'android'): string | undefined {
+export function consistency(t: TargetTruth, platform?: 'ios' | 'android', screen?: { width: number; height: number }): string | undefined {
   const g = t.geometry ?? 'whole';
   if (g === 'off-screen') return t.reached || t.probe.length > 0 || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
+  if (screen !== undefined && !centreOnScreen(t.frame, screen)) {
+    return t.reached || t.probe.length > 0 ? `its centre ${at(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
+  }
   if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
   if (touchesAt(t.probe, probePoint(t.frame)).length === 0) return NOT_DELIVERED;
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
@@ -248,7 +257,8 @@ export function clipCuts(frame: Rect, visible: Rect, clip: Rect | undefined): { 
 }
 
 /**
- * Where a target's frame lies (schema.ts#Geometry), in averi's judging order (ADR 0005): off the screen; outside its
+ * Where a target's frame lies (schema.ts#Geometry), in averi's judging order (ADR 0005): off the screen (a frame of no
+ * area too, wherever it lies — intersect needs area: nothing of it can be drawn, and it is never probed); outside its
  * scroll view's clip; its centre in the status band, then the navigation band (ADR 0008, ADR 0009 N-a: the tap and the
  * plain stop are centre-based); cut — by the screen's edge or its clip — with what shows across a clip's cut edge under
  * the tap minimum (a sliver, ADR 0013: clipCuts), else with its centre outside what shows; its centre — of a whole

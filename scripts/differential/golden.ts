@@ -89,7 +89,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   const c = await connect(side, recording, profile);
   try {
     for (const t of truth.targets) {
-      const why = consistency(t, recording.platform);
+      const why = consistency(t, recording.platform, truth.screen);
       if (why !== undefined) {
         result.broken.push(`${t.tag}: ${why}`);
         continue;
