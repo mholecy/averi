@@ -216,12 +216,15 @@ target on screen was lost.
    has a bare dim `presentedSurface` does not name, and its form's targets read clear (a tap reported done); the
    parser now marks the `Alert` (`UiNode.presentation`), whose layer covers the whole screen beneath it. The
    target's own flag is still never read.
-   **Closed for WDA** (2026-10-15, "Amendment: the presented layer is the source's fact" above): the occluded screen's
-   flags are now the evidence that marks the layer over it, so every presented screen whose beneath WDA reports
-   wholly `0` covers that screen's targets through the marked layer, whatever its surface's shape — the half sheet,
-   the RN modal and the action sheet included. Stands for a tree whose source did not judge (a snapshot printed
-   before the marks) and for a presentation WDA's flags do not show so (a beneath not wholly `0`: mid-animation or a
-   non-modal sheet, unmeasured — ADR 0018's risks).
+   **Closed for WDA** (2026-10-15, "Amendment: the presented layer is the source's fact" above), within the flags
+   rule's reach: the occluded screen's flags are now the evidence that marks the layer over it, so a presented screen
+   laid as a screen-sized layer of the same Window as the screen beneath, which WDA reports wholly `0`, covers that
+   screen's targets through the marked layer, whatever its surface's shape — the half sheet, the RN modal and the
+   action sheet included. Stands for a presented screen in a LATER Window (the rule is per Window; none measured —
+   ADR 0018's residual 3, though a typed layer in any Window is marked), for a presented layer under
+   `SCREEN_SIZED_FRACTION` of its Window (the rule walks past it), for a tree whose source did not judge (a snapshot
+   printed before the marks), and for a presentation WDA's flags do not show so (a beneath not wholly `0`:
+   mid-animation or a non-modal sheet, unmeasured — ADR 0018's risks).
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
 5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
    was not measured) is not placed.
