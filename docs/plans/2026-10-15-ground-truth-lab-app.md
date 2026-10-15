@@ -180,8 +180,15 @@ How to add a cell (B2–B5):
    with the first cell that needs them; a recapture of the existing cells then adds those keys to their state and
    `geometry: whole` to their targets, which asks no new row).
 3. **Capture** — `capture.ts --udid <lab> --out tests/fixtures/truth/<run> --family <family>` (and the Android one).
-4. **Spec rows** — the family's `golden-spec/<family>.ts` maps its truths to rows.ts's row types (a new row type goes
-   into rows.ts with the ADR or note deciding it, and a judge table test).
+4. **Spec rows** — a target's rows are chosen by its MEASURED geometry (truth.ts#geometryOf), not by its family:
+   `golden-spec/edges.ts` and `golden-spec/bars.ts` are geometry groups, asked of a target of any family whose capture
+   measured an edge, band or chrome geometry, so a B2 or B4 cell needs no spec change for a geometry they already map. A
+   family file maps what a geometry does not decide (presented.ts: the presented-over rows; forms.ts: the form rows); a
+   new row type goes into rows.ts with the ADR or note deciding it, and a judge table test. A row keyed on the cell, not
+   on a target's geometry, is wired through the façade, `golden-spec.ts#expectations` — false-covers' R-dismiss
+   (rows.ts#dismissRow, under the cell's `config.ios.keyboardDismiss`). So a B5 author edits
+   `golden-spec/false-covers.ts` (its rows), `golden-spec.ts#expectations` (to ask them), rows.ts only for a new row
+   type, and steps 1–3 and 5's files.
 5. **KNOWN** — `tests/differential/golden/<family>.known.ts`: the captures' COUNTS, and each mismatch the checkout has
    with its class, reply kind, calls, note and `as: bug:<note>` or `residual:<decision>`; then the note's rows in
    `scripts/truth/calibration.json` and a calibrate run.

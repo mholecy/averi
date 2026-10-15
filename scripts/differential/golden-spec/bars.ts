@@ -5,10 +5,11 @@ import { isOverlap, parseGeometry } from '../../truth/truth.js';
 import { bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
 
 /**
- * The bars family's rows (fixtures/apps/cells/bars.json, phase 3 B4): an open target whose measured centre lies in a
- * system band or under the app's chrome. The row types are rows.ts's; here, which a geometry asks. R-stroke (rows.ts)
- * is asked by any family's row that strokes on a cell with chrome (edges.ts). Nothing for a target with no geometry or
- * a `whole` one.
+ * The band and chrome geometries' rows — a geometry group, named for the bars family (fixtures/apps/cells/bars.json,
+ * phase 3 B4) whose cells build them, but asked of an open target of ANY family whose measured centre lies in a system
+ * band or under the app's chrome, or whose edge they overlap (golden-spec.ts#expectations picks by geometry). The row
+ * types are rows.ts's; here, which a geometry asks. R-stroke (rows.ts) is asked by any family's row that strokes on a
+ * cell with chrome (edges.ts). Nothing for a target with no geometry or a `whole` one.
  *
  * | geometry | rows |
  * |---|---|

@@ -4,9 +4,11 @@ import { classed, type Expectation } from './judges.js';
 import { colourFails, directionRow, fullyRow, landRow, notReachedStill, refusedTap, strokeRow } from './rows.js';
 
 /**
- * The edges family's rows (fixtures/apps/cells/edges.json, phase 3 B2): an open target whose measured geometry puts it
- * at an edge — of the screen, or of its scroll view's clip. The row types are rows.ts's (each citing what decides it);
- * here, which a geometry asks. Nothing for a target with no geometry or a `whole` one.
+ * The edge geometries' rows — a geometry group, named for the edges family (fixtures/apps/cells/edges.json, phase 3 B2)
+ * whose cells build them, but asked of an open target of ANY family whose measured geometry puts it at an edge — of the
+ * screen, or of its scroll view's clip (golden-spec.ts#expectations picks by geometry, never by family). The row types
+ * are rows.ts's (each citing what decides it); here, which a geometry asks. Nothing for a target with no geometry or a
+ * `whole` one.
  *
  * | geometry | rows |
  * |---|---|

@@ -16,7 +16,9 @@ import type { Expectation } from './golden-spec/judges.js';
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
  * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
  *
- * A row is added with the cells that need it. Every row's judge goes through one classification (classed). A reply
+ * A row is added with the cells that need it — except phase 3's row types (golden-spec/rows.ts), which B1 (the plan's
+ * phase 3) declared ahead of their cells so that the families can be built in parallel: a row type asks nothing until a
+ * capture carries the geometry or kind it judges. Every row's judge goes through one classification (classed). A reply
  * that says the target is not in the tree (a tap timing out "waiting for element … to appear", scroll_until's "never
  * appeared in the tree", an assert's "not found within") is judged by its effect first: where the row's own judge
  * rejects it (a tap refused without "close it first", a swipe beneath the presented layer, a touch-down under the
@@ -29,9 +31,17 @@ import type { Expectation } from './golden-spec/judges.js';
  * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's
  * (scripts/truth/live.ts).
  *
- * The rows live per cell family (scripts/differential/golden-spec/<family>.ts, the families of
- * fixtures/apps/cells/), the judges they share in golden-spec/judges.ts; this module is what the golden mode and the
- * tests import, and it picks a target's rows.
+ * The rows live in scripts/differential/golden-spec/ (one file per cell family of fixtures/apps/cells/), the judges
+ * they share in golden-spec/judges.ts, phase 3's row types in golden-spec/rows.ts; this module is what the golden mode
+ * and the tests import, and it picks a target's rows (expectations). A coloured target's rows are chosen by its truth —
+ * presented-over, else its MEASURED geometry (truth.ts#geometryOf) — never by its cell's family: edges.ts and bars.ts
+ * are geometry groups, asked of a target of any family whose capture measured an edge, band or chrome geometry, and
+ * base.ts's open rows of any target measured `whole` (or unmeasured). A row not keyed on a target's geometry is wired
+ * here too: false-covers' R-dismiss (rows.ts#dismissRow, a cell's row under its `config.ios.keyboardDismiss`) goes
+ * through expectations(), as the form rows go through formExpectations. So a B5 (false covers) author edits
+ * golden-spec/false-covers.ts (its rows), this module's expectations() (to ask them of the cell), rows.ts only for a
+ * new row type — and the family's catalog file, app views and tests/differential/golden/false-covers.known.ts, as every
+ * batch does.
  */
 
 export * from './golden-spec/judges.js';

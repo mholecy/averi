@@ -46,7 +46,9 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 
 - A fix is checked against the whole lab corpus at once, without a device; a device round confirms, it does not discover.
 - The truth is only as wide as the cells: a situation no cell builds is judged by nothing here. New rows come with the
-  cells that need them.
+  cells that need them — except phase 3's row types (scripts/differential/golden-spec/rows.ts), which B1 (the plan's
+  phase 3) declared ahead of their cells so that the cell families can be built in parallel. A row type asks nothing
+  until a capture carries the geometry or kind it judges.
 - Recapture after an Xcode, OS or app change is one script run (scripts/truth/capture.ts, capture-android.ts); a cell
   that breaks on recapture is fixed in the lab app, not in the spec.
 
