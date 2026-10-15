@@ -64,8 +64,9 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
 // reaches, is pinned against the real sentences (`actualSentences`).
 vi.mock('../../src/ui-tree/standing.js', async (orig) => ({
   ...(await orig<typeof import('../../src/ui-tree/standing.js')>()),
-  presentedRemedy: (what: 'it' | 'the element') => (what === 'it' ? '<the presented remedy, as ui-tree/standing.ts renders it of "it">' : '<the presented remedy, as ui-tree/standing.ts renders it of "the element">'),
-  presentedStop: () => '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>',
+  presentedRemedy: (what: 'it' | 'the element', layer?: { kind: string; label?: string }) =>
+    `<the presented remedy, as ui-tree/standing.ts renders it of "${what}"${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
+  presentedStop: (layer?: { kind: string; label?: string }) => `<the presented stop's remedy, as ui-tree/standing.ts renders it${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
 }));
 vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
@@ -133,6 +134,15 @@ describe('tool descriptions quote each operation default from its owner', () => 
   it('ui_snapshot: says what WDA\'s `"presentation": "alert"` means (adapters/types.ts#UiNode.presentation): the alert covers the whole screen beneath it', () => {
     expect(description('ui_snapshot')).toContain('"presentation": "alert"');
     expect(description('ui_snapshot')).toContain('covers the whole screen beneath it');
+  });
+
+  it('ui_snapshot and scroll_until: the alert\'s remedy is quoted from its owner (ui-tree/standing.ts) — of "it" for tap and scroll_until, of "the element" for color/ocr — never typed out', () => {
+    expect(description('ui_snapshot')).toContain(
+      'tap and scroll_until refuse a target there naming the alert (\'<the presented remedy, as ui-tree/standing.ts renders it of "it" under an alert titled …>\'), ' +
+        'color/ocr fail closed likewise (\'<the presented remedy, as ui-tree/standing.ts renders it of "the element" under an alert titled …>\')',
+    );
+    expect(description('scroll_until')).toContain('on … — <the presented stop\'s remedy, as ui-tree/standing.ts renders it under an alert titled …>, so none was sent"');
+    for (const tool of ['ui_snapshot', 'scroll_until']) expect(description(tool)).not.toContain('an alert is presented over');
   });
 
   it('ui_snapshot: says what the root\'s dialect marks mean — WDA\'s `"unclippedFrames": true` (adapters/types.ts#UiNode.unclippedFrames) and idb\'s `"flatList": true`', () => {
