@@ -1012,6 +1012,36 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(ocrFoldPattern('^x[–-]y$')).toBeUndefined();
   });
 
+  it('a pattern with nothing of its own to fold runs on the folded reading too: an ASCII apostrophe matches a typographic one read, saying it folded the reading\'s', () => {
+    expect(evaluateOcrAssert({ match: "Payee's" }, [line('Payee’s name', 30)], 1080)).toEqual({
+      pass: true,
+      detail: `read "Payee’s name"; vs /Payee's/ matches (only with the reading's ’ vs ' folded — the recognizer does not tell typographic punctuation from its ASCII look-alike)`,
+    });
+    expect(evaluateOcrAssert({ match: '^Prihlasit sa$' }, [line('Prihlásiť sa', 30)], 1080)).toEqual({
+      pass: true,
+      detail: `read "Prihlásiť sa"; vs /^Prihlasit sa$/ matches (only with the reading's á vs a, ť vs t folded — the recognizer does not tell a letter with diacritics from one without)`,
+    });
+  });
+
+  it('…the note names only what it folded of the reading where the pattern matched', () => {
+    expect(evaluateOcrAssert({ match: "Payee's" }, [line('Payee’s náme', 30)], 1080).detail).toBe(
+      `read "Payee’s náme"; vs /Payee's/ matches (only with the reading's ’ vs ' folded — the recognizer does not tell typographic punctuation from its ASCII look-alike)`,
+    );
+  });
+
+  it.each([
+    ["^Payee's game$", 'Payee’s name'],
+    ["^payee's", 'Payee’s name'],
+    ['^Prihlasit$', 'PRIHLÁSIŤ'],
+    // A pattern that names a fold character itself, literally or by escape, is written as the screen reads: the
+    // reading is not folded for it — (?<!’) must still see the ’ the reading has.
+    ['(?<!’)s$', 'x’s'],
+    ['(?<!\\u2019)s$', 'x’s'],
+    ['^[^\\u2019]+$', 'a’b'],
+  ])('/%s/ against %j: the reading\'s fold does not help — FAIL, no note', (match, read) => {
+    expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080)).toEqual({ pass: false, detail: `read ${JSON.stringify(read)}; vs /${match}/ NO MATCH` });
+  });
+
   it('the note on a lone combining mark in a pattern shows the mark on a dotted circle', () => {
     expect(evaluateOcrAssert({ match: '^e\u0301$' }, [line('e', 30)], 1080).detail).toContain('(only with ◌\u0301 vs nothing folded — ');
   });

@@ -12,7 +12,10 @@
  * The fold is deliberately narrow: punctuation look-alikes and combining
  * marks, nothing else. Case is NOT folded (a case difference renders, and the
  * recognizer reads it); a letter keeps its base letter (only a Latin combining
- * mark comes off), digits never change. And it applies to
+ * mark comes off), digits never change. It runs either way round: a typographic
+ * expectation read as ASCII and an ASCII one read typographic are alike, and a
+ * `match` pattern either has its own characters folded (`ocrFoldPattern`) or,
+ * naming none (`foldFree`), meets the folded reading. And it applies to
  * recognizer readings ONLY — the tree carries the app's characters exactly, so
  * a `’` → `'` change there is a copy change the tree can see.
  */
@@ -73,8 +76,9 @@ const escapedLiteral = (c: string | undefined): string | undefined =>
  *
  * What holds: the folded pattern accepts a folded reading only if the pattern
  * itself accepts some string that folds to it. Only the pattern's own
- * typographic and accented characters are folded — an ASCII pattern is never
- * widened to a typographic reading. So:
+ * typographic and accented characters are folded here; a pattern with none
+ * (`foldFree`) is run as written on the folded reading instead
+ * (verify/text-parity.ts#evaluateOcrAssert), which holds the same. So:
  * - a literal character outside a class — bare or as an identity escape (`\–`)
  *   — becomes its fold as one unit, `(?:…)`, so a quantifier after it still
  *   binds to the whole fold (`…?` is `(?:\.\.\.)?`, never `\.\.\.?`);
@@ -151,6 +155,41 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
   // character, which would move a word boundary.
   if (boundary && folded.some(([, f]) => /\w/.test(f))) return undefined;
   return { source: out, folded };
+}
+
+/**
+ * Whether `source` names no character the fold changes — neither literally nor
+ * by an escape (`\u2019`, `\xe9`; a doubled backslash before one counts too,
+ * erring safe) — so a READING's fold may be matched by it as written: the
+ * pattern then holds no opinion on typographic or accented characters the
+ * fold could take from under it. A pattern that names one is written as the
+ * screen reads (`ocrFoldPattern` folds it instead): `(?<!’)s$` must still see
+ * the `’` a reading has.
+ */
+export function foldFree(source: string): boolean {
+  if (ocrFold(source) !== source) return false;
+  for (const m of source.matchAll(/\\(?:u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2}))/g)) {
+    if (parseInt(m[1] ?? m[2], 16) > 0x7f) return false;
+  }
+  return true;
+}
+
+/**
+ * The characters of `read` the fold changed, as `[read, fold]` pairs, where
+ * their folds lie in `[start, end)` of `ocrFold(read)` (a dropped mark: where
+ * it stood) — what a match found there in the folded reading took on trust.
+ */
+export function readingFolds(read: string, start: number, end: number): [string, string][] {
+  const pairs: [string, string][] = [];
+  let at = 0;
+  for (const c of charsOf(read)) {
+    const f = foldChar(c);
+    const next = at + f.length;
+    const inside = f.length === 0 ? at >= start && at <= end : next > start && at < end;
+    if (f !== c && inside) pairs.push([c, f]);
+    at = next;
+  }
+  return pairs;
 }
 
 /** The character a class member lists: `\-` lists `-`; a letter escape (`\d`) lists no one character. */

@@ -18,10 +18,12 @@ import { failClosed } from './fail-closed.js';
 import {
   differsOnlyByOcrFold,
   foldDifference,
+  foldFree,
   foldReason,
   namePairs,
   ocrFold,
   ocrFoldPattern,
+  readingFolds,
 } from './ocr-fold.js';
 import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -1066,6 +1068,28 @@ function foldedMatch(pattern: string, seen: string): [string, string][] | undefi
 }
 
 /**
+ * The pattern as written against the folded READING (ocr-fold.ts), for a
+ * pattern with nothing of its own to fold (`foldFree`; one that names a fold
+ * character is folded itself, `foldedMatch`): the reading's characters it
+ * folded where the pattern matched — all it folded when the match spans none
+ * of them (`(?<=')s` on `’s`) — else undefined. Case is not folded, so
+ * `^Payee's game$` still fails on `Payee’s name`; a pattern the engine cannot
+ * run fails, it never throws.
+ */
+function readingFoldMatch(pattern: string, seen: string): [string, string][] | undefined {
+  const folded = ocrFold(seen);
+  if (folded === seen || !foldFree(pattern)) return undefined;
+  try {
+    const m = new RegExp(pattern).exec(folded);
+    if (m === null) return undefined;
+    const here = readingFolds(seen, m.index, m.index + m[0].length);
+    return here.length > 0 ? here : readingFolds(seen, 0, folded.length);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Single-element rendered-text check over one region's recognizer output.
  * Pure: `measureOcrAssert` does the cropping and recognizing, this decides
  * the verdict, so the whole decision is testable without a Swift toolchain.
@@ -1106,15 +1130,19 @@ export function evaluateOcrAssert(
   }
   if (expectation.match !== undefined) {
     // The reading as read first; failing that, the folded reading against the
-    // folded pattern (ocr-fold.ts) — a pass that names what it folded.
+    // folded pattern — or, for a pattern with nothing of its own to fold,
+    // against the pattern as written (ocr-fold.ts) — a pass that names what it
+    // folded, and of which side.
     const exact = new RegExp(expectation.match).test(seen);
     const folded = exact ? undefined : foldedMatch(expectation.match, seen);
-    const ok = exact || folded !== undefined;
+    const ofReading = exact || folded !== undefined ? undefined : readingFoldMatch(expectation.match, seen);
+    const ok = exact || folded !== undefined || ofReading !== undefined;
     if (!ok) pass = false;
-    parts.push(
-      `vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}` +
-        (folded !== undefined ? ` (only with ${namePairs(folded)} folded — ${foldReason(folded)})` : ''),
-    );
+    const note =
+      folded !== undefined ? ` (only with ${namePairs(folded)} folded — ${foldReason(folded)})`
+      : ofReading !== undefined ? ` (only with the reading's ${namePairs(ofReading)} folded — ${foldReason(ofReading)})`
+      : '';
+    parts.push(`vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}${note}`);
   }
   let heightUnchecked: string | undefined;
   if (expectation.heightPct !== undefined) {
