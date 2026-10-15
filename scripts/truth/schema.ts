@@ -238,9 +238,10 @@ export interface TargetTruth {
 /**
  * Where a target's frame lies, measured (truth.ts#geometryOf), in averi's judging order (ADR 0005: off the screen, the
  * system bands, cut, covered): `off-screen` none of it on the screen; `outside-scroll-view` on the screen but none of
- * it in its scroll view's clip; `status-band` / `nav-band` its centre in the top / bottom system band; `sliver` cut (by
- * the screen or its clip) to a piece under the tap minimum (ADR 0013); `partly-centre-in` / `centre-out` cut, its centre
- * inside / outside what shows; `under-chrome:<name>` whole, its centre under the app's chrome of that name; `whole`.
+ * it in its scroll view's clip; `status-band` / `nav-band` its centre in the top / bottom system band; `sliver` cut by
+ * its scroll view's clip, what shows across that edge under the tap minimum (ADR 0013; truth.ts#clipCuts);
+ * `partly-centre-in` / `centre-out` cut, its centre inside / outside what shows; `under-chrome:<name>` whole, its
+ * centre under the app's chrome of that name; `whole`.
  */
 export type Geometry =
   | 'whole'

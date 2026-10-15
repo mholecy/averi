@@ -31,6 +31,8 @@ const SCREEN = rect(0, 0, 402, 874);
 const SAFE: Insets = { top: 62, left: 0, bottom: 34, right: 0 };
 const LIST = rect(0, 100, 402, 600);
 const TAB = rect(0, 790, 402, 84);
+/** A horizontal carousel's clip: 300 pt wide, ending inside the screen. */
+const CAROUSEL = rect(0, 250, 300, 100);
 const ctx = (over: Partial<GeometryContext> = {}): GeometryContext => ({ screen: SCREEN, safeArea: SAFE, ...over });
 
 describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
@@ -49,7 +51,13 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['centre-out: cut by its clip\'s bottom, 30 of 64 showing', rect(51, 670, 300, 64), ctx({ clip: LIST }), 'centre-out'],
     ['sliver: 20 pt showing, under 6 % of 402 (24 pt)', rect(51, 680, 300, 64), ctx({ clip: LIST }), 'sliver'],
     ['not a sliver at exactly the minimum (24 pt showing)', rect(51, 676, 300, 64), ctx({ clip: LIST }), 'centre-out'],
-    ['sliver: cut by the screen\'s right edge to 10 pt wide', rect(392, 200, 300, 64), ctx(), 'sliver'],
+    ['not a sliver: cut by the screen\'s right edge alone to 10 pt wide — its centre off it', rect(392, 200, 300, 64), ctx(), 'centre-out'],
+    ['not a sliver: cut by the screen\'s left edge alone to 20 pt wide, its centre on it', rect(-10, 200, 30, 64), ctx(), 'partly-centre-in'],
+    ['not a sliver: cut sideways by a carousel\'s clip, 100 pt across the cut though 20 pt tall', rect(200, 300, 302, 20), ctx({ clip: CAROUSEL }), 'centre-out'],
+    ['not a sliver: cut sideways by the screen, 202 pt across the cut though 20 pt tall', rect(200, 300, 302, 20), ctx(), 'partly-centre-in'],
+    ['sliver: a tall target cut across its width by a carousel\'s clip, 10 pt across the cut', rect(290, 260, 40, 80), ctx({ clip: CAROUSEL }), 'sliver'],
+    ['sliver: a tall row cut at its clip\'s bottom, 20 pt across the cut', rect(51, 680, 300, 200), ctx({ clip: LIST }), 'sliver'],
+    ['sliver: a 20-pt icon cut by 1 pt at its clip\'s top — what shows across the cut, 19 pt, is under the minimum', rect(51, 99, 20, 20), ctx({ clip: LIST }), 'sliver'],
     ['under-chrome: whole, its centre under the tab bar', rect(51, 780, 300, 64), ctx({ safeArea: undefined, chrome: { tabBar: TAB } }), 'under-chrome:tabBar'],
     ['under-chrome names the first chrome by name where two overlap', rect(51, 780, 300, 64), ctx({ safeArea: undefined, chrome: { toolbar: TAB, fab: TAB } }), 'under-chrome:fab'],
     ['a cut before a cover: cut by its clip, its centre under the tab bar too', rect(51, 670, 300, 64), ctx({ clip: LIST, chrome: { tabBar: rect(0, 690, 402, 84) } }), 'centre-out'],

@@ -191,10 +191,31 @@ export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
 }
 
 /**
+ * The edges of `frame` its scroll view's clip cuts — the clip's edge is where what shows of it ends, and the frame runs
+ * on past it — each with what shows of the frame ACROSS that edge (`visible.height` at the top or bottom, its width at
+ * a side): ADR 0013's sliver is `ui-tree/geometry.ts#Clips.cutSliver`'s, "what shows of the node across that edge"
+ * under the minimum, and only at a clipping container's edge (its `scrollersOf` chain). A cut by the screen's edge
+ * alone is not one: src judges such a target by its centre (on the screen: tapped; off it: off the screen). On iOS no
+ * tree marks a clipping ancestor (`scrollersOf` is empty there), so src refuses no sliver: an iOS cell's R-sliver rows
+ * would show that gap (ADR 0013 decides the refusal; it does not say the gap is accepted).
+ */
+export function clipCuts(frame: Rect, visible: Rect, clip: Rect | undefined): { edge: 'top' | 'bottom' | 'left' | 'right'; depth: number }[] {
+  if (clip === undefined) return [];
+  const cuts: { edge: 'top' | 'bottom' | 'left' | 'right'; depth: number }[] = [];
+  if (frame.y < clip.y && visible.y === clip.y) cuts.push({ edge: 'top', depth: visible.height });
+  if (frame.y + frame.height > clip.y + clip.height && visible.y + visible.height === clip.y + clip.height) cuts.push({ edge: 'bottom', depth: visible.height });
+  if (frame.x < clip.x && visible.x === clip.x) cuts.push({ edge: 'left', depth: visible.width });
+  if (frame.x + frame.width > clip.x + clip.width && visible.x + visible.width === clip.x + clip.width) cuts.push({ edge: 'right', depth: visible.width });
+  return cuts;
+}
+
+/**
  * Where a target's frame lies (schema.ts#Geometry), in averi's judging order (ADR 0005): off the screen; outside its
  * scroll view's clip; its centre in the status band, then the navigation band (ADR 0008, ADR 0009 N-a: the tap and the
- * plain stop are centre-based); cut — by the screen's edge or its clip — to a sliver under the tap minimum (ADR 0013),
- * else with its centre inside or outside what shows; its centre under the app's chrome (the first by name); else whole.
+ * plain stop are centre-based); cut — by the screen's edge or its clip — with what shows across a clip's cut edge under
+ * the tap minimum (a sliver, ADR 0013: clipCuts), else with its centre inside or outside what shows; its centre under
+ * the app's chrome (the first by name); else whole. A target under the minimum whole (a 20-pt icon) cut by its clip by
+ * any amount is a sliver: what shows across the cut is under the minimum, as Clips.cutSliver judges it.
  */
 export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   if (intersect(frame, ctx.screen) === null) return 'off-screen';
@@ -205,8 +226,7 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   if (bands.status !== undefined && inside(c, bands.status)) return 'status-band';
   if (bands.nav !== undefined && inside(c, bands.nav)) return 'nav-band';
   if (area(visible) < area(frame)) {
-    const min = minPiece(ctx.screen);
-    if (visible.width < min || visible.height < min) return 'sliver';
+    if (clipCuts(frame, visible, ctx.clip).some((cut) => cut.depth < minPiece(ctx.screen))) return 'sliver';
     return inside(c, visible) ? 'partly-centre-in' : 'centre-out';
   }
   const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => inside(c, r));
