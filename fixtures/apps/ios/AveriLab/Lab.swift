@@ -99,7 +99,8 @@ struct Frame: Codable, Equatable {
 
 struct LabEvent: Codable {
     /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button); on a form
-    /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row).
+    /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row);
+    /// "touch" (a touch began in one of the app's windows, `tag` "x,y" in screen points — the probe's positive control).
     let kind: String
     let tag: String
     let at: Double
@@ -160,11 +161,21 @@ final class Lab: ObservableObject {
     private var state: LabState
     private let file: URL
 
+    /// The lab the touch recorder reports to (TouchRecorder): one per process.
+    static weak var current: Lab?
+
     init() {
         file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("lab-state.json")
         let screen = UIScreen.main
         state = LabState(cell: "", ready: false, screen: Frame(screen.bounds), scale: Double(screen.scale), frames: [:], events: [])
+        Lab.current = self
+        TouchRecorder.install()
         if let id = UserDefaults.standard.string(forKey: "cell") { show(id) } else { write() }
+    }
+
+    /// A touch began at `p` (screen points): logged, so a probe tap that never reached the app reads as undelivered.
+    func touched(_ p: CGPoint) {
+        event("touch", String(format: "%.1f,%.1f", p.x, p.y))
     }
 
     /// A fresh state for `id`: what the last cell wrote is gone, so the capture script never reads it as this one's.
@@ -233,6 +244,35 @@ final class Lab: ObservableObject {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(state) else { return }
         try? data.write(to: file, options: .atomic)
+    }
+}
+
+/// Every touch any window of the app receives, before anything handles it: UIApplication.sendEvent, swapped once for
+/// a version that logs each touch's start and then sends the event on unchanged. A sheet, an alert and the keyboard's
+/// host window are all the app's windows; a touch the system keeps (the keyboard's own process) is not seen.
+enum TouchRecorder {
+    @MainActor static func install() {
+        guard !installed,
+              let original = class_getInstanceMethod(UIApplication.self, #selector(UIApplication.sendEvent(_:))),
+              let recording = class_getInstanceMethod(UIApplication.self, #selector(UIApplication.lab_sendEvent(_:)))
+        else { return }
+        method_exchangeImplementations(original, recording)
+        installed = true
+    }
+
+    @MainActor private static var installed = false
+}
+
+extension UIApplication {
+    /// After TouchRecorder.install this IS sendEvent, and `lab_sendEvent` the original.
+    @objc func lab_sendEvent(_ event: UIEvent) {
+        if event.type == .touches {
+            for touch in event.allTouches ?? [] where touch.phase == .began {
+                guard let window = touch.window else { continue }
+                Lab.current?.touched(window.convert(touch.location(in: window), to: window.screen.coordinateSpace))
+            }
+        }
+        lab_sendEvent(event)
     }
 }
 

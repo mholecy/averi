@@ -3,11 +3,17 @@
  * bundle (fixtures/apps/cells.json), the state file an app writes while a cell is on screen, and the truth file the
  * capture script writes beside each capture.
  *
- * The truth has three sources, each answering one question:
+ * The truth of a coloured target has three sources, each answering one question:
  *  - DECLARED (the catalog): what the cell builds — `open`, or `presented-over` (a layer is presented over the target);
- *  - REACHED (the tap probe): whether a raw tap at the target's centre fired its action;
+ *  - REACHED (the tap probe): whether a raw tap at the target's centre fired its action — and, its positive control,
+ *    whether the tap reached the app at all (the app logs every touch its windows receive);
  *  - DRAWN (the screenshot): the fraction of the target's frame painted its own colour.
- * The frames are the app's own layout, not the tree's: a tree whose rect disagrees is itself a finding.
+ * A form control (a field, the submit, a picker row) has no DECLARED source: the catalog says nothing about where it
+ * lies. Its situation is MEASURED from the app's frames (truth.ts#situationOf) and checked against its probe.
+ *
+ * Units are the tree's: POINTS on iOS (the screenshot at `scale` 3 on the iPhone 17), screen PIXELS on Android (`scale`
+ * 1, uiautomator's bounds). The frames are the app's own layout, not the tree's: a tree whose rect disagrees is itself
+ * a finding.
  */
 
 /** What a cell builds around a target. New kinds come with the cells that need them. */
@@ -89,21 +95,25 @@ export interface Rect {
   height: number;
 }
 
-/** What the lab app writes (fixtures/apps/ios/AveriLab/Lab.swift#LabState): points, screen coordinates. */
+/**
+ * What the lab app writes (fixtures/apps/ios/AveriLab/Lab.swift#LabState, fixtures/apps/android/…/Lab.kt): screen
+ * coordinates in the tree's units — points on iOS, pixels on Android.
+ */
 export interface LabState {
   cell: string;
   /** The cell's layer has been presented and its animation has had time to finish. */
   ready: boolean;
   screen: Rect;
-  /** Pixels per point. */
+  /** Screenshot pixels per unit: the device's scale on iOS (3), 1 on Android. */
   scale: number;
   frames: Record<string, Rect>;
   /**
    * `tap` a target's action fired; `dismissed` a layer went away; `button` a layer's own button; on a form cell
    * `focus` a field took the focus (`tag` empty: none has it), `submit` the submit fired (`tag` `valid`/`invalid`),
-   * `select` a picker row was chosen (`tag` its code).
+   * `select` a picker row was chosen (`tag` its code); `touch` a touch began in one of the app's windows (`tag` `x,y`,
+   * screen coordinates in the state's units) — the probe's positive control.
    */
-  events: { kind: 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select'; tag: string; at: number }[];
+  events: (ProbeEvent & { at: number })[];
   /** A form cell's oracle — absent on the coloured-target cells (and in their phase-1 captures). */
   fields?: Record<string, FieldState>;
   /** The field holding the focus, or null. */
@@ -122,12 +132,20 @@ export interface FieldState {
 }
 
 export interface KeyboardState {
-  /** The keyboard's end frame (UIKeyboardFrameEndUserInfoKey), points, screen coordinates. */
+  /** The keyboard's end frame, screen coordinates in the tree's units (iOS: UIKeyboardFrameEndUserInfoKey, points). */
   frame: Rect;
   /** Its frame lies on the screen (a hide moves it below the bottom edge). */
   visible: boolean;
   /** The field focused when it changed — the one it serves. */
   field: string | null;
+}
+
+export type EventKind = 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select' | 'touch';
+
+/** One thing the app logged, as the truth keeps it. */
+export interface ProbeEvent {
+  kind: EventKind;
+  tag: string;
 }
 
 export interface TargetTruth {
@@ -136,12 +154,12 @@ export interface TargetTruth {
   id: string;
   color: string;
   declared: Declared;
-  /** The app's frame, in points. */
+  /** The app's frame, in the tree's units (points on iOS, pixels on Android). */
   frame: Rect;
   /** A raw tap at the frame's centre fired the target's action. */
   reached: boolean;
-  /** What else the probe tap did (a layer dismissed, …), as the app logged it. */
-  probe: string[];
+  /** Everything else the probe tap made the app log (its touch, a layer dismissed, another target's tap, …). */
+  probe: ProbeEvent[];
   /** The fraction of the frame's pixels painted the target's own colour (pixels.ts#OWN_COLOUR_TOLERANCE). */
   drawn: number;
   /** The colour most of the frame shows in the screenshot, `#RRGGBB` — what the user sees there. */
@@ -160,11 +178,11 @@ export interface CellTruth {
 }
 
 /**
- * Where a form control is, measured from the app's frames (capture.ts#situationOf), not declared: `open` its centre
+ * Where a form control is, measured from the app's frames (truth.ts#situationOf), not declared: `open` its centre
  * on the screen, clear of the keyboard and of the pinned bar; `under-keyboard` all of it below the keyboard's top;
- * `covered` its centre under the pinned submit bar, or straddling the keyboard's top (judged by no row); `presented-over`
- * under the picker sheet; `off-screen` its centre below the screen; `not-rendered` the app laid out no frame for it
- * (a lazy list's row far down).
+ * `covered` its centre under the pinned submit bar, or straddling the keyboard's top (judged when its probe fired
+ * another control — golden-spec.ts#controlRows); `presented-over` under the picker sheet; `off-screen` its centre off
+ * the screen; `not-rendered` the app laid out no frame for it (a lazy list's row far down).
  */
 export type Situation = 'open' | 'under-keyboard' | 'covered' | 'presented-over' | 'off-screen' | 'not-rendered';
 
@@ -176,10 +194,10 @@ export interface ControlTruth {
   /** The app's frame, absent when it laid out none. */
   frame?: Rect;
   situation: Situation;
-  /** A raw tap at the frame's centre focused the field / fired the button / chose the row. Never probed off the screen. */
+  /** A raw tap at the frame's centre focused the field / fired the button / chose the row. */
   reached: boolean;
-  /** What else the probe tap did, as the app logged it. */
-  probe: string[];
+  /** Everything else the probe tap made the app log (its touch first); empty for a control never probed (off the screen, not laid out). */
+  probe: ProbeEvent[];
 }
 
 /** A field as the app's model held it when the trees were read. */
@@ -204,21 +222,6 @@ export interface FormTruth {
   submits: { valid: boolean }[];
   /** The picker sheet's frame, when it is presented. */
   sheet?: Rect;
-}
-
-/** Whether the three sources tell one story: an `open` target is reached and drawn; a covered one neither. */
-export function consistency(t: TargetTruth): string | undefined {
-  if (t.declared === 'open' && !(t.reached && t.drawn >= DRAWN)) return `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
-  if (t.declared === 'presented-over' && t.reached) return 'declared presented-over, but the probe tap reached it';
-  return undefined;
-}
-
-/** Whether a control's probe agrees with where its frame puts it: an open one is reached, a hidden one not. */
-export function controlConsistency(c: ControlTruth): string | undefined {
-  if (c.situation === 'covered') return undefined;
-  if (c.situation === 'open' && !c.reached) return 'open, but the probe tap did not reach it';
-  if (c.situation !== 'open' && c.reached) return `${c.situation}, but the probe tap reached it`;
-  return undefined;
 }
 
 /** A target counts as drawn as itself from this fraction on (a frame's edge pixels may be antialiased). */

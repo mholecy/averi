@@ -20,7 +20,12 @@
         "height": 176
       },
       "reached": true,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,391"
+        }
+      ],
       "drawn": 1,
       "seen": "#E53935"
     },
@@ -36,7 +41,12 @@
         "height": 176
       },
       "reached": true,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,886"
+        }
+      ],
       "drawn": 1,
       "seen": "#1E88E5"
     },
@@ -52,7 +62,12 @@
         "height": 176
       },
       "reached": true,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1381"
+        }
+      ],
       "drawn": 1,
       "seen": "#43A047"
     },
@@ -68,7 +83,12 @@
         "height": 176
       },
       "reached": true,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1876"
+        }
+      ],
       "drawn": 1,
       "seen": "#FB8C00"
     }

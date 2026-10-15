@@ -10,7 +10,7 @@ import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
-import { BUNDLE, LabDevice, pause } from './lab-device.js';
+import { BUNDLE, IosLab, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import type { LabState } from './schema.js';
 
 /**
@@ -25,7 +25,8 @@ import type { LabState } from './schema.js';
  * The server is built as tests/mcp/tools.test.ts builds one (createAveriServer over the SDK's in-memory transport and
  * a real Client), over a REAL AdapterRegistry whose factory constructs the iOS adapter itself: averi gives WDA port
  * 8100 to the first simulator a process asks for, and 8100/8101 may belong to another session's WebDriverAgent — here
- * the WDA source takes `--wda-port` (default 8120, capture.ts's). Discovery lists the lab simulator only, so no tool
+ * the WDA source takes `--wda-port` (default 8120, capture.ts's) and builds into the lab's own derived data
+ * (lab-device.ts#LAB_WDA_DERIVED_DATA), never device-check's `averi-wda`. Discovery lists the lab simulator only, so no tool
  * call can bind another booted device. Each case launches its cell in a fresh process (simctl, as the capture does —
  * not averi's launch_app, which is not under test here), runs its calls, waits for the app to write, and reads the
  * model.
@@ -35,7 +36,7 @@ import type { LabState } from './schema.js';
  *  - LOUD: the model does not hold it, and averi said so (an error, or "NOT verified") — honest, not a pass;
  *  - MISMATCH: averi claimed what did not happen ("Filled", "Tapped" with the model unchanged), or failed what did;
  *  - SKIP: a keyboard case whose launch shows no soft keyboard — the simulator hides it once it has seen HID typing
- *    (idb ui text); LabDevice.launch writes the simulator's keyboard preferences back before every launch, and the
+ *    (idb ui text); IosLab.launch writes the simulator's keyboard preferences back before every launch, and the
  *    keyboard's cases run first besides.
  * Not a vitest test: it needs the simulator. Exit code 1 on a MISMATCH.
  */
@@ -51,7 +52,7 @@ const only = values.cases?.split(',');
 /** Where a case that is not ok leaves its screenshot (`--shots <dir>`), for the evidence. */
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
-const lab = new LabDevice(udid);
+const lab = new IosLab(udid);
 
 // --- the cases ---
 
@@ -106,7 +107,7 @@ const TITLE = { tap: { text: 'Transfer details' } };
 const CASES: Case[] = [
   // The keyboard's cases first: once the simulator has seen HID typing (idb ui text) it shows no soft keyboard
   // ("typing with a hardware keyboard keeps the software keyboard from showing", src/adapters/ios.ts) until
-  // LabDevice.launch writes its keyboard preferences back — first, so a failure of that write cannot skip them.
+  // IosLab.launch writes its keyboard preferences back — first, so a failure of that write cannot skip them.
   {
     id: 'k1',
     cell: K,
@@ -218,7 +219,7 @@ const CASES: Case[] = [
 
 async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
   const registry = new AdapterRegistry({
-    factory: (_platform, deviceId, opts) => new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? 'idb', deviceId, { port }) }),
+    factory: (_platform, deviceId, opts) => new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? 'idb', deviceId, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
     discovery: async (platform) => (platform === 'ios' ? (await listIosDevices()).filter((d) => d.id === udid) : []),
   });
   const server = createAveriServer({ registry, version: 'live-golden' });
@@ -255,6 +256,7 @@ async function callTool(client: Client, call: Call, configPath: string): Promise
   }
 }
 
+console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
 const results: { source: IosTreeSourceKind; c: Case; verdict: Verdict; replies: string[] }[] = [];
 const { client, close } = await connect();
 try {
@@ -263,7 +265,7 @@ try {
     for (const source of sources) {
       const launched = await lab.launch(c.cell);
       if (c.keyboard && launched.keyboard?.visible !== true) {
-        const verdict: Verdict = { outcome: 'SKIP', why: 'no soft keyboard at launch (the simulator saw HID typing; see LabDevice.launch)' };
+        const verdict: Verdict = { outcome: 'SKIP', why: 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' };
         results.push({ source, c, verdict, replies: [] });
         console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
         continue;

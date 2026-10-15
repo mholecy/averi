@@ -5,6 +5,8 @@ package dev.averi.lab
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
+import android.view.MotionEvent
+import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -51,6 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -83,6 +87,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** Every touch the activity's window receives, before anything handles it (the probe's positive control). */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) lab.touched(ev.rawX, ev.rawY)
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -134,6 +144,29 @@ private fun TargetBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modi
     )
 }
 
+/**
+ * Every touch the window of the dialog this is composed in receives — a dialog and a modal sheet are windows of their
+ * own, which the activity's dispatchTouchEvent never sees: its Window.Callback is wrapped to log each touch's start
+ * (the dim outside an alert's card included: a modal window receives every touch) and pass the event on unchanged.
+ */
+@Composable
+private fun RecordWindowTouches(lab: Lab) {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        val original = window?.callback
+        if (window != null && original != null && original !is TouchLog) window.callback = TouchLog(original, lab)
+        onDispose { if (window != null && original != null) window.callback = original }
+    }
+}
+
+private class TouchLog(private val original: Window.Callback, private val lab: Lab) : Window.Callback by original {
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) lab.touched(event.rawX, event.rawY)
+        return original.dispatchTouchEvent(event)
+    }
+}
+
 @Composable
 private fun CellScreen(cell: Cell, lab: Lab) {
     var sheet by remember { mutableStateOf(false) }
@@ -151,6 +184,7 @@ private fun CellScreen(cell: Cell, lab: Lab) {
             onDismissRequest = { sheet = false; lab.event("dismissed", "sheet") },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
         ) {
+            RecordWindowTouches(lab)
             Column(
                 Modifier.fillMaxWidth().fillMaxHeight().semantics { testTagsAsResourceId = true }.padding(top = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -166,7 +200,10 @@ private fun CellScreen(cell: Cell, lab: Lab) {
             confirmButton = { TextButton({ alert = false; lab.event("button", "Keep") }) { Text("Keep") } },
             dismissButton = { TextButton({ alert = false; lab.event("button", "Discard") }) { Text("Discard") } },
             title = { Text("Lab alert") },
-            text = { Text("A presented layer over the targets.") },
+            text = {
+                RecordWindowTouches(lab)
+                Text("A presented layer over the targets.")
+            },
         )
     }
     LaunchedEffect(Unit) {

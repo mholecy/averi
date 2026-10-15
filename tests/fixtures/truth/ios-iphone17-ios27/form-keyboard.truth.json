@@ -184,7 +184,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,177.0"
+          }
+        ]
       },
       {
         "tag": "message",
@@ -198,7 +203,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,251.0"
+          }
+        ]
       },
       {
         "tag": "street",
@@ -212,7 +222,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,325.0"
+          }
+        ]
       },
       {
         "tag": "city",
@@ -226,7 +241,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,399.0"
+          }
+        ]
       },
       {
         "tag": "postcode",
@@ -240,7 +260,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,473.0"
+          }
+        ]
       },
       {
         "tag": "phone",
@@ -255,7 +280,14 @@
         "situation": "covered",
         "reached": false,
         "probe": [
-          "submit invalid"
+          {
+            "kind": "touch",
+            "tag": "201.0,547.0"
+          },
+          {
+            "kind": "submit",
+            "tag": "invalid"
+          }
         ]
       },
       {
@@ -270,7 +302,12 @@
         },
         "situation": "under-keyboard",
         "reached": false,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,621.0"
+          }
+        ]
       },
       {
         "tag": "ks",
@@ -284,7 +321,12 @@
         },
         "situation": "under-keyboard",
         "reached": false,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,695.0"
+          }
+        ]
       },
       {
         "tag": "ss",
@@ -298,7 +340,12 @@
         },
         "situation": "under-keyboard",
         "reached": false,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,769.0"
+          }
+        ]
       },
       {
         "tag": "note",
@@ -312,7 +359,12 @@
         },
         "situation": "under-keyboard",
         "reached": false,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,843.0"
+          }
+        ]
       },
       {
         "tag": "submit",
@@ -326,7 +378,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,540.0"
+          }
+        ]
       }
     ],
     "keyboard": {

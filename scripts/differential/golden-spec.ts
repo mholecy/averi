@@ -1,6 +1,7 @@
 import type { Platform } from './corpus.js';
 import type { Call, Outcome } from './differential.js';
 import { DRAWN, type CellTruth, type ControlTruth, type FieldTruth, type Rect, type TargetTruth } from '../truth/schema.js';
+import { otherControlsFired } from '../truth/truth.js';
 
 /**
  * The golden mode's spec table (docs/plans/2026-10-15-ground-truth-lab-app.md): for a target whose truth is known,
@@ -10,9 +11,11 @@ import { DRAWN, type CellTruth, type ControlTruth, type FieldTruth, type Rect, t
  * | truth | tap | colour assert | scroll_until down |
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
- * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover | stops before any swipe, `close it first` (ADR 0018) |
+ * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
  *
- * A row is added with the cells that need it.
+ * A row is added with the cells that need it. Wherever a reply says the target is not in the tree (a tap timing out
+ * "waiting for element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within"), the
+ * mismatch is of one class, said first — `not in the tree:` — so the known list names one cause for all of them.
  *
  * The form cells (phase 1b) add rows a replayed tree CAN judge — see formExpectations. What it cannot judge (a fill, a
  * clear: typing changes nothing in a recorded tree) is the live golden's (scripts/truth/live.ts).
@@ -31,16 +34,32 @@ export interface Expectation {
 
 const BUDGET_MS = 1_000;
 const failed = (o: Outcome) => !o.reply.startsWith('All 1 asserts passed');
-/** The device's taps (`idb ui tap x y`) and swipe touch-downs (`idb ui swipe x1 y1 …`), as the fake device logged them. */
-const taps = (o: Outcome) => o.device.filter((c) => /^idb ui tap /.test(c));
-const touchDowns = (o: Outcome) =>
+/**
+ * The device's taps and swipe touch-downs as the fake device logged them (fake-device.ts): `idb ui tap x y`, `idb ui
+ * swipe x1 y1 x2 y2 …` on iOS; `adb shell input tap x y`, `adb shell input swipe x1 y1 x2 y2 …` on Android.
+ */
+export const taps = (o: Outcome) => o.device.filter((c) => /^(idb ui|adb shell input) tap /.test(c));
+export const touchDowns = (o: Outcome) =>
   o.device.flatMap((c) => {
-    const m = /^idb ui swipe (-?[\d.]+) (-?[\d.]+) /.exec(c);
+    const m = /^(?:idb ui|adb shell input) swipe (-?[\d.]+) (-?[\d.]+) /.exec(c);
     return m === null ? [] : [{ x: Number(m[1]), y: Number(m[2]) }];
   });
 const passed = (o: Outcome) => o.reply.startsWith('All 1 asserts passed');
-const swipes = (o: Outcome) => o.device.filter((c) => / ui swipe | input swipe /.test(` ${c} `)).length;
-const first = (o: Outcome) => o.reply.split('\n')[0].slice(0, 200);
+const swipes = (o: Outcome) => touchDowns(o).length;
+/** The reply's first line — an assert's first verdict line, under its `N/N asserts …` summary. */
+const first = (o: Outcome) => {
+  const lines = o.reply.split('\n');
+  return (/^\d+\/\d+ asserts|^All \d+ asserts/.test(lines[0]) && lines.length > 1 ? lines[1] : lines[0]).slice(0, 200);
+};
+/** The reply without the selectors it echoes: `id:"lab.form-keyboard.vs"` must not read as the word keyboard. */
+export const ownWords = (o: Outcome) => o.reply.replace(/\b[a-z]+:"(?:[^"\\]|\\.)*"/gi, '<selector>');
+/** The reply says the element is not in the tree — no evidence of what covers it (see the table above). */
+export const notInTree = (o: Outcome) => /waiting for element .* to appear|never appeared in the tree|not found within/.test(o.reply);
+/** The first words of a mismatch: its class when the target is not in the tree, then the reply's first line. */
+const said = (o: Outcome, what: string) => `${notInTree(o) ? 'not in the tree: ' : ''}${what}: ${first(o)}`;
+/** A tap that must not land: not `Tapped`, and no tap sent. */
+export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
+const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
 
 export function expectations(platform: Platform, t: TargetTruth): Expectation[] {
   const selector = `id:"${t.id}"`;
@@ -68,26 +87,24 @@ export function expectations(platform: Platform, t: TargetTruth): Expectation[] 
     ];
   }
   if (t.declared === 'presented-over' && !t.reached) {
-    const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
     return [
       {
         verb: 'tap',
         says: 'refused: close it first, nothing tapped',
         call: { tool: 'tap', args: { platform, selector } },
-        judge: (o) =>
-          o.reply.startsWith('Tapped') ? `tapped a target a presented layer covers: ${first(o)}` : !closeFirst(o) ? `refused without "close it first": ${first(o)}` : undefined,
+        judge: (o) => notTapped(o) ?? (closeFirst(o) ? undefined : said(o, 'refused without "close it first"')),
       },
       {
         verb: 'colour',
-        says: `fails, even asked for the colour the screen shows there (${t.seen})`,
+        says: `fails, even asked for the colour the screen shows there (${t.seen}), with the element in the tree`,
         call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: t.seen }, timeout: BUDGET_MS }] } },
-        judge: (o) => (passed(o) ? `passed on ${t.seen}: it measured the layer over the target as the target` : undefined),
+        judge: (o) => (passed(o) ? `passed on ${t.seen}: it measured the layer over the target as the target` : notInTree(o) ? `not in the tree: ${first(o)}` : undefined),
       },
       {
         verb: 'scroll_until',
         says: 'stops before any swipe: close it first',
         call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
-        judge: (o) => (swipes(o) > 0 ? `swiped ${swipes(o)}× beneath a presented layer: ${first(o)}` : !closeFirst(o) ? `no "close it first": ${first(o)}` : undefined),
+        judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath a presented layer`) : !closeFirst(o) ? said(o, 'no "close it first"') : undefined),
       },
     ];
   }
@@ -101,6 +118,7 @@ export type PairingRule =
   | 'same identifier below the field'
   | 'own error identifier close under the field'
   | 'named neither way: not seen'
+  | 'another field between: pairs with none'
   | 'too far under the field: pairs with none';
 
 const ERROR_ID = /[._-]error$/i;
@@ -120,7 +138,7 @@ export function pairingOf(fields: readonly FieldTruth[], field: FieldTruth, id: 
   if (!ERROR_ID.test(id)) return 'named neither way: not seen';
   const column = fields.filter((f) => overlapX(f.frame, frame) > 0 && bottom(f.frame) <= frame.y);
   const nearest = column.reduce<FieldTruth | undefined>((a, f) => (a === undefined || bottom(f.frame) > bottom(a.frame) ? f : a), undefined);
-  if (nearest !== field) return 'too far under the field: pairs with none';
+  if (nearest !== field) return 'another field between: pairs with none';
   return frame.y - bottom(field.frame) <= Math.max(MAX_GAP, field.frame.height) ? 'own error identifier close under the field' : 'too far under the field: pairs with none';
 }
 
@@ -145,6 +163,8 @@ export type FormExpectation = Expectation & { target: string };
  * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
+ * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") |
+ * | the same | scroll_until down | never "reached" without a swipe |
  * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent |
  * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
  */
@@ -212,7 +232,6 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
   const target = c.tag;
   const keyboard = truth.form?.keyboard;
   const sheet = truth.form?.sheet;
-  const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
   switch (c.situation) {
     case 'open': {
       const rows: FormExpectation[] = [
@@ -237,7 +256,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           verb: 'tap',
           says: 'refused naming the keyboard, nothing tapped',
           call: tap,
-          judge: (o) => notTapped(o) ?? (/keyboard/i.test(o.reply) ? undefined : `refused without naming the keyboard: ${first(o)}`),
+          judge: (o) => notTapped(o) ?? (/\bsoft keyboard\b/i.test(ownWords(o)) ? undefined : said(o, 'refused without naming the keyboard')),
         },
         {
           target,
@@ -252,25 +271,23 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
         },
       ];
     }
-    case 'presented-over': {
-      const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
+    case 'presented-over':
       return [
         {
           target,
           verb: 'tap',
           says: 'refused: close it first, nothing tapped',
           call: tap,
-          judge: (o) => notTapped(o) ?? (closeFirst(o) ? undefined : `refused without "close it first": ${first(o)}`),
+          judge: (o) => notTapped(o) ?? (closeFirst(o) ? undefined : said(o, 'refused without "close it first"')),
         },
         {
           target,
           verb: 'scroll_until',
           says: 'stops before any swipe: close it first',
           call: scroll,
-          judge: (o) => (swipes(o) > 0 ? `swiped ${swipes(o)}× beneath the sheet: ${first(o)}` : !closeFirst(o) ? `no "close it first": ${first(o)}` : undefined),
+          judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath the sheet`) : !closeFirst(o) ? said(o, 'no "close it first"') : undefined),
         },
       ];
-    }
     case 'off-screen':
     case 'not-rendered':
       return [
@@ -288,7 +305,22 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           },
         },
       ];
-    case 'covered':
-      return [];
+    case 'covered': {
+      // Partly hidden. Judged when the probe shows what a tap at its centre does: it fires ANOTHER control (the pinned
+      // submit over the field) — so a tap must not be sent, and scroll_until must not call it reached where it is.
+      const fired = otherControlsFired(c.probe, c.tag);
+      if (fired.length === 0) return [];
+      const other = fired.map((e) => `${e.kind} ${e.tag}`).join(', ');
+      return [
+        { target, verb: 'tap', says: `not tapped, nothing sent (a tap at its centre fires ${other})`, call: tap, judge: notTapped },
+        {
+          target,
+          verb: 'scroll_until',
+          says: `not reached with no swipe (a tap at its centre fires ${other})`,
+          call: scroll,
+          judge: (o) => (!o.reply.startsWith('ERROR') && swipes(o) === 0 ? `reached with no swipe where a tap fires ${other}: ${first(o)}` : undefined),
+        },
+      ];
+    }
   }
 }

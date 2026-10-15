@@ -149,7 +149,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,177.0"
+          }
+        ]
       },
       {
         "tag": "email",
@@ -163,7 +168,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,273.0"
+          }
+        ]
       },
       {
         "tag": "amount",
@@ -177,7 +187,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,368.0"
+          }
+        ]
       },
       {
         "tag": "pin",
@@ -191,7 +206,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,464.0"
+          }
+        ]
       },
       {
         "tag": "iban",
@@ -205,7 +225,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,560.0"
+          }
+        ]
       },
       {
         "tag": "submit",
@@ -219,7 +244,12 @@
         },
         "situation": "open",
         "reached": true,
-        "probe": []
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,646.0"
+          }
+        ]
       }
     ],
     "keyboard": null,

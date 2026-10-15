@@ -20,7 +20,12 @@
         "y": 110
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,142.0"
+        }
+      ],
       "drawn": 0,
       "seen": "#B72E2A"
     },
@@ -36,7 +41,12 @@
         "y": 290
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,322.0"
+        }
+      ],
       "drawn": 0,
       "seen": "#186DB7"
     },
@@ -52,7 +62,12 @@
         "y": 470
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,502.0"
+        }
+      ],
       "drawn": 0,
       "seen": "#327735"
     },
@@ -68,7 +83,12 @@
         "y": 650
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,682.0"
+        }
+      ],
       "drawn": 0,
       "seen": "#C97000"
     }

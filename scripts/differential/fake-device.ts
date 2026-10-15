@@ -85,6 +85,7 @@ let current: DeviceState | undefined;
 
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
+  if (profile.screenshot !== undefined) servedScreenshot(profile.frame, profile.screenshot);
   current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [] };
 }
 
@@ -124,8 +125,22 @@ export function resetDevice(): void {
 // --- PNG frames, built once per size and paint ---
 
 const frames = new Map<string, Buffer>();
+/** A PNG's size, from its IHDR chunk (bytes 16–23, big-endian). */
+export const pngSize = (png: Buffer): Screen => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
+/**
+ * A captured screenshot, checked against the profile's frame: the tools read the size from the PNG they are served, so a
+ * profile whose frame says otherwise would describe one device and serve another. Asserted when the profile is set
+ * (useDevice) and again when the frame is served.
+ */
+function servedScreenshot(screen: Screen, screenshot: Buffer): Buffer {
+  const size = pngSize(screenshot);
+  if (size.width !== screen.width || size.height !== screen.height) {
+    throw new Error(`differential: the captured screenshot is ${size.width}x${size.height}, the profile's frame ${screen.width}x${screen.height}`);
+  }
+  return screenshot;
+}
 function frame(screen: Screen, paint: Paint | undefined, screenshot?: Buffer): Buffer {
-  if (screenshot !== undefined) return screenshot;
+  if (screenshot !== undefined) return servedScreenshot(screen, screenshot);
   const key = `${screen.width}x${screen.height} ${JSON.stringify(paint ?? null)}`;
   let png = frames.get(key);
   if (png === undefined) {

@@ -1,0 +1,169 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { PNG } from 'pngjs';
+import type { RunManifest } from '../differential/corpus.js';
+import type { LabDevice } from './lab-device.js';
+import { measure } from './pixels.js';
+import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
+import { consistency, controlConsistency, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
+
+/**
+ * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
+ * LabDevice (lab-device.ts), the command lines thin (capture.ts: iOS, capture-android.ts: Android):
+ *
+ * Per cell: launch it in a fresh process, wait for the app's `ready`, save every raw tree the platform has (WDA and idb;
+ * uiautomator), the screenshot and the app's state; then per target, and per control of a form cell, relaunch the cell
+ * and tap its centre with a raw tap — the probe: did its action fire, and (the positive control) did the tap reach the
+ * app at all? — and, for a target, measure from the screenshot how much of it is drawn as itself. Writes a differential
+ * corpus run: one capture per tree, sharing the cell's screenshot and truth.
+ *
+ * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown and
+ * its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus per
+ * control (field, submit, the picker's probe rows) where its frame lies (truth.ts#situationOf) and what its probe did.
+ *
+ * averi judges nothing here: the trees are read with the raw tools, so the truth does not depend on the code it will
+ * test. Run it against a device that holds nothing else of value: the lab app's data is replaced per launch.
+ */
+
+export interface CaptureOptions {
+  /** The run's directory (tests/fixtures/truth/<run>). */
+  out: string;
+  /** The manifest's note: what captured it. */
+  note: string;
+  /** The catalog, for the manifest's order. */
+  catalog: readonly CatalogCell[];
+  log?: (line: string) => void;
+}
+
+export interface CaptureResult {
+  /** Targets and controls whose truth's sources disagree — `<cell>/<tag>: why`. */
+  broken: string[];
+  /** Cells the app cannot build — `<cell>: why`. */
+  skipped: string[];
+  manifest: RunManifest;
+}
+
+export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opts: CaptureOptions): Promise<CaptureResult> {
+  const log = opts.log ?? ((line: string) => console.log(line));
+  const device = await lab.describe();
+  await mkdir(opts.out, { recursive: true });
+  // A cell already captured and not asked for again keeps its entries — a run of some cells adds to the manifest. Only
+  // from the same device: a manifest names one device for all its captures.
+  const previous = await readFile(join(opts.out, 'manifest.json'), 'utf8').then((t) => JSON.parse(t) as RunManifest).catch(() => undefined);
+  if (previous !== undefined && (previous.platform !== lab.platform || previous.device !== device)) {
+    throw new Error(`${opts.out} holds captures of ${previous.platform} "${previous.device}", not ${lab.platform} "${device}": capture into a run of its own, or recapture every cell`);
+  }
+  const manifest: RunManifest = { platform: lab.platform, app: 'AveriLab', device, note: opts.note, captures: [] };
+  const broken: string[] = [];
+  const skipped: string[] = [];
+  const captured = new Set<string>();
+  for (const cell of cells) {
+    const why = lab.unsupported(cell);
+    if (why !== undefined) {
+      skipped.push(`${cell.id}: ${why}`);
+      log(`${cell.id}: skipped — ${why}`);
+      continue;
+    }
+    const s = await lab.launch(cell.id);
+    const trees = await lab.trees();
+    const shot = await lab.screenshot();
+    const png = PNG.sync.read(shot);
+    await writeFile(join(opts.out, `${cell.id}.png`), shot);
+    for (const t of trees) await writeFile(join(opts.out, `${cell.id}${t.suffix}`), t.payload);
+    await writeFile(join(opts.out, `${cell.id}.state.json`), JSON.stringify(s, null, 2) + '\n');
+
+    const truth: CellTruth = { cell: cell.id, layer: cell.layer, device, screen: { width: s.screen.width, height: s.screen.height }, scale: s.scale, targets: [] };
+    for (const t of cell.targets) {
+      const frame = s.frames[t.tag];
+      if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
+      const { drawn, seen } = measure(png, frame, s.scale, t.color);
+      const events = await probe(lab, cell.id, frame);
+      const target: TargetTruth = { tag: t.tag, id: `lab.${cell.id}.${t.tag}`, color: t.color, declared: t.declared, frame, ...readTargetProbe(events.events, t.tag), drawn: Math.round(drawn * 1000) / 1000, seen };
+      truth.targets.push(target);
+      const bad = consistency(target);
+      if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
+      log(`${cell.id}/${t.tag}: reached ${target.reached}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
+    }
+    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, broken, log);
+    await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
+    for (const t of trees) {
+      manifest.captures.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
+    }
+    captured.add(cell.id);
+  }
+  const order = (file: string) => opts.catalog.findIndex((c) => file.startsWith(`${c.id}.`));
+  const kept = (previous?.captures ?? []).filter((c) => !captured.has(c.file.slice(0, c.file.indexOf('.'))));
+  manifest.captures = [...kept, ...manifest.captures].sort((a, b) => order(a.file) - order(b.file));
+  await writeFile(join(opts.out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+  return { broken, skipped, manifest };
+}
+
+/** Relaunch the cell, tap the frame's centre, give the app 1 s to log — the events the tap produced, the launch's own left out. */
+async function probe(lab: LabDevice, cell: string, frame: Rect): Promise<{ events: ReturnType<typeof probeEvents>; after: LabState | undefined }> {
+  const before = (await lab.launch(cell)).events.length;
+  const at = probePoint(frame);
+  await lab.tap(at.x, at.y);
+  await new Promise((r) => setTimeout(r, 1_000));
+  const after = await lab.state();
+  return { events: probeEvents(after, before), after };
+}
+
+const described = (probe: readonly { kind: string; tag: string }[]) => (probe.length ? `, probe ${probe.map((e) => `${e.kind} ${e.tag}`).join('; ')}` : '');
+
+async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, broken: string[], log: (line: string) => void): Promise<FormTruth> {
+  const frameOf = (tag: string): Rect => {
+    const f = s.frames[tag];
+    if (f === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${tag}`);
+    return f;
+  };
+  const fields = form.fields.map((f) => {
+    const st = s.fields?.[f.tag];
+    if (st === undefined) throw new Error(`cell ${cell.id}: the app reported no state for field ${f.tag}`);
+    return {
+      tag: f.tag,
+      id: `lab.${cell.id}.${f.tag}`,
+      kind: f.kind,
+      title: f.title,
+      titleId: f.titleId ?? `lab.${cell.id}.${f.tag}.title`,
+      frame: frameOf(f.tag),
+      ...st,
+      ...(st.error !== null && { errorFrame: frameOf(`${f.tag}.error`) }),
+    };
+  });
+  const wanted: { tag: string; id: string; kind: ControlTruth['kind']; inSheet: boolean; frame: string }[] = [
+    ...form.fields.map((f) => ({ tag: f.tag, id: `lab.${cell.id}.${f.tag}`, kind: 'field' as const, inSheet: false, frame: f.tag })),
+    { tag: form.submit.tag, id: `lab.${cell.id}.${form.submit.tag}`, kind: 'button', inSheet: false, frame: form.submit.tag },
+    ...(form.picker?.open === true ? form.picker.probe ?? [] : []).map((code) => ({
+      tag: `${form.picker!.field}.${code}`,
+      id: `lab.${cell.id}.${form.picker!.field}.${code}`,
+      kind: 'row' as const,
+      inSheet: true,
+      frame: `row.${code}`,
+    })),
+  ];
+  const keyboard = s.keyboard?.visible === true ? s.keyboard : undefined;
+  const controls: ControlTruth[] = [];
+  for (const w of wanted) {
+    const frame = s.frames[w.frame];
+    const situation = situationOf(frame, s, form, w);
+    let read: { reached: boolean; probe: ControlTruth['probe'] } = { reached: false, probe: [] };
+    if (frame !== undefined && situation !== 'off-screen' && situation !== 'not-rendered') {
+      const { events, after } = await probe(lab, cell.id, frame);
+      read = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
+    }
+    const c: ControlTruth = { tag: w.tag, id: w.id, kind: w.kind, ...(frame !== undefined && { frame }), situation, ...read };
+    controls.push(c);
+    const bad = controlConsistency(c, keyboard?.frame);
+    if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
+    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${described(c.probe)}`);
+  }
+  const screenError = form.screenError !== undefined && s.frames.screenError !== undefined ? { ...form.screenError, frame: s.frames.screenError } : null;
+  return {
+    fields,
+    controls,
+    keyboard: keyboard === undefined ? null : { frame: keyboard.frame, field: keyboard.field },
+    screenError,
+    submits: (s.submits ?? []).map((x) => ({ valid: x.valid })),
+    ...(form.picker?.open === true && s.frames.sheet !== undefined && { sheet: s.frames.sheet }),
+  };
+}

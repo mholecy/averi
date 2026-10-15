@@ -21,7 +21,14 @@
       },
       "reached": false,
       "probe": [
-        "dismissed alert"
+        {
+          "kind": "touch",
+          "tag": "540,391"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "alert"
+        }
       ],
       "drawn": 0,
       "seen": "#5C1715"
@@ -38,7 +45,12 @@
         "height": 176
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,886"
+        }
+      ],
       "drawn": 0,
       "seen": "#ECE6F0"
     },
@@ -54,7 +66,12 @@
         "height": 176
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1381"
+        }
+      ],
       "drawn": 0,
       "seen": "#1B401C"
     },
@@ -71,7 +88,14 @@
       },
       "reached": false,
       "probe": [
-        "dismissed alert"
+        {
+          "kind": "touch",
+          "tag": "540,1876"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "alert"
+        }
       ],
       "drawn": 0,
       "seen": "#643800"

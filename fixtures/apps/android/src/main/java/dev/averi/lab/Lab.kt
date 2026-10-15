@@ -85,6 +85,9 @@ class Lab(context: Context, private val screen: Rect) {
         write()
     }
 
+    /** A touch began at (x, y), screen pixels, in one of the app's windows — the probe's positive control (`touch`, `x,y`). */
+    fun touched(x: Float, y: Float) = event("touch", String.format(java.util.Locale.ROOT, "%.0f,%.0f", x, y))
+
     fun event(kind: String, tag: String) {
         events += JSONObject().put("kind", kind).put("tag", tag).put("at", System.currentTimeMillis() / 1000.0)
         write()

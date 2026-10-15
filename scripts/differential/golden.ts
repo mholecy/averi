@@ -8,7 +8,8 @@ import type { Recording } from './corpus.js';
 import { configFor, connect } from './differential.js';
 import { expectations, formExpectations, type Verb } from './golden-spec.js';
 import type { Side } from './side.js';
-import { consistency, controlConsistency, pct, type CellTruth } from '../truth/schema.js';
+import { pct, type CellTruth } from '../truth/schema.js';
+import { consistency, controlConsistency } from '../truth/truth.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -18,7 +19,7 @@ import { consistency, controlConsistency, pct, type CellTruth } from '../truth/s
  *
  *   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>]
  *
- * The side defaults to this checkout.
+ * The side defaults to this checkout. Exit code 1 on a mismatch or a broken target.
  */
 
 export interface GoldenCheck {
@@ -34,7 +35,7 @@ export interface GoldenCheck {
 export interface GoldenResult {
   recording: string;
   checks: GoldenCheck[];
-  /** Targets whose truth's sources disagree (schema.ts#consistency). */
+  /** Targets and controls whose truth's sources disagree (scripts/truth/truth.ts#consistency, #controlConsistency). */
   broken: string[];
 }
 
@@ -68,7 +69,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
     const brokenControls = (truth.form?.controls ?? []).flatMap((c) => {
-      const why = controlConsistency(c);
+      const why = controlConsistency(c, truth.form?.keyboard?.frame);
       return why === undefined ? [] : [`${c.tag}: ${why}`];
     });
     result.broken.push(...brokenControls);
@@ -123,7 +124,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
     console.log(goldenReport(results));
-    if (results.some((r) => r.checks.some((c) => c.mismatch !== undefined))) process.exitCode = 1;
+    if (results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined))) process.exitCode = 1;
   } finally {
     cleanup?.();
   }

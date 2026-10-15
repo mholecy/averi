@@ -87,29 +87,37 @@ groups as `device calls only`, and that a colour assert passes on its own painte
 
 ## Golden mode: against the truth, not against another checkout
 
-OLD vs NEW cannot see an answer both sides get wrong. The golden mode judges ONE side against ground truth: captures of
-the lab app (`fixtures/apps/`, docs/plans/2026-10-15-ground-truth-lab-app.md), each naming in its manifest entry the
-`screenshot` the device showed and a `truth` file (scripts/truth/schema.ts: per target the app's own frame, whether a
-raw tap at its centre fired its action, how much of it the screenshot shows in its own colour). The fake device serves
-that screenshot instead of the grey frame; `golden-spec.ts` says what each verb must answer for each kind of truth
-(tapped or refused and the remedy, colour pass or fail, scroll_until reached or stopped) — classes, not wording.
+OLD vs NEW cannot see an answer both sides get wrong. The golden mode judges ONE side against ground truth (ADR 0020):
+captures of the lab apps (`fixtures/apps/`, docs/plans/2026-10-15-ground-truth-lab-app.md), each naming in its manifest
+entry the `screenshot` the device showed and a `truth` file (scripts/truth/schema.ts: per target the app's own frame,
+whether a raw tap at its centre fired its action, what else that tap made the app log — its touch first, the positive
+control that the tap reached the app at all — and how much of the target the screenshot shows in its own colour). The
+fake device serves that screenshot instead of the grey frame (and refuses a profile whose frame is not its size);
+`golden-spec.ts` says what each verb must answer for each kind of truth (tapped or refused and the remedy, colour pass
+or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. A reply that says the
+target is not in the tree (a tap "waiting for element … to appear", an assert's "not found within") is no evidence
+either way: its mismatch is said to be of that class first (`not in the tree: …`).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>]
 ```
 
-`tests/differential/golden.test.ts` runs it over the committed truth on this checkout, with the known mismatches
-listed.
+Exit code 1 on a mismatch or a broken target. `tests/differential/golden.test.ts` runs it over the committed truth on
+this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
+<verb>` with their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or
+listed).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
 the identifier it shows it under, the keyboard's frame, the submits — and per control (field, submit, picker row) where
-its frame lies (open, under the keyboard, under the sheet, off the screen, not laid out) and whether a raw tap reached
-it. `golden-spec.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
+its frame lies (open, under the keyboard, partly covered, under the sheet, off the screen, not laid out — measured from
+the app's frames by scripts/truth/truth.ts#situationOf, not declared) and what a raw tap at its centre did. `golden-spec.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
 docs/verification.md (each row names the rule it relies on, applied to the app's frames), titles and prefilled values
 read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a secure value never read back, a tap under the
-keyboard refused naming it, the submit pinned above the keyboard tapped and reached with no swipe, `scroll_until`
-touching down above the keyboard, and a lazy picker row swiped for on the sheet.
+keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the
+keyboard tapped and reached with no swipe, `scroll_until` touching down above the keyboard, a field under the pinned
+submit whose probe tap submitted the form neither tapped nor "reached" without a swipe, and a lazy picker row swiped for
+on the sheet.
 
 What a replayed tree cannot judge — a fill, a clear, typing into the focused field, a dismissal — the live golden runs
 on the lab simulator through averi's MCP tools, the app's model as the oracle (not a vitest test; it needs the
@@ -118,7 +126,19 @@ keyboard preferences):
 
 ```sh
 node --import tsx scripts/truth/live.ts --udid <lab udid> [--wda-port 8120] [--sources idb,wda] [--cases k1,b1]
-``` Recapturing (a simulator, not the device-check one; WDA on its own port):
+```
+
+The capture is one module, `scripts/truth/capture-run.ts#capture(lab, cells, opts)`, over a `LabDevice`
+(`scripts/truth/lab-device.ts`: launch a cell in a fresh process and wait for its `ready`, read the app's state file,
+a raw tap, the screenshot, the raw trees): `IosLab` (simctl, idb, WDA's own `/source`) and `AndroidLab` (adb). The
+arithmetic — where a control lies, what a probe's events say, when a cell is broken — is `scripts/truth/truth.ts`,
+pure and unit-tested (tests/truth/truth.test.ts). `capture.ts` and `capture-android.ts` are its command lines. Both
+apps log every touch their windows receive (iOS: `UIApplication.sendEvent`; Android: the activity's and each dialog
+window's `dispatchTouchEvent`), so a probe whose tap left no touch is a broken cell, not "not reached".
+
+Recapturing iOS (a simulator, not the device-check one; WDA on its own port, built into its own derived data
+`~/Library/Developer/Xcode/DerivedData/averi-wda-lab`, never device-check's `averi-wda`; idb's companion must be up for
+the simulator):
 
 ```sh
 cd fixtures/apps/ios && xcodegen generate && xcodebuild -scheme AveriLab -destination 'id=<udid>' -derivedDataPath build build
@@ -126,7 +146,9 @@ xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphones
 node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run> [--cells form-basic,…]
 ```
 
-A run of `--cells` adds to (or replaces those cells in) the run's manifest; the other cells keep their captures.
+A run of `--cells` adds to (or replaces those cells in) the run's manifest; the other cells keep their captures. A
+manifest names one device: a run into a directory captured on another device is refused. Exit code 1 when a cell is
+broken.
 
 Android (fixtures/apps/android, Compose; an emulator of its own — the committed run is a dedicated `averi_lab` AVD,
 Pixel 3a profile, API 33 — never the device-check AVD; JDK 17, the Gradle wrapper's 8.13). The truth is in screen
@@ -137,6 +159,9 @@ cd fixtures/apps/android && ANDROID_HOME=~/Library/Android/sdk ./gradlew assembl
 adb -s <serial> install -r fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk
 node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests/fixtures/truth/android-<avd>-api<N>
 ```
+
+The Android app builds the coloured-target cells; a form cell or another layer is skipped and said so (phase 2b brings
+the forms, through the same `capture`).
 
 ## Corpus format
 

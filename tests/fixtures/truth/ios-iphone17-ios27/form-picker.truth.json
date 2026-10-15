@@ -57,8 +57,18 @@
         "situation": "presented-over",
         "reached": false,
         "probe": [
-          "select AL",
-          "dismissed sheet"
+          {
+            "kind": "touch",
+            "tag": "201.0,177.0"
+          },
+          {
+            "kind": "select",
+            "tag": "AL"
+          },
+          {
+            "kind": "dismissed",
+            "tag": "sheet"
+          }
         ]
       },
       {
@@ -74,8 +84,18 @@
         "situation": "presented-over",
         "reached": false,
         "probe": [
-          "select AD",
-          "dismissed sheet"
+          {
+            "kind": "touch",
+            "tag": "201.0,251.0"
+          },
+          {
+            "kind": "select",
+            "tag": "AD"
+          },
+          {
+            "kind": "dismissed",
+            "tag": "sheet"
+          }
         ]
       },
       {
@@ -91,8 +111,18 @@
         "situation": "presented-over",
         "reached": false,
         "probe": [
-          "select AT",
-          "dismissed sheet"
+          {
+            "kind": "touch",
+            "tag": "201.0,315.0"
+          },
+          {
+            "kind": "select",
+            "tag": "AT"
+          },
+          {
+            "kind": "dismissed",
+            "tag": "sheet"
+          }
         ]
       },
       {
@@ -108,7 +138,14 @@
         "situation": "open",
         "reached": true,
         "probe": [
-          "dismissed sheet"
+          {
+            "kind": "touch",
+            "tag": "201.0,158.0"
+          },
+          {
+            "kind": "dismissed",
+            "tag": "sheet"
+          }
         ]
       },
       {
@@ -117,9 +154,7 @@
         "kind": "row",
         "situation": "not-rendered",
         "reached": false,
-        "probe": [
-          "not tapped: not-rendered"
-        ]
+        "probe": []
       }
     ],
     "keyboard": null,

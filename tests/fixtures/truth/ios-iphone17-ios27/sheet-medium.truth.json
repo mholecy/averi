@@ -21,7 +21,14 @@
       },
       "reached": false,
       "probe": [
-        "dismissed sheet"
+        {
+          "kind": "touch",
+          "tag": "201.0,142.0"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "sheet"
+        }
       ],
       "drawn": 0,
       "seen": "#B72E2A"
@@ -39,7 +46,14 @@
       },
       "reached": false,
       "probe": [
-        "dismissed sheet"
+        {
+          "kind": "touch",
+          "tag": "201.0,322.0"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "sheet"
+        }
       ],
       "drawn": 0,
       "seen": "#186DB7"
@@ -57,7 +71,14 @@
       },
       "reached": false,
       "probe": [
-        "tap S"
+        {
+          "kind": "touch",
+          "tag": "201.0,502.0"
+        },
+        {
+          "kind": "tap",
+          "tag": "S"
+        }
       ],
       "drawn": 0,
       "seen": "#8E24AA"
@@ -74,7 +95,12 @@
         "y": 650
       },
       "reached": false,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,682.0"
+        }
+      ],
       "drawn": 0,
       "seen": "#FFB955"
     },
@@ -90,7 +116,12 @@
         "y": 453.4344941956882
       },
       "reached": true,
-      "probe": [],
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,484.0"
+        }
+      ],
       "drawn": 0.989,
       "seen": "#8E24AA"
     }

@@ -17,7 +17,7 @@ neighbourhood of its bug at once.
 | cell catalog | `fixtures/apps/cells.json` | one entry per screen: `id`, the layer over the targets, the geometry, the targets (tag, colour, what the cell declares about it) |
 | iOS lab app (SwiftUI) | `fixtures/apps/ios/` (xcodegen) | renders a cell chosen by launch argument (`-cell <id>`) or deep link (`averilab://cell/<id>`); writes its state file |
 | Android lab app (Compose) | `fixtures/apps/android/` | the same catalog, phase 2 |
-| capture | `scripts/truth/capture.ts` | per cell: launch, wait for `ready`, save raw trees (WDA, idb / uiautomator), the screenshot, the app's state, then the tap probe |
+| capture | `scripts/truth/capture-run.ts` over a `LabDevice` (`lab-device.ts`: `IosLab` simctl/idb/WDA, `AndroidLab` adb); the arithmetic pure in `truth.ts`; command lines `capture.ts` (iOS) and `capture-android.ts` (uiautomator) | per cell: launch, wait for `ready`, save raw trees (WDA, idb / uiautomator), the screenshot, the app's state, then the tap probe |
 | truth corpus | `tests/fixtures/truth/<platform>/` | a differential corpus run (manifest + payloads) plus `screenshot` and `truth` per capture — committed |
 | golden mode | `scripts/differential/golden.ts` | replays the truth corpus through ONE side, serves the captured screenshot, compares each verb's answer with what the truth implies |
 | expected replies | `scripts/differential/golden-spec.ts` | the table: truth → expected outcome class per verb |
@@ -29,7 +29,7 @@ Not in the npm package (`package.json` `files` lists only `dist`, `skill`, docs)
 | source | from | answers |
 |---|---|---|
 | declared | the catalog | what kind of situation the cell builds (open, beneath a presented layer, outside its scroll view, …) — names the expected remedy |
-| reached | the tap probe: the capture script taps each target's centre with a raw `idb ui tap` / `adb input tap`, reads the app's tap log, relaunches | whether a tap at its centre reaches the target |
+| reached | the tap probe: the capture script taps each target's centre with a raw `idb ui tap` / `adb input tap`, reads the app's tap log, relaunches; the app logs every touch its windows receive, the positive control that the tap reached it at all | whether a tap at its centre reaches the target |
 | drawn | the screenshot: the fraction of the target's frame (as the app reports it, `.frame(in: .global)`) painted the target's own colour | how much of it the user sees as itself |
 
 The app reports its own frames, so the truth does not depend on what WDA, idb or uiautomator list — a disagreement
@@ -62,7 +62,8 @@ matters for `Tapped` is whether the action fired.
 
 ### Phase 0 — decisions and schemas (this branch)
 
-- Answers to the proposal's questions: Q2 in this repo (`fixtures/apps/`); Q3 in code, principle in an ADR; Q1 (P3's
+- Answers to the proposal's questions: Q2 in this repo (`fixtures/apps/`); Q3 in code, principle in an ADR
+  (docs/adr/0020-the-truth-outranks-a-hand-written-expectation.md); Q1 (P3's
   inversion) after golden exists, measured against truth rather than as a count of `Tapped → refused`.
 - `fixtures/apps/cells.json` schema, the app's state file schema, the truth file schema (`scripts/truth/schema.ts`).
 - The golden spec's first rows.
@@ -80,7 +81,8 @@ matters for `Tapped` is whether the action fired.
 - Golden mode + vitest over the committed captures.
 - **Acceptance:** golden reports the round-18 bug on `alert-dim` at `dda435b` (tap `Tapped`, colour pass on the dim,
   `scroll_until` fully visible), and the cell is green once round 19's alert fix (`fix/r19-alert`) lands. `open` is
-  green at `dda435b`.
+  green at `dda435b`. Measured: red at `dda435b` as stated, green at `fix/r19-alert` `e10219e` (commit 9604314's message
+  says `5ac759f`; that SHA is wrong — the green tip was `e10219e`).
 
 ### Phase 1b — forms and validation (iOS)
 
