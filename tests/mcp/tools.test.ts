@@ -809,6 +809,15 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.texts[0]).toContain('"presentation": "alert"');
   });
 
+  it('ui_snapshot prints the root\'s word that its source judged presented layers, and a layer marked "screen"', async () => {
+    const sheet = node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, presentation: 'screen', children: [node({ role: 'button', label: 'Cancel', rect: { x: 16, y: 72, width: 70, height: 36 } })] });
+    const root = node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, presentationsJudged: true, children: [node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 } }), sheet] });
+    const { call } = await connect({ ios: new FakeAdapter({ sheet: root }, 'sheet'), android: home() });
+    const result = await call('ui_snapshot', { platform: 'ios', configPath: missing() });
+    expect(result.texts[0]).toContain('"presentationsJudged": true');
+    expect(result.texts[0]).toContain('"presentation": "screen"');
+  });
+
   it('ui_snapshot: a filter nothing matches in a tree WITH content returns `[]` and a second block with the tree size — no warning', async () => {
     const { call } = await connect({ android: pin(), ios: home() });
     const result = await call('ui_snapshot', { platform: 'android', filter: 'role:textfield' });
