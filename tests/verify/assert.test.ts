@@ -757,6 +757,24 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     expect(result.detail).toContain('sampled #FDFDFD (dominant, 100% of region)');
   });
 
+  it('on a root of no area and no device screen, nothing is cut: the sampler reads the whole card, as the judge judged it, not only the part its list draws', async () => {
+    resetLayout();
+    const list = node({ role: 'scrollable', identifier: 'list', rect: { x: 0, y: 0, width: 1000, height: 240 }, children: [node({ identifier: 'card', rect: { ...CARD } })] });
+    const root = node({ role: 'application', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [list] });
+    const fake = new FakeAdapter({ detail: { ...root, unclippedFrames: true } }, 'detail');
+    fake.viewport = async () => {
+      throw new Error('no device screen');
+    };
+    // The list's part (200–240) light, the rest (240–300) dark: the whole card's inset region is mostly dark.
+    fake.nextScreenshot = png(1000, 320, (p) => {
+      fill(p, '#FDFDFD', { ...CARD, height: 40 });
+      fill(p, '#20242C', { ...CARD, y: 240, height: 60 });
+    });
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#20242C' } });
+    expect(result.detail).toContain('sampled #20242C');
+    expect(result.pass).toBe(true);
+  });
+
   it('measures the FIRST of duplicate matches — the rect-parity duplicate-id rule, owned by the pixel poll', async () => {
     resetLayout();
     const second = { x: 100, y: 20, width: 800, height: 100 };

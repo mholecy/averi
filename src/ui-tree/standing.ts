@@ -274,6 +274,14 @@ export interface Scene {
   /** The stops' standing (and the tap's, asked as a `TouchPurpose`). */
   standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
+  /**
+   * THE region of the node a pixel measurement is asked of, on the screen the pixel purpose is judged on (`screen`,
+   * else the tree's own): the part of its rect its scroll views draw (the drawn frame, geometry.ts#drawnPart) — the
+   * whole rect where nothing cuts it, and on a root of no area (treeScreen's `failsOpen`: nothing is judged off its
+   * box). The pixel standing judges over it and the sampler reads it (verify/pixel-poll.ts#pollPixels): one function,
+   * so the two cannot diverge.
+   */
+  pixelRegion(node: UiNode, screen: UsableScreen | undefined): Rect;
 }
 
 /**
@@ -535,7 +543,17 @@ export function sceneOf(tree: UiNode): Scene {
       return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree) }));
     },
     standing,
+    pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
   };
+  /** The usable screen the pixel purpose judges on: `screen` when it has `oriented`, else the tree's own. */
+  function pixelScreen(screen: StandingScreen | UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
+    return screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree);
+  }
+  /** `Scene.pixelRegion`, with the drawn frame it was cut by (undefined on a root of no area: nothing is cut there). */
+  function pixelDrawn(node: UiNode, usable: UsableScreen & { readonly failsOpen?: boolean }): { readonly drawn: Drawn | undefined; readonly rect: Rect } {
+    const drawn = usable.failsOpen === true ? undefined : scene.clips.drawnIn(node);
+    return { drawn, rect: drawnPart(node.rect, drawn) ?? node.rect };
+  }
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
@@ -544,14 +562,12 @@ export function sceneOf(tree: UiNode): Scene {
     const judged: Judged = { scene, node, centre: tapPoint(node) };
     if (purpose.of === 'pixel') {
       // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
-      const usable = screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree);
+      const usable = pixelScreen(screen);
       const single = singleBox(usable);
       // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
-      const failsOpen = 'failsOpen' in usable && usable.failsOpen === true;
-      // What it reads is asked of the part its scroll views draw (the drawn frame): one region for what is judged over it
-      // and what its sampler reads (verify/pixel-poll.ts#pollPixels measures the same part).
-      const drawn = failsOpen ? undefined : scene.clips.drawnIn(node);
-      const rect = drawnPart(node.rect, drawn) ?? node.rect;
+      const failsOpen = usable.failsOpen === true;
+      // What it reads is asked of THE region (`pixelRegion`): what is judged over it is what its sampler reads.
+      const { drawn, rect } = pixelDrawn(node, usable);
       const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
       const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, drawn), single.box, single, read, !listsAncestry(tree));
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
