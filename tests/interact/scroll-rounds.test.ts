@@ -2320,6 +2320,16 @@ describe('round — a sheet whose detent the swipes changed', () => {
     expect(reply).toBe('fully visible after 1 swipe');
   });
 
+  it('two sheets stacked, the top one closed meanwhile: the lower sheet\'s grabber is last at the end — another sheet, not a detent change, so nothing is said', () => {
+    const stacked = (detents: readonly string[], y: number): Row => {
+      const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+      const grabbers = detents.map((value) => node({ role: 'button', label: 'Sheet Grabber', value, rect: { x: 151, y: 58, width: 100, height: 24 } }));
+      return { tree: node({ role: 'container', rect: IPHONE_BOX, children: [row, ...grabbers] }), found: [row] };
+    };
+    const played = play(IPHONE, [stacked(['Half screen', 'Expanded'], 900), stacked(['Half screen'], 300), stacked(['Half screen'], 300)]);
+    expect(describeScrollResult(resultOf(played))).toBe('fully visible after 1 swipe');
+  });
+
   it('a grabber only one of the two reads holds (a sheet presented or closed) says nothing of a detent', () => {
     expect(describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet(undefined, 300), sheet(undefined, 300)])))).toBe('fully visible after 1 swipe');
     expect(describeScrollResult(resultOf(play(IPHONE, [sheet(undefined, 900), sheet('Expanded', 300), sheet('Expanded', 300)])))).toBe('fully visible after 1 swipe');

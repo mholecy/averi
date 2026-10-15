@@ -2,7 +2,7 @@ import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { sheetDetent, showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
+import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 
@@ -126,10 +126,10 @@ export interface TreeFacts {
    */
   loading: boolean;
   /**
-   * The detent the tree's top sheet's grabber reports (ui-tree/read-tree.ts#sheetDetent), undefined when it holds
-   * none — compared between the scroll's first and last reads (scroll-rounds.ts#ScrollOutcome's `detent`).
+   * The tree's top sheet's grabber: its detent and how many grabbers the tree holds (ui-tree/read-tree.ts#sheetDetent),
+   * undefined when it holds none — compared between the scroll's first and last reads (scroll-rounds.ts#DetentMove).
    */
-  detent: string | undefined;
+  detent: SheetDetent | undefined;
 }
 
 /**

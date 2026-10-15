@@ -332,13 +332,14 @@ describe('sheetDetent — the detent a sheet\'s grabber reports', () => {
   const grabber = (value: string | null): UiNode => ({ role: 'button', label: 'Sheet Grabber', identifier: null, value, rect: { x: 152, y: 411, width: 98, height: 24 }, children: [] });
   const screen = (...children: UiNode[]): UiNode => ({ role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 402, height: 874 }, children });
 
-  it('reads the grabber\'s value, the top sheet\'s (the last in tree order) when sheets are stacked', () => {
-    expect(sheetDetent(screen(grabber('Half screen')))).toBe('Half screen');
-    expect(sheetDetent(screen(grabber('Expanded'), screen(grabber('Half screen'))))).toBe('Half screen');
+  it('reads the grabber\'s value, the top sheet\'s (the last in tree order) when sheets are stacked, with how many grabbers the tree holds', () => {
+    expect(sheetDetent(screen(grabber('Half screen')))).toEqual({ detent: 'Half screen', grabbers: 1 });
+    expect(sheetDetent(screen(grabber('Expanded'), screen(grabber('Half screen'))))).toEqual({ detent: 'Half screen', grabbers: 2 });
   });
 
-  it('is undefined with no grabber, or one that exposes no value', () => {
+  it('is undefined with no grabber, or when the top sheet\'s exposes no value — a lower sheet\'s value is not taken for it', () => {
     expect(sheetDetent(screen())).toBeUndefined();
     expect(sheetDetent(screen(grabber(null)))).toBeUndefined();
+    expect(sheetDetent(screen(grabber('Expanded'), grabber(null)))).toBeUndefined();
   });
 });

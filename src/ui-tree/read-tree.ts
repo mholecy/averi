@@ -334,15 +334,26 @@ export function showsProgress(tree: UiNode): boolean {
 const SHEET_GRABBER = 'Sheet Grabber';
 
 /**
- * The detent a sheet's grabber reports (`Half screen`, `Expanded`): the value of the LAST node labelled
- * `Sheet Grabber` with one — in tree order the sheet presented on top — undefined when the tree holds none (Android,
- * a screen with no sheet, a sheet without a grabber). Both iOS sources give it. A stroke on a half sheet's list at its
- * top drags the sheet up before it scrolls the list; `scroll_until` asks this of its first and last reads to say the
- * sheet moved (interact/scroll-rounds.ts#ScrollOutcome's `detent`). The label is matched as the devices measured dump it (English);
- * a label in another language is not read. One walk.
+ * The top sheet's grabber in a tree: the detent it reports (`Half screen`, `Expanded`) and how many grabbers the tree
+ * holds — one per sheet that shows one. The top sheet's is the LAST node labelled `Sheet Grabber` in tree order (a
+ * sheet presented later is dumped later); undefined when the tree holds none (Android, a screen with no sheet) or when
+ * that grabber exposes no value. Both iOS sources give it. `scroll_until` compares its first and last reads' to say a
+ * sheet moved (interact/scroll-rounds.ts#DetentMove), and the count is what tells it the last grabber is the same
+ * sheet's in both. The label is matched as the devices measured dump it (English); a label in another language is
+ * not read. One walk.
  */
-export function sheetDetent(tree: UiNode): string | undefined {
-  let detent: string | undefined;
-  for (const n of everyNode(tree)) if (n.label === SHEET_GRABBER && n.value !== null) detent = n.value;
-  return detent;
+export interface SheetDetent {
+  detent: string;
+  grabbers: number;
+}
+
+export function sheetDetent(tree: UiNode): SheetDetent | undefined {
+  let top: UiNode | undefined;
+  let grabbers = 0;
+  for (const n of everyNode(tree)) {
+    if (n.label !== SHEET_GRABBER) continue;
+    top = n;
+    grabbers++;
+  }
+  return top === undefined || top.value === null ? undefined : { detent: top.value, grabbers };
 }

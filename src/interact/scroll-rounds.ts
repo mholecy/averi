@@ -1,6 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
+import type { SheetDetent } from '../ui-tree/read-tree.js';
 import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
@@ -182,8 +183,9 @@ export type RoundStep =
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
  *
- * Every kind may carry `detent`: the top sheet's grabber reported another
- * detent at the last read that read than at the first (`DetentMove`).
+ * Every kind may carry `detent`: the top sheet — the same sheet at both
+ * reads — reported another detent at the last read that read than at the
+ * first (`DetentMove`).
  */
 export type ScrollOutcome = (
   | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush }
@@ -222,15 +224,24 @@ export type ScrollOutcome = (
 ) & { detent?: DetentMove };
 
 /**
- * A sheet the scroll moved to another detent: the detent its grabber
- * reported at the scroll's first read that read (`from`) and at its last
- * (`to`) — scroll-read.ts#TreeFacts' `detent`, compared at the stop only.
- * A stroke on a half sheet's list at its top drags the sheet up before it
- * scrolls the list (measured: `Half screen` to `Expanded` under a stroke
- * from (201,699)), which the verdict alone does not say. Not set when the
- * two agree, whatever lay between, or when either read holds no grabber —
- * a sheet presented or closed meanwhile is not a detent change. The
- * verdict is the same with or without it.
+ * A sheet that moved to another detent during the call: the detent the top
+ * sheet's grabber reported at the scroll's first read that read (`from`)
+ * and at its last (`to`) — scroll-read.ts#TreeFacts' `detent`, compared at
+ * the stop only. A stroke on a half sheet's list at its top drags the sheet
+ * up before it scrolls the list (measured: `Half screen` to `Expanded` under
+ * a stroke from (201,699)), which the verdict alone does not say; the note
+ * names no cause, as the sheet may also move between two reads with no
+ * swipe sent.
+ *
+ * Set only when both reads hold a grabber with a value, the same NUMBER of
+ * grabbers, and the values differ — whatever lay between. The count is the
+ * sheet's identity: the top sheet's grabber is the last in tree order, so
+ * with as many sheets showing one at both reads the last is the same
+ * sheet's — one closed or presented meanwhile changes the count, and the
+ * last grabber would be another sheet's. The grabber's frame cannot serve:
+ * it moves and resizes with the detent (152,411 98x24 at half, 151,58
+ * 100x24 expanded). Not caught: one sheet closed and another presented
+ * within the one call. The verdict is the same with or without it.
  */
 export interface DetentMove {
   from: string;
@@ -672,8 +683,8 @@ interface State {
   /** A read after a stroke found the whole tree changed from the read before — the content moved at least once (`Shortfall.absent`'s `unsearched`: not a screen no stroke ever changed). */
   readonly treeMoved: boolean;
   readonly treeUnmovedStrokes: number;
-  /** The detent the top sheet's grabber reported at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
-  readonly detents: { readonly first: string | undefined; readonly last: string | undefined } | undefined;
+  /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
+  readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
 }
 
 /**
@@ -1525,11 +1536,12 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
   return { state: s as unknown as Rounds, step: { do: 'stop', outcome: detent === undefined ? outcome : { ...outcome, detent } } };
 }
 
-/** The sheet's detent at the first read that read against the last (`DetentMove`), when both reads hold one and they differ. */
+/** The top sheet's detent at the first read that read against the last (`DetentMove`): both read, as many grabbers, values differing. */
 function detentMove({ detents }: State): DetentMove | undefined {
   if (detents === undefined) return undefined;
   const { first, last } = detents;
-  return first !== undefined && last !== undefined && first !== last ? { from: first, to: last } : undefined;
+  if (first === undefined || last === undefined || first.grabbers !== last.grabbers || first.detent === last.detent) return undefined;
+  return { from: first.detent, to: last.detent };
 }
 
 /**
