@@ -111,7 +111,15 @@ export function parseWdaSourceValue(value: unknown): UiNode {
   const tree = toUiNode(root, { ...keyboardMarks(root), hiddenRoots: hiddenRoots(root) }, { hidden: false, cell: undefined, scroller: undefined });
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
-  // The source's dialect (UiNode.unclippedFrames): every frame as laid out, a scroll view's content past its frame too.
+  return markUnclippedFrames(tree);
+}
+
+/**
+ * The WDA source's dialect, marked on its tree's root (UiNode.unclippedFrames): every frame as laid out, a scroll
+ * view's content past its frame too. THE mark: the parser sets it on every tree, and a WDA `ui_snapshot` capture that
+ * lacks it (older captures do) is given it with this, so it is judged as the live source's tree. Returns `tree`.
+ */
+export function markUnclippedFrames<T extends UiNode>(tree: T): T {
   tree.unclippedFrames = true;
   return tree;
 }

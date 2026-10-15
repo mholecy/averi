@@ -1009,7 +1009,7 @@ export function pngRegion(
  * (`pngRegion`, the png as the frame) asks the same two steps apart — `clipTo`, then `insetBy` with `unit: 'pixels'` —
  * since it also needs the clip alone for its clipped fraction; the judge and the sampler share `clipTo` and `insetBy`,
  * so the two read ONE region — of one `rect`, the element's part its scroll views draw (the pixel poll and the standing
- * both take it, ui-tree/geometry.ts#drawnPart). Undefined when nothing of `rect` lies in `frame` (no width or no height left).
+ * both ask it of ui-tree/standing.ts#Scene.pixelRegion). Undefined when nothing of `rect` lies in `frame` (no width or no height left).
  *
  * Clip, THEN inset, in that order, both of them: a rect running past the screen's edge is sampled on the part that
  * shows. Measured: the SWIFT form's `payee_street_input 24,869 354x52` beneath the Fees sheet's dim, on a 402x874

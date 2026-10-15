@@ -8,6 +8,7 @@ import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
+import { stackedLayers } from '../helpers/stacked-layers.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { tapPoint } from '../../src/ui-tree/selectors.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
@@ -1169,8 +1170,7 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
 });
 
 describe('the presented remedy\'s cover — the node a sentence names for a target beneath a screen presented over its own (ADR 0018)', () => {
-  const screens = async () =>
-    (JSON.parse(await fixture('wda-ui-snapshot-stacked-layers.json')) as { screens: Record<string, UiNode> }).screens;
+  const screens = stackedLayers;
   const at = (tree: UiNode, r: Rect): UiNode => [...everyNode(tree)].find((n) => JSON.stringify(n.rect) === JSON.stringify(r))!;
   const remedyOf = (s: Standing | PixelStanding) => (s.kind === 'reachable' ? undefined : s.remedy);
   it('covered: the cover over its centre, whichever surface is presented (the modal\'s card over the dim)', async () => {
@@ -1317,7 +1317,7 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(sceneOf(tree).standing(toggle, IPHONE, OCR(toggle)).kind).toBe('reachable');
   });
 
-  it('the thin sliver at the scroll view\'s edge as at the screen\'s (ADR 0002\'s slack): 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
+  it('the thin sliver at the scroll view\'s edge as at the screen\'s, the same slack: 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
     const two = node({ role: 'button', identifier: 'two', rect: r(24, 778, 354, 52) });
     const three = node({ role: 'button', identifier: 'three', rect: r(24, 777, 354, 52) });
     const { tree } = atRest(two, three);

@@ -274,6 +274,14 @@ export interface Scene {
   /** The stops' standing (and the tap's, asked as a `TouchPurpose`). */
   standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
+  /**
+   * THE region of the node a pixel measurement is asked of, on the screen the pixel purpose is judged on (`screen`,
+   * else the tree's own): the part of its rect its scroll views draw (the drawn frame, geometry.ts#drawnPart) — the
+   * whole rect where nothing cuts it, and on a root of no area (treeScreen's `failsOpen`: nothing is judged off its
+   * box). The pixel standing judges over it and the sampler reads it (verify/pixel-poll.ts#pollPixels): one function,
+   * so the two cannot diverge.
+   */
+  pixelRegion(node: UiNode, screen: UsableScreen | undefined): Rect;
 }
 
 /**
@@ -479,12 +487,26 @@ type TouchKind =
   | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number; readonly scroller?: UiNode }
   /** `band`: the band's rect on the box, only when the node's rect (not its centre) lies in it past the slack — a `fully` stop's region rule. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band?: Rect }
-  | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
+  /** `byScrollView`: the edges its scroll view's edge clips, inside the box, not the screen's (`ScrollViewCut`). */
+  | { readonly kind: 'clipped'; readonly edges: readonly Edge[]; readonly byScrollView?: ScrollViewCut }
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
   /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
   | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
   /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it). */
   | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine };
+
+/**
+ * What of a `clipped` node its scroll view clips (`Scene`'s contract, the drawn frame): `edges`, the ones it is clipped
+ * at where the frame judged in ends at the drawn frame's edge and the box does not (the rest of `edges` are the
+ * screen's, or a keyboard line's); `scroller`, the scroll view a sentence names (`scrollerOf`); `longer`, `taller` or
+ * `wider` when the node is longer, on an axis of those edges, than what of the drawn frame is judged in (the screen's
+ * part of it, above any keyboard line) — no scroll shows it whole.
+ */
+export interface ScrollViewCut {
+  readonly edges: readonly Edge[];
+  readonly scroller: UiNode;
+  readonly longer?: 'taller' | 'wider';
+}
 
 /** Where the node stands for a touch (the tap, the stop), and why: `facts`, one kind with what its sentence quotes, and — not reachable — its `remedy`. */
 export type Standing = { readonly facts: StandingFacts } & Remedied<TouchKind, TouchRemedies>;
@@ -514,6 +536,13 @@ type PixelKind =
 /** Where the node stands for the pixel assert (`Scene`'s contract: a region, never clipped), and why — and, not reachable, its `remedy`. */
 export type PixelStanding = { readonly facts: StandingFacts } & Remedied<PixelKind, PixelRemedies>;
 
+/**
+ * Whether the standing is `offScreen` on the screen but outside what its scroll views draw (`Scene`'s contract, the
+ * drawn frame): it names the scroll view (`scroller`). THE test every sentence and refusal asks — not the screen's edge.
+ */
+export const outsideItsScrollView = <S extends Standing | PixelStanding>(s: S): s is Extract<S, { readonly kind: 'offScreen' }> & { readonly scroller: UiNode } =>
+  s.kind === 'offScreen' && s.scroller !== undefined;
+
 /** A touch standing before its remedy is decided. */
 type TouchJudgement = { readonly facts: StandingFacts } & TouchKind;
 /** A tap standing before its remedy is decided. */
@@ -535,7 +564,17 @@ export function sceneOf(tree: UiNode): Scene {
       return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree) }));
     },
     standing,
+    pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
   };
+  /** The usable screen the pixel purpose judges on: `screen` when it has `oriented`, else the tree's own. */
+  function pixelScreen(screen: StandingScreen | UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
+    return screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree);
+  }
+  /** `Scene.pixelRegion`, with the drawn frame it was cut by (undefined on a root of no area: nothing is cut there). */
+  function pixelDrawn(node: UiNode, usable: UsableScreen & { readonly failsOpen?: boolean }): { readonly drawn: Drawn | undefined; readonly rect: Rect } {
+    const drawn = usable.failsOpen === true ? undefined : scene.clips.drawnIn(node);
+    return { drawn, rect: drawnPart(node.rect, drawn) ?? node.rect };
+  }
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
   function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
@@ -544,14 +583,12 @@ export function sceneOf(tree: UiNode): Scene {
     const judged: Judged = { scene, node, centre: tapPoint(node) };
     if (purpose.of === 'pixel') {
       // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
-      const usable = screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree);
+      const usable = pixelScreen(screen);
       const single = singleBox(usable);
       // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
-      const failsOpen = 'failsOpen' in usable && usable.failsOpen === true;
-      // What it reads is asked of the part its scroll views draw (the drawn frame): one region for what is judged over it
-      // and what its sampler reads (verify/pixel-poll.ts#pollPixels measures the same part).
-      const drawn = failsOpen ? undefined : scene.clips.drawnIn(node);
-      const rect = drawnPart(node.rect, drawn) ?? node.rect;
+      const failsOpen = usable.failsOpen === true;
+      // What it reads is asked of THE region (`pixelRegion`): what is judged over it is what its sampler reads.
+      const { drawn, rect } = pixelDrawn(node, usable);
       const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
       const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, drawn), single.box, single, read, !listsAncestry(tree));
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
@@ -749,13 +786,11 @@ function drawnPlace(place: PointPlace, { scene, node, centre }: Judged): PointPl
 const scrollerOf = (drawn: Drawn, leaves: (frame: Rect) => boolean): UiNode => drawn.scrollers.find((s) => leaves(s.rect)) ?? drawn.scrollers[0];
 
 /**
- * `frame` cut by the node's drawn frame (geometry.ts#Clips.drawnIn): `frame` itself when nothing cuts it (the same
+ * `frame` cut by the node's drawn frame (geometry.ts#drawnPart): `frame` itself when nothing cuts it (the same
  * object); of no area, at `frame`'s origin, when nothing of `frame` is drawn.
  */
 function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
-  const drawn = scene.clips.drawnIn(node);
-  if (drawn === undefined) return frame;
-  return (drawn.frame === undefined ? undefined : rectIntersection(frame, drawn.frame)) ?? { ...frame, width: 0, height: 0 };
+  return drawnPart(frame, scene.clips.drawnIn(node)) ?? { ...frame, width: 0, height: 0 };
 }
 
 /**
@@ -1011,12 +1046,36 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
 function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): TouchJudgement {
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
-  if (facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
+  if (facts.clipped.length > 0) {
+    const byScrollView = clippedByScrollView(judged, box, facts);
+    return { facts, kind: 'clipped', edges: facts.clipped, ...(byScrollView !== undefined && { byScrollView }) };
+  }
   // The system bands as a region, as the pixel assert judges them — any of the node past the slack.
   // docs/adr/0009-android-navigation-band.md
   // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
   const placed = place === 'on' && pinnedSurface(judged.node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(judged.node.rect, box, bands) ?? place) : place;
   return stopOrdered(facts, placed, undefined, facts.centreCover ?? facts.covers.at(-1), line);
+}
+
+/**
+ * What of the node's clip (`facts.clipped`) its scroll view's edge makes (`ScrollViewCut`), or undefined when none of
+ * it: an edge where the frame judged in ends at the drawn frame's edge (geometry.ts#Clips.drawnIn) and the box does
+ * not — a scroll view ending at the screen's edge, or a keyboard line above its edge, leaves the screen's or the
+ * keyboard's cut.
+ */
+function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: StandingFacts): ScrollViewCut | undefined {
+  const drawn = scene.clips.drawnIn(node);
+  const frame = drawn?.frame;
+  if (drawn === undefined || frame === undefined) return undefined;
+  const line = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);
+  const edges = facts.clipped.filter((edge) => line(facts.screen, edge) === line(frame, edge) && line(box, edge) !== line(frame, edge));
+  if (edges.length === 0) return undefined;
+  const across = (edge: Edge): boolean => edge === 'top' || edge === 'bottom';
+  // Longer than what of the drawn frame is judged in (`facts.screen`: the box's part of it, above any keyboard line).
+  const shown = facts.screen;
+  const longer =
+    edges.some(across) && node.rect.height > shown.height ? 'taller' : edges.some((e) => !across(e)) && node.rect.width > shown.width ? 'wider' : undefined;
+  return { edges, scroller: scrollerOf(drawn, (f) => !rectWithin(node.rect, f)), ...(longer !== undefined && { longer }) };
 }
 
 /**

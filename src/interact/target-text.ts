@@ -1,5 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
-import { nodeText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { nodeText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { presentedRemedy } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
@@ -40,7 +40,7 @@ import { SIDES } from './swipe.js';
 export function pastSideText(side: Edge, clippedOut: boolean, scrollView?: UiNode): string {
   if (clippedOut) return `clipped out ${SIDES[side].past} its scroll container`;
   // Past the edge of what its scroll view draws, that scroll view on the screen (ui-tree/standing.ts, the drawn frame).
-  return scrollView === undefined ? `${SIDES[side].past} the viewport` : `${SIDES[side].past} its scroll view ${nodeText(scrollView)}`;
+  return scrollView === undefined ? `${SIDES[side].past} the viewport` : outsideScrollViewText(scrollView, SIDES[side].past);
 }
 
 /**

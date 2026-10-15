@@ -1,14 +1,14 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { drawnPart, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { presentedRemedy, sceneOf, type PixelRegionOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, sceneOf, type PixelRegionOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
-import { treeScreen, usableScreen } from '../ui-tree/usable-screen.js';
+import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -366,7 +366,9 @@ class PixelPollMemory {
  * idb's reading is `unknown`), so an element its band meets is the same
  * keyboard miss, quoting the band, and its keys are no covers named
  * instead. `reads`: what the measurement reads (`PixelPollSpec.reads`; the
- * whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert).
+ * whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert);
+ * `judgedOn`: told the usable screen the standing is judged on, once read
+ * (the pixel poll's sampler asks THE region of the same screen).
  * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  *
  * The reading's two rects are in the same units: on Android both are device
@@ -385,12 +387,17 @@ export async function overElement(
   adapter: Pick<DeviceAdapter, 'viewport' | 'keyboard' | 'keyboardAdvice'>,
   tree: UiNode,
   element: UiNode,
-  { reads = (rect) => rect, glyphs = false, scene = sceneOf(tree) }: { reads?: PixelRegionOf; glyphs?: boolean; scene?: Scene } = {},
+  {
+    reads = (rect) => rect,
+    glyphs = false,
+    scene = sceneOf(tree),
+    judgedOn = () => {},
+  }: { reads?: PixelRegionOf; glyphs?: boolean; scene?: Scene; judgedOn?: (screen: UsableScreen) => void } = {},
 ): Promise<string | undefined> {
   const keyboard = readKeyboard(adapter, tree);
   const frame = await keyboard.overlapping(element.rect, element);
   if (frame !== undefined) return keyboardOver(element.rect, frame, keyboard.remedy);
-  return judgeOver(adapter, tree, element, { reads, glyphs, scene, keyboard: { line: keyboardPosition(scene.order).line(element), remedy: keyboard.remedy } });
+  return judgeOver(adapter, tree, element, { reads, glyphs, scene, judgedOn, keyboard: { line: keyboardPosition(scene.order).line(element), remedy: keyboard.remedy } });
 }
 
 /**
@@ -496,9 +503,10 @@ async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   tree: UiNode,
   element: UiNode,
-  { reads, glyphs, scene, keyboard }: { reads: PixelRegionOf; glyphs: boolean; scene: Scene; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, scene, judgedOn, keyboard }: { reads: PixelRegionOf; glyphs: boolean; scene: Scene; judgedOn: (screen: UsableScreen) => void; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
   const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
+  judgedOn(usable);
   // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelRegionOf).
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
@@ -507,7 +515,7 @@ async function judgeOver(
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
     case 'offScreen': {
-      if (standing.scroller !== undefined) {
+      if (outsideItsScrollView(standing)) {
         // On the screen, but outside what its scroll view draws: what lies there is not the element.
         const view = nodeText(standing.scroller);
         const where = standing.sliver === undefined ? `${OUTSIDE_ITS_SCROLL_VIEW} ${view} ${at}` : `${TOO_THIN_IN_ITS_SCROLL_VIEW} ${view} ${at}, drawn ${rectText(standing.sliver)}`;
@@ -681,7 +689,13 @@ export async function pollPixels(
     if (memory.outOfTime(deadline)) return undefined;
     // The keyboard, then the system bands and what of the app is drawn over it — never a measurement.
     const scene = sceneOf(tree);
-    const over = await overElement(adapter, tree, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, scene });
+    // One screen for the judge and the sampler: the one the standing was judged on (`judgedOn`), of which both ask THE
+    // region (ui-tree/standing.ts#Scene.pixelRegion). Read where the judge reads it, after the keyboard: no extra device read.
+    let screen: UsableScreen | undefined;
+    const judgedOn = (s: UsableScreen): void => {
+      screen = s;
+    };
+    const over = await overElement(adapter, tree, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, scene, judgedOn });
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
@@ -694,8 +708,8 @@ export async function pollPixels(
     const { shot, measured } = frame;
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
-    // Measured on the part its scroll views draw (the drawn frame) — the part the standing judged over (one region).
-    const verdict = await measure({ rect: drawnPart(rect, scene.clips.drawnIn(found[0])) ?? rect, shot, measured });
+    // Measured on THE region the standing judged over (Scene.pixelRegion): the part its scroll views draw.
+    const verdict = await measure({ rect: scene.pixelRegion(found[0], screen), shot, measured });
     // A failure no later round can change leaves the poll at once, as a refused capture does.
     if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;

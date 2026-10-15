@@ -742,10 +742,10 @@ export interface Drawn {
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
  * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
- * tree's nesting is its nodes' ancestry — draw-order.ts#listsAncestry says,
- * the one reader of the tree's dialect; `unclipped`: whether its source
- * reports frames unclipped (draw-order.ts#listsUnclippedFrames), which
- * `drawnIn` asks.
+ * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry);
+ * `unclipped`: whether its source reports frames unclipped, which `drawnIn`
+ * asks (draw-order.ts#listsUnclippedFrames) — the two readers of the tree's
+ * dialect, both in draw order.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
@@ -1025,11 +1025,14 @@ export function rectText(r: Rect): string {
 
 /**
  * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
- * 402x780)` — when nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame,
- * `Clips.drawnIn`). One spelling for the tap's refusal, `scroll_until`'s sentences, the dismissal picker's skip line
- * and the pixel assert's miss.
+ * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
+ * nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame, `Clips.drawnIn`). One
+ * spelling for the tap's refusal, `scroll_until`'s sentences and the dismissal picker's skip line; the pixel assert's
+ * miss heads (verify/pixel-poll.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole by the tool
+ * description, end with the same words.
  */
-export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string => `outside its scroll view ${nodeText(scroller)}`;
+export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, where = 'outside'): string =>
+  `${where} its scroll view ${nodeText(scroller)}`;
 
 /**
  * How a sentence names a NODE drawn over another — `button "Continue to

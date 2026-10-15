@@ -9,6 +9,7 @@ import { sceneOf, type Scene } from '../../src/ui-tree/standing.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/tap-judgement.js';
 import { node } from '../helpers/fake.js';
+import { stackedLayers } from '../helpers/stacked-layers.js';
 
 // THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look and a screen — no settle
 // loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a hand-made reading that
@@ -276,7 +277,7 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
     expect(freshReads).toEqual([]);
   });
 
-  it('a card partly drawn, its centre outside what its scroll views draw (a carousel at the form\'s foot): refused as at the screen\'s edge, "fully: true first" — not tapped on its drawn part (ADR 0010, "Amendment: the drawn frame")', async () => {
+  it('a card partly drawn, its centre outside what its scroll views draw (a carousel at the form\'s foot): refused as at the screen\'s edge, "fully: true first" — not tapped on its drawn part', async () => {
     // low_card 750–830 in the carousel 740–840, inside the form ending at 780: 30 of its 80 pt drawn, its centre (124,790) not.
     const low = node({ role: 'button', identifier: 'low_card', rect: { x: 24, y: 750, width: 200, height: 80 } });
     const carousel = node({ role: 'scrollable', identifier: 'carousel_low', rect: { x: 0, y: 740, width: 402, height: 100 }, children: [low] });
@@ -305,8 +306,7 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
 });
 
 describe('judgeTap(…).aim() — a later stacked screen layer over the target (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
-  const screens = async () =>
-    (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+  const screens = stackedLayers;
 
   it('the RN transparent Modal\'s dimming root over the login screen (#248): lang_sk is refused as under `forgot_overlay`, never tapped (device: "Tapped", the shim\'s tap at 290,251 swallowed)', async () => {
     const { outcome } = await judge((await screens()).finportalForgot, 'lang_sk', { first: IPHONE });
@@ -439,7 +439,7 @@ describe('judgeTap(…).aim() — a wrapper over the target holding one small co
   });
 
   it('a screen presented over the target wins over the hint: the RN modal\'s card made a wrapper of one small button still says close it first', async () => {
-    const tree = structuredClone((JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens.finportalForgot);
+    const tree = (await stackedLayers()).finportalForgot;
     const modal = find(tree, 'forgot_modal');
     modal.children = [node({ role: 'button', identifier: 'forgot_send', label: 'Send', rect: rect(32, 317, 80, 40) })];
     expect(said((await judge(tree, 'login_title', { first: IPHONE })).outcome)).toBe(
@@ -496,6 +496,7 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
         return real.clips;
       },
       standing: ((...args: Parameters<Scene['standing']>) => (asked.push('standing'), real.standing(...args))) as Scene['standing'],
+      pixelRegion: (...args) => (asked.push('pixelRegion'), real.pixelRegion(...args)),
     };
     return { scene, asked };
   }

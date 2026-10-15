@@ -8,6 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
+import { outsideItsScrollView } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -354,6 +355,31 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
             `stays clipped with the keyboard down is it a layout defect. ${last}`,
         );
       }
+      // Clipped, at an edge or more, by its scroll view's edge inside the screen: each edge named with what cuts it, the
+      // part drawn quoted, and why the rest may stay past that scroll view — no overlay diagnosed for its edge.
+      const { standing } = judged;
+      if (standing.kind === 'clipped' && standing.byScrollView !== undefined) {
+        const { edges, scroller, longer } = standing.byScrollView;
+        const byScreen = clipped.filter((edge) => !edges.includes(edge));
+        const at = `${edges.join('/')} ${outsideScrollViewText(scroller, 'by')}${byScreen.length === 0 ? '' : ` and at ${byScreen.join('/')} by the viewport`}`;
+        // Where its content stops short of the element: past its end (bottom, right), before its start (top, left), or both.
+        const after = edges.every((e) => e === 'bottom' || e === 'right');
+        const before = edges.every((e) => e === 'top' || e === 'left');
+        const short = after
+          ? 'its content ends before the element does (no room after it — a layout defect)'
+          : before
+            ? 'its content begins after the element does (no room before it — a layout defect)'
+            : 'its content stops short of the element at those edges (no room past them — a layout defect)';
+        const past = byScreen.length > 0 ? 'those edges' : edges.length > 1 ? "that scroll view's edges" : "that scroll view's edge";
+        const rest =
+          longer !== undefined
+            ? `It is ${longer} than what of its scroll view the screen shows: no scroll shows it whole.`
+            : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${short}.`;
+        return new Error(
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
+            `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
+        );
+      }
       return new Error(
         `scroll_until ${describe} failed after ${n} — ` +
           `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
@@ -432,7 +458,7 @@ function notInViewportText(judged: Judged, viewport: Rect): string {
   if (standing.kind === 'underKeyboard') return `element lies ${underKeyboardText(tapPoint(node), standing.line.y)}`;
   if (standing.facts.visible === 0) {
     // On the screen, but nothing of it drawn: its scroll view's frame, not the viewport's, is what it lies outside of.
-    if (standing.kind === 'offScreen' && standing.scroller !== undefined) return `element lies ${outsideScrollViewText(standing.scroller)}: nothing of it is drawn`;
+    if (outsideItsScrollView(standing)) return `element lies ${outsideScrollViewText(standing.scroller)}: nothing of it is drawn`;
     const side = wholePast(node.rect, viewport);
     return `element lies ${side === undefined ? 'outside the viewport' : pastSideText(side, node.clippedOut === side)}`;
   }

@@ -9,6 +9,7 @@ import { isInteractive } from '../../src/ui-tree/selectors.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS } from '../helpers/synthetic-android-trees.js';
 import { node as uiNode } from '../helpers/fake.js';
+import { stackedLayers } from '../helpers/stacked-layers.js';
 
 const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
@@ -24,7 +25,7 @@ const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scroll
 /** The iPhone 17's screen, 402x874 pt. */
 const IPHONE_BOX = rect(0, 0, 402, 874);
 /** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
-const STACKED = JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+const STACKED = { screens: await stackedLayers() };
 /** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now. */
 /** mp-native's SWIFT form pushed over the tab host, the host's hidden tab bar listed after it (ADR 0019): the raw /source capture. */
 const SWIFT_PUSHED = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-swift-form-pushed.json', import.meta.url), 'utf8'));

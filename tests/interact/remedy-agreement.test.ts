@@ -10,6 +10,7 @@ import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
+import { stackedLayers } from '../helpers/stacked-layers.js';
 import { node } from '../helpers/fake.js';
 
 // ONE remedy for a target that is not reachable itself (ui-tree/standing.ts#Remedy), decided once by the standing with
@@ -62,8 +63,7 @@ function probe(): { tree: UiNode; target: UiNode } {
   return { tree, target };
 }
 
-const stacked = async (): Promise<Record<string, UiNode>> =>
-  (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;
+const stacked = stackedLayers;
 
 const byRect = (tree: UiNode, r: Rect): UiNode =>
   [...everyNode(tree)].find((n) => n.rect.x === r.x && n.rect.y === r.y && n.rect.width === r.width && n.rect.height === r.height)!;

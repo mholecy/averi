@@ -66,7 +66,11 @@ was reported done at (201,827), 3 pt below CONTINUE.
   capture shows of the element: CONTINUE from 780 over a row running past its form's 780, the status bar over a row
   above its form's top at 62, a carousel's next card over the undrawn part of the card before it. Those asserts,
   which failed closed naming that cover, now measure the drawn part — and the tap and `scroll_until` agree on the same
-  node (a plain stop at its drawn centre, `fully: true` clipped at the scroll view's edge).
+  node (a plain stop at its drawn centre, `fully: true` clipped at the scroll view's edge). The owner kept this
+  (2026-10-15) over failing closed on such a cover: the sweep's 19 colour/ocr asserts that turned from a fail closed
+  to a measurement are measured on what the capture shows of the element. The region is one function
+  (`ui-tree/standing.ts#Scene.pixelRegion`) that the judge and the sampler both ask, of one screen per round, so they
+  cannot diverge (on a root of no area neither cuts).
 - Before idb's band: idb is flat, so its band never meets this rule.
 - The same frame cuts the tap's and `scroll_until`'s judgement (`ui-tree/standing.ts#Scene`, "THE DRAWN FRAME"), so the
   verbs agree: the tap refuses naming the scroll view (after the keyboard guard, since a scroll view laid out above
