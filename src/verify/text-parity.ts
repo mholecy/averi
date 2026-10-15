@@ -18,10 +18,10 @@ import { failClosed } from './fail-closed.js';
 import {
   differsOnlyByOcrFold,
   foldDifference,
+  foldReason,
   namePairs,
   ocrFold,
   ocrFoldPattern,
-  RECOGNIZER_DIFFERENCE,
 } from './ocr-fold.js';
 import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -1113,7 +1113,7 @@ export function evaluateOcrAssert(
     if (!ok) pass = false;
     parts.push(
       `vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}` +
-        (folded !== undefined ? ` (only with ${namePairs(folded)} folded — ${RECOGNIZER_DIFFERENCE})` : ''),
+        (folded !== undefined ? ` (only with ${namePairs(folded)} folded — ${foldReason(folded)})` : ''),
     );
   }
   let heightUnchecked: string | undefined;

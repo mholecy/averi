@@ -241,21 +241,37 @@ function foldedPairs(want: string, read: string): [string, string][] {
   return pairs;
 }
 
-/** Why a folded difference is forgiven, said once wherever it is. */
-export const RECOGNIZER_DIFFERENCE =
-  'the recognizer reads typographic punctuation as ASCII and drops diacritics';
+/** What the recognizer cannot tell apart, per kind of folded character — said of neither side, since either may be the typographic or accented one. */
+const CANNOT_TELL: Readonly<Record<'punctuation' | 'diacritics', string>> = {
+  punctuation: 'typographic punctuation from its ASCII look-alike',
+  diacritics: 'a letter with diacritics from one without',
+};
+
+/**
+ * Why folded pairs are forgiven, naming only the kinds present: a punctuation
+ * look-alike (`’ vs '`, either way round), a letter's diacritics (`ť vs t`), or
+ * both — `the recognizer does not tell typographic punctuation from its ASCII
+ * look-alike, nor a letter with diacritics from one without`.
+ */
+export function foldReason(pairs: readonly (readonly [string, string])[]): string {
+  const chars = pairs.flatMap(([a, b]) => [...charsOf(a), ...charsOf(b)]);
+  const kinds = (['punctuation', 'diacritics'] as const).filter((kind) =>
+    chars.some((c) => (kind === 'punctuation' ? PUNCTUATION[c] !== undefined : PUNCTUATION[c] === undefined && foldMarks(c) !== c)),
+  );
+  return `the recognizer does not tell ${kinds.map((kind) => CANNOT_TELL[kind]).join(', nor ')}`;
+}
 
 /**
  * What a fold-equal pair differs in and why that is forgiven, for a note:
- * `characters` is `’ vs '`, `reason` the recognizer's. Two strings that differ
- * only in how a letter is encoded (`é` as one code point or as `e` + a
- * combining acute) have no such character and are not the recognizer's doing;
- * that is said instead.
+ * `characters` is `’ vs '`, `reason` the recognizer's for the kinds of
+ * character named (`foldReason`). Two strings that differ only in how a letter
+ * is encoded (`é` as one code point or as `e` + a combining acute) have no
+ * such character and are not the recognizer's doing; that is said instead.
  */
 export function foldDifference(want: string, read: string): { characters: string; reason: string } {
   const pairs = foldedPairs(want, read);
   return pairs.length > 0 ?
-      { characters: namePairs(pairs), reason: RECOGNIZER_DIFFERENCE }
+      { characters: namePairs(pairs), reason: foldReason(pairs) }
     : { characters: 'composed vs decomposed characters', reason: 'the same letters, encoded differently' };
 }
 
