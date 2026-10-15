@@ -106,8 +106,9 @@ node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [
 
 Exit code 1 on a mismatch or a broken target. `tests/differential/golden.test.ts` runs it over the committed truth on
 this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
-<verb>` with their class, the taps and swipes they sent and their notes — a ratchet both ways (one fixed fails until
-struck off; a new one fails until fixed or listed; one whose class or device calls change fails until re-noted).
+<verb>` with their class, their reply's kind (`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL,
+refused, other), the taps and swipes they sent and their notes — a ratchet both ways (one fixed fails until struck off;
+a new one fails until fixed or listed; one whose class, reply kind or device calls change fails until re-noted).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with

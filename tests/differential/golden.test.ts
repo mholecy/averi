@@ -4,6 +4,7 @@ import { installVirtualClock } from '../../scripts/differential/clock.js';
 import { loadCorpus, type Recording } from '../../scripts/differential/corpus.js';
 import { installFakeDevice } from '../../scripts/differential/fake-device.js';
 import { goldenRecording, type GoldenCheck, type GoldenResult } from '../../scripts/differential/golden.js';
+import type { ReplyKind } from '../../scripts/differential/golden-spec.js';
 import { loadSide, type Side } from '../../scripts/differential/side.js';
 
 // The golden mode over the committed ground truth (tests/fixtures/truth, captured from the lab apps by
@@ -11,9 +12,11 @@ import { loadSide, type Side } from '../../scripts/differential/side.js';
 // mismatches this checkout is known to have are listed in KNOWN — a ratchet (docs/adr/0020): one fixed fails this test
 // until it is struck off, and a new one fails it until it is fixed or listed with its note. A known mismatch is pinned
 // by what the reply DID: its class (what the judge's reason says first — golden-spec.ts#classed: the judge's own
-// reason where it rejects the reply, `not in the tree` only where it would accept a reply that is no evidence) and the
-// taps and swipes the device was sent. A known row that changes either — a stroke moved under the keyboard, a swipe
-// fewer — fails here, though it still mismatches.
+// reason where it rejects the reply, `not in the tree` only where it would accept a reply that is no evidence), its
+// kind (golden-spec.ts#replyKind: not found, Tapped, visible, PASS, FAIL, refused, other) and the taps and swipes the
+// device was sent. A known row that changes any of them — a stroke moved under the keyboard, a swipe fewer, a timeout
+// turned into a refusal with the wrong remedy, a stop turned into `fully visible` — fails here, though it still
+// mismatches.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TRUTH = fileURLToPath(new URL('../fixtures/truth/', import.meta.url));
@@ -24,12 +27,14 @@ const ANDROID = 'android-averi_lab-api33';
 interface Known {
   /** What the mismatch says first, up to its `: ` — the judge's reason, or `not in the tree` (vacuous). */
   cls: string;
+  /** What kind of reply it is (GoldenCheck.kind, golden-spec.ts#replyKind): a timeout turned refusal fails here. */
+  kind: ReplyKind;
   /** The taps and swipes the device was sent (GoldenCheck.calls), in order. */
   calls: readonly string[];
   note: string;
 }
-const keys = (file: string, tags: readonly string[], verbs: readonly string[], cls: string, calls: readonly string[], note: string) =>
-  tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, { cls, calls, note }] as const));
+const keys = (file: string, tags: readonly string[], verbs: readonly string[], cls: string, kind: ReplyKind, calls: readonly string[], note: string) =>
+  tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, { cls, kind, calls, note }] as const));
 
 const NOT_IN_TREE = 'not in the tree';
 const NO_CLOSE_IT_FIRST = 'refused without "close it first"';
@@ -48,33 +53,33 @@ const KNOWN: Record<string, Known> = Object.fromEntries([
   // false Tapped, but no "close it first"; the colour assert fails "not found" (no evidence either way: vacuous); and
   // scroll_until swipes twice beneath the presented layer looking for it.
   ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
-    ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, [], 'idb lists only the presented layer: the tap times out'),
-    ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, [], 'idb lists only the presented layer'),
-    ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], 'swiped 2× beneath a presented layer', twice(IDB_STROKE), 'idb lists only the presented layer: scroll_until swipes twice beneath it'),
+    ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, 'not found', [], 'idb lists only the presented layer: the tap times out'),
+    ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, 'not found', [], 'idb lists only the presented layer'),
+    ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], 'swiped 2× beneath a presented layer', 'not found', twice(IDB_STROKE), 'idb lists only the presented layer: scroll_until swipes twice beneath it'),
   ]),
   // The form beneath the country picker sheet: the same, a form's fields and its submit.
-  ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], NO_CLOSE_IT_FIRST, [], 'idb lists only the presented sheet: the tap times out'),
-  ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], 'swiped 2× beneath the sheet', twice(IDB_STROKE), 'idb lists only the presented sheet: scroll_until swipes twice beneath it'),
+  ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], NO_CLOSE_IT_FIRST, 'not found', [], 'idb lists only the presented sheet: the tap times out'),
+  ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], 'swiped 2× beneath the sheet', 'not found', twice(IDB_STROKE), 'idb lists only the presented sheet: scroll_until swipes twice beneath it'),
   // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the tap
   // timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice; scroll_until
   // swipes twice ABOVE the keyboard (pinned: a stroke moved under it fails here) and stops "never appeared in the tree"
   // — its touch-downs are right, but a replayed tree cannot show whether they would bring the field out (vacuous).
-  ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], 'refused without naming the keyboard', [], 'idb lists nothing under the keyboard: the tap times out'),
-  ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], NOT_IN_TREE, twice(IDB_STROKE_ABOVE_KEYBOARD), 'idb lists nothing under the keyboard'),
+  ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], 'refused without naming the keyboard', 'not found', [], 'idb lists nothing under the keyboard: the tap times out'),
+  ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], NOT_IN_TREE, 'not found', twice(IDB_STROKE_ABOVE_KEYBOARD), 'idb lists nothing under the keyboard'),
   // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under idb
   // the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers Tapped and
   // sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0 swipes.
-  ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['tap'], 'Tapped', ['idb ui tap 201 547'], 'lab finding: idb reads the pinned submit bar as no cover — the tap submits the form'),
-  ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['scroll_until'], 'reached with no swipe where a tap fires submit invalid', [], 'lab finding: idb reads the pinned submit bar as no cover'),
+  ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['tap'], 'Tapped', 'Tapped', ['idb ui tap 201 547'], 'lab finding: idb reads the pinned submit bar as no cover — the tap submits the form'),
+  ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['scroll_until'], 'reached with no swipe where a tap fires submit invalid', 'visible', [], 'lab finding: idb reads the pinned submit bar as no cover'),
   // LAB FINDING, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
   // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
   // the tree, as on idb. The tap waits 5 s "to appear" (no false Tapped, no "close it first"); the colour assert fails
   // "not found" (vacuous); scroll_until strokes 1776 → 444 twice, and on the device that stroke dismisses the dialog
   // (it lands on its dim) or expands the sheet.
   ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
-    ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, [], 'lab finding: uiautomator lists only the presented window; the tap times out'),
-    ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, [], 'lab finding: uiautomator lists only the presented window'),
-    ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['scroll_until'], 'swiped 2× beneath a presented layer', twice(ADB_STROKE), 'lab finding: strokes beneath the presented layer (dismisses the dialog / expands the sheet)'),
+    ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, 'not found', [], 'lab finding: uiautomator lists only the presented window; the tap times out'),
+    ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, 'not found', [], 'lab finding: uiautomator lists only the presented window'),
+    ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['scroll_until'], 'swiped 2× beneath a presented layer', 'not found', twice(ADB_STROKE), 'lab finding: strokes beneath the presented layer (dismisses the dialog / expands the sheet)'),
   ]),
 ]);
 
@@ -138,15 +143,16 @@ describe('golden over the lab app truth', () => {
     expect(fresh).toEqual([]);
   });
 
-  it('a known mismatch is of its noted class, and sends the device what it is noted to', () => {
+  it('a known mismatch is of its noted class and reply kind, and sends the device what it is noted to', () => {
     const changed = results
       .flatMap((r) => r.checks)
       .filter((c) => c.mismatch !== undefined && Object.hasOwn(KNOWN, key(c)))
       .flatMap((c) => {
         const k = KNOWN[key(c)];
         const cls = c.mismatch!.startsWith(`${k.cls}: `) ? [] : [`${key(c)} — noted ${k.cls} — judged: ${c.mismatch}`];
+        const kind = c.kind === k.kind ? [] : [`${key(c)} — noted a ${k.kind} reply — got ${c.kind}: ${c.reply.split('\n')[0]}`];
         const calls = JSON.stringify(c.calls) === JSON.stringify(k.calls) ? [] : [`${key(c)} — noted ${JSON.stringify(k.calls)} — sent ${JSON.stringify(c.calls)}`];
-        return [...cls, ...calls];
+        return [...cls, ...kind, ...calls];
       });
     expect(changed).toEqual([]);
   });

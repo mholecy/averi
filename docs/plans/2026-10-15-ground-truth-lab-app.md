@@ -86,11 +86,11 @@ matters for `Tapped` is whether the action fired.
   says `5ac759f`; that SHA is wrong — the green tip was `e10219e`). On this branch: green from the merge of
   `arch/round-20` (round 19's alert fix and round 20's presented layer) at `8600176` — golden 237 checks, 69 → 60
   mismatches, the 9 WDA `alert-dim` rows struck off KNOWN, no other row's verdict changed. With phases 1b and 2: 237
-  checks, 64 mismatches, all KNOWN and each pinned by its class and the taps and swipes it sent (a "not in the tree"
-  reply is classed by its effect where its row rejects it): 19 tap refused without "close it first", 4 tap refused
-  without naming the keyboard, 1 Tapped, 16 swiped 2× beneath a presented layer, 3 swiped 2× beneath the sheet, 1
-  reached with no swipe where a tap fires submit, and 20 vacuous "not in the tree" (16 colour, 4 keyboard
-  `scroll_until`).
+  checks, 64 mismatches, all KNOWN and each pinned by its class, its reply's kind (62 not found, 1 Tapped, 1 visible)
+  and the taps and swipes it sent (a "not in the tree" reply is classed by its effect where its row rejects it): 19
+  tap refused without "close it first", 4 tap refused without naming the keyboard, 1 Tapped, 16 swiped 2× beneath a
+  presented layer, 3 swiped 2× beneath the sheet, 1 reached with no swipe where a tap fires submit, and 20 vacuous
+  "not in the tree" (16 colour, 4 keyboard `scroll_until`).
 
 ### Phase 1b — forms and validation (iOS)
 

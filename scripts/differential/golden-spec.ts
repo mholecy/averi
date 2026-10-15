@@ -84,6 +84,22 @@ export function classed<E extends Expectation>(e: E): E {
 }
 /** The taps and swipes the device was sent — what a reply DID, recorded on every golden check. */
 export const sent = (o: Outcome) => o.device.filter((c) => /^(idb ui|adb shell input) (tap|swipe) /.test(c));
+/**
+ * What kind of reply it is, from a closed set — recorded on every golden check, so a known mismatch whose reply turns
+ * into another kind (a timeout into a refusal, a stop into `fully visible`) fails the ratchet though its class and its
+ * device calls stay: `not found` (the target not in the tree: notInTree), `Tapped`, `visible` (scroll_until stopped on
+ * it), `PASS` and `FAIL` (an assert's verdict), `refused` (any other ERROR), `other`.
+ */
+export type ReplyKind = 'not found' | 'Tapped' | 'visible' | 'PASS' | 'FAIL' | 'refused' | 'other';
+export function replyKind(o: Outcome): ReplyKind {
+  if (notInTree(o)) return 'not found';
+  if (o.reply.startsWith('Tapped')) return 'Tapped';
+  if (/^Element .* visible after /.test(o.reply)) return 'visible';
+  if (passed(o)) return 'PASS';
+  if (/^\d+\/\d+ asserts FAILED/.test(o.reply)) return 'FAIL';
+  if (o.reply.startsWith('ERROR')) return 'refused';
+  return 'other';
+}
 /** A tap that must not land: not `Tapped`, and no tap sent. */
 export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
