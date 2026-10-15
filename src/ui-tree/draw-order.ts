@@ -223,8 +223,8 @@ export interface DrawOrder {
    * scrolling the alert's own content, a search inside a sheet's own list). Named by its cover: a typed layer's
    * element (an alert, an action sheet, a popover); for a `screen` layer, the last node of it at the point that
    * draws by the column that needs no target (`drawnOver`'s), else the layer itself. A node the source says is not
-   * shown (`UiNode.hidden`) is neither such a scroll view nor named, as the `target` column's `hidden` row judges it. A screen presented by shape
-   * alone is not asked here. Undefined when none. One reader: `scroll_until`'s stroke
+   * shown (`UiNode.hidden`) is neither such a scroll view nor named, as the `target` column's `hidden` row judges it.
+   * A screen presented by shape alone is not asked here. Undefined when none. One reader: `scroll_until`'s stroke
    * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no stroke that would land on
    * it.
    */
@@ -1863,7 +1863,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
       // `hidden` row judges it for a target: the stroke for no target and the one for a target agree.
       const own = (layer: Placed): readonly Placed[] =>
         order.slice(layer.at + 1, layer.end).filter((p) => p.node.hidden !== true);
-      const scrolledAt = (layer: Placed): boolean => own(layer).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point));
+      const scrolledAt = (layer: Placed): boolean =>
+        own(layer).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point));
       const on = marked.filter(({ layer }) => !scrolledAt(layer)).at(-1);
       if (on === undefined || on.kind !== 'screen') return on?.cover.node;
       // No target to judge a cover for: what of the layer draws at the point by the column that needs none
