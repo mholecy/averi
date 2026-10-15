@@ -845,7 +845,12 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
   it.each([
     ['it’s Bob’s', "it's Bob’s", "’ vs '"],
     ['a–b–c', 'a-b–c', '– vs -'],
-    ['café’', "café'", "’ vs '"],
+    ['cafe\u0301’', "café'", "’ vs '"],
+    ['Prihlásiť – “Spät”…', 'Prihlasit - "Spat"...', 'á vs a, ť vs t, – vs -, “ vs ", ä vs a, ” vs ", … vs ...'],
+    ["Payee's name", 'Payee’s name', "' vs ’"],
+    ['10-20', '10—20', '- vs —'],
+    ['1\u00a0000 Kč', '1 000 Kc', 'č vs c'],
+    ['\u212b', 'A', 'Å vs A'],
   ])('%j read as %j names the character that differs, though the same character is also kept elsewhere', (want, read, pairs) => {
     expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).detail).toContain(`= (differs only in ${pairs} — `);
   });
@@ -884,6 +889,23 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ['^x\\Bé$', 'xe', false],
     ['^Payee’s name$', "Payee's game", false],
     ['^PAYEE’S', "Payee's", false],
+    ['^Loading…$', 'LoadingABC', false],
+    ['^a…?$', 'a', true],
+    ['^[…]$', '...', false],
+    ["^it's ’$", "it's '", true],
+    ['^[a-–]$', 'b', true],
+    ['^[^–]$', '-', true],
+    ['^[^’]+$', "'", true],
+    ['\\u2019s', "Payee's", false],
+    ['^Sp[äa]t$', 'Spat', true],
+    ['^10–20$', '10—20', true],
+    ['^Späť$', 'Spat', true],
+    ['^e\u0301$', 'e', true],
+    ['^[0-9]+–[0-9]+$', 'abc', false],
+    ['^Č[a-z]+$', 'ABC', false],
+    ['^[ぁ-ゖ]+$', 'abc', false],
+    ['^합계$', '합게', false],
+    ['^Total: [0-9]+ Kč$', 'Total: 12 CZK', false],
   ])('/%s/ against %j under the fold: pass %s', (match, read, pass) => {
     expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(pass);
   });
@@ -902,6 +924,17 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(evaluateOcrAssert({ match: '^が$' }, [line('か', 30)], 1080).pass).toBe(false);
     // A Hangul range kept whole while the ellipsis beside it folds.
     expect(evaluateOcrAssert({ match: '^[가-힣]+…$' }, [line('합계...', 30)], 1080).pass).toBe(true);
+  });
+
+  it.each([
+    ['A…', 'A..'],
+    ['ﬁle', 'file'],
+  ])('%j read as %j is outside the fold and fails', (want, read) => {
+    expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).pass).toBe(false);
+  });
+
+  it('the note on a lone combining mark in a pattern shows the mark on a dotted circle', () => {
+    expect(evaluateOcrAssert({ match: '^e\u0301$' }, [line('e', 30)], 1080).detail).toContain('(only with ◌\u0301 vs nothing folded — ');
   });
 
   it('case is not folded', () => {
