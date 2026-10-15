@@ -31,10 +31,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * for a node not reachable — its REMEDY, one closed set of cases decided
  * here with one precedence, presented first (`Remedy`). WHO OWNS A REMEDY'S
  * WORDS: each verb owns its sentences, save one clause — the presented
- * screen's (`presentedRemedy`), which lives here because interact/ and
- * verify/ both say it and verify/ may not import interact/; each verb's
- * constant built on it (interact/target-text.ts#PRESENTED_OVER,
- * interact/scroll-text.ts#PRESENTED_STOP,
+ * screen's (`presentedRemedy`, and `scroll_until`'s stop on it,
+ * `presentedStop`), which lives here because interact/ and verify/ both say
+ * it and verify/ may not import interact/; each verb's constant built on it
+ * (interact/target-text.ts#PRESENTED_OVER,
  * verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT) owns its full sentence.
  * The keyboard actions stay with the callers, and the keyboard guard (K1)
  * alone acts on the keyboard.
@@ -389,6 +389,15 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
   layer?.kind === 'alert'
     ? `an alert is presented over ${what}${layer.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+
+/**
+ * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no
+ * swipe was sent — one on that screen may dismiss it; under a presented layer the tree source marks (an alert, `layer`)
+ * it is named, and a swipe would land on it. With no layer, the one sentence the `scroll_until` description quotes
+ * (mcp/tools.ts).
+ */
+export const presentedStop = (layer?: MarkedLayer): string =>
+  `${presentedRemedy('it', layer)}, ${layer === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${layer.kind}`}`;
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];

@@ -6,10 +6,9 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, presentedOver, revealText, underKeyboardText, untriedSideText } from './target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, presentedOver, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import type { MarkedLayer } from '../ui-tree/draw-order.js';
-import { outsideItsScrollView, reachOf } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type PresentedTouchDown, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -290,16 +289,6 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
       : otherWay === 'outward'
         ? `, and swiping ${back} would only push it out through that edge`
         : `, and swiping ${back} was tried earlier in the scroll`;
-
-/**
- * The `presented` stop's remedy (`scrollFailure`): the presented screen's (target-text.ts#PRESENTED_OVER), and why no
- * swipe was sent — one on that screen may dismiss it. The one sentence the `scroll_until` description quotes
- * (mcp/tools.ts).
- */
-export const PRESENTED_STOP = `${PRESENTED_OVER}, and a swipe on it may dismiss it`;
-
-/** `PRESENTED_STOP` for a presented layer the tree source marks (an alert, the outcome's `layer`): it is named, and a swipe would land on it. */
-const presentedStop = (layer: MarkedLayer | undefined): string => (layer === undefined ? PRESENTED_STOP : `${presentedOver(layer)}, and a swipe would land on the ${layer.kind}`);
 
 /** `, and the next swipe would touch down at (x,y) on <the surface>` — where the `presented` stop's held-back stroke would have landed (`next`); empty when it was judged in the frame. */
 const touchDownText = (next: PresentedTouchDown | undefined): string => (next === undefined ? '' : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${coverText(next.surface, next.reach)}`);

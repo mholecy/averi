@@ -59,16 +59,16 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
 }));
 
 // The remedy sentences a description quotes have one owner too — the module that renders them: the tap's presented
-// remedy (interact/target-text.ts#PRESENTED_OVER), scroll_until's presented stop (interact/scroll-text.ts#PRESENTED_STOP)
+// remedy (interact/target-text.ts#PRESENTED_OVER), scroll_until's presented stop (ui-tree/standing.ts#presentedStop)
 // and the pixel assert's (verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT). Replaced by sentinels the descriptions must quote; the
 // troubleshooting reference, a file no import reaches, is pinned against the real sentences (`actualSentences`).
 vi.mock('../../src/interact/target-text.js', async (orig) => ({
   ...(await orig<typeof import('../../src/interact/target-text.js')>()),
   PRESENTED_OVER: '<the presented remedy, as interact/target-text.ts renders it>',
 }));
-vi.mock('../../src/interact/scroll-text.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/interact/scroll-text.js')>()),
-  PRESENTED_STOP: '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>',
+vi.mock('../../src/ui-tree/standing.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/ui-tree/standing.js')>()),
+  presentedStop: () => '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>',
 }));
 vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
@@ -276,11 +276,7 @@ async function actualSentences(): Promise<{
   TOO_THIN_IN_ITS_SCROLL_VIEW: string;
 }> {
   const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
-  // The actual scroll-text.ts still imports the MOCKED target-text.ts: its stop sentence is built on the tap's sentinel,
-  // which is put back here for the owner's real words.
-  const { PRESENTED_OVER: sentinel } = await import('../../src/interact/target-text.js');
-  const built = (await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js')).PRESENTED_STOP;
-  const PRESENTED_STOP = built.replace(sentinel, PRESENTED_OVER);
+  const PRESENTED_STOP = (await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js')).presentedStop();
   const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
     '../../src/verify/pixel-poll.js',
   );
@@ -297,7 +293,7 @@ describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
   const TAP_SENTINEL = '<the presented remedy, as interact/target-text.ts renders it>';
   const PIXEL_SENTINEL = '<the presented remedy, as verify/pixel-poll.ts renders it>';
-  const STOP_SENTINEL = '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>';
+  const STOP_SENTINEL = '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>';
 
   it('every description quotes the owners\' sentences, never a copy of them', async () => {
     const { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
