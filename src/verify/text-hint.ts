@@ -112,18 +112,19 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
  * see; the hint only names the node, so the reader need not dump the tree.
  */
 function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
-  const hits: { node: UiNode; text: string }[] = [];
+  const hits: { node: UiNode; field: 'label' | 'value'; text: string }[] = [];
   for (const node of candidates) {
-    const text = [node.label, node.value].find(
-      (v): v is string => v !== null && differsOnlyByOcrFold(expected, v),
-    );
-    if (text !== undefined) hits.push({ node, text });
+    const field = (['label', 'value'] as const).find((f) => {
+      const v = node[f];
+      return v !== null && differsOnlyByOcrFold(expected, v);
+    });
+    if (field !== undefined) hits.push({ node, field, text: node[field] as string });
   }
   if (hits.length === 0) return undefined;
   const pairs = [...new Set(hits.flatMap(({ text }) => foldDifference(expected, text).characters.split(', ')))];
   const shown = hits
     .slice(0, 3)
-    .map(({ node, text }) => `    id=${node.identifier ?? '(none)'} label=${JSON.stringify(text)}`)
+    .map(({ node, field, text }) => `    id=${node.identifier ?? '(none)'} ${field}=${JSON.stringify(text)}`)
     .join('\n');
   return (
     `no node has this exact text, but ${hits.length} node(s) differ from it only in ${pairs.join(', ')}:\n${shown}\n` +

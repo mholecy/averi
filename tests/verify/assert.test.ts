@@ -314,6 +314,16 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     expect(result.detail).toContain("differ from it only in ' vs ’:");
   });
 
+  it('prints the field that differs only by the fold — a field\'s value is shown as value=', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { p: screen(el({ role: 'textfield', identifier: 'payee', label: 'Payee', value: 'Bob’s' })) },
+      'p',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'payee' }, text: "Bob's" });
+    expect(result.detail).toContain('    id=payee value="Bob’s"');
+  });
+
   it('stays quiet for a node that differs outside the fold', async () => {
     resetLayout();
     const fake = new FakeAdapter(
