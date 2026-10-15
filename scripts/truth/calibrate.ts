@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +36,10 @@ import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
  * the checkouts THIS run created (one found in place stays). An open note is judged on the working tree — this checkout
  * as it is on disk, uncommitted changes included.
  * Exit code 1 when a note's verdict is not the one it expects (`expect`; CALIBRATED, or OPEN-RED for an open note), or a
- * note regressed elsewhere unrecorded.
+ * note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more (runSide;
+ * said on the console only, so the report stays the same); a side that still does not load carries why — the exit code
+ * or signal and the last lines of stderr, or git's own stderr for a checkout that failed. While a side does not load
+ * where its note does not expect it, --out leaves its file as it is and writes `<out>.failed` (disposition).
  */
 
 export type Verdict =
@@ -131,17 +134,91 @@ export function sideRunOf(json: GoldenJson): SideRun {
   return { checks: new Map(checks.map((c) => [keyOf(c), c])) };
 }
 
+const lastLine = (stdout: string) => stdout.trim().split('\n').at(-1) ?? '';
+const jsonOf = (line: string): GoldenJson | undefined => {
+  try {
+    return JSON.parse(line) as GoldenJson;
+  } catch {
+    return undefined;
+  }
+};
+
 /** golden's stdout (its JSON on the last line) as a SideRun; `failure` is why the process failed, if it did. */
 export function sideRunFromOutput(stdout: string, failure?: string): SideRun {
-  const json = stdout.trim().split('\n').at(-1) ?? '';
-  let parsed: GoldenJson;
-  try {
-    parsed = JSON.parse(json) as GoldenJson;
-  } catch {
-    return { error: failure ?? `no JSON from golden: ${json.slice(0, 200)}` };
-  }
-  return sideRunOf(parsed);
+  const json = lastLine(stdout);
+  const parsed = jsonOf(json);
+  return parsed === undefined ? { error: failure ?? `no JSON from golden: ${json.slice(0, 200)}` } : sideRunOf(parsed);
 }
+
+/** execFile's error for a process that failed: its exit code (or a spawn error's code), the signal that killed it. */
+export interface ProcessError {
+  code?: number | string | null;
+  signal?: string | null;
+  stdout?: string;
+  stderr?: string;
+  message: string;
+}
+
+/** Why a golden process failed: killed by a signal, or its exit code — and the last 3 lines of its stderr. */
+export function failureOf(err: ProcessError): string {
+  const how = err.signal != null ? `killed by ${err.signal}` : err.code != null ? `exit code ${err.code}` : err.message.split('\n')[0];
+  const tail = (err.stderr ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '')
+    .slice(-3);
+  return `${how}; ${tail.length > 0 ? `stderr: ${tail.join(' | ')}` : 'no stderr'}`;
+}
+
+/** What runSide needs from the world: golden run as a process, and a checkout of a commit. */
+export interface SideDeps {
+  /** Runs golden with these arguments: its stdout, or rejects with execFile's error (ProcessError). */
+  golden: (args: string[]) => Promise<string>;
+  /** golden's arguments over a code root. */
+  args: (root: string) => string[];
+  /** checkout.ts#codeRoot for a commit; throws when it cannot be checked out. */
+  checkout: (sha: string) => { root: string; cleanup?: () => void };
+}
+
+export interface SideOutcome {
+  run: SideRun;
+  /** Removes the checkout, when this run created it. */
+  cleanup?: () => void;
+  /** Why the first golden process failed, when the side was run twice. */
+  retried?: string;
+}
+
+/**
+ * One side's run: its checkout (the working tree is `repo` itself), then golden over it. golden exits 1 on any mismatch
+ * with its JSON still on stdout; a process that printed no JSON or was killed failed itself — not the side's tool — and
+ * is run once more. A side that still does not load carries why (failureOf, or git's stderr for a checkout).
+ */
+export async function runSide(side: string, repo: string, deps: SideDeps): Promise<SideOutcome> {
+  let code: { root: string; cleanup?: () => void };
+  try {
+    code = side === WORKING_TREE ? { root: repo } : deps.checkout(side);
+  } catch (e) {
+    return { run: { error: `no checkout: ${(e as Error).message.replace(/\s*\n\s*/g, ' ')}` } };
+  }
+  const once = async (): Promise<{ run: SideRun; failed?: string }> => {
+    try {
+      return { run: sideRunFromOutput(await deps.golden(deps.args(code.root))) };
+    } catch (e) {
+      const err = e as ProcessError;
+      const failure = failureOf(err);
+      const stdout = err.stdout ?? '';
+      return { run: sideRunFromOutput(stdout, failure), ...((err.signal != null || jsonOf(lastLine(stdout)) === undefined) && { failed: failure }) };
+    }
+  };
+  const first = await once();
+  if (first.failed === undefined) return { run: first.run, cleanup: code.cleanup };
+  return { run: (await once()).run, cleanup: code.cleanup, retried: first.failed };
+}
+
+/** The console line for a side: ran, or DID NOT LOAD with why; and why it was run twice. */
+export const sideLine = (side: string, o: SideOutcome, seconds: number): string =>
+  `calibrate: ${side} ${'error' in o.run ? `DID NOT LOAD — ${o.run.error}` : 'ran'} in ${seconds.toFixed(1)} s` +
+  (o.retried === undefined ? '' : ` (run twice: the first golden process failed — ${o.retried})`);
 
 export const expected = (e: CalibrationEntry): Verdict => e.expect ?? (e.status === 'open' ? 'OPEN-RED' : 'CALIBRATED');
 
@@ -214,6 +291,19 @@ export function results(entries: readonly CalibrationEntry[], runs: ReadonlyMap<
 /** The notes that fail the run: a verdict other than expected, or a regression elsewhere the table does not record. */
 export const failing = (rs: readonly NoteResult[]): NoteResult[] =>
   rs.filter((r) => r.verdict !== undefined && (r.verdict !== expected(r.entry) || unrecorded(r.entry, r.elsewhere ?? []).length > 0));
+
+/** The notes whose side did not load where they do not expect it: a report of a failed run, not of the notes. */
+export const unloaded = (rs: readonly NoteResult[]): NoteResult[] =>
+  rs.filter((r) => r.verdict === 'SIDE-DOES-NOT-LOAD' && expected(r.entry) !== 'SIDE-DOES-NOT-LOAD');
+
+/**
+ * Where the report goes and the run's exit code: `out` (stdout when none) — or `<out>.failed` while a side does not
+ * load unexpectedly, `out` left as it is; 1 when a note fails (`failing`).
+ */
+export function disposition(rs: readonly NoteResult[], out?: string): { path?: string; code: 0 | 1 } {
+  const path = out === undefined ? undefined : unloaded(rs).length > 0 ? `${out}.failed` : out;
+  return { path, code: failing(rs).length > 0 ? 1 : 0 };
+}
 
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim() !== '' && !/^\d+\/\d+ asserts|^All \d+ asserts/.test(l))?.slice(0, 220) ?? '';
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
@@ -305,41 +395,29 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const { codeRoot } = await import('../differential/checkout.js');
   const worktrees = resolve(values.worktrees ?? join(tmpdir(), 'averi-calibration'));
   const run = promisify(execFile);
+  const deps: SideDeps = {
+    golden: async (args) => (await run(process.execPath, args, { cwd: repo, maxBuffer: 64 << 20 })).stdout,
+    args: (root) => ['--import', 'tsx', join(repo, 'scripts/differential/golden.ts'), '--corpus', join(repo, table.corpus), '--side', root, '--json'],
+    checkout: (sha) => codeRoot(repo, sha, 'cal', worktrees),
+  };
   const runs = new Map<string, SideRun>();
   const created: (() => void)[] = [];
   for (const side of plan(entries)) {
     const started = Date.now();
-    let root: string;
-    try {
-      if (side === WORKING_TREE) root = repo;
-      else {
-        const code = codeRoot(repo, side, 'cal', worktrees);
-        root = code.root;
-        if (code.cleanup !== undefined) created.push(code.cleanup);
-      }
-    } catch (e) {
-      runs.set(side, { error: `no checkout: ${(e as Error).message.split('\n')[0]}` });
-      continue;
-    }
-    const args = ['--import', 'tsx', join(repo, 'scripts/differential/golden.ts'), '--corpus', join(repo, table.corpus), '--side', root, '--json'];
-    let stdout = '';
-    let failure: string | undefined;
-    try {
-      stdout = (await run(process.execPath, args, { cwd: repo, maxBuffer: 64 << 20 })).stdout;
-    } catch (e) {
-      // golden exits 1 on any mismatch — its JSON is still on stdout; no JSON means the side did not load.
-      const err = e as { stdout?: string; stderr?: string; message: string };
-      stdout = err.stdout ?? '';
-      failure = (err.stderr ?? err.message).split('\n').filter((l) => /Error|error/.test(l)).slice(0, 2).join(' ') || err.message.split('\n')[0];
-    }
-    runs.set(side, sideRunFromOutput(stdout, failure));
-    console.error(`calibrate: ${side} ${'error' in runs.get(side)! ? 'DID NOT LOAD' : 'ran'} in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+    const outcome = await runSide(side, repo, deps);
+    if (outcome.cleanup !== undefined) created.push(outcome.cleanup);
+    runs.set(side, outcome.run);
+    console.error(sideLine(side, outcome, (Date.now() - started) / 1000));
   }
   const rs = results(entries, runs);
   const report = calibrationReport(rs);
-  if (values.out !== undefined) await writeFile(resolve(values.out), report);
-  else console.log(report);
+  const out = values.out === undefined ? undefined : resolve(values.out);
+  const { path, code } = disposition(rs, out);
+  if (path === undefined) console.log(report);
+  else await writeFile(path, report);
+  if (out !== undefined && path !== out) console.error(`calibrate: ${unloaded(rs).length} note(s) on a side that did not load — ${values.out} left as it is; the report is in ${path}`);
+  else if (out !== undefined) await rm(`${out}.failed`, { force: true });
   for (const r of rs) if (r.verdict !== undefined) console.error(`${r.entry.n.padEnd(4)} ${verdictCell(r).replace(/\*\*/g, '')}`);
   if (values.remove === true) for (const cleanup of created) cleanup();
-  if (failing(rs).length > 0) process.exitCode = 1;
+  process.exitCode = code;
 }

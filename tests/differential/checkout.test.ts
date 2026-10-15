@@ -33,3 +33,9 @@ describe('codeRoot — a directory in place under the checkout name', () => {
     }
   });
 });
+
+describe('codeRoot — a git command that fails', () => {
+  it("throws with git's own stderr: a side that cannot be checked out says why", () => {
+    expect(() => codeRoot(ROOT, 'no-such-ref-at-all', 'cal', tmpdir())).toThrow(/^git -C .* rev-parse no-such-ref-at-all\^\{commit\}: .*no-such-ref-at-all/);
+  });
+});

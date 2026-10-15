@@ -195,8 +195,11 @@ still prints JSON, every row an error a refusal row would accept. Every row of t
 green before and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the
 note's `regressions` records it. An open note is judged on the working tree. Checkouts (`differential-cal-<sha>`) are
 kept for the next run and reused only when they are at that commit; `--remove` removes those this run created. Exit
-code 1 on a verdict other than the note's `expect`, or an unrecorded regression. `tests/truth/calibration.test.ts` pins
-the table against docs/bugs and the git history, and the verdicts, the canary and the wiring as pure functions.
+code 1 on a verdict other than the note's `expect`, or an unrecorded regression. A golden process that printed no JSON
+or was killed is run once more; a side that still does not load says why (the exit code or signal and the last lines of
+stderr, or git's stderr), and `--out` then leaves its file as it is and writes `<out>.failed`.
+`tests/truth/calibration.test.ts` pins the table against docs/bugs and the git history, and the verdicts, the canary,
+the wiring and a side that fails as pure functions.
 
 ## Corpus format
 
