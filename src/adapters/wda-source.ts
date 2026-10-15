@@ -352,8 +352,9 @@ const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement |
  * The PRESENTED LAYERS of a payload (`UiNode.presentation`), each a direct child of a `Window` (the root's child when
  * the payload has no Window). Read once per payload, beside `keyboardMarks`; the keyboard's Windows and the input
  * host's (`keyboardMarks`' roots) are never searched.
- * - BY TYPE (`PRESENTATIONS`): a layer holding an `Alert`, a `Sheet` or a `Popover` is that kind, the element
- *   (the first of the first type in precedence) naming it.
+ * - BY TYPE (`PRESENTATIONS`): a layer holding an `Alert`, a `Sheet` or a `Popover` whose rect shares area with the
+ *   Window is that kind, the element (the first of the first type in precedence) naming it; one parked off the
+ *   screen (a dismissed alert WDA keeps) types nothing, and the flags judge its layer.
  * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them: one layer per Window at most.
  * A layer typed is not also `screen` (one mark a layer).
  */
@@ -368,9 +369,12 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
   visit(root);
   for (const window of windows.length > 0 ? windows : [root]) {
     if (keyboardWindows.has(window)) continue;
+    // An element types its layer only ON the screen: WDA keeps a dismissed alert in its tree, parked off it.
+    const screen = usableRect(window.rect) ?? usableRect(root.rect);
+    const onScreen = (e: WdaElement): boolean => screen === undefined || (usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen));
     for (const layer of window.children ?? []) {
       for (const [type, kind] of PRESENTATIONS) {
-        const element = firstIn(layer, (e) => e.type === type);
+        const element = firstIn(layer, (e) => e.type === type && onScreen(e));
         if (element === undefined) continue;
         layers.set(layer, kind);
         elements.add(element);

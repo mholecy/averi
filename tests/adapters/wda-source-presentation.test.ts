@@ -149,6 +149,14 @@ describe('UiNode.presentation "screen" — a later screen-sized layer shown over
     ]);
   });
 
+  it('a typed element parked OFF the screen (a dismissed alert WDA keeps at y 1200) types nothing: the flags judge its layer — "screen" over a hidden screen, nothing over a shown one', () => {
+    const parked = el('Alert', { label: 'Gone', rect: rect(41, 1200, 320, 172) });
+    const sheetWithParked = pageSheet();
+    (sheetWithParked.children as Record<string, unknown>[]).push(parked);
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Contacts')), sheetWithParked))))).toEqual([['0,0 402x874', 'screen']]);
+    expect(marks(parseWdaSourceValue(app(win(screen('Form'), el('Other', { children: [el('Other'), parked] })))))).toEqual([]);
+  });
+
   it('per Window: the keyboard\'s Window is never beneath and never presented — a hidden keyboard layer before a shown one marks nothing', () => {
     const keyboardWindow = win(
       hiddenAll(el('Other', { children: [el('Keyboard', { rect: rect(0, 874, 402, 243), children: [el('Key', { label: 'q', rect: rect(3, 880, 37, 42) })] })] })),
