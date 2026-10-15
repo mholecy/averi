@@ -263,3 +263,174 @@ describe('capture', () => {
     await expect(run(new FakeLab(() => [], 'another emulator, Android 14 (API 34)'), [OPEN])).rejects.toThrow(/holds captures of android "fake emulator, Android 13 \(API 33\)", not android "another emulator/);
   });
 });
+
+// --- the form path of the capture, behind a fake iOS lab ---
+
+const FORM_KEYBOARD: CatalogCell = {
+  id: 'form-k',
+  layer: 'none',
+  targets: [],
+  form: {
+    title: 'Transfer',
+    fields: [
+      { tag: 'name', kind: 'text', title: 'Name', error: { text: 'Required', id: 'lab.form-k.name_error' } },
+      { tag: 'phone', kind: 'text', title: 'Phone' },
+      { tag: 'vs', kind: 'text', title: 'Variable symbol', titleId: 'lab.form-k.vs.label' },
+    ],
+    submit: { tag: 'submit', title: 'Continue', pinned: true },
+    screenError: { text: 'Fix the errors', id: 'lab.form-k.screen' },
+    focus: 'name',
+  },
+};
+const FORM_PICKER: CatalogCell = {
+  id: 'form-p',
+  layer: 'sheet-large',
+  targets: [],
+  form: {
+    title: 'Bank',
+    fields: [
+      { tag: 'bank', kind: 'text', title: 'Bank name' },
+      { tag: 'country', kind: 'country', title: 'Country' },
+    ],
+    submit: { tag: 'submit', title: 'Save' },
+    picker: { field: 'country', title: 'Country', open: true, rows: [{ code: 'AL', name: 'Albania' }, { code: 'CZ', name: 'Czechia' }, { code: 'ST', name: 'São Tomé' }], probe: ['AL', 'CZ', 'ST'] },
+  },
+};
+const empty = { value: '', focused: false, error: null };
+
+/**
+ * The two form cells as the iOS app would report them. form-k: `name` open and focused (an error under it), `phone`
+ * under the pinned submit's bar, `vs` under the keyboard (0,573 402x301), a screen-level error; a dirty submit made.
+ * form-p: the picker sheet from y 300 over `country` and the submit, row AL on the sheet, row CZ laid out below the
+ * screen, row ST not laid out.
+ */
+function formState(cell: string): Omit<LabState, 'events'> {
+  if (cell === 'form-k') {
+    return {
+      cell,
+      ready: true,
+      screen: SCREEN,
+      scale: 3,
+      frames: { name: rect(20, 160, 362, 34), 'name.error': rect(20, 200, 150, 16), phone: rect(20, 530, 362, 34), vs: rect(20, 604, 362, 34), submit: rect(20, 516.7, 362, 46.3), screenError: rect(20, 300, 362, 20) },
+      fields: { name: { value: 'Ann', focused: true, error: { text: 'Required', id: 'lab.form-k.name_error' } }, phone: empty, vs: empty },
+      focus: 'name',
+      keyboard: { frame: rect(0, 573, 402, 301), visible: true, field: 'name' },
+      submits: [{ at: 0, valid: false, values: {} }],
+    };
+  }
+  return {
+    cell,
+    ready: true,
+    screen: SCREEN,
+    scale: 3,
+    frames: { bank: rect(20, 160, 362, 34), country: rect(20, 330, 362, 34), submit: rect(20, 420, 362, 46), sheet: rect(0, 300, 402, 574), 'row.AL': rect(0, 400, 402, 52), 'row.CZ': rect(0, 900, 402, 52) },
+    fields: { bank: empty, country: empty },
+    focus: null,
+    keyboard: null,
+    submits: [],
+  };
+}
+
+/** What a raw tap at a point does in the fake app: every tap logs its touch (the keyboard's too, as on iOS), then the control under it acts. */
+const FORM_TAPS: Record<string, (s: { focus: string | null }) => ProbeEvent[]> = {
+  'form-k 201,177': () => [], // the field focused on appear: the focus stays, no focus event — reached by the focus after
+  'form-k 201,547': () => [ev('submit', 'invalid')], // the pinned bar over the phone field
+  'form-k 201,621': () => [], // a key of the keyboard
+  'form-k 201,540': () => [ev('submit', 'invalid')],
+  'form-p 201,177': (s) => ((s.focus = 'bank'), [ev('focus', 'bank')]),
+  'form-p 201,347': () => [], // the sheet over the country field
+  'form-p 201,443': () => [],
+  'form-p 201,426': () => [ev('select', 'AL')],
+};
+
+class FakeIosFormLab implements LabDevice {
+  readonly platform = 'ios';
+  taps: string[] = [];
+  private cell = '';
+  private focus: string | null = null;
+  private events: LabState['events'] = [];
+  constructor(private readonly touches = true) {}
+  async describe() {
+    return 'averi-lab iPhone 17 simulator, iOS 27.0';
+  }
+  unsupported() {
+    return undefined;
+  }
+  async launch(cell: string): Promise<LabState> {
+    this.cell = cell;
+    this.events = [];
+    this.focus = formState(cell).focus ?? null;
+    return (await this.state())!;
+  }
+  async state(): Promise<LabState | undefined> {
+    const base = formState(this.cell);
+    return { ...base, focus: this.focus, events: [...this.events] };
+  }
+  async tap(x: number, y: number) {
+    const key = `${this.cell} ${x},${y}`;
+    this.taps.push(key);
+    const s = { focus: this.focus };
+    const acted = FORM_TAPS[key]?.(s) ?? [];
+    this.focus = s.focus;
+    this.events.push(...[...(this.touches ? [ev('touch', `${x}.0,${y}.0`)] : []), ...acted].map((e) => ({ ...e, at: 0 })));
+  }
+  async screenshot() {
+    return PNG.sync.write(new PNG({ width: 4, height: 4 }));
+  }
+  async trees(): Promise<RawTree[]> {
+    return [
+      { source: 'wda', suffix: '.wda.json', payload: '{}' },
+      { source: 'idb', suffix: '.idb.json', payload: '[]' },
+    ];
+  }
+  async close() {}
+}
+
+describe('capture of a form cell (iOS)', () => {
+  const runForm = (lab: LabDevice, cells: CatalogCell[]) => capture(lab, cells, { out, note: 'test', catalog: [FORM_KEYBOARD, FORM_PICKER], log: () => undefined });
+  const truthOf = async (cell: string) => JSON.parse(await readFile(join(out, `${cell}.truth.json`), 'utf8')) as CellTruth;
+
+  it('the keyboard cell: the model\'s fields, each control where its frame lies and what its probe did, the keyboard, the screen error, the submits', async () => {
+    const lab = new FakeIosFormLab();
+    const { broken, manifest } = await runForm(lab, [FORM_KEYBOARD]);
+    expect(broken).toEqual([]);
+    expect(lab.taps).toEqual(['form-k 201,177', 'form-k 201,547', 'form-k 201,621', 'form-k 201,540']);
+    const truth = await truthOf('form-k');
+    expect(truth.targets).toEqual([]);
+    expect(truth.form!.fields).toEqual([
+      { tag: 'name', id: 'lab.form-k.name', kind: 'text', title: 'Name', titleId: 'lab.form-k.name.title', frame: rect(20, 160, 362, 34), value: 'Ann', focused: true, error: { text: 'Required', id: 'lab.form-k.name_error' }, errorFrame: rect(20, 200, 150, 16) },
+      { tag: 'phone', id: 'lab.form-k.phone', kind: 'text', title: 'Phone', titleId: 'lab.form-k.phone.title', frame: rect(20, 530, 362, 34), ...empty },
+      { tag: 'vs', id: 'lab.form-k.vs', kind: 'text', title: 'Variable symbol', titleId: 'lab.form-k.vs.label', frame: rect(20, 604, 362, 34), ...empty },
+    ]);
+    expect(truth.form!.controls).toEqual([
+      { tag: 'name', id: 'lab.form-k.name', kind: 'field', frame: rect(20, 160, 362, 34), situation: 'open', reached: true, probe: [ev('touch', '201.0,177.0')] },
+      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')] },
+      { tag: 'vs', id: 'lab.form-k.vs', kind: 'field', frame: rect(20, 604, 362, 34), situation: 'under-keyboard', reached: false, probe: [ev('touch', '201.0,621.0')] },
+      { tag: 'submit', id: 'lab.form-k.submit', kind: 'button', frame: rect(20, 516.7, 362, 46.3), situation: 'open', reached: true, probe: [ev('touch', '201.0,540.0')] },
+    ]);
+    expect(truth.form!.keyboard).toEqual({ frame: rect(0, 573, 402, 301), field: 'name' });
+    expect(truth.form!.screenError).toEqual({ text: 'Fix the errors', id: 'lab.form-k.screen', frame: rect(20, 300, 362, 20) });
+    expect(truth.form!.submits).toEqual([{ valid: false }]);
+    expect(truth.form!.sheet).toBeUndefined();
+    expect(manifest.captures.map((c) => c.file)).toEqual(['form-k.wda.json', 'form-k.idb.json']);
+  }, 15_000);
+
+  it('the picker cell: what the sheet covers, its rows mapped from `row.<code>`, a row off the screen or not laid out never probed', async () => {
+    const lab = new FakeIosFormLab();
+    const { broken } = await runForm(lab, [FORM_PICKER]);
+    expect(broken).toEqual([]);
+    expect(lab.taps).toEqual(['form-p 201,177', 'form-p 201,347', 'form-p 201,443', 'form-p 201,426']);
+    const truth = await truthOf('form-p');
+    expect(truth.form!.controls).toEqual([
+      { tag: 'bank', id: 'lab.form-p.bank', kind: 'field', frame: rect(20, 160, 362, 34), situation: 'open', reached: true, probe: [ev('touch', '201.0,177.0')] },
+      { tag: 'country', id: 'lab.form-p.country', kind: 'field', frame: rect(20, 330, 362, 34), situation: 'presented-over', reached: false, probe: [ev('touch', '201.0,347.0')] },
+      { tag: 'submit', id: 'lab.form-p.submit', kind: 'button', frame: rect(20, 420, 362, 46), situation: 'presented-over', reached: false, probe: [ev('touch', '201.0,443.0')] },
+      { tag: 'country.AL', id: 'lab.form-p.country.AL', kind: 'row', frame: rect(0, 400, 402, 52), situation: 'open', reached: true, probe: [ev('touch', '201.0,426.0')] },
+      { tag: 'country.CZ', id: 'lab.form-p.country.CZ', kind: 'row', frame: rect(0, 900, 402, 52), situation: 'off-screen', reached: false, probe: [] },
+      { tag: 'country.ST', id: 'lab.form-p.country.ST', kind: 'row', situation: 'not-rendered', reached: false, probe: [] },
+    ]);
+    expect(truth.form!.keyboard).toBeNull();
+    expect(truth.form!.screenError).toBeNull();
+    expect(truth.form!.sheet).toEqual(rect(0, 300, 402, 574));
+  }, 15_000);
+});
