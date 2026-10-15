@@ -320,6 +320,41 @@ describe('compareTextParity — the occlusion guard', () => {
     expect(r.rows[0].android?.ocr).toBe('Prihlásit sa');
   });
 
+  it('a reading of typographic punctuation as ASCII is READ and not drift — the same fold as the ocr assert', () => {
+    const c = contract([{ id: 'payee', text: 'Payee’s name' }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('payee', 'Payee’s name')]),
+        ocr: { byId: ocrMap({ payee: [line("Payee's name", 30)] }), pngWidth: 1080 },
+      },
+      ios: {
+        tree: root(1080, [text('payee', 'Payee’s name')]),
+        ocr: { byId: ocrMap({ payee: [line('Payee’s name', 30)] }), pngWidth: 1080 },
+      },
+    });
+    expect(r.occluded).toHaveLength(0);
+    expect(r.rows[0].verdict).toBe('OK');
+    expect(r.findings).toEqual([]);
+    expect(r.notes).toEqual([
+      `payee: android "Payee's name" vs ios "Payee’s name" differ only in ' vs ’ ` +
+        '(the recognizer reads typographic punctuation as ASCII and drops diacritics) — not drift.',
+      `payee: android read "Payee's name" for contract "Payee’s name" — differs only in ’ vs ' ` +
+        '(the recognizer reads typographic punctuation as ASCII and drops diacritics); not drift.',
+    ]);
+    expect(r.rows[0].android?.ocr).toBe("Payee's name");
+  });
+
+  it('a reading that differs from the contract outside the fold is still drift', () => {
+    const c = contract([{ id: 'payee', text: 'Payee’s name' }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('payee', 'Payee’s game')]),
+        ocr: { byId: ocrMap({ payee: [line("Payee's game", 30)] }), pngWidth: 1080 },
+      },
+    });
+    expect(r.rows[0].verdict).toBe('FAIL');
+  });
+
   it('a TREE reading that differs only in diacritics is still drift — the tree carries marks faithfully', () => {
     const c = contract([{ id: 'cta', text: 'Prihlásiť sa' }]);
     const r = compareTextParity(c, {

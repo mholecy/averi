@@ -17,9 +17,7 @@ import {
 import { failClosed } from './fail-closed.js';
 import {
   differsOnlyByOcrFold,
-  differsOnlyIn,
-  foldedPairs,
-  foldMarks,
+  foldedCharacters,
   ocrFold,
   ocrFoldPattern,
   RECOGNIZER_DIFFERENCE,
@@ -257,19 +255,19 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  */
 
 /**
- * The forgiving form the UNREAD guard compares on: case folded, joining
- * punctuation dropped, whitespace collapsed. NEVER used for the reported
- * strings — a row's message must keep both sides verbatim so the reader sees
- * the real difference, and never for drift, which stays exact.
+ * The forgiving form the UNREAD guard compares on: the recognizer's fold,
+ * case folded, joining punctuation dropped, whitespace collapsed. NEVER used
+ * for the reported strings — a row's message must keep both sides verbatim so
+ * the reader sees the real difference — and never for drift, which forgives
+ * only the recognizer's fold.
  */
-
 const looseForm = (s: string): string =>
-  // Diacritics folded: the recognizer reads Slovak `Prihlásiť sa` as
-  // `Prihlásit sa` and `Späť` as `Spät` (measured 2026-09-18, finportal) —
-  // every such row was OCCLUDED while correct on the screenshot. The
-  // reported strings stay verbatim; the drift comparison forgives the same
-  // marks-only difference for OCR readings (see `ocrDroppedMarks`).
-  foldMarks(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // The recognizer's fold (ocr-fold.ts): it reads Slovak `Prihlásiť sa` as
+  // `Prihlásit sa` (measured 2026-09-18, finportal) and `Payee’s` as
+  // `Payee's` — every such row was OCCLUDED while correct on the screenshot.
+  // The reported strings stay verbatim; the drift comparison forgives the
+  // same difference for OCR readings (see `recognizerDifference`).
+  ocrFold(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The whole-string test: containment, or a prefix of an ellipsized render. */
 function survivesWhole(treeString: string, got: string): boolean {
@@ -757,17 +755,18 @@ export function compareTextParity(
     if (!dynamic) {
       const a = seen('android');
       const i = seen('ios');
-      // Drift stays exact — except that a recognizer reading loses combining
-      // marks (`Prihlásiť` → `Prihlásit`, measured 2026-09-18), and once the
-      // occlusion guard forgives that (looseForm) the row would land HERE as a
-      // copy-drift finding for text that is correct on screen (review
-      // 2026-09-18). OCR-only, marks-only differences are a note, never a
-      // finding; the tree carries diacritics faithfully, so `tree` stays exact.
-      const ocrDroppedMarks = (x: string, y: string): boolean =>
-        source === 'ocr' && x !== y && foldMarks(x) === foldMarks(y);
+      // Drift stays exact — except for what a recognizer cannot tell apart
+      // (ocr-fold.ts: combining marks dropped, typographic punctuation read as
+      // ASCII). Once the occlusion guard forgives that (looseForm) the row
+      // would land HERE as a copy-drift finding for text that is correct on
+      // screen. OCR-only, fold-only differences are a note, never a finding —
+      // the same fold the ocr assert passes on; the tree carries the app's
+      // characters faithfully, so `tree` stays exact.
+      const recognizerDifference = (x: string, y: string): boolean =>
+        source === 'ocr' && differsOnlyByOcrFold(x, y);
       if (a !== undefined && i !== undefined && a !== i) {
-        if (ocrDroppedMarks(a, i)) {
-          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in diacritics (a recognizer reading, which drops combining marks) — not drift.`);
+        if (recognizerDifference(a, i)) {
+          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in ${foldedCharacters(a, i)} (${RECOGNIZER_DIFFERENCE}) — not drift.`);
         } else {
           findings.push({
             anchor: id,
@@ -781,8 +780,8 @@ export function compareTextParity(
         for (const p of present) {
           const got = seen(p) as string;
           if (got === expected) continue;
-          if (ocrDroppedMarks(got, expected)) {
-            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — they differ only in diacritics, which the recognizer drops; not drift.`);
+          if (recognizerDifference(got, expected)) {
+            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — differs only in ${foldedCharacters(expected, got)} (${RECOGNIZER_DIFFERENCE}); not drift.`);
             continue;
           }
           findings.push({
@@ -1082,7 +1081,7 @@ export function evaluateOcrAssert(
     if (!ok) pass = false;
     parts.push(
       `vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}` +
-        (folded ? ` (${differsOnlyIn(want, seen)} — ${RECOGNIZER_DIFFERENCE})` : ''),
+        (folded ? ` (differs only in ${foldedCharacters(want, seen)} — ${RECOGNIZER_DIFFERENCE})` : ''),
     );
   }
   if (expectation.match !== undefined) {
@@ -1094,7 +1093,7 @@ export function evaluateOcrAssert(
     if (!ok) pass = false;
     parts.push(
       `vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}` +
-        (folded ? ` (only with ${foldedPairs(expectation.match, seen).join(', ')} folded — ${RECOGNIZER_DIFFERENCE})` : ''),
+        (folded ? ` (only with ${foldedCharacters(expectation.match, seen)} folded — ${RECOGNIZER_DIFFERENCE})` : ''),
     );
   }
   let heightUnchecked: string | undefined;

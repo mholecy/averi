@@ -35,7 +35,7 @@ const PUNCTUATION: Readonly<Record<string, string>> = {
 };
 
 /** Strip combining marks only (NFD, then U+0300–U+036F): `ť` → `t`, case and spacing untouched. */
-export const foldMarks = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+const foldMarks = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /** One character's fold: its ASCII look-alike, or itself without combining marks. */
 const foldChar = (c: string): string => PUNCTUATION[c] ?? foldMarks(c);
@@ -72,7 +72,7 @@ export const differsOnlyByOcrFold = (a: string, b: string): boolean => a !== b &
  * (the assert's side first): every character the fold changes that occurs on
  * one side only. A character on both sides is not a difference between them.
  */
-export function foldedPairs(want: string, read: string): string[] {
+function foldedPairs(want: string, read: string): string[] {
   const w = new Set(charsOf(want));
   const r = new Set(charsOf(read));
   const pairs: string[] = [];
@@ -85,6 +85,5 @@ export function foldedPairs(want: string, read: string): string[] {
 export const RECOGNIZER_DIFFERENCE =
   'the recognizer reads typographic punctuation as ASCII and drops diacritics';
 
-/** `differs only in ’ vs '` — the note a fold-equal pair carries. */
-export const differsOnlyIn = (want: string, read: string): string =>
-  `differs only in ${foldedPairs(want, read).join(', ')}`;
+/** `’ vs '` — the folded characters a fold-equal pair differs in, for a note to name. */
+export const foldedCharacters = (want: string, read: string): string => foldedPairs(want, read).join(', ');
