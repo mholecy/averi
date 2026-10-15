@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
+import { FAMILIES } from './schema.js';
 
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
@@ -66,7 +67,8 @@ export const VERDICTS: readonly Verdict[] = [
   'SIDE-DOES-NOT-LOAD',
 ];
 
-export const STATUSES = /^(calibrate|open|residual:.+|needs-cell:(edges|presented|bars|false-covers|forms)|needs-2b|needs-live|needs-ocr)$/;
+/** A note's status: `needs-cell:<family>` names a family of schema.ts#FAMILIES. */
+export const STATUSES = new RegExp(`^(calibrate|open|residual:.+|needs-cell:(${FAMILIES.join('|')})|needs-2b|needs-live|needs-ocr)$`);
 
 export interface Regression {
   /** The rows that went red, keyed as `checks`. */

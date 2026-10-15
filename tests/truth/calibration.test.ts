@@ -72,11 +72,11 @@ describe('calibration.json', () => {
   });
 
   it('the statuses: exactly the closed set', () => {
-    for (const s of ['calibrate', 'open', 'residual:anything', 'needs-cell:edges', 'needs-cell:presented', 'needs-cell:bars', 'needs-cell:false-covers', 'needs-cell:forms', 'needs-2b', 'needs-live', 'needs-ocr'])
+    for (const s of ['calibrate', 'open', 'residual:anything', 'needs-cell:base', 'needs-cell:edges', 'needs-cell:presented', 'needs-cell:bars', 'needs-cell:false-covers', 'needs-cell:forms', 'needs-2b', 'needs-live', 'needs-ocr'])
       expect(STATUSES.test(s), s).toBe(true);
     for (const s of ['needs-cell:other', 'needs-cell:', 'residual:', 'needs-3', 'calibrated', 'open ', 'needs-2b:x', ''])
       expect(STATUSES.test(s), s).toBe(false);
-    expect(STATUSES.source).toBe('^(calibrate|open|residual:.+|needs-cell:(edges|presented|bars|false-covers|forms)|needs-2b|needs-live|needs-ocr)$');
+    expect(STATUSES.source).toBe('^(calibrate|open|residual:.+|needs-cell:(base|presented|forms|edges|bars|false-covers)|needs-2b|needs-live|needs-ocr)$');
     expect(VERDICTS).toEqual(['CALIBRATED', 'CALIBRATED-ON-DEFECT', 'DOES-NOT-FAIL', 'STILL-RED-AFTER', 'OPEN-RED', 'OPEN-NOT-REPRODUCED', 'NOT-ASKED', 'SIDE-DOES-NOT-LOAD']);
   });
 
