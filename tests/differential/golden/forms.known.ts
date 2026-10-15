@@ -2,6 +2,9 @@ import { IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, NO
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
 
+// This KNOWN owns the ratchet for the lab finding's rows too (L2); scripts/truth/calibration.json owns only the link
+// from its note to the rows. A fix that strikes those rows off here turns L2 OPEN-NOT-REPRODUCED, and calibrate.ts
+// exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
 const LAB_IOS = 'bug:2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md';
 
 export const forms: KnownFile = {

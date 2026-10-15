@@ -2,6 +2,9 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim.
 
+// This KNOWN owns the ratchet for the lab finding's rows too (L1); scripts/truth/calibration.json owns only the link
+// from its note to the rows. A fix that strikes those rows off here turns L1 OPEN-NOT-REPRODUCED, and calibrate.ts
+// exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
 const LAB_ANDROID = 'bug:2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md';
 
 export const presented: KnownFile = {

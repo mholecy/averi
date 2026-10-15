@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,37 @@ describe('codeRoot — a directory in place under the checkout name', () => {
       execFileSync('git', ['init', '-q', root]);
       execFileSync('git', ['-C', root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'x']);
       expect(() => codeRoot(ROOT, head!, 'cal', dir)).toThrow(`not ${head!.slice(0, 7)}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('codeRoot — a directory in place inside another checkout', () => {
+  it.skipIf(!existsSync(join(ROOT, '.git')))('is refused: git answers for the checkout around it, not for the directory', () => {
+    const sha = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    const dir = mkdtempSync(join(tmpdir(), 'averi-checkout-'));
+    try {
+      execFileSync('git', ['init', '-q', dir]);
+      execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'x']);
+      mkdirSync(join(dir, `differential-cal-${sha.slice(0, 7)}`));
+      expect(() => codeRoot(ROOT, sha, 'cal', dir)).toThrow('no checkout of its own');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('codeRoot — a git command that fails', () => {
+  it("throws with git's own stderr: a side that cannot be checked out says why", () => {
+    expect(() => codeRoot(ROOT, 'no-such-ref-at-all', 'cal', tmpdir())).toThrow(/^git -C .* rev-parse no-such-ref-at-all\^\{commit\}: .*no-such-ref-at-all/);
+    // an unknown SHA: git's own words (gitReason, its stderr), which the command line alone does not carry
+    expect(() => codeRoot(ROOT, 'fffffff', 'cal', tmpdir())).toThrow(/^git -C .* rev-parse fffffff\^\{commit\}: fatal: .*unknown revision/);
+    // a worktree git cannot create (its directory under a plain file): git's reason, not a bare "Command failed"
+    const dir = mkdtempSync(join(tmpdir(), 'averi-checkout-'));
+    try {
+      writeFileSync(join(dir, 'file'), '');
+      expect(() => codeRoot(ROOT, 'HEAD', 'cal', join(dir, 'file'))).toThrow(/^git -C .* worktree add --detach .*: .*file/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -121,14 +121,15 @@ node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [
 a token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. A check
 whose reply is a harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake
 device's `differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
-(`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault. `tests/differential/golden.test.ts` runs it over the committed truth on
-this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
-<verb>` with their class, their reply's kind (`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL,
-refused, other), the taps and swipes they sent and their notes — a ratchet both ways (one fixed fails until struck off;
-a new one fails until fixed or listed; one whose class, reply kind or device calls change fails until re-noted). The
-ratchet is kept per cell family, `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's
-cells only, aggregated by golden.test.ts, which refuses a row filed under another family's file); a row may say what it
-is beside its class — `as: bug:<docs/bugs file>` or `residual:<decision>`.
+(`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault.
+`tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, the checks per
+capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their class, their reply's kind
+(`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they sent and
+their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or listed; one whose
+class, reply kind or device calls change fails until re-noted). The ratchet is kept per cell family,
+`tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's cells only, aggregated by
+golden.test.ts, which refuses a row filed under another family's file); a row may say what it is beside its class —
+`as: bug:<docs/bugs file>` or `residual:<decision>`.
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
@@ -207,14 +208,20 @@ node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>�
 ```
 
 A note is CALIBRATED when every row it names is red before with the note's own symptom (`defect`, matched against the
-mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A side
-counts only when it passes the canary: no check with a fault, the `open` cell replayed and green — a side miswired
-still prints JSON, every row an error a refusal row would accept. Every row of the corpus is compared at each fix: one
-green before and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the
-note's `regressions` records it. An open note is judged on the working tree. Checkouts (`differential-cal-<sha>`) are
-kept for the next run and reused only when they are at that commit; `--remove` removes those this run created. Exit
-code 1 on a verdict other than the note's `expect`, or an unrecorded regression. `tests/truth/calibration.test.ts` pins
-the table against docs/bugs and the git history, and the verdicts, the canary and the wiring as pure functions.
+mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A side counts
+only when it passes the canary: no check with a fault, the `open` cell replayed and green — a side miswired still prints
+JSON, every row an error a refusal row would accept. Every row of the corpus is compared at each fix: one green before
+and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the note's
+`regressions` records it. An open note is judged on the working tree; for the lab findings (L1, L2) their family's KNOWN
+(`tests/differential/golden/presented.known.ts` for L1, `forms.known.ts` for L2) owns the ratchet and calibration.json
+only the note→rows link, so a fix that strikes their rows off KNOWN turns them OPEN-NOT-REPRODUCED, and calibrate exits
+1, until the note becomes `calibrate` with its fix. Checkouts (`differential-cal-<sha>`) are kept for the next run and
+reused only when they are at that commit; `--remove` removes those this run created. Exit code 1 on a verdict other than
+the note's `expect`, or an unrecorded regression. A golden process that printed no JSON or was killed is run once more;
+a side that still does not load says why (the exit code or signal and the last lines of stderr, or git's stderr), and
+`--out` then leaves its file as it is and writes `<out>.failed`. With `--note`, which runs some notes only, `--out`
+writes `<out>.partial`, the full report left as it is. `tests/truth/calibration.test.ts` pins the table against
+docs/bugs and the git history, and the verdicts, the canary, the wiring and a side that fails as pure functions.
 
 ## Corpus format
 

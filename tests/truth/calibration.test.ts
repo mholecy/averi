@@ -6,10 +6,15 @@ import type { GoldenCheck, GoldenJson } from '../../scripts/differential/golden.
 import {
   calibrationReport,
   captureOf,
+  disposition,
   failing,
+  failureOf,
+  isOpenCell,
   plan,
   regressedElsewhere,
   results,
+  runSide,
+  sideLine,
   sideRunFromOutput,
   sideRunOf,
   STATUSES,
@@ -19,6 +24,8 @@ import {
   WORKING_TREE,
   type Calibration,
   type CalibrationEntry,
+  type ProcessError,
+  type SideDeps,
   type SideRun,
 } from '../../scripts/truth/calibrate.js';
 
@@ -206,6 +213,8 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
     const before = side({ [K1]: 'Tapped', [KX]: undefined, [K2]: 'red both' });
     const after = side({ [K1]: undefined, [KX]: 'not tapped: under container', [K2]: 'red both' });
     expect(regressedElsewhere(entry(), before, after)).toEqual([KX]);
+    // a row the before side did not ask (a new capture or target) is no regression, red as it is after
+    expect(regressedElsewhere(entry(), side({ [K1]: 'Tapped' }), side({ [K1]: undefined, [KX]: 'not tapped' }))).toEqual([]);
     // the note's own rows are its verdict's business, never "elsewhere"
     expect(regressedElsewhere(entry(), side({ [K1]: undefined }), side({ [K1]: 'Tapped' }))).toEqual([]);
     const runs = new Map([['aaaaaaa', before], ['bbbbbbb', after]]);
@@ -237,6 +246,13 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
 describe('calibrate.ts — the canary (sideRunOf)', () => {
   const json = (checks: GoldenCheck[]): GoldenJson => ({ side: '/x', results: [{ recording: 'r', checks, broken: [] }] });
 
+  it('the open cell: a capture whose file is `open.<ext>`, nothing else that names "open"', () => {
+    expect(isOpenCell('ios-iphone17-ios27/open.wda.json')).toBe(true);
+    expect(isOpenCell('android-averi_lab-api33/open.xml')).toBe(true);
+    for (const r of ['ios-iphone17-ios27/reopen.wda.json', 'open-run/alert-dim.xml', 'ios-iphone17-ios27/open-sheet.wda.json', 'ios/open.wda.json/x'])
+      expect(isOpenCell(r), r).toBe(false);
+  });
+
   it('a side with the open cell green and no fault counts, its rows by key', () => {
     const run = sideRunOf(json([check(OPEN, undefined), check(K1, 'Tapped')]));
     expect('checks' in run && [...run.checks.keys()]).toEqual([OPEN, K1]);
@@ -255,5 +271,117 @@ describe('calibrate.ts — the canary (sideRunOf)', () => {
     expect(sideRunFromOutput('', 'SyntaxError: boom')).toEqual({ error: 'SyntaxError: boom' });
     expect(sideRunFromOutput('noise')).toEqual({ error: 'no JSON from golden: noise' });
     expect(sideRunFromOutput(`warn\n${JSON.stringify(json([check(K1, undefined)]))}\n`)).toEqual({ error: expect.stringContaining('open cell was not replayed') });
+  });
+});
+
+// A side that fails to load says why — on the console and in the report — and a failed run never overwrites the
+// committed report. golden runs as a process (SideDeps.golden): faked here, as execFile rejects.
+describe('calibrate.ts — a side that fails (runSide, failureOf, disposition)', () => {
+  const GOOD = JSON.stringify({ side: '/x', results: [{ recording: 'r', checks: [check(OPEN, undefined), check(K1, 'Tapped')], broken: [] }] } satisfies GoldenJson);
+  const killed: ProcessError = { code: null, signal: 'SIGKILL', stdout: '', stderr: 'fork: Resource temporarily unavailable\n', message: 'Command failed: node --import tsx golden.ts' };
+  const exited: ProcessError = { code: 1, signal: null, stdout: 'progress\n', stderr: 'a\nb\nTypeError: x is not iterable\n    at golden.ts:12\n    at main\n', message: 'Command failed: node golden.ts\nTypeError …' };
+  /** Fake deps: golden answers each call with the next of `answers` (a stdout, or an error to reject with). */
+  const deps = (answers: (string | ProcessError)[], checkout: SideDeps['checkout'] = (sha) => ({ root: `/wt/${sha}` })) => {
+    const calls: string[][] = [];
+    const d: SideDeps = {
+      golden: async (args) => {
+        calls.push(args);
+        const a = answers.shift();
+        if (a === undefined) throw new Error('golden called once too often');
+        if (typeof a === 'string') return a;
+        throw Object.assign(new Error(a.message), a);
+      },
+      args: (root) => ['--side', root],
+      checkout,
+    };
+    return { d, calls };
+  };
+
+  it('failureOf: the signal, the exit code or the spawn error, and the last 3 lines of stderr', () => {
+    expect(failureOf(killed)).toBe('killed by SIGKILL; stderr: fork: Resource temporarily unavailable');
+    expect(failureOf(exited)).toBe('exit code 1; stderr: TypeError: x is not iterable | at golden.ts:12 | at main');
+    expect(failureOf({ code: 'ENOENT', message: 'spawn node ENOENT' })).toBe('spawn error ENOENT; no stderr');
+  });
+
+  it('killed by a signal, twice: run twice, the side does not load with the signal and the stderr', async () => {
+    const { d, calls } = deps([killed, killed]);
+    const o = await runSide('aaaaaaa', '/repo', d);
+    expect(calls).toEqual([['--side', '/wt/aaaaaaa'], ['--side', '/wt/aaaaaaa']]);
+    expect(o.run).toEqual({ error: 'killed by SIGKILL; stderr: fork: Resource temporarily unavailable' });
+    expect(o.retried).toBe('killed by SIGKILL; stderr: fork: Resource temporarily unavailable');
+    expect(sideLine('aaaaaaa', o, 0.1)).toBe(
+      'calibrate: aaaaaaa DID NOT LOAD — killed by SIGKILL; stderr: fork: Resource temporarily unavailable in 0.1 s (run twice: the first golden process failed — killed by SIGKILL; stderr: fork: Resource temporarily unavailable)',
+    );
+  });
+
+  it('killed once, then clean: the second run counts, and it is said it was run twice', async () => {
+    const { d } = deps([killed, GOOD]);
+    const o = await runSide('aaaaaaa', '/repo', d);
+    expect('checks' in o.run && [...o.run.checks.keys()]).toEqual([OPEN, K1]);
+    expect(sideLine('aaaaaaa', o, 2)).toBe('calibrate: aaaaaaa ran in 2.0 s (run twice: the first golden process failed — killed by SIGKILL; stderr: fork: Resource temporarily unavailable)');
+  });
+
+  it('run twice: the checkout this run created is still handed back for --remove', async () => {
+    const cleanup = () => undefined;
+    expect((await runSide('aaaaaaa', '/repo', deps([killed, GOOD], () => ({ root: '/wt', cleanup })).d)).cleanup).toBe(cleanup);
+    expect((await runSide('aaaaaaa', '/repo', deps([killed, killed], () => ({ root: '/wt', cleanup })).d)).cleanup).toBe(cleanup);
+  });
+
+  it('killed though its JSON was out: run once more all the same', async () => {
+    const { d, calls } = deps([{ ...killed, stdout: `${GOOD}\n` }, GOOD]);
+    const o = await runSide('aaaaaaa', '/repo', d);
+    expect(calls).toHaveLength(2);
+    expect('checks' in o.run).toBe(true);
+  });
+
+  it('a non-zero exit with no JSON: run twice, its exit code and stderr tail are the reason', async () => {
+    const { d } = deps([exited, exited]);
+    const o = await runSide(WORKING_TREE, '/repo', d);
+    expect(o.run).toEqual({ error: 'exit code 1; stderr: TypeError: x is not iterable | at golden.ts:12 | at main' });
+  });
+
+  it('exit 1 with its JSON (golden on a mismatch): one run, the side loads', async () => {
+    const { d, calls } = deps([{ ...exited, stdout: `${GOOD}\n` }]);
+    const o = await runSide(WORKING_TREE, '/repo', d);
+    expect(calls).toEqual([['--side', '/repo']]);
+    expect('checks' in o.run).toBe(true);
+    expect(o.retried).toBeUndefined();
+    expect(sideLine(WORKING_TREE, o, 1)).toBe('calibrate: working tree ran in 1.0 s');
+  });
+
+  it("a checkout git refuses: not loaded with git's stderr, golden never run", async () => {
+    const cleanup = () => undefined;
+    const { d, calls } = deps([], (sha) => {
+      throw new Error(`git -C /repo rev-parse ${sha}^{commit}: fatal: ambiguous argument\n'${sha}^{commit}': unknown revision`);
+    });
+    const o = await runSide('zzzzzzz', '/repo', d);
+    expect(calls).toEqual([]);
+    expect(o.run).toEqual({ error: "no checkout: git -C /repo rev-parse zzzzzzz^{commit}: fatal: ambiguous argument 'zzzzzzz^{commit}': unknown revision" });
+    expect(sideLine('zzzzzzz', o, 0)).toContain('DID NOT LOAD — no checkout: git -C /repo rev-parse');
+    // a checkout this run created is handed back for --remove
+    expect((await runSide('aaaaaaa', '/repo', deps([GOOD], () => ({ root: '/wt', cleanup })).d)).cleanup).toBe(cleanup);
+  });
+
+  it('--out: written only when no side failed unexpectedly — else <out>.failed, the file left as it is; exit 1 on a failing note', () => {
+    const runs = (b: SideRun) => new Map([['aaaaaaa', b], ['bbbbbbb', side({ [K1]: undefined })]]);
+    const ok = results([entry()], runs(side({ [K1]: 'Tapped' })));
+    const lost = results([entry()], runs({ error: 'killed by SIGKILL; no stderr' }));
+    const meant = results([entry({ expect: 'SIDE-DOES-NOT-LOAD' })], runs({ error: 'x' }));
+    const red = results([entry()], runs(side({ [K1]: undefined })));
+    // a clean full run: the report written, a stale <out>.failed of an earlier run deleted
+    expect(disposition(ok, '/d/c.md')).toEqual({ path: '/d/c.md', stale: '/d/c.md.failed', code: 0 });
+    expect(disposition(ok)).toEqual({ code: 0 });
+    expect(disposition(lost, '/d/c.md')).toEqual({ path: '/d/c.md.failed', code: 1 });
+    expect(disposition(lost)).toEqual({ code: 1 });
+    expect(disposition(meant, '/d/c.md')).toEqual({ path: '/d/c.md', stale: '/d/c.md.failed', code: 0 });
+    expect(disposition(red, '/d/c.md')).toEqual({ path: '/d/c.md', stale: '/d/c.md.failed', code: 1 });
+  });
+
+  it('--out with --note (some notes only): <out>.partial, the full report and any <out>.failed left as they are', () => {
+    const ok = results([entry()], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]]));
+    const lost = results([entry()], new Map([['aaaaaaa', { error: 'x' }], ['bbbbbbb', side({ [K1]: undefined })]]));
+    expect(disposition(ok, '/d/c.md', true)).toEqual({ path: '/d/c.md.partial', code: 0 });
+    expect(disposition(lost, '/d/c.md', true)).toEqual({ path: '/d/c.md.partial', code: 1 });
+    expect(disposition(ok, undefined, true)).toEqual({ code: 0 });
   });
 });
