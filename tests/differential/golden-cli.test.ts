@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { cellOf, faultsOf, parseOnly, selectRecordings } from '../../scripts/differential/golden.js';
+import { cellOf, checkOf, exitCode, faultsOf, parseOnly, selectRecordings, type GoldenResult } from '../../scripts/differential/golden.js';
 import { loadSide, takesDeps } from '../../scripts/differential/side.js';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
@@ -128,5 +128,26 @@ describe('golden --json: the faults a check carries (faultsOf)', () => {
     expect(faultsOf({ reply: 'ERROR differential: no device for idb describe', device: [] })).toHaveLength(1);
     expect(faultsOf({ reply: 'Tapped id:"a"', device: ['idb ui tap 1 2', 'UNMODELLED xcrun foo'] })).toEqual(['UNMODELLED xcrun foo']);
     expect(faultsOf({ reply: 'ERROR id:"a" is under button "B" … close it first; nothing was tapped', device: ['idb ui describe-all --json'] })).toEqual([]);
+  });
+});
+
+describe('golden --json: a fault reaches the check and the exit code (checkOf, exitCode)', () => {
+  const FAULTY = { reply: 'ERROR id:"a" could not be read\n  at tap\nTypeError: this.factory is not a function', device: ['idb ui tap 1 2', 'UNMODELLED xcrun simctl foo'] };
+  it('a harness error deeper than the reply\'s first line, and an UNMODELLED call, are the check\'s faults', () => {
+    expect(faultsOf(FAULTY)).toEqual(['TypeError: this.factory is not a function', 'UNMODELLED xcrun simctl foo']);
+    const c = checkOf('r/a.json', 'A', 'tap', 'Tapped', undefined, FAULTY);
+    expect(c.faults).toEqual(['TypeError: this.factory is not a function', 'UNMODELLED xcrun simctl foo']);
+    expect(c.mismatch).toBeUndefined();
+    expect(c.calls).toEqual(['idb ui tap 1 2']);
+    expect('faults' in checkOf('r/a.json', 'A', 'tap', 'Tapped', undefined, { reply: 'Tapped id:"a"', device: ['idb ui tap 1 2'] })).toBe(false);
+  });
+
+  it('exit code 1 on a fault alone, as on a mismatch or a broken target; 0 when every check holds', () => {
+    const result = (checks: GoldenResult['checks'], broken: GoldenResult['broken'] = []): GoldenResult => ({ recording: 'r/a.json', checks, broken });
+    const green = checkOf('r/a.json', 'A', 'tap', 'Tapped', undefined, { reply: 'Tapped id:"a"', device: [] });
+    expect(exitCode([result([green])])).toBe(0);
+    expect(exitCode([result([green]), result([checkOf('r/a.json', 'B', 'tap', 'Tapped', undefined, FAULTY)])])).toBe(1);
+    expect(exitCode([result([{ ...green, mismatch: 'not tapped' }])])).toBe(1);
+    expect(exitCode([result([green], ['C'])])).toBe(1);
   });
 });

@@ -59,7 +59,8 @@ export function faultsOf(o: { reply: string; device: readonly string[] }): strin
   return [...(line === undefined ? [] : [line.slice(0, 200)]), ...o.device.filter((d) => d.startsWith('UNMODELLED '))];
 }
 
-const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: Outcome): GoldenCheck => {
+/** One golden row: the call's verdict, its reply, kind and device calls, and its faults (faultsOf) when it has any. */
+export const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: Outcome): GoldenCheck => {
   const faults = faultsOf(outcome);
   return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
 };
@@ -173,6 +174,10 @@ export interface GoldenJson {
   results: GoldenResult[];
 }
 
+/** golden's exit code: 1 on a mismatch, a broken target or a fault. */
+export const exitCode = (results: readonly GoldenResult[]): 0 | 1 =>
+  results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined || c.faults !== undefined)) ? 1 : 0;
+
 // --- the command line ---
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -197,7 +202,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
     console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results));
-    if (results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined || c.faults !== undefined))) process.exitCode = 1;
+    process.exitCode = exitCode(results);
   } finally {
     cleanup?.();
   }
