@@ -58,21 +58,18 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
   DEFAULT_ENSURE_TIMEOUT_MS: 20_250,
 }));
 
-// The remedy sentences a description quotes have one owner too — the module that renders them: the tap's presented
-// remedy (interact/target-text.ts#PRESENTED_OVER), scroll_until's presented stop (interact/scroll-text.ts#PRESENTED_STOP)
-// and the pixel assert's (verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT). Replaced by sentinels the descriptions must quote; the
-// troubleshooting reference, a file no import reaches, is pinned against the real sentences (`actualSentences`).
-vi.mock('../../src/interact/target-text.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/interact/target-text.js')>()),
-  PRESENTED_OVER: '<the presented remedy, as interact/target-text.ts renders it>',
-}));
-vi.mock('../../src/interact/scroll-text.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/interact/scroll-text.js')>()),
-  PRESENTED_STOP: '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>',
+// The presented remedy a description quotes has one owner too — ui-tree/standing.ts, whose words every verb says:
+// `presentedRemedy` (of "it" for the tap, of "the element" for the pixel assert) and scroll_until's stop on it
+// (`presentedStop`). Replaced by sentinels the descriptions must quote; the troubleshooting reference, a file no import
+// reaches, is pinned against the real sentences (`actualSentences`).
+vi.mock('../../src/ui-tree/standing.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/ui-tree/standing.js')>()),
+  presentedRemedy: (what: 'it' | 'the element', layer?: { kind: string; label?: string }) =>
+    `<the presented remedy, as ui-tree/standing.ts renders it of "${what}"${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
+  presentedStop: (layer?: { kind: string; label?: string }) => `<the presented stop's remedy, as ui-tree/standing.ts renders it${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
 }));
 vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
-  PRESENTED_OVER_THE_ELEMENT: '<the presented remedy, as verify/pixel-poll.ts renders it>',
   OFF_THE_SCREEN: '<the off-screen miss, as verify/pixel-poll.ts renders it>',
   TOO_THIN_ON_THE_SCREEN: '<the thin-sliver miss, as verify/pixel-poll.ts renders it>',
   OUTSIDE_ITS_SCROLL_VIEW: '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it>',
@@ -137,6 +134,15 @@ describe('tool descriptions quote each operation default from its owner', () => 
   it('ui_snapshot: says what WDA\'s `"presentation": "alert"` means (adapters/types.ts#UiNode.presentation): the alert covers the whole screen beneath it', () => {
     expect(description('ui_snapshot')).toContain('"presentation": "alert"');
     expect(description('ui_snapshot')).toContain('covers the whole screen beneath it');
+  });
+
+  it('ui_snapshot and scroll_until: the alert\'s remedy is quoted from its owner (ui-tree/standing.ts) — of "it" for tap and scroll_until, of "the element" for color/ocr — never typed out', () => {
+    expect(description('ui_snapshot')).toContain(
+      'tap and scroll_until refuse a target there naming the alert (\'<the presented remedy, as ui-tree/standing.ts renders it of "it" under an alert titled …>\'), ' +
+        'color/ocr fail closed likewise (\'<the presented remedy, as ui-tree/standing.ts renders it of "the element" under an alert titled …>\')',
+    );
+    expect(description('scroll_until')).toContain('on … — <the presented stop\'s remedy, as ui-tree/standing.ts renders it under an alert titled …>, so none was sent"');
+    for (const tool of ['ui_snapshot', 'scroll_until']) expect(description(tool)).not.toContain('an alert is presented over');
   });
 
   it('ui_snapshot: says what the root\'s dialect marks mean — WDA\'s `"unclippedFrames": true` (adapters/types.ts#UiNode.unclippedFrames) and idb\'s `"flatList": true`', () => {
@@ -275,13 +281,9 @@ async function actualSentences(): Promise<{
   OUTSIDE_ITS_SCROLL_VIEW: string;
   TOO_THIN_IN_ITS_SCROLL_VIEW: string;
 }> {
-  const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
-  // The actual scroll-text.ts still imports the MOCKED target-text.ts: its stop sentence is built on the tap's sentinel,
-  // which is put back here for the owner's real words.
-  const { PRESENTED_OVER: sentinel } = await import('../../src/interact/target-text.js');
-  const built = (await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js')).PRESENTED_STOP;
-  const PRESENTED_STOP = built.replace(sentinel, PRESENTED_OVER);
-  const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
+  const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+  const [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT] = [presentedRemedy('it'), presentedStop(), presentedRemedy('the element')];
+  const { OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
     '../../src/verify/pixel-poll.js',
   );
   return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW };
@@ -295,9 +297,9 @@ async function actualSlack(): Promise<number> {
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
 describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
-  const TAP_SENTINEL = '<the presented remedy, as interact/target-text.ts renders it>';
-  const PIXEL_SENTINEL = '<the presented remedy, as verify/pixel-poll.ts renders it>';
-  const STOP_SENTINEL = '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>';
+  const TAP_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "it">';
+  const PIXEL_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "the element">';
+  const STOP_SENTINEL = '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>';
 
   it('every description quotes the owners\' sentences, never a copy of them', async () => {
     const { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
@@ -357,6 +359,16 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(
       'and so does a modal\'s full-screen dimming view or a sheet\'s scroll view over the screen beneath.',
     );
+  });
+
+  it('troubleshooting: under an alert — the tap\'s, scroll_until\'s (its swipe would land on the alert; a target not in the tree included), the picker\'s and color/ocr\'s words, as the owner renders them', async () => {
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    const alert = { kind: 'alert', label: '…' } as const;
+    expect(TROUBLESHOOTING).toContain(`- **\`… ${presentedRemedy('it', alert)}\`** (tap or \`scroll_until\`; iOS with \`treeSource: wda\`)`);
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${presentedStop(alert)}, so none was sent\` (or \`so no further swipe was sent\`)`);
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until … stopped before any swipe — element is not in the tree, and the next swipe would touch down at (x,y) on … — ${presentedStop(alert)}, so none was sent\``);
+    expect(TROUBLESHOOTING).toContain(`  - \`${presentedRemedy('it', alert)}\` (iOS with \`treeSource: wda\`): an alert is up over the entry's screen`);
+    expect(TROUBLESHOOTING).toContain(`the message ends \`… ${presentedRemedy('the element', alert)}\` instead: tap the alert's button that closes it`);
   });
 
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', async () => {

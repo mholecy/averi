@@ -321,6 +321,18 @@ describe('compareTextParity — the occlusion guard', () => {
     expect(r.rows[0].android?.ocr).toBe('Prihlásit sa');
   });
 
+  it('a drift-table pair that differs only in diacritics gives that reason alone', () => {
+    const c = contract([{ id: 'login', text: 'Prihlásiť sa' }]);
+    const r = compareTextParity(c, {
+      android: { tree: root(1080, [text('login', 'Prihlásiť sa')]), ocr: { byId: ocrMap({ login: [line('Prihlásit sa', 30)] }), pngWidth: 1080 } },
+      ios: { tree: root(1080, [text('login', 'Prihlásiť sa')]), ocr: { byId: ocrMap({ login: [line('Prihlásiť sa', 30)] }), pngWidth: 1080 } },
+    });
+    expect(r.findings).toEqual([]);
+    expect(r.notes).toContain(
+      'login: android read "Prihlásit sa" for contract "Prihlásiť sa" — differs only in ť vs t (the recognizer does not tell a letter with diacritics from one without); not drift.',
+    );
+  });
+
   it('a drift-table pair that differs only in how a letter is encoded gives that reason, not the recognizer\'s', () => {
     const c = contract([{ id: 'cafe', text: 'Caf\u00e9' }]);
     const r = compareTextParity(c, {
@@ -353,9 +365,9 @@ describe('compareTextParity — the occlusion guard', () => {
     expect(r.findings).toEqual([]);
     expect(r.notes).toEqual([
       `payee: android "Payee's name" vs ios "Payee’s name" differ only in ' vs ’ ` +
-        '(the recognizer reads typographic punctuation as ASCII and drops diacritics) — not drift.',
+        '(the recognizer does not tell typographic punctuation from its ASCII look-alike) — not drift.',
       `payee: android read "Payee's name" for contract "Payee’s name" — differs only in ’ vs ' ` +
-        '(the recognizer reads typographic punctuation as ASCII and drops diacritics); not drift.',
+        '(the recognizer does not tell typographic punctuation from its ASCII look-alike); not drift.',
     ]);
     expect(r.rows[0].android?.ocr).toBe("Payee's name");
   });
@@ -803,7 +815,7 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(r.pass).toBe(true);
     expect(r.detail).toBe(
       `read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — ` +
-        'the recognizer reads typographic punctuation as ASCII and drops diacritics)',
+        'the recognizer does not tell typographic punctuation from its ASCII look-alike)',
     );
   });
 
@@ -835,7 +847,7 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
       pass: true,
       detail:
         `read "Payee's name"; vs /Payee’s/ matches (only with ’ vs ' folded — ` +
-        'the recognizer reads typographic punctuation as ASCII and drops diacritics)',
+        'the recognizer does not tell typographic punctuation from its ASCII look-alike)',
     });
   });
 
@@ -869,6 +881,26 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ['\u212b', 'A', 'Å vs A'],
   ])('%j read as %j names the character that differs, though the same character is also kept elsewhere', (want, read, pairs) => {
     expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).detail).toContain(`= (differs only in ${pairs} — `);
+  });
+
+  it.each([
+    ['Payee’s name', "Payee's name", "’ vs '", 'the recognizer does not tell typographic punctuation from its ASCII look-alike'],
+    ["Payee's name", 'Payee’s name', "' vs ’", 'the recognizer does not tell typographic punctuation from its ASCII look-alike'],
+    ['Prihlásiť sa', 'Prihlásit sa', 'ť vs t', 'the recognizer does not tell a letter with diacritics from one without'],
+    ['Prihlasit sa', 'Prihlásiť sa', 'a vs á, t vs ť', 'the recognizer does not tell a letter with diacritics from one without'],
+    ['x\u0301y', 'xy', '◌\u0301y vs y', 'the recognizer does not tell a letter with diacritics from one without'],
+    ['Späť – 1', 'Spat - 1', 'ä vs a, ť vs t, – vs -', 'the recognizer does not tell typographic punctuation from its ASCII look-alike, nor a letter with diacritics from one without'],
+  ])('%j read as %j: the note gives the reason for the kinds of character it names (%s) — of neither side', (want, read, pairs, reason) => {
+    expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).detail).toContain(`= (differs only in ${pairs} — ${reason})`);
+  });
+
+  it('a match note gives the reason for the kinds it folded: diacritics alone, or both', () => {
+    expect(evaluateOcrAssert({ match: '^Späť$' }, [line('Spat', 30)], 1080).detail).toBe(
+      'read "Spat"; vs /^Späť$/ matches (only with ä vs a, ť vs t folded — the recognizer does not tell a letter with diacritics from one without)',
+    );
+    expect(evaluateOcrAssert({ match: '^Späť…$' }, [line('Spat...', 30)], 1080).detail).toBe(
+      'read "Spat..."; vs /^Späť…$/ matches (only with ä vs a, ť vs t, … vs ... folded — the recognizer does not tell typographic punctuation from its ASCII look-alike, nor a letter with diacritics from one without)',
+    );
   });
 
   it('a reading that differs only in how a letter is composed says so, rather than naming no character', () => {
@@ -955,6 +987,12 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(false);
   });
 
+  it('a folded pattern too long for the regex engine to run (it compiles, and overflows the stack on its first test) never throws — the assert fails on the reading as read', () => {
+    const match = '’'.repeat(10_000);
+    expect(() => evaluateOcrAssert({ match }, [line('x', 30)], 1080)).not.toThrow();
+    expect(evaluateOcrAssert({ match }, [line('x', 30)], 1080)).toMatchObject({ pass: false });
+  });
+
   it('letters without Latin combining marks are not folded: a Hangul or kana pattern still matches its reading', () => {
     expect(evaluateOcrAssert({ match: '^[가-힣]+$' }, [line('합계', 30)], 1080).pass).toBe(true);
     expect(evaluateOcrAssert({ match: '^が$' }, [line('か', 30)], 1080).pass).toBe(false);
@@ -972,6 +1010,36 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
   it('a class that already lists a fold, escaped or not, gains nothing', () => {
     expect(ocrFoldPattern('^x[–\\-a]y$')).toBeUndefined();
     expect(ocrFoldPattern('^x[–-]y$')).toBeUndefined();
+  });
+
+  it('a pattern with nothing of its own to fold runs on the folded reading too: an ASCII apostrophe matches a typographic one read, saying it folded the reading\'s', () => {
+    expect(evaluateOcrAssert({ match: "Payee's" }, [line('Payee’s name', 30)], 1080)).toEqual({
+      pass: true,
+      detail: `read "Payee’s name"; vs /Payee's/ matches (only with the reading's ’ vs ' folded — the recognizer does not tell typographic punctuation from its ASCII look-alike)`,
+    });
+    expect(evaluateOcrAssert({ match: '^Prihlasit sa$' }, [line('Prihlásiť sa', 30)], 1080)).toEqual({
+      pass: true,
+      detail: `read "Prihlásiť sa"; vs /^Prihlasit sa$/ matches (only with the reading's á vs a, ť vs t folded — the recognizer does not tell a letter with diacritics from one without)`,
+    });
+  });
+
+  it('…the note names only what it folded of the reading where the pattern matched', () => {
+    expect(evaluateOcrAssert({ match: "Payee's" }, [line('Payee’s náme', 30)], 1080).detail).toBe(
+      `read "Payee’s náme"; vs /Payee's/ matches (only with the reading's ’ vs ' folded — the recognizer does not tell typographic punctuation from its ASCII look-alike)`,
+    );
+  });
+
+  it.each([
+    ["^Payee's game$", 'Payee’s name'],
+    ["^payee's", 'Payee’s name'],
+    ['^Prihlasit$', 'PRIHLÁSIŤ'],
+    // A pattern that names a fold character itself, literally or by escape, is written as the screen reads: the
+    // reading is not folded for it — (?<!’) must still see the ’ the reading has.
+    ['(?<!’)s$', 'x’s'],
+    ['(?<!\\u2019)s$', 'x’s'],
+    ['^[^\\u2019]+$', 'a’b'],
+  ])('/%s/ against %j: the reading\'s fold does not help — FAIL, no note', (match, read) => {
+    expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080)).toEqual({ pass: false, detail: `read ${JSON.stringify(read)}; vs /${match}/ NO MATCH` });
   });
 
   it('the note on a lone combining mark in a pattern shows the mark on a dotted circle', () => {

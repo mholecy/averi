@@ -4,7 +4,7 @@ import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js
 import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
-import { outsideItsScrollView, type TapStanding } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, type TapStanding } from '../ui-tree/standing.js';
 import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
 import {
@@ -322,9 +322,14 @@ async function pickDismissal(
  * outside the band) — is skipped naming that node, the last such (drawn on
  * top): the tap would press it, and on the post-fill `dismiss()` path a
  * pressed control would be reported as the dismissal. A silently pressed
- * control is worse than a skipped title (ADR 0016).
+ * control is worse than a skipped title (ADR 0016). A candidate beneath a
+ * presented layer the tree marks (an alert) is skipped in the tap's words for
+ * it (ui-tree/standing.ts#presentedRemedy: the alert named, close it first),
+ * whatever else keeps it from a tap.
  */
 function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
+  // Beneath a presented layer the tree marks (an alert), whatever the kind: the alert's words, as the tap refuses it.
+  if (standing.kind !== 'reachable' && standing.remedy.of === 'presented' && standing.remedy.layer !== undefined) return presentedRemedy('it', standing.remedy.layer);
   switch (standing.kind) {
     case 'reachable': {
       if (standing.moved !== undefined) return `covered by ${coverName(standing.moved.cover)}`;

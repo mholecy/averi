@@ -4,6 +4,26 @@ import { isInteractive, tapPoint } from './selectors.js';
 import { clips, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
+/** A presented layer the tree source marks (`UiNode.presentation`), as a sentence names it: its kind and its label. */
+export interface MarkedLayer {
+  readonly kind: NonNullable<UiNode['presentation']>;
+  readonly label?: string;
+}
+
+/**
+ * A presented surface as a sentence quotes it (`DrawOrder.presentedPress`): the `surface` `presentedAt`,
+ * `presentedOver` or `markedAt` named, where it presses (`reach`: the whole screen for the element of a marked
+ * presented layer, else its rect), and that marked `layer` when it is one's element.
+ */
+export interface PresentedPress {
+  readonly surface: UiNode;
+  readonly reach: Rect;
+  readonly layer?: MarkedLayer;
+}
+
+/** THE reading of the tree source's presented-layer mark (`UiNode.presentation`): the layer `node` is the element of, as `MarkedLayer`; undefined for any other node. */
+const markOf = (node: UiNode): MarkedLayer | undefined => (node.presentation === undefined ? undefined : { kind: node.presentation, ...(node.label ? { label: node.label } : {}) });
+
 /**
  * DRAW ORDER: what a tree says is drawn on top of what — and, for a target,
  * what of it still shows and where a tap on it goes (`exposure`). One walk of the
@@ -63,7 +83,8 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * One fact is the tree source's, not a shape's: an element it MARKS as a presented layer's (`UiNode.presentation`,
  * WDA's `Alert`) covers every node drawn before it through the whole screen, as its layer's one cover and that
  * screen's surface (`markedLayers`) — for `exposure`, `paintsOver`, `coversOf`, `presentedAt` and `presentedOver`
- * alike; the `drawnOver` column (the stroke box) does not read it.
+ * alike; the `drawnOver` column (the stroke box) does not read it. The mark is read here and nowhere else
+ * (`markOf`): a verb learns of it from `presentedPress` (`MarkedLayer`: its kind and label), never from the node.
  *
  * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -151,16 +172,17 @@ export interface DrawOrder {
    * only where `presentedAt` holds at its stroke's touch-down (or the surface lies over the target in its read's
    * frame): beneath a dim filling the screen it does, as the others say — and beneath a marked presented layer
    * (`markedLayers`, WDA's `Alert`), which reaches the whole screen; beneath an UNDIMMED partial sheet the touch-down
-   * misses, it strokes while they say close it first (ADR 0018's residual 11).
+   * misses, it strokes while they say close it first.
    * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
    */
   presentedOver(node: UiNode): UiNode | undefined;
   /**
-   * Where a presented surface `presentedAt` or `presentedOver` named presses — the reach `presentedAt` holds its point
-   * against: the whole screen for the element of a marked presented layer (`markedLayers`), else its rect. What a
-   * sentence naming it at a touch-down quotes (geometry.ts#coverText).
+   * A presented surface `presentedAt`, `presentedOver` or `markedAt` named, as a sentence quotes it (`PresentedPress`):
+   * where it presses — the reach `presentedAt` holds its point against: the whole screen for the element of a marked
+   * presented layer (`markedLayers`), else its rect (geometry.ts#coverText quotes it) — and that marked layer, which
+   * the remedy names (ui-tree/standing.ts#presentedRemedy). The verbs' one view of the tree source's mark.
    */
-  presentedReach(surface: UiNode): Rect;
+  presentedPress(surface: UiNode): PresentedPress;
   /**
    * The element of a marked presented layer (`markedLayers`: WDA's `Alert`, on the screen) a touch-down at `point`
    * lands on, asked for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the
@@ -329,7 +351,7 @@ export interface Exposure {
    * marks as a presented layer's, `markedLayers`: WDA's `Alert`, reaching the whole screen), in `covers`' order; empty
    * when none — never a control, a bar the layer carries or any other labelled node, which cover anyway (Safari's
    * capsule bar). What the sentences read: a target under one lies under a
-   * presented screen no scroll moves it out from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
+   * presented screen no scroll moves it out from under — close it first (ui-tree/standing.ts#presentedRemedy; ADR 0018).
    */
   readonly presented: readonly UiNode[];
   /**
@@ -1710,7 +1732,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
    * mid-animation may read hidden while it already takes every touch.
    */
   const marked = order.filter((p) => {
-    if (p.node.presentation === undefined) return false;
+    if (markOf(p.node) === undefined) return false;
     const on = rectIntersection(p.node.rect, screen);
     return on !== undefined && rectArea(on) > 0;
   });
@@ -1787,7 +1809,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
     presentedOver: (node) => lastPresentedSurface(node),
     markedAt: (point) =>
       marked.filter((element) => !order.slice(element.at + 1, element.end).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point))).at(-1)?.node,
-    presentedReach: (surface) => (surface.presentation !== undefined ? { ...screen } : { ...surface.rect }),
+    presentedPress(surface) {
+      const layer = markOf(surface);
+      return { surface, reach: layer === undefined ? { ...surface.rect } : { ...screen }, ...(layer !== undefined && { layer }) };
+    },
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);

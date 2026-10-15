@@ -12,7 +12,10 @@
  * The fold is deliberately narrow: punctuation look-alikes and combining
  * marks, nothing else. Case is NOT folded (a case difference renders, and the
  * recognizer reads it); a letter keeps its base letter (only a Latin combining
- * mark comes off), digits never change. And it applies to
+ * mark comes off), digits never change. It runs either way round: a typographic
+ * expectation read as ASCII and an ASCII one read typographic are alike, and a
+ * `match` pattern either has its own characters folded (`ocrFoldPattern`) or,
+ * naming none (`foldFree`), meets the folded reading. And it applies to
  * recognizer readings ONLY — the tree carries the app's characters exactly, so
  * a `’` → `'` change there is a copy change the tree can see.
  */
@@ -73,8 +76,9 @@ const escapedLiteral = (c: string | undefined): string | undefined =>
  *
  * What holds: the folded pattern accepts a folded reading only if the pattern
  * itself accepts some string that folds to it. Only the pattern's own
- * typographic and accented characters are folded — an ASCII pattern is never
- * widened to a typographic reading. So:
+ * typographic and accented characters are folded here; a pattern with none
+ * (`foldFree`) is run as written on the folded reading instead
+ * (verify/text-parity.ts#evaluateOcrAssert), which holds the same. So:
  * - a literal character outside a class — bare or as an identity escape (`\–`)
  *   — becomes its fold as one unit, `(?:…)`, so a quantifier after it still
  *   binds to the whole fold (`…?` is `(?:\.\.\.)?`, never `\.\.\.?`);
@@ -153,6 +157,44 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
   return { source: out, folded };
 }
 
+/**
+ * Whether `source` names no character the fold changes — neither literally nor
+ * by an escape (`\u2019`, `\xe9`; a doubled backslash before one counts too,
+ * erring safe). Such a pattern is also tried, as written, on the folded
+ * reading, so what it accepts of a typographic or accented character it
+ * accepts of that character's ASCII form too: a literal `'` matches a `’`
+ * read, and so does a class or escape that leaves typographic and accented
+ * characters out — `^[a-z]+$` passes on `résumé`, `^\w+$` on `café`, with a
+ * note. A pattern that names one is written as the screen reads
+ * (`ocrFoldPattern` folds it instead): `(?<!’)s$` must still see the `’` a
+ * reading has.
+ */
+export function foldFree(source: string): boolean {
+  if (ocrFold(source) !== source) return false;
+  for (const m of source.matchAll(/\\(?:u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2}))/g)) {
+    if (parseInt(m[1] ?? m[2], 16) > 0x7f) return false;
+  }
+  return true;
+}
+
+/**
+ * The characters of `read` the fold changed, as `[read, fold]` pairs, where
+ * their folds lie in `[start, end)` of `ocrFold(read)` (a dropped mark: where
+ * it stood) — what a match found there in the folded reading took on trust.
+ */
+export function readingFolds(read: string, start: number, end: number): [string, string][] {
+  const pairs: [string, string][] = [];
+  let at = 0;
+  for (const c of charsOf(read)) {
+    const f = foldChar(c);
+    const next = at + f.length;
+    const inside = f.length === 0 ? at >= start && at <= end : next > start && at < end;
+    if (f !== c && inside) pairs.push([c, f]);
+    at = next;
+  }
+  return pairs;
+}
+
 /** The character a class member lists: `\-` lists `-`; a letter escape (`\d`) lists no one character. */
 const memberChar = (m: string): string | undefined =>
   m.startsWith('\\') ? (m.length === 2 && !/[A-Za-z0-9]/.test(m[1]) ? m[1] : undefined) : m;
@@ -179,6 +221,8 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
   const text = cps.slice(start, end + 1).join('');
   if (i >= cps.length) return { text, end, added: [] };
   const added: [string, string][] = [];
+  // Every character the class lists, or a fold already added lists: one set, so each member is asked once.
+  const listed = new Set(members.map(memberChar).filter((c) => c !== undefined));
   for (let k = 0; k < members.length; k++) {
     if (members[k + 1] === '-' && k + 2 < members.length) {
       k += 2; // a range: both endpoints stay as written
@@ -188,8 +232,10 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
     const c = m.length > 1 && m.startsWith('\\') ? escapedLiteral(m.slice(1)) : m;
     if (c === undefined) continue;
     const f = foldChar(c);
-    const listed = members.some((other) => memberChar(other) === f) || added.some(([, g]) => g === f);
-    if (f !== c && [...f].length === 1 && !listed) added.push([c, f]);
+    if (f !== c && [...f].length === 1 && !listed.has(f)) {
+      added.push([c, f]);
+      listed.add(f);
+    }
   }
   if (added.length === 0) return { text, end, added };
   // The added members form a class of their own beside the class as written —
@@ -241,21 +287,37 @@ function foldedPairs(want: string, read: string): [string, string][] {
   return pairs;
 }
 
-/** Why a folded difference is forgiven, said once wherever it is. */
-export const RECOGNIZER_DIFFERENCE =
-  'the recognizer reads typographic punctuation as ASCII and drops diacritics';
+/** What the recognizer cannot tell apart, per kind of folded character — said of neither side, since either may be the typographic or accented one. */
+const CANNOT_TELL: Readonly<Record<'punctuation' | 'diacritics', string>> = {
+  punctuation: 'typographic punctuation from its ASCII look-alike',
+  diacritics: 'a letter with diacritics from one without',
+};
+
+/**
+ * Why folded pairs are forgiven, naming only the kinds present: a punctuation
+ * look-alike (`’ vs '`, either way round), a letter's diacritics (`ť vs t`), or
+ * both — `the recognizer does not tell typographic punctuation from its ASCII
+ * look-alike, nor a letter with diacritics from one without`.
+ */
+export function foldReason(pairs: readonly (readonly [string, string])[]): string {
+  const chars = pairs.flatMap(([a, b]) => [...charsOf(a), ...charsOf(b)]);
+  const kinds = (['punctuation', 'diacritics'] as const).filter((kind) =>
+    chars.some((c) => (kind === 'punctuation' ? PUNCTUATION[c] !== undefined : PUNCTUATION[c] === undefined && foldMarks(c) !== c)),
+  );
+  return `the recognizer does not tell ${kinds.map((kind) => CANNOT_TELL[kind]).join(', nor ')}`;
+}
 
 /**
  * What a fold-equal pair differs in and why that is forgiven, for a note:
- * `characters` is `’ vs '`, `reason` the recognizer's. Two strings that differ
- * only in how a letter is encoded (`é` as one code point or as `e` + a
- * combining acute) have no such character and are not the recognizer's doing;
- * that is said instead.
+ * `characters` is `’ vs '`, `reason` the recognizer's for the kinds of
+ * character named (`foldReason`). Two strings that differ only in how a letter
+ * is encoded (`é` as one code point or as `e` + a combining acute) have no
+ * such character and are not the recognizer's doing; that is said instead.
  */
 export function foldDifference(want: string, read: string): { characters: string; reason: string } {
   const pairs = foldedPairs(want, read);
   return pairs.length > 0 ?
-      { characters: namePairs(pairs), reason: RECOGNIZER_DIFFERENCE }
+      { characters: namePairs(pairs), reason: foldReason(pairs) }
     : { characters: 'composed vs decomposed characters', reason: 'the same letters, encoded differently' };
 }
 

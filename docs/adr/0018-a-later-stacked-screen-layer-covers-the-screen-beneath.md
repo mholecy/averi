@@ -101,7 +101,7 @@ sheet's form; never a
 control, a bar the layer carries or any other labelled node, which cover anyway (Safari's capsule bar). Carried as
 `StandingFacts.presented`. When a target has any such surface among its covers,
 whichever cover is on top at its centre (the modal's card over the dim), its sentences say so
-(interact/target-text.ts#PRESENTED_OVER), in place of "scroll_until it first" and of the pinned-bar "layout defect":
+(ui-tree/standing.ts#presentedRemedy), in place of "scroll_until it first" and of the pinned-bar "layout defect":
 
 - the tap: `lang_sk is under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it; nothing
   of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under

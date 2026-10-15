@@ -1,5 +1,5 @@
 import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure } from './draw-order.js';
+import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure, type MarkedLayer } from './draw-order.js';
 import {
   aboveNavigationBand,
   belowStatusBand,
@@ -31,11 +31,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * for a node not reachable — its REMEDY, one closed set of cases decided
  * here with one precedence, presented first (`Remedy`). WHO OWNS A REMEDY'S
  * WORDS: each verb owns its sentences, save one clause — the presented
- * screen's (`presentedRemedy`), which lives here because interact/ and
- * verify/ both say it and verify/ may not import interact/; each verb's
- * constant built on it (interact/target-text.ts#PRESENTED_OVER,
- * interact/scroll-text.ts#PRESENTED_STOP,
- * verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT) owns its full sentence.
+ * screen's (`presentedRemedy`, and `scroll_until`'s stop on it,
+ * `presentedStop`), which lives here because interact/ and verify/ both say
+ * it and verify/ may not import interact/; each verb calls it inside its own
+ * sentence.
  * The keyboard actions stay with the callers, and the keyboard guard (K1)
  * alone acts on the keyboard.
  *
@@ -380,21 +379,27 @@ export interface StandingFacts {
 
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
- * `what` — `it` in the tap's refusal and `scroll_until`'s stop (interact/target-text.ts#PRESENTED_OVER), `the element`
+ * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
  * since no scroll moves the node out from under it. The one clause of a remedy kept here, in the UI-tree layer both
  * verbs and the pixel assert may import, as system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
-export const presentedRemedy = (what: 'it' | 'the element', layer?: UiNode): string =>
-  layer?.presentation === 'alert'
+export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string =>
+  layer?.kind === 'alert'
     ? `an alert is presented over ${what}${layer.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 
+/**
+ * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no
+ * swipe was sent — one on that screen may dismiss it; under a presented layer the tree source marks (an alert, `layer`)
+ * it is named, and a swipe would land on it. With no layer, the one sentence the `scroll_until` description quotes
+ * (mcp/tools.ts).
+ */
+export const presentedStop = (layer?: MarkedLayer): string =>
+  `${presentedRemedy('it', layer)}, ${layer === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${layer.kind}`}`;
+
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
-
-/** The element of the presented layer the tree source marks (`UiNode.presentation`) when `surface` is one — what `presentedRemedy` names; else undefined. */
-export const markedLayer = (surface: UiNode): UiNode | undefined => (surface.presentation !== undefined ? surface : undefined);
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
@@ -415,7 +420,9 @@ export const markedLayer = (surface: UiNode): UiNode | undefined => (surface.pre
  *    `scroll_until` stops on the presented screen: so every non-reachable kind takes it.
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
- *    dim), else the last presented surface among its covers, else the last drawn over it.
+ *    dim), else the last presented surface among its covers, else the last drawn over it. `layer`: the presented
+ *    layer the tree source marks when that surface is its element (draw-order.ts#DrawOrder.presentedPress), which
+ *    `presentedRemedy` names.
  * 2. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
  * 3. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
@@ -448,7 +455,7 @@ export const markedLayer = (surface: UiNode): UiNode | undefined => (surface.pre
  * words those and the compiler refuses one it cannot (a keyboard remedy under a bar, say).
  */
 export type Remedy =
-  | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: UiNode }
+  | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: MarkedLayer }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
   | { readonly of: 'pinned' }
@@ -633,7 +640,7 @@ function remedied(
   // nothing in the frame (below the fold, inside the status band) has no covers there.
   const surface = judgement.facts.presented?.at(-1) ?? scene.order.presentedOver(node);
   if (surface !== undefined) {
-    const layer = markedLayer(surface);
+    const { layer } = scene.order.presentedPress(surface);
     return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface, ...(layer !== undefined && { layer }) } };
   }
   if ('touch' in judging) {

@@ -1,6 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { nodeText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
-import { presentedRemedy } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -13,11 +12,9 @@ import { SIDES } from './swipe.js';
  * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
  * the shared wording. Phrases, not policies: what counts as cut is
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
- * caller's switch — and the remedy for a target under a screen presented
- * over its own (`PRESENTED_OVER`), a case of ui-tree/standing.ts#Remedy
- * (the standing decides it), whose words live in
- * ui-tree/standing.ts#presentedRemedy (the pixel assert says them too, of
- * "the element"; this module names them for a target, "it"). Shallow by
+ * caller's switch. The remedy for a target under a screen presented over its
+ * own, a case of ui-tree/standing.ts#Remedy, is not here: its words are
+ * ui-tree/standing.ts#presentedRemedy's, which every verb calls. Shallow by
  * design, like ui-tree/system-bar.ts: delete it and each shared sentence
  * reappears in its two or three callers.
  *
@@ -89,21 +86,6 @@ export function cutRemedy(edge: Edge): string {
   const direction = SIDES[edge].reveals;
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
 }
-
-/**
- * THE remedy for a target under a screen PRESENTED over its own — a modal's
- * dimming view, a sheet (ui-tree/draw-order.ts#Exposure.presented, ADR 0018):
- * no scroll moves it out from under that screen, so neither "scroll_until it
- * first" nor the pinned-bar "layout defect" is said — the standing's remedy
- * `presented` (ui-tree/standing.ts#Remedy), whatever the target's kind. One
- * wording for the tap's refusal (tap-judgement.ts) and `scroll_until`'s stop without a swipe
- * (scroll-text.ts, the `presented` outcome); its words are
- * ui-tree/standing.ts#presentedRemedy's, which the pixel assert says too.
- */
-export const PRESENTED_OVER = presentedRemedy('it');
-
-/** `PRESENTED_OVER` for a presented layer the tree source marks (ui-tree/standing.ts#Remedy's `layer`): it names it — an alert and its title. */
-export const presentedOver = (layer?: UiNode): string => presentedRemedy('it', layer);
 
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts

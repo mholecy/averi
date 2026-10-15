@@ -497,10 +497,13 @@ export interface UiNode {
    * form beneath was reported done.
    *
    * Its readers, all of them:
-   * - ui-tree/draw-order.ts (`markedLayers`): the marked element, when its rect has area on the screen (never judged
-   *   by `hidden`), covers every node drawn before it — not its ancestors, nor its own subtree — through the whole screen, as the one cover of its layer and the surface of a
-   *   screen presented over the target (`Exposure.presented`, `presentedAt`, `presentedOver`).
-   * - ui-tree/standing.ts#presentedRemedy, which names it ("an alert is presented over it ("Exit confirmation")").
+   * - ui-tree/draw-order.ts#markOf, the one reading of it in code: the marked element, when its rect has area on the
+   *   screen (never judged by `hidden`), covers every node drawn before it — not its ancestors, nor its own subtree —
+   *   through the whole screen, as the one cover of its layer and the surface of a screen presented over the target
+   *   (`markedLayers`: `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); and draw order hands the
+   *   mark on as `MarkedLayer` (its kind and label, `DrawOrder.presentedPress`) — to the standing's remedy
+   *   (ui-tree/standing.ts#Remedy, whose `presentedRemedy` names it: "an alert is presented over it ("Exit
+   *   confirmation")") and to `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
    * Absent everywhere else — on an idb or Android tree always.
    */

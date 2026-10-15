@@ -552,7 +552,7 @@ async function judgeOver(
 /**
  * The head of the miss for an element NOTHING of which — of what the assert reads — lies on the screen judged
  * (ui-tree/standing.ts's pixel `offScreen`: below the fold, above the screen's top, past a side): no capture shows any
- * of it. Its remedy is the standing's: beneath a presented screen, close it first (`PRESENTED_OVER_THE_ELEMENT`); else
+ * of it. Its remedy is the standing's: beneath a presented screen, close it first (ui-tree/standing.ts#presentedRemedy, of "the element"); else
  * scroll it on-screen. The one sentence head the `assert` tool's description and the troubleshooting reference quote
  * (mcp/tools.ts).
  */
@@ -582,13 +582,6 @@ export const OUTSIDE_ITS_SCROLL_VIEW = 'nothing of the element is drawn: it lies
  * quoted. The one sentence head the `assert` tool's description and the troubleshooting reference quote.
  */
 export const TOO_THIN_IN_ITS_SCROLL_VIEW = 'only a sliver of the element is drawn, too thin to measure: the rest lies outside its scroll view';
-
-/**
- * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it
- * (ui-tree/standing.ts#presentedRemedy owns the words). The one sentence the `assert` tool's description quotes
- * (mcp/tools.ts).
- */
-export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
 
 /**
  * The pixel assert's advice for a standing's remedy (ui-tree/standing.ts#Remedy) where the sentence names the keyboard
