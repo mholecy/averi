@@ -45,7 +45,10 @@ export type FrameExcuse = (row: FrameRow, placed: Placed, target: Placed) => boo
  */
 const carriesContent = (n: UiNode): boolean => n.children.some((child) => !itemless(child) && (!emptyFrame(child) || carriesContent(child)));
 
-/** The child of `both` on `placed`'s branch — or `placed` itself when it is one: the layer `placed` lies in below `both`. */
+/**
+ * The child of `both` on `placed`'s branch — or `placed` itself when it is one: the layer `placed` lies in below
+ * `both`.
+ */
 const layerOf = (placed: Placed, both: Placed): Placed => {
   let layer = placed;
   while (layer.parent !== undefined && layer.parent !== both) layer = layer.parent;
@@ -101,7 +104,8 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
 };
 
 /**
- * The shape fallback for a tree of `screenArea` (`screenOf`'s), with draw order's frame rows' own excuses (`excuses`).
+ * The shape fallback for a tree of `screenArea` (`screenOf`'s), with draw order's frame rows' own excuses
+ * (`excuses`).
  *
  * `givesWay` — A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses, or one
  * a row would name as a presented surface (`surface`, through the row's `surfaceCandidate`: for `structural` any
