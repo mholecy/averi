@@ -1,0 +1,344 @@
+{
+  "cell": "form-keyboard",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [],
+  "form": {
+    "fields": [
+      {
+        "tag": "reference",
+        "id": "lab.form-keyboard.reference",
+        "kind": "text",
+        "title": "Payment reference",
+        "titleId": "lab.form-keyboard.reference.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "message",
+        "id": "lab.form-keyboard.message",
+        "kind": "text",
+        "title": "Message for the recipient",
+        "titleId": "lab.form-keyboard.message.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "street",
+        "id": "lab.form-keyboard.street",
+        "kind": "text",
+        "title": "Street & number",
+        "titleId": "lab.form-keyboard.street.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 308
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "city",
+        "id": "lab.form-keyboard.city",
+        "kind": "text",
+        "title": "City / town",
+        "titleId": "lab.form-keyboard.city.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 382
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "postcode",
+        "id": "lab.form-keyboard.postcode",
+        "kind": "text",
+        "title": "Postcode",
+        "titleId": "lab.form-keyboard.postcode.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 456
+        },
+        "error": null,
+        "focused": true,
+        "value": ""
+      },
+      {
+        "tag": "phone",
+        "id": "lab.form-keyboard.phone",
+        "kind": "text",
+        "title": "Phone – optional",
+        "titleId": "lab.form-keyboard.phone.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 530
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "vs",
+        "id": "lab.form-keyboard.vs",
+        "kind": "text",
+        "title": "Variable symbol",
+        "titleId": "lab.form-keyboard.vs.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 604
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "ks",
+        "id": "lab.form-keyboard.ks",
+        "kind": "text",
+        "title": "Constant symbol",
+        "titleId": "lab.form-keyboard.ks.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 678
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "ss",
+        "id": "lab.form-keyboard.ss",
+        "kind": "text",
+        "title": "Specific symbol",
+        "titleId": "lab.form-keyboard.ss.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 752
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "note",
+        "id": "lab.form-keyboard.note",
+        "kind": "text",
+        "title": "Note “for me”",
+        "titleId": "lab.form-keyboard.note.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 826
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      }
+    ],
+    "controls": [
+      {
+        "tag": "reference",
+        "id": "lab.form-keyboard.reference",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "message",
+        "id": "lab.form-keyboard.message",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "street",
+        "id": "lab.form-keyboard.street",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 308
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "city",
+        "id": "lab.form-keyboard.city",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 382
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "postcode",
+        "id": "lab.form-keyboard.postcode",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 456
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "phone",
+        "id": "lab.form-keyboard.phone",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 530
+        },
+        "situation": "covered",
+        "reached": false,
+        "probe": [
+          "submit invalid"
+        ]
+      },
+      {
+        "tag": "vs",
+        "id": "lab.form-keyboard.vs",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 604
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": []
+      },
+      {
+        "tag": "ks",
+        "id": "lab.form-keyboard.ks",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 678
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": []
+      },
+      {
+        "tag": "ss",
+        "id": "lab.form-keyboard.ss",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 752
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": []
+      },
+      {
+        "tag": "note",
+        "id": "lab.form-keyboard.note",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 826
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": []
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-keyboard.submit",
+        "kind": "button",
+        "frame": {
+          "height": 46.33333333333337,
+          "width": 362,
+          "x": 20,
+          "y": 516.6666666666667
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      }
+    ],
+    "keyboard": {
+      "frame": {
+        "height": 301,
+        "width": 402,
+        "x": 0,
+        "y": 573
+      },
+      "field": "postcode"
+    },
+    "screenError": null,
+    "submits": []
+  }
+}

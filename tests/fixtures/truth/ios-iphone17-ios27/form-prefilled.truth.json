@@ -1,0 +1,184 @@
+{
+  "cell": "form-prefilled",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [],
+  "form": {
+    "fields": [
+      {
+        "tag": "name",
+        "id": "lab.form-prefilled.name",
+        "kind": "text",
+        "title": "Recipient’s name & surname",
+        "titleId": "lab.form-prefilled.name.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "error": null,
+        "focused": false,
+        "value": "Jan Šťastný"
+      },
+      {
+        "tag": "email",
+        "id": "lab.form-prefilled.email",
+        "kind": "email",
+        "title": "E-mail for “receipts”",
+        "titleId": "lab.form-prefilled.email.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "error": null,
+        "focused": false,
+        "value": "jan.stastny@example.com"
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-prefilled.iban",
+        "kind": "iban",
+        "title": "IBAN – account number",
+        "titleId": "lab.form-prefilled.iban.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 308
+        },
+        "error": null,
+        "focused": false,
+        "value": "SK31 1200 0000 1987 4263 7541"
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-prefilled.amount",
+        "kind": "amount",
+        "title": "Amount in EUR (max 10 000)",
+        "titleId": "lab.form-prefilled.amount.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 382
+        },
+        "error": null,
+        "focused": false,
+        "value": "1 234,56"
+      },
+      {
+        "tag": "pin",
+        "id": "lab.form-prefilled.pin",
+        "kind": "pin",
+        "title": "PIN…",
+        "titleId": "lab.form-prefilled.pin.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 456
+        },
+        "error": null,
+        "focused": false,
+        "value": "2580"
+      }
+    ],
+    "controls": [
+      {
+        "tag": "name",
+        "id": "lab.form-prefilled.name",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "email",
+        "id": "lab.form-prefilled.email",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-prefilled.iban",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 308
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-prefilled.amount",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 382
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "pin",
+        "id": "lab.form-prefilled.pin",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 456
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-prefilled.submit",
+        "kind": "button",
+        "frame": {
+          "height": 46.33333333333326,
+          "width": 362,
+          "x": 20,
+          "y": 514
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": []
+  }
+}

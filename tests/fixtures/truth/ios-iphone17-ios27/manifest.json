@@ -69,6 +69,116 @@
       },
       "screenshot": "alert-dim.png",
       "truth": "alert-dim.truth.json"
+    },
+    {
+      "file": "form-basic.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-basic.png",
+      "truth": "form-basic.truth.json"
+    },
+    {
+      "file": "form-basic.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-basic.png",
+      "truth": "form-basic.truth.json"
+    },
+    {
+      "file": "form-errors.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-errors.png",
+      "truth": "form-errors.truth.json"
+    },
+    {
+      "file": "form-errors.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-errors.png",
+      "truth": "form-errors.truth.json"
+    },
+    {
+      "file": "form-keyboard.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-keyboard.png",
+      "truth": "form-keyboard.truth.json"
+    },
+    {
+      "file": "form-keyboard.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-keyboard.png",
+      "truth": "form-keyboard.truth.json"
+    },
+    {
+      "file": "form-prefilled.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-prefilled.png",
+      "truth": "form-prefilled.truth.json"
+    },
+    {
+      "file": "form-prefilled.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-prefilled.png",
+      "truth": "form-prefilled.truth.json"
+    },
+    {
+      "file": "form-picker.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-picker.png",
+      "truth": "form-picker.truth.json"
+    },
+    {
+      "file": "form-picker.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-picker.png",
+      "truth": "form-picker.truth.json"
     }
   ]
 }

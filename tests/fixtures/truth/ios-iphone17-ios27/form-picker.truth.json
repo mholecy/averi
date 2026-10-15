@@ -1,0 +1,135 @@
+{
+  "cell": "form-picker",
+  "layer": "sheet-large",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [],
+  "form": {
+    "fields": [
+      {
+        "tag": "name",
+        "id": "lab.form-picker.name",
+        "kind": "text",
+        "title": "Bank name",
+        "titleId": "lab.form-picker.name.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      },
+      {
+        "tag": "country",
+        "id": "lab.form-picker.country",
+        "kind": "country",
+        "title": "Bank’s country",
+        "titleId": "lab.form-picker.country.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "error": null,
+        "focused": false,
+        "value": ""
+      }
+    ],
+    "controls": [
+      {
+        "tag": "name",
+        "id": "lab.form-picker.name",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "situation": "presented-over",
+        "reached": false,
+        "probe": [
+          "select AL",
+          "dismissed sheet"
+        ]
+      },
+      {
+        "tag": "country",
+        "id": "lab.form-picker.country",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "situation": "presented-over",
+        "reached": false,
+        "probe": [
+          "select AD",
+          "dismissed sheet"
+        ]
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-picker.submit",
+        "kind": "button",
+        "frame": {
+          "height": 46.333333333333314,
+          "width": 362,
+          "x": 20,
+          "y": 292
+        },
+        "situation": "presented-over",
+        "reached": false,
+        "probe": [
+          "select AT",
+          "dismissed sheet"
+        ]
+      },
+      {
+        "tag": "country.AL",
+        "id": "lab.form-picker.country.AL",
+        "kind": "row",
+        "frame": {
+          "height": 20.333333333333343,
+          "width": 370,
+          "x": 16,
+          "y": 147.83333333333334
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          "dismissed sheet"
+        ]
+      },
+      {
+        "tag": "country.ST",
+        "id": "lab.form-picker.country.ST",
+        "kind": "row",
+        "situation": "not-rendered",
+        "reached": false,
+        "probe": [
+          "not tapped: not-rendered"
+        ]
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": [],
+    "sheet": {
+      "height": 778,
+      "width": 402,
+      "x": 0,
+      "y": 62
+    }
+  }
+}

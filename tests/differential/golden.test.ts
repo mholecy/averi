@@ -26,6 +26,8 @@ const KNOWN: Record<string, string> = {
     [
       ['alert-dim', ['A', 'B', 'C', 'D']],
       ['sheet-medium', ['A', 'B', 'C', 'D']],
+      // The form beneath the country picker sheet: the same class, a form's fields and its submit.
+      ['form-picker', ['name', 'country', 'submit']],
     ].flatMap(([cell, tags]) => (tags as string[]).flatMap((t) => ['tap', 'scroll_until'].map((v) => [`${cell as string}.idb.json ${t} ${v}`, 'idb: beneath a presented layer is not in the tree']))),
   ),
 };
@@ -45,7 +47,7 @@ describe('golden over the lab app truth', { timeout: 120_000 }, () => {
     for (const r of corpus) results.push(await goldenRecording(r, side));
     expect(results.flatMap((r) => r.broken.map((b) => `${r.recording} ${b}`))).toEqual([]);
     const checks = results.flatMap((r) => r.checks);
-    expect(checks.length).toBeGreaterThan(70);
+    expect(checks.length).toBeGreaterThan(180);
     const mismatches = checks.filter((c) => c.mismatch !== undefined).map((c) => `${c.recording.split('/')[1]} ${c.target} ${c.verb}`).sort();
     expect(mismatches).toEqual(Object.keys(KNOWN).sort());
   });

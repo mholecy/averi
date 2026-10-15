@@ -1,0 +1,242 @@
+{
+  "cell": "form-errors",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [],
+  "form": {
+    "fields": [
+      {
+        "tag": "name",
+        "id": "lab.form-errors.name",
+        "kind": "text",
+        "title": "Recipient’s name & surname",
+        "titleId": "lab.form-errors.name",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "error": {
+          "id": "lab.form-errors.name",
+          "text": "Enter the recipient’s name"
+        },
+        "focused": false,
+        "value": "",
+        "errorFrame": {
+          "height": 15.666666666666686,
+          "width": 158.33333333333331,
+          "x": 20,
+          "y": 200
+        }
+      },
+      {
+        "tag": "email",
+        "id": "lab.form-errors.email",
+        "kind": "email",
+        "title": "E-mail for “receipts”",
+        "titleId": "lab.form-errors.email.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 255.66666666666669
+        },
+        "error": {
+          "id": "lab.form-errors.email_error",
+          "text": "That’s not an e-mail – check the “@”"
+        },
+        "focused": false,
+        "value": "",
+        "errorFrame": {
+          "height": 15.666666666666686,
+          "width": 222,
+          "x": 20,
+          "y": 295.6666666666667
+        }
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-errors.amount",
+        "kind": "amount",
+        "title": "Amount in EUR (max 10 000)",
+        "titleId": "lab.form-errors.amount.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 351.33333333333337
+        },
+        "error": {
+          "id": "lab.form-errors.amount",
+          "text": "Amount must be 0,01 – 10 000 €"
+        },
+        "focused": false,
+        "value": "",
+        "errorFrame": {
+          "height": 15.666666666666686,
+          "width": 196.66666666666666,
+          "x": 20,
+          "y": 391.33333333333337
+        }
+      },
+      {
+        "tag": "pin",
+        "id": "lab.form-errors.pin",
+        "kind": "pin",
+        "title": "PIN…",
+        "titleId": "lab.form-errors.pin.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 447
+        },
+        "error": {
+          "id": "lab.form-errors.pin-error",
+          "text": "PIN must have 4 digits…"
+        },
+        "focused": false,
+        "value": "",
+        "errorFrame": {
+          "height": 15.666666666666686,
+          "width": 146,
+          "x": 20,
+          "y": 487
+        }
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-errors.iban",
+        "kind": "iban",
+        "title": "IBAN – account number",
+        "titleId": "lab.form-errors.iban.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 542.6666666666667
+        },
+        "error": {
+          "id": "IbanError",
+          "text": "IBAN “SK00…” isn’t valid"
+        },
+        "focused": false,
+        "value": "",
+        "errorFrame": {
+          "height": 15.666666666666629,
+          "width": 147.66666666666666,
+          "x": 20,
+          "y": 582.6666666666667
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "name",
+        "id": "lab.form-errors.name",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "email",
+        "id": "lab.form-errors.email",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 255.66666666666669
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-errors.amount",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 351.33333333333337
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "pin",
+        "id": "lab.form-errors.pin",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 447
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-errors.iban",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 542.6666666666667
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-errors.submit",
+        "kind": "button",
+        "frame": {
+          "height": 46.33333333333337,
+          "width": 362,
+          "x": 20,
+          "y": 622.3333333333334
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": []
+      }
+    ],
+    "keyboard": null,
+    "screenError": {
+      "text": "Payment wasn’t sent — fix the fields & try again",
+      "id": "lab.form-errors.banner_error",
+      "frame": {
+        "height": 19.33333333333337,
+        "width": 343.3333333333333,
+        "x": 20,
+        "y": 724.6666666666667
+      }
+    },
+    "submits": [
+      {
+        "valid": false
+      }
+    ]
+  }
+}

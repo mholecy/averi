@@ -6,9 +6,9 @@ import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
 import type { Recording } from './corpus.js';
 import { configFor, connect } from './differential.js';
-import { expectations, type Verb } from './golden-spec.js';
+import { expectations, formExpectations, type Verb } from './golden-spec.js';
 import type { Side } from './side.js';
-import { consistency, pct, type CellTruth } from '../truth/schema.js';
+import { consistency, controlConsistency, pct, type CellTruth } from '../truth/schema.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -64,6 +64,19 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
         const outcome = await c.call(e.call, config);
         const mismatch = e.judge(outcome);
         result.checks.push({ recording: recording.id, target: t.tag, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply });
+      }
+    }
+    // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
+    const brokenControls = (truth.form?.controls ?? []).flatMap((c) => {
+      const why = controlConsistency(c);
+      return why === undefined ? [] : [`${c.tag}: ${why}`];
+    });
+    result.broken.push(...brokenControls);
+    if (brokenControls.length === 0) {
+      for (const e of formExpectations(recording.platform, truth)) {
+        const outcome = await c.call(e.call, config);
+        const mismatch = e.judge(outcome);
+        result.checks.push({ recording: recording.id, target: e.target, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply });
       }
     }
   } finally {

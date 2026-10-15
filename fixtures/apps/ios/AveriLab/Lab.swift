@@ -22,6 +22,57 @@ struct Cell: Decodable, Identifiable {
     let id: String
     let layer: String
     let targets: [Target]
+    /// A form cell (scripts/truth/schema.ts#CatalogForm): fields, a submit, maybe a picker — no coloured targets.
+    let form: FormSpec?
+}
+
+struct Message: Codable, Equatable {
+    let text: String
+    let id: String
+}
+
+struct FormSpec: Decodable {
+    let title: String
+    let fields: [FieldSpec]
+    let submit: SubmitSpec
+    let screenError: Message?
+    let submitOnAppear: Bool?
+    let focus: String?
+    let picker: PickerSpec?
+}
+
+struct FieldSpec: Decodable, Identifiable {
+    let tag: String
+    /// text, email, iban, amount, pin, country.
+    let kind: String
+    let title: String
+    let titleId: String?
+    let placeholder: String?
+    let prefill: String?
+    let error: Message?
+
+    var id: String { tag }
+}
+
+struct SubmitSpec: Decodable {
+    let tag: String
+    let title: String
+    let pinned: Bool?
+}
+
+struct PickerSpec: Decodable {
+    let field: String
+    let title: String
+    let open: Bool?
+    let rows: [PickerRow]
+    let probe: [String]?
+}
+
+struct PickerRow: Decodable, Identifiable {
+    let code: String
+    let name: String
+
+    var id: String { code }
 }
 
 struct Target: Decodable {
@@ -47,10 +98,46 @@ struct Frame: Codable, Equatable {
 }
 
 struct LabEvent: Codable {
-    /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button).
+    /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button); on a form
+    /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row).
     let kind: String
     let tag: String
     let at: Double
+}
+
+/// One field as the model holds it — the oracle a fill is judged by, not what any tree reports.
+struct FieldState: Codable, Equatable {
+    var value: String
+    var focused: Bool
+    var error: Message?
+
+    private enum CodingKeys: String, CodingKey { case value, focused, error }
+
+    init(value: String, focused: Bool, error: Message?) {
+        self.value = value; self.focused = focused; self.error = error
+    }
+
+    /// `error` written as null when none is shown (the synthesized encoder would leave the key out).
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(value, forKey: .value)
+        try c.encode(focused, forKey: .focused)
+        try c.encode(error, forKey: .error)
+    }
+}
+
+struct KeyboardState: Codable, Equatable {
+    /// UIKeyboardFrameEndUserInfoKey: points, screen coordinates.
+    let frame: Frame
+    let visible: Bool
+    /// The field focused when the frame changed — the one the keyboard serves.
+    let field: String?
+}
+
+struct Submit: Codable {
+    let at: Double
+    let valid: Bool
+    let values: [String: String]
 }
 
 struct LabState: Codable {
@@ -60,6 +147,11 @@ struct LabState: Codable {
     var scale: Double
     var frames: [String: Frame]
     var events: [LabEvent]
+    // A form cell's oracle; nil (absent from the file) on the coloured-target cells.
+    var fields: [String: FieldState]?
+    var focus: String?
+    var keyboard: KeyboardState?
+    var submits: [Submit]?
 }
 
 @MainActor
@@ -82,6 +174,40 @@ final class Lab: ObservableObject {
         state.ready = false
         state.frames = [:]
         state.events = []
+        state.fields = cell?.form == nil ? nil : [:]
+        state.focus = nil
+        state.keyboard = nil
+        state.submits = cell?.form == nil ? nil : []
+        write()
+    }
+
+    // --- the form oracle ---
+
+    func field(_ tag: String, _ f: FieldState) {
+        guard state.fields?[tag] != f else { return }
+        state.fields?[tag] = f
+        write()
+    }
+
+    func focused(_ tag: String?) {
+        guard state.focus != tag else { return }
+        state.focus = tag
+        state.events.append(LabEvent(kind: "focus", tag: tag ?? "", at: Date().timeIntervalSince1970))
+        write()
+    }
+
+    /// From `keyboardWillChangeFrame` / `keyboardWillHide`: the end frame, and whether any of it lies on the screen.
+    func keyboard(_ end: CGRect) {
+        let k = KeyboardState(frame: Frame(end), visible: end.minY < state.screen.height && end.height > 0, field: state.focus)
+        guard state.keyboard != k else { return }
+        state.keyboard = k
+        write()
+    }
+
+    func submit(valid: Bool, values: [String: String]) {
+        let now = Date().timeIntervalSince1970
+        state.submits?.append(Submit(at: now, valid: valid, values: values))
+        state.events.append(LabEvent(kind: "submit", tag: valid ? "valid" : "invalid", at: now))
         write()
     }
 
