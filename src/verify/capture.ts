@@ -1008,8 +1008,8 @@ export function pngRegion(
  * (verify/color-parity.ts#colorSampleRect, `unit: 'units'`, the screen judged as the frame). The colour sampler
  * (`pngRegion`, the png as the frame) asks the same two steps apart — `clipTo`, then `insetBy` with `unit: 'pixels'` —
  * since it also needs the clip alone for its clipped fraction; the judge and the sampler share `clipTo` and `insetBy`,
- * so the two read ONE region (where a WDA scroll view draws only part of the element, the sampler reads that part and
- * the judge of covers the whole, a region holding it: ui-tree/standing.ts#Scene). Undefined when nothing of `rect` lies in `frame` (no width or no height left).
+ * so the two read ONE region — of one `rect`, the element's part its scroll views draw (the pixel poll and the standing
+ * both take it, ui-tree/geometry.ts#drawnPart). Undefined when nothing of `rect` lies in `frame` (no width or no height left).
  *
  * Clip, THEN inset, in that order, both of them: a rect running past the screen's edge is sampled on the part that
  * shows. Measured: the SWIFT form's `payee_street_input 24,869 354x52` beneath the Fees sheet's dim, on a 402x874

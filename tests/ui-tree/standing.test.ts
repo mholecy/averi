@@ -1286,13 +1286,35 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(sceneOf(t2).standing(inside, IPHONE, PLAIN).facts.visible).toBeCloseTo(60 / 70);
   });
 
-  it('a cover over the undrawn part still fails the pixel assert closed — the safe direction: a row 700–800 with CONTINUE over its undrawn 780–800; with nothing over it, measured', () => {
-    const tall = node({ role: 'button', identifier: 'tall', rect: r(24, 700, 354, 100) });
-    const { tree } = atRest(tall);
-    expect(said(sceneOf(tree).standing(tall, IPHONE, COLOUR(tall)))).toMatchObject({ kind: 'covered', cover: 'continue' });
-    expect(said(sceneOf(tree).standing(tall, IPHONE, OCR(tall)))).toMatchObject({ kind: 'covered', cover: 'continue' });
-    const bare = { ...tree, children: [tree.children[0]] };
-    expect(sceneOf(bare).standing(tall, IPHONE, COLOUR(tall)).kind).toBe('reachable');
+  it('one region for the judge and the sampler: what lies over only the UNDRAWN part covers nothing drawn — the tap, both stops and the colour and ocr asserts agree on the same node', () => {
+    // tall_row 600–840 in the form ending at 780, CONTINUE 780–824 over its undrawn part only.
+    const tall = node({ role: 'button', identifier: 'tall_row', rect: r(24, 600, 354, 240) });
+    const t1 = atRest(tall).tree;
+    expect(said(sceneOf(t1).standing(tall, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 720 } });
+    expect(said(sceneOf(t1).standing(tall, IPHONE, PLAIN))).toEqual({ kind: 'reachable', at: { x: 201, y: 720 } });
+    expect(said(sceneOf(t1).standing(tall, IPHONE, FULLY))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+    for (const reader of [COLOUR(tall), OCR(tall)]) expect(sceneOf(t1).standing(tall, IPHONE, reader).kind).toBe('reachable');
+    // A row across a form's TOP edge (116), a button listed after it over its undrawn 90–116 only.
+    const top30 = node({ role: 'button', identifier: 'top30', rect: r(24, 90, 100, 54) });
+    const above = node({ role: 'button', identifier: 'above', rect: r(24, 62, 100, 54) });
+    const t2 = wdaRoot([node({ role: 'scrollable', rect: r(0, 116, 402, 664), children: [top30, above] })]);
+    for (const reader of [COLOUR(top30), OCR(top30)]) expect(sceneOf(t2).standing(top30, IPHONE, reader).kind).toBe('reachable');
+    // A carousel's card past its right edge (378), the next card listed after it over its undrawn part only.
+    const cardB = node({ role: 'button', identifier: 'card_b', rect: r(340, 570, 300, 80) });
+    const peek = node({ role: 'button', identifier: 'card_peek', rect: r(390, 570, 300, 80) });
+    const t3 = wdaRoot([node({ role: 'scrollable', rect: r(0, 0, 402, 780), children: [node({ role: 'scrollable', rect: r(24, 560, 354, 100), children: [cardB, peek] })] })]);
+    expect(said(sceneOf(t3).standing(cardB, IPHONE, COLOUR(cardB)))).toMatchObject({ kind: 'reachable' });
+    // What lies over its DRAWN part still covers it.
+    const t4 = atRest(tall, node({ role: 'button', identifier: 'over', label: 'Over', rect: r(24, 700, 354, 60) })).tree;
+    expect(said(sceneOf(t4).standing(tall, IPHONE, COLOUR(tall)))).toMatchObject({ kind: 'covered', cover: 'over' });
+  });
+
+  it('the pushed SWIFT form, as WDA dumps it: details_toggle 342,749 36x36 runs past its form\'s 780 onto CONTINUE — the plain stop and the ocr assert both measure its drawn part, fully: true is clipped at that edge', async () => {
+    const tree = parseWdaSource(await fixture('wda-capture-swift-form-pushed.json'));
+    const toggle = byId(tree, 'swift_payment.form.details_toggle');
+    expect(sceneOf(tree).standing(toggle, IPHONE, PLAIN).kind).toBe('reachable');
+    expect(said(sceneOf(tree).standing(toggle, IPHONE, FULLY))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+    expect(sceneOf(tree).standing(toggle, IPHONE, OCR(toggle)).kind).toBe('reachable');
   });
 
   it('the thin sliver at the scroll view\'s edge as at the screen\'s (ADR 0002\'s slack): 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
@@ -1302,8 +1324,8 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     const sliver = sceneOf(tree).standing(two, IPHONE, OCR(two));
     expect(said(sliver)).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
     expect(sliver.kind === 'offScreen' && 'sliver' in sliver && sliver.sliver).toEqual(r(24, 778, 354, 2));
-    // 3 pt drawn: no sliver — judged on, here under CONTINUE, which lies over its undrawn rest.
-    expect(said(sceneOf(tree).standing(three, IPHONE, OCR(three)))).toMatchObject({ kind: 'covered', cover: 'continue' });
+    // 3 pt drawn: measured — CONTINUE lies over the undrawn rest only.
+    expect(sceneOf(tree).standing(three, IPHONE, OCR(three)).kind).toBe('reachable');
   });
 
   it('the country sheet\'s list ending at 811: its row `Ukraine` 31,825 340x43 is judged outside the list by every verb', () => {
