@@ -842,6 +842,14 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     );
   });
 
+  it.each([
+    ['it’s Bob’s', "it's Bob’s", "’ vs '"],
+    ['a–b–c', 'a-b–c', '– vs -'],
+    ['café’', "café'", "’ vs '"],
+  ])('%j read as %j names the character that differs, though the same character is also kept elsewhere', (want, read, pairs) => {
+    expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).detail).toContain(`= (differs only in ${pairs} — `);
+  });
+
   it('a reading that differs only in how a letter is composed says so, rather than naming no character', () => {
     const r = evaluateOcrAssert({ text: 'Caf\u0065\u0301' }, [line('Caf\u00e9', 30)], 1080);
     expect(r.pass).toBe(true);

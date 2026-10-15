@@ -180,16 +180,37 @@ export const differsOnlyByOcrFold = (a: string, b: string): boolean => a !== b &
 
 /**
  * The folded characters that make `want` and `read` differ, as `’ vs '` pairs
- * (the assert's side first): every character the fold changes that occurs on
- * one side only. A character on both sides is not a difference between them.
+ * (the assert's side first), found by position: both strings are walked
+ * character by character along their folds, and wherever the two spans that
+ * fold to the same text are spelled differently, that pair is named. So
+ * `it’s Bob’s` read as `it's Bob’s` names `’ vs '` once — the second `’` was
+ * read as written. Meant for a fold-equal pair (`differsOnlyByOcrFold`).
  */
-function foldedPairs(want: string, read: string): string[] {
-  const w = new Set(charsOf(want));
-  const r = new Set(charsOf(read));
-  const pairs: string[] = [];
-  for (const c of w) if (!r.has(c) && foldChar(c) !== c) pairs.push(`${c} vs ${foldChar(c)}`);
-  for (const c of r) if (!w.has(c) && foldChar(c) !== c) pairs.push(`${foldChar(c)} vs ${c}`);
-  return [...new Set(pairs)];
+function foldedPairs(want: string, read: string): [string, string][] {
+  const a = charsOf(want);
+  const b = charsOf(read);
+  const pairs: [string, string][] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    // One aligned span: grow the side whose fold is shorter until both folds
+    // have the same length (equal, since the whole folds are).
+    let spanA = '';
+    let spanB = '';
+    let foldA = '';
+    let foldB = '';
+    do {
+      if (i < a.length && (foldA.length <= foldB.length || j >= b.length)) {
+        spanA += a[i];
+        foldA += foldChar(a[i++]);
+      } else if (j < b.length) {
+        spanB += b[j];
+        foldB += foldChar(b[j++]);
+      }
+    } while ((foldA.length !== foldB.length || spanA === '' || spanB === '') && (i < a.length || j < b.length));
+    if (spanA !== spanB) pairs.push([spanA, spanB]);
+  }
+  return pairs;
 }
 
 /** Why a folded difference is forgiven, said once wherever it is. */
@@ -204,7 +225,7 @@ export const RECOGNIZER_DIFFERENCE =
  */
 export const foldedCharacters = (want: string, read: string): string => {
   const pairs = foldedPairs(want, read);
-  return pairs.length > 0 ? pairs.join(', ') : 'composed vs decomposed characters';
+  return pairs.length > 0 ? namePairs(pairs) : 'composed vs decomposed characters';
 };
 
 /** A combining mark shown on a dotted circle, so a note can print it on its own. */

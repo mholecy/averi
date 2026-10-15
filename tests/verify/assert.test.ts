@@ -304,6 +304,16 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     expect(result.detail).toContain('differ from it only in t vs ť');
   });
 
+  it('names the character that differs even when the node also keeps it elsewhere', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { p: screen(el({ role: 'text', identifier: 'bob', label: 'it’s Bob’s' })) },
+      'p',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { text: "it's Bob’s" } });
+    expect(result.detail).toContain("differ from it only in ' vs ’:");
+  });
+
   it('stays quiet for a node that differs outside the fold', async () => {
     resetLayout();
     const fake = new FakeAdapter(
