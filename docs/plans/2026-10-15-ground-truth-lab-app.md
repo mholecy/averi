@@ -136,6 +136,13 @@ on both platforms, the constant dropped.
 Every visibility note (36 of 72) gets a cell. Golden must fail on the commit before its fix and pass after. A note
 that does not fail shows a hole in the truth or the spec table.
 
+Done for the existing cells: `scripts/truth/calibration.json` lists every bug note — calibrated on golden rows with the
+note's own symptom as its `defect`, or why no cell reproduces it yet (`needs-cell:…`, `needs-2b`, `needs-live`,
+`needs-ocr`, a residual), or excluded with its class — and `scripts/truth/calibrate.ts` replays the whole corpus over
+each note's before and after commit (a canary refuses a side that does not really load; rows regressed elsewhere at a
+fix are reported) into `docs/truth/calibration.md`. The `needs` of each note not yet reproduced are the cells phase 4
+builds (scripts/differential/README.md, Calibration on the bug notes).
+
 ### Phase 4 — the matrix, generated
 
 One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells

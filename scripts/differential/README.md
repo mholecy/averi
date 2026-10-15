@@ -4,12 +4,18 @@ Replays recorded device trees through two checkouts of averi — OLD and NEW —
 answer differs. It is how a change that should move behaviour only where intended is checked against every tree a
 device check ever saved, without a device.
 
-It depends on each side only through two interfaces (`side.ts`):
+It depends on each side through two interfaces (`side.ts`), and one shim for older sides:
 
 - the **tool interface**: the side's own `createAveriServer` over an `AdapterRegistry`, called through an in-memory MCP
   client exactly as `tests/mcp/tools.test.ts` does — the reply an agent would read;
 - the **adapter seam**: the side's own adapters over a recorded payload. Nothing behind the tools (standing, scroll
-  rounds, tap judgement, the pixel poll …) is imported, so a refactor inside averi needs no change here.
+  rounds, tap judgement, the pixel poll …) is imported, so a refactor inside averi needs no change here;
+- the **legacy-registry shim** (`side.ts#registry`): since 8413120 (2026-10-08) the registry is constructed with
+  `{ factory, discovery }`; before, with the factory alone, and it listed devices through an unbound adapter's
+  `listDevices()`. Which constructor a side has is told by its behaviour (`takesDeps`: one built with `{ factory,
+  discovery }` asks that discovery when it lists devices), and an older side gets a factory that answers the unbound
+  call with the discovery. A side picked wrong answers every call "this.factory is not a function"; golden marks such a
+  reply as a fault (below).
 
 Where the recording meets each side:
 
@@ -99,10 +105,15 @@ target is not in the tree (a tap "waiting for element … to appear", an assert'
 either way: its mismatch is said to be of that class first (`not in the tree: …`).
 
 ```sh
-node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>]
+node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
+  [--only <cell>[,<cell>…]] [--json]
 ```
 
-Exit code 1 on a mismatch or a broken target. `tests/differential/golden.test.ts` runs it over the committed truth on
+`--only` keeps the captures a token names (a cell, a capture with or without its extension, either behind its run;
+a token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. A check
+whose reply is a harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake
+device's `differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
+(`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault. `tests/differential/golden.test.ts` runs it over the committed truth on
 this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
 <verb>` with their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or
 listed).
@@ -162,6 +173,27 @@ node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests
 
 The Android app builds the coloured-target cells; a form cell or another layer is skipped and said so (phase 2b brings
 the forms, through the same `capture`).
+
+### Calibration on the bug notes (phase 3)
+
+`scripts/truth/calibrate.ts` runs golden (`--json`, the whole corpus) over the src of each before and after commit
+`scripts/truth/calibration.json` names — every visibility note and the field-error notes, each calibrated on golden
+rows, or why none can be (needs a cell, phase 2b, a live run, OCR; a residual), and every other bug note excluded with
+its class — and writes `docs/truth/calibration.md`:
+
+```sh
+node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]] [--out docs/truth/calibration.md] [--remove]
+```
+
+A note is CALIBRATED when every row it names is red before with the note's own symptom (`defect`, matched against the
+mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A side
+counts only when it passes the canary: no check with a fault, the `open` cell replayed and green — a side miswired
+still prints JSON, every row an error a refusal row would accept. Every row of the corpus is compared at each fix: one
+green before and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the
+note's `regressions` records it. An open note is judged on the working tree. Checkouts (`differential-cal-<sha>`) are
+kept for the next run and reused only when they are at that commit; `--remove` removes those this run created. Exit
+code 1 on a verdict other than the note's `expect`, or an unrecorded regression. `tests/truth/calibration.test.ts` pins
+the table against docs/bugs and the git history, and the verdicts, the canary and the wiring as pure functions.
 
 ## Corpus format
 
