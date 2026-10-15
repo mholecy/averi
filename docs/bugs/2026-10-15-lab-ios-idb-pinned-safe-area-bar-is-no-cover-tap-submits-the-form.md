@@ -73,3 +73,5 @@ background rect as its keys, or measure the floor from the background); the gold
 - The four fields wholly under the keyboard (`vs`, `ks`, `ss`, `note`) are absent from idb's list: their `tap` times out
   "waiting for element … to appear" — the known "idb lists nothing under the keyboard" class (tools.ts says so), not
   this bug.
+- Re-verified by replay at `8600176` (`arch/round-20` merged): unchanged — idb `tap` answers `Tapped
+  id:"lab.form-keyboard.phone"` and sends `idb ui tap 201 547`; `scroll_until` answers `fully visible after 0 swipes`.

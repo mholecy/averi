@@ -21,9 +21,9 @@ const NOT_IN_TREE = 'not in the tree';
 const keys = (file: string, tags: readonly string[], verbs: readonly string[], note: string) => tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, note] as const));
 
 const KNOWN: Record<string, string> = Object.fromEntries([
-  // docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md — the alert's dim, a bare
-  // childless layer, is no cover (round 18; fixed on fix/r19-alert). Target C lies under the alert card and is refused.
-  ...keys(`${IOS}/alert-dim.wda.json`, ['A', 'B', 'D'], ['tap', 'colour', 'scroll_until'], 'r18 alert dim'),
+  // alert-dim.wda.json — the round-18 bug (the alert's dim, a bare childless layer, was no cover: A, B, D answered
+  // Tapped, passed the colour on the dim, and scroll_until called them fully visible) went green with round 19's alert
+  // fix, merged into this branch with arch/round-20 at 8600176: all 12 rows now answer "close it first". Struck off.
   // idb lists only the presented layer: a target beneath it is not in the tree. The tap answers "not found" (no false
   // Tapped, but no "close it first"), the colour assert fails "not found" (no evidence either way), and scroll_until
   // swipes twice beneath the presented layer looking for it.

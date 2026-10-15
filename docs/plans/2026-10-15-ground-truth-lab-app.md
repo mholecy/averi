@@ -82,7 +82,9 @@ matters for `Tapped` is whether the action fired.
 - **Acceptance:** golden reports the round-18 bug on `alert-dim` at `dda435b` (tap `Tapped`, colour pass on the dim,
   `scroll_until` fully visible), and the cell is green once round 19's alert fix (`fix/r19-alert`) lands. `open` is
   green at `dda435b`. Measured: red at `dda435b` as stated, green at `fix/r19-alert` `e10219e` (commit 9604314's message
-  says `5ac759f`; that SHA is wrong — the green tip was `e10219e`).
+  says `5ac759f`; that SHA is wrong — the green tip was `e10219e`). On this branch: green from the merge of
+  `arch/round-20` (round 19's alert fix and round 20's presented layer) at `8600176` — golden 237 checks, 69 → 60
+  mismatches, the 9 WDA `alert-dim` rows struck off KNOWN, no other row's verdict changed.
 
 ### Phase 1b — forms and validation (iOS)
 

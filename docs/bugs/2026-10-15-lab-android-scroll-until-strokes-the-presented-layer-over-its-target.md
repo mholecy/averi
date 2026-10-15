@@ -56,3 +56,7 @@ tree at all, so the rule needs "the tree is a presented window" rather than "thi
 - iOS idb has the same tree shape (only the presented layer listed; KNOWN in tests/differential/golden.test.ts); whether
   its `scroll_until` strokes dismiss a SwiftUI alert was not measured here.
 - Kept in golden.test.ts's KNOWN list as `lab finding: …` until fixed.
+- Re-verified by replay at `8600176` (`arch/round-20` merged: round 19's alert fix, round 20's presented layer):
+  unchanged — the same `Timed out … to appear`, `not found within 1 s` and two `input swipe 540 1776 540 444 1334`
+  strokes for A–D on both cells. Round 20 reads the presented layer from the source's own facts; uiautomator's dump
+  of the active window lists no layer beneath to judge.
