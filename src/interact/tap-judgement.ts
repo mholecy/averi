@@ -338,8 +338,9 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band — the only line no guard acts on — is found only in a flat
-      // list, which holds no presented screen (ui-tree/draw-order.ts#holderOf's `parent`); the type still lets this kind
-      // carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin its rendering.
+      // list, which holds no presented screen (ui-tree/presented-by-shape.ts#presentedOver: the holder is the root);
+      // the type still lets this kind carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin
+      // its rendering.
       throw new CoveredRefusal(
         told.refusal(`${underKeyboardText(centre, standing.line.y)}, where a tap presses the keyboard — ${advice(standing.remedy, () => `scroll_until it first, or ${hideIt(told.remedy)}`)}`),
       );
