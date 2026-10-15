@@ -85,7 +85,7 @@ export interface CalibrationEntry {
   /** The commit judged green: a fix commit (usually the first). */
   after?: string;
   verified?: 'golden' | 'merge-subject' | 'unverified';
-  /** Golden rows, `<run>/<file> <target> <verb>` as tests/differential/golden.test.ts keys them. */
+  /** Golden rows, `<run>/<file> <target> <verb>` as the ratchet keys them (tests/differential/golden/<family>.known.ts). */
   checks?: string[];
   /**
    * The note's own symptom, a pattern of a red row's mismatch or reply (the mismatch quotes the reply's first line
@@ -109,7 +109,7 @@ export interface Calibration {
 /** The side an open note is judged on: this checkout as it is on disk, not its committed HEAD. */
 export const WORKING_TREE = 'working tree';
 
-/** A row's key, as the calibration table and golden.test.ts's KNOWN name it. */
+/** A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it. */
 export const keyOf = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
 /** The capture a row key names (`<run>/<file>`). */
 export const captureOf = (key: string) => key.slice(0, key.indexOf(' '));

@@ -217,7 +217,7 @@
         "ios-iphone17-ios27/form-keyboard.idb.json note scroll_until"
       ],
       "expect": "CALIBRATED-ON-DEFECT",
-      "remark": "idb lists nothing under the keyboard, so these rows stay red at every commit (golden.test.ts KNOWN): before the fix their mismatch is the judge's own \"touched down under the keyboard at (201,699)\" — the note's defect; after it, the vacuous \"not in the tree\" with both swipes above the keyboard."
+      "remark": "idb lists nothing under the keyboard, so these rows stay red at every commit (KNOWN, tests/differential/golden/forms.known.ts): before the fix their mismatch is the judge's own \"touched down under the keyboard at (201,699)\" — the note's defect; after it, the vacuous \"not in the tree\" with both swipes above the keyboard."
     },
     {
       "n": "17",

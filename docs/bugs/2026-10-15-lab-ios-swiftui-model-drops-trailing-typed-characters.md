@@ -29,7 +29,8 @@ value. So the loss happens with idb's HID typing alone; it is not something aver
 - The model lags or loses the END of the typed string, never the middle; reading it again 3 s later (live.ts does)
   does not bring the characters back.
 - The field's text (UITextField under SwiftUI's `TextField`) has them all; only the `@State` dictionary the lab app
-  binds every field to (Form.swift: one `[String: String]` behind a hand-written `Binding(get:set:)` per field) does not.
+  binds every field to (Forms.swift: one `[String: String]` behind a hand-written `Binding(get:set:)` per field) does
+  not.
 - Both tree sources, both with and without averi.
 
 ## What is not known

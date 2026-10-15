@@ -3,7 +3,7 @@
 **Measured 2026-10-15**, lab simulator `averi-lab iPhone 17` (`3AB1E82E-47C1-4BEF-9F89-1FF62DBBC348`, iOS 27.0,
 402×874 pt), averi = mobile-verify `truth/forms-ios` (src as on `truth/phase-0-1` @ `9604314`), through
 `scripts/truth/live.ts` (createAveriServer over a real AdapterRegistry, `treeSource: wda`, WDA on port 8120), the lab
-app's `form-basic` / `form-keyboard` cells (fixtures/apps/ios, Form.swift). Found by the live golden of phase 1b
+app's `form-basic` / `form-keyboard` cells (fixtures/apps/ios, Forms.swift). Found by the live golden of phase 1b
 (docs/plans/2026-10-15-ground-truth-lab-app.md); the app's own model of the field is the oracle.
 
 ## Observed (measured)

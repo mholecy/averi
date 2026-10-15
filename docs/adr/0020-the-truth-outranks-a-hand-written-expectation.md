@@ -32,14 +32,14 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    of scripts/truth/truth.ts) — it says nothing about averi: it is listed broken and the run fails until the cell is
    fixed or recaptured. What is not asked: on a coloured-target cell, the broken target's rows (its other targets are
    still judged); on a form cell, every row of the cell, once any control is broken.
-4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch by
-   `<run>/<file> <target> <verb>` with its class (what its mismatch says first), its reply's kind (one of a closed set:
-   not found, Tapped, visible, PASS, FAIL, refused, other — `replyKind` in scripts/differential/golden-spec.ts), the
-   taps and swipes it sent, and its note (the bug note, or why). A listed mismatch that stops occurring fails the test
-   until it is struck off; a new one fails it until it is fixed or listed with its note; a listed one whose class,
-   reply kind or device calls change fails it too — it still mismatches, but differently (a timeout turned into a
-   refusal with the wrong remedy keeps its class and its calls, but not its kind). The checks per capture are pinned,
-   so a row that silently stops being asked fails.
+4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch — filed per cell
+   family in tests/differential/golden/<family>.known.ts and aggregated there — by `<run>/<file> <target> <verb>` with
+   its class (what its mismatch says first), its reply's kind (one of a closed set: not found, Tapped, visible, PASS,
+   FAIL, refused, other — `replyKind` in scripts/differential/golden-spec.ts), the taps and swipes it sent, and its note
+   (the bug note, or why). A listed mismatch that stops occurring fails the test until it is struck off; a new one fails
+   it until it is fixed or listed with its note; a listed one whose class, reply kind or device calls change fails it
+   too — it still mismatches, but differently (a timeout turned into a refusal with the wrong remedy keeps its class and
+   its calls, but not its kind). The checks per capture are pinned, so a row that silently stops being asked fails.
 
 ## Consequences
 

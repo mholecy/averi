@@ -8,7 +8,7 @@ the tap's effect is the capture's own probe on the simulator.
 
 ## The screen
 
-`form-keyboard` (fixtures/apps/ios/AveriLab/Form.swift): ten fields in a scroll view, `postcode` focused on appear, the
+`form-keyboard` (fixtures/apps/ios/AveriLab/Forms.swift): ten fields in a scroll view, `postcode` focused on appear, the
 submit `Continue` pinned in the bottom safe-area inset (`.safeAreaInset(edge: .bottom)`), so it rides on the keyboard.
 The app's own frames (`form-keyboard.truth.json`): the keyboard `0,573 402x301`; `Continue` `20,516.7 362x46.3`; the
 `phone` field `20,530 362x34` — its centre `(201,547)` lies under `Continue`.
@@ -89,8 +89,8 @@ keyboard`: it is not inside by 1 pt. The golden rows above are the fix's check.
 
 ## Notes
 
-- Kept in tests/differential/golden.test.ts's KNOWN list as `lab finding: …` (`form-keyboard.idb.json phone tap`,
-  `… phone scroll_until`) until fixed.
+- Kept in the forms family's KNOWN list (tests/differential/golden/forms.known.ts) as `lab finding: …`, `as: bug:` this
+  note (`form-keyboard.idb.json phone tap`, `… phone scroll_until`) until fixed.
 - The four fields wholly under the keyboard (`vs`, `ks`, `ss`, `note`) are absent from idb's list: their `tap` times out
   "waiting for element … to appear" — the known "idb lists nothing under the keyboard" (tools.ts says so), not this
   bug. Their `scroll_until` rows are KNOWN too: two swipes touching down at y 472, above the keyboard, then "never

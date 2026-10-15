@@ -126,7 +126,7 @@ The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
   - RED ios-iphone17-ios27/form-keyboard.idb.json ss scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never
   - RED ios-iphone17-ios27/form-keyboard.idb.json note scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element nev
 
-idb lists nothing under the keyboard, so these rows stay red at every commit (golden.test.ts KNOWN): before the fix their mismatch is the judge's own "touched down under the keyboard at (201,699)" — the note's defect; after it, the vacuous "not in the tree" with both swipes above the keyboard.
+idb lists nothing under the keyboard, so these rows stay red at every commit (KNOWN, tests/differential/golden/forms.known.ts): before the fix their mismatch is the judge's own "touched down under the keyboard at (201,699)" — the note's defect; after it, the vacuous "not in the tree" with both swipes above the keyboard.
 
 ## 18: CALIBRATED (partial: the cell-background half only)
 
