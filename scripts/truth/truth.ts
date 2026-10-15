@@ -99,11 +99,12 @@ const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive cont
 
 /**
  * Whether a target's sources tell one story: the tap was delivered; an `open` target is reached and drawn; a covered
- * one is not reached. With a measured geometry (phase 3; `whole` or absent is the rule above): an `off-screen` target is
- * never probed; on Android a probe in a system band is swallowed by the system bar — no touch reaches the app, and it
- * must not be reached (systemBarSwallows); an open target cut with its centre in what shows is reached; one whose
- * centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a sliver and a centre under chrome may be
- * either (what fires there is the truth the rows read).
+ * one is not reached. With a measured geometry (phase 3; `whole` or absent is the rule above): an `off-screen` target
+ * is never probed; on Android a probe in a system band is swallowed by the system bar — no touch reaches the app, and
+ * it must not be reached (systemBarSwallows); an open target cut with its centre in what shows is reached, and so is
+ * one overlapped at its edge by a band or the chrome (its centre clear; what of it is drawn is not held to DRAWN); one
+ * whose centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a sliver and a centre under chrome
+ * may be either (what fires there is the truth the rows read).
  */
 export function consistency(t: TargetTruth, platform?: 'ios' | 'android'): string | undefined {
   const g = t.geometry ?? 'whole';
@@ -113,6 +114,7 @@ export function consistency(t: TargetTruth, platform?: 'ios' | 'android'): strin
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? undefined : `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
   if (g === 'partly-centre-in' && !t.reached) return 'declared open, cut with its centre showing, but the probe tap did not reach it';
+  if ((g.startsWith('band-overlap:') || g.startsWith('chrome-overlap:')) && !t.reached) return `${g}, its centre clear, but the probe tap did not reach it`;
   if ((g === 'centre-out' || g === 'outside-scroll-view') && t.reached) return `${g}, but the probe tap at its centre reached it`;
   return undefined;
 }
@@ -173,6 +175,43 @@ export function bandsOf(screen: Rect, safeArea: Insets | undefined): { status?: 
 export const SLIVER_FRACTION = 0.06;
 export const minPiece = (screen: Rect) => Math.round(SLIVER_FRACTION * Math.min(screen.width, screen.height));
 
+/**
+ * How thick an overlap may be on its thin side and still hide nothing of a pixel assert's element: 2 tree units — ADR
+ * 0002's slack (averi's `PIXEL_OVERLAP_SLACK`, ui-tree/geometry.ts). Restated, as SLIVER_FRACTION is.
+ */
+export const OVERLAP_SLACK = 2;
+/** The two rects share area thicker than OVERLAP_SLACK on its thin side (averi's `overlapsPastSlack`). */
+export const overlapsPastSlack = (a: Rect, b: Rect) => {
+  const o = intersect(a, b);
+  return o !== null && Math.min(o.width, o.height) > OVERLAP_SLACK;
+};
+/**
+ * What a colour assert samples of what shows: the rect inset 12 % of its size on each side (ADR 0001: "the colour
+ * sampler's 12 %-inset rect", averi's `colorSampleRect`, clipped to the screen before it is inset). Restated.
+ */
+export const COLOUR_SAMPLE_INSET = 0.12;
+export const sampleOf = (r: Rect): Rect => ({
+  x: r.x + r.width * COLOUR_SAMPLE_INSET,
+  y: r.y + r.height * COLOUR_SAMPLE_INSET,
+  width: r.width * (1 - 2 * COLOUR_SAMPLE_INSET),
+  height: r.height * (1 - 2 * COLOUR_SAMPLE_INSET),
+});
+
+/**
+ * The first band or chrome a region overlaps past the slack (ADR 0002): the status band, then the navigation band, then
+ * the chrome by name — `band-overlap:<status|nav>`, `chrome-overlap:<name>`; undefined when none does. Asked of what
+ * shows of a whole target by geometryOf (`fully: true` judges the node's region, ADR 0009 N-a), and of its colour
+ * sample by the colour row (golden-spec/bars.ts: ADR 0001 fails the assert closed only where what it READS is
+ * overlapped).
+ */
+export function regionOverlap(region: Rect, ctx: Pick<GeometryContext, 'screen' | 'safeArea' | 'chrome'>): Extract<Geometry, `band-overlap:${string}` | `chrome-overlap:${string}`> | undefined {
+  const bands = bandsOf(ctx.screen, ctx.safeArea);
+  if (bands.status !== undefined && overlapsPastSlack(region, bands.status)) return 'band-overlap:status';
+  if (bands.nav !== undefined && overlapsPastSlack(region, bands.nav)) return 'band-overlap:nav';
+  const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => overlapsPastSlack(region, r));
+  return chrome === undefined ? undefined : `chrome-overlap:${chrome[0]}`;
+}
+
 /** The frame clipped by the screen and the scroll view's clip: what of it can be drawn. */
 export function visibleOf(frame: Rect, ctx: GeometryContext): Rect | null {
   const on = intersect(frame, ctx.screen);
@@ -214,9 +253,10 @@ export function clipCuts(frame: Rect, visible: Rect, clip: Rect | undefined): { 
  * plain stop are centre-based); cut — by the screen's edge or its clip — with what shows across a clip's cut edge under
  * the tap minimum (a sliver, ADR 0013: clipCuts), else with its centre outside what shows; its centre — of a whole
  * target, or of a cut one where it shows — under the app's chrome (the first by name): the probe at the centre lands on
- * the chrome, as averi's tap judges it covered (ADR 0005: cut, then covered); else partly-centre-in, or whole. A target
- * under the minimum whole (a 20-pt icon) cut by its clip by any amount is a sliver: what shows across the cut is under
- * the minimum, as Clips.cutSliver judges it.
+ * the chrome, as averi's tap judges it covered (ADR 0005: cut, then covered); else partly-centre-in; a whole one whose
+ * region overlaps a band or the chrome past the slack (regionOverlap: ADR 0002, its centre clear) `band-overlap:<band>`
+ * / `chrome-overlap:<name>`; else whole. A target under the minimum whole (a 20-pt icon) cut by its clip by any amount
+ * is a sliver: what shows across the cut is under the minimum, as Clips.cutSliver judges it.
  */
 export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   if (intersect(frame, ctx.screen) === null) return 'off-screen';
@@ -236,7 +276,7 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
     if (!inside(c, visible)) return 'centre-out';
     return underChrome ?? 'partly-centre-in';
   }
-  return underChrome ?? 'whole';
+  return underChrome ?? regionOverlap(visible, ctx) ?? 'whole';
 }
 
 /** Whether a state reports anything a geometry is measured from — else the targets carry none (every capture before phase 3). */

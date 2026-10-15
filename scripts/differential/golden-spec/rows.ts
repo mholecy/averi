@@ -1,6 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
+import { regionOverlap, sampleOf } from '../../truth/truth.js';
 import { BUDGET_MS, first, landed, notTapped, passed, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
 
 /**
@@ -21,13 +22,17 @@ import { BUDGET_MS, first, landed, notTapped, passed, said, scrollAdvice, stroke
  * | R-sliver | sliver | scroll_until | not reached without a swipe (the plain stop does not stop on a sliver) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
- * | R-fully | partly-centre-in, centre-out, sliver | scroll_until `fully: true` | not "visible" without a swipe: it is cut | ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
+ * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | not "visible" without a swipe: it is cut | ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
  * | R-band | status-band, nav-band | tap | refused, nothing tapped | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
  * | R-band | status-band, nav-band | colour | fails: a system band over what it reads | ADR 0001 |
  * | R-band | status-band, nav-band | scroll_until | not reached without a swipe | ADR 0009 (N-a: neither stop stops on a centre in the band) |
  * | R-under-chrome | under-chrome:<name> | tap | R-land on its piece | docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md; ADR 0005 |
  * | R-under-chrome | under-chrome:<name> | colour | fails: the chrome is a pixel cover over what it reads | ADR 0001, ADR 0003 |
  * | R-under-chrome | under-chrome:<name> | scroll_until | not reached without a swipe | docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
+ * | R-overlap | band-overlap:<band>, chrome-overlap:<name> (whole, centre clear, its edge overlapped past ADR 0002's slack) | tap | `Tapped`, inside what shows (R-land at its centre) | ADR 0009 (N-a: the tap is centre-based) |
+ * | R-overlap | band-overlap:<band>, chrome-overlap:<name> | colour | fails closed when what it samples (the 12 %-inset rect) is overlapped past the slack, else passes on its own colour | ADR 0001, ADR 0002 |
+ * | R-overlap | band-overlap:<band>, chrome-overlap:<name> | scroll_until | reached with no swipe | ADR 0009 (N-a: the plain stop is centre-based) |
+ * | R-overlap | band-overlap:<band> (in a scroll view), chrome-overlap:<name> | scroll_until `fully: true` | R-fully: not "visible" where it is | ADR 0009 (N-a, `fully`: the bands as a region); ui-tree/standing.ts#fullyStanding (any cover covers) |
  * | R-dismiss | a field under the keyboard, the cell's `keyboardDismiss` (CellTruth.config) naming an element a bar lies over | tap | the dismissal is tapped (a tap sent inside the element), not refused for the bar | docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md, docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md; ADR 0016 |
  * | R-direction | below / above what shows | scroll_until | each stroke brings it closer (LIVE ONLY: a replayed tree never moves) | docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md |
  */
@@ -94,19 +99,19 @@ export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTr
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   return {
     verb: 'scroll_until',
-    says: 'R-fully: fully: true is not reached without a swipe (it is cut)',
+    says: `R-fully: fully: true is not reached without a swipe where it is ${t.geometry}`,
     call: scrollCall(platform, t, directionOf(t, cell), true),
     judge: (o) => (/^Element .* visible after /.test(o.reply) && swipes(o) === 0 ? said(o, `fully visible with no swipe where it is ${t.geometry}`) : undefined),
   };
 }
 
 /**
- * R-land: the tap lands on what shows of the target. Reached at its centre (`partly-centre-in`): `Tapped`, inside
- * `visible`. Else (`centre-out`, `under-chrome:<name>`): refused with nothing sent, or `Tapped` inside its piece where
+ * R-land: the tap lands on what shows of the target. Reached at its centre (`partly-centre-in`, and a whole target
+ * overlapped at its edge, `band-overlap:<band>` / `chrome-overlap:<name>`): `Tapped`, inside `visible`. Else (`centre-out`, `under-chrome:<name>`): refused with nothing sent, or `Tapped` inside its piece where
  * the second probe fired (`reachedAtPiece`).
  */
 export function landRow(platform: Platform, t: TargetTruth): Expectation {
-  const atCentre = t.geometry === 'partly-centre-in' && t.reached;
+  const atCentre = (t.geometry === 'partly-centre-in' || isOverlap(t)) && t.reached;
   const where = atCentre ? t.visible : t.piece;
   const fired = atCentre || t.reachedAtPiece === true;
   return {
@@ -142,5 +147,34 @@ export function directionRow(platform: Platform, t: TargetTruth, cell: CellTruth
     call: scrollCall(platform, t, direction),
     live: 'a stroke moves nothing in a replayed tree: the scroll offset the lab app reports is the oracle (phase 5)',
     judge: () => undefined,
+  };
+}
+
+/** A whole target overlapped at its edge past the slack (truth.ts#regionOverlap): its centre clear. */
+export const isOverlap = (t: Pick<TargetTruth, 'geometry'>) => t.geometry !== undefined && (t.geometry.startsWith('band-overlap:') || t.geometry.startsWith('chrome-overlap:'));
+
+/** R-overlap: the plain stop is centre-based (ADR 0009 N-a), and the centre is clear — reached with no swipe. */
+export function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+  return {
+    verb: 'scroll_until',
+    says: `${row}: reached with no swipe (its centre clear)`,
+    call: scrollCall(platform, t, directionOf(t, cell)),
+    judge: (o) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined),
+  };
+}
+
+/**
+ * R-overlap's colour: fails closed when what the colour assert SAMPLES (truth.ts#sampleOf, the 12 %-inset rect of what
+ * shows) is overlapped by a band or the chrome past the slack (ADR 0001, ADR 0002); else the sample reads the target
+ * alone, and the assert passes on its own colour.
+ */
+export function overlapColour(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
+  const over = t.visible === null || t.visible === undefined ? undefined : regionOverlap(sampleOf(t.visible), { screen: { x: 0, y: 0, ...cell.screen }, ...(cell.safeArea !== undefined && { safeArea: cell.safeArea }), ...(cell.chrome !== undefined && { chrome: cell.chrome }) });
+  if (over !== undefined) return colourFails(platform, t, `R-overlap: ${over.slice(over.indexOf(':') + 1)} over what it samples`);
+  return {
+    verb: 'colour',
+    says: `R-overlap: passes on its own colour ${t.color} (what it samples is clear)`,
+    call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: BUDGET_MS }] } },
+    judge: (o) => (passed(o) ? undefined : `failed: ${first(o)}`),
   };
 }

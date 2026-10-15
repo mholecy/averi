@@ -45,7 +45,7 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['outside-scroll-view: flush under the clip\'s bottom edge', rect(51, 700, 300, 64), ctx({ clip: LIST }), 'outside-scroll-view'],
     ['status-band: its centre in the top inset', rect(51, 10, 300, 64), ctx(), 'status-band'],
     ['nav-band: its centre in the bottom inset', rect(51, 820, 300, 64), ctx(), 'nav-band'],
-    ['the rounded centre the probe taps: 0..123 has its centre at 61.5, tapped at 62 — below the 62-pt band', rect(51, 0, 300, 123), ctx(), 'whole'],
+    ['the rounded centre the probe taps: 0..123 has its centre at 61.5, tapped at 62 — below the 62-pt band', rect(51, 0, 300, 123), ctx(), 'band-overlap:status'],
     ['the rounded centre the probe taps: 0..121 has its centre at 60.5, tapped at 61 — in the band', rect(51, 0, 300, 121), ctx(), 'status-band'],
     ['the rounded centre the probe taps: 700..823 is tapped at 762, on a tab bar from 762', rect(51, 700, 300, 123), ctx({ safeArea: undefined, chrome: { tabBar: rect(0, 762, 402, 84) } }), 'under-chrome:tabBar'],
     ['the rounded centre the probe taps: a cut target\'s centre at 99.5 is tapped at 100, inside its clip from 100', rect(51, 60, 300, 79), ctx({ safeArea: undefined, clip: LIST }), 'partly-centre-in'],
@@ -68,6 +68,14 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['under-chrome: cut by its clip with its centre showing, under a FAB — the probe lands on the FAB', rect(51, 650, 300, 64), ctx({ clip: LIST, chrome: { fab: rect(150, 660, 120, 60) } }), 'under-chrome:fab'],
     ['partly-centre-in: the same cut target, the FAB clear of its centre', rect(51, 650, 300, 64), ctx({ clip: LIST, chrome: { fab: rect(300, 660, 60, 60) } }), 'partly-centre-in'],
     ['a sliver before a cover: cut to 20 pt by its clip, its centre under a FAB', rect(51, 680, 300, 64), ctx({ clip: LIST, chrome: { fab: rect(150, 660, 120, 60) } }), 'sliver'],
+    // A whole target, its centre clear, whose edge a band or the chrome overlaps past ADR 0002's 2-unit slack.
+    ['whole: a tab bar from 798 overlaps 51,600 300x200 by 2 — within the slack', rect(51, 600, 300, 200), ctx({ chrome: { tabBar: rect(0, 798, 402, 76) } }), 'whole'],
+    ['chrome-overlap: a tab bar from 797 overlaps it by 3 — past the slack', rect(51, 600, 300, 200), ctx({ chrome: { tabBar: rect(0, 797, 402, 77) } }), 'chrome-overlap:tabBar'],
+    ['chrome-overlap: the reviewer\'s 51,600 300x200 over a tab bar from 790', rect(51, 600, 300, 200), ctx({ chrome: { tabBar: TAB } }), 'chrome-overlap:tabBar'],
+    ['whole: 2 pt into the navigation band (840)', rect(51, 640, 300, 202), ctx(), 'whole'],
+    ['band-overlap:nav: 3 pt into the navigation band', rect(51, 640, 300, 203), ctx(), 'band-overlap:nav'],
+    ['band-overlap:status: 3 pt into the status band, its centre clear', rect(51, 59, 300, 64), ctx(), 'band-overlap:status'],
+    ['the status band before the navigation band before the chrome', rect(51, 59, 300, 784), ctx({ chrome: { a: rect(0, 300, 402, 10) } }), 'band-overlap:status'],
   ] as const)('%s', (_name, frame, c, expected: Geometry) => {
     expect(geometryOf(frame, c)).toBe(expected);
   });
@@ -162,6 +170,9 @@ describe('consistency with a measured geometry', () => {
     expect(consistency(T({ geometry: 'sliver', drawn: 0.2 }))).toBeUndefined();
     // Cut with its centre showing under chrome: the probe lands on the chrome — not held to reached.
     expect(consistency(T({ geometry: 'under-chrome:fab', reached: false, drawn: 0.6 }))).toBeUndefined();
+    // Overlapped at its edge, its centre clear: reached, whatever of it is drawn.
+    expect(consistency(T({ geometry: 'chrome-overlap:tabBar', drawn: 0.9 }))).toBeUndefined();
+    expect(consistency(T({ geometry: 'band-overlap:nav', reached: false }))).toBe('band-overlap:nav, its centre clear, but the probe tap did not reach it');
   });
 });
 

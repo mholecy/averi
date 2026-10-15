@@ -100,17 +100,17 @@ whether a raw tap at its centre fired its action, what else that tap made the ap
 control that the tap reached the app at all — and how much of the target the screenshot shows in its own colour). The
 fake device serves that screenshot instead of the grey frame (and refuses a profile whose frame is not its size);
 `golden-spec.ts` says what each verb must answer for each kind of truth (tapped or refused and the remedy, colour pass
-or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. It is a façade over
-one file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars; false-covers to come), the
-judges they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv,
-R-sliver, R-stroke, R-land, R-fully, R-band, R-under-chrome, R-dismiss; R-direction declared live only — golden never
+or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. It is a façade over one
+file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars; false-covers to come), the judges
+they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
+R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). A row type is asked only of a target whose truth carries a measured `geometry` other than
 `whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
-clips or its chrome — no capture before phase 3 does). A reply that says the
-target is not in the tree (a tap "waiting for element … to appear", scroll_until's "never appeared in the tree", an
-assert's "not found within") is judged by its effect first — a tap refused without its remedy, a stroke beneath the
-presented layer is the row's own mismatch; only where the row would accept it is it no evidence either way, its
-mismatch said to be of that class first (`not in the tree: …`).
+clips or its chrome — no capture before phase 3 does). A reply that says the target is not in the tree (a tap "waiting
+for element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within") is judged by its
+effect first — a tap refused without its remedy, a stroke beneath the presented layer is the row's own mismatch; only
+where the row would accept it is it no evidence either way, its mismatch said to be of that class first (`not in the
+tree: …`).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \

@@ -73,6 +73,9 @@ describe('the rows each geometry asks', () => {
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
     ['nav-band', { frame: rect(51, 820, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the navigation band', 'scroll_until: R-band']],
     ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
+    ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'scroll_until fully: R-fully']],
+    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203) }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached']],
+    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203), scrollView: 'list' }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached', 'scroll_until fully: R-fully']],
   ] as const)('%s', (g, over, expected) => {
     const got = says(rows(target(g, over as Partial<TargetTruth>)));
     expect(got).toHaveLength(expected.length);
@@ -200,5 +203,30 @@ describe('a cell\'s averi.yaml variant (CellTruth.config)', () => {
   it('with one, merged over the platform\'s settings — a keyboardDismiss variant (#7, #19)', async () => {
     const c = JSON.parse(await readFile(await configFor(rec, undefined, { ios: { keyboardDismiss: [{ tap: 'text:"Transfer details"' }] }, android: { x: 1 } }), 'utf8'));
     expect(c).toEqual({ app: { android: { package: 'differential.app', x: 1 }, ios: { bundleId: 'differential.app', treeSource: 'wda', keyboardDismiss: [{ tap: 'text:"Transfer details"' }] } } });
+  });
+});
+
+describe('R-overlap: a whole target, its centre clear, its edge under a band or the chrome past the slack', () => {
+  // 51,600 300x200: the colour sampler reads its 12 %-inset rect, 87,624 228x152 — down to y 776.
+  const overlapped = (tabTop: number) =>
+    expectations('ios', target('chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }), { ...CELL, safeArea: undefined, chrome: { tabBar: rect(0, tabTop, 402, 874 - tabTop) } });
+  it('the colour fails closed when what it samples is overlapped past the slack (ADR 0001, 0002); else passes on its own colour', () => {
+    const colour = (tabTop: number) => overlapped(tabTop).find((r) => r.verb === 'colour')!;
+    expect(colour(774).says).toMatch(/^R-overlap: passes/);
+    expect(colour(774).judge(out(PASSED))).toBeUndefined();
+    expect(colour(774).judge(out(FAILED))).toBe('failed: ✗ colour: covered');
+    expect(colour(773).says).toBe('fails (R-overlap: tabBar over what it samples)');
+    expect(colour(773).judge(out(PASSED))).toBe('passed on #43A047: All 1 asserts passed');
+    expect(colour(773).judge(out(FAILED))).toBeUndefined();
+  });
+  it('the tap lands at its centre; the plain stop stops at once; fully: true does not', () => {
+    const rs = overlapped(790);
+    expect(verdict(rs, 'tap', out(TAPPED, ['idb ui tap 201 700']))).toBeUndefined();
+    expect(verdict(rs, 'tap', out('ERROR: covered by tab bar'))).toBe('not tapped: ERROR: covered by tab bar');
+    expect(verdict(rs, 'scroll_until', out(VISIBLE))).toBeUndefined();
+    expect(verdict(rs, 'scroll_until', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]))).toMatch(/^swiped 1×/);
+    expect(verdict(rs, 'scroll_until', out('ERROR: stuck'))).toBe('stopped: ERROR: stuck');
+    expect(verdict(rs, 'scroll_until', out(VISIBLE), true)).toMatch(/^fully visible/);
+    expect(verdict(rs, 'scroll_until', out('ERROR: stuck under the tab bar'), true)).toBeUndefined();
   });
 });

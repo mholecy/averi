@@ -241,7 +241,9 @@ export interface TargetTruth {
  * it in its scroll view's clip; `status-band` / `nav-band` its centre in the top / bottom system band; `sliver` cut by
  * its scroll view's clip, what shows across that edge under the tap minimum (ADR 0013; truth.ts#clipCuts);
  * `partly-centre-in` / `centre-out` cut, its centre inside / outside what shows; `under-chrome:<name>` whole, or cut
- * with its centre showing, its centre under the app's chrome of that name; `whole`.
+ * with its centre showing, its centre under the app's chrome of that name; `band-overlap:<status|nav>` /
+ * `chrome-overlap:<name>` whole, its centre clear, but what shows of it overlapped past ADR 0002's slack by that band
+ * or chrome (truth.ts#regionOverlap); `whole`.
  */
 export type Geometry =
   | 'whole'
@@ -252,7 +254,10 @@ export type Geometry =
   | 'off-screen'
   | 'status-band'
   | 'nav-band'
-  | `under-chrome:${string}`;
+  | `under-chrome:${string}`
+  | 'band-overlap:status'
+  | 'band-overlap:nav'
+  | `chrome-overlap:${string}`;
 
 export interface CellTruth {
   cell: string;
