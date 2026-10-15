@@ -1,7 +1,8 @@
 import type { Platform } from '../corpus.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
-import { bandTap, colourFails, fullyRow, isOverlap, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
+import { isOverlap, parseGeometry } from '../../truth/truth.js';
+import { bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
 
 /**
  * The bars family's rows (fixtures/apps/cells/bars.json, phase 3 B4): an open target whose measured centre lies in a
@@ -24,15 +25,17 @@ import { bandTap, colourFails, fullyRow, isOverlap, landRow, notReachedStill, ov
  */
 export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation[] {
   const g = t.geometry;
+  if (g === undefined) return [];
+  const { kind, name } = parseGeometry(g);
   if (g === 'status-band' || g === 'nav-band') {
     return [bandTap(platform, t), colourFails(platform, t, `R-band: the ${g === 'status-band' ? 'status' : 'navigation'} band over it`), notReachedStill(platform, t, cell, 'R-band')].map(classed);
   }
-  if (g !== undefined && g.startsWith('under-chrome:')) {
-    const chrome = g.slice('under-chrome:'.length);
+  if (kind === 'under-chrome') {
+    const chrome = name;
     return [landRow(platform, t), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), notReachedStill(platform, t, cell, `R-under-chrome (${chrome})`)].map(classed);
   }
-  if (isOverlap(t)) {
-    const band = g!.startsWith('band-overlap:');
+  if (isOverlap(g)) {
+    const band = kind === 'band-overlap';
     return [
       landRow(platform, t),
       overlapColour(platform, t, cell),

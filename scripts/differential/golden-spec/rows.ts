@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { regionOverlap, sampleOf } from '../../truth/truth.js';
+import { isOverlap, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
 
 /**
@@ -125,7 +125,7 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): E
  * fired (`reachedAtPiece`).
  */
 export function landRow(platform: Platform, t: TargetTruth): Expectation {
-  const atCentre = (t.geometry === 'partly-centre-in' || isOverlap(t)) && t.reached;
+  const atCentre = (t.geometry === 'partly-centre-in' || isOverlap(t.geometry)) && t.reached;
   const where = atCentre ? t.visible : t.piece;
   const fired = atCentre || t.reachedAtPiece === true;
   return {
@@ -166,9 +166,6 @@ export function directionRow(platform: Platform, t: TargetTruth, cell: CellTruth
   };
 }
 
-/** A whole target overlapped at its edge past the slack (truth.ts#regionOverlap): its centre clear. */
-export const isOverlap = (t: Pick<TargetTruth, 'geometry'>) => t.geometry !== undefined && (t.geometry.startsWith('band-overlap:') || t.geometry.startsWith('chrome-overlap:'));
-
 /** R-overlap: the plain stop is centre-based (ADR 0009 N-a), and the centre is clear — reached with no swipe. */
 export function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
   return {
@@ -186,7 +183,7 @@ export function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTrut
  */
 export function overlapColour(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   const over = t.visible === null || t.visible === undefined ? undefined : regionOverlap(sampleOf(t.visible), { screen: { x: 0, y: 0, ...cell.screen }, ...(cell.safeArea !== undefined && { safeArea: cell.safeArea }), ...(cell.chrome !== undefined && { chrome: cell.chrome }) });
-  if (over !== undefined) return colourFails(platform, t, `R-overlap: ${over.slice(over.indexOf(':') + 1)} over what it samples`);
+  if (over !== undefined) return colourFails(platform, t, `R-overlap: ${parseGeometry(over).name} over what it samples`);
   return {
     verb: 'colour',
     says: `R-overlap: passes on its own colour ${t.color} (what it samples is clear)`,

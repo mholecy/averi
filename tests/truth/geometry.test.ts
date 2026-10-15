@@ -12,7 +12,9 @@ import {
   geometryOf,
   measuredGeometry,
   minPiece,
+  isOverlap,
   otherControlsFired,
+  parseGeometry,
   pieceOf,
   pieceProbePoint,
   subtract,
@@ -88,6 +90,21 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['the status band before the navigation band before the chrome', rect(51, 59, 300, 784), ctx({ chrome: { a: rect(0, 300, 402, 10) } }), 'band-overlap:status'],
   ] as const)('%s', (_name, frame, c, expected: Geometry) => {
     expect(geometryOf(frame, c)).toBe(expected);
+  });
+});
+
+describe('a geometry read apart (parseGeometry) — the one place its spelling is parsed', () => {
+  it('the kind and the band or chrome it names; a geometry naming nothing is its kind alone', () => {
+    expect(parseGeometry('under-chrome:tabBar')).toEqual({ kind: 'under-chrome', name: 'tabBar' });
+    expect(parseGeometry('band-overlap:status')).toEqual({ kind: 'band-overlap', name: 'status' });
+    expect(parseGeometry('chrome-overlap:fab')).toEqual({ kind: 'chrome-overlap', name: 'fab' });
+    expect(parseGeometry('nav-band')).toEqual({ kind: 'nav-band' });
+    expect(parseGeometry('partly-centre-in')).toEqual({ kind: 'partly-centre-in' });
+  });
+
+  it('isOverlap: band-overlap and chrome-overlap, nothing else', () => {
+    const all: (Geometry | undefined)[] = ['band-overlap:nav', 'chrome-overlap:tabBar', 'under-chrome:tabBar', 'status-band', 'whole', undefined];
+    expect(all.map((g) => isOverlap(g))).toEqual([true, true, false, false, false, false]);
   });
 });
 

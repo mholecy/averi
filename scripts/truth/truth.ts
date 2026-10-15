@@ -130,7 +130,7 @@ export function consistency(t: TargetTruth, platform?: 'ios' | 'android', screen
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? undefined : `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
   if (g === 'partly-centre-in' && !t.reached) return 'declared open, cut with its centre showing, but the probe tap did not reach it';
-  if ((g.startsWith('band-overlap:') || g.startsWith('chrome-overlap:')) && !t.reached) return `${g}, its centre clear, but the probe tap did not reach it`;
+  if (isOverlap(g) && !t.reached) return `${g}, its centre clear, but the probe tap did not reach it`;
   if ((g === 'centre-out' || g === 'outside-scroll-view') && t.reached) return `${g}, but the probe tap at its centre reached it`;
   return undefined;
 }
@@ -153,6 +153,29 @@ export const systemBarSwallows = (platform: 'ios' | 'android' | undefined, g: Ge
 export const unprobedBand = (platform: 'ios' | 'android' | undefined, g: Geometry) => platform === 'android' && g === 'nav-band';
 
 // --- the measured geometry (phase 3) ---
+
+type KindOf<G> = G extends `${infer K}:${string}` ? K : G;
+/** A geometry without the band or chrome it names: `under-chrome`, `band-overlap`, `chrome-overlap`, or itself. */
+export type GeometryKind = KindOf<Geometry>;
+/**
+ * A geometry read apart, the one place its spelling is parsed: `under-chrome:fab` is `{kind: 'under-chrome',
+ * name: 'fab'}`, `band-overlap:status` `{kind: 'band-overlap', name: 'status'}`, a geometry naming nothing (`sliver`)
+ * its kind alone.
+ */
+export function parseGeometry(g: Geometry): { kind: GeometryKind; name?: string } {
+  const i = g.indexOf(':');
+  return i < 0 ? { kind: g as GeometryKind } : { kind: g.slice(0, i) as GeometryKind, name: g.slice(i + 1) };
+}
+/**
+ * A whole target overlapped at its edge past the slack (regionOverlap), its centre clear: `band-overlap:<band>`,
+ * `chrome-overlap:<name>`.
+ */
+export type OverlapGeometry = Extract<Geometry, `band-overlap:${string}` | `chrome-overlap:${string}`>;
+export function isOverlap(g: Geometry | undefined): g is OverlapGeometry {
+  if (g === undefined) return false;
+  const { kind } = parseGeometry(g);
+  return kind === 'band-overlap' || kind === 'chrome-overlap';
+}
 
 export const area = (r: Rect) => Math.max(0, r.width) * Math.max(0, r.height);
 /** The overlap of two rects, or null when they share no area. */
@@ -233,7 +256,7 @@ export const sampleOf = (r: Rect): Rect => ({
  * sample by the colour row (golden-spec/bars.ts: ADR 0001 fails the assert closed only where what it READS is
  * overlapped).
  */
-export function regionOverlap(region: Rect, ctx: Pick<GeometryContext, 'screen' | 'safeArea' | 'chrome'>): Extract<Geometry, `band-overlap:${string}` | `chrome-overlap:${string}`> | undefined {
+export function regionOverlap(region: Rect, ctx: Pick<GeometryContext, 'screen' | 'safeArea' | 'chrome'>): OverlapGeometry | undefined {
   const bands = bandsOf(ctx.screen, ctx.safeArea);
   if (bands.status !== undefined && overlapsPastSlack(region, bands.status)) return 'band-overlap:status';
   if (bands.nav !== undefined && overlapsPastSlack(region, bands.nav)) return 'band-overlap:nav';
