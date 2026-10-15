@@ -69,6 +69,8 @@ export const LAB_SIMULATOR_PREFIX = 'averi-lab ';
 export const DEVICE_CHECK_SIMULATOR = '37956039-94EA-4F51-93E5-94F7723A4578';
 /** The lab's AVD (`adb emu avd name`); any other emulator or device is refused. */
 export const LAB_AVD = 'averi_lab';
+/** The device-check simulator's WebDriverAgent ports (averi gives the first simulator 8100, the next 8101): refused. */
+export const DEVICE_CHECK_WDA_PORTS: readonly number[] = [8100, 8101];
 
 /**
  * The lab's own WebDriverAgent build: never the default `averi-wda` derived data, which device-check builds use — a
@@ -82,12 +84,18 @@ export class IosLab implements LabDevice {
   private wdaServer: WdaServer | undefined;
 
   private guarded: Promise<string> | undefined;
+  /** Set once guard() has resolved: until then close() runs nothing — a refused device is not touched, not even there. */
+  private cleared = false;
 
-  /** `wdaPort`: never 8100/8101 (the device-check simulator's); capture.ts and live.ts default to 8120. */
+  /** `wdaPort`: never 8100/8101 (the device-check simulator's, refused here); capture.ts and live.ts default to 8120. */
   constructor(
     readonly udid: string,
-    private readonly opts: { wdaPort?: number; device?: string; exec?: Exec } = {},
-  ) {}
+    private readonly opts: { wdaPort?: number; exec?: Exec } = {},
+  ) {
+    if (opts.wdaPort !== undefined && DEVICE_CHECK_WDA_PORTS.includes(opts.wdaPort)) {
+      throw new Error(`WDA port ${opts.wdaPort} is the device-check simulator's (${DEVICE_CHECK_WDA_PORTS.join(', ')}): the lab runs WDA on a port of its own (8120)`);
+    }
+  }
 
   simctl(...args: string[]) {
     return (this.opts.exec ?? exec)('xcrun', ['simctl', ...args]);
@@ -111,6 +119,7 @@ export class IosLab implements LabDevice {
         if (d === undefined) continue;
         if (!d.name.startsWith(LAB_SIMULATOR_PREFIX)) throw new Error(`simulator ${this.udid} is "${d.name}", not the lab's (${LAB_SIMULATOR_PREFIX}…): refused`);
         const os = /SimRuntime\.(\w+)-(\d+)-(\d+)$/.exec(runtime);
+        this.cleared = true;
         return `${d.name} simulator, ${os === null ? runtime : `${os[1]} ${os[2]}.${os[3]}`}`;
       }
       throw new Error(`no simulator ${this.udid} in simctl's list: refused`);
@@ -118,9 +127,8 @@ export class IosLab implements LabDevice {
     return this.guarded;
   }
 
-  async describe(): Promise<string> {
-    const reported = await this.guard();
-    return this.opts.device ?? reported;
+  describe(): Promise<string> {
+    return this.guard();
   }
 
   unsupported(): string | undefined {
@@ -193,7 +201,9 @@ export class IosLab implements LabDevice {
     return new WdaServer({ udid: this.udid, port, derivedDataPath: LAB_WDA_DERIVED_DATA });
   }
 
+  /** Nothing unless guard() resolved: a refused (or never checked) simulator is left as it was. */
   async close(): Promise<void> {
+    if (!this.cleared) return;
     await this.wdaServer?.shutdown();
     await this.simctl('terminate', this.udid, BUNDLE).catch(() => undefined);
   }
@@ -208,11 +218,13 @@ export class AndroidLab implements LabDevice {
   readonly platform = 'android';
 
   private guarded: Promise<void> | undefined;
+  /** Set once guard() has resolved: until then close() runs nothing (see IosLab). */
+  private cleared = false;
 
   /** Every adb command names the serial; nothing restarts the adb server. */
   constructor(
     readonly serial: string,
-    private readonly opts: { device?: string; exec?: Exec } = {},
+    private readonly opts: { exec?: Exec } = {},
   ) {}
 
   adb(...args: string[]) {
@@ -224,13 +236,13 @@ export class AndroidLab implements LabDevice {
     this.guarded ??= (async () => {
       const avd = (await this.adb('emu', 'avd', 'name').catch(() => ({ stdout: '' }))).stdout.split(/\r?\n/)[0].trim();
       if (avd !== LAB_AVD) throw new Error(`${this.serial} is ${avd === '' ? 'no emulator adb can name' : `AVD "${avd}"`}, not the lab's ${LAB_AVD}: refused`);
+      this.cleared = true;
     })();
     return this.guarded;
   }
 
   async describe(): Promise<string> {
     await this.guard();
-    if (this.opts.device !== undefined) return this.opts.device;
     const sdk = (await this.adb('shell', 'getprop', 'ro.build.version.sdk')).stdout.trim();
     const release = (await this.adb('shell', 'getprop', 'ro.build.version.release')).stdout.trim();
     return `${LAB_AVD} emulator, Android ${release} (API ${sdk})`;
@@ -272,7 +284,9 @@ export class AndroidLab implements LabDevice {
     return [{ source: 'uiautomator', suffix: '.xml', payload: (await this.adb('exec-out', 'uiautomator', 'dump', '/dev/tty')).stdout }];
   }
 
+  /** Nothing unless guard() resolved: a refused (or never checked) device is left as it was. */
   async close(): Promise<void> {
+    if (!this.cleared) return;
     await this.adb('shell', 'am', 'force-stop', BUNDLE);
   }
 }
