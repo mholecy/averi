@@ -350,7 +350,7 @@ const imageOf = (b: Buffer) =>
 export async function connect(side: Side, recording: Recording, profile: DeviceProfile): Promise<Connection> {
   const adapter = recordedAdapter(side, recording, profile);
   const device = recording.platform === 'ios' ? IOS_UDID : ANDROID_SERIAL;
-  const registry = new side.AdapterRegistry({
+  const registry = side.registry({
     factory: () => adapter,
     discovery: async (platform) =>
       platform === recording.platform ? [{ id: device, platform, name: 'differential', osVersion: '0', state: 'booted' }] : [],

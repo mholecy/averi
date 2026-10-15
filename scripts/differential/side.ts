@@ -30,6 +30,12 @@ export interface Side {
   defaultFactory: AdapterFactory;
   IosAdapter: new (opts: ConstructorParameters<typeof IosAdapter>[0]) => DeviceAdapter;
   parseWdaSourceValue: (value: unknown) => UiNode;
+  /**
+   * The side's registry over `deps`, whichever constructor the side has: since 8413120 (2026-10-08) it takes
+   * `{ factory, discovery }`; before, the factory alone, and devices were listed by an UNBOUND adapter's
+   * `listDevices()` — so an older side gets a factory that answers an unbound call with the discovery.
+   */
+  registry(deps: { factory: AdapterFactory; discovery: DeviceDiscovery }): AdapterRegistry;
 }
 
 export async function loadSide(root: string): Promise<Side> {
@@ -45,6 +51,8 @@ export async function loadSide(root: string): Promise<Side> {
     at('src/adapters/ios.ts', ['IosAdapter']),
     at('src/adapters/wda-source.ts', ['parseWdaSourceValue']),
   ]);
+  const Registry = registry.AdapterRegistry as Side['AdapterRegistry'];
+  const discoverySeam = typeof registry.defaultDiscovery === 'function';
   return {
     root: resolve(root),
     createAveriServer: tools.createAveriServer as Side['createAveriServer'],
@@ -52,6 +60,13 @@ export async function loadSide(root: string): Promise<Side> {
     defaultFactory: registry.defaultFactory as Side['defaultFactory'],
     IosAdapter: ios.IosAdapter as Side['IosAdapter'],
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
+    registry: (deps) => {
+      if (discoverySeam) return new Registry(deps);
+      const legacy = Registry as unknown as new (factory: AdapterFactory) => AdapterRegistry;
+      return new legacy((platform, deviceId, opts) =>
+        deviceId === undefined ? ({ listDevices: () => deps.discovery(platform) } as unknown as DeviceAdapter) : deps.factory(platform, deviceId, opts),
+      );
+    },
   };
 }
 

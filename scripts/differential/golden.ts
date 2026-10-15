@@ -18,8 +18,11 @@ import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/
  * device round; a target whose truth's sources disagree is a broken cell, reported and not judged.
  *
  *   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>]
+ *     [--only <cell>[,<cell>…]] [--json]
  *
- * The side defaults to this checkout. Exit code 1 on a mismatch or a broken target.
+ * The side defaults to this checkout; an older commit's src is loaded by this checkout's harness (side.ts). `--only`
+ * keeps the captures a token names (selectRecordings); `--json` prints the results as data (GoldenJson) in place of the
+ * report — scripts/truth/calibrate.ts reads it. Exit code 1 on a mismatch or a broken target.
  */
 
 export interface GoldenCheck {
@@ -102,11 +105,47 @@ export function goldenReport(results: readonly GoldenResult[]): string {
 
 export { pct };
 
+/** A capture's cell: its file name up to the first dot (`form-keyboard.wda.json` → `form-keyboard`). */
+export const cellOf = (r: Pick<Recording, 'file'>) => r.file.slice(0, r.file.indexOf('.') < 0 ? undefined : r.file.indexOf('.'));
+/** A capture's file name without its extension (`form-keyboard.wda.json` → `form-keyboard.wda`, `alert-dim.xml` → `alert-dim`). */
+const stemOf = (r: Pick<Recording, 'file'>) => r.file.replace(/\.(json|xml)$/, '');
+
+/** `--only`'s value: comma-separated tokens, blanks dropped. */
+export const parseOnly = (value: string | undefined): string[] | undefined =>
+  value === undefined ? undefined : value.split(',').map((t) => t.trim()).filter((t) => t !== '');
+
+/**
+ * The captures `only` names, in corpus order (all of them when `only` is undefined). A token is a cell
+ * (`form-keyboard`: every source of it), a capture without its extension (`form-keyboard.wda`) or its file name
+ * (`form-keyboard.wda.json`), each optionally behind its run (`ios-iphone17-ios27/alert-dim`). Strict: a token that
+ * names no capture is an error naming it — a filter that silently matches nothing would read as all green.
+ */
+export function selectRecordings<R extends Pick<Recording, 'run' | 'file'>>(recordings: readonly R[], only: readonly string[] | undefined): R[] {
+  if (only === undefined) return [...recordings];
+  const matches = (r: R, token: string) => {
+    const slash = token.lastIndexOf('/');
+    if (slash >= 0 && token.slice(0, slash) !== r.run) return false;
+    const name = token.slice(slash + 1);
+    return name === cellOf(r) || name === stemOf(r) || name === r.file;
+  };
+  const none = only.filter((t) => !recordings.some((r) => matches(r, t)));
+  if (none.length > 0) throw new Error(`golden --only: ${none.join(', ')} names no capture of the corpus`);
+  return recordings.filter((r) => only.some((t) => matches(r, t)));
+}
+
+/** `--json`'s output: the side's code root and each capture's checks and broken targets. */
+export interface GoldenJson {
+  side: string;
+  results: GoldenResult[];
+}
+
 // --- the command line ---
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { values } = parseArgs({ options: { corpus: { type: 'string' }, side: { type: 'string' }, worktrees: { type: 'string' } } });
-  if (values.corpus === undefined) throw new Error('usage: golden.ts --corpus <dir> [--side <ref|path>] [--worktrees <dir>]');
+  const { values } = parseArgs({
+    options: { corpus: { type: 'string' }, side: { type: 'string' }, worktrees: { type: 'string' }, only: { type: 'string' }, json: { type: 'boolean' } },
+  });
+  if (values.corpus === undefined) throw new Error('usage: golden.ts --corpus <dir> [--side <ref|path>] [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json]');
   // The checkout first: git runs before the fake device refuses every process.
   const { codeRoot } = await import('./checkout.js');
   const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -120,10 +159,10 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const { loadCorpus } = await import('./corpus.js');
   try {
     const side = await loadSide(code.root);
-    const corpus = (await loadCorpus(resolve(values.corpus))).filter((r) => r.truth !== undefined);
+    const corpus = selectRecordings((await loadCorpus(resolve(values.corpus))).filter((r) => r.truth !== undefined), parseOnly(values.only));
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
-    console.log(goldenReport(results));
+    console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results));
     if (results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined))) process.exitCode = 1;
   } finally {
     cleanup?.();
