@@ -110,6 +110,10 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
       i++;
       continue;
     }
+    if (c === '(' && cps[i + 1] === '?' && (cps[i + 2] === '=' || cps[i + 2] === '!')) return undefined;
+    if (c === '(' && cps[i + 1] === '?' && cps[i + 2] === '<' && (cps[i + 3] === '=' || cps[i + 3] === '!')) {
+      return undefined;
+    }
     if (c === '(' && cps[i + 1] === '?' && cps[i + 2] === '<' && cps[i + 3] !== '=' && cps[i + 3] !== '!') {
       const end = cps.indexOf('>', i + 3);
       const stop = end === -1 ? cps.length - 1 : end;

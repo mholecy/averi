@@ -899,7 +899,10 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ['^[^’]$', 'x', true],
     ['^it’+s$', "it''s", true],
     ['(’)x\\1', "'x'", true],
-    ['(?<=Payee)’s', "Payee's", true],
+    // A lookaround sees the characters a folded literal stands for, so a
+    // pattern with one is not folded: these fail on the reading as read.
+    ['(?<=Payee)’s', "Payee's", false],
+    ["’(?<=')", "'", false],
     ['^(?<náme>é)\\k<náme>$', 'ee', true],
     ['^x\\Bé$', 'xe', false],
     ['^Payee’s name$', "Payee's game", false],
@@ -927,6 +930,10 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ['^x[’-]y$', "x'y", true],
     ['^x[–+-]y$', 'x,y', false],
     ['^x[–+-]y$', 'x-y', true],
+    ["^(?=’)'$", "'", false],
+    ["^(?=.*’)(?=.*')a.$", "a'", false],
+    ['(?<=’)s', "Payee's", false],
+    ['(?<!’)s$', "x’s", false],
   ])('/%s/ against %j under the fold: pass %s', (match, read, pass) => {
     expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(pass);
   });
