@@ -36,15 +36,17 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch — filed per cell
    family in tests/differential/golden/<family>.known.ts and aggregated there — by `<run>/<file> <target> <verb>` with
    its class (what its mismatch says first), its reply's kind (one of a closed set: not found, Tapped, visible, PASS,
-   FAIL, refused, other — `replyKind` in scripts/differential/golden-spec/judges.ts), the taps and swipes it sent, and its note
-   (the bug note, or why). A listed mismatch that stops occurring fails the test until it is struck off; a new one fails
-   it until it is fixed or listed with its note; a listed one whose class, reply kind or device calls change fails it
-   too — it still mismatches, but differently (a timeout turned into a refusal with the wrong remedy keeps its class and
-   its calls, but not its kind). The checks per capture are pinned, so a row that silently stops being asked fails.
+   FAIL, refused, other — `replyKind` in scripts/differential/golden-spec/judges.ts), the taps and swipes it sent, and
+   its note (the bug note, or why). A listed mismatch that stops occurring fails the test until it is struck off; a new
+   one fails it until it is fixed or listed with its note; a listed one whose class, reply kind or device calls change
+   fails it too — it still mismatches, but differently (a timeout turned into a refusal with the wrong remedy keeps its
+   class and its calls, but not its kind). The checks per capture are pinned, so a row that silently stops being asked
+   fails.
 
 ## Consequences
 
-- A fix is checked against the whole lab corpus at once, without a device; a device round confirms, it does not discover.
+- A fix is checked against the whole lab corpus at once, without a device; a device round confirms, it does not
+  discover.
 - The truth is only as wide as the cells: a situation no cell builds is judged by nothing here. New rows come with the
   cells that need them — except phase 3's row types (scripts/differential/golden-spec/rows.ts), which B1 (the plan's
   phase 3) declared ahead of their cells so that the cell families can be built in parallel. A row type asks nothing

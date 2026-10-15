@@ -117,25 +117,26 @@ node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [
   [--only <cell>[,<cell>…]] [--json]
 ```
 
-`--only` keeps the captures a token names (a cell, a capture with or without its extension, either behind its run;
-a token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. A check
-whose reply is a harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake
-device's `differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
+`--only` keeps the captures a token names (a cell, a capture with or without its extension, either behind its run; a
+token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. A check whose
+reply is a harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake device's
+`differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
 (`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault.
 `tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, the checks per
 capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their class, their reply's kind
-(`golden-spec/judges.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they sent and
-their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or listed; one whose
-class, reply kind or device calls change fails until re-noted). The ratchet is kept per cell family,
+(`golden-spec/judges.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they
+sent and their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or listed; one
+whose class, reply kind or device calls change fails until re-noted). The ratchet is kept per cell family,
 `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's cells only, aggregated by
-golden.test.ts, which refuses a row filed under another family's file); a row may say what it is beside its class —
-`as: bug:<docs/bugs file>` or `residual:<decision>`.
+golden.test.ts, which refuses a row filed under another family's file); a row may say what it is beside its class — `as:
+bug:<docs/bugs file>` or `residual:<decision>`.
 
-The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
-targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
-the identifier it shows it under, the keyboard's frame, the submits — and per control (field, submit, picker row) where
-its frame lies (open, under the keyboard, partly covered, under the sheet, off the screen, not laid out — measured from
-the app's frames by scripts/truth/truth.ts#situationOf, not declared) and what a raw tap at its centre did. `golden-spec/forms.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
+The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no
+coloured targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it
+shows with the identifier it shows it under, the keyboard's frame, the submits — and per control (field, submit, picker
+row) where its frame lies (open, under the keyboard, partly covered, under the sheet, off the screen, not laid out —
+measured from the app's frames by scripts/truth/truth.ts#situationOf, not declared) and what a raw tap at its centre
+did. `golden-spec/forms.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
 docs/verification.md (each row names the rule it relies on, applied to the app's frames), titles and prefilled values
 read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a secure value never read back, a tap under the
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the
@@ -179,9 +180,9 @@ node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/tr
 ```
 
 `--family` keeps the cells of those families, `--cells` those cells (both given: the named cells of those families); a
-name that matches nothing is an error. A run of some cells adds to (or replaces those cells in) the run's manifest; the other cells keep their captures. A
-manifest names one device: a run into a directory captured on another device is refused. Exit code 1 when a cell is
-broken.
+name that matches nothing is an error. A run of some cells adds to (or replaces those cells in) the run's manifest; the
+other cells keep their captures. A manifest names one device: a run into a directory captured on another device is
+refused. Exit code 1 when a cell is broken.
 
 Android (fixtures/apps/android, Compose; an emulator of its own — the committed run is a dedicated `averi_lab` AVD,
 Pixel 3a profile, API 33 — never the device-check AVD; JDK 17, the Gradle wrapper's 8.13). The truth is in screen
@@ -277,11 +278,11 @@ beside `x.json`) still fails the conversion (`duplicate corpus file x.json`): re
 `rebuilt-idb-ios` holds an idb `describe-all` list rebuilt from each normalized idb tree (idb's normalization maps
 element by element, so the inverse is exact up to the type within a role and minus the parser's own marks, such as a
 field's `error`: 41 of its 94 trees carry such marks from the parser that read them, so an OLD parser gives back 53 of
-the 94 exactly). Such
-a run says so in its manifest (`device` and `note`, and each capture's `note`), and every tree in it is also in its own
-run as normalized: it lets an idb parser change show where no raw payload was saved (the IBAN `_error` pairing), but
-it is no evidence of what a device sends. `report.md` lists each run replayed with what its manifest says it is. `convert.ts` does not build it: the script that does is kept in the run's
-directory, outside the repository like the corpus.
+the 94 exactly). Such a run says so in its manifest (`device` and `note`, and each capture's `note`), and every tree in
+it is also in its own run as normalized: it lets an idb parser change show where no raw payload was saved (the IBAN
+`_error` pairing), but it is no evidence of what a device sends. `report.md` lists each run replayed with what its
+manifest says it is. `convert.ts` does not build it: the script that does is kept in the run's directory, outside the
+repository like the corpus.
 
 ```sh
 node --import tsx scripts/differential/convert.ts --runs <dir of run<N>-* dirs> --repo . --out <corpus dir>

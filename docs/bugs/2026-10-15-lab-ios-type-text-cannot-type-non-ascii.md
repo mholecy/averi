@@ -32,8 +32,8 @@ WDA alike — only typing fails.
 
 The owner verifies a banking app: names (`Šťastný`, `Ľubomír`), addresses and payment notes carry diacritics, and
 copy-pasted references carry typographic quotes and dashes. Today no such value can be filled on iOS, and the reply is
-idb's Python traceback (with the host's pipx paths), not a sentence an agent can act on. Nothing is typed, so no wrong value lands —
-the failure is loud, which is why this is a capability gap with a bad reply rather than a false report.
+idb's Python traceback (with the host's pipx paths), not a sentence an agent can act on. Nothing is typed, so no wrong
+value lands — the failure is loud, which is why this is a capability gap with a bad reply rather than a false report.
 
 ## Expected
 

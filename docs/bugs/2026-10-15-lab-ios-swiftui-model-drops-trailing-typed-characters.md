@@ -17,8 +17,9 @@ model: "CZ65 0800 0000 1920 0014 539"   (28 characters — the last "9" missing)
 ```
 
 The same case on idb in the same run was ok; the commit that added the live golden (dd8b7fb) records losses of the last
-1–2 characters on wda and idb alike over the day's runs. averi verifies a fill against the tree, and the tree (and the screenshot the run kept,
-`wda-p2-*.png` in the session's scratch `shots/`) shows all 29: by what averi can see, `Filled` is true.
+1–2 characters on wda and idb alike over the day's runs. averi verifies a fill against the tree, and the tree (and the
+screenshot the run kept, `wda-p2-*.png` in the session's scratch `shots/`) shows all 29: by what averi can see, `Filled`
+is true.
 
 Without averi: a throwaway script launched `form-basic` ten times, tapped the e-mail field with a raw `idb ui tap`,
 typed `jan.stastny@example.com` with a raw `idb ui text`, waited 3 s and read the model — 1 of 10 runs held a shorter
