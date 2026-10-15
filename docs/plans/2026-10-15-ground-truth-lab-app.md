@@ -149,6 +149,14 @@ each note's before and after commit (a canary refuses a side that does not reall
 fix are reported) into `docs/truth/calibration.md`. The `needs` of each note not yet reproduced are the cells phase 4
 builds (scripts/differential/README.md, Calibration on the bug notes).
 
+Two notes calibrated on the existing cells are holes, each DOES-NOT-FAIL as its `expect` says, with its `needs`: #28 (a
+WDA sheet's bare background is no cover) needs a `presented` sheet-background cell — a page sheet whose bare background,
+no node of its own content, lies over a target beneath (form-picker's sheet puts its rows over every target); FE2 (field
+errors pair a shared component id with the next field's title) needs a `forms` variant whose fields and titles share one
+identifier (form-errors gives every title its own). The first B0 run called #28 CALIBRATED (32d002f's message says so,
+and history keeps it); review round 1 corrected it to DOES-NOT-FAIL: at its before commit, 53da035, its rows are
+already refused, red only on #33's defect.
+
 **B1 — the families and the plumbing (no cell, no capture).** So that phase 3's batches (B2 edges, B3 presented, B4
 bars, B5 false covers) are written in parallel worktrees without touching each other's files, every shared file is
 split by cell family — `base` (`open`), `presented` (`sheet-medium`, `alert-dim`), `forms` (the five form cells),
@@ -170,6 +178,14 @@ chrome-overlap:<name>, whole), measured from the app's frames and the state's ne
 `CatalogTarget.text`, `CatalogCell.config` (golden's configFor), the `tab` event. All optional: no app writes them yet,
 so every committed capture loads and judges as before, and the new rows ask only a target that carries a geometry other
 than `whole`.
+
+What B1 leaves where, so no batch looks for it here: R-presented (a target beneath a presented layer) is no row type in
+rows.ts — the phase-1 presented-over rows in `golden-spec/presented.ts` cover it, and B3 extends them; the Android IME's
+frame from `dumpsys` (calibration.json #1, `needs-2b`) is captured in phase 2b (B6), not in B1–B5. Until B2–B5's
+captures carry a geometry, the new rows are exercised only by tests/differential/golden-wiring.test.ts (golden over a
+committed capture under a synthetic truth whose targets carry one; golden-rows.test.ts pins their judges alone). The
+apps' B1 changes were compiled outside the sandbox at 690ef8f: Android `assembleDebug` with JDK 17, iOS `xcodebuild`
+for a generic iOS Simulator.
 
 How to add a cell (B2–B5):
 
@@ -195,7 +211,7 @@ How to add a cell (B2–B5):
 
 **B4 (bars) — an open assumption to measure first.** What a raw tap in Android's navigation band does is not measured:
 under gesture navigation it reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's
-context). Until B4 measures it in both modes, the capture never taps a centre there (`truth.ts#unprobedBand`, the
+context). Until B4 measures it in both modes, the capture never taps a centre there (`truth.ts#unprobedReason`, the
 target's `unprobed`), and consistency holds such a target to no probe; only the status bar's swallowed probe is
 measured (calibration.json #21, `systemBarSwallows`). An iOS status-band probe is taken: its touch is the app's, and
 the scroll-to-top it may also fire cannot reach the next probe (each relaunches the cell).
