@@ -452,7 +452,12 @@ remedy alone changed; scroll_until 171: 73 "fully visible after 0 swipes" and 77
 any swipe, 21 stops renaming their cover; assert 226: 57 colour asserts measured and PASSED (the harness paints each target its own colour) → failed closed, 51 failed closed
 newly naming the alert, 23 renaming their cover, 95 whose remedy alone changed; ui_snapshot 1 (the mark printed). No reply
 became `Tapped`, visible or PASS; on NEW no tap, swipe or screenshot is sent under the alert. The alert's `Discard` and
-`Keep editing` are tapped as before (no diff).
+`Keep editing` are tapped as before (no diff). With the review's fixes, the same harness (NEW = this change merged with the round's other slices, 385 738
+calls): the alert tree's 518 unchanged but for the reach the cover is now named with; 1 072 more on 170 iOS trees,
+wording only — each reply equal to OLD's once `, reaching …` is taken out of the cover named (`scroll_until` 702, tap
+370, 38 of them moved taps to the same point; idb's pinned and lifted `Continue to summary`, a floating tab bar's
+items, a few bottom-pinned controls); and Android's 60 on its two raw trees holding numeric character references (the
+round's entity decode, not this change).
 
 ## Residuals accepted
 
