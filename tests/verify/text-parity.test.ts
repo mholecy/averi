@@ -848,6 +848,38 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(r.detail).toContain('= (differs only in composed vs decomposed characters — ');
   });
 
+  // The folded pattern accepts only what the pattern accepted, modulo the fold.
+  it.each([
+    ['^[À-ž]+$', 'abc', false],
+    ['^[À-ž]+$', 'X_Y', false],
+    ['[à-ž]', 'Z', false],
+    ['^[À-ÿ]$', 'Z', false],
+    ['^[‘-’]$', "'", false],
+    ['^a…?$', 'a..', false],
+    ['^a…?$', 'a...', true],
+    ['^a…{2}$', 'a......', true],
+    ['^a…{2}$', 'a....', false],
+    ['^a…+$', 'a....', false],
+    ['^[…]$', '.', false],
+    ['^a\\…$', 'aZ..', false],
+    ['^a\\…$', 'a...', true],
+    ['^x[a\\–z]$', 'xb', false],
+    ['^x[a\\–z]$', 'x-', true],
+    ['^x\\–y$', 'x\\-y', false],
+    ['^x\\–y$', 'x-y', true],
+    ['^[–—]$', '-', true],
+    ['^[^’]$', 'x', true],
+    ['^it’+s$', "it''s", true],
+    ['(’)x\\1', "'x'", true],
+    ['(?<=Payee)’s', "Payee's", true],
+    ['^(?<náme>é)\\k<náme>$', 'ee', true],
+    ['^x\\Bé$', 'xe', false],
+    ['^Payee’s name$', "Payee's game", false],
+    ['^PAYEE’S', "Payee's", false],
+  ])('/%s/ against %j under the fold: pass %s', (match, read, pass) => {
+    expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(pass);
+  });
+
   it.each([
     ['^[가-힣]+$', 'abc'],
     ['^[z-é]$', 'q'],

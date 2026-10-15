@@ -18,6 +18,7 @@ import { failClosed } from './fail-closed.js';
 import {
   differsOnlyByOcrFold,
   foldedCharacters,
+  namePairs,
   ocrFold,
   ocrFoldPattern,
   RECOGNIZER_DIFFERENCE,
@@ -1046,18 +1047,21 @@ export async function measureOcrAssert(
 }
 
 /**
- * The folded pattern against the folded reading. A pattern the fold leaves
- * uncompilable is not folded: the assert fails on the reading as read, it
+ * The folded pattern against the folded reading (ocr-fold.ts): the characters
+ * it folded when that matches, else undefined. A pattern the fold leaves
+ * uncompilable is not folded — the assert fails on the reading as read, it
  * never throws.
  */
-function foldedMatch(pattern: string, seen: string): boolean {
+function foldedMatch(pattern: string, seen: string): [string, string][] | undefined {
+  const fold = ocrFoldPattern(pattern);
+  if (fold === undefined) return undefined;
   let folded: RegExp;
   try {
-    folded = new RegExp(ocrFoldPattern(pattern));
+    folded = new RegExp(fold.source);
   } catch {
-    return false;
+    return undefined;
   }
-  return folded.test(ocrFold(seen));
+  return folded.test(ocrFold(seen)) ? fold.folded : undefined;
 }
 
 /**
@@ -1103,12 +1107,12 @@ export function evaluateOcrAssert(
     // The reading as read first; failing that, the folded reading against the
     // folded pattern (ocr-fold.ts) — a pass that names what it folded.
     const exact = new RegExp(expectation.match).test(seen);
-    const folded = !exact && foldedMatch(expectation.match, seen);
-    const ok = exact || folded;
+    const folded = exact ? undefined : foldedMatch(expectation.match, seen);
+    const ok = exact || folded !== undefined;
     if (!ok) pass = false;
     parts.push(
       `vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}` +
-        (folded ? ` (only with ${foldedCharacters(expectation.match, seen)} folded — ${RECOGNIZER_DIFFERENCE})` : ''),
+        (folded !== undefined ? ` (only with ${namePairs(folded)} folded — ${RECOGNIZER_DIFFERENCE})` : ''),
     );
   }
   let heightUnchecked: string | undefined;
