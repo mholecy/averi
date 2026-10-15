@@ -1,6 +1,7 @@
 # Plan: a ground-truth lab app and a golden mode for the harness
 
-Answers `2026-10-15-proposal-find-bugs-in-batches.md` (P1 + P2, with P3/P5/P6 placed around them). Written 2026-10-15
+Answers `2026-10-15-proposal-find-bugs-in-batches.md` (P1 + P2, with P3/P5/P6 placed around them; the proposal lives
+in the main checkout's docs/plans, not committed, so not on this branch). Written 2026-10-15
 on `truth/phase-0-1`, branched from `arch/round-18` @ `dda435b`. Separate from the round-19 fix work: it touches no
 file under `src/`.
 
@@ -71,7 +72,7 @@ matters for `Tapped` is whether the action fired.
 ### Phase 1 — iOS walking skeleton (this branch)
 
 - SwiftUI lab app, three cells:
-  - `open` — three coloured targets, no layer;
+  - `open` — four coloured targets (A–D), no layer;
   - `sheet-medium` — a form of coloured targets, a sheet at the medium detent presented on appear (targets under the
     dim above it and under the sheet; a target inside the sheet);
   - `alert-dim` — the form beneath a SwiftUI alert (the round-18 note
@@ -104,8 +105,8 @@ that, so forms are a cell family of their own, with an oracle of their own — t
 | `form-prefilled` | fields pre-filled, as a dev flavour does | a `fill` without `clear` that must not destroy content; a `clear` that must |
 | `form-picker` | a country field opening a sheet with a long list (the SWIFT form's country sheet) | `scroll_until` in a sheet, a row tap, the value back in the field |
 
-Text cells for P5's sample (typographic quotes, NBSP, diacritics) are fields and labels here too, so `fill`, the
-tree's text and `ocr` are judged on the same strings. The golden spec gains rows per verb: the field's value after
+Text cells for P5's sample (typographic quotes, NBSP, diacritics) are fields and labels here too, so `fill` and the
+tree's text are judged on the same strings. `ocr` on them moved to phase 4, with OCR against real pixels. The golden spec gains rows per verb: the field's value after
 `fill` equals what was asked, an error the app shows is the one `assert … error:` reads, and so on.
 
 A replayed tree is static: typing changes nothing in it, so `fill` / `type_text` / `clear` cannot be judged by replay.
@@ -139,7 +140,9 @@ that does not fail shows a hole in the truth or the spec table.
 
 One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells
 for P5's sample. OCR judged against real pixels (the macOS recognizer on the captured screenshot; skipped where it
-is unavailable). The RN modal cases only if the existing RN trees do not cover them.
+is unavailable), phase 1b's text samples included. The covering layer per target (the proposal's P1, "the covering
+layer, if any") is recorded in the truth file here; until then the cell's `layer`, the declared kind and the probe's
+events (`dismissed`, another target's `tap`) stand for it (ADR 0020, residuals). The RN modal cases only if the existing RN trees do not cover them.
 
 ### Phase 5 — live golden
 

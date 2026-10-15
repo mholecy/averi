@@ -22,12 +22,15 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    frame and a tree's rect is a finding about the tree, not about the truth.
 2. **Golden judges classes, not wording.** Tapped or refused and the remedy named; passed or failed; reached or stopped;
    a tap or a stroke sent or not. The table that maps a truth to its classes lives in code
-   (scripts/differential/golden-spec.ts), each row citing the rule or ADR that decides it. Wording stays the OLD/NEW
+   (scripts/differential/golden-spec.ts), each row citing the rule or ADR that decides it. A reply saying the target is
+   not in the tree is no evidence either way: every row classes it as the "not in the tree" mismatch, never a pass —
+   unless the row's truth allows the target to be absent (a lazy row not laid out). Wording stays the OLD/NEW
    differential's business.
 3. **A broken cell is reported, not judged.** When a capture's sources disagree with each other — declared open but not
    reached, a probe tap that left no touch in the app, an open control the probe did not reach (the consistency checks
-   of scripts/truth/truth.ts) — the cell says nothing about averi: it is listed broken,
-   its rows are not asked, and the run fails until the cell is fixed or recaptured.
+   of scripts/truth/truth.ts) — it says nothing about averi: it is listed broken and the run fails until the cell is
+   fixed or recaptured. What is not asked: on a coloured-target cell, the broken target's rows (its other targets are
+   still judged); on a form cell, every row of the cell, once any control is broken.
 4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch by
    `<run>/<file> <target> <verb>` with its note (the bug note, or the class: "not in the tree"). A listed mismatch that
    stops occurring fails the test until it is struck off; a new one fails it until it is fixed or listed with its note.
