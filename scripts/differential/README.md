@@ -100,7 +100,13 @@ whether a raw tap at its centre fired its action, what else that tap made the ap
 control that the tap reached the app at all — and how much of the target the screenshot shows in its own colour). The
 fake device serves that screenshot instead of the grey frame (and refuses a profile whose frame is not its size);
 `golden-spec.ts` says what each verb must answer for each kind of truth (tapped or refused and the remedy, colour pass
-or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. A reply that says the
+or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. It is a façade over
+one file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars; false-covers to come), the
+judges they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv,
+R-sliver, R-stroke, R-land, R-fully, R-band, R-under-chrome, R-dismiss; R-direction declared live only — golden never
+asks a row marked `live`). A row type is asked only of a target whose truth carries a measured `geometry` other than
+`whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
+clips or its chrome — no capture before phase 3 does). A reply that says the
 target is not in the tree (a tap "waiting for element … to appear", scroll_until's "never appeared in the tree", an
 assert's "not found within") is judged by its effect first — a tap refused without its remedy, a stroke beneath the
 presented layer is the row's own mismatch; only where the row would accept it is it no evidence either way, its
@@ -119,7 +125,10 @@ device's `differential:`) or whose call sent a command the fake does not model (
 this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
 <verb>` with their class, their reply's kind (`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL,
 refused, other), the taps and swipes they sent and their notes — a ratchet both ways (one fixed fails until struck off;
-a new one fails until fixed or listed; one whose class, reply kind or device calls change fails until re-noted).
+a new one fails until fixed or listed; one whose class, reply kind or device calls change fails until re-noted). The
+ratchet is kept per cell family, `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's
+cells only, aggregated by golden.test.ts, which refuses a row filed under another family's file); a row may say what it
+is beside its class — `as: bug:<docs/bugs file>` or `residual:<decision>`.
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with
@@ -142,6 +151,14 @@ keyboard preferences):
 node --import tsx scripts/truth/live.ts --udid <lab udid> [--wda-port 8120] [--sources idb,wda] [--cases k1,b1]
 ```
 
+The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
+false-covers — scripts/truth/schema.ts#FAMILIES); both apps bundle `fixtures/apps/cells.json`, which
+`node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1 when it is stale;
+tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app routes it to its
+family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged into the averi.yaml
+golden replays it under (`differential.ts#configFor`, through the truth's `config`). How to add a cell:
+docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3, B1.
+
 The capture is one module, `scripts/truth/capture-run.ts#capture(lab, cells, opts)`, over a `LabDevice`
 (`scripts/truth/lab-device.ts`: launch a cell in a fresh process and wait for its `ready`, read the app's state file,
 a raw tap, the screenshot, the raw trees): `IosLab` (simctl, idb, WDA's own `/source`) and `AndroidLab` (adb). The
@@ -157,10 +174,11 @@ the simulator):
 ```sh
 cd fixtures/apps/ios && xcodegen generate && xcodebuild -scheme AveriLab -destination 'id=<udid>' -derivedDataPath build build
 xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app
-node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run> [--cells form-basic,…]
+node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run> [--family forms] [--cells form-basic,…]
 ```
 
-A run of `--cells` adds to (or replaces those cells in) the run's manifest; the other cells keep their captures. A
+`--family` keeps the cells of those families, `--cells` those cells (both given: the named cells of those families); a
+name that matches nothing is an error. A run of some cells adds to (or replaces those cells in) the run's manifest; the other cells keep their captures. A
 manifest names one device: a run into a directory captured on another device is refused. Exit code 1 when a cell is
 broken.
 
@@ -171,7 +189,7 @@ pixels, uiautomator's units (`scale` 1); the golden profile is the fake device's
 ```sh
 cd fixtures/apps/android && ANDROID_HOME=~/Library/Android/sdk ./gradlew assembleDebug
 adb -s <serial> install -r fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk
-node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests/fixtures/truth/android-<avd>-api<N>
+node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests/fixtures/truth/android-<avd>-api<N> [--family presented]
 ```
 
 The Android app builds the coloured-target cells; a form cell or another layer is skipped and said so (phase 2b brings
