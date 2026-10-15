@@ -174,6 +174,13 @@ describe('consistency with a measured geometry', () => {
     // Its rounded centre on the screen's last row is on it: probed as ever.
     expect(consistency(T({ frame: rect(51, 810, 300, 127), geometry: 'partly-centre-in', reached: true, probe: [ev('touch', '201,874')] }), 'ios', { width: 402, height: 875 })).toBeUndefined();
   });
+  it('unmeasured, a declared-open target whose centre lies off the screen is broken (the phase-1 rule); presented-over is not', () => {
+    const off = T({ frame: rect(51, 850, 300, 64), reached: false, probe: [], drawn: 0.4 });
+    expect(consistency(off, 'ios', { width: 402, height: 874 })).toBe('declared open, but its centre (201,882) lies off the screen: never probed');
+    expect(consistency({ ...off, declared: 'presented-over' }, 'ios', { width: 402, height: 874 })).toBeUndefined();
+    // Measured, the same frame's geometry says what holds: its centre cut off by the screen's edge, never probed.
+    expect(consistency({ ...off, geometry: 'centre-out' }, 'ios', { width: 402, height: 874 })).toBeUndefined();
+  });
   it('the status bar on Android swallows the probe (no touch, not reached); on iOS the touch is the app\'s, reached or not', () => {
     const band = T({ frame: rect(51, 10, 300, 64), geometry: 'status-band', reached: false, probe: [] });
     expect(consistency(band, 'android')).toBeUndefined();
@@ -306,5 +313,15 @@ describe('capture with a measured geometry', () => {
     const t = await truthOf();
     expect(Object.keys(t)).toEqual(['cell', 'layer', 'device', 'screen', 'scale', 'targets']);
     expect(Object.keys(t.targets[0])).toEqual(['tag', 'id', 'color', 'declared', 'frame', 'reached', 'probe', 'drawn', 'seen']);
+  });
+
+  it('a state reporting none of it: an open target with its centre off the screen is never tapped there, and broken', async () => {
+    const lab = new GeometryLab({});
+    const cell = { ...CELL, targets: CELL.targets.slice(1, 2), config: undefined };
+    const { broken } = await capture(lab, [cell], { out, note: 't', catalog: [cell], log: () => undefined });
+    expect(lab.taps).toEqual([]);
+    expect(broken).toEqual(['edges/B: declared open, but its centre (20,40) lies off the screen: never probed']);
+    const [b] = (await truthOf()).targets;
+    expect([b.geometry, b.reached, b.probe, b.unprobed]).toEqual([undefined, false, [], 'its centre (20,40) lies off the 40x40 screen']);
   });
 });

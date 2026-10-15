@@ -22,9 +22,9 @@ import { centreOnScreen, consistency, controlConsistency, measuredGeometry, outO
  * centred where its frame is gets a second probe at the piece's centre (`reachedAtPiece`). A state reporting none of it
  * — every cell before phase 3 — captures as before. On any cell, a target whose probe point (probePoint, its rounded
  * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
- * no touch — and records why (`unprobed`), `reached` false; so is an Android target whose centre lies in the navigation
- * band (truth.ts#unprobedBand: what a tap there does is unmeasured, and on three-button navigation it would leave the
- * app).
+ * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
+ * phase 3: truth.ts#consistency); so is an Android target whose centre lies in the navigation band (truth.ts#unprobedBand:
+ * what a tap there does is unmeasured, and on three-button navigation it would leave the app).
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown and
  * its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus per

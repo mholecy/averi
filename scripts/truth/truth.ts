@@ -111,12 +111,15 @@ const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive cont
  * target cut with its centre in what shows is reached, and so is one overlapped at its edge by a band or the chrome
  * (its centre clear; what of it is drawn is not held to DRAWN); one whose centre lies outside what shows (`centre-out`,
  * `outside-scroll-view`) is not; a sliver, a centre under chrome and, on iOS, a centre in a band (the touch is the
- * app's window's) may be either (what fires there is the truth the rows read).
+ * app's window's) may be either (what fires there is the truth the rows read). Unmeasured, a declared-open target whose
+ * centre lies off the screen is broken, as the phase-1 rule has it: never probed, it is never reached.
  */
 export function consistency(t: TargetTruth, platform?: 'ios' | 'android', screen?: { width: number; height: number }): string | undefined {
   const g = t.geometry ?? 'whole';
   if (g === 'off-screen') return t.reached || t.probe.length > 0 || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
   if (screen !== undefined && !centreOnScreen(t.frame, screen)) {
+    // Unmeasured (no geometry): the phase-1 rule — an open target must be reached, and one never probed is not.
+    if (t.geometry === undefined && t.declared === 'open') return `declared open, but its centre ${at(probePoint(t.frame))} lies off the screen: never probed`;
     return t.reached || t.probe.length > 0 ? `its centre ${at(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
   }
   if (unprobedBand(platform, g)) return t.reached || t.probe.length > 0 ? 'nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe' : undefined;
