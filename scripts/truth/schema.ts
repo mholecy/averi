@@ -29,8 +29,21 @@ export interface CatalogTarget {
   declared: Declared;
 }
 
+/**
+ * The cell families (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3): one catalog file
+ * (fixtures/apps/cells/<family>.json), one app file per platform, one golden-spec file and one KNOWN file each, so cells
+ * of different families are written apart. `base` the open control; `presented` a layer presented over the targets
+ * (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the screen's edge;
+ * `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar that is no cover.
+ * In this order in the generated catalog (scripts/truth/catalog.ts).
+ */
+export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers'] as const;
+export type Family = (typeof FAMILIES)[number];
+
 export interface CatalogCell {
   id: string;
+  /** The family whose file holds it — set by the generator (scripts/truth/catalog.ts), never written in a family file. */
+  family?: Family;
   /** `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`. */
   layer: string;
   targets: CatalogTarget[];
@@ -85,6 +98,7 @@ export interface CatalogForm {
 
 export interface Catalog {
   version: number;
+  note?: string;
   cells: CatalogCell[];
 }
 

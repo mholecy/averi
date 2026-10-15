@@ -1,0 +1,5 @@
+{
+  "family": "edges",
+  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it) — phase 3 B2 (calibration.json: #4, #6, #9, #10, #12, #13, #17, #29). App files: AveriLab/Edges.swift, Edges.kt.",
+  "cells": []
+}

@@ -1,0 +1,5 @@
+{
+  "family": "false-covers",
+  "note": "What is no cover: a target's own parts (a button's text, a field's scroll bar), a toolbar host over the keyboard dismissal (with a config variant) — phase 3 B5 (calibration.json: #7, #8, #18, #19). App files: AveriLab/FalseCovers.swift, FalseCovers.kt.",
+  "cells": []
+}
