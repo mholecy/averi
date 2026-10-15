@@ -1936,6 +1936,12 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     );
   });
 
+  it('a sheet that moved to another detent between the two reads of a stop that sent no swipe: the failure says the sheet moved, not that a swipe moved it', () => {
+    const played = play(IPHONE, [rowOf('swiftFeesSheet', 'swift_payment.form.debit_select'), rowOf('swiftFeesSheetExpanded', 'swift_payment.form.debit_select')]);
+    expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
+    expect(failureOf(played, 'id:swift_payment.form.debit_select').message).toMatch(/^scroll_until id:swift_payment\.form\.debit_select stopped before any swipe — .* so none was sent\. Last rect .* viewport; the sheet moved from its Half screen detent to Expanded$/);
+  });
+
   it('Contacts\' discard popover over a row of the New Contact sheet: no stroke (one would close the popover), the stop is `presented`', () => {
     const played = play(IPHONE, [rowOf('contactsDiscardPopover', 'Insert add instant message'), rowOf('contactsDiscardPopover', 'Insert add instant message')]);
     expect(strokesToward(played)).toEqual([]);
@@ -1985,27 +1991,27 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     /** The same cell, read where no screen is presented over it (the popover closed): a tree of the cell alone. */
     const unpresented: Row = { found: [node({ role: 'container', label: 'add instant message', rect: { x: 20, y: 1306, width: 362, height: 52 } })] };
 
-    it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the dim at the touch-down (201,699)', () => {
+    it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the action sheet WDA types in the popover\'s layer — reaching the whole screen — at the touch-down (201,699)', () => {
       const played = play(IPHONE, [BELOW, BELOW]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'role:container label:"add instant message"').message).toBe(
         'scroll_until role:container label:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ' +
-          'container "dismiss popup" (0,0 402x874) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, ' +
-          'and a swipe on it may dismiss it, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport',
+          'other "Are you sure you want to discard this new contact?" (10,78 240x169, reaching 0,0 402x874) — an action sheet is presented over it ("Are you sure you want to discard this new contact?") — close it first, ' +
+          'and a swipe would land on the action sheet, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport',
       );
     });
 
-    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the dim at the touch-down (201,699)', () => {
+    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the action sheet at the touch-down (201,699)', () => {
       const tree = screens.contactsDiscardPopoverKeyboardDown;
       const text = [...everyNode(tree)].find((x) => x.role === 'text' && x.label === 'add instant message')!;
       expect(text.rect).toEqual({ x: 20, y: 1306, width: 362, height: 52 });
       const row: Row = { tree, found: [text] };
       const played = play(IPHONE, [row, row]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'text:"add instant message"').message).toMatch(
-        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
+        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it /,
       );
     });
 
@@ -2037,7 +2043,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [field, field]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       // Asked where the stroke would touch down above the keyboard (swipe.ts#strokeRoom's cut), not on its keys at (201,699).
-      expect(played.outcome).toMatchObject({ kind: 'presented', touchDown: { x: 201, y: 459 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', next: { touchDown: { x: 201, y: 459 } } });
       expect(failureOf(played, 'role:container label:"add field"').message).toMatch(
         /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
       );
@@ -2085,7 +2091,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
       expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 1 });
       expect(failureOf(played, 'role:container label:"add instant message"').message).toMatch(
-        /^scroll_until role:container label:"add instant message" stopped after 1 swipe, without swiping further — element lies below the viewport, .*, and a swipe on it may dismiss it, so no further swipe was sent\. Last rect /,
+        /^scroll_until role:container label:"add instant message" stopped after 1 swipe, without swiping further — element lies below the viewport, .*, and a swipe would land on the action sheet, so no further swipe was sent\. Last rect /,
       );
     });
 
@@ -2108,7 +2114,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const row: Row = { tree, found: [twin], screen: eitherWayUp };
       const played = play({ ...IPHONE, direction: 'up', maxSwipes: 5, timeoutMs: 30_000 }, [row, row, row, row]);
       expect(played.steps.map((st) => (st.do === 'stroke' ? st.toward : st.do))).toEqual(['up', 'up', 'confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 2, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 2, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'label:"dismiss popup"').message).toMatch(
         /^scroll_until label:"dismiss popup" stopped after 2 swipes, without swiping further — element is in the viewport but CLIPPED at [a-z/]+, 10% of it is in the viewport, and the next swipe would touch down at \(201,699\) on scrollable \(31,456 340x355\) — a screen is presented over it /,
       );
@@ -2118,7 +2124,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const failed: Row = { error: 'WDA /source returned 500' };
       const played = play(IPHONE, [BELOW, failed, failed, failed]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'confirm', 'confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
     });
 
     it('sideways (synthetic: a carousel of the screen beneath, a presented dim over the screen): a card wholly right of the viewport, or left of it, is named on that side, and the next swipe would touch down on the dim', () => {
@@ -2140,7 +2146,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [unpresented, unpresented, BELOW]);
       expect(played.outcome?.kind).toBe('bound');
       expect(failureOf(played, 'role:container label:"add instant message"').message).toMatch(
-        /\. The next swipe would have touched down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; no scroll moves it out from under that screen$/,
+        /\. The next swipe would have touched down at \(201,699\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it \("Are you sure you want to discard this new contact\?"\) — close it first$/,
       );
     });
 
@@ -2285,5 +2291,56 @@ describe('round — fully: true on a row its scroll view cuts, the content exhau
     const message = failure(listRow({ y: 456, height: 418 }, 850));
     expect(message).toContain('element is in the viewport but CLIPPED at bottom, 56% of it is in the viewport, and the content is exhausted');
     expect(message).toContain('The element cannot be fully revealed — that is a layout defect (no clearance for an overlay?)');
+  });
+});
+
+describe('round — a sheet whose detent the swipes changed', () => {
+  // A sheet's grabber says its detent in its value (`Sheet Grabber`, `Half screen` / `Expanded`): a stroke on a half
+  // sheet's list at its top drags the sheet up before it scrolls the list.
+  const sheet = (detent: string | undefined, y: number): Row => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+    const grabber = detent === undefined ? [] : [node({ role: 'button', label: 'Sheet Grabber', value: detent, rect: { x: 152, y: 58, width: 98, height: 24 } })];
+    return { tree: node({ role: 'container', rect: IPHONE_BOX, children: [...grabber, row] }), found: [row] };
+  };
+  const MOVED = '; the sheet moved from its Half screen detent to Expanded';
+
+  it('a stop says the sheet moved from the detent the first read showed to the one the last read showed', () => {
+    const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Expanded', 300)])));
+    expect(reply).toBe(`fully visible after 1 swipe${MOVED}`);
+  });
+
+  it('a failure says it too, after the rest of its sentence — the verdict unchanged', () => {
+    const message = failureOf(play(IPHONE, [sheet('Half screen', 5_000), sheet('Expanded', 4_990), sheet('Expanded', 4_980), sheet('Expanded', 4_970), sheet('Expanded', 4_960)]), 'id:row_7').message;
+    expect(message).toMatch(/^scroll_until id:row_7 failed after 4 swipes \(maxSwipes\) — element in tree but never intersected the 402x874 viewport/);
+    expect(message.endsWith(MOVED)).toBe(true);
+  });
+
+  it('a failure judged by absence keeps its class with the clause attached: a target no read held is ElementNotFoundError', () => {
+    const empty = (detent: string): Row => ({ tree: node({ role: 'container', rect: IPHONE_BOX, children: [node({ role: 'button', label: 'Sheet Grabber', value: detent, rect: { x: 152, y: 58, width: 98, height: 24 } })] }), found: [] });
+    const played = play(IPHONE, [empty('Half screen'), empty('Expanded'), empty('Expanded'), empty('Expanded')]);
+    expect(played.outcome?.kind).toBe('bound');
+    const error = failureOf(played, 'id:row_7');
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message.endsWith(MOVED)).toBe(true);
+  });
+
+  it('a detent the same at the first and last read is not mentioned, whatever it was between', () => {
+    const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Half screen', 300)])));
+    expect(reply).toBe('fully visible after 1 swipe');
+  });
+
+  it('two sheets stacked, the top one closed meanwhile: the lower sheet\'s grabber is last at the end — another sheet, not a detent change, so nothing is said', () => {
+    const stacked = (detents: readonly string[], y: number): Row => {
+      const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+      const grabbers = detents.map((value) => node({ role: 'button', label: 'Sheet Grabber', value, rect: { x: 151, y: 58, width: 100, height: 24 } }));
+      return { tree: node({ role: 'container', rect: IPHONE_BOX, children: [row, ...grabbers] }), found: [row] };
+    };
+    const played = play(IPHONE, [stacked(['Half screen', 'Expanded'], 900), stacked(['Half screen'], 300), stacked(['Half screen'], 300)]);
+    expect(describeScrollResult(resultOf(played))).toBe('fully visible after 1 swipe');
+  });
+
+  it('a grabber only one of the two reads holds (a sheet presented or closed) says nothing of a detent', () => {
+    expect(describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet(undefined, 300), sheet(undefined, 300)])))).toBe('fully visible after 1 swipe');
+    expect(describeScrollResult(resultOf(play(IPHONE, [sheet(undefined, 900), sheet('Expanded', 300), sheet('Expanded', 300)])))).toBe('fully visible after 1 swipe');
   });
 });

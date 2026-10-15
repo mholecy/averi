@@ -5,6 +5,10 @@ in the form the captures support, with the presented-surface guard and the `hidd
 (a), the parked off-screen cell content fixed alongside it). Narrowed the same day on the slice's review: a hidden
 subtree's root is no structural wrapper (owner decision); a parked element needs the measured scroll-view shape; a
 hidden node excused at a target's centre is still listed in `Exposure.centreExcused`.
+Amended 2026-10-15 (owner decisions Q1 and Q3 on the round-20 architecture review, with ADR 0018's amendment "the
+presented layer is the source's fact"): the parser reads a whole layer's flags to mark a presented screen, never one
+node's and never a target's; Decision 1's guard is the shape fallback's, asked only of a tree whose source did not
+judge presented layers; residual 3 closed for WDA (see "Amendment: the presented layer is the source's fact" below).
 
 ## Context
 
@@ -79,6 +83,34 @@ the Table (a scroll view, no wrapper) roots a hidden subtree. That Table is the 
 (ADR 0018). Unguarded, the rule would stop it covering the list's rows; on that capture the popover's own dim still
 covers them, but a sheet so marked over a list with no second dim would let a tap through (pinned on a synthetic tree
 in tests/ui-tree/draw-order-hidden.test.ts).
+
+## Amendment: the presented layer is the source's fact (2026-10-15)
+
+Owner decisions Q1 and Q3 on the round-20 architecture review; ADR 0018's amendment of the same name is the decision,
+this one what it changes here. Residual 3 below is a measured platform fact, not a misreading: UIKit's modal
+presentation hides the presenting screen from accessibility, and where idb and uiautomator drop that screen from the
+tree, WDA lists it whole with every node `isVisible="0"`. The parser now reads that fact once, for the LAYER
+(`adapters/wda-source.ts#presentedScreen`): a Window's first screen-sized layer with visible content on the screen,
+laid after screen-sized content layers of the same Window every node of which reads `isVisible="0"`, is marked
+presented (`UiNode.presentation` `screen`); draw order covers the screen beneath through it (ADR 0018).
+
+- **What it reads, and what it never reads.** A whole layer's flags AND a visible later layer beside it — the two
+  together, corroboration, never one flag alone. Never one node's flag (residual 2: `isVisible` alone is no geometric
+  truth — Account Detail's search icon reads `0` on screen), and never the target's own: Decision 1's "a target's
+  own flags are never read" stays true, and a target beneath a sheet is judged covered because its LAYER is beneath a
+  marked one, not because it reads `0`. Measured over the 59 raw WDA payloads of the differential corpus: a mark on
+  exactly the 28 with a presented screen, none on the 31 without (Safari's capsule layer over a visible web layer,
+  Settings, the pushed SWIFT form, Account Detail, MyPort, the Contacts list, a dismissed country sheet).
+- **Decision 1's guard.** "Except a node that is the surface of a screen presented over the target's
+  (`presentedSurface`)" now holds only on a tree whose source did not judge presented layers (no
+  `UiNode.presentationsJudged` on its root — for `hidden`, which only a flagged payload sets, a snapshot printed before
+  the marks): there the surface is the shape fallback's (`presented-by-shape.ts#PresentedByShape.presentedSurface`). On
+  a judged tree no hidden node is excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover,
+  must still cover the list beneath — holds by the mark instead: a marked layer covers the screen beneath through its
+  own cover, which no row excuses, whatever its hidden nodes. Reading the marks in the guard (a hidden node of a marked
+  layer covering as before) was measured and not taken: 36 replies on the three expanded country-sheet trees, wording
+  only, each naming a hidden child where its visible control lies — `text "Kosovo" (42,67 55x21)`, WDA-hidden, for the
+  row's `button "Kosovo" (24,55 354x45)` — so it waits on a naming rule (residual 6).
 
 ## Decision 2: parked cell content (Q-E (a), narrowed to the measured shape)
 
@@ -179,10 +211,27 @@ target on screen was lost.
    guard), so the measured verdicts hold; but a presented screen whose surface `presentedSurface` does not name (a
    medium sheet under 90 % of the screen, an RN modal whose dimming view is a wrapper with children — ADR 0018
    residual 2) leaves such a target read as clear where its own screen's chrome lay over it. Measured on the payee
-   row's lesson: WDA's flags say "occluded", which the rule takes for "not drawn".
+   row's lesson: WDA's flags say "occluded", which the rule takes for "not drawn". An ALERT is no longer such a
+   screen (2026-10-15, ADR 0018 "Amendment: a layer holding an alert"): the SwiftUI exit alert over the SWIFT form
+   has a bare dim `presentedSurface` does not name, and its form's targets read clear (a tap reported done); the
+   parser now marks the `Alert` (`UiNode.presentation`), whose layer covers the whole screen beneath it. The
+   target's own flag is still never read.
+   **Closed for WDA** (2026-10-15, "Amendment: the presented layer is the source's fact" above), within the flags
+   rule's reach: the occluded screen's flags are now the evidence that marks the layer over it, so a presented screen
+   laid as a screen-sized layer of the same Window as the screen beneath, which WDA reports wholly `0`, covers that
+   screen's targets through the marked layer, whatever its surface's shape — the half sheet, the RN modal and the
+   action sheet included. Stands for a presented screen in a LATER Window (the rule is per Window; none measured —
+   ADR 0018's residual 3, though a typed layer in any Window is marked), for a presented layer under
+   `SCREEN_SIZED_FRACTION` of its Window (the rule walks past it), for a tree whose source did not judge (a snapshot
+   printed before the marks), and for a presentation WDA's flags do not show so (a beneath not wholly `0`:
+   mid-animation or a non-modal sheet, unmeasured — ADR 0018's risks).
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
 5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
    was not measured) is not placed.
+6. **A hidden node of a marked presented layer is never named** (2026-10-15, the amendment above). On a judged tree
+   every node of a hidden subtree stays excused, inside a marked `screen` layer too: verdicts do not depend on it (the
+   layer covers through its own cover), but a hidden node is never the cover named at a point. Naming such nodes needs
+   a rule first, so a hidden child does not out-name its visible control.
 
 ## Bug notes
 

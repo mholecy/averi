@@ -58,21 +58,18 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
   DEFAULT_ENSURE_TIMEOUT_MS: 20_250,
 }));
 
-// The remedy sentences a description quotes have one owner too — the module that renders them: the tap's presented
-// remedy (interact/target-text.ts#PRESENTED_OVER), scroll_until's presented stop (interact/scroll-text.ts#PRESENTED_STOP)
-// and the pixel assert's (verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT). Replaced by sentinels the descriptions must quote; the
-// troubleshooting reference, a file no import reaches, is pinned against the real sentences (`actualSentences`).
-vi.mock('../../src/interact/target-text.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/interact/target-text.js')>()),
-  PRESENTED_OVER: '<the presented remedy, as interact/target-text.ts renders it>',
-}));
-vi.mock('../../src/interact/scroll-text.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/interact/scroll-text.js')>()),
-  PRESENTED_STOP: '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>',
+// The presented remedy a description quotes has one owner too — ui-tree/standing.ts, whose words every verb says:
+// `presentedRemedy` (of "it" for the tap, of "the element" for the pixel assert) and scroll_until's stop on it
+// (`presentedStop`). Replaced by sentinels the descriptions must quote; the troubleshooting reference, a file no import
+// reaches, is pinned against the real sentences (`actualSentences`).
+vi.mock('../../src/ui-tree/standing.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/ui-tree/standing.js')>()),
+  presentedRemedy: (what: 'it' | 'the element', layer?: { kind: string; label?: string }) =>
+    `<the presented remedy, as ui-tree/standing.ts renders it of "${what}"${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
+  presentedStop: (layer?: { kind: string; label?: string }) => `<the presented stop's remedy, as ui-tree/standing.ts renders it${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
 }));
 vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
-  PRESENTED_OVER_THE_ELEMENT: '<the presented remedy, as verify/pixel-poll.ts renders it>',
   OFF_THE_SCREEN: '<the off-screen miss, as verify/pixel-poll.ts renders it>',
   TOO_THIN_ON_THE_SCREEN: '<the thin-sliver miss, as verify/pixel-poll.ts renders it>',
   OUTSIDE_ITS_SCROLL_VIEW: '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it>',
@@ -131,7 +128,25 @@ describe('tool descriptions quote each operation default from its owner', () => 
 
   it('ui_snapshot: says what WDA\'s `"hidden": true` and a parked cell\'s content mean (adapters/types.ts#UiNode.hidden, adapters/wda-source.ts#parkedIn)', () => {
     expect(description('ui_snapshot')).toContain('"hidden": true');
+    expect(description('ui_snapshot')).toContain('a screen presented over that element covers it all the same, through the layer WebDriverAgent shows presented');
     expect(description('ui_snapshot')).toContain('at its cell\'s rect');
+  });
+
+  it('ui_snapshot: says what WDA\'s `"presentation": "alert"` means (adapters/types.ts#UiNode.presentation): the alert covers the whole screen beneath it', () => {
+    expect(description('ui_snapshot')).toContain('"presentation": "alert"');
+    expect(description('ui_snapshot')).toContain('covers the whole screen beneath it');
+  });
+
+  it('ui_snapshot and scroll_until: the alert\'s remedy is quoted from its owner (ui-tree/standing.ts) — of "it" for tap and scroll_until, of "the element" for color/ocr — never typed out', () => {
+    expect(description('ui_snapshot')).toContain(
+      'tap and scroll_until refuse a target there naming the alert (\'<the presented remedy, as ui-tree/standing.ts renders it of "it" under an alert titled …>\'), ' +
+        'color/ocr fail closed likewise (\'<the presented remedy, as ui-tree/standing.ts renders it of "the element" under an alert titled …>\')',
+    );
+    expect(description('ui_snapshot')).toContain(
+      'an action sheet or a popover is named the same way; under a "screen" layer they name what of that layer lies at the point — the layer itself where nothing of it draws — and say \'<the presented remedy, as ui-tree/standing.ts renders it of "it">\'',
+    );
+    expect(description('scroll_until')).toContain('on … — <the presented stop\'s remedy, as ui-tree/standing.ts renders it under an alert titled …>, so none was sent"');
+    for (const tool of ['ui_snapshot', 'scroll_until']) expect(description(tool)).not.toContain('an alert is presented over');
   });
 
   it('ui_snapshot: says what the root\'s dialect marks mean — WDA\'s `"unclippedFrames": true` (adapters/types.ts#UiNode.unclippedFrames) and idb\'s `"flatList": true`', () => {
@@ -270,13 +285,9 @@ async function actualSentences(): Promise<{
   OUTSIDE_ITS_SCROLL_VIEW: string;
   TOO_THIN_IN_ITS_SCROLL_VIEW: string;
 }> {
-  const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
-  // The actual scroll-text.ts still imports the MOCKED target-text.ts: its stop sentence is built on the tap's sentinel,
-  // which is put back here for the owner's real words.
-  const { PRESENTED_OVER: sentinel } = await import('../../src/interact/target-text.js');
-  const built = (await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js')).PRESENTED_STOP;
-  const PRESENTED_STOP = built.replace(sentinel, PRESENTED_OVER);
-  const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
+  const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+  const [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT] = [presentedRemedy('it'), presentedStop(), presentedRemedy('the element')];
+  const { OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
     '../../src/verify/pixel-poll.js',
   );
   return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW };
@@ -290,9 +301,9 @@ async function actualSlack(): Promise<number> {
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
 describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
-  const TAP_SENTINEL = '<the presented remedy, as interact/target-text.ts renders it>';
-  const PIXEL_SENTINEL = '<the presented remedy, as verify/pixel-poll.ts renders it>';
-  const STOP_SENTINEL = '<the presented stop\'s remedy, as interact/scroll-text.ts renders it>';
+  const TAP_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "it">';
+  const PIXEL_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "the element">';
+  const STOP_SENTINEL = '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>';
 
   it('every description quotes the owners\' sentences, never a copy of them', async () => {
     const { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
@@ -313,24 +324,30 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below). ');
     expect(description('tap')).toContain('fully: true when the next step measures it), unless a screen is presented over the target (below); ');
     expect(description('tap')).toContain(
-      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +
+      'Under a screen presented over the target — iOS wda: a layer WebDriverAgent shows presented (see ui_snapshot\'s "presentation"; an alert, an action sheet or a popover is named as ui_snapshot says); elsewhere (Android): a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +
         `'${TAP_SENTINEL}'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.`,
     );
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
     expect(description('scroll_until')).toContain(
-      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +
+      'Once a read finds the target in the viewport under a screen presented over it (as for tap: a layer WebDriverAgent shows presented, or elsewhere a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +
         `${STOP_SENTINEL}" — since a swipe there could dismiss a sheet or raise its discard prompt.`,
     );
   });
 
   it('scroll_until: a target not judged in the viewport whose swipe would touch down on that screen fails without the swipe — the description and the troubleshooting entry say so, and that a target not yet in the tree is still swiped for', () => {
     expect(description('scroll_until')).toContain(
-      'The same holds, with the same confirming read, for a target in the tree that is NOT judged in the viewport (below the fold, under the soft keyboard, cut, or under a bar of its own screen) when the next swipe would touch down on such a screen: it fails without that swipe, saying why the target is not in the viewport and where the swipe would have landed — e.g. "element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is presented over it …" — since that swipe would land on the presented screen, not on the target\'s (a popover closed, a sheet moved to another detent); a read that fails meanwhile is retried, never answered with a swipe. When a bound (maxSwipes, the timeout, content exhausted) ends the scroll first, the failure adds "The next swipe would have touched down at (x,y) on … — a screen is presented over it …". A row of the presented sheet itself is still swiped for on the sheet, and a target not yet in the tree is still swiped for.',
+      'The same holds, with the same confirming read, for a target in the tree that is NOT judged in the viewport (below the fold, under the soft keyboard, cut, or under a bar of its own screen) when the next swipe would touch down on such a screen: it fails without that swipe, saying why the target is not in the viewport and where the swipe would have landed — e.g. "element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is presented over it …" — since that swipe would land on the presented screen, not on the target\'s (a popover closed, a sheet moved to another detent); a read that fails meanwhile is retried, never answered with a swipe. When a bound (maxSwipes, the timeout, content exhausted) ends the scroll first, the failure adds "The next swipe would have touched down at (x,y) on … — a screen is presented over it …". A row of the presented sheet itself is still swiped for on the sheet, and a target not yet in the tree is still swiped for — except under a layer WebDriverAgent shows presented',
     );
     expect(TROUBLESHOOTING).toContain(
       '`scroll_until` says the same when the target is in the tree but not in the viewport (below the fold, under the soft keyboard, cut) and the next swipe would touch down on such a screen: `… — element lies below the viewport, and the next swipe would touch down at (x,y) on <that screen\'s dimming view or scroll view> — a screen is presented over it …`, and no swipe was sent, because that swipe would land on the modal or sheet (closing a popover, moving a sheet to another size) and not on the target\'s screen. A failure at a bound adds `The next swipe would have touched down at (x,y) on … — a screen is presented over it …` for the same reason. Close that screen first here too.',
+    );
+  });
+
+  it('scroll_until: under a layer WDA shows presented no swipe is sent for a target not in the tree either, but on that layer\'s own scroll view — the description says so', () => {
+    expect(description('scroll_until')).toContain(
+      'except under a layer WebDriverAgent shows presented (iOS wda: an alert, an action sheet, a popover, or a "screen" layer such as a sheet), where no swipe is sent for any target unless it would touch down on a scroll view of that layer\'s own (a search inside the sheet\'s list)',
     );
   });
 
@@ -350,10 +367,30 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
+  it('troubleshooting: under an alert — the tap\'s, scroll_until\'s (its swipe would land on the alert; a target not in the tree included), the picker\'s and color/ocr\'s words, as the owner renders them', async () => {
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    const alert = { kind: 'alert', label: '…' } as const;
+    expect(TROUBLESHOOTING).toContain(`- **\`… ${presentedRemedy('it', alert)}\`** (tap or \`scroll_until\`; iOS with \`treeSource: wda\`)`);
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${presentedStop(alert)}, so none was sent\` (or \`so no further swipe was sent\`)`);
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until … stopped before any swipe — element is not in the tree, and the next swipe would touch down at (x,y) on … — ${presentedStop(alert)}, so none was sent\``);
+    expect(TROUBLESHOOTING).toContain(`  - \`${presentedRemedy('it', alert)}\` (iOS with \`treeSource: wda\`): an alert is up over the entry's screen`);
+    expect(TROUBLESHOOTING).toContain(`the message ends \`… ${presentedRemedy('the element', alert)}\` instead: tap the alert's button that closes it`);
+  });
+
+  it('troubleshooting: an action sheet or a popover reads as the alert, named by its kind; a layer WDA shows presented stops a swipe for a target not in the tree, but on its own scroll view', async () => {
+    const { presentedRemedy } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    expect(TROUBLESHOOTING).toContain(`\`… ${presentedRemedy('it', { kind: 'actionSheet', label: '…' })}\``);
+    expect(TROUBLESHOOTING).toContain('`ui_snapshot` marks its layer `"presentation": "alert"` and the Alert itself `"presentationElement": true`');
+    expect(TROUBLESHOOTING).toContain('`ui_snapshot` marks the layer `"presentation": "screen"`');
+    expect(TROUBLESHOOTING).toContain(
+      'Under a layer WebDriverAgent shows presented (iOS with `treeSource: wda`) no swipe is sent for a target not in the tree either — `scroll_until … stopped before any swipe — element is not in the tree, and the next swipe would touch down at (x,y) on … — a screen is presented over it …` — unless the swipe would touch down on a scroll view of that layer\'s own',
+    );
+  });
+
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', async () => {
     const { PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
     expect(description('assert')).toContain(
-      `Under a screen presented over the element (a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice, and wherever the element lies, nothing of it on the screen included; a keyboard the device reports is still named first, with its own).`,
+      `Under a screen presented over the element (a layer WebDriverAgent shows presented, or a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice, and wherever the element lies, nothing of it on the screen included; a keyboard the device reports is still named first, with its own).`,
     );
     expect(TROUBLESHOOTING).toContain(
       `Under a modal or sheet still up over the element's screen the message ends \`… ${PRESENTED_OVER_THE_ELEMENT}\` instead, whatever else lies over it (the status bar, a possible cut at the navigation bar): the message still names what lies over it, and this replaces its own advice. Close that screen, then assert again.`,

@@ -29,7 +29,7 @@ import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from 
 import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
-import { containsTextHint, flattenTree } from './text-hint.js';
+import { flattenTree, textHint } from './text-hint.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5). Three tiers, cheapest first:
@@ -337,7 +337,7 @@ export class Verifier {
           const hint =
             exactText === undefined || hintScope === undefined ?
               undefined
-            : containsTextHint(hintScope, exactText);
+            : textHint(hintScope, exactText);
           return hint === undefined ? base : `${base}\n  ${hint}`;
         },
       },

@@ -1,0 +1,329 @@
+/**
+ * What a text recognizer cannot tell apart — one notion of "a recognizer
+ * difference", shared by the ocr assert, the text parity table's drift check
+ * and the element assert's not-found hint.
+ *
+ * Measured on device: macOS Vision reads Slovak `Prihlásiť sa` as
+ * `Prihlásit sa` (combining marks dropped) and a typographic `Payee’s name` as
+ * `Payee's name` (curly punctuation read as its ASCII look-alike). Neither is
+ * on the screen — the screenshot shows the right glyphs — so an exact compare
+ * of a READING against the app's copy fails on text that is correct.
+ *
+ * The fold is deliberately narrow: punctuation look-alikes and combining
+ * marks, nothing else. Case is NOT folded (a case difference renders, and the
+ * recognizer reads it); a letter keeps its base letter (only a Latin combining
+ * mark comes off), digits never change. It runs either way round: a typographic
+ * expectation read as ASCII and an ASCII one read typographic are alike, and a
+ * `match` pattern either has its own characters folded (`ocrFoldPattern`) or,
+ * naming none (`foldFree`), meets the folded reading. And it applies to
+ * recognizer readings ONLY — the tree carries the app's characters exactly, so
+ * a `’` → `'` change there is a copy change the tree can see.
+ */
+
+/** Typographic punctuation → the ASCII the recognizer reads it as. */
+const PUNCTUATION: Readonly<Record<string, string>> = {
+  '’': "'",
+  '‘': "'",
+  'ʼ': "'",
+  '′': "'",
+  '‛': "'",
+  '“': '"',
+  '”': '"',
+  '„': '"',
+  '″': '"',
+  '–': '-',
+  '—': '-',
+  '‒': '-',
+  '−': '-',
+  '…': '...',
+};
+
+/**
+ * Strip Latin combining marks only (NFD, drop U+0300–U+036F, recompose):
+ * `ť` → `t`, case and spacing untouched. Recomposing keeps every letter that
+ * has no such mark as it was — a Hangul syllable, a kana with its voicing
+ * mark — rather than leaving it in pieces.
+ */
+const foldMarks = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').normalize('NFC');
+
+/** One character's fold: its ASCII look-alike, or itself without combining marks. */
+const foldChar = (c: string): string => PUNCTUATION[c] ?? foldMarks(c);
+
+/** Code points of the composed form, so `ť` is one character whether it arrived as one or as `t` + caron. */
+const charsOf = (s: string): string[] => [...s.normalize('NFC')];
+
+/** The string as the recognizer could have read it: look-alikes to ASCII, combining marks dropped. */
+export const ocrFold = (s: string): string => charsOf(s).map(foldChar).join('');
+
+/** A regex source spelling `s` literally (outside a character class). */
+const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+
+/** A character a class can list literally: escaped when the class syntax would read it. */
+const classMember = (c: string): string => (/[\]\\^-]/.test(c) ? `\\${c}` : c);
+
+/**
+ * The literal character an escape `\c` stands for when it is a fold candidate:
+ * every character the fold changes is outside ASCII, and outside ASCII an
+ * escape in a pattern without the `u` flag is an identity escape.
+ */
+const escapedLiteral = (c: string | undefined): string | undefined =>
+  c !== undefined && c.charCodeAt(0) > 0x7f && foldChar(c) !== c ? c : undefined;
+
+/**
+ * A `match` pattern folded for a folded reading, with the characters it
+ * folded — or undefined when there is nothing to fold or it cannot be folded
+ * safely.
+ *
+ * What holds: the folded pattern accepts a folded reading only if the pattern
+ * itself accepts some string that folds to it. Only the pattern's own
+ * typographic and accented characters are folded here; a pattern with none
+ * (`foldFree`) is run as written on the folded reading instead
+ * (verify/text-parity.ts#evaluateOcrAssert), which holds the same. So:
+ * - a literal character outside a class — bare or as an identity escape (`\–`)
+ *   — becomes its fold as one unit, `(?:…)`, so a quantifier after it still
+ *   binds to the whole fold (`…?` is `(?:\.\.\.)?`, never `\.\.\.?`);
+ * - in a class, a character listed on its own (not a range endpoint) whose
+ *   fold is one character and not already listed adds that fold as a class of
+ *   its own beside the class as written — `[’ -]` is `(?:[’ -]|['])`, so no
+ *   trailing `-` becomes a range — and a negated class refuses it too:
+ *   `[^’]` is `(?:(?![\'])[^’])`; range endpoints and multi-character folds
+ *   (`[…]`) stay as written;
+ * - other escapes (`\u2019`, `\d`), group names and backreference names stay
+ *   as written;
+ * - a pattern with a lookaround is not folded: the lookaround would see the
+ *   characters a folded literal stands for (`’(?<=')` accepts nothing, its
+ *   fold `'(?<=')` would accept `'`);
+ * - a pattern with a word boundary (`\b`, `\B`) is not folded when the fold
+ *   turns a letter into a word character (`é` → `e`), which would move the
+ *   boundary; a punctuation fold keeps a non-word character non-word.
+ */
+export function ocrFoldPattern(source: string): { source: string; folded: [string, string][] } | undefined {
+  const cps = [...source];
+  const folded: [string, string][] = [];
+  let out = '';
+  let boundary = false;
+  for (let i = 0; i < cps.length; i++) {
+    const c = cps[i];
+    if (c === '\\') {
+      const next = cps[i + 1];
+      if (next === 'b' || next === 'B') boundary = true;
+      const lit = escapedLiteral(next);
+      if (lit !== undefined) {
+        out += `(?:${literal(foldChar(lit))})`;
+        folded.push([lit, foldChar(lit)]);
+      } else if (next === 'k' && cps[i + 2] === '<') {
+        const end = cps.indexOf('>', i + 2);
+        const stop = end === -1 ? cps.length - 1 : end;
+        out += cps.slice(i, stop + 1).join('');
+        i = stop;
+        continue;
+      } else {
+        out += c + (next ?? '');
+      }
+      i++;
+      continue;
+    }
+    if (c === '(' && cps[i + 1] === '?' && (cps[i + 2] === '=' || cps[i + 2] === '!')) return undefined;
+    if (c === '(' && cps[i + 1] === '?' && cps[i + 2] === '<' && (cps[i + 3] === '=' || cps[i + 3] === '!')) {
+      return undefined;
+    }
+    if (c === '(' && cps[i + 1] === '?' && cps[i + 2] === '<' && cps[i + 3] !== '=' && cps[i + 3] !== '!') {
+      const end = cps.indexOf('>', i + 3);
+      const stop = end === -1 ? cps.length - 1 : end;
+      out += cps.slice(i, stop + 1).join('');
+      i = stop;
+      continue;
+    }
+    if (c === '[') {
+      const { text, end, added } = foldClass(cps, i);
+      out += text;
+      folded.push(...added);
+      i = end;
+      continue;
+    }
+    const f = foldChar(c);
+    if (f === c) {
+      out += c;
+    } else {
+      out += `(?:${literal(f)})`;
+      folded.push([c, f]);
+    }
+  }
+  if (folded.length === 0) return undefined;
+  // Without the `u` flag a word character is ASCII: a folded punctuation mark
+  // stays a non-word character, but a folded letter (`é` → `e`) becomes a word
+  // character, which would move a word boundary.
+  if (boundary && folded.some(([, f]) => /\w/.test(f))) return undefined;
+  return { source: out, folded };
+}
+
+/**
+ * Whether `source` names no character the fold changes — neither literally nor
+ * by an escape (`\u2019`, `\xe9`; a doubled backslash before one counts too,
+ * erring safe). Such a pattern is also tried, as written, on the folded
+ * reading, so what it accepts of a typographic or accented character it
+ * accepts of that character's ASCII form too: a literal `'` matches a `’`
+ * read, and so does a class or escape that leaves typographic and accented
+ * characters out — `^[a-z]+$` passes on `résumé`, `^\w+$` on `café`, with a
+ * note. A pattern that names one is written as the screen reads
+ * (`ocrFoldPattern` folds it instead): `(?<!’)s$` must still see the `’` a
+ * reading has.
+ */
+export function foldFree(source: string): boolean {
+  if (ocrFold(source) !== source) return false;
+  for (const m of source.matchAll(/\\(?:u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2}))/g)) {
+    if (parseInt(m[1] ?? m[2], 16) > 0x7f) return false;
+  }
+  return true;
+}
+
+/**
+ * The characters of `read` the fold changed, as `[read, fold]` pairs, where
+ * their folds lie in `[start, end)` of `ocrFold(read)` (a dropped mark: where
+ * it stood) — what a match found there in the folded reading took on trust.
+ */
+export function readingFolds(read: string, start: number, end: number): [string, string][] {
+  const pairs: [string, string][] = [];
+  let at = 0;
+  for (const c of charsOf(read)) {
+    const f = foldChar(c);
+    const next = at + f.length;
+    const inside = f.length === 0 ? at >= start && at <= end : next > start && at < end;
+    if (f !== c && inside) pairs.push([c, f]);
+    at = next;
+  }
+  return pairs;
+}
+
+/** The character a class member lists: `\-` lists `-`; a letter escape (`\d`) lists no one character. */
+const memberChar = (m: string): string | undefined =>
+  m.startsWith('\\') ? (m.length === 2 && !/[A-Za-z0-9]/.test(m[1]) ? m[1] : undefined) : m;
+
+/**
+ * The class opening at `cps[start]`, with the fold of each lone member added.
+ * Members are read the way the pattern's class syntax reads them: an escape is
+ * one member, and `x-y` is a range unless the `-` closes the class.
+ */
+function foldClass(cps: string[], start: number): { text: string; end: number; added: [string, string][] } {
+  const members: string[] = [];
+  let i = start + 1;
+  const negated = cps[i] === '^';
+  if (negated) i++;
+  for (; i < cps.length && cps[i] !== ']'; i++) {
+    if (cps[i] === '\\') {
+      members.push(cps[i] + (cps[i + 1] ?? ''));
+      i++;
+    } else {
+      members.push(cps[i]);
+    }
+  }
+  const end = Math.min(i, cps.length - 1);
+  const text = cps.slice(start, end + 1).join('');
+  if (i >= cps.length) return { text, end, added: [] };
+  const added: [string, string][] = [];
+  // Every character the class lists, or a fold already added lists: one set, so each member is asked once.
+  const listed = new Set(members.map(memberChar).filter((c) => c !== undefined));
+  for (let k = 0; k < members.length; k++) {
+    if (members[k + 1] === '-' && k + 2 < members.length) {
+      k += 2; // a range: both endpoints stay as written
+      continue;
+    }
+    const m = members[k];
+    const c = m.length > 1 && m.startsWith('\\') ? escapedLiteral(m.slice(1)) : m;
+    if (c === undefined) continue;
+    const f = foldChar(c);
+    if (f !== c && [...f].length === 1 && !listed.has(f)) {
+      added.push([c, f]);
+      listed.add(f);
+    }
+  }
+  if (added.length === 0) return { text, end, added };
+  // The added members form a class of their own beside the class as written —
+  // appended inside it, a member after a trailing `-` would turn that `-` into
+  // a range. A listed character's fold is one more character the class
+  // accepts, or, negated, one more it refuses.
+  const extra = `[${added.map(([, f]) => classMember(f)).join('')}]`;
+  return { text: negated ? `(?:(?!${extra})${text})` : `(?:${text}|${extra})`, end, added };
+}
+
+/**
+ * Equal under the fold but not exactly: the two differ ONLY in what the
+ * recognizer cannot tell apart.
+ */
+export const differsOnlyByOcrFold = (a: string, b: string): boolean => a !== b && ocrFold(a) === ocrFold(b);
+
+/**
+ * The folded characters that make `want` and `read` differ, as `’ vs '` pairs
+ * (the assert's side first), found by position: both strings are walked
+ * character by character along their folds, and wherever the two spans that
+ * fold to the same text are spelled differently, that pair is named. So
+ * `it’s Bob’s` read as `it's Bob’s` names `’ vs '` once — the second `’` was
+ * read as written. Meant for a fold-equal pair (`differsOnlyByOcrFold`).
+ */
+function foldedPairs(want: string, read: string): [string, string][] {
+  const a = charsOf(want);
+  const b = charsOf(read);
+  const pairs: [string, string][] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    // One aligned span: grow the side whose fold is shorter until both folds
+    // have the same length (equal, since the whole folds are).
+    let spanA = '';
+    let spanB = '';
+    let foldA = '';
+    let foldB = '';
+    do {
+      if (i < a.length && (foldA.length <= foldB.length || j >= b.length)) {
+        spanA += a[i];
+        foldA += foldChar(a[i++]);
+      } else if (j < b.length) {
+        spanB += b[j];
+        foldB += foldChar(b[j++]);
+      }
+    } while ((foldA.length !== foldB.length || spanA === '' || spanB === '') && (i < a.length || j < b.length));
+    if (spanA !== spanB) pairs.push([spanA, spanB]);
+  }
+  return pairs;
+}
+
+/** What the recognizer cannot tell apart, per kind of folded character — said of neither side, since either may be the typographic or accented one. */
+const CANNOT_TELL: Readonly<Record<'punctuation' | 'diacritics', string>> = {
+  punctuation: 'typographic punctuation from its ASCII look-alike',
+  diacritics: 'a letter with diacritics from one without',
+};
+
+/**
+ * Why folded pairs are forgiven, naming only the kinds present: a punctuation
+ * look-alike (`’ vs '`, either way round), a letter's diacritics (`ť vs t`), or
+ * both — `the recognizer does not tell typographic punctuation from its ASCII
+ * look-alike, nor a letter with diacritics from one without`.
+ */
+export function foldReason(pairs: readonly (readonly [string, string])[]): string {
+  const chars = pairs.flatMap(([a, b]) => [...charsOf(a), ...charsOf(b)]);
+  const kinds = (['punctuation', 'diacritics'] as const).filter((kind) =>
+    chars.some((c) => (kind === 'punctuation' ? PUNCTUATION[c] !== undefined : PUNCTUATION[c] === undefined && foldMarks(c) !== c)),
+  );
+  return `the recognizer does not tell ${kinds.map((kind) => CANNOT_TELL[kind]).join(', nor ')}`;
+}
+
+/**
+ * What a fold-equal pair differs in and why that is forgiven, for a note:
+ * `characters` is `’ vs '`, `reason` the recognizer's for the kinds of
+ * character named (`foldReason`). Two strings that differ only in how a letter
+ * is encoded (`é` as one code point or as `e` + a combining acute) have no
+ * such character and are not the recognizer's doing; that is said instead.
+ */
+export function foldDifference(want: string, read: string): { characters: string; reason: string } {
+  const pairs = foldedPairs(want, read);
+  return pairs.length > 0 ?
+      { characters: namePairs(pairs), reason: foldReason(pairs) }
+    : { characters: 'composed vs decomposed characters', reason: 'the same letters, encoded differently' };
+}
+
+/** A combining mark shown on a dotted circle, so a note can print it on its own. */
+const shown = (c: string): string => (c === '' ? 'nothing' : /^\p{M}/u.test(c) ? `◌${c}` : c);
+
+/** `’ vs ', … vs ...` — folded characters as a note names them, each pair once. */
+export const namePairs = (pairs: readonly (readonly [string, string])[]): string =>
+  [...new Set(pairs.map(([a, b]) => `${shown(a)} vs ${shown(b)}`))].join(', ');

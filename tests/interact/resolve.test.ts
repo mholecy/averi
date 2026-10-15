@@ -690,7 +690,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
     await expect(tapElement(fake, 'id:swift_payment.form.value_date_select', OPTS)).rejects.toThrow(
-      'id:swift_payment.form.value_date_select is under button "Continue to summary" (24,512 354x44) at its centre (201,571), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped',
+      'id:swift_payment.form.value_date_select is under button "Continue to summary" (24,512 354x44, reaching 24,512 354x77) at its centre (201,571), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([]);
   });
@@ -720,7 +720,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
-    await expect(tapElement(fake, 'id:fees', OPTS)).rejects.toThrow('id:fees is under button "Continue to summary" (24,512 354x44) at its centre (201,580), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped');
+    await expect(tapElement(fake, 'id:fees', OPTS)).rejects.toThrow('id:fees is under button "Continue to summary" (24,512 354x44, reaching 24,512 354x77) at its centre (201,580), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped');
     expect(fake.tapPoints).toEqual([]);
     tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);
     expect((await tapElement(fake, 'id:fees', OPTS)).moved).toBeUndefined();

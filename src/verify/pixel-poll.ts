@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { pollTree } from '../ui-tree/read-tree.js';
@@ -526,8 +526,8 @@ async function judgeOver(
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
-      // screen (ui-tree/draw-order.ts#holderOf's `parent`); the type still lets this kind carry it, and the agreement
-      // rows (tests/interact/remedy-agreement.test.ts) pin its rendering.
+      // screen (ui-tree/presented-by-shape.ts#presentedOver: the holder is the root); the type still lets this kind
+      // carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin its rendering.
       return `${keyboardCovers(element.rect, standing.band)} — ${advice(standing.remedy, () => hideKeyboard(keyboard.remedy))}`;
     case 'systemBar': {
       const bar = systemBarName(standing.bar.edge);
@@ -538,8 +538,7 @@ async function judgeOver(
       return `${cut} — ${advice(standing.remedy, () => 'scroll it up: scroll_until the element with `fully: true` first and re-run')}`;
     }
     case 'covered': {
-      const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
-      const named = `${nodeText(standing.cover).slice(0, -1)}${reach})`;
+      const named = coverText(standing.cover, standing.reach);
       return `${named} is drawn over the element ${at}) — ${coverRemedy(standing.remedy)}`;
     }
     default: {
@@ -553,7 +552,7 @@ async function judgeOver(
 /**
  * The head of the miss for an element NOTHING of which — of what the assert reads — lies on the screen judged
  * (ui-tree/standing.ts's pixel `offScreen`: below the fold, above the screen's top, past a side): no capture shows any
- * of it. Its remedy is the standing's: beneath a presented screen, close it first (`PRESENTED_OVER_THE_ELEMENT`); else
+ * of it. Its remedy is the standing's: beneath a presented screen, close it first (ui-tree/standing.ts#presentedRemedy, of "the element"); else
  * scroll it on-screen. The one sentence head the `assert` tool's description and the troubleshooting reference quote
  * (mcp/tools.ts).
  */
@@ -585,19 +584,12 @@ export const OUTSIDE_ITS_SCROLL_VIEW = 'nothing of the element is drawn: it lies
 export const TOO_THIN_IN_ITS_SCROLL_VIEW = 'only a sliver of the element is drawn, too thin to measure: the rest lies outside its scroll view';
 
 /**
- * The presented screen's remedy, said of "the element" — the pixel assert's "it" is already what is drawn over it
- * (ui-tree/standing.ts#presentedRemedy owns the words). The one sentence the `assert` tool's description quotes
- * (mcp/tools.ts).
- */
-export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
-
-/**
  * The pixel assert's advice for a standing's remedy (ui-tree/standing.ts#Remedy) where the sentence names the keyboard
- * or the navigation bar's cut: beneath a presented screen, that screen's (`PRESENTED_OVER_THE_ELEMENT`); else
+ * or the navigation bar's cut: beneath a presented screen, that screen's (`presentedRemedy('the element')`, naming an alert the tree marks); else
  * `otherwise`, told the remedy's other case. A bar or a cover words its own (`coverRemedy`).
  */
 function advice<R extends Exclude<Remedy, { readonly of: 'presented' }>>(remedy: Extract<Remedy, { readonly of: 'presented' }> | R, otherwise: (remedy: R) => string): string {
-  return remedy.of === 'presented' ? PRESENTED_OVER_THE_ELEMENT : otherwise(remedy);
+  return remedy.of === 'presented' ? presentedRemedy('the element', remedy.layer) : otherwise(remedy);
 }
 
 /**
@@ -618,7 +610,7 @@ const coverRemedy = (remedy: CoverRemedy): string => {
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   switch (remedy.of) {
     case 'presented':
-      return `the capture would show it, not the element; ${PRESENTED_OVER_THE_ELEMENT}`;
+      return `the capture would show it, not the element; ${presentedRemedy('the element', remedy.layer)}`;
     case 'fixed':
       return FIXED_REMEDY[remedy.what];
     case 'pinned':

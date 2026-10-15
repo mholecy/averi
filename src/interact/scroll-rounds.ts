@@ -1,6 +1,8 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
+import type { MarkedLayer, PresentedPress } from '../ui-tree/draw-order.js';
+import type { SheetDetent } from '../ui-tree/read-tree.js';
 import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
@@ -174,15 +176,24 @@ export type RoundStep =
  *   dismiss it (a page sheet's pull-to-dismiss, a popover closed by a touch
  *   on its dim). Either the match lies in the frame under that screen
  *   (its standing's remedy is `presented`, ui-tree/standing.ts#Remedy; `cover`
- *   the one the sentence names, that remedy's), or — `touchDown` set — it was not
- *   judged in the frame (below the fold, under the soft keyboard, cut or
- *   clipped) and the next stroke would touch down at `touchDown` on `cover`,
- *   a surface of that screen (ui-tree/draw-order.ts#DrawOrder.presentedAt).
+ *   the one the sentence names and `layer` the marked layer it names, that
+ *   remedy's), or — `next` set — it was not judged in the frame (below the
+ *   fold, under the soft keyboard, cut or clipped) and the next stroke would
+ *   touch down on a surface of that screen (`PresentedTouchDown`,
+ *   ui-tree/standing.ts#Scene.presentedAt), carried whole.
+ *   `judged` undefined: no target in the tree, and the next stroke would
+ *   touch down on a layer the tree marks as presented, off its own scroll
+ *   views (an alert, an action sheet, a popover, a `screen` layer: the same
+ *   question asked for no target) — no stroke is sent under it.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
+ *
+ * Every kind may carry `detent`: the top sheet — the same sheet at both
+ * reads — reported another detent at the last read that read than at the
+ * first (`DetentMove`).
  */
-export type ScrollOutcome =
+export type ScrollOutcome = (
   | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush }
   | {
       kind: 'stuck';
@@ -201,7 +212,8 @@ export type ScrollOutcome =
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point }
+  | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; layer?: MarkedLayer; next?: undefined }
+  | { kind: 'presented'; swipes: number; judged: Judged | undefined; viewport: Rect; next: PresentedTouchDown }
   | {
       kind: 'bound';
       swipes: number;
@@ -213,9 +225,44 @@ export type ScrollOutcome =
       keyboard?: { cover: Cover; rounds: number; read: number };
       unlocated: boolean;
       evidence: WaitEvidence;
-      /** The swipe the bound held back would have touched down at `touchDown` on `surface`, a screen presented over the target's (`presentedTouchDown`). */
-      presented?: { surface: UiNode; touchDown: Point };
-    };
+      /** The swipe the bound held back would have touched down on a screen presented over the target's (`presentedTouchDown`). */
+      presented?: PresentedTouchDown;
+    }
+) & { detent?: DetentMove };
+
+/**
+ * Where a stroke would touch down (`touchDown`, the driver's own point) on the surface of a presented screen, with
+ * that surface as a sentence quotes it — its reach and the marked layer it is the element of
+ * (ui-tree/draw-order.ts#PresentedPress): the `presented` stop's `next`, a bound's `presented`.
+ */
+export interface PresentedTouchDown extends PresentedPress {
+  readonly touchDown: Point;
+}
+
+/**
+ * A sheet that moved to another detent during the call: the detent the top
+ * sheet's grabber reported at the scroll's first read that read (`from`)
+ * and at its last (`to`) — scroll-read.ts#TreeFacts' `detent`, compared at
+ * the stop only. A stroke on a half sheet's list at its top drags the sheet
+ * up before it scrolls the list (measured: `Half screen` to `Expanded` under
+ * a stroke from (201,699)), which the verdict alone does not say; the note
+ * names no cause, as the sheet may also move between two reads with no
+ * swipe sent.
+ *
+ * Set only when both reads hold a grabber with a value, the same NUMBER of
+ * grabbers, and the values differ — whatever lay between. The count is the
+ * sheet's identity: the top sheet's grabber is the last in tree order, so
+ * with as many sheets showing one at both reads the last is the same
+ * sheet's — one closed or presented meanwhile changes the count, and the
+ * last grabber would be another sheet's. The grabber's frame cannot serve:
+ * it moves and resizes with the detent (152,411 98x24 at half, 151,58
+ * 100x24 expanded). Not caught: one sheet closed and another presented
+ * within the one call. The verdict is the same with or without it.
+ */
+export interface DetentMove {
+  from: string;
+  to: string;
+}
 
 /**
  * A `fully: true` stop whose edge along the scroll lies on its scroll
@@ -652,6 +699,8 @@ interface State {
   /** A read after a stroke found the whole tree changed from the read before — the content moved at least once (`Shortfall.absent`'s `unsearched`: not a screen no stroke ever changed). */
   readonly treeMoved: boolean;
   readonly treeUnmovedStrokes: number;
+  /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
+  readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
 }
 
 /**
@@ -732,6 +781,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     prevFingerprint: undefined,
     treeUnmovedStrokes: 0,
     treeMoved: false,
+    detents: undefined,
   };
   return state as unknown as Rounds;
 }
@@ -1150,6 +1200,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const gesture = seen.screen?.oriented;
   const now: ThisRead | undefined = read === undefined || judged === undefined ? undefined : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames, strokeLine: judged.strokeLine };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
+  if (now !== undefined) s.detents = { first: s.detents === undefined ? now.facts.detent : s.detents.first, last: now.facts.detent };
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
   const probed = s.probe;
@@ -1243,7 +1294,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
     // ask, at its touch-down (`presentedTouchDown`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the
@@ -1313,7 +1364,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s, now.facts);
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
     // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`).
-    const onPresented = presentedTouchDown(plannedStroke(s, now, gesture).step, best, now);
+    // Asked only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe
+    // would land.
+    const heldBack = plannedStroke(s, now, gesture).step;
+    const onPresented = best === undefined ? undefined : presentedTouchDown(heldBack, now, best.node);
     const by: BoundBy =
       exhausted !== undefined
       ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
@@ -1346,11 +1400,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // popover over it, and read the cell "fully visible after 1 swipe"; under the SWIFT form's Fees half sheet two
   // strokes moved the sheet to another detent and read "content exhausted". So, as for a target judged under such a
   // screen (above): one more read with no stroke between, then stop `presented` — or, should the screen be gone from
-  // the touch-down by then, stroke as before. Only for a target this read holds: one not in the tree has nothing to
-  // ask on behalf of, and is still stroked for (ADR 0018, residual 6).
-  const onPresented = presentedTouchDown(stroke, best, now);
-  if (onPresented !== undefined && best !== undefined) {
-    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown }, current === 'settle' && presentedBefore, seen.elapsedMs);
+  // the touch-down by then, stroke as before. And on behalf of NO target (none in the tree): a stroke that would touch
+  // down on a layer the tree marks as presented — an alert, an action sheet, a popover, a `screen` layer (its reach is
+  // the whole screen) — lands on it, not on any screen beneath it — the same hold and stop, it named; one on a scroll
+  // view of that layer's own (a search inside a sheet's list) is sent. A screen presented by shape alone is still
+  // stroked over for a target not in the tree: it has nothing to ask on behalf of. One question of the scene, at the
+  // touch-down (`presentedTouchDown`, ui-tree/standing.ts#Scene.presentedAt).
+  const onPresented = presentedTouchDown(stroke, now, best?.node);
+  if (onPresented !== undefined) {
+    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: onPresented }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
   const { toward } = stroke;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
@@ -1399,16 +1457,22 @@ function plannedStroke(
 }
 
 /**
- * Where `stroke` would touch down — the driver's own point (swipe.ts#scrollStroke's `from`) — when that point lies
- * on a surface of a screen presented over `best`'s own (ui-tree/draw-order.ts#DrawOrder.presentedAt, ADR 0018), asked
- * on behalf of the target this read holds; undefined when it does not, when this round did not read, or when the
- * stroke has no box. Only the touch-down is asked: it is where the gesture is recognised.
+ * Where `stroke` would touch down — the driver's own point (swipe.ts#scrollStroke's `from`) — when that point lies on
+ * a presented screen, asked of the scene (ui-tree/standing.ts#Scene.presentedAt): on behalf of `target`, a surface of
+ * a screen presented over the target's own; with no target (none in the tree), the cover of a layer the tree marks as
+ * presented, off that layer's own scroll views.
+ * Undefined when it does not, when this round did not read, or when the stroke has no box. Only the touch-down is
+ * asked: it is where the gesture is recognised.
  */
-function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): { surface: UiNode; touchDown: Point } | undefined {
-  if (best === undefined || now === undefined || stroke.box === undefined) return undefined;
+function presentedTouchDown(
+  stroke: Extract<RoundStep, { do: 'stroke' }>,
+  now: ThisRead | undefined,
+  target: UiNode | undefined,
+): PresentedTouchDown | undefined {
+  if (now === undefined || stroke.box === undefined) return undefined;
   const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
-  const surface = now.facts.scene.order.presentedAt(best.node, touchDown);
-  return surface === undefined ? undefined : { surface, touchDown };
+  const press = now.facts.scene.presentedAt(touchDown, target);
+  return press === undefined ? undefined : { ...press, touchDown };
 }
 
 /**
@@ -1497,7 +1561,16 @@ function confirm(s: Mutable<State>): { state: Rounds; step: RoundStep } {
 
 function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step: RoundStep } {
   s.done = true;
-  return { state: s as unknown as Rounds, step: { do: 'stop', outcome } };
+  const detent = detentMove(s);
+  return { state: s as unknown as Rounds, step: { do: 'stop', outcome: detent === undefined ? outcome : { ...outcome, detent } } };
+}
+
+/** The top sheet's detent at the first read that read against the last (`DetentMove`): both read, as many grabbers, values differing. */
+function detentMove({ detents }: State): DetentMove | undefined {
+  if (detents === undefined) return undefined;
+  const { first, last } = detents;
+  if (first === undefined || last === undefined || first.grabbers !== last.grabbers || first.detent === last.detent) return undefined;
+  return { from: first.detent, to: last.detent };
 }
 
 /**

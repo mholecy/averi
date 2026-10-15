@@ -1,15 +1,15 @@
-import { rectArea, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
-import { drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
+import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
-import { absenceError } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
+import { absenceError, type WaitEvidence } from './resolve.js';
+import { cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { outsideItsScrollView } from '../ui-tree/standing.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type PresentedTouchDown, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
@@ -93,6 +93,8 @@ export interface ScrollUntilResult {
    * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    */
   covered?: { by: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; shows: number };
+  /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
+  detent?: DetentMove;
 }
 
 /**
@@ -133,6 +135,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
     ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
+    ...(o.detent !== undefined && { detent: o.detent }),
   };
 }
 
@@ -147,7 +150,7 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  */
 function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): string {
   const { centreCover, shows } = judged.standing.facts;
-  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
+  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(shows)}% of it shows`;
 }
 
 /** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (target-text.ts#cutSliverText). */
@@ -184,7 +187,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   if (r.clipped.length === 0 && r.covered === undefined) {
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
-    return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}`;
+    return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}${detentText(r.detent)}`;
   }
   // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.
@@ -192,8 +195,15 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
   const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
-  return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}`;
+  return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${detentText(r.detent)}`;
 }
+
+/**
+ * The detent clause, last in every reply and failure (scroll-rounds.ts#DetentMove): a sheet moved during the call —
+ * a state change of the screen the verdict does not say, worded without a cause (a call that sent no swipe says it
+ * too). Empty when it did not.
+ */
+const detentText = (detent: DetentMove | undefined): string => (detent === undefined ? '' : `; the sheet moved from its ${detent.from} detent to ${detent.to}`);
 
 /**
  * The flush clause (scroll-rounds.ts#PROBE_REACH): what the stop's edge on
@@ -280,12 +290,10 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
         ? `, and swiping ${back} would only push it out through that edge`
         : `, and swiping ${back} was tried earlier in the scroll`;
 
-/**
- * The `presented` stop's remedy (`scrollFailure`): the presented screen's (target-text.ts#PRESENTED_OVER), and why no
- * swipe was sent — one on that screen may dismiss it. The one sentence the `scroll_until` description quotes
- * (mcp/tools.ts).
- */
-export const PRESENTED_STOP = `${PRESENTED_OVER}, and a swipe on it may dismiss it`;
+/** `, and the next swipe would touch down at (x,y) on <the surface>` — where the `presented` stop's held-back stroke would have landed (`next`); empty when it was judged in the frame. */
+const touchDownText = (next: PresentedTouchDown | undefined): string => (next === undefined ? '' : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${coverText(next.surface, next.reach)}`);
+
+const pointText = (p: Point): string => `(${p.x},${p.y})`;
 
 /**
  * The failure for every outcome but `visible`, and its class: `stuck` and
@@ -297,6 +305,13 @@ export const PRESENTED_STOP = `${PRESENTED_OVER}, and a swipe on it may dismiss 
  * the caller spelled it (resolve.ts#describeTarget).
  */
 export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
+  const { message, absence } = failureText(o, describe);
+  const full = `${message}${detentText(o.detent)}`;
+  return absence === undefined ? new Error(full) : absenceError(full, absence);
+}
+
+/** `scrollFailure`'s sentence, one case per kind, and the evidence of absence for the kinds judged by it (`covered`, `bound`). */
+function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): { message: string; absence?: WaitEvidence } {
   switch (o.kind) {
     case 'stuck': {
       const { short, viewport } = o;
@@ -320,26 +335,29 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
           o.otherWay === 'untried'
             ? ` — try direction: "${back}"; if no direction moves it, ${pinned}, and ${reach}. `
             : `${otherWayText(o.otherWay, back)} — ${pinned}, and ${reach}. `;
-        return new Error(
-          `scroll_until ${describe} failed after ${n} — ${systemBarText(short)}, and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it out from under the ${systemBarName(short.bar.edge)}${other}${last}`,
-        );
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — ${systemBarText(short)}, and the content is exhausted: ` +
+              `swiping ${o.lastStroke} no longer moves it out from under the ${systemBarName(short.bar.edge)}${other}${last}`,
+        };
       }
       // Cut to a sliver by its scroll container at the end of the content (ui-tree/standing.ts#Scene.standing):
       // the rest stays past the container's edge however it is swiped — or the node only reads cut (geometry.ts#evidentCut's residual).
       if (short.of === 'sliver') {
-        return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays past its container's edge at the end of the content — a layout ` +
-            `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutRemedy(short.cut.edge)}). ${last}`,
-        );
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
+              `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays past its container's edge at the end of the content — a layout ` +
+              `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutRemedy(short.cut.edge)}). ${last}`,
+        };
       }
       if (short.of === 'covered') {
-        return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
-            `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
-        );
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
+              `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
+              `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
+        };
       }
       // Clipped at the keyboard's edge at the end of the content: the
       // keyboard, not the layout, is what hides the rest — a container that
@@ -348,12 +366,13 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // keyboard is not the edge in question.
       const { clipped, visible } = judged.standing.facts;
       if (judged.under !== undefined && clipped.includes('bottom')) {
-        return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-            `${describeClip(clipped, visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
-            `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
-            `stays clipped with the keyboard down is it a layout defect. ${last}`,
-        );
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
+              `${describeClip(clipped, visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
+              `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
+              `stays clipped with the keyboard down is it a layout defect. ${last}`,
+        };
       }
       // Clipped, at an edge or more, by its scroll view's edge inside the screen: each edge named with what cuts it, the
       // part drawn quoted, and why the rest may stay past that scroll view — no overlay diagnosed for its edge.
@@ -375,18 +394,20 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
           longer !== undefined
             ? `It is ${longer} than what of its scroll view the screen shows: no scroll shows it whole.`
             : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${short}.`;
-        return new Error(
-          `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
-            `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
-        );
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
+              `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
+        };
       }
-      return new Error(
-        `scroll_until ${describe} failed after ${n} — ` +
-          `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
-          `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
-          `The element cannot be fully revealed — that is a layout defect ` +
-          `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
-      );
+      return {
+        message:
+          `scroll_until ${describe} failed after ${n} — ` +
+            `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
+            `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
+            `The element cannot be fully revealed — that is a layout defect ` +
+            `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
+      };
     }
     case 'covered': {
       // The absence rule holds here too: a target no
@@ -395,12 +416,13 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // could look further.
       const { cover, viewport } = o;
       const seenAs = o.evidence.sighted ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
-      return absenceError(
-        `scroll_until ${describe} failed after ${swipesText(o.swipes)} — ${seenAs}; the soft keyboard over ` +
-          `${frameText(cover.topCover)} ${cover.topCover.y + cover.topCover.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
-          hideToJudgeWholeScreen(cover.remedy),
-        o.evidence,
-      );
+      return {
+        message:
+          `scroll_until ${describe} failed after ${swipesText(o.swipes)} — ${seenAs}; the soft keyboard over ` +
+            `${frameText(cover.topCover)} ${cover.topCover.y + cover.topCover.height >= viewport.height ? 'covers the whole screen' : 'leaves nothing of the screen above its top edge'}, so nothing under it can be judged and no swipe was sent — ` +
+            hideToJudgeWholeScreen(cover.remedy),
+        absence: o.evidence,
+      };
     }
     case 'presented': {
       // Under a screen presented over it (ADR 0018): stopped without a swipe — none moves it out, and one on
@@ -408,16 +430,23 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       // viewport under that screen, the sentence says what is over it; not judged there (`touchDown`), why not
       // and where the next swipe would have landed — on that screen (`notInViewportText`). "The next swipe", not
       // "the swipe toward it": a turn, or a caller's direction away from the target, strokes the other way.
-      const { judged, cover, viewport } = o;
+      const { judged, viewport, next } = o;
       const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
+      const layer = next === undefined ? o.layer : next.layer;
+      if (judged === undefined) {
+        // No target in the tree: the next swipe would have landed on a layer the tree marks as presented
+        // (`Scene.presentedAt`, asked for no target).
+        return { message: `scroll_until ${describe} stopped ${when} — element is not in the tree${touchDownText(next)} — ${presentedStop(layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent.` };
+      }
       const where =
-        o.touchDown === undefined
-          ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
-          : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${nodeText(cover)}`;
-      return new Error(
-        `scroll_until ${describe} stopped ${when} — ${where} — ${PRESENTED_STOP}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
-          `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
-      );
+        next === undefined
+          ? `element is in the viewport but ${drawnOverText(o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, o.cover))} — ${percent(judged.standing.facts.shows)}% of it shows`
+          : `${notInViewportText(judged, viewport)}${touchDownText(next)}`;
+      return {
+        message:
+          `scroll_until ${describe} stopped ${when} — ${where} — ${presentedStop(layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+            `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+      };
     }
     case 'bound': {
       const turned =
@@ -436,8 +465,8 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const presented =
         o.presented === undefined
           ? ''
-          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${nodeText(o.presented.surface)} — ${PRESENTED_OVER}`;
-      return absenceError(`scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, o.evidence);
+          : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedRemedy('it', o.presented.layer)}`;
+      return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
   }
 }

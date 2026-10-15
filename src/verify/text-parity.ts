@@ -15,6 +15,16 @@ import {
   type OcrRegionResult,
 } from './ocr.js';
 import { failClosed } from './fail-closed.js';
+import {
+  differsOnlyByOcrFold,
+  foldDifference,
+  foldFree,
+  foldReason,
+  namePairs,
+  ocrFold,
+  ocrFoldPattern,
+  readingFolds,
+} from './ocr-fold.js';
 import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -248,21 +258,19 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  */
 
 /**
- * The forgiving form the UNREAD guard compares on: case folded, joining
- * punctuation dropped, whitespace collapsed. NEVER used for the reported
- * strings — a row's message must keep both sides verbatim so the reader sees
- * the real difference, and never for drift, which stays exact.
+ * The forgiving form the UNREAD guard compares on: the recognizer's fold,
+ * case folded, joining punctuation dropped, whitespace collapsed. NEVER used
+ * for the reported strings — a row's message must keep both sides verbatim so
+ * the reader sees the real difference — and never for drift, which forgives
+ * only the recognizer's fold.
  */
-/** Strip combining marks only (NFD, then U+0300–U+036F): `ť` → `t`, case and spacing untouched. */
-const foldMarks = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
 const looseForm = (s: string): string =>
-  // Diacritics folded: the recognizer reads Slovak `Prihlásiť sa` as
-  // `Prihlásit sa` and `Späť` as `Spät` (measured 2026-09-18, finportal) —
-  // every such row was OCCLUDED while correct on the screenshot. The
-  // reported strings stay verbatim; the drift comparison forgives the same
-  // marks-only difference for OCR readings (see `ocrDroppedMarks`).
-  foldMarks(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // The recognizer's fold (ocr-fold.ts): it reads Slovak `Prihlásiť sa` as
+  // `Prihlásit sa` and `Payee’s` as
+  // `Payee's` — every such row was OCCLUDED while correct on the screenshot.
+  // The reported strings stay verbatim; the drift comparison forgives the
+  // same difference for OCR readings (see `recognizerDifference`).
+  ocrFold(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The whole-string test: containment, or a prefix of an ellipsized render. */
 function survivesWhole(treeString: string, got: string): boolean {
@@ -750,17 +758,19 @@ export function compareTextParity(
     if (!dynamic) {
       const a = seen('android');
       const i = seen('ios');
-      // Drift stays exact — except that a recognizer reading loses combining
-      // marks (`Prihlásiť` → `Prihlásit`, measured 2026-09-18), and once the
-      // occlusion guard forgives that (looseForm) the row would land HERE as a
-      // copy-drift finding for text that is correct on screen (review
-      // 2026-09-18). OCR-only, marks-only differences are a note, never a
-      // finding; the tree carries diacritics faithfully, so `tree` stays exact.
-      const ocrDroppedMarks = (x: string, y: string): boolean =>
-        source === 'ocr' && x !== y && foldMarks(x) === foldMarks(y);
+      // Drift stays exact — except for what a recognizer cannot tell apart
+      // (ocr-fold.ts: combining marks dropped, typographic punctuation read as
+      // ASCII). Once the occlusion guard forgives that (looseForm) the row
+      // would land HERE as a copy-drift finding for text that is correct on
+      // screen. OCR-only, fold-only differences are a note, never a finding —
+      // the same fold the ocr assert passes on; the tree carries the app's
+      // characters faithfully, so `tree` stays exact.
+      const recognizerDifference = (x: string, y: string): boolean =>
+        source === 'ocr' && differsOnlyByOcrFold(x, y);
       if (a !== undefined && i !== undefined && a !== i) {
-        if (ocrDroppedMarks(a, i)) {
-          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in diacritics (a recognizer reading, which drops combining marks) — not drift.`);
+        if (recognizerDifference(a, i)) {
+          const { characters, reason } = foldDifference(a, i);
+          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in ${characters} (${reason}) — not drift.`);
         } else {
           findings.push({
             anchor: id,
@@ -774,8 +784,9 @@ export function compareTextParity(
         for (const p of present) {
           const got = seen(p) as string;
           if (got === expected) continue;
-          if (ocrDroppedMarks(got, expected)) {
-            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — they differ only in diacritics, which the recognizer drops; not drift.`);
+          if (recognizerDifference(got, expected)) {
+            const { characters, reason } = foldDifference(expected, got);
+            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — differs only in ${characters} (${reason}); not drift.`);
             continue;
           }
           findings.push({
@@ -1040,6 +1051,45 @@ export async function measureOcrAssert(
 }
 
 /**
+ * The folded pattern against the folded reading (ocr-fold.ts): the characters
+ * it folded when that matches, else undefined. A pattern the fold leaves
+ * uncompilable, or too large for the engine to run (V8 compiles a pattern
+ * lazily: a long folded one overflows the stack on its first test), is not
+ * folded — the assert fails on the reading as read, it never throws.
+ */
+function foldedMatch(pattern: string, seen: string): [string, string][] | undefined {
+  const fold = ocrFoldPattern(pattern);
+  if (fold === undefined) return undefined;
+  try {
+    return new RegExp(fold.source).test(ocrFold(seen)) ? fold.folded : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The pattern as written against the folded READING (ocr-fold.ts), for a
+ * pattern with nothing of its own to fold (`foldFree`; one that names a fold
+ * character is folded itself, `foldedMatch`): the reading's characters it
+ * folded where the pattern matched — all it folded when the match spans none
+ * of them (`(?<=')s` on `’s`) — else undefined. Case is not folded, so
+ * `^Payee's game$` still fails on `Payee’s name`; a pattern the engine cannot
+ * run fails, it never throws.
+ */
+function readingFoldMatch(pattern: string, seen: string): [string, string][] | undefined {
+  const folded = ocrFold(seen);
+  if (folded === seen || !foldFree(pattern)) return undefined;
+  try {
+    const m = new RegExp(pattern).exec(folded);
+    if (m === null) return undefined;
+    const here = readingFolds(seen, m.index, m.index + m[0].length);
+    return here.length > 0 ? here : readingFolds(seen, 0, folded.length);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Single-element rendered-text check over one region's recognizer output.
  * Pure: `measureOcrAssert` does the cropping and recognizing, this decides
  * the verdict, so the whole decision is testable without a Swift toolchain.
@@ -1068,14 +1118,31 @@ export function evaluateOcrAssert(
   let pass = true;
   if (expectation.text !== undefined) {
     const want = normalizeText(expectation.text);
-    const ok = seen === want;
+    // Exact first; equal only under the recognizer's fold is a pass that says
+    // which characters it took on trust (ocr-fold.ts) — both strings verbatim.
+    const folded = differsOnlyByOcrFold(want, seen) ? foldDifference(want, seen) : undefined;
+    const ok = seen === want || folded !== undefined;
     if (!ok) pass = false;
-    parts.push(`vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}`);
+    parts.push(
+      `vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}` +
+        (folded !== undefined ? ` (differs only in ${folded.characters} — ${folded.reason})` : ''),
+    );
   }
   if (expectation.match !== undefined) {
-    const ok = new RegExp(expectation.match).test(seen);
+    // The reading as read first; failing that, the folded reading against the
+    // folded pattern — or, for a pattern with nothing of its own to fold,
+    // against the pattern as written (ocr-fold.ts) — a pass that names what it
+    // folded, and of which side.
+    const exact = new RegExp(expectation.match).test(seen);
+    const folded = exact ? undefined : foldedMatch(expectation.match, seen);
+    const ofReading = exact || folded !== undefined ? undefined : readingFoldMatch(expectation.match, seen);
+    const ok = exact || folded !== undefined || ofReading !== undefined;
     if (!ok) pass = false;
-    parts.push(`vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}`);
+    const note =
+      folded !== undefined ? ` (only with ${namePairs(folded)} folded — ${foldReason(folded)})`
+      : ofReading !== undefined ? ` (only with the reading's ${namePairs(ofReading)} folded — ${foldReason(ofReading)})`
+      : '';
+    parts.push(`vs /${expectation.match}/ ${ok ? 'matches' : 'NO MATCH'}${note}`);
   }
   let heightUnchecked: string | undefined;
   if (expectation.heightPct !== undefined) {

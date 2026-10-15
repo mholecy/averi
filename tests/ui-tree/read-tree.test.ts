@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, showsProgress, treeFingerprint } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, sheetDetent, showsProgress, treeFingerprint } from '../../src/ui-tree/read-tree.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -325,5 +325,21 @@ describe('showsProgress — a progress node with area (2026-10-09)', () => {
     expect(showsProgress(n('container', 100, [n('text', 10), n('container', 50, [n('progress', 80)])]))).toBe(true);
     expect(showsProgress(n('container', 100, [n('text', 10)]))).toBe(false);
     expect(showsProgress(n('container', 100, [n('progress', 0)]))).toBe(false);
+  });
+});
+
+describe('sheetDetent — the detent a sheet\'s grabber reports', () => {
+  const grabber = (value: string | null): UiNode => ({ role: 'button', label: 'Sheet Grabber', identifier: null, value, rect: { x: 152, y: 411, width: 98, height: 24 }, children: [] });
+  const screen = (...children: UiNode[]): UiNode => ({ role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 402, height: 874 }, children });
+
+  it('reads the grabber\'s value, the top sheet\'s (the last in tree order) when sheets are stacked, with how many grabbers the tree holds', () => {
+    expect(sheetDetent(screen(grabber('Half screen')))).toEqual({ detent: 'Half screen', grabbers: 1 });
+    expect(sheetDetent(screen(grabber('Expanded'), screen(grabber('Half screen'))))).toEqual({ detent: 'Half screen', grabbers: 2 });
+  });
+
+  it('is undefined with no grabber, or when the top sheet\'s exposes no value — a lower sheet\'s value is not taken for it', () => {
+    expect(sheetDetent(screen())).toBeUndefined();
+    expect(sheetDetent(screen(grabber(null)))).toBeUndefined();
+    expect(sheetDetent(screen(grabber('Expanded'), grabber(null)))).toBeUndefined();
   });
 });

@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { keyboardPosition, type KeyboardLine, type KeyboardPosition } from '../../src/ui-tree/keyboard-position.js';
 import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
+import type { MarkedLayer } from '../../src/ui-tree/draw-order.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
-import { PRESENTED_OVER } from '../../src/interact/target-text.js';
+import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
@@ -116,10 +117,13 @@ function beneathDim(box: Rect, content: UiNode[], dimmed = true): UiNode {
 }
 
 const PRESENTED_FOR_THE_ELEMENT = presentedRemedy('the element');
+const PRESENTED_OVER = presentedRemedy('it');
 
 describe('one remedy for a target beneath a presented screen — the tap, the pixel assert and scroll_until agree', () => {
   /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */
-  const cases = async (): Promise<[string, UiNode, UiNode][]> => {
+  /** The action sheet WDA types in the discard popover's layer, as the remedy names it. */
+  const DISCARD_SHEET: MarkedLayer = { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' };
+  const cases = async (): Promise<[string, UiNode, UiNode, MarkedLayer?][]> => {
     const screens = await stacked();
     const { tree, target } = probe();
     return [
@@ -299,13 +303,15 @@ describe('a target wholly out of the judged frame beneath a presented screen —
     const copy = moved(tree);
     return { tree: copy, target: target! };
   };
-  const cases = async (): Promise<[string, UiNode, UiNode][]> => {
+  /** The action sheet WDA types in the discard popover's layer, as the remedy names it. */
+  const DISCARD_SHEET: MarkedLayer = { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' };
+  const cases = async (): Promise<[string, UiNode, UiNode, MarkedLayer?][]> => {
     const screens = await stacked();
     const discard = await popover();
     const band = inStatusBand(screens.swiftFeesSheet);
     return [
       ['the SWIFT form beneath the Fees half sheet: bank_country_select 24,1209 354x52, wholly below the screen', screens.swiftFeesSheet, byRect(screens.swiftFeesSheet, { x: 24, y: 1209, width: 354, height: 52 })],
-      ['the New Contact sheet beneath the discard popover\'s dim: its text `add instant message` 20,1306, wholly below the screen', discard, [...everyNode(discard)].find((n) => n.role === 'text' && n.label === 'add instant message')!],
+      ['the New Contact sheet beneath the discard popover\'s action sheet: its text `add instant message` 20,1306, wholly below the screen', discard, [...everyNode(discard)].find((n) => n.role === 'text' && n.label === 'add instant message')!, DISCARD_SHEET],
       ['the SWIFT form beneath the Fees sheet: priority_select at 24,-20 354x52, wholly inside the status band', band.tree, band.target],
     ];
   };
@@ -326,14 +332,15 @@ describe('a target wholly out of the judged frame beneath a presented screen —
   });
 
   it('each verb says "close it first": the tap refuses, the ocr and colour asserts miss, scroll_until stops before any swipe', async () => {
-    for (const [name, tree, target] of await cases()) {
-      expect({ name, tap: (await tapSaid(tree, target)).endsWith(` — ${PRESENTED_OVER}; nothing was tapped`) }).toEqual({ name, tap: true });
-      expect({ name, ocr: (await pixelSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ name, ocr: true });
-      expect({ name, colour: (await colourSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ name, colour: true });
+    for (const [name, tree, target, layer] of await cases()) {
+      const [over, forTheElement] = [presentedRemedy('it', layer), presentedRemedy('the element', layer)];
+      expect({ name, tap: (await tapSaid(tree, target)).endsWith(` — ${over}; nothing was tapped`) }).toEqual({ name, tap: true });
+      expect({ name, ocr: (await pixelSaid(tree, target))?.endsWith(forTheElement) }).toEqual({ name, ocr: true });
+      expect({ name, colour: (await colourSaid(tree, target))?.endsWith(forTheElement) }).toEqual({ name, colour: true });
       for (const direction of ['down', 'up'] as const) {
         const row: Row = { tree, found: [target], screen: USABLE };
         const message = failureOf(play({ direction, fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row, row]), 'id:t').message;
-        expect({ name, direction, stop: message.includes(PRESENTED_OVER) && message.includes('stopped before any swipe') }).toEqual({ name, direction, stop: true });
+        expect({ name, direction, stop: message.includes(over) && message.includes('stopped before any swipe') }).toEqual({ name, direction, stop: true });
       }
     }
   });
@@ -527,5 +534,125 @@ describe('a target outside what its scroll view draws — the tap, the pixel ass
     expect(await colourSaid(tree, street)).toBe(`${OUTSIDE} (element 24,869 354x52, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`);
     expect(await pixelSaid(tree, name)).toBe(`${OUTSIDE} (element 24,801 354x52, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`);
     expect(stopOf(tree, name).outcome?.kind).toBe('presented');
+  });
+});
+
+/**
+ * A form beneath an ALERT (tests/fixtures/wda-synthetic-alert-over-form.json, the measured shape of a SwiftUI alert over
+ * a pushed form): the alert's layer covers the whole screen (UiNode.presentation, the WDA parser's mark), so every verb
+ * refuses the form's targets — no tap, no measurement, no swipe — naming the alert, and reaches the alert's own buttons.
+ */
+describe('a target beneath an alert — the tap, the pixel assert and scroll_until name the alert', () => {
+  const alertForm = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-synthetic-alert-over-form.json', import.meta.url), 'utf8'));
+  const ofId = (tree: UiNode, id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
+  // Named with its reach, the whole screen: the point a sentence names lies on the reach, not always on the card.
+  const ALERT = 'container "Leave the form" (41,365 320x172, reaching 0,0 402x874)';
+  const CLOSE_IT = 'an alert is presented over it ("Leave the form") — close it first';
+
+  it('the tap refuses a field of the form, under the alert at its centre: never "Tapped"', async () => {
+    const tree = await alertForm();
+    expect(await tapSaid(tree, ofId(tree, 'form.note_input'))).toBe(`id:t is under ${ALERT} at its centre (201,602), drawn over it; nothing of it shows — ${CLOSE_IT}; nothing was tapped`);
+  });
+
+  it('…and the form\'s full-screen Toolbar, of the dim\'s exact frame: refused, not moved', async () => {
+    const tree = await alertForm();
+    expect(await tapSaid(tree, ofId(tree, 'Toolbar'))).toBe(`id:t is under ${ALERT} at its centre (201,437), drawn over it; nothing of it shows — ${CLOSE_IT}; nothing was tapped`);
+  });
+
+  it('the alert\'s own buttons are tapped at their centre', async () => {
+    const tree = await alertForm();
+    const leave = [...everyNode(tree)].find((n) => n.role === 'button' && n.label === 'Leave')!;
+    expect(JSON.parse(await tapSaid(tree, leave))).toEqual({ point: { x: 275, y: 497 } });
+  });
+
+  it('the colour and the ocr assert fail closed naming the alert, which reaches the whole screen', async () => {
+    const tree = await alertForm();
+    const said = `${ALERT} is drawn over the element (element 24,576 354x52) — the capture would show it, not the element; an alert is presented over the element ("Leave the form") — close it first`;
+    expect(await colourSaid(tree, ofId(tree, 'form.note_input'))).toBe(said);
+    expect(await pixelSaid(tree, ofId(tree, 'form.note_input'))).toBe(said);
+  });
+
+  it('scroll_until stops before any swipe, naming the alert', async () => {
+    const tree = await alertForm();
+    expect(failureOf(stopOf(tree, ofId(tree, 'form.note_input')), 'id:t').message).toBe(
+      `scroll_until id:t stopped before any swipe — element is in the viewport but under ${ALERT} at its centre (201,602), drawn over it — 0% of it shows — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":576,"width":354,"height":52} in a 402x874 viewport`,
+    );
+  });
+
+  it('a field below the fold beneath the alert: the tap says close it first, and scroll_until does not swipe — every touch-down lies on the alert', async () => {
+    const tree = await alertForm();
+    const field = ofId(tree, 'form.note_input');
+    field.rect = { x: 24, y: 1200, width: 354, height: 52 };
+    expect(await tapSaid(tree, field)).toBe(`id:t is off screen at (201,1226) on a 402x874 screen (rect 24,1200 354x52) — ${CLOSE_IT}; nothing was tapped`);
+    expect(failureOf(stopOf(tree, field), 'id:t').message).toBe(
+      `scroll_until id:t stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":1200,"width":354,"height":52} in a 402x874 viewport`,
+    );
+  });
+
+  it('a target not in the tree: scroll_until sends no swipe under the alert — its touch-down lies on the alert, wherever it would land', async () => {
+    const tree = await alertForm();
+    const row: Row = { tree, found: [], screen: USABLE };
+    const played = play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    expect(failureOf(played, 'text:"Nothing like this"').message).toBe(
+      `scroll_until text:"Nothing like this" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent.`,
+    );
+  });
+
+  it('a target not in the tree with the bound already reached: the bound says nothing of where its held-back swipe would touch down — that is asked only on behalf of a target', async () => {
+    const tree = await alertForm();
+    const row: Row = { tree, found: [], screen: USABLE };
+    const played = play({ direction: 'down', fully: false, maxSwipes: 0, timeoutMs: 30_000, screen: IPHONE }, [row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' } });
+    expect(played.outcome).not.toHaveProperty('presented');
+  });
+});
+
+
+/**
+ * A screen beneath a layer the tree source marks `screen` (UiNode.presentation): a list screen whose list fills the
+ * screen, and over it a sheet — its nav bar with Cancel, then either a form with no scroll view of its own, or its own
+ * list over the lower part of the screen. A stroke for a target not in the tree touches down on the screen's largest
+ * scroll view, the list beneath, at (201,699).
+ */
+describe('a target not in the tree beneath a marked presented screen — scroll_until stops unless it strokes the sheet\'s own list', () => {
+  const sheetOver = (own: 'form' | 'list'): UiNode => {
+    const rows = Array.from({ length: 12 }, (_, i) => node({ role: 'text', label: `Row ${i}`, rect: { x: 0, y: 100 + 70 * i, width: 402, height: 60 } }));
+    const beneath = node({ role: 'container', rect: { ...BOX }, children: [node({ role: 'scrollable', rect: { ...BOX }, children: rows })] });
+    const bar = node({ role: 'container', rect: { x: 0, y: 62, width: 402, height: 56 }, children: [node({ role: 'button', label: 'Cancel', rect: { x: 16, y: 72, width: 70, height: 36 } })] });
+    const body =
+      own === 'form'
+        ? node({ role: 'container', identifier: 'sheet.form', rect: { x: 0, y: 118, width: 402, height: 756 }, children: [node({ role: 'textfield', identifier: 'name', rect: { x: 20, y: 300, width: 362, height: 44 } })] })
+        : node({ role: 'scrollable', identifier: 'sheet.list', rect: { x: 0, y: 118, width: 402, height: 700 }, children: [node({ role: 'text', label: 'Austria', rect: { x: 0, y: 130, width: 402, height: 44 } })] });
+    const layer = node({ role: 'container', rect: { ...BOX }, presentation: 'screen', children: [bar, body] });
+    return node({ role: 'container', label: 'App', rect: { ...BOX }, presentationsJudged: true, children: [node({ role: 'container', rect: { ...BOX }, children: [beneath, layer] })] });
+  };
+  const RULES = { direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE } as const;
+
+  it('the touch-down on the sheet, off any scroll view of its own: no swipe — the stop names what of the sheet is there', () => {
+    const row: Row = { tree: sheetOver('form'), found: [], screen: USABLE };
+    const played = play(RULES, [row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    const failure = failureOf(played, 'text:"Nothing like this"');
+    expect(failure.message).toBe(
+      'scroll_until text:"Nothing like this" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (201,699) on ' +
+        `container id:sheet.form (0,118 402x756) — ${presentedRemedy('it')}, and a swipe on it may dismiss it, so none was sent.`,
+    );
+  });
+
+  it('…a plain failure, not absence: an optional step fails there, as beneath an alert', () => {
+    const row: Row = { tree: sheetOver('form'), found: [], screen: USABLE };
+    expect(failureOf(play(RULES, [row, row]), 'text:"Nothing like this"')).not.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('the touch-down on the sheet\'s own list: a search inside the sheet keeps stroking', () => {
+    const row: Row = { tree: sheetOver('list'), found: [], screen: USABLE };
+    const played = play(RULES, [row, row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(true);
+    expect(played.outcome?.kind).not.toBe('presented');
   });
 });

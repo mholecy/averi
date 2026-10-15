@@ -17,6 +17,14 @@ element nothing of which it reads lies on the screen off the screen, and a colou
 screen before it is inset (the same amendment); an app-drawn strip with no node at a list's bottom is residual 10; an
 undimmed partial sheet, where `scroll_until` strokes while the tap says close it first, residual 11. Supersedes, in one
 part, ADR 0016's note that a screen-sized dimming node holding the title whole is excused (see "What changes" below).
+Amended again 2026-10-15 (owner decisions Q1 (D), Q2 and Q3 on the round-18 device check): a layer holding an alert is
+presented over the whole screen beneath it by the adapter's mark, not by shape (see "Amendment: a layer holding an
+alert" below; residual 8 amended). Amended again 2026-10-15 (owner decisions Q1–Q6 on the round-20 architecture
+review): the presented layer is the tree source's fact — the WDA parser marks it, by type or by its visibility flags,
+and a marked layer covers what lies outside it through the whole screen; the Decision's conditions and the amendment
+"a labelled dim" are the fallback for a tree whose source did not judge presented layers; residuals 1, 2, 5 (iOS),
+6, 8 and 11 closed for WDA, 7 partly (a layer of only empty frames stands), 3, 4, 9 and 10 stand, 12–16 added (see
+"Amendment: the presented layer is the source's fact" below).
 
 ## Context
 
@@ -44,8 +52,12 @@ layer's own surface.
 
 ## Decision
 
+(Since 2026-10-15 this Decision, its three conditions and the amendment "a labelled dim" are the FALLBACK, asked only
+of a tree whose source did not judge presented layers: `ui-tree/presented-by-shape.ts`. On a judged tree the
+presented layers are the ones the source marks — "Amendment: the presented layer is the source's fact".)
+
 A node on a screen PRESENTED over the target's covers the target — through its own surface — when it is a surface that
-draws its whole rect (`draw-order.ts#givesWay`, the owner's option (a) on the review of the slice):
+draws its whole rect (`presented-by-shape.ts#givesWay`, the owner's option (a) on the review of the slice):
 
 - in `structural`: a structural LEAF (no children) that FILLS THE SCREEN — the RN Modal's dimming root `forgot_overlay`;
   a smaller leaf stays excused (every unmapped Android leaf is an `other`, every RN View leaf under WDA too: an icon's
@@ -98,7 +110,7 @@ sheet's form; never a
 control, a bar the layer carries or any other labelled node, which cover anyway (Safari's capsule bar). Carried as
 `StandingFacts.presented`. When a target has any such surface among its covers,
 whichever cover is on top at its centre (the modal's card over the dim), its sentences say so
-(interact/target-text.ts#PRESENTED_OVER), in place of "scroll_until it first" and of the pinned-bar "layout defect":
+(ui-tree/standing.ts#presentedRemedy), in place of "scroll_until it first" and of the pinned-bar "layout defect":
 
 - the tap: `lang_sk is under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it; nothing
   of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under
@@ -373,6 +385,233 @@ surface — on a dim filling the screen it does; on an undimmed partial sheet it
 docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
 docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
 
+## Amendment: a layer holding an alert (2026-10-15)
+
+Owner decisions Q1 (D), Q2 and Q3 on the round-18 device check (iPhone 17 simulator, iOS 27.0, WDA, at dda435b).
+mp-native's SWIFT form with its SwiftUI exit alert up (`run18-ios/swift-exit-alert-wda.json`): in the app's Window, the
+form's layer, then a later layer `Other 0,0 402x874` holding a BARE dimming leaf `Other 0,0 402x874` (no label, value or
+identifier, no children), an empty frame and `Alert 'Exit confirmation' 41,365 320x172` — whose own backdrop views WDA
+lists inside it as two bare leaves `41,365 402x874`. Every condition of `presentedOver` held; the dim was excused by the
+bare-frame clause (residual 8's shape), and the parser mapped `Alert` to a plain `container`. `tap
+id:swift_payment.form.message_for_bank_input` → `Tapped` (shim `201 602`), a colour assert expecting the field's grey
+measured the dim's `#808080`, `scroll_until` → "fully visible after 0 swipes"; the alert's buttons were tapped right.
+
+docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md
+
+The bare dim cannot be the fact: its shape is also a live sheet's dim (the country sheet's, `vis 1`), a live page sheet's
+(Contacts', `vis 0`) and a dismissed sheet's leftover (`run17-ios/swift-closed-rest.snapshot.json`, `-402,-874
+1206x2622`) — dropping the bare-frame clause was measured (option A: 8 604 diffs on 47 trees, a whole live form falsely
+refused on `swift-closed-rest`) and rejected.
+
+Decision (Q1 (D)): a layer that holds a WDA `Alert` is a PRESENTED LAYER that covers the WHOLE screen beneath it,
+regardless of node frames — bare dim leaf or not, a same-frame `Toolbar` of the form included. The fact is the
+ADAPTER'S, not a shape's: `adapters/wda-source.ts#PRESENTATIONS` marks the `Alert` element (`UiNode.presentation:
+"alert"`; its role stays `container`) — the one place a source says a layer is presented, built so that a later
+decision may mark other presentations there, alerts only now. Draw order reads the mark (`draw-order.ts#markedLayers`):
+the marked element covers every node drawn before it — not its ancestors, nor its own subtree — with its reach the
+whole screen, drawn whatever the rows say; it is the layer's ONE cover (what else its layer holds — the dim, the empty
+frame, the alert's texts and backdrop leaves — is drawn on it and no cover of its own), and that screen's surface
+(`Exposure.presented`, `presentedAt` at any point, `presentedOver`). No stacked-screens, window or bare-frame condition:
+an alert is modal (UIKit's `UIAlertController` and SwiftUI's `.alert` alike), so an alert laid in a later Window covers
+the Window before it too (a residual 3 shape, closed for alerts). The alert's own buttons and texts are judged as before.
+`drawnOver` (the stroke box) does not read the mark.
+Only an alert ON THE SCREEN counts (owner decision, 2026-10-15, on the slice's review): one whose rect shares no area
+with the screen — 0x0, or wholly off it, as WDA may keep a dismissed alert in its tree — presents nothing, and the
+screen beneath is judged as before. Judged by the rect only, never by WDA's `isVisible`/`UiNode.hidden`: an alert
+mid-animation may read hidden while it already takes every touch, and reading the flag would turn it into a false
+`Tapped` on the screen beneath. The keyboard's own nodes are never beneath an alert, wherever WDA lists the keyboard's
+Window: the keyboard is drawn over the app's windows (a key of an alert's text field stays tappable).
+Residual (accepted on the slice's review): with the soft keyboard up beneath an alert, a target of the screen beneath
+whose centre lies under the keyboard gets the keyboard's refusal first, not the alert's — nothing is tapped either way.
+
+Wording (Q2): the presented remedy names the alert by its label (`ui-tree/standing.ts#presentedRemedy`, the remedy's
+`layer`) — the tap `… is under container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) at its centre
+(201,602), drawn over it;
+nothing of it shows — an alert is presented over it ("Exit confirmation") — close it first; nothing was tapped`; the
+colour and ocr asserts `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) is drawn over the element
+(…) — the capture would show it, not the element; an alert is presented over the element ("Exit confirmation") — close
+it first`; `scroll_until` `stopped before any swipe — … — an alert is presented over it ("Exit confirmation") — close it
+first, and a swipe would land on the alert, so none was sent`. Not "a modal or a sheet" and no "no scroll moves it out"
+clause (an alert is no screen a scroll could move anything out from under), and never the alert's internal backdrop
+leaf `41,365 402x874`, a rect that runs off the screen. The alert is named with its REACH, the whole screen
+(`geometry.ts#coverText`, one spelling for the tap, `scroll_until` and the pixel assert, which said it already): the
+point a sentence names — a centre at (44,84), a touch-down at (201,699) — lies on the reach, not on the card; so does
+every cover whose reach is not its rect (idb's pinned CONTINUE, run down to the screen's bottom or the keyboard's top,
+and a floating tab bar's item raised by its lift, now `button "Continue to summary" (24,780 354x44, reaching 24,780
+354x94)` in the tap's and `scroll_until`'s sentences too). What holds of residual 11 under an alert: the tap,
+the pixel assert and `scroll_until` agree — its reach is the whole screen, so every touch-down `presentedAt` asks for a
+target beneath it lies on it, where every verb's `presentedOver` names it. And — owner decision on the slice's review,
+2026-10-15, "stop before the swipe" — for a target NOT in the tree too (residual 6's first case, closed for alerts):
+a stroke whose touch-down lies beneath an alert the tree marks (`DrawOrder.markedAt`; not on a scroll view of the
+alert's own) is not sent, with the same confirming read — `scroll_until text:"Nothing like this" stopped before any
+swipe — element is not in the tree, and the next swipe would touch down at (201,699) on container "Exit confirmation"
+(41,365 320x172, reaching 0,0 402x874) — an alert is presented over it ("Exit confirmation") — close it first, and a
+swipe would land on the alert, so none was sent.` (a plain failure, not "not present": the alert, not the selector, is
+what stops it).
+
+`ui_snapshot` prints the mark (Q3), as it prints `hidden`, so later device trees carry it into the corpus (the
+normalized twin of the capture, `swift-exit-alert-after.snapshot.json`, predates it and reads as before).
+
+The harness (OLD = dda435b, NEW = this change, the whole corpus of 648 trees): 385 712 calls, **518 differing, all on
+`run18-ios/swift-exit-alert-after-wda.json`** (the raw capture; 0 on every other tree — Contacts' bare page-sheet dim, the
+country sheet's dim, the Fees sheet, `run17-ios/swift-closed-rest` — and 0 on Android and idb). tap 120: 58 `Tapped` →
+refused, 2 moved → refused (`id:"Toolbar"`, the dim's frame, had been moved to a 402x337 strip above the card), 13 refusals
+renaming their cover (the alert's button row `container (41,457 320x80)` or its title text → the alert), 47 refusals whose
+remedy alone changed; scroll_until 171: 73 "fully visible after 0 swipes" and 77 bound or stuck failures → the stop before
+any swipe, 21 stops renaming their cover; assert 226: 57 colour asserts measured and PASSED (the harness paints each target its own colour) → failed closed, 51 failed closed
+newly naming the alert, 23 renaming their cover, 95 whose remedy alone changed; ui_snapshot 1 (the mark printed). No reply
+became `Tapped`, visible or PASS; on NEW no tap, swipe or screenshot is sent under the alert. The alert's `Discard` and
+`Keep editing` are tapped as before (no diff). With the review's fixes, the same harness (NEW = this change merged with the round's other slices, 385 738
+calls): the alert tree's 518 unchanged but for the reach the cover is now named with; 1 072 more on 170 iOS trees,
+wording only — each reply equal to OLD's once `, reaching …` is taken out of the cover named (`scroll_until` 702, tap
+370, 38 of them moved taps to the same point; idb's pinned and lifted `Continue to summary`, a floating tab bar's
+items, a few bottom-pinned controls); and Android's 60 on its two raw trees holding numeric character references (the
+round's entity decode, not this change).
+
+## Amendment: the presented layer is the source's fact (2026-10-15)
+
+Owner decisions Q1–Q6 on the round-20 architecture review (the architecture review of 2026-10-15, candidates 1 and 5;
+the owner's plan allowed this ADR and ADR 0019 to be reopened, on one condition: the target's own visibility is never
+evidence alone).
+
+**What the sources already say.** WDA tells, in every raw `/source` with a presented screen, which screen is beneath:
+EVERY node of the layer beneath reads `isVisible="0"`, while a later screen-sized layer of the same Window shows. That
+is UIKit's modal presentation, which hides the presenting screen from accessibility: idb lists only the presented
+screen (the Fees sheet's grabber, dims and rows; the alert's texts and buttons — never the form beneath), uiautomator
+dumps a dialog's window alone, and WDA lists the hidden screen whole, invisible — the Contacts list's top 62 pt show
+above its page sheet and still read `0`, so it is no geometric flag. Over the 59 raw WDA payloads of the differential
+corpus the rule "a screen-sized layer wholly `0` under a later one that shows" holds on all 28 with a presented screen
+(Contacts' page sheet and its discard popover, SwiftUI half and expanded sheets, Finportal's RN transparent modal, the
+SwiftUI alert) and on none of the 31 without (Safari with its capsule layer over a visible web layer, Settings, the
+pushed SWIFT form, Account Detail, MyPort, the Contacts list, a dismissed country sheet). Element types say little:
+`Alert` on one tree, `Popover` → `Sheet` (an action sheet) on the five discard-popover trees; page sheets, SwiftUI
+sheets and RN modals carry no type. With the layers marked, the shape rule of the Decision above changed no reply on
+any raw WDA tree (the same harness diff with and without it).
+
+**Decision (Q2, Q3): the source marks the presented LAYER.** The WDA parser (`adapters/wda-source.ts#presentedLayers`,
+once per payload; the keyboard's and the input host's Windows are never searched) marks a Window's direct child —
+one mark a layer, one closed kind set (`adapters/types.ts#PresentationKind`):
+
+- by TYPE — `alert`, `actionSheet`, `popover`: the layer holds an `Alert`, a `Sheet` (UIKit's action sheet, labelled
+  by its message) or a `Popover` whose rect shares area with its Window, in that precedence (Contacts' discard prompt,
+  `Popover` → `Sheet "Are you sure…"`, is an action sheet). That element carries `UiNode.presentationElement` and
+  names the layer; one parked off the screen (a dismissed alert WDA keeps) types nothing. The mark moved from the
+  `Alert` element (the amendment "a layer holding an alert") to its layer.
+- by the FLAGS — `screen` (`wda-source.ts#presentedScreen`), only in a payload that carries them: walking the Window's
+  layers in order, past those under `SCREEN_SIZED_FRACTION` of the Window and those with no content (no element of a
+  non-structural role: a bare dimming leaf, the input host's placeholder), the first with VISIBLE CONTENT ON THE SCREEN
+  (a non-structural element `isVisible="1"` sharing area with the Window), when a layer walked past before it reads
+  every element `isVisible="0"`; none when a content layer is neither — a beneath only partly `0`, or visible content
+  parked off the screen (a dismissed sheet's leftover). A layer typed is not also `screen`.
+- the ROOT of a payload carrying the flags is marked `UiNode.presentationsJudged`: its source judged presented layers.
+
+What the flags rule reads (Q3): a whole LAYER's flags AND a visible later layer beside it — corroboration, never one
+flag alone; never one node's flag (ADR 0019's residual 2: `isVisible` alone is no geometric truth) and never the
+target's own. No shape corroboration is asked. `ui_snapshot` prints all three fields, as it prints `hidden`.
+
+**Draw order reads the marks** (`draw-order.ts#markOf`, the one reader; `markedLayers`): a marked layer covers what
+lies OUTSIDE it and is drawn before it — never a layer holding the target, nor one inside it, nor the keyboard's own
+nodes — through the whole screen, whatever the frames around it, for every question but `drawnOver`. So a layer's own
+nodes are never beneath it: `tap id:"PopoverDismissRegion"`, the popover's own dim and the way to close it, stays
+`Tapped`, and so do the action sheet's and the alert's buttons (marking the `Popover` element instead refused it, 10
+false refusals on the five popover trees). How each kind covers:
+
+- a TYPED layer as the alert before: its element is the layer's ONE cover, reaching the whole screen, named by its
+  label — `… an action sheet is presented over it ("Are you sure you want to discard this new contact?") — close it
+  first`, and `scroll_until`'s stop `… and a swipe would land on the action sheet`; a popover holding no action sheet
+  reads `a popover is presented over it`. The alert's tree reads as before.
+- a `screen` layer (Q6): the layer reaches the whole screen and is that screen's surface of last resort; its own nodes
+  STAY covers, judged by the rows as before, each one over the target a presented surface (`Exposure.presented`), so
+  the cover named is what of the layer lies at the point — the sheet's container, its title bar, a row, the RN modal's
+  card — and the anonymous layer (`container (0,0 402x874)`) only where nothing of it draws there. The remedy is the
+  presented screen's, unchanged: `ERROR id:"login_screen" is under container id:forgot_modal (16,301 370x220) at its
+  centre (201,437), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it
+  first; no scroll moves it out from under that screen; nothing was tapped` (it had been tapped on a 402x255 part
+  below the card). Not taken: N3, no frame excuse inside a marked layer (the layer's bare full-screen wrappers win the
+  point: 5 554 replies naming an anonymous container), and naming the layer itself everywhere (~9 000 covers renamed to
+  it).
+
+**The shape rule is the fallback (Q1).** The Decision's three conditions and the amendment "a labelled dim" —
+`presentedOver`, `givesWay`, `presentedSurface`, the frame rows' `overPresented` / `surfaceCandidate`, and the `hidden`
+row's guard (ADR 0019) — live in ONE module, `ui-tree/presented-by-shape.ts`, which `draw-order.ts#drawOrder` builds
+only for a tree whose root is not `presentationsJudged`: Android's uiautomator tree, idb's flat list (where it never
+holds), a WDA payload with no flags, and every snapshot printed before the marks — the normalized trees in the tests'
+fixtures and in the corpus. A judged tree never reaches it: there the marked layers are the presented ones, and a later
+screen-sized layer the source did not mark presents nothing. What both read of a node's place (`Placed`, `holderOf`,
+`stackedScreens`, the frame predicates) is `ui-tree/placed.ts`. Kept, not deleted, because the old snapshots have no
+other presented fact: switching the shape off everywhere was measured at 18 529 harness diffs on 42 normalized WDA
+snapshots, idb 0, and on Android one tree (`run11-android/session-6.json`, SystemUI's notification shade, whose
+notification stack it reads as a screen presented over the shade's own quick settings — a misreading). Deleting it is
+a later pure step, once the corpus holds snapshots printed with the marks.
+
+**`scroll_until` (Q4 and the fold of candidate 5).** The round asks ONE question for its stroke's touch-down,
+`ui-tree/standing.ts#Scene.presentedAt(point, target?)`, in place of three draw-order reads. With a target, a marked
+layer's cover reaches the whole screen, so `presentedAt` holds at every touch-down beneath a marked layer, wherever
+the target lies — the tap and `scroll_until` agree (residual 11, closed for WDA). With NO target — one not in the tree
+— `DrawOrder.markedAt(point)` asks the marked layers, the TOPMOST alone: it takes the touch (its reach is the whole
+screen), and on a scroll view of its own the stroke is sent (a search inside the sheet's own list), no layer beneath
+it asked; else no stroke is sent, with the same confirming read, and the stop names the layer's cover — for a `screen`
+layer the last node of it at the point that draws by the column needing no target (`drawnOver`'s), else the layer
+itself; a node WDA reports hidden (`UiNode.hidden`) is neither its scroll view nor named. Measured by playing
+`scroll_until text:"absent"` up and down over the 59 raw WDA trees (the harness plays only targets from the tree, so
+none reaches this path): 15 plays on 12 `screen`-marked trees go from two strokes and a bound to the stop before any
+swipe, none the other way — `scroll_until text:"absent" stopped before any swipe — element is not in the tree, and the
+next swipe would touch down at (201,175) on container "dismiss popup" (-402,-874 1206x2622) — a screen is presented
+over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may
+dismiss it, so none was sent.` (the Fees half sheet, stroke up, onto the sheet's labelled dim); down on the half
+sheets, both ways on the Contacts sheet and the country list, the strokes land on the layer's own scroll view and are
+sent, as before. As under the alert, `optional: true` does not make it a pass: the layer, not the selector, stops it.
+
+**The harness** (the whole corpus, 648 trees, 385 712 calls, per slice against the previous): the fold, 0 diffs; the
+marks, 6 555 replies on 58 trees — Android 0, idb 0, every normalized snapshot 0, on 30 unmarked raw WDA trees only the
+root's mark in `ui_snapshot`, on the alert's tree only the moved mark in `ui_snapshot`; 63 verdicts flipped, all toward
+refusal and all on targets of the occluded screen: 42 moved taps refused (`ContactsListView` beneath the page sheet,
+moved to the status strip — residual 8's tap; the form's SwiftUI host beneath the expanded country sheet; `Toolbar`, the
+occluded screen's full-screen toolbar — residual 6's same-frame shape; Finportal's `login_screen` beneath the modal —
+residual 2's), 18 `scroll_until` failures (a bound, or a "layout defect") turned into the stop before any swipe
+(`Toolbar`, `login_screen`), one `Tapped` refused (`priority_select` beneath the expanded country sheet, its centre
+under the status bar), one colour assert PASS → failed closed beneath the same sheet, one fail-closed assert that no
+longer samples; no reply became `Tapped`, PASS or a stroke. The rest is wording: the cover named moves from the shape's
+surface to what of the layer lies at the point, and on the five discard-popover trees to the action sheet, with its
+remedy (3 693 replies). The fallback's move, 0 diffs; the no-target stop, 0 (no play reaches it; measured as above).
+
+The round's device check carries the probes this rests on but could not measure (Q5): a raw `/source` with the PAY
+blur menu up (residual 9), a `/source` polled every 50 ms across a sheet's present and dismiss, a system permission
+alert, and a non-modal sheet.
+
+### What each residual becomes
+
+| residual | on a judged (live WDA) tree | elsewhere |
+|---|---|---|
+| 1 full-screen pass-through leaf or scroll view refuses beneath | **closed**: no shape is asked; nothing is presented unless the source marks it (Safari's capsule layer: unmarked) | stands (the fallback) |
+| 2 RN modal whose dim is a wrapper with children | **closed**: the screen beneath reads `0` whatever the dim's shape | stands |
+| 3 a presentation in a later Window | stands for `screen` (the flags rule is per Window; none measured); a typed layer in any Window covers what is drawn before it | stands |
+| 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
+| 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
+| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands |
+| 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **stands** for a layer of only empty frames: the flags rule skips a layer with no non-structural element, so it is not marked | stands |
+| 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
+| 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
+| 10 a strip with no node at a list's bottom | stands (no presentation) | stands |
+| 11 an undimmed partial sheet: the tap says close, `scroll_until` strokes | **closed**: a marked layer reaches the whole screen, so every touch-down beneath it is on it | stands |
+
+### New residuals and risks
+
+Residuals 12–17 below are this amendment's. Risks, none measured (the device probes above are for them):
+
+- **Mid-animation.** While a sheet presents, the screen beneath may still read `1`: no mark, nothing presented, a tap
+  beneath is `Tapped`. While it dismisses, the beneath may still read `0` with the sheet sliding out: a false refusal
+  for a few hundred milliseconds, which the tap's own settle and retry may cover.
+- **Non-modal sheets** (a detent with background interaction): the screen beneath stays accessible, so WDA should
+  report it visible — no mark, the sheet covering only where it lies. That is the right answer; unmeasured.
+- **iPad-style passthrough popovers.** A typed layer over a screen WDA reports VISIBLE is still marked, and now refuses
+  what lies beneath it (toward refusal), where a passthrough view would take the touch.
+- **System alerts.** A permission alert is SpringBoard's, not the app's: if the app's tree reads wholly `0` with no
+  visible later layer, nothing is marked and targets read clear (as before).
+- **A lingering dismissed layer**: guarded by "visible content ON the screen" (a leftover parked at y 874 marks
+  nothing; pinned on a synthetic tree); a leftover WDA kept visible on the screen over a beneath still `0` would be
+  marked.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -386,21 +625,31 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
    stops without a swipe (a labelled one refused already, with "scroll_until it first"). What it does not refuse: a
    pass-through HOST with children — an RN Portal host, a FAB or Snackbar host with `box-none`, Safari's capsule — or a
    small leaf of one (an icon's View), whose content covers only where it lies, as before.
+   **Closed for WDA** (2026-10-15): on a judged tree no shape is asked, and a layer presents only when the source
+   marks it (Safari's capsule layer is not). Stands on a tree whose source did not judge.
 2. **An RN modal whose dimming view is a wrapper WITH children** (the card inside the tinted view, no separate dim leaf)
    is not seen: its bare surface beside the card reads as no cover, and a tap there is sent to the screen beneath and
    lands on the dim — as at 20307d2. Finportal's modal has a separate leaf; the shape is common elsewhere. Confirmed by
    the owner, 2026-10-13.
+   **Closed for WDA** (2026-10-15): the screen beneath the modal reads wholly `isVisible="0"` whatever the dim's
+   shape, and the modal's layer is marked. Stands on a tree whose source did not judge.
 3. **A later Window is still seen only through its content.** An opaque presentation WDA lays in a Window of its own
    (none measured) has its bare surface read as no cover, as before.
+   Stands (2026-10-15): the flags rule is per Window, so a presented screen in a later Window is not marked by its
+   flags; a typed layer (an alert, an action sheet, a popover) in any Window covers what is drawn before it.
 4. **The bar-in-a-full-screen-host shape** (`scrolledContent`'s stated residual: a bar nested in a full-screen host of
    its own, beside the content's full-screen layer, reads as two screens) is wider: the content's scroll view now
    covers the bar's button through its frame, not only a row scrolled under it. Whether real bars nest so is
    unmeasured; no fixture does.
+   Stands (2026-10-15): a draw question of `scrolledContent`, not of presentation.
 5. **Still not seen**, as before: a later layer under 90 % of the screen with no screen-sized wrapper (a medium sheet,
    a popover — unless its dim is a screen-filling leaf of its layer, as UIKit's `PopoverDismissRegion` is), a target
    that is itself a direct child of the node holding both, and an Android in-window overlay Compose flattens away. A
    layer drawn by the root's direct children (one window's top level, on a tree whose root is the window) reads as
    across Windows.
+   **Closed for iOS under WDA** (2026-10-15): UIKit lays a half sheet and a popover in a layer of the screen's size,
+   marked by the flags or by the `Popover`. The Android shapes stand, and so do they all on a tree whose source did
+   not judge.
 6. **`scroll_until` stops at a presented screen on its own reads**: two reads with no stroke between (or one, when no
    confirming read is left; a read that fails meanwhile is confirmed again, never answered with a stroke), of a target
    judged in the viewport under a presented surface, or — since the amendment "No stroke onto a presented screen" —
@@ -408,6 +657,7 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
    keyboard that this residual first named (the device check: a stroke for a cell below the fold closed Contacts'
    discard popover and read "fully visible"). Still stroked for:
    - a target NOT YET IN THE TREE — there is nothing to ask on behalf of; its strokes may land on a presented screen
+     (but not on an alert the tree marks: see "Amendment: a layer holding an alert")
      (Q-A option (b), judging the touch-down against surfaces presented over the stroked container's screen, was not
      taken: a search whose target lies in the presented sheet itself, stroked over a container picked from the screen
      beneath, would stop); a bound that ends such a scroll says nothing of it either;
@@ -422,10 +672,20 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
      off every presented surface, wherever its path goes; a row of the presented screen itself, on its own screen; and
      the flush probe of a `fully: true` stop (scroll-rounds.ts#PROBE_REACH, Android's cut bounds), which is not asked.
    The stroke box (`drawnOver`) is unchanged.
+   **Closed for WDA** (2026-10-15): the first case, a target not in the tree, is not stroked for beneath a marked
+   layer — the topmost one, unless the touch-down lies on a scroll view of its own (residuals 13 and 14); the second,
+   the same-frame twin, by construction: a marked layer's cover is no row's to excuse, `sameFrame` included. Both
+   stand on a tree whose source did not judge.
 7. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
+   Partly closed for WDA (2026-10-15), when the screen beneath reads wholly `0`: a layer of itemless toolbars is
+   marked (a toolbar is content to the flags rule), and a bare dim inside a typed layer or a content-carrying one is
+   covered through that layer's mark (the alert's bare dim, by the typed mark). Stands for a layer of ONLY empty frames
+   (`container`/`other`, no non-structural element): `wda-source.ts#presentedScreen` skips a layer with no content, so
+   it is not marked, and the screen beneath reads as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
-   unidentified, unlabelled frame). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath
+   unidentified, unlabelled frame) — except in a layer holding an alert, which covers the whole screen by the adapter's
+   mark whatever its dim is (see "Amendment: a layer holding an alert"). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath
    shows only under the status bar, where no tap goes: with the device's 62-pt status band a target of the list there
    is refused as under a presented screen — its centre under the form (the harness: Contacts' `container 0,0
    402x156`, centre (201,78)), or its centre under the status bar: the refusal still names the bar, and its remedy
@@ -445,6 +705,9 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
 
    The presented fact is judged of the node itself, wherever it lies: see "Amendment: presented judged of the node,
    geometry-free" above.
+   **Closed for WDA** (2026-10-15): the page sheet's layer is marked, so its bare dim no longer matters, and a target
+   of the list in the status strip above the sheet is refused, "close it first" (`ContactsListView`, moved there
+   before: 12 taps). Stands on a tree whose source did not judge.
 9. **An in-window overlay with no node is not seen** (owner decision Q7 (a), 2026-10-14). mp-native's Account Detail
    `PAY` menu: a SwiftUI card inserted in the screen's own container over a blurred, dimmed Account Detail. Neither WDA
    nor idb lists a node for the blur/dim backdrop, so the rows beneath read uncovered: `tap
@@ -458,6 +721,9 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
    of its own after the screen's, as a sheet's dim is (inserted in the screen's own container, as this menu is, it is
    an ordinary cover: refused, with "scroll_until it first").
    docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
+   Stands (2026-10-15), undecided: the PAY menu was captured only as a normalized snapshot, without flags. A raw
+   `/source` with the menu up decides it — if WDA reports Account Detail wholly `0` there, the flags rule marks the
+   menu's layer; if not (the menu inserted in the screen, no `.isModal`), it stays.
 10. **An app-drawn strip at a list's bottom with no node is not seen** (round-16 device check, 2026-10-14; residual 9's
    class). mp-native's Account Detail: the raw WDA ancestry is `ScrollView transactions.list.container` from y 180 to
    874 → its content → `row_4` from y 816 to 869, and no node clips at y 839, yet the capture shows an opaque blank
@@ -465,6 +731,7 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
    colour assert on it measures — the tree gives no evidence of the strip, so averi cannot judge it. iOS reports no
    bottom band to cut; inventing a 34-pt home-indicator band would refuse real taps elsewhere. The same list took no
    swipes there, also app-side. No code change.
+   Stands (2026-10-15): no presentation.
 11. **An undimmed partial presented surface: the verbs' words agree, their behaviour does not** (the review of the
    amendment "presented judged of the node", 2026-10-14). A later screen-sized layer holding only a sheet's scroll view
    over the screen's lower part (`0,500 402x374`), with no dimming view: for a target the sheet does not lie over —
@@ -474,6 +741,32 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
    then its bound or the stuck sentence. Kept: the stroke lands on the target's own screen, not on the sheet, and no
    measured tree holds this shape (every measured sheet and popover lays a dim over the whole screen). Pinned by a row
    of tests/interact/remedy-agreement.test.ts stating the disagreement.
+
+   **Closed for WDA** (2026-10-15): a marked layer reaches the whole screen, so `presentedAt` holds at every
+   touch-down beneath it and `scroll_until` stops where the tap says close it first. Stands on a tree whose source
+   did not judge, where the remedy-agreement row (a tree with no judged root) still pins the disagreement.
+12. **A typed element inside the target's own layer no longer covers it** (2026-10-15, the review of the marks). A
+   marked layer covers only what lies outside it, so an alert, an action sheet or a popover nested in the layer of
+   the screen it is presented over (an over-current-context shape) covers nothing of that screen. Synthetic only —
+   no measured tree lays one so — and toward `Tapped` against the element mark it replaced.
+13. **A search up inside a half sheet's own list stops** (2026-10-15, the review of the no-target stop). With no
+   target, the stroke's box is the scroll view beneath the half sheet (the form's), so a stroke up touches down at
+   (201,175), above the sheet, on its dim, and is not sent, while a search down, touching down on the sheet's own
+   list, is. The rule is as decided (Q4); the gap is the stroke box's choice of container, which reads no marks.
+14. **Stacked marked layers, no target: only the topmost is asked** (2026-10-15). A touch-down on a scroll view of
+   the topmost marked layer's own strokes it, and no layer beneath is asked — the discard popover's buttons list over
+   the Contacts sheet, stroked up, as before. So a typed layer stacked beneath another marked layer whose own scroll
+   view holds the point no longer stops a stroke there (synthetic only; two stacked typed layers were never measured).
+15. **With no target a `screen` layer may be named by a frames-only wrapper** (2026-10-15) where a target's path
+   names the form: the no-target column (`drawnOver`'s) excuses fewer frames. Wording only.
+16. **A hidden node of a marked layer is never named** (2026-10-15): on a judged tree the `hidden` row still excuses
+   every node WDA reports hidden, inside a marked `screen` layer too — the verdicts hold by the layer's cover, but a
+   naming rule is needed before such a node may be named (ADR 0019's residual 6).
+17. **No target: a later, unmarked layer over a marked one does not take the touch** (2026-10-15, the final review).
+   With any marked layer on the screen, a touch-down is asked of the topmost marked layer alone (`markedAt`): only a
+   scroll view of that layer's own lets the stroke go. A scroll view of a LATER layer or Window the source did not
+   mark, drawn above the marked one, holds the point all the same and is not asked, so the stroke stops there
+   (toward refusal). No tree of the corpus lays one so.
 
 ## Bug notes
 

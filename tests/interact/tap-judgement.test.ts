@@ -106,7 +106,8 @@ const idbForm = (y: number): UiNode =>
       node({ role: 'button', label: 'Continue to summary', identifier: 'continue', rect: { x: 24, y: 780, width: 354, height: 44 } }),
     ],
   });
-const CONTINUE = 'button "Continue to summary" (24,780 354x44)';
+/** Named with its reach: idb lists no node for the pinned bar's background, which runs down to the screen's bottom. */
+const CONTINUE = 'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)';
 /** Android: a 300-px row whose top 200 px lie under a bar laid after its list — its centre (540,1250) on the bar. */
 const sheet = (): UiNode =>
   node({
@@ -214,7 +215,7 @@ describe('judgeTap(…).aim() — cut, cover, keyboard, after the guard', () => 
   it('covered, with nothing of it showing above idb\'s band: CoveredRefusal, "above the soft keyboard"', async () => {
     const { outcome } = await judge(await numberPad(), 'swift_payment.form.value_date_select', { first: IPHONE });
     expect(said(outcome)).toBe(
-      'CoveredRefusal: swift_payment.form.value_date_select is under button "Continue to summary" (24,512 354x44) at its centre (201,571), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped',
+      'CoveredRefusal: swift_payment.form.value_date_select is under button "Continue to summary" (24,512 354x44, reaching 24,512 354x77) at its centre (201,571), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped',
     );
   });
 
@@ -497,6 +498,7 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
       },
       standing: ((...args: Parameters<Scene['standing']>) => (asked.push('standing'), real.standing(...args))) as Scene['standing'],
       pixelRegion: (...args) => (asked.push('pixelRegion'), real.pixelRegion(...args)),
+      presentedAt: (...args) => (asked.push('presentedAt'), real.presentedAt(...args)),
     };
     return { scene, asked };
   }

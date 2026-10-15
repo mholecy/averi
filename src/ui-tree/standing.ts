@@ -1,5 +1,13 @@
-import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure } from './draw-order.js';
+import { isTyped, rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type TypedPresentationKind, type UiNode } from '../adapters/types.js';
+import {
+  drawOrder,
+  listsAncestry,
+  listsUnclippedFrames,
+  type DrawOrder,
+  type Exposure,
+  type MarkedLayer,
+  type PresentedPress,
+} from './draw-order.js';
 import {
   aboveNavigationBand,
   belowStatusBand,
@@ -31,11 +39,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * for a node not reachable — its REMEDY, one closed set of cases decided
  * here with one precedence, presented first (`Remedy`). WHO OWNS A REMEDY'S
  * WORDS: each verb owns its sentences, save one clause — the presented
- * screen's (`presentedRemedy`), which lives here because interact/ and
- * verify/ both say it and verify/ may not import interact/; each verb's
- * constant built on it (interact/target-text.ts#PRESENTED_OVER,
- * interact/scroll-text.ts#PRESENTED_STOP,
- * verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT) owns its full sentence.
+ * screen's (`presentedRemedy`, and `scroll_until`'s stop on it,
+ * `presentedStop`), which lives here because interact/ and verify/ both say
+ * it and verify/ may not import interact/; each verb calls it inside its own
+ * sentence.
  * The keyboard actions stay with the callers, and the keyboard guard (K1)
  * alone acts on the keyboard.
  *
@@ -282,6 +289,17 @@ export interface Scene {
    * so the two cannot diverge.
    */
   pixelRegion(node: UiNode, screen: UsableScreen | undefined): Rect;
+  /**
+   * THE presented question a stroke asks at its touch-down (`point`), as a sentence quotes the answer
+   * (draw-order.ts#PresentedPress): on behalf of `target`, the surface of a screen presented over the target's own
+   * that holds the point (draw-order.ts#DrawOrder.presentedAt) — or, with NO target (one not in the tree), the cover
+   * of a layer the tree marks as presented the point lands on, off that layer's own scroll views
+   * (draw-order.ts#DrawOrder.markedAt: an alert's, an action sheet's or a popover's element, what of a `screen` layer
+   * draws there; a screen presented by shape alone is not asked of no target). Undefined when none. The point is
+   * kept: a surface judged by shape only where it lies is not one at every touch-down (a dismissed sheet parked off
+   * screen is no stop). One reader: `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
+   */
+  presentedAt(point: Point, target?: UiNode): PresentedPress | undefined;
 }
 
 /**
@@ -378,15 +396,49 @@ export interface StandingFacts {
   readonly drawn?: Rect;
 }
 
+/** A presented layer the source TYPES, as the words name it (`presentedRemedy`): its article and its noun. */
+interface TypedWords {
+  readonly article: string;
+  readonly noun: string;
+}
+/** The words for each typed kind (`TypedWords`). */
+const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
+  alert: { article: 'an', noun: 'alert' },
+  actionSheet: { article: 'an', noun: 'action sheet' },
+  popover: { article: 'a', noun: 'popover' },
+};
+/** The words for `layer` when the source typed it; undefined for a `screen` layer, or none. */
+const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
+
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
- * `what` — `it` in the tap's refusal and `scroll_until`'s stop (interact/target-text.ts#PRESENTED_OVER), `the element`
+ * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
- * since no scroll moves the node out from under it. The one clause of a remedy kept here, in the UI-tree layer both
- * verbs and the pixel assert may import, as system-bar.ts's words are (the module's doc: who owns a remedy's words).
+ * since no scroll moves the node out from under it. A layer the tree source types (an alert, an action sheet, a
+ * popover: `layer`) is named by its kind and label; a `screen` layer, or none, is "a screen … (a modal or a sheet)".
+ * The one clause of a remedy kept here, in the UI-tree layer both verbs and the pixel assert may import, as
+ * system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
-export const presentedRemedy = (what: 'it' | 'the element'): string =>
-  `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
+  const typed = typedWords(layer);
+  return typed !== undefined
+    ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
+    : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+};
+
+/**
+ * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no
+ * swipe was sent — one on that screen may dismiss it; under a layer the tree source types (an alert, an action sheet,
+ * a popover: `layer`) it is named, and a swipe would land on it. With no typed layer, the one sentence the
+ * `scroll_until` description quotes (mcp/tools.ts).
+ */
+export const presentedStop = (layer?: MarkedLayer): string => {
+  const typed = typedWords(layer);
+  return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
+};
+
+/** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
+export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
@@ -407,7 +459,9 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  *    `scroll_until` stops on the presented screen: so every non-reachable kind takes it.
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
- *    dim), else the last presented surface among its covers, else the last drawn over it.
+ *    dim), else the last presented surface among its covers, else the last drawn over it. `layer`: the presented
+ *    layer the tree source marks when that surface is its element (draw-order.ts#DrawOrder.presentedPress), which
+ *    `presentedRemedy` names.
  * 2. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
  * 3. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
@@ -440,7 +494,7 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  * words those and the compiler refuses one it cannot (a keyboard remedy under a bar, say).
  */
 export type Remedy =
-  | { readonly of: 'presented'; readonly cover: UiNode }
+  | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: MarkedLayer }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
   | { readonly of: 'pinned' }
@@ -565,6 +619,10 @@ export function sceneOf(tree: UiNode): Scene {
     },
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
+    presentedAt(point, target) {
+      const surface = target === undefined ? scene.order.markedAt(point) : scene.order.presentedAt(target, point);
+      return surface === undefined ? undefined : scene.order.presentedPress(surface);
+    },
   };
   /** The usable screen the pixel purpose judges on: `screen` when it has `oriented`, else the tree's own. */
   function pixelScreen(screen: StandingScreen | UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
@@ -624,7 +682,10 @@ function remedied(
   // covers in the frame, else one judged of the node itself (draw-order.ts#DrawOrder.presentedOver) — a node with
   // nothing in the frame (below the fold, inside the status band) has no covers there.
   const surface = judgement.facts.presented?.at(-1) ?? scene.order.presentedOver(node);
-  if (surface !== undefined) return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface } };
+  if (surface !== undefined) {
+    const { layer } = scene.order.presentedPress(surface);
+    return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface, ...(layer !== undefined && { layer }) } };
+  }
   if ('touch' in judging) {
     const touch = judging.touch;
     switch (touch.kind) {
