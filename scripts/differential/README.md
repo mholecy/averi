@@ -198,12 +198,12 @@ note's `regressions` records it. An open note is judged on the working tree; for
 `golden.test.ts` owns the ratchet and calibration.json only the note→rows link, so a fix that strikes their rows off
 KNOWN turns them OPEN-NOT-REPRODUCED, and calibrate exits 1, until the note becomes `calibrate` with its fix.
 Checkouts (`differential-cal-<sha>`) are kept for the next run and reused only when they are at that commit; `--remove`
-removes those this run created. Exit
-code 1 on a verdict other than the note's `expect`, or an unrecorded regression. A golden process that printed no JSON
-or was killed is run once more; a side that still does not load says why (the exit code or signal and the last lines of
-stderr, or git's stderr), and `--out` then leaves its file as it is and writes `<out>.failed`.
-`tests/truth/calibration.test.ts` pins the table against docs/bugs and the git history, and the verdicts, the canary,
-the wiring and a side that fails as pure functions.
+removes those this run created. Exit code 1 on a verdict other than the note's `expect`, or an unrecorded regression. A
+golden process that printed no JSON or was killed is run once more; a side that still does not load says why (the exit
+code or signal and the last lines of stderr, or git's stderr), and `--out` then leaves its file as it is and writes
+`<out>.failed`. With `--note`, which runs some notes only, `--out` writes `<out>.partial`, the full report left as it
+is. `tests/truth/calibration.test.ts` pins the table against docs/bugs and the git history, and the verdicts, the
+canary, the wiring and a side that fails as pure functions.
 
 ## Corpus format
 

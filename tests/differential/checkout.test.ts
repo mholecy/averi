@@ -52,6 +52,8 @@ describe('codeRoot — a directory in place inside another checkout', () => {
 describe('codeRoot — a git command that fails', () => {
   it("throws with git's own stderr: a side that cannot be checked out says why", () => {
     expect(() => codeRoot(ROOT, 'no-such-ref-at-all', 'cal', tmpdir())).toThrow(/^git -C .* rev-parse no-such-ref-at-all\^\{commit\}: .*no-such-ref-at-all/);
+    // an unknown SHA: git's own words (gitReason, its stderr), which the command line alone does not carry
+    expect(() => codeRoot(ROOT, 'fffffff', 'cal', tmpdir())).toThrow(/^git -C .* rev-parse fffffff\^\{commit\}: fatal: .*unknown revision/);
     // a worktree git cannot create (its directory under a plain file): git's reason, not a bare "Command failed"
     const dir = mkdtempSync(join(tmpdir(), 'averi-checkout-'));
     try {

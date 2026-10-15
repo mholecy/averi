@@ -297,10 +297,10 @@ describe('calibrate.ts — a side that fails (runSide, failureOf, disposition)',
     return { d, calls };
   };
 
-  it('failureOf: the signal or the exit code, and the last 3 lines of stderr', () => {
+  it('failureOf: the signal, the exit code or the spawn error, and the last 3 lines of stderr', () => {
     expect(failureOf(killed)).toBe('killed by SIGKILL; stderr: fork: Resource temporarily unavailable');
     expect(failureOf(exited)).toBe('exit code 1; stderr: TypeError: x is not iterable | at golden.ts:12 | at main');
-    expect(failureOf({ code: 'ENOENT', message: 'spawn node ENOENT' })).toBe('exit code ENOENT; no stderr');
+    expect(failureOf({ code: 'ENOENT', message: 'spawn node ENOENT' })).toBe('spawn error ENOENT; no stderr');
   });
 
   it('killed by a signal, twice: run twice, the side does not load with the signal and the stderr', async () => {
@@ -319,6 +319,12 @@ describe('calibrate.ts — a side that fails (runSide, failureOf, disposition)',
     const o = await runSide('aaaaaaa', '/repo', d);
     expect('checks' in o.run && [...o.run.checks.keys()]).toEqual([OPEN, K1]);
     expect(sideLine('aaaaaaa', o, 2)).toBe('calibrate: aaaaaaa ran in 2.0 s (run twice: the first golden process failed — killed by SIGKILL; stderr: fork: Resource temporarily unavailable)');
+  });
+
+  it('run twice: the checkout this run created is still handed back for --remove', async () => {
+    const cleanup = () => undefined;
+    expect((await runSide('aaaaaaa', '/repo', deps([killed, GOOD], () => ({ root: '/wt', cleanup })).d)).cleanup).toBe(cleanup);
+    expect((await runSide('aaaaaaa', '/repo', deps([killed, killed], () => ({ root: '/wt', cleanup })).d)).cleanup).toBe(cleanup);
   });
 
   it('killed though its JSON was out: run once more all the same', async () => {
@@ -362,11 +368,20 @@ describe('calibrate.ts — a side that fails (runSide, failureOf, disposition)',
     const lost = results([entry()], runs({ error: 'killed by SIGKILL; no stderr' }));
     const meant = results([entry({ expect: 'SIDE-DOES-NOT-LOAD' })], runs({ error: 'x' }));
     const red = results([entry()], runs(side({ [K1]: undefined })));
-    expect(disposition(ok, '/d/c.md')).toEqual({ path: '/d/c.md', code: 0 });
-    expect(disposition(ok)).toEqual({ path: undefined, code: 0 });
+    // a clean full run: the report written, a stale <out>.failed of an earlier run deleted
+    expect(disposition(ok, '/d/c.md')).toEqual({ path: '/d/c.md', stale: '/d/c.md.failed', code: 0 });
+    expect(disposition(ok)).toEqual({ code: 0 });
     expect(disposition(lost, '/d/c.md')).toEqual({ path: '/d/c.md.failed', code: 1 });
-    expect(disposition(lost)).toEqual({ path: undefined, code: 1 });
-    expect(disposition(meant, '/d/c.md')).toEqual({ path: '/d/c.md', code: 0 });
-    expect(disposition(red, '/d/c.md')).toEqual({ path: '/d/c.md', code: 1 });
+    expect(disposition(lost)).toEqual({ code: 1 });
+    expect(disposition(meant, '/d/c.md')).toEqual({ path: '/d/c.md', stale: '/d/c.md.failed', code: 0 });
+    expect(disposition(red, '/d/c.md')).toEqual({ path: '/d/c.md', stale: '/d/c.md.failed', code: 1 });
+  });
+
+  it('--out with --note (some notes only): <out>.partial, the full report and any <out>.failed left as they are', () => {
+    const ok = results([entry()], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]]));
+    const lost = results([entry()], new Map([['aaaaaaa', { error: 'x' }], ['bbbbbbb', side({ [K1]: undefined })]]));
+    expect(disposition(ok, '/d/c.md', true)).toEqual({ path: '/d/c.md.partial', code: 0 });
+    expect(disposition(lost, '/d/c.md', true)).toEqual({ path: '/d/c.md.partial', code: 1 });
+    expect(disposition(ok, undefined, true)).toEqual({ code: 0 });
   });
 });

@@ -39,7 +39,8 @@ import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
  * note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more (runSide;
  * said on the console only, so the report stays the same); a side that still does not load carries why — the exit code
  * or signal and the last lines of stderr, or git's own stderr for a checkout that failed. While a side does not load
- * where its note does not expect it, --out leaves its file as it is and writes `<out>.failed` (disposition).
+ * where its note does not expect it, --out leaves its file as it is and writes `<out>.failed`; with --note, which runs
+ * some notes only, it writes `<out>.partial` (disposition).
  */
 
 export type Verdict =
@@ -159,9 +160,16 @@ export interface ProcessError {
   message: string;
 }
 
-/** Why a golden process failed: killed by a signal, or its exit code — and the last 3 lines of its stderr. */
+/** Why a golden process failed: killed by a signal, its exit code or its spawn error — and the last 3 lines of its stderr. */
 export function failureOf(err: ProcessError): string {
-  const how = err.signal != null ? `killed by ${err.signal}` : err.code != null ? `exit code ${err.code}` : err.message.split('\n')[0];
+  const how =
+    err.signal != null
+      ? `killed by ${err.signal}`
+      : typeof err.code === 'number'
+        ? `exit code ${err.code}`
+        : err.code != null
+          ? `spawn error ${err.code}`
+          : err.message.split('\n')[0];
   const tail = (err.stderr ?? '')
     .split('\n')
     .map((l) => l.trim())
@@ -297,12 +305,16 @@ export const unloaded = (rs: readonly NoteResult[]): NoteResult[] =>
   rs.filter((r) => r.verdict === 'SIDE-DOES-NOT-LOAD' && expected(r.entry) !== 'SIDE-DOES-NOT-LOAD');
 
 /**
- * Where the report goes and the run's exit code: `out` (stdout when none) — or `<out>.failed` while a side does not
- * load unexpectedly, `out` left as it is; 1 when a note fails (`failing`).
+ * Where the report goes and the run's exit code: `out` (stdout when none) — or `<out>.partial` for a run of some notes
+ * (`--note`), `<out>.failed` while a side does not load unexpectedly, `out` left as it is either way; 1 when a note
+ * fails (`failing`). `stale` is a `<out>.failed` a full clean run makes stale, to delete.
  */
-export function disposition(rs: readonly NoteResult[], out?: string): { path?: string; code: 0 | 1 } {
-  const path = out === undefined ? undefined : unloaded(rs).length > 0 ? `${out}.failed` : out;
-  return { path, code: failing(rs).length > 0 ? 1 : 0 };
+export function disposition(rs: readonly NoteResult[], out?: string, partial = false): { path?: string; stale?: string; code: 0 | 1 } {
+  const code = failing(rs).length > 0 ? 1 : 0;
+  if (out === undefined) return { code };
+  if (partial) return { path: `${out}.partial`, code };
+  if (unloaded(rs).length > 0) return { path: `${out}.failed`, code };
+  return { path: out, stale: `${out}.failed`, code };
 }
 
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim() !== '' && !/^\d+\/\d+ asserts|^All \d+ asserts/.test(l))?.slice(0, 220) ?? '';
@@ -412,11 +424,12 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const rs = results(entries, runs);
   const report = calibrationReport(rs);
   const out = values.out === undefined ? undefined : resolve(values.out);
-  const { path, code } = disposition(rs, out);
+  const { path, stale, code } = disposition(rs, out, only !== undefined);
   if (path === undefined) console.log(report);
   else await writeFile(path, report);
-  if (out !== undefined && path !== out) console.error(`calibrate: ${unloaded(rs).length} note(s) on a side that did not load — ${values.out} left as it is; the report is in ${path}`);
-  else if (out !== undefined) await rm(`${out}.failed`, { force: true });
+  if (only !== undefined && path !== undefined) console.error(`calibrate: --note runs some notes only — ${values.out} left as it is; the report is in ${path}`);
+  else if (path !== out) console.error(`calibrate: ${unloaded(rs).length} note(s) on a side that did not load — ${values.out} left as it is; the report is in ${path}`);
+  if (stale !== undefined) await rm(stale, { force: true });
   for (const r of rs) if (r.verdict !== undefined) console.error(`${r.entry.n.padEnd(4)} ${verdictCell(r).replace(/\*\*/g, '')}`);
   if (values.remove === true) for (const cleanup of created) cleanup();
   process.exitCode = code;
