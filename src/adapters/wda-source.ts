@@ -121,8 +121,9 @@ export function parseWdaSource(json: string): UiNode {
 export function parseWdaSourceValue(value: unknown): UiNode {
   const root = unwrapEnvelope(value);
   const keyboard = keyboardMarks(root);
-  const tree = toUiNode(root, { ...keyboard, hiddenRoots: hiddenRoots(root), presented: presentedLayers(root, keyboard.roots) }, { hidden: false, cell: undefined, scroller: undefined });
-  if (carriesFlags(root)) tree.presentationsJudged = true;
+  const judged = carriesFlags(root);
+  const tree = toUiNode(root, { ...keyboard, hiddenRoots: hiddenRoots(root), presented: presentedLayers(root, keyboard.roots, judged) }, { hidden: false, cell: undefined, scroller: undefined });
+  if (judged) tree.presentationsJudged = true;
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
   return markUnclippedFrames(tree);
@@ -367,10 +368,11 @@ const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement |
  * - BY TYPE (`PRESENTATIONS`): a layer holding an `Alert`, a `Sheet` or a `Popover` whose rect shares area with the
  *   Window is that kind, the element (the first of the first type in precedence) naming it; one parked off the
  *   screen (a dismissed alert WDA keeps) types nothing, and the flags judge its layer.
- * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them: one layer per Window at most.
+ * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them (`flags`, `carriesFlags`): one
+ *   layer per Window at most.
  * A layer typed is not also `screen` (one mark a layer).
  */
-function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>): PresentedLayers {
+function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>, flags: boolean): PresentedLayers {
   const layers = new Map<WdaElement, PresentationKind>();
   const elements = new Set<WdaElement>();
   const windows: WdaElement[] = [];
@@ -394,7 +396,7 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
         break;
       }
     }
-    const shown = carriesFlags(root) ? presentedScreen(window) : undefined;
+    const shown = flags ? presentedScreen(window) : undefined;
     if (shown !== undefined && !layers.has(shown)) layers.set(shown, 'screen');
   }
   return { layers, elements };
