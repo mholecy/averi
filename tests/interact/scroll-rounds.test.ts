@@ -2201,8 +2201,8 @@ describe('round — a target the strokes never bring into what its scroll view d
 
 describe('round — fully: true on a row its scroll view cuts, the content exhausted', () => {
   // The country sheet's list ends at 811 inside the 402x874 screen: row_7 (779–822) is drawn 32 of its 43 pt.
-  const listRow = (list: { y: number; height: number }, y: number, height = 43): Row => {
-    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height } });
+  const listRow = (list: { y: number; height: number }, y: number, height = 43, x = 31, width = 340): Row => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x, y, width, height } });
     const tree = node({
       role: 'container',
       unclippedFrames: true,
@@ -2212,23 +2212,49 @@ describe('round — fully: true on a row its scroll view cuts, the content exhau
     return { tree, found: [row] };
   };
   const failure = (row: Row): string => failureOf(play({ ...IPHONE, fully: true }, [row, row, row, row]), 'id:row_7').message;
+  const EITHER = 'either the swipes do not scroll that scroll view (swipe inside it), or ';
 
-  it('cut at its scroll view\'s edge (the country sheet\'s row_7, 74% drawn above the list\'s 811): the failure names that scroll view and both ways it can stay cut, with no verdict', () => {
+  it('cut at its scroll view\'s bottom edge (the country sheet\'s row_7, 74% drawn above the list\'s 811): the failure names that scroll view and both ways it can stay cut, with no verdict', () => {
     const message = failure(listRow({ y: 456, height: 355 }, 779));
     expect(message).toContain(
       'element is in the viewport but CLIPPED at bottom by its scroll view scrollable id:country_list (31,456 340x355): 74% of it is drawn, and the content is exhausted: ' +
-        'swiping down no longer moves it, nor does swiping up. The rest lies past that scroll view\'s edge: either the swipes do not scroll that scroll view (swipe inside it), ' +
-        'or its content ends before the row does (no room after it — a layout defect). Last rect',
+        `swiping down no longer moves it, nor does swiping up. The rest lies past that scroll view's edge: ${EITHER}` +
+        'its content ends before the element does (no room after it — a layout defect). Last rect',
     );
     expect(message).not.toContain('not a layout defect');
     expect(message).not.toContain('no clearance for an overlay');
+  });
+
+  it('cut at its scroll view\'s top edge (a row at 440 above the list\'s 456): its content begins after the element does — no room before it', () => {
+    const message = failure(listRow({ y: 456, height: 355 }, 440));
+    expect(message).toContain(
+      'element is in the viewport but CLIPPED at top by its scroll view scrollable id:country_list (31,456 340x355): 63% of it is drawn, and the content is exhausted: ' +
+        `swiping up no longer moves it, nor does swiping down. The rest lies past that scroll view's edge: ${EITHER}` +
+        'its content begins after the element does (no room before it — a layout defect). Last rect',
+    );
+  });
+
+  it('cut at two of its scroll view\'s edges on its far sides, bottom and right (a row past the list\'s 811 and 371): its content ends before the element does', () => {
+    const message = failure(listRow({ y: 456, height: 355 }, 779, 43, 200, 200));
+    expect(message).toContain(
+      `CLIPPED at bottom/right by its scroll view scrollable id:country_list (31,456 340x355): 64% of it is drawn, and the content is exhausted: swiping down no longer moves it, nor does swiping up. The rest lies past that scroll view's edges: ${EITHER}` +
+        'its content ends before the element does (no room after it — a layout defect). Last rect',
+    );
+  });
+
+  it('cut at two of its scroll view\'s edges on opposite kinds of side, top and right (a row above the list\'s 456 and past its 371): its content stops short of the element at those edges', () => {
+    const message = failure(listRow({ y: 456, height: 355 }, 440, 43, 200, 200));
+    expect(message).toContain(
+      `CLIPPED at top/right by its scroll view scrollable id:country_list (31,456 340x355): 54% of it is drawn, and the content is exhausted: swiping up no longer moves it, nor does swiping down. The rest lies past that scroll view's edges: ${EITHER}` +
+        'its content stops short of the element at those edges (no room past them — a layout defect). Last rect',
+    );
   });
 
   it('taller than its scroll view (a 400-pt row in a 355-pt list), cut at both its edges: no scroll shows it whole', () => {
     const message = failure(listRow({ y: 456, height: 355 }, 440, 400));
     expect(message).toContain(
       'element is in the viewport but CLIPPED at top/bottom by its scroll view scrollable id:country_list (31,456 340x355): 89% of it is drawn, and the content is exhausted: ' +
-        'swiping down no longer moves it, nor does swiping up. It is taller than its scroll view: no scroll shows it whole. Last rect',
+        'swiping down no longer moves it, nor does swiping up. It is taller than what of its scroll view the screen shows: no scroll shows it whole. Last rect',
     );
     expect(message).not.toContain('layout defect');
   });
@@ -2238,16 +2264,21 @@ describe('round — fully: true on a row its scroll view cuts, the content exhau
     expect(message).toContain(
       'element is in the viewport but CLIPPED at top by its scroll view scrollable id:country_list (31,456 340x418) and at bottom by the viewport: 84% of it is drawn, and the content is exhausted: ',
     );
-    expect(message).toContain('It is taller than its scroll view: no scroll shows it whole. Last rect');
+    expect(message).toContain('It is taller than what of its scroll view the screen shows: no scroll shows it whole. Last rect');
     expect(message).not.toContain('no clearance for an overlay');
   });
 
-  it('cut at its top by its scroll view and at its bottom by the screen, its scroll view running past the screen: the rest lies past those edges, either way said', () => {
+  it('taller than what of its scroll view the screen shows, though not than the scroll view (a 450-pt row, the 600-pt list from 456 showing 418 pt): no scroll shows it whole', () => {
     const message = failure(listRow({ y: 456, height: 600 }, 440, 450));
     expect(message).toContain('CLIPPED at top by its scroll view scrollable id:country_list (31,456 340x600) and at bottom by the viewport: 93% of it is drawn');
-    expect(message).toContain(
-      'The rest lies past those edges: either the swipes do not scroll that scroll view (swipe inside it), or its content ends before the row does (no room after it — a layout defect). Last rect',
-    );
+    expect(message).toContain('It is taller than what of its scroll view the screen shows: no scroll shows it whole. Last rect');
+    expect(message).not.toContain('layout defect');
+  });
+
+  it('cut at its left by its scroll view and at its bottom by the screen (a row from x 20, the list from 31 running past the screen): the rest lies past those edges, its content beginning after it', () => {
+    const message = failure(listRow({ y: 456, height: 600 }, 850, 43, 20, 340));
+    expect(message).toContain('CLIPPED at left by its scroll view scrollable id:country_list (31,456 340x600) and at bottom by the viewport: ');
+    expect(message).toContain(`The rest lies past those edges: ${EITHER}its content begins after the element does (no room before it — a layout defect). Last rect`);
   });
 
   it('cut at the screen\'s edge, its scroll view reaching it too: "CLIPPED at bottom, N% of it is in the viewport" and "cannot be fully revealed — that is a layout defect (no clearance for an overlay?)"', () => {

@@ -362,11 +362,19 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
         const { edges, scroller, longer } = standing.byScrollView;
         const byScreen = clipped.filter((edge) => !edges.includes(edge));
         const at = `${edges.join('/')} ${outsideScrollViewText(scroller, 'by')}${byScreen.length === 0 ? '' : ` and at ${byScreen.join('/')} by the viewport`}`;
+        // Where its content stops short of the element: past its end (bottom, right), before its start (top, left), or both.
+        const after = edges.every((e) => e === 'bottom' || e === 'right');
+        const before = edges.every((e) => e === 'top' || e === 'left');
+        const short = after
+          ? 'its content ends before the element does (no room after it — a layout defect)'
+          : before
+            ? 'its content begins after the element does (no room before it — a layout defect)'
+            : 'its content stops short of the element at those edges (no room past them — a layout defect)';
+        const past = byScreen.length > 0 ? 'those edges' : edges.length > 1 ? "that scroll view's edges" : "that scroll view's edge";
         const rest =
           longer !== undefined
-            ? `It is ${longer} than its scroll view: no scroll shows it whole.`
-            : `The rest lies past ${byScreen.length === 0 ? "that scroll view's edge" : 'those edges'}: either the swipes do not scroll that scroll view (swipe inside it), ` +
-              'or its content ends before the row does (no room after it — a layout defect).';
+            ? `It is ${longer} than what of its scroll view the screen shows: no scroll shows it whole.`
+            : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${short}.`;
         return new Error(
           `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
             `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,

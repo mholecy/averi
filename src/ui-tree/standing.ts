@@ -499,7 +499,8 @@ type TouchKind =
  * What of a `clipped` node its scroll view clips (`Scene`'s contract, the drawn frame): `edges`, the ones it is clipped
  * at where the frame judged in ends at the drawn frame's edge and the box does not (the rest of `edges` are the
  * screen's, or a keyboard line's); `scroller`, the scroll view a sentence names (`scrollerOf`); `longer`, `taller` or
- * `wider` when the node is longer than the drawn frame on an axis of those edges — no scroll shows it whole.
+ * `wider` when the node is longer, on an axis of those edges, than what of the drawn frame is judged in (the screen's
+ * part of it, above any keyboard line) — no scroll shows it whole.
  */
 export interface ScrollViewCut {
   readonly edges: readonly Edge[];
@@ -1070,8 +1071,10 @@ function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: Standing
   const edges = facts.clipped.filter((edge) => line(facts.screen, edge) === line(frame, edge) && line(box, edge) !== line(frame, edge));
   if (edges.length === 0) return undefined;
   const across = (edge: Edge): boolean => edge === 'top' || edge === 'bottom';
+  // Longer than what of the drawn frame is judged in (`facts.screen`: the box's part of it, above any keyboard line).
+  const shown = facts.screen;
   const longer =
-    edges.some(across) && node.rect.height > frame.height ? 'taller' : edges.some((e) => !across(e)) && node.rect.width > frame.width ? 'wider' : undefined;
+    edges.some(across) && node.rect.height > shown.height ? 'taller' : edges.some((e) => !across(e)) && node.rect.width > shown.width ? 'wider' : undefined;
   return { edges, scroller: scrollerOf(drawn, (f) => !rectWithin(node.rect, f)), ...(longer !== undefined && { longer }) };
 }
 
