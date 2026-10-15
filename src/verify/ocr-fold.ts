@@ -40,7 +40,7 @@ const PUNCTUATION: Readonly<Record<string, string>> = {
  * has no such mark as it was — a Hangul syllable, a kana with its voicing
  * mark — rather than leaving it in pieces.
  */
-const foldMarks = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC');
+const foldMarks = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').normalize('NFC');
 
 /** One character's fold: its ASCII look-alike, or itself without combining marks. */
 const foldChar = (c: string): string => PUNCTUATION[c] ?? foldMarks(c);
