@@ -70,7 +70,15 @@ was reported done at (201,827), 3 pt below CONTINUE.
 - Before idb's band: idb is flat, so its band never meets this rule.
 - The same frame cuts the tap's and `scroll_until`'s judgement (`ui-tree/standing.ts#Scene`, "THE DRAWN FRAME"), so the
   verbs agree: the tap refuses naming the scroll view (after the keyboard guard, since a scroll view laid out above
-  the keyboard grows back once it hides), and `scroll_until` strokes.
+  the keyboard grows back once it hides), and `scroll_until` strokes — under a witnessed keyboard line too: a stop
+  never stops on a centre its scroll view does not draw.
+- **A centre outside its scroll view, part of the node drawn** (owner, 2026-10-15): the tap REFUSES it as at the
+  screen's edge — "outside its scroll view … only N% of it … is drawn, and a tap goes to its centre — scroll_until it
+  with fully: true first" — and does not tap the drawn part. The tap's rule for a centre past the screen's edge is the
+  same (interact/tap-judgement.ts, "ON THE SCREEN"): moving the point would change what the keyboard guard judged,
+  the drawn part of such a node is a strip at an edge where a tap is least likely to reach it, and `scroll_until`'s
+  plain stop stops only with the centre drawn, so `scroll_until X` then `tap X` agree. Measured shape: a carousel's
+  card at a form's foot (`low_card 24,750 200x80` in a carousel at 740, the form ending at 780: 38 % drawn).
 
 ## Residuals accepted
 
@@ -84,6 +92,10 @@ was reported done at (201,827), 3 pt below CONTINUE.
   `42,817` under idb) is judged on the screen alone, so the drawn frame cannot refuse it there: it is refused only
   where something the flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`),
   and otherwise tapped, stopped on and measured on what shows.
+- **Strokes over the screen's middle, not the target's scroll view** (iOS): the drawn frame names the target's scroll
+  views (`Clips.drawnIn`'s `scrollers`), but `scroll_until` still strokes in the screen box on a WDA tree (its stroke
+  containers are Android's clipping chain, `Clips.scrollersOf`). On the country sheet, a stroke `up` toward a row past
+  the list's 811 touches down above the sheet's list. Unchanged; the scrollers could feed the stroke's containers.
 - **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
   `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
   the safe direction.
