@@ -128,6 +128,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
 
   it('ui_snapshot: says what WDA\'s `"hidden": true` and a parked cell\'s content mean (adapters/types.ts#UiNode.hidden, adapters/wda-source.ts#parkedIn)', () => {
     expect(description('ui_snapshot')).toContain('"hidden": true');
+    expect(description('ui_snapshot')).toContain('a screen presented over that element covers it all the same, through the layer WebDriverAgent shows presented');
     expect(description('ui_snapshot')).toContain('at its cell\'s rect');
   });
 
@@ -323,14 +324,14 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below). ');
     expect(description('tap')).toContain('fully: true when the next step measures it), unless a screen is presented over the target (below); ');
     expect(description('tap')).toContain(
-      'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +
+      'Under a screen presented over the target — iOS wda: a layer WebDriverAgent shows presented (see ui_snapshot\'s "presentation"; an alert, an action sheet or a popover is named as ui_snapshot says); elsewhere (Android): a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +
         `'${TAP_SENTINEL}'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.`,
     );
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
     expect(description('scroll_until')).toContain(
-      'Once a read finds the target in the viewport under a screen presented over it (a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +
+      'Once a read finds the target in the viewport under a screen presented over it (as for tap: a layer WebDriverAgent shows presented, or elsewhere a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +
         `${STOP_SENTINEL}" — since a swipe there could dismiss a sheet or raise its discard prompt.`,
     );
   });
@@ -376,10 +377,20 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`the message ends \`… ${presentedRemedy('the element', alert)}\` instead: tap the alert's button that closes it`);
   });
 
+  it('troubleshooting: an action sheet or a popover reads as the alert, named by its kind; a layer WDA shows presented stops a swipe for a target not in the tree, but on its own scroll view', async () => {
+    const { presentedRemedy } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    expect(TROUBLESHOOTING).toContain(`\`… ${presentedRemedy('it', { kind: 'actionSheet', label: '…' })}\``);
+    expect(TROUBLESHOOTING).toContain('`ui_snapshot` marks its layer `"presentation": "alert"` and the Alert itself `"presentationElement": true`');
+    expect(TROUBLESHOOTING).toContain('`ui_snapshot` marks the layer `"presentation": "screen"`');
+    expect(TROUBLESHOOTING).toContain(
+      'Under a layer WebDriverAgent shows presented (iOS with `treeSource: wda`) no swipe is sent for a target not in the tree either — `scroll_until … stopped before any swipe — element is not in the tree, and the next swipe would touch down at (x,y) on … — a screen is presented over it …` — unless the swipe would touch down on a scroll view of that layer\'s own',
+    );
+  });
+
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', async () => {
     const { PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
     expect(description('assert')).toContain(
-      `Under a screen presented over the element (a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice, and wherever the element lies, nothing of it on the screen included; a keyboard the device reports is still named first, with its own).`,
+      `Under a screen presented over the element (a layer WebDriverAgent shows presented, or a modal's full-screen dimming view or a sheet's scroll view, as for tap) no scroll helps, and the failure says so instead: '${PIXEL_SENTINEL}' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice, and wherever the element lies, nothing of it on the screen included; a keyboard the device reports is still named first, with its own).`,
     );
     expect(TROUBLESHOOTING).toContain(
       `Under a modal or sheet still up over the element's screen the message ends \`… ${PRESENTED_OVER_THE_ELEMENT}\` instead, whatever else lies over it (the status bar, a possible cut at the navigation bar): the message still names what lies over it, and this replaces its own advice. Close that screen, then assert again.`,
