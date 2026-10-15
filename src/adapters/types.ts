@@ -495,19 +495,22 @@ export interface UiNode {
   hidden?: true;
   /**
    * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
-   * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one mark
-   * per layer:
-   * - by the TYPE of an element the layer holds: `alert` (WDA's `Alert`), `actionSheet` (a `Sheet`: UIKit's action
-   *   sheet, its message the label), `popover` (a `Popover` holding neither) — that element carries
-   *   `presentationElement`, and names the layer;
+   * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one
+   * mark per layer:
+   * - by the TYPE of an element the layer holds ON THE SCREEN (one parked off it, as WDA keeps a dismissed alert,
+   *   types nothing): `alert` (WDA's `Alert`), `actionSheet` (a `Sheet`: UIKit's action sheet, its message the label),
+   *   `popover` (a `Popover`) — in that precedence, so a layer holding several is the first's (an action sheet
+   *   presented in a popover is an action sheet); that element carries `presentationElement`, and names the layer;
    * - by WDA's own visibility flags, `screen`: the first screen-sized layer of its Window with visible content on the
    *   screen, laid after a screen-sized layer carrying content every node of which reads `isVisible="0"` (and every
    *   earlier such layer of that Window reads so too). UIKit's modal presentation hides the presenting screen from
    *   accessibility; WDA reports it whole, invisible — measured on page sheets, SwiftUI half sheets and React Native
    *   transparent modals (iPhone 17, iOS 27). The flags of a whole LAYER beneath and of a visible later one, never one
-   *   node's, never a target's own.
+   *   node's, never a target's own: corroboration, never one flag alone. Only in a payload carrying the flags; a
+   *   layer typed is not also `screen`. The keyboard's and the input host's Windows are never searched.
    * The source's fact, not a shape draw order infers: a marked layer covers what lies OUTSIDE it and is drawn before
-   * it, through the whole screen, whatever the frames around it.
+   * it, through the whole screen, whatever the frames around it; its own nodes are not beneath it (a popover's dismiss
+   * region, an alert's buttons are reached).
    *
    * Its readers, all of them:
    * - ui-tree/draw-order.ts#markOf, the one reading of it in code (with `presentationElement`): a typed layer's
@@ -523,8 +526,9 @@ export interface UiNode {
   presentation?: PresentationKind;
   /**
    * Set on the ELEMENT that names a layer marked by type (`presentation` `alert`, `actionSheet` or `popover`): the
-   * `Alert`, the `Sheet` or the `Popover` itself — its label is the layer's in the remedy, its rect where the layer is
-   * named. Read only with `presentation`, by ui-tree/draw-order.ts#markOf; printed by `ui_snapshot`.
+   * `Alert`, the `Sheet` or the `Popover` itself — its label is the layer's in the remedy, its rect where the layer
+   * is named; the layer's one cover. Read only with `presentation`, by ui-tree/draw-order.ts#markOf; printed by
+   * `ui_snapshot`.
    */
   presentationElement?: true;
   /**
@@ -533,7 +537,8 @@ export interface UiNode {
    * (`presentation`), so draw order never asks its shape fallback of it (ui-tree/presented-by-shape.ts). Absent on a
    * tree whose source says nothing of presentation (idb, Android, a flagless WDA payload, a snapshot printed before the
    * mark existed): there draw order still infers a presented screen from shape, through that fallback. Read by
-   * ui-tree/draw-order.ts#drawOrder; printed by `ui_snapshot`.
+   * ui-tree/draw-order.ts#drawOrder, which builds the fallback only without it (so on a judged tree the `hidden` row's
+   * shape guard holds of no node); printed by `ui_snapshot`.
    */
   presentationsJudged?: true;
 }
