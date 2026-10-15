@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "note": "The lab apps' cell catalog (docs/plans/2026-10-15-ground-truth-lab-app.md). Both apps bundle this file. A target is a solid rectangle of its own colour with no visible text, identified as lab.<cell>.<tag>; `declared` is what the cell builds, the truth's first source (scripts/truth/schema.ts).",
+  "cells": [
+    {
+      "id": "open",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "open" }
+      ]
+    },
+    {
+      "id": "sheet-medium",
+      "layer": "sheet-medium",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "alert-dim",
+      "layer": "alert",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" }
+      ]
+    }
+  ]
+}

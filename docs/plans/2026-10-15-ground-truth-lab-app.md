@@ -82,7 +82,34 @@ matters for `Tapped` is whether the action fired.
   `scroll_until` fully visible), and the cell is green once round 19's alert fix (`fix/r19-alert`) lands. `open` is
   green at `dda435b`.
 
-### Phase 2 — Android (Compose, the same three cells, uiautomator)
+### Phase 1b — forms and validation (iOS)
+
+averi's daily use is verifying a banking app: forms, validation, the keyboard. The visibility cells alone do not test
+that, so forms are a cell family of their own, with an oracle of their own — the app reports, per field:
+
+- its **value** as the model holds it (not as the tree reports it), whether it is **focused**, and its **validation
+  error** (text and the identifier convention it uses);
+- the **keyboard's frame** (`keyboardWillChangeFrame`) and which field it serves;
+- every **submit** and whether the form passed validation.
+
+| cell | builds | verbs it checks |
+|---|---|---|
+| `form-basic` | text, email, IBAN, amount (number pad), secure PIN; a submit at the bottom | `fill` (with and without `clear`), `type_text`, the value read back, a secure field's masked value |
+| `form-errors` | the same fields after a dirty submit: an error under each, by both conventions (same identifier below the field; `<id>_error`) and one by neither | `assert … error:`, field-error pairing, a screen-level error that pairs with no field |
+| `form-keyboard` | a long form; the focused field near the bottom; the submit pinned over the keyboard (a toolbar / safe-area inset) | taps under the keyboard refused, `scroll_until` above the keyboard, dismissal (`keyboardDismiss`), the submit reachable |
+| `form-prefilled` | fields pre-filled, as a dev flavour does | a `fill` without `clear` that must not destroy content; a `clear` that must |
+| `form-picker` | a country field opening a sheet with a long list (the SWIFT form's country sheet) | `scroll_until` in a sheet, a row tap, the value back in the field |
+
+Text cells for P5's sample (typographic quotes, NBSP, diacritics) are fields and labels here too, so `fill`, the
+tree's text and `ocr` are judged on the same strings. The golden spec gains rows per verb: the field's value after
+`fill` equals what was asked, an error the app shows is the one `assert … error:` reads, and so on.
+
+A replayed tree is static: typing changes nothing in it, so `fill` / `type_text` / `clear` cannot be judged by replay.
+The form cells therefore bring the **live** golden mode forward (phase 5's): averi runs on the lab simulator, and the
+app's own report of the field's value is the oracle. The static parts (error pairing, the keyboard cover, the submit
+over the keyboard) are captured and replayed like the visibility cells.
+
+### Phase 2 — Android (Compose, the same cells, uiautomator)
 
 The tap log is a `Modifier.clickable` per target; state file read with `adb exec-out run-as`. Emulator use only with
 the owner's go (device-check rules: no adb server commands without it).

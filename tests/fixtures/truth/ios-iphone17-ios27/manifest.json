@@ -1,0 +1,74 @@
+{
+  "platform": "ios",
+  "app": "AveriLab",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "note": "Ground truth: the iOS lab app (fixtures/apps/ios), captured by scripts/truth/capture.ts",
+  "captures": [
+    {
+      "file": "open.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "open.png",
+      "truth": "open.truth.json"
+    },
+    {
+      "file": "open.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "open.png",
+      "truth": "open.truth.json"
+    },
+    {
+      "file": "sheet-medium.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-medium.png",
+      "truth": "sheet-medium.truth.json"
+    },
+    {
+      "file": "sheet-medium.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-medium.png",
+      "truth": "sheet-medium.truth.json"
+    },
+    {
+      "file": "alert-dim.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "alert-dim.png",
+      "truth": "alert-dim.truth.json"
+    },
+    {
+      "file": "alert-dim.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "alert-dim.png",
+      "truth": "alert-dim.truth.json"
+    }
+  ]
+}

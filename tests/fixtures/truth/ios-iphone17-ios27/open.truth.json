@@ -1,0 +1,76 @@
+{
+  "cell": "open",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.open.A",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 110
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#E53935"
+    },
+    {
+      "tag": "B",
+      "id": "lab.open.B",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 290
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#1E88E5"
+    },
+    {
+      "tag": "C",
+      "id": "lab.open.C",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 470
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#43A047"
+    },
+    {
+      "tag": "D",
+      "id": "lab.open.D",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 650
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#FB8C00"
+    }
+  ]
+}

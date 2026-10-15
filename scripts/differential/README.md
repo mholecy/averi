@@ -85,6 +85,28 @@ groups as `device calls only`, and that a colour assert passes on its own painte
 `session.log` extraction, the classification of each file, de-duplication, and the names a raw payload and its saved
 `ui_snapshot` take side by side.
 
+## Golden mode: against the truth, not against another checkout
+
+OLD vs NEW cannot see an answer both sides get wrong. The golden mode judges ONE side against ground truth: captures of
+the lab app (`fixtures/apps/`, docs/plans/2026-10-15-ground-truth-lab-app.md), each naming in its manifest entry the
+`screenshot` the device showed and a `truth` file (scripts/truth/schema.ts: per target the app's own frame, whether a
+raw tap at its centre fired its action, how much of it the screenshot shows in its own colour). The fake device serves
+that screenshot instead of the grey frame; `golden-spec.ts` says what each verb must answer for each kind of truth
+(tapped or refused and the remedy, colour pass or fail, scroll_until reached or stopped) — classes, not wording.
+
+```sh
+node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>]
+```
+
+`tests/differential/golden.test.ts` runs it over the committed truth on this checkout, with the known mismatches
+listed. Recapturing (a simulator, not the device-check one; WDA on its own port):
+
+```sh
+cd fixtures/apps/ios && xcodegen generate && xcodebuild -scheme AveriLab -destination 'id=<udid>' -derivedDataPath build build
+xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app
+node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run>
+```
+
 ## Corpus format
 
 One directory per capture run, one file per tree, and a `manifest.json` (`corpus.ts`). The directory's name is the run —

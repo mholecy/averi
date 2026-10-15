@@ -332,9 +332,9 @@ function treeCalls(recording: Recording, tools: ReadonlySet<ToolName>, shared: r
 
 // --- one side's server ---
 
-const BLOCK = '\n⏎\n';
+export const BLOCK = '\n⏎\n';
 
-interface Connection {
+export interface Connection {
   call(call: Call, configPath: string): Promise<Outcome>;
   close(): Promise<void>;
 }
@@ -347,7 +347,7 @@ const untemp = (s: string) => s.replace(TEMP, '<tmp>');
 const imageOf = (b: Buffer) =>
   `${b.length >= 24 && b.readUInt32BE(12) === 0x49484452 ? `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}` : `${b.length} bytes`} sha1:${createHash('sha1').update(b).digest('hex').slice(0, 12)}`;
 
-async function connect(side: Side, recording: Recording, profile: DeviceProfile): Promise<Connection> {
+export async function connect(side: Side, recording: Recording, profile: DeviceProfile): Promise<Connection> {
   const adapter = recordedAdapter(side, recording, profile);
   const device = recording.platform === 'ios' ? IOS_UDID : ANDROID_SERIAL;
   const registry = new side.AdapterRegistry({
@@ -388,7 +388,7 @@ async function connect(side: Side, recording: Recording, profile: DeviceProfile)
 let configDir: string | undefined;
 let configs = 0;
 
-async function configFor(recording: Recording, dismiss: unknown[] | undefined): Promise<string> {
+export async function configFor(recording: Recording, dismiss: unknown[] | undefined): Promise<string> {
   configDir ??= join(tmpdir(), `averi-differential-${process.pid}`);
   await mkdir(configDir, { recursive: true });
   const kind = recording.source === 'uiautomator' ? undefined : recording.source;

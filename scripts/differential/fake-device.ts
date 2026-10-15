@@ -39,7 +39,8 @@ import type { Platform, Screen } from './corpus.js';
  *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
  *    running (`pidof`), no log.
  *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
- *    caller asks — what a colour assert on that rect must sample.
+ *    caller asks — what a colour assert on that rect must sample; or, for
+ *    a ground-truth capture (golden.ts), the screenshot the device showed.
  *  - `swiftc` compiles nothing (an empty file where the binary goes), and
  *    the "recognizer" reads no text in any region.
  */
@@ -63,6 +64,8 @@ export interface DeviceProfile {
   displays?: 'api33' | 'api36';
   /** iOS: the app's display name `simctl appinfo` answers. */
   app?: string;
+  /** The captured screenshot (PNG): answered as it is, in place of the grey frame — `frame` must be its size. */
+  screenshot?: Buffer;
 }
 
 /** A rect of the frame, in its pixels, painted one colour. */
@@ -121,7 +124,8 @@ export function resetDevice(): void {
 // --- PNG frames, built once per size and paint ---
 
 const frames = new Map<string, Buffer>();
-function frame(screen: Screen, paint: Paint | undefined): Buffer {
+function frame(screen: Screen, paint: Paint | undefined, screenshot?: Buffer): Buffer {
+  if (screenshot !== undefined) return screenshot;
   const key = `${screen.width}x${screen.height} ${JSON.stringify(paint ?? null)}`;
   let png = frames.get(key);
   if (png === undefined) {
@@ -200,7 +204,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     const [, verb, , ...rest] = args;
     if (verb === 'io' && rest[0] === 'screenshot') {
       device.calls.push('simctl screenshot');
-      writeFileSync(rest[1], frame(profile.frame, device.paint));
+      writeFileSync(rest[1], frame(profile.frame, device.paint, profile.screenshot));
       return '';
     }
     if (verb === 'spawn' && rest[0] === 'launchctl') return 'PID\tStatus\tLabel\n1\t0\tUIKitApplication:differential.app[1][rb-legacy]\n';
@@ -241,7 +245,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     }
     if (argv[0] === 'exec-out' && argv[1] === 'screencap') {
       device.calls.push('adb screencap');
-      return frame(profile.frame, device.paint);
+      return frame(profile.frame, device.paint, profile.screenshot);
     }
     if (argv[0] === 'get-state') {
       device.calls.push(`adb ${line}`);
