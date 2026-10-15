@@ -134,6 +134,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('ui_snapshot')).toContain('at its cell\'s rect');
   });
 
+  it('ui_snapshot: says what WDA\'s `"presentation": "alert"` means (adapters/types.ts#UiNode.presentation): the alert covers the whole screen beneath it', () => {
+    expect(description('ui_snapshot')).toContain('"presentation": "alert"');
+    expect(description('ui_snapshot')).toContain('covers the whole screen beneath it');
+  });
+
   it('ui_snapshot: says what the root\'s dialect marks mean — WDA\'s `"unclippedFrames": true` (adapters/types.ts#UiNode.unclippedFrames) and idb\'s `"flatList": true`', () => {
     expect(description('ui_snapshot')).toContain('"unclippedFrames": true under iOS wda');
     expect(description('ui_snapshot')).toContain('"flatList": true under iOS idb');
