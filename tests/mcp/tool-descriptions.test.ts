@@ -378,6 +378,8 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
     expect(TROUBLESHOOTING).toContain(`or **\`${TOO_THIN_ON_THE_SCREEN} (element …, on the screen …, screen …)\`**: nothing of what the assert reads lies on the screen`);
     expect(TROUBLESHOOTING).toContain(`or the screen's edge leaves only a sliver of it no thicker than ${await actualSlack()} units (pt on iOS, px on Android)`);
+    expect(TROUBLESHOOTING).toContain(`An overlap of ${await actualSlack()} units or less (pt on iOS, px on Android) does not count`);
+    expect(TROUBLESHOOTING).toContain(`with \`fully: true\` none of the element may lie under a system bar past ${await actualSlack()} units (pt on iOS, px on Android)`);
     expect(description('assert')).toContain('and an overlap of 2.25 units or less are not counted');
     expect(description('scroll_until')).toContain('past 2.25 units (pt on iOS, px on Android)');
     expect(description('assert')).toContain('Judged over what the assert reads: the whole rect for ocr; for color the part of the rect on the screen, inset 12% a side — the region its sampler reads — so');
