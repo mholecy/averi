@@ -263,7 +263,7 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  */
 const looseForm = (s: string): string =>
   // The recognizer's fold (ocr-fold.ts): it reads Slovak `Prihlásiť sa` as
-  // `Prihlásit sa` (measured 2026-09-18, finportal) and `Payee’s` as
+  // `Prihlásit sa` and `Payee’s` as
   // `Payee's` — every such row was OCCLUDED while correct on the screenshot.
   // The reported strings stay verbatim; the drift comparison forgives the
   // same difference for OCR readings (see `recognizerDifference`).

@@ -275,6 +275,45 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     }
   });
 
+  it('names a node whose text differs only in typographic punctuation or diacritics, and still fails', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { p: screen(el({ role: 'text', identifier: 'payee', label: 'Payee’s name' })) },
+      'p',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { text: "Payee's name" } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'not found within 0.1 s\n' +
+        "  no node has this exact text, but 1 node(s) differ from it only in ' vs ’:\n" +
+        '    id=payee label="Payee’s name"\n' +
+        '    (the tree carries the app\'s characters exactly, so the assert compares them exactly — ' +
+        'expect the text as the node has it)',
+    );
+  });
+
+  it('names a fold-equal node when the element is found but its content differs only that way', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { p: screen(el({ role: 'text', identifier: 'cta', label: 'Prihlásiť sa' })) },
+      'p',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'cta' }, text: 'Prihlásit sa' });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain('element found but content was: "Prihlásiť sa"');
+    expect(result.detail).toContain('differ from it only in t vs ť');
+  });
+
+  it('stays quiet for a node that differs outside the fold', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { p: screen(el({ role: 'text', identifier: 'payee', label: 'Payee’s game' })) },
+      'p',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'payee' }, text: "Payee's name" });
+    expect(result.detail).toBe('element found but content was: "Payee’s game"');
+  });
+
   it('stays quiet when the string is genuinely absent — no hint to invent', async () => {
     const result = await new Verifier(dashboardFake(), FAST).assert({ element: { text: 'Nowhere' } });
     expect(result.detail).toBe('not found within 0.1 s');
