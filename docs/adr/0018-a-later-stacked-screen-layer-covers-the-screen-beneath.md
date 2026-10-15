@@ -48,7 +48,7 @@ layer's own surface.
 ## Decision
 
 A node on a screen PRESENTED over the target's covers the target — through its own surface — when it is a surface that
-draws its whole rect (`draw-order.ts#givesWay`, the owner's option (a) on the review of the slice):
+draws its whole rect (`presented-by-shape.ts#givesWay`, the owner's option (a) on the review of the slice):
 
 - in `structural`: a structural LEAF (no children) that FILLS THE SCREEN — the RN Modal's dimming root `forgot_overlay`;
   a smaller leaf stays excused (every unmapped Android leaf is an `other`, every RN View leaf under WDA too: an icon's

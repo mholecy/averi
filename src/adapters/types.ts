@@ -529,9 +529,10 @@ export interface UiNode {
   /**
    * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
    * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
-   * (`presentation`), so draw order asks no shape of it (ui-tree/draw-order.ts#givesWay). Absent on a tree whose source
-   * says nothing of presentation (idb, Android, a flagless WDA payload, a snapshot printed before the mark existed):
-   * there draw order still infers a presented screen from shape. Printed by `ui_snapshot`.
+   * (`presentation`), so draw order never asks its shape fallback of it (ui-tree/presented-by-shape.ts). Absent on a
+   * tree whose source says nothing of presentation (idb, Android, a flagless WDA payload, a snapshot printed before the
+   * mark existed): there draw order still infers a presented screen from shape, through that fallback. Read by
+   * ui-tree/draw-order.ts#drawOrder; printed by `ui_snapshot`.
    */
   presentationsJudged?: true;
 }

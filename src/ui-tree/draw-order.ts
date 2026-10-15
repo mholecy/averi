@@ -1,5 +1,7 @@
-import { everyNode, INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
+import { INPUT_ROLE, KEYBOARD_ROLE, rectArea, rectIntersection, sameRect, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
+import { CONTENT_FRAMED_ROLES, fillsScreen, framesOnly, itemless, stackedScreens, within, type Placed } from './placed.js';
+import { presentedByShape, type FrameRow, type PresentedByShape } from './presented-by-shape.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
@@ -101,8 +103,8 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * - `presentedAt(node, point)` — `scroll_until`'s stroke
  *   (standing.ts#Scene.presentedAt): is the touch-down of a
  *   stroke for a target not judged in the viewport on a surface of a screen
- *   presented over the target's own (`exposure`'s column, then
- *   `presentedSurface`, ADR 0018)?
+ *   presented over the target's own (`exposure`'s column, then a marked
+ *   layer, or the shape fallback's surface: presented-by-shape.ts)?
  * - `presentedOver(node)` — the standing's remedy
  *   (ui-tree/standing.ts#remedied): is a screen presented over the
  *   target's own at all, wherever the target lies — `presentedAt` less the
@@ -115,8 +117,10 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * for `exposure`, `paintsOver`, `coversOf`, `presentedAt` and `presentedOver` alike; the `drawnOver` column (the
  * stroke box) does not read it. The mark is read here and nowhere else (`markOf`): a verb learns of it from
  * `presentedPress` (`MarkedLayer`: its kind and label), never from the node. On a tree whose source judged presented
- * layers (`UiNode.presentationsJudged`) its marks are the presented layers, and no shape is asked (`givesWay`); on any
- * other tree a presented screen is still inferred from shape (`presentedOver`, `presentedSurface`).
+ * layers (`UiNode.presentationsJudged`) its marks are the presented layers, and no shape is asked; on any other tree
+ * (Android, idb, a flagless WDA payload, a snapshot printed before the source's marks) a presented screen is still
+ * inferred from shape by ONE fallback, asked from here only then (`Seen.byShape`, presented-by-shape.ts: a frame
+ * row's excuse giving way over a presented screen, and that screen's surface).
  *
  * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -176,10 +180,11 @@ export interface DrawOrder {
    */
   exposure(node: UiNode, within: Rect): Exposure;
   /**
-   * The SURFACE of a screen presented over `node`'s own (`presentedSurface`, ADR 0018: a modal's dimming leaf, a
-   * popover's or a half sheet's `dismiss popup`, a sheet's scroll view) that holds `point`, wherever `node` lies — the
-   * last such drawn after it (the one on top there), and one that draws for it as a target (`NOT_DRAWN`'s `target`
-   * column, as `exposure` asks before it asks `presentedSurface`); undefined when none, or for a node not in this tree.
+   * The SURFACE of a screen presented over `node`'s own (a marked layer's, `markedLayers`, or by shape on a tree whose
+   * source did not judge, presented-by-shape.ts: a modal's dimming leaf, a popover's or a half sheet's `dismiss
+   * popup`, a sheet's scroll view) that holds `point`, wherever `node` lies — the last such drawn after it (the one on
+   * top there), and one that draws for it as a target (`NOT_DRAWN`'s `target` column, as `exposure` asks before it
+   * asks for a surface); undefined when none, or for a node not in this tree.
    * `exposure` cannot answer it for a node outside the box: it judges only what of the node shows, so a target below
    * the fold has no covers and no presented surface (`presentedOver` asks the same less the point). One reader:
    * `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which asks it at
@@ -194,9 +199,9 @@ export interface DrawOrder {
   /**
    * The SURFACE of a screen presented over `node`'s own, judged of the NODE, geometry-free: `presentedAt`'s rule less
    * its point — the last node drawn after `node` that draws for it as a target (`NOT_DRAWN`'s `target` column) and is a
-   * presented screen's surface (`presentedSurface`, ADR 0018) — wherever `node` lies: below the fold, wholly inside
-   * the status band, cut, covered. Undefined when none, or for a node not in this tree. Being presented over is a fact
-   * of the two layers (`presentedOver`: stacked screens inside one window, outside scrolled content), not of where the
+   * presented screen's surface (`markedLayers`, or presented-by-shape.ts) — wherever `node` lies: below the fold,
+   * wholly inside the status band, cut, covered. Undefined when none, or for a node not in this tree. Being presented
+   * over is a fact of the two layers (a mark, or the shape fallback's stacked screens), not of where the
    * node shows, so `exposure`'s `presented`, which judges only what of it shows inside the box, is its in-frame part:
    * a node with nothing in the box has none there. One reader: the standing's remedy (ui-tree/standing.ts#remedied),
    * which asks it when the frame named no presented surface — so the tap and the pixel assert tell a target wholly
@@ -380,10 +385,10 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
-   * The covers that are the SURFACE of a screen presented over the node (`presentedSurface`: a dimming leaf, labelled
-   * or not, a sheet's scroll view, on a later screen-sized layer stacked over its own, on a tree whose source did not
-   * judge presented layers; or a marked presented layer's cover, reaching the whole screen, or a node of a marked
-   * `screen` layer, `markedLayers`), in `covers`' order; empty when none — never a control, a bar the layer carries or
+   * The covers that are the SURFACE of a screen presented over the node (presented-by-shape.ts: a dimming leaf,
+   * labelled or not, a sheet's scroll view, on a later screen-sized layer stacked over its own, on a tree whose source
+   * did not judge presented layers; or a marked presented layer's cover, reaching the whole screen, or a node of a
+   * marked `screen` layer, `markedLayers`), in `covers`' order; empty when none — never a control, a bar the layer carries or
    * any other labelled node, which cover anyway (Safari's capsule bar). What the sentences read: a target under one
    * lies under a presented screen no scroll moves it out from under — close it first
    * (ui-tree/standing.ts#presentedRemedy; ADR 0018).
@@ -403,28 +408,14 @@ export interface Exposure {
   coverAt(point: Point): UiNode | undefined;
 }
 
-/** One node in pre-order, with what a row may ask of where it is. */
-interface Placed {
-  readonly node: UiNode;
-  /** Its index in the walk's order. */
-  readonly at: number;
-  /** The index just past its subtree in the walk's order. */
-  end: number;
-  /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`) or its band (`KEYBOARD_ROLE`, the tree source's mark — inside the keyboard's Window on WDA). */
-  readonly inKeyboard: boolean;
-  /** Its nearest ancestor that scrolls (scroll-containers.ts#scrolls), if any. */
-  readonly scroller: Placed | undefined;
-  /** Its parent; undefined for the root. */
-  readonly parent: Placed | undefined;
-}
-
 /**
- * What a row is judged against beside the node: the screen's area (`screenOf`), and whether the tree's source judged
- * presented layers itself (`UiNode.presentationsJudged` on its root: no shape is asked, `givesWay`).
+ * What a row is judged against beside the node: the screen's area (`screenOf`), and the shape fallback for presented
+ * screens (presented-by-shape.ts) — only on a tree whose source did not judge presented layers itself (no
+ * `UiNode.presentationsJudged` on its root); absent on one whose source did, which never reaches it.
  */
 interface Seen {
   readonly screenArea: number;
-  readonly judged: boolean;
+  readonly byShape?: PresentedByShape;
 }
 
 /**
@@ -460,9 +451,6 @@ interface Row {
   readonly target?: (placed: Placed, seen: SeenFor) => boolean;
 }
 
-/** A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none, the caller asks. */
-const fillsScreen = (r: Rect, screenArea: number): boolean => rectArea(r) >= screenArea * SCREEN_SIZED_FRACTION;
-
 /**
  * The `structural` row's wrapper excuse for a target: `node` holds the
  * target's whole rect, and is the screen's size or holds the target's
@@ -472,117 +460,8 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
   rectWithin(target.node.rect, node.rect) &&
   (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
-/** `inner` lies in `outer`'s subtree (or is it). */
-const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
-
-/** Some node from `from` up to, not including, `above` `fillsScreen`: a screen-sized layer around `from` below `above`. */
-const screenLayerBelow = (from: Placed | undefined, above: Placed, screenArea: number): boolean => {
-  for (let p = from; p !== undefined && p !== above; p = p.parent) if (fillsScreen(p.node.rect, screenArea)) return true;
-  return false;
-};
-
-/** The nearest node holding both `later` (above it) and `target`; undefined when none does. */
-const holderOf = (later: Placed, target: Placed): Placed | undefined => {
-  let both = later.parent;
-  while (both !== undefined && !within(target, both)) both = both.parent;
-  return both;
-};
-
-/**
- * `scroller` and `target` lie in two STACKED SCREENS (the `scrolledContent`
- * row; `presentedOver` asks it of any node, inside one window): below the
- * nearest node holding both, each lies in a screen-sized layer of its own —
- * the later one, the scroller's, drawn over the earlier
- * (an RN transparent Modal presented over the screen, a full-screen sheet)
- * — or that node is a root of no area, the parser's holder of several
- * WINDOWS, each drawn over the ones before it. `both`: the node holding
- * both (`holderOf`), when the caller has already found it.
- */
-const stackedScreens = (scroller: Placed, target: Placed, screenArea: number, both = holderOf(scroller, target)): boolean => {
-  if (both === undefined) return false;
-  if (both.parent === undefined && rectArea(both.node.rect) === 0) return true;
-  return screenLayerBelow(scroller, both, screenArea) && screenLayerBelow(target.parent, both, screenArea);
-};
-
-/**
- * `n` carries something DRAWABLE: a descendant that is neither an empty frame (`emptyFrame`) nor an itemless toolbar
- * (`itemless`, whose frames are not looked into). False of a leaf, of a node of empty frames only (`framesOnly`), and of
- * one whose content is only itemless toolbars (WDA's `toolbar 'Toolbar'` hosts, the parked accessory's Window).
- */
-const carriesContent = (n: UiNode): boolean => n.children.some((child) => !itemless(child) && (!emptyFrame(child) || carriesContent(child)));
-
-/** The child of `both` on `placed`'s branch — or `placed` itself when it is one: the layer `placed` lies in below `both`. */
-const layerOf = (placed: Placed, both: Placed): Placed => {
-  let layer = placed;
-  while (layer.parent !== undefined && layer.parent !== both) layer = layer.parent;
-  return layer;
-};
-
-/**
- * `placed` lies on a screen PRESENTED over `target`'s: a later screen-sized layer stacked over the target's own, inside
- * one window and outside scrolled content, carrying content. Each condition:
- * - two STACKED SCREENS (`stackedScreens`, asked of the node as of a scroller: below the node holding both, each lies
- *   in a screen-sized layer of its own) INSIDE ONE WINDOW — the node holding both is not the tree's root, whose
- *   children are WDA's Windows (the parser's 0×0 holder of Android's, idb's flat list): a later Window may be a
- *   pass-through one, the parked input-accessory Window over every screen (wda-source-myport-2fa-keyboard-parked.json),
- *   so across Windows only content covers, as before;
- * - NOT IN SCROLLED CONTENT: the node holding both neither scrolls nor lies in anything that scrolls — layers of a
- *   scroll view's content are one screen's (Finportal's RN ScrollView lays a full-screen background container and
- *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
- * - its layer — the child of the node holding both on its branch (`layerOf`) — carries something drawable
- *   (`carriesContent`): not only empty frames and itemless toolbars (WDA's `toolbar 'Toolbar'` hosts).
- * Asked through `givesWay`: of a node a frame row would excuse (`frameExcused`), and of a node a row would name as a
- * presented surface (`presentedSurface`, through the row's `surfaceCandidate`).
- */
-const presentedOver = (placed: Placed, target: Placed, screenArea: number): boolean => {
-  const both = holderOf(placed, target);
-  if (both?.parent === undefined || scrolls(both.node) || both.scroller !== undefined) return false;
-  return carriesContent(layerOf(placed, both).node) && stackedScreens(placed, target, screenArea, both);
-};
-
-/**
- * A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses (`frameExcused`),
- * or one a row would name as a presented surface (`presentedSurface`, through the row's `surfaceCandidate`: for
- * `structural` any structural node, excused or not), whose own `overPresented` holds (`structural`: a LEAF that
- * FILLS THE SCREEN, `fillsScreen`; `screenSizedHost` and `contentFramed`: a scroll view, drawing only through its
- * rows), covers a target (or, asked by `presentedSurface`, is named a presented surface) when it lies on a screen
- * presented over the target's (`presentedOver`) and is no bare frame — on a tree whose source did not judge presented
- * layers itself (`Seen.judged`: Android, idb, a flagless WDA payload, a snapshot printed before the source's marks):
- * where it did, its marks (`markedLayers`) are the presented layers and no shape is asked
- * (`emptyFrame` with nothing drawable in it — a spacer of the layer stays excused, so a leaf the app named, the RN
- * Modal's dimming root `forgot_overlay`, covers and an anonymous one does not). Only surfaces that draw their
- * whole rect: a dimming leaf, a sheet's scroll view. A smaller leaf stays excused: every unmapped Android leaf is an
- * `other`, every RN View leaf under WDA too, so an icon's parts or a field's wrapper would read as a screen's surface.
- * A wrapper or a host WITH children stays excused over another screen too — it may be a pass-through layer drawing
- * only its content: measured, Safari's `CapsuleViewController 0,0 402x874` (its bottom bar, Back and Tabs) laid in the
- * app's Window after the web view, whose links were measured tapped.
- * Measured: Finportal's RN transparent Modal (its dimming leaf, its card) and Contacts' New Contact page sheet (its form
- * `scrollable 0,62 402x812`, 0.929 of the screen), each laid in the app's Window after the screen beneath, which a tap
- * was sent to through the layer. The decision and its residuals:
- * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
- */
-const givesWay = (row: FrameRow, placed: Placed, target: Placed, { screenArea, judged }: Seen): boolean =>
-  !judged &&
-  FRAME_EXCUSES[row].overPresented(placed.node, screenArea) &&
-  !(emptyFrame(placed.node) && !carriesContent(placed.node)) &&
-  presentedOver(placed, target, screenArea);
-
-/**
- * The roles whose frame is not a surface: a node of one, non-interactive and
- * with children, covers a point only through its content (the
- * `contentFramed` row). One role, deliberately — see the rejected ones there.
- * A draw rule, not a scroll predicate (scroll-containers.ts says why).
- */
-const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
-
 /** A node with children that `fillsScreen`: it draws through its content, which is walked. */
 const screenSized = (n: UiNode, screenArea: number): boolean => n.children.length > 0 && fillsScreen(n.rect, screenArea);
-
-/** A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see `itemlessToolbar`). */
-const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
-
-/** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
-const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));
 
 /**
  * `node` repeats `target` (the `onTarget` row, in a flat list): it carries
@@ -663,61 +542,31 @@ const fieldOf = (control: UiNode, target: Rect): boolean =>
   containsPoint(control.rect, rectCentre(target)) &&
   rectWithin(target, { x: control.rect.x - LABEL_OVERHANG, y: control.rect.y - LABEL_OVERHANG, width: control.rect.width + 2 * LABEL_OVERHANG, height: control.rect.height + 2 * LABEL_OVERHANG });
 
-/** A `toolbar` none of whose descendants could be an item (`itemlessToolbar`). */
-const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
-
 /**
- * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target — each with
- * the part of it that gives way over a presented screen (`overPresented`; the rest of the exception is `givesWay`'s,
- * one for the three) and the nodes it would name as a presented screen's surface (`surfaceCandidate`: `structural`'s
- * is any structural node, excused or not, since a labelled dim covers anyway; the other two rows' is the node they
- * excuse). The rows (`structural`, `screenSizedHost`, `contentFramed`, whose docs have the rules and their
- * measurements) ask `frameExcused`, which asks `givesWay` of a node `excuses` holds; `Exposure.presented` asks
- * `presentedSurface`, which asks `givesWay` of a node `surfaceCandidate` holds — so it can tell a presented screen's
- * surface from a cover of the target's own screen.
+ * The `target` column's three FRAME excuses — a node judged to draw nothing by its frame, for a target. The rows
+ * (`structural`, `screenSizedHost`, `contentFramed`, whose docs have the rules and their measurements) ask
+ * `frameExcused`. On a tree whose source did not judge presented layers, the shape fallback (`Seen.byShape`,
+ * presented-by-shape.ts) may take an excuse back over a screen presented over the target's, and names that screen's
+ * surface from the same rows (`surfaceOf`).
  */
 const FRAME_EXCUSES = {
-  structural: {
-    excuses: ({ node }: Placed, target: Placed, screenArea: number): boolean =>
-      STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
-    // A leaf that fills the screen: a dimming view. A wrapper with children may be a pass-through layer.
-    overPresented: (node: UiNode, screenArea: number): boolean => node.children.length === 0 && fillsScreen(node.rect, screenArea),
-    // Any structural node, labelled or valued too: a dim the app or UIKit labelled is still a presented screen's surface.
-    surfaceCandidate: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => STRUCTURAL_ROLES.has(node.role),
-  },
-  screenSizedHost: {
-    excuses: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
-    // A scroll view only (a sheet's form); any other host may pass touches through.
-    overPresented: (node: UiNode, _screenArea: number): boolean => CONTENT_FRAMED_ROLES.has(node.role),
-    surfaceCandidate: (placed: Placed, target: Placed, screenArea: number): boolean => FRAME_EXCUSES.screenSizedHost.excuses(placed, target, screenArea),
-  },
-  contentFramed: {
-    // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES growing one.
-    excuses: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
-    // Every scroll view this row excuses.
-    overPresented: (_node: UiNode, _screenArea: number): boolean => true,
-    surfaceCandidate: (placed: Placed, target: Placed, screenArea: number): boolean => FRAME_EXCUSES.contentFramed.excuses(placed, target, screenArea),
-  },
-} as const;
+  structural: ({ node }: Placed, target: Placed, screenArea: number): boolean =>
+    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
+  screenSizedHost: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
+  // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES
+  // growing one.
+  contentFramed: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
+} as const satisfies Record<FrameRow, (placed: Placed, target: Placed, screenArea: number) => boolean>;
 
-type FrameRow = keyof typeof FRAME_EXCUSES;
-
-/** `row` excuses `placed` for `target`, and the exception over a presented screen does not take the excuse back (`givesWay`). */
+/** `row` excuses `placed` for `target`, and the shape fallback, where it is asked, does not take the excuse back. */
 const frameExcused = (row: FrameRow, placed: Placed, target: Placed, seen: Seen): boolean =>
-  FRAME_EXCUSES[row].excuses(placed, target, seen.screenArea) && !givesWay(row, placed, target, seen);
+  FRAME_EXCUSES[row](placed, target, seen.screenArea) && seen.byShape?.givesWay(row, placed, target) !== true;
 
 /**
- * A cover of `target` that is the SURFACE of a screen presented over it (`Exposure.presented`): a node some frame row
- * names as a candidate (`surfaceCandidate`) and whose exception over a presented screen holds (that row's `givesWay`).
- * For `structural`, a STRUCTURAL leaf that fills the screen on a presented layer, whether that row excuses it or not
- * — labelled or valued, it covers anyway, so only what the sentences say of it is the exception's: UIKit's
- * `container 'dismiss popup' id=PopoverDismissRegion`, the dim of a half-height SwiftUI sheet (`-402,-874 1206x2622`)
- * and of Contacts' discard popover (`0,0 402x874`), each a leaf beside what it dims, whose swipe "out from under" moved
- * the sheet to another detent and closed the popover; for the other two rows, a scroll view they excuse and that gives
- * way. ADR 0018.
+ * A cover of `target` that the shape fallback names the SURFACE of a screen presented over it (presented-by-shape.ts),
+ * on a tree whose source did not judge presented layers; never on one whose source did (no `Seen.byShape`).
  */
-const presentedSurface = (placed: Placed, target: Placed, seen: Seen): boolean =>
-  (Object.keys(FRAME_EXCUSES) as FrameRow[]).some((row) => FRAME_EXCUSES[row].surfaceCandidate(placed, target, seen.screenArea) && givesWay(row, placed, target, seen));
+const surfaceOf = (placed: Placed, target: Placed, seen: Seen): boolean => seen.byShape?.surface(placed, target) === true;
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
@@ -786,7 +635,7 @@ const NOT_DRAWN = {
    * unlabelled frames no longer cover the switcher they lie in), reads as
    * drawing nothing — a false "clear"; WDA gives such a node no trait that
    * tells it from the cell's background.
-   * Except over ANOTHER SCREEN (`givesWay`, ADR 0018): a structural
+   * Except over ANOTHER SCREEN (presented-by-shape.ts#givesWay, ADR 0018): a structural
    * LEAF on a screen presented over the target's covers — the React Native
    * transparent Modal's dimming root `forgot_overlay 0,0 402x874` (a leaf the
    * app named) was excused here, and a tap on the login screen beneath was
@@ -813,7 +662,7 @@ const NOT_DRAWN = {
    * tap on that screen was refused as "covered by toolbar". An interactive
    * one still covers: a full-screen `button` backdrop (an RN transparent
    * Modal's Pressable) takes the tap. And so does a screen-sized SCROLL VIEW
-   * on a screen presented over the target's (`givesWay`, ADR 0018):
+   * on a screen presented over the target's (presented-by-shape.ts#givesWay, ADR 0018):
    * a sheet's form, measured to swallow the tap. Any other host stays
    * excused, over another screen too — ADR 0018 keeps the trade-off this
    * row accepted for hosts that may pass touches through (Safari's
@@ -868,7 +717,7 @@ const NOT_DRAWN = {
    * cover). What still covers: its content at the point, a childless
    * scrollable, an interactive node of any role — and a scroll view that is,
    * or lies in, a later screen-sized layer stacked over the target's own
-   * screen, carrying content (`givesWay`, ADR 0018): Contacts' New
+   * screen, carrying content (presented-by-shape.ts#givesWay, ADR 0018): Contacts' New
    * Contact page sheet's form `scrollable 0,62 402x812`, whose bare
    * background took a tap sent to the list beneath. Accepted trade-off, this
    * row LOOSENS the guard: a scroll view really drawn over the point with
@@ -901,7 +750,7 @@ const NOT_DRAWN = {
    * is judged by `contentFramed`. A row of the SAME scroll view as the
    * target (a sticky section header over a row) still covers, and so does
    * the content of a scroller in a LATER screen (and, inside one window, that
-   * screen's scroll view or dimming leaf: `givesWay`, ADR 0018) — an RN transparent Modal
+   * screen's scroll view or dimming leaf: presented-by-shape.ts#givesWay, ADR 0018) — an RN transparent Modal
    * presented over the screen (a later screen-sized layer, in the same
    * window or another), a full-screen sheet's list, a later window under
    * the parser's 0×0 root (an assumption: uiautomator's z-order across
@@ -1381,9 +1230,9 @@ const NOT_DRAWN = {
    * and `fully` spent a stroke moving a row off a phantom.
    * docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md
    *
-   * Except the SURFACE of a screen presented over the target's (`presentedSurface`, ADR 0018), which covers as before
-   * and stays in `Exposure.presented` — the mirror of `givesWay`: with Contacts' discard popover up, WDA marks the
-   * whole New Contact sheet layer `0/0`, its form `Table 0,62 402x812` included
+   * Except the SURFACE of a screen presented over the target's (presented-by-shape.ts#presentedSurface, ADR 0018),
+   * which covers as before and stays in `Exposure.presented` — the mirror of `givesWay`: with Contacts' discard
+   * popover up, WDA marks the whole New Contact sheet layer `0/0`, its form `Table 0,62 402x812` included
    * (tests/fixtures/wda-capture-contacts-discard-popover.json), and that Table is still the presented sheet over the
    * list's rows. Without the exception a sheet marked so, over a list with no second dim, would let a tap through
    * to the list. The TARGET's own flag is never read: a target under a modal is `isVisible="0"` too.
@@ -1392,7 +1241,7 @@ const NOT_DRAWN = {
    * mark). Residuals and the decision: docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md
    */
   hidden: {
-    target: (placed, about) => placed.node.hidden === true && !presentedSurface(placed, about.target, about),
+    target: (placed, about) => placed.node.hidden === true && !surfaceOf(placed, about.target, about),
   },
 } as const satisfies Record<string, Row>;
 
@@ -1683,7 +1532,11 @@ export function listsUnclippedFrames(tree: UiNode): boolean {
 
 export function drawOrder(tree: UiNode): DrawOrder {
   const screen = screenOf(tree);
-  const seen: Seen = { screenArea: rectArea(screen), judged: tree.presentationsJudged === true };
+  const screenArea = rectArea(screen);
+  const seen: Seen = {
+    screenArea,
+    ...(tree.presentationsJudged !== true && { byShape: presentedByShape(screenArea, (row, placed, target) => FRAME_EXCUSES[row](placed, target, screenArea)) }),
+  };
   const flatList = !listsAncestry(tree);
   const paddedTouchTargets = tree.paddedTouchTargets === true;
   const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
@@ -1785,7 +1638,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
    * node (a layer's own nodes are not beneath it: the popover's `dismiss popup` is the way to close it), nor one in its
    * subtree; never over the keyboard's own nodes (`Placed.inKeyboard`). Such a layer is presented over the node
    * whatever the frames around it, its cover reaching the WHOLE screen (`laterFor`). No stacked-screens, window or
-   * bare-frame condition: those are draw order's inferences from shape (`presentedOver`), which the mark makes moot.
+   * bare-frame condition: those are the shape fallback's inferences (presented-by-shape.ts), which the mark makes moot.
    */
   const markedLayers = (places: readonly Placed[]): readonly PresentedLayer[] =>
     // The keyboard's own nodes are never beneath: the keyboard is drawn over the app's windows, wherever WDA lists its
@@ -1815,7 +1668,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /**
    * The last node drawn after `node` whose reach `where` keeps (a marked presented layer's cover reaches the whole
    * screen, `laterFor`), that draws for it as a target and is the surface of a screen presented over its own — a node
-   * of a marked `screen` layer, or by shape on a tree whose source did not judge (`presentedSurface`) — or that cover:
+   * of a marked `screen` layer, or by shape on a tree whose source did not judge (`surfaceOf`) — or that cover:
    * `presentedAt` keeps those holding its point, `presentedOver` every one.
    */
   const lastPresentedSurface = (node: UiNode, where: (reach: Rect) => boolean = () => true): UiNode | undefined => {
@@ -1823,7 +1676,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     if (places.length === 0) return undefined;
     const about = asTarget(places[0]);
     const { later, marks, inScreen } = laterFor(places);
-    return later.filter((p) => (marks(p) ? where(screen) : where(p.node.rect) && drawsOverTarget(p, about) && (inScreen(p) || presentedSurface(p, places[0], seen)))).at(-1)?.node;
+    return later.filter((p) => (marks(p) ? where(screen) : where(p.node.rect) && drawsOverTarget(p, about) && (inScreen(p) || surfaceOf(p, places[0], seen)))).at(-1)?.node;
   };
 
   const api: DrawOrder = {
@@ -1913,7 +1766,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        presented: over.filter((c) => c.marks || inScreen(c.placed) || presentedSurface(c.placed, places[0], seen)).map((c) => c.node),
+        presented: over.filter((c) => c.marks || inScreen(c.placed) || surfaceOf(c.placed, places[0], seen)).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,
