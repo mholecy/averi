@@ -211,7 +211,7 @@ export class IosLab implements LabDevice {
 
 // --- Android: adb ---
 
-/** The cell layers the Android app builds (Lab.kt#SUPPORTED_LAYERS). */
+/** The cell layers the Android app builds (Lab.kt#SUPPORTED_LAYERS; its cells routed by family, MainActivity.kt#CellRouter). */
 const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert']);
 
 export class AndroidLab implements LabDevice {

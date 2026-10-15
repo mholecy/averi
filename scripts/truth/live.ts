@@ -18,7 +18,7 @@ import type { LabState } from './schema.js';
  * forms): averi's verbs that CHANGE state — a fill with and without clear, typing into the focused field, a fill on the
  * secure field and on a prefilled one, a tap under the keyboard with and without a dismissal, a picker row reached by
  * scroll_until — run through averi's MCP tools against the REAL lab simulator, and the app's own model (the state
- * file, Form.swift) is the oracle. A replayed tree cannot judge these: typing changes nothing in it.
+ * file, Forms.swift) is the oracle. A replayed tree cannot judge these: typing changes nothing in it.
  *
  *   node --import tsx scripts/truth/live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--cases b1,p4] [--shots <dir>]
  *

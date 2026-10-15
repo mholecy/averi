@@ -16,7 +16,8 @@ val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert")
 
 data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean)
 
-data class Cell(val id: String, val layer: String, val targets: List<Target>) {
+/** `family`: base, presented, forms, edges, bars, false-covers — MainActivity's CellRouter routes by it. */
+data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null) {
     val supported get() = layer in SUPPORTED_LAYERS
 }
 
@@ -42,7 +43,7 @@ object Catalog {
                     onLayer = t.optString("in") == "layer",
                 )
             }
-            Cell(c.optString("id"), c.optString("layer"), targets)
+            Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null })
         }
     }
 }

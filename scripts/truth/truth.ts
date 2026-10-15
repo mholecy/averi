@@ -8,7 +8,7 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, typ
  */
 
 /**
- * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it (Form.swift).
+ * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it (Forms.swift).
  * iOS's, in points: Android's forms (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2b) need the bar in pixels —
  * deferred to phase 2b, where the app should report its bar's frame (e.g. `frames["submit.bar"]`) for situationOf to
  * read instead of this guess (round-2 review, MINOR-4).

@@ -20,6 +20,8 @@ struct Catalog: Decodable {
 
 struct Cell: Decodable, Identifiable {
     let id: String
+    /// base, presented, forms, edges, bars, false-covers — CellRouter (AveriLabApp.swift) routes by it.
+    let family: String?
     let layer: String
     let targets: [Target]
     /// A form cell (scripts/truth/schema.ts#CatalogForm): fields, a submit, maybe a picker — no coloured targets.
