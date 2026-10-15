@@ -128,6 +128,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('ui_snapshot')).toContain('at its cell\'s rect');
   });
 
+  it('ui_snapshot: says what the root\'s dialect marks mean — WDA\'s `"unclippedFrames": true` (adapters/types.ts#UiNode.unclippedFrames) and idb\'s `"flatList": true`', () => {
+    expect(description('ui_snapshot')).toContain('"unclippedFrames": true under iOS wda');
+    expect(description('ui_snapshot')).toContain('"flatList": true under iOS idb');
+  });
+
   it('ui_snapshot: a hidden subtree\'s root is any element but a structural wrapper — a scroll view and a toolbar too, as adapters/wda-source.ts#hiddenRoots asks (STRUCTURAL_ROLES), not only a control, an image or a text', () => {
     expect(description('ui_snapshot')).toContain('a subtree whose ROOT — any element but a structural wrapper —');
     expect(description('ui_snapshot')).not.toContain('a control, an image or a text, never a wrapper');

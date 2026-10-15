@@ -96,6 +96,9 @@ was reported done at (201,827), 3 pt below CONTINUE.
   views (`Clips.drawnIn`'s `scrollers`), but `scroll_until` still strokes in the screen box on a WDA tree (its stroke
   containers are Android's clipping chain, `Clips.scrollersOf`). On the country sheet, a stroke `up` toward a row past
   the list's 811 touches down above the sheet's list. Unchanged; the scrollers could feed the stroke's containers.
+- **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
+  21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
+  at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.
 - **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
   `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
   the safe direction.
