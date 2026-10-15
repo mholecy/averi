@@ -3,29 +3,23 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { GoldenCheck, GoldenJson } from '../../scripts/differential/golden.js';
+import { failureOf, runSide, sideLine, sideRunFromOutput, type ProcessError, type SideDeps } from '../../scripts/truth/calibrate-run.js';
+import { calibrationReport, verdictCell } from '../../scripts/truth/calibration-report.js';
 import {
-  calibrationReport,
   captureOf,
   disposition,
   failing,
-  failureOf,
   isOpenCell,
   plan,
   regressedElsewhere,
   results,
-  runSide,
-  sideLine,
-  sideRunFromOutput,
   sideRunOf,
   STATUSES,
   VERDICTS,
-  verdictCell,
   verdictOf,
   WORKING_TREE,
   type Calibration,
   type CalibrationEntry,
-  type ProcessError,
-  type SideDeps,
   type SideRun,
 } from '../../scripts/truth/calibrate.js';
 
