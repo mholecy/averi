@@ -85,5 +85,13 @@ function foldedPairs(want: string, read: string): string[] {
 export const RECOGNIZER_DIFFERENCE =
   'the recognizer reads typographic punctuation as ASCII and drops diacritics';
 
-/** `’ vs '` — the folded characters a fold-equal pair differs in, for a note to name. */
-export const foldedCharacters = (want: string, read: string): string => foldedPairs(want, read).join(', ');
+/**
+ * `’ vs '` — the folded characters a fold-equal pair differs in, for a note
+ * to name. Two strings that differ only in how a letter is encoded (`é` as one
+ * code point or as `e` + a combining acute) have no such character; that is
+ * said instead of naming nothing.
+ */
+export const foldedCharacters = (want: string, read: string): string => {
+  const pairs = foldedPairs(want, read);
+  return pairs.length > 0 ? pairs.join(', ') : 'composed vs decomposed characters';
+};

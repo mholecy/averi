@@ -842,6 +842,12 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     );
   });
 
+  it('a reading that differs only in how a letter is composed says so, rather than naming no character', () => {
+    const r = evaluateOcrAssert({ text: 'Caf\u0065\u0301' }, [line('Caf\u00e9', 30)], 1080);
+    expect(r.pass).toBe(true);
+    expect(r.detail).toContain('= (differs only in composed vs decomposed characters — ');
+  });
+
   it('case is not folded', () => {
     expect(evaluateOcrAssert({ text: 'Payee’s Name' }, [line("Payee's name", 30)], 1080).pass).toBe(false);
     expect(evaluateOcrAssert({ text: 'CONTINUE' }, [line('Continue', 30)], 1080).pass).toBe(false);
