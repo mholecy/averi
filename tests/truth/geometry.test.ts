@@ -124,6 +124,9 @@ describe('what shows of it, and where a tap can land', () => {
     expect(measuredGeometry(rect(51, 900, 300, 64), s, undefined)).toEqual({});
     expect(measuredGeometry(rect(51, 900, 300, 64), { ...s, safeArea: SAFE }, undefined)).toEqual({ geometry: 'off-screen', visible: null, piece: null });
     expect(() => measuredGeometry(rect(51, 200, 300, 64), { ...s, scrollViews: {} }, 'list')).toThrow('no scroll view list');
+    // Any one of the three is enough: a state reporting only its chrome, or only its scroll views, is measured.
+    expect(measuredGeometry(rect(51, 760, 300, 64), { ...s, chrome: { tabBar: TAB } }, undefined)).toEqual({ geometry: 'under-chrome:tabBar', visible: rect(51, 760, 300, 64), piece: rect(51, 760, 300, 30) });
+    expect(measuredGeometry(rect(51, 720, 300, 64), { ...s, scrollViews: { list: LIST } }, 'list')).toEqual({ geometry: 'outside-scroll-view', visible: null, piece: null });
   });
 
   it('a tab bar\'s item firing is another control fired, as a submit is', () => {

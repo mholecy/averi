@@ -65,8 +65,8 @@ describe('the rows ask nothing of a capture with no measured geometry', () => {
 
 describe('the rows each geometry asks', () => {
   it.each([
-    ['off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }, ['tap: R-off', 'colour: fails (R-off', 'scroll_until: R-off, R-stroke: swipes down']],
-    ['outside-scroll-view', { frame: rect(51, 720, 300, 64), reached: false, visible: null }, ['tap: R-outside-sv', 'colour: fails (R-outside-sv', 'scroll_until: R-outside-sv, R-stroke: swipes down']],
+    ['off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }, ['tap: R-off', 'colour: fails (R-off', 'scroll_until: R-off, R-stroke: swipes down', 'scroll_until: R-direction: each stroke down']],
+    ['outside-scroll-view', { frame: rect(51, 720, 300, 64), reached: false, visible: null }, ['tap: R-outside-sv', 'colour: fails (R-outside-sv', 'scroll_until: R-outside-sv, R-stroke: swipes down', 'scroll_until: R-direction: each stroke down']],
     ['sliver', { visible: rect(51, 670, 300, 20) }, ['tap: R-sliver', 'scroll_until: R-sliver', 'scroll_until fully: R-fully']],
     ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'scroll_until fully: R-fully']],
     ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'scroll_until fully: R-fully']],
@@ -185,11 +185,14 @@ describe('R-dismiss and R-direction', () => {
     expect(r.judge(out('ERROR: no keyboard dismissal: covered by Toolbar'))).toBe('no tap on the dismissal Transfer details (refused for a toolbar): ERROR: no keyboard dismissal: covered by Toolbar');
     expect(r.judge(out(TAPPED, ['idb ui tap 201 700']))).toBe('no tap on the dismissal Transfer details: Tapped id:"lab.edges.A"');
   });
-  it('R-direction is live only: declared, never asked by the golden mode', () => {
+  it('R-direction is live only: declared — asked of a target off what shows, never by the golden mode (golden-wiring.test.ts)', () => {
     const d = directionRow('ios', target('off-screen', { frame: rect(51, 908, 300, 64) }), CELL);
     expect(d.live).toMatch(/phase 5/);
     expect(d.call.args).toMatchObject({ direction: 'down' });
-    for (const g of ['off-screen', 'outside-scroll-view', 'sliver', 'partly-centre-in', 'centre-out', 'status-band', 'nav-band', 'under-chrome:x'] as const) {
+    for (const g of ['off-screen', 'outside-scroll-view'] as const) {
+      expect(rows(target(g, { visible: null })).filter((x) => x.live !== undefined).map((x) => x.says)).toEqual(['R-direction: each stroke down brings it closer, and a stroke that does not turns back']);
+    }
+    for (const g of ['sliver', 'partly-centre-in', 'centre-out', 'status-band', 'nav-band', 'under-chrome:x', 'band-overlap:nav', 'chrome-overlap:x'] as const) {
       expect(rows(target(g, { visible: rect(51, 670, 300, 30) })).filter((x) => x.live !== undefined)).toEqual([]);
     }
   });
@@ -203,6 +206,11 @@ describe('a cell\'s averi.yaml variant (CellTruth.config)', () => {
   it('with one, merged over the platform\'s settings — a keyboardDismiss variant (#7, #19)', async () => {
     const c = JSON.parse(await readFile(await configFor(rec, undefined, { ios: { keyboardDismiss: [{ tap: 'text:"Transfer details"' }] }, android: { x: 1 } }), 'utf8'));
     expect(c).toEqual({ app: { android: { package: 'differential.app', x: 1 }, ios: { bundleId: 'differential.app', treeSource: 'wda', keyboardDismiss: [{ tap: 'text:"Transfer details"' }] } } });
+  });
+  it('the cell\'s variant wins over the differential\'s own dismissal variant: it is what the truth was captured under', async () => {
+    const c = JSON.parse(await readFile(await configFor(rec, ['escape'], { ios: { keyboardDismiss: ['accessory'] } }), 'utf8'));
+    expect(c.app.ios.keyboardDismiss).toEqual(['accessory']);
+    expect(JSON.parse(await readFile(await configFor(rec, ['escape']), 'utf8')).app.ios.keyboardDismiss).toEqual(['escape']);
   });
 });
 
