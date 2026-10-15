@@ -653,7 +653,7 @@ const NOT_DRAWN = {
    * unlabelled frames no longer cover the switcher they lie in), reads as
    * drawing nothing — a false "clear"; WDA gives such a node no trait that
    * tells it from the cell's background.
-   * Except over ANOTHER SCREEN (presented-by-shape.ts#givesWay, ADR 0018): a structural
+   * Except over ANOTHER SCREEN (presented-by-shape.ts#givesWay): a structural
    * LEAF on a screen presented over the target's covers — the React Native
    * transparent Modal's dimming root `forgot_overlay 0,0 402x874` (a leaf the
    * app named) was excused here, and a tap on the login screen beneath was
@@ -680,9 +680,9 @@ const NOT_DRAWN = {
    * tap on that screen was refused as "covered by toolbar". An interactive
    * one still covers: a full-screen `button` backdrop (an RN transparent
    * Modal's Pressable) takes the tap. And so does a screen-sized SCROLL VIEW
-   * on a screen presented over the target's (presented-by-shape.ts#givesWay, ADR 0018):
+   * on a screen presented over the target's (presented-by-shape.ts#givesWay):
    * a sheet's form, measured to swallow the tap. Any other host stays
-   * excused, over another screen too — ADR 0018 keeps the trade-off this
+   * excused, over another screen too — the exception keeps the trade-off this
    * row accepted for hosts that may pass touches through (Safari's
    * `CapsuleViewController`, measured): a full-screen non-interactive host
    * with nothing of its own at the point (an RN transparent modal whose
@@ -735,7 +735,7 @@ const NOT_DRAWN = {
    * cover). What still covers: its content at the point, a childless
    * scrollable, an interactive node of any role — and a scroll view that is,
    * or lies in, a later screen-sized layer stacked over the target's own
-   * screen, carrying content (presented-by-shape.ts#givesWay, ADR 0018): Contacts' New
+   * screen, carrying content (presented-by-shape.ts#givesWay): Contacts' New
    * Contact page sheet's form `scrollable 0,62 402x812`, whose bare
    * background took a tap sent to the list beneath. Accepted trade-off, this
    * row LOOSENS the guard: a scroll view really drawn over the point with
@@ -768,7 +768,7 @@ const NOT_DRAWN = {
    * is judged by `contentFramed`. A row of the SAME scroll view as the
    * target (a sticky section header over a row) still covers, and so does
    * the content of a scroller in a LATER screen (and, inside one window, that
-   * screen's scroll view or dimming leaf: presented-by-shape.ts#givesWay, ADR 0018) — an RN transparent Modal
+   * screen's scroll view or dimming leaf: presented-by-shape.ts#givesWay) — an RN transparent Modal
    * presented over the screen (a later screen-sized layer, in the same
    * window or another), a full-screen sheet's list, a later window under
    * the parser's 0×0 root (an assumption: uiautomator's z-order across
