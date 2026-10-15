@@ -256,6 +256,12 @@ export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'othe
  */
 export const SCREEN_SIZED_FRACTION = 0.9;
 
+/**
+ * The kinds of PRESENTED LAYER a tree source marks (`UiNode.presentation`) — one closed set: three a source types
+ * (`alert`, `actionSheet`, `popover`), and `screen`, a presented screen it shows by its visibility flags.
+ */
+export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'screen';
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, keyboard (KEYBOARD_ROLE), ...
@@ -487,27 +493,47 @@ export interface UiNode {
    */
   hidden?: true;
   /**
-   * Set on the ELEMENT OF A PRESENTED LAYER, by the tree source that says so itself: the WDA parser marks an element
-   * of a type that is a presentation (adapters/wda-source.ts#PRESENTATIONS) — `Alert`, `alert`, today; nothing else.
-   * The source's fact, not a shape draw order infers: a layer holding such an element is presented over every screen
-   * drawn before it, the WHOLE screen whatever the frames of the nodes around it (an alert is modal: UIKit's and
-   * SwiftUI's alike). Measured on mp-native's SWIFT form with its exit alert up (WDA, iPhone 17, iOS 27): the alert's
-   * layer is a bare dimming leaf `0,0 402x874`, an empty frame and `Alert 'Exit confirmation' 41,365 320x172`, whose
-   * own backdrop leaves lie at `41,365 402x874` — no shape there told it from a sheet's leftover dim, and a tap on the
-   * form beneath was reported done.
+   * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
+   * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one mark
+   * per layer:
+   * - by the TYPE of an element the layer holds: `alert` (WDA's `Alert`), `actionSheet` (a `Sheet`: UIKit's action
+   *   sheet, its message the label), `popover` (a `Popover` holding neither) — that element carries
+   *   `presentationElement`, and names the layer;
+   * - by WDA's own visibility flags, `screen`: the first screen-sized layer of its Window with visible content on the
+   *   screen, laid after a screen-sized layer carrying content every node of which reads `isVisible="0"` (and every
+   *   earlier such layer of that Window reads so too). UIKit's modal presentation hides the presenting screen from
+   *   accessibility; WDA reports it whole, invisible — measured on page sheets, SwiftUI half sheets and React Native
+   *   transparent modals (iPhone 17, iOS 27). The flags of a whole LAYER beneath and of a visible later one, never one
+   *   node's, never a target's own.
+   * The source's fact, not a shape draw order infers: a marked layer covers what lies OUTSIDE it and is drawn before
+   * it, through the whole screen, whatever the frames around it.
    *
    * Its readers, all of them:
-   * - ui-tree/draw-order.ts#markOf, the one reading of it in code: the marked element, when its rect has area on the
-   *   screen (never judged by `hidden`), covers every node drawn before it — not its ancestors, nor its own subtree —
-   *   through the whole screen, as the one cover of its layer and the surface of a screen presented over the target
-   *   (`markedLayers`: `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); and draw order hands the
-   *   mark on as `MarkedLayer` (its kind and label, `DrawOrder.presentedPress`) — to the standing's remedy
-   *   (ui-tree/standing.ts#Remedy, whose `presentedRemedy` names it: "an alert is presented over it ("Exit
-   *   confirmation")") and to `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
+   * - ui-tree/draw-order.ts#markOf, the one reading of it in code (with `presentationElement`): a typed layer's
+   *   element, when its rect has area on the screen (never judged by `hidden`), is that layer's ONE cover through the
+   *   whole screen; a `screen` layer reaches the whole screen and its own nodes stay covers, each a presented surface
+   *   (`markedLayers`: `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); draw order hands the mark on
+   *   as `MarkedLayer` (its kind and label, `DrawOrder.presentedPress`) — to the standing's remedy
+   *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
+   *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
    * Absent everywhere else — on an idb or Android tree always.
    */
-  presentation?: 'alert';
+  presentation?: PresentationKind;
+  /**
+   * Set on the ELEMENT that names a layer marked by type (`presentation` `alert`, `actionSheet` or `popover`): the
+   * `Alert`, the `Sheet` or the `Popover` itself — its label is the layer's in the remedy, its rect where the layer is
+   * named. Read only with `presentation`, by ui-tree/draw-order.ts#markOf; printed by `ui_snapshot`.
+   */
+  presentationElement?: true;
+  /**
+   * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
+   * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
+   * (`presentation`), so draw order asks no shape of it (ui-tree/draw-order.ts#givesWay). Absent on a tree whose source
+   * says nothing of presentation (idb, Android, a flagless WDA payload, a snapshot printed before the mark existed):
+   * there draw order still infers a presented screen from shape. Printed by `ui_snapshot`.
+   */
+  presentationsJudged?: true;
 }
 
 /**

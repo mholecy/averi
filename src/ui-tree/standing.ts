@@ -293,8 +293,8 @@ export interface Scene {
    * THE presented question a stroke asks at its touch-down (`point`), as a sentence quotes the answer
    * (draw-order.ts#PresentedPress): on behalf of `target`, the surface of a screen presented over the target's own
    * that holds the point (draw-order.ts#DrawOrder.presentedAt) — or, with NO target (one not in the tree), the
-   * element of a marked presented layer the point lands on (draw-order.ts#DrawOrder.markedAt: a screen presented by
-   * shape alone is not asked of no target). Undefined when none. The point is kept: a surface judged by shape only
+   * element of a layer the tree marks by its type the point lands on (draw-order.ts#DrawOrder.markedAt: an alert, an
+   * action sheet, a popover; a `screen` layer or a screen presented by shape alone is not asked of no target). Undefined when none. The point is kept: a surface judged by shape only
    * where it lies is not one at every touch-down (a dismissed sheet parked off screen is no stop). One reader:
    * `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
    */
@@ -395,26 +395,41 @@ export interface StandingFacts {
   readonly drawn?: Rect;
 }
 
+/** A presented layer the source TYPES, as the words name it (`presentedRemedy`): its article and its noun. */
+const TYPED_WORDS: Readonly<Record<Exclude<MarkedLayer['kind'], 'screen'>, readonly [string, string]>> = {
+  alert: ['an', 'alert'],
+  actionSheet: ['an', 'action sheet'],
+  popover: ['a', 'popover'],
+};
+/** The words for `layer` when the source typed it; undefined for a `screen` layer, or none. */
+const typedWords = (layer: MarkedLayer | undefined): readonly [string, string] | undefined => (layer === undefined || layer.kind === 'screen' ? undefined : TYPED_WORDS[layer.kind]);
+
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
  * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
- * since no scroll moves the node out from under it. The one clause of a remedy kept here, in the UI-tree layer both
- * verbs and the pixel assert may import, as system-bar.ts's words are (the module's doc: who owns a remedy's words).
+ * since no scroll moves the node out from under it. A layer the tree source types (an alert, an action sheet, a
+ * popover: `layer`) is named by its kind and label; a `screen` layer, or none, is "a screen … (a modal or a sheet)".
+ * The one clause of a remedy kept here, in the UI-tree layer both verbs and the pixel assert may import, as
+ * system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
-export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string =>
-  layer?.kind === 'alert'
-    ? `an alert is presented over ${what}${layer.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
+export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
+  const typed = typedWords(layer);
+  return typed !== undefined
+    ? `${typed[0]} ${typed[1]} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+};
 
 /**
  * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no
- * swipe was sent — one on that screen may dismiss it; under a presented layer the tree source marks (an alert, `layer`)
- * it is named, and a swipe would land on it. With no layer, the one sentence the `scroll_until` description quotes
- * (mcp/tools.ts).
+ * swipe was sent — one on that screen may dismiss it; under a layer the tree source types (an alert, an action sheet,
+ * a popover: `layer`) it is named, and a swipe would land on it. With no typed layer, the one sentence the
+ * `scroll_until` description quotes (mcp/tools.ts).
  */
-export const presentedStop = (layer?: MarkedLayer): string =>
-  `${presentedRemedy('it', layer)}, ${layer === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${layer.kind}`}`;
+export const presentedStop = (layer?: MarkedLayer): string => {
+  const typed = typedWords(layer);
+  return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed[1]}`}`;
+};
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
