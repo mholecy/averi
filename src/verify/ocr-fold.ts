@@ -218,6 +218,8 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
   const text = cps.slice(start, end + 1).join('');
   if (i >= cps.length) return { text, end, added: [] };
   const added: [string, string][] = [];
+  // Every character the class lists, or a fold already added lists: one set, so each member is asked once.
+  const listed = new Set(members.map(memberChar).filter((c) => c !== undefined));
   for (let k = 0; k < members.length; k++) {
     if (members[k + 1] === '-' && k + 2 < members.length) {
       k += 2; // a range: both endpoints stay as written
@@ -227,8 +229,10 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
     const c = m.length > 1 && m.startsWith('\\') ? escapedLiteral(m.slice(1)) : m;
     if (c === undefined) continue;
     const f = foldChar(c);
-    const listed = members.some((other) => memberChar(other) === f) || added.some(([, g]) => g === f);
-    if (f !== c && [...f].length === 1 && !listed) added.push([c, f]);
+    if (f !== c && [...f].length === 1 && !listed.has(f)) {
+      added.push([c, f]);
+      listed.add(f);
+    }
   }
   if (added.length === 0) return { text, end, added };
   // The added members form a class of their own beside the class as written —
