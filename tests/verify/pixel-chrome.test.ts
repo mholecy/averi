@@ -8,6 +8,7 @@ import { sceneOf, type PixelRegionOf as Reads, type PixelStanding } from '../../
 import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
+import { stackedLayers } from '../helpers/stacked-layers.js';
 
 /** What the pixel assert's round says lies over `element` (verify/pixel-poll.ts#overElement), the measurement reading `reads` (its rect when omitted) — with glyphs for the ocr assert. */
 const over = (adapter: Parameters<typeof overElement>[0], tree: UiNode, element: UiNode, reads?: Reads, glyphs = false): Promise<string | undefined> =>
@@ -467,7 +468,7 @@ describe('the Android navigation band (D7)', () => {
  */
 describe('the pixel assert under a presented screen (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
   const IPHONE_ADAPTER = { viewport: async (): Promise<DeviceScreen> => IPHONE };
-  const screens = async () => (await json('wda-ui-snapshot-stacked-layers.json')).screens as Record<string, UiNode>;
+  const screens = stackedLayers;
   const named = (tree: UiNode, label: string): UiNode => [...everyNode(tree)].find((x) => x.label === label || x.identifier === label)!;
 
   it('the Contacts New Contact sheet over the list: a colour assert on a row\'s photo button names the sheet and says to close it first, not to scroll', async () => {

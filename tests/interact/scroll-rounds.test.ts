@@ -5,6 +5,7 @@ import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRead, type RoundRul
 import { describeScrollResult, scrollFailure } from '../../src/interact/scroll-text.js';
 import { scrollStroke } from '../../src/interact/swipe.js';
 import { node } from '../helpers/fake.js';
+import { stackedLayers } from '../helpers/stacked-layers.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
 import { coverOver, drawnFor, failureOf, match, NO_BACK, play, resultOf, strokeCovers, strokesToward, treeOf, type Played, type Row } from '../helpers/rounds.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
@@ -1894,7 +1895,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
   const { everyNode } = await import('../../src/adapters/types.js');
   const { parseWdaSource } = await import('../../src/adapters/wda-source.js');
   const screens: Record<string, UiNode> = {
-    ...(JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens,
+    ...(await stackedLayers()),
     // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now.
     contactsDiscardPopoverKeyboardDown: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8')),
   };

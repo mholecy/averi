@@ -1,5 +1,6 @@
 import type { ApplicationLabel, IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
+import { markUnclippedFrames } from '../../src/adapters/wda-source.js';
 import type { Recording } from './corpus.js';
 
 /**
@@ -52,7 +53,7 @@ export class RecordedTreeSource implements IosTreeSource {
     this.onRead(`${this.kind} tree read (${this.recording.form})`);
     const value: unknown = JSON.parse(this.recording.payload);
     if (this.recording.form === 'raw') return this.parseWdaSourceValue(value);
-    return this.kind === 'wda' ? { ...(value as UiNode), unclippedFrames: true } : (value as UiNode);
+    return this.kind === 'wda' ? markUnclippedFrames(value as UiNode) : (value as UiNode);
   }
 
   /** As WdaTreeSource answers (declined, no read); a normalized tree keeps no element types to answer from. */
