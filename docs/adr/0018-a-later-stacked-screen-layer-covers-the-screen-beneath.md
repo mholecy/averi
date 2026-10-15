@@ -427,7 +427,7 @@ country sheet's dim, the Fees sheet, `run17-ios/swift-closed-rest` — and 0 on 
 refused, 2 moved → refused (`id:"Toolbar"`, the dim's frame, had been moved to a 402x337 strip above the card), 13 refusals
 renaming their cover (the alert's button row `container (41,457 320x80)` or its title text → the alert), 47 refusals whose
 remedy alone changed; scroll_until 171: 73 "fully visible after 0 swipes" and 77 bound or stuck failures → the stop before
-any swipe, 21 stops renaming their cover; assert 226: 57 measured (a PASS among them) → failed closed, 51 failed closed
+any swipe, 21 stops renaming their cover; assert 226: 57 colour asserts measured and PASSED (the harness paints each target its own colour) → failed closed, 51 failed closed
 newly naming the alert, 23 renaming their cover, 95 whose remedy alone changed; ui_snapshot 1 (the mark printed). No reply
 became `Tapped`, visible or PASS; on NEW no tap, swipe or screenshot is sent under the alert. The alert's `Discard` and
 `Keep editing` are tapped as before (no diff).
