@@ -151,7 +151,7 @@ export interface DrawOrder {
    * only where `presentedAt` holds at its stroke's touch-down (or the surface lies over the target in its read's
    * frame): beneath a dim filling the screen it does, as the others say — and beneath a marked presented layer
    * (`markedLayers`, WDA's `Alert`), which reaches the whole screen; beneath an UNDIMMED partial sheet the touch-down
-   * misses, it strokes while they say close it first (ADR 0018's residual 11).
+   * misses, it strokes while they say close it first.
    * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
    */
   presentedOver(node: UiNode): UiNode | undefined;
