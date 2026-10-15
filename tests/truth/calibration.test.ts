@@ -9,6 +9,7 @@ import {
   disposition,
   failing,
   failureOf,
+  isOpenCell,
   plan,
   regressedElsewhere,
   results,
@@ -212,6 +213,8 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
     const before = side({ [K1]: 'Tapped', [KX]: undefined, [K2]: 'red both' });
     const after = side({ [K1]: undefined, [KX]: 'not tapped: under container', [K2]: 'red both' });
     expect(regressedElsewhere(entry(), before, after)).toEqual([KX]);
+    // a row the before side did not ask (a new capture or target) is no regression, red as it is after
+    expect(regressedElsewhere(entry(), side({ [K1]: 'Tapped' }), side({ [K1]: undefined, [KX]: 'not tapped' }))).toEqual([]);
     // the note's own rows are its verdict's business, never "elsewhere"
     expect(regressedElsewhere(entry(), side({ [K1]: undefined }), side({ [K1]: 'Tapped' }))).toEqual([]);
     const runs = new Map([['aaaaaaa', before], ['bbbbbbb', after]]);
@@ -242,6 +245,13 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
 
 describe('calibrate.ts — the canary (sideRunOf)', () => {
   const json = (checks: GoldenCheck[]): GoldenJson => ({ side: '/x', results: [{ recording: 'r', checks, broken: [] }] });
+
+  it('the open cell: a capture whose file is `open.<ext>`, nothing else that names "open"', () => {
+    expect(isOpenCell('ios-iphone17-ios27/open.wda.json')).toBe(true);
+    expect(isOpenCell('android-averi_lab-api33/open.xml')).toBe(true);
+    for (const r of ['ios-iphone17-ios27/reopen.wda.json', 'open-run/alert-dim.xml', 'ios-iphone17-ios27/open-sheet.wda.json', 'ios/open.wda.json/x'])
+      expect(isOpenCell(r), r).toBe(false);
+  });
 
   it('a side with the open cell green and no fault counts, its rows by key', () => {
     const run = sideRunOf(json([check(OPEN, undefined), check(K1, 'Tapped')]));
