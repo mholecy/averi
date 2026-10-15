@@ -487,16 +487,25 @@ type TouchKind =
   | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number; readonly scroller?: UiNode }
   /** `band`: the band's rect on the box, only when the node's rect (not its centre) lies in it past the slack — a `fully` stop's region rule. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band?: Rect }
-  /**
-   * `scroller`: every edge it is clipped at is its scroll view's, inside the box (`Scene`'s contract, the drawn frame) —
-   * the scroll view clips it there, not the screen — the scroll view a sentence names (`scrollerOf`).
-   */
-  | { readonly kind: 'clipped'; readonly edges: readonly Edge[]; readonly scroller?: UiNode }
+  /** `byScrollView`: the edges its scroll view's edge clips, inside the box, not the screen's (`ScrollViewCut`). */
+  | { readonly kind: 'clipped'; readonly edges: readonly Edge[]; readonly byScrollView?: ScrollViewCut }
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
   /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
   | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
   /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it). */
   | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine };
+
+/**
+ * What of a `clipped` node its scroll view clips (`Scene`'s contract, the drawn frame): `edges`, the ones it is clipped
+ * at where the frame judged in ends at the drawn frame's edge and the box does not (the rest of `edges` are the
+ * screen's, or a keyboard line's); `scroller`, the scroll view a sentence names (`scrollerOf`); `longer`, `taller` or
+ * `wider` when the node is longer than the drawn frame on an axis of those edges — no scroll shows it whole.
+ */
+export interface ScrollViewCut {
+  readonly edges: readonly Edge[];
+  readonly scroller: UiNode;
+  readonly longer?: 'taller' | 'wider';
+}
 
 /** Where the node stands for a touch (the tap, the stop), and why: `facts`, one kind with what its sentence quotes, and — not reachable — its `remedy`. */
 export type Standing = { readonly facts: StandingFacts } & Remedied<TouchKind, TouchRemedies>;
@@ -1037,8 +1046,8 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stan
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
   if (facts.clipped.length > 0) {
-    const scroller = clippedByScrollView(judged, box, facts);
-    return { facts, kind: 'clipped', edges: facts.clipped, ...(scroller !== undefined && { scroller }) };
+    const byScrollView = clippedByScrollView(judged, box, facts);
+    return { facts, kind: 'clipped', edges: facts.clipped, ...(byScrollView !== undefined && { byScrollView }) };
   }
   // The system bands as a region, as the pixel assert judges them — any of the node past the slack.
   // docs/adr/0009-android-navigation-band.md
@@ -1048,17 +1057,22 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stan
 }
 
 /**
- * The scroll view whose edge clips the node at every edge it is clipped at (`facts.clipped`), or undefined: each of
- * them the frame judged in ends at the drawn frame's edge (geometry.ts#Clips.drawnIn), and the box does not — a scroll
- * view ending at the screen's edge, or a keyboard line above its edge, leaves the screen's or the keyboard's cut.
+ * What of the node's clip (`facts.clipped`) its scroll view's edge makes (`ScrollViewCut`), or undefined when none of
+ * it: an edge where the frame judged in ends at the drawn frame's edge (geometry.ts#Clips.drawnIn) and the box does
+ * not — a scroll view ending at the screen's edge, or a keyboard line above its edge, leaves the screen's or the
+ * keyboard's cut.
  */
-function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: StandingFacts): UiNode | undefined {
+function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: StandingFacts): ScrollViewCut | undefined {
   const drawn = scene.clips.drawnIn(node);
   const frame = drawn?.frame;
   if (drawn === undefined || frame === undefined) return undefined;
   const line = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);
-  const atScrollView = (edge: Edge): boolean => line(facts.screen, edge) === line(frame, edge) && line(box, edge) !== line(frame, edge);
-  return facts.clipped.every(atScrollView) ? scrollerOf(drawn, (f) => !rectWithin(node.rect, f)) : undefined;
+  const edges = facts.clipped.filter((edge) => line(facts.screen, edge) === line(frame, edge) && line(box, edge) !== line(frame, edge));
+  if (edges.length === 0) return undefined;
+  const across = (edge: Edge): boolean => edge === 'top' || edge === 'bottom';
+  const longer =
+    edges.some(across) && node.rect.height > frame.height ? 'taller' : edges.some((e) => !across(e)) && node.rect.width > frame.width ? 'wider' : undefined;
+  return { edges, scroller: scrollerOf(drawn, (f) => !rectWithin(node.rect, f)), ...(longer !== undefined && { longer }) };
 }
 
 /**
