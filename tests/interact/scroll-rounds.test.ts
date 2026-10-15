@@ -1936,6 +1936,12 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     );
   });
 
+  it('a sheet that moved to another detent between the two reads of a stop that sent no swipe: the failure says the sheet moved, not that a swipe moved it', () => {
+    const played = play(IPHONE, [rowOf('swiftFeesSheet', 'swift_payment.form.debit_select'), rowOf('swiftFeesSheetExpanded', 'swift_payment.form.debit_select')]);
+    expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
+    expect(failureOf(played, 'id:swift_payment.form.debit_select').message).toMatch(/^scroll_until id:swift_payment\.form\.debit_select stopped before any swipe — .* so none was sent\. Last rect .* viewport; the sheet moved from its Half screen detent to Expanded$/);
+  });
+
   it('Contacts\' discard popover over a row of the New Contact sheet: no stroke (one would close the popover), the stop is `presented`', () => {
     const played = play(IPHONE, [rowOf('contactsDiscardPopover', 'Insert add instant message'), rowOf('contactsDiscardPopover', 'Insert add instant message')]);
     expect(strokesToward(played)).toEqual([]);

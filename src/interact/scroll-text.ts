@@ -93,7 +93,7 @@ export interface ScrollUntilResult {
    * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    */
   covered?: { by: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; shows: number };
-  /** Set when the swipes moved a sheet to another detent (scroll-rounds.ts#DetentMove); the reply ends saying so. */
+  /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
 }
 
@@ -199,8 +199,9 @@ export function describeScrollResult(r: ScrollUntilResult): string {
 }
 
 /**
- * The detent clause, last in every reply and failure (scroll-rounds.ts#DetentMove): the swipes moved a sheet —
- * a state change of the screen the verdict does not say. Empty when they did not.
+ * The detent clause, last in every reply and failure (scroll-rounds.ts#DetentMove): a sheet moved during the call —
+ * a state change of the screen the verdict does not say, worded without a cause (a call that sent no swipe says it
+ * too). Empty when it did not.
  */
 const detentText = (detent: DetentMove | undefined): string => (detent === undefined ? '' : `; the sheet moved from its ${detent.from} detent to ${detent.to}`);
 
