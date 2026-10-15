@@ -410,7 +410,8 @@ Only an alert ON THE SCREEN counts (owner decision, 2026-10-15, on the slice's r
 with the screen — 0x0, or wholly off it, as WDA may keep a dismissed alert in its tree — presents nothing, and the
 screen beneath is judged as before. Judged by the rect only, never by WDA's `isVisible`/`UiNode.hidden`: an alert
 mid-animation may read hidden while it already takes every touch, and reading the flag would turn it into a false
-`Tapped` on the screen beneath.
+`Tapped` on the screen beneath. The keyboard's own nodes are never beneath an alert, wherever WDA lists the keyboard's
+Window: the keyboard is drawn over the app's windows (a key of an alert's text field stays tappable).
 
 Wording (Q2): the presented remedy names the alert by its label (`ui-tree/standing.ts#presentedRemedy`, the remedy's
 `layer`) — the tap `… is under container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) at its centre

@@ -104,4 +104,13 @@ describe('an alert covers the whole screen beneath it', () => {
     const { tree, row } = rowUnder(rect(41, 365, 320, 172), true);
     expect(exposed(tree, row)).toMatchObject({ covers: ['container Session expired 41,365 320x172'], shows: 0, tapAt: undefined });
   });
+
+  it('the keyboard is never beneath an alert: a key of a keyboard Window listed BEFORE the alert\'s Window is reached as before (the keyboard is drawn over the app\'s windows)', () => {
+    const key = node({ role: 'button', label: 'q', rect: rect(3, 600, 37, 42) });
+    const keyboard = node({ role: 'container', rect: IPHONE, ofKeyboard: true, children: [node({ role: 'container', rect: rect(0, 560, 402, 314), children: [key] })] });
+    const alert = node({ role: 'container', label: 'Sign in', rect: rect(41, 300, 320, 220), presentation: 'alert' });
+    const tree = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE }), keyboard, node({ role: 'container', rect: IPHONE, children: [alert] })] });
+    expect(exposed(tree, key)).toMatchObject({ covers: [], presented: [], shows: 1, tapAt: { moved: false } });
+    expect(drawOrder(tree).presentedOver(key)).toBeUndefined();
+  });
 });

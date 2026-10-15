@@ -1709,8 +1709,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /**
    * The PRESENTED LAYERS over the node at `places` that the tree source marks (`UiNode.presentation`: WDA's `Alert`) —
    * the source's fact, read here and nowhere else: each marked element drawn after the node (never its ancestor, nor
-   * in its subtree), with its LAYER — the child of the nearest node holding both on the element's branch (`layerOf`;
-   * the element itself when it is that child). Such a layer is presented over the node whatever the frames around it
+   * in its subtree; never over the keyboard's own nodes, `Placed.inKeyboard`), with its LAYER — the child of the
+   * nearest node holding both on the element's branch (`layerOf`; the element itself when it is that child). Such a layer is presented over the node whatever the frames around it
    * (an alert is modal): its element covers the node through the WHOLE screen, as the layer's one cover — what else
    * the layer holds (its dim, a bare frame or not; the alert's texts, buttons and backdrop leaves) is drawn on it and
    * no cover of its own (`markedLayers`'s readers: `laterFor`). No stacked-screens, window or bare-frame condition:
@@ -1718,6 +1718,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
    */
   const markedLayers = (places: readonly Placed[]): readonly { readonly element: Placed; readonly layer: Placed }[] =>
     marked.flatMap((element) => {
+      // The keyboard's own nodes are never beneath: the keyboard is drawn over the app's windows, wherever WDA lists its Window.
+      if (places[0].inKeyboard) return [];
       if (element.at < places[0].end || places.some((place) => within(element, place))) return [];
       const both = holderOf(element, places[0]);
       return [{ element, layer: both === undefined ? element : layerOf(element, both) }];
