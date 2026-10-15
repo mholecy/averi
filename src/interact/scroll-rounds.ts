@@ -1362,7 +1362,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     }
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s, now.facts);
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
-    // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`).
+    // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`). Asked only
+    // on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe would land.
     const onPresented = best === undefined ? undefined : presentedTouchDown(plannedStroke(s, now, gesture).step, now, best.node);
     const by: BoundBy =
       exhausted !== undefined
