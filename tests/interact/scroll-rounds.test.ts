@@ -2042,23 +2042,26 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       );
     });
 
-    it('in the viewport but short of a `fully: true` stop under something of its own screen: the SWIFT form\'s "Payee’s name" under its CONTINUE bar, the expanded Fees sheet\'s form over the rest — the stroke would touch down on that form', () => {
+    it('on the screen but outside its own scroll view, nothing of it drawn: the SWIFT form\'s "Payee’s name" 42,816, listed below the form\'s 780 (under its CONTINUE bar), the expanded Fees sheet\'s form over the rest — the stroke would touch down on that form', () => {
       const name: Row = { tree: screens.swiftFeesSheetExpanded, found: [[...everyNode(screens.swiftFeesSheetExpanded)].find((x) => x.role === 'text' && x.label === 'Payee’s name')!] };
       const played = play({ ...IPHONE, fully: true }, [name, name]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       expect(failureOf(played, 'text:"Payee’s name"').message).toContain(
-        '— element is in the viewport but under button "Continue to summary" (24,780 354x44), drawn over it — 64% of it shows, and the next swipe would touch down at (201,699) on scrollable (24,105 354x711) — a screen is presented over it',
+        '— element lies outside its scroll view scrollable (0,0 402x780): nothing of it is drawn, and the next swipe would touch down at (201,699) on scrollable (24,105 354x711) — a screen is presented over it',
       );
     });
 
-    it('in the viewport but its centre under the status bar: the New Contact sheet\'s cell "add birthday" at y -24, under the discard popover — the stroke up would touch down on the popover\'s own scroll view, on top there', () => {
+    it('above its own scroll view, its centre under the status bar: the New Contact sheet\'s cell "add birthday" at y -24, above the sheet\'s form (from 62), under the discard popover — nothing of it drawn: the stroke the caller\'s way would touch down on the popover\'s dim, one up on its own scroll view', () => {
       const box = { x: 0, y: 0, width: 402, height: 874 };
       const cell: Row = { ...cellOf('contactsDiscardPopover', 'add birthday'), screen: { box, boxes: [box], oriented: box, from: 'device', statusBand: 62 } };
       const played = play(IPHONE, [cell, cell]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       expect(failureOf(played, 'role:container label:"add birthday"').message).toMatch(
-        /— element is in the viewport but its centre stays under the status bar at \(201,3\), in the top 62 of the screen \(tree units\), where a tap goes to the status bar, and the next swipe would touch down at \(201,175\) on scrollable \(10,166 240x81\) — a screen is presented over it /,
+        /— element lies outside its scroll view scrollable \(0,62 402x812\): nothing of it is drawn, and the next swipe would touch down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
       );
+      // Asked to scroll up, toward it: the stroke up would touch down on the popover's own scroll view, on top there.
+      const up = play({ ...IPHONE, direction: 'up' }, [cell, cell]);
+      expect(failureOf(up, 'role:container label:"add birthday"').message).toMatch(/and the next swipe would touch down at \(201,175\) on scrollable \(10,166 240x81\) — a screen is presented over it /);
     });
 
     it('platform-blind, a synthetic shape on ANDROID (no Android device tree has a presented screen): in the viewport but cut to a sliver by its scroll container (the SWIFT form\'s "Payment details" toggle 66,1924 948x55 at the form\'s bottom edge), a sheet\'s scroll view presented over the rest of the form — the stroke would touch down on that sheet, so the stop is `presented` there as on iOS', () => {
@@ -2145,5 +2148,52 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [cell, cell]);
       expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down' });
     });
+  });
+});
+
+/**
+ * The drawn frame (ui-tree/standing.ts): on a WDA tree a scroll view's content keeps its laid-out rect past the scroll
+ * view's frame, which draws none of it there. The far edge is judged at that frame's edge as at the screen's: a SwiftUI
+ * form whose ScrollView starts under its navigation header (`0,116 402x664`), a row flung across that top edge.
+ */
+describe('round — the far edge at the edge of what the target\'s scroll view draws', () => {
+  const formRow = (y: number): Row => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y, width: 354, height: 60 } });
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [node({ role: 'scrollable', rect: { x: 0, y: 116, width: 402, height: 664 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 400, width: 354, height: 52 } }), row] }), node({ role: 'other', label: 'Header', rect: { x: 0, y: 0, width: 402, height: 116 } })],
+    });
+    return { tree, found: [row] };
+  };
+
+  it('fully: true, a row across the form\'s top edge (90–150) and short of its stop: the strokes turn toward it, up — never down, pushing it further under the header', () => {
+    const played = play({ ...IPHONE, fully: true }, [formRow(800), formRow(90), formRow(90), formRow(200), formRow(200)]);
+    expect(strokesToward(played)).toEqual(['down', 'up', 'up']);
+  });
+
+  it('a row wholly above the form\'s top edge (40–100), nothing of it drawn: off the frame, as one wholly above the screen — the caller\'s direction on a first read', () => {
+    const played = play({ ...IPHONE, maxSwipes: 1 }, [formRow(40), formRow(40)]);
+    expect(strokesToward(played)).toEqual(['down']);
+    // The failure says where it lay: above its scroll view, which is on the screen — not above the viewport.
+    const message = failureOf(played, 'id:row').message;
+    expect(message).toContain('it lay above its scroll view scrollable (0,116 402x664), past the edge the swipes push it out through: scroll_until it with direction: "up"');
+    expect(message).not.toContain('the viewport, past');
+  });
+});
+
+describe('round — a target the strokes never bring into what its scroll view draws', () => {
+  it('the at-rest SWIFT form\'s payee_name_input listed below its form, content that no longer moves: the failure says it was never drawn inside that scroll view — not that it never met the viewport it lies on', () => {
+    const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: { x: 24, y: 801, width: 354, height: 52 } });
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 300, width: 354, height: 52 } }), name] })],
+    });
+    const row: Row = { tree, found: [name] };
+    const played = play({ ...IPHONE, maxSwipes: 5 }, [row, row, row]);
+    expect(failureOf(played, 'id:payee_name_input').message).toContain('element in tree but never drawn: it lies outside its scroll view scrollable id:form (0,0 402x780) (last rect');
   });
 });

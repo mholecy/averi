@@ -1,5 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
-import { rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { nodeText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { presentedRemedy } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
@@ -32,11 +32,15 @@ import { SIDES } from './swipe.js';
 /**
  * Where a node read wholly past `side` lies — `clipped out above its scroll
  * container` when Android dumped it so (UiNode.clippedOut), `above the
- * viewport` when its rect lies there — the one wording of it, for the wait's
- * hint (resolve.ts) and `scroll_until`'s failure (scroll-text.ts).
+ * viewport` when its rect lies there — or `above its scroll view <node>` when
+ * it lies past the edge of what that scroll view draws, on the screen
+ * (`scrollView`, a WDA tree's drawn frame) — the one wording of it, for the
+ * wait's hint (resolve.ts) and `scroll_until`'s failure (scroll-text.ts).
  */
-export function pastSideText(side: Edge, clippedOut: boolean): string {
-  return clippedOut ? `clipped out ${SIDES[side].past} its scroll container` : `${SIDES[side].past} the viewport`;
+export function pastSideText(side: Edge, clippedOut: boolean, scrollView?: UiNode): string {
+  if (clippedOut) return `clipped out ${SIDES[side].past} its scroll container`;
+  // Past the edge of what its scroll view draws, that scroll view on the screen (ui-tree/standing.ts, the drawn frame).
+  return scrollView === undefined ? `${SIDES[side].past} the viewport` : `${SIDES[side].past} its scroll view ${nodeText(scrollView)}`;
 }
 
 /**

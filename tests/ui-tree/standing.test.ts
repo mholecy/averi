@@ -9,6 +9,7 @@ import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
+import { tapPoint } from '../../src/ui-tree/selectors.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
 const box = (width: number, height: number) => ({ x: 0, y: 0, width, height });
@@ -71,9 +72,12 @@ const said = (s: Standing | PixelStanding): unknown => {
   switch (s.kind) {
     case 'reachable':
       return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
-    case 'offScreen':
+    case 'offScreen': {
+      // Outside the scroll view it lies in (its drawn frame, geometry.ts#Clips.drawnIn): the scroll view named.
+      const outside = s.scroller === undefined ? {} : { scroller: s.scroller.identifier };
       // The pixel's own: nothing of what it reads on the box judged, the box quoted.
-      return 'box' in s ? { kind: s.kind, box: s.box } : { kind: s.kind, at: s.at, visible: s.visible };
+      return 'box' in s ? { kind: s.kind, box: s.box, ...outside } : { kind: s.kind, at: s.at, visible: s.visible, ...outside };
+    }
     case 'systemBar':
       return { kind: s.kind, at: s.at, bar: s.bar, ...('band' in s && { band: s.band }) };
     case 'clipped':
@@ -1225,5 +1229,164 @@ describe('Scene.standing for the pixel assert — off the screen', () => {
     const list = node({ role: 'scrollable', clipsDescendants: true, rect: { x: 0, y: 737, width: 1080, height: 1417 }, children: [node({ identifier: 'filler', rect: { x: 0, y: 800, width: 1080, height: 100 } }), row] });
     const t = node({ role: 'container', rect: box(1080, 2220), children: [list] });
     expect(sceneOf(t).standing(row, PIXEL_NAV, { of: 'pixel', reads: WHOLE, glyphs: true }).kind).toBe('cut');
+  });
+});
+
+describe('Scene.standing — the drawn frame: what of a node its scroll views draw, on a tree of unclipped frames (WDA\'s)', () => {
+  const r = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
+  /** A WDA screen's root over `children`: its source's mark, every frame unclipped (UiNode.unclippedFrames). */
+  const wdaRoot = (children: UiNode[]): UiNode => ({ ...node({ role: 'container', rect: box(402, 874), children }), unclippedFrames: true });
+  /**
+   * The at-rest SWIFT form's shape under WDA, synthetic: the form's ScrollView `0,0 402x780` above the pinned CONTINUE
+   * `24,780 354x44`; `payee_name_input`'s row `24,801 354x52` and the street field `24,869 354x52` listed below the
+   * scroll view, drawn nowhere (the capture shows the bare background from 824 down). `extra`: more of the form's rows.
+   */
+  const atRest = (...extra: UiNode[]) => {
+    const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: r(24, 801, 354, 52) });
+    const street = node({ role: 'textfield', identifier: 'payee_street_input', rect: r(24, 869, 354, 52) });
+    const form = node({ role: 'scrollable', identifier: 'form', rect: r(0, 0, 402, 780), children: [node({ role: 'other', rect: r(24, 801, 354, 52), children: [name] }), street, ...extra] });
+    const tree = wdaRoot([form, node({ role: 'button', identifier: 'continue', label: 'Continue to summary', rect: r(24, 780, 354, 44) })]);
+    return { tree, name, street, form };
+  };
+  const ALL: readonly Purpose[] = [TAP, PLAIN, FULLY];
+
+  it('payee_name_input, wholly below its scroll view, its centre on the screen: off the screen for the tap and both stops — outside the form, nothing of it drawn', () => {
+    const { tree, name } = atRest();
+    for (const purpose of ALL) {
+      expect(said(sceneOf(tree).standing(name, IPHONE, purpose as TouchPurpose))).toEqual({ kind: 'offScreen', at: { x: 201, y: 827 }, visible: 0, scroller: 'form' });
+    }
+  });
+
+  it('payee_street_input, 5 pt on the screen and none in its scroll view: the colour and the ocr reader judge it outside the form, not measured', () => {
+    const { tree, street } = atRest();
+    for (const purpose of [COLOUR(street), OCR(street)]) {
+      expect(said(sceneOf(tree).standing(street, IPHONE, purpose))).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
+    }
+  });
+
+  it('off the screen is judged first: a row below the screen and below its scroll view is off the screen, no scroll view named', () => {
+    const below = node({ role: 'button', identifier: 'below', rect: r(24, 1000, 354, 52) });
+    const { tree } = atRest(below);
+    expect(said(sceneOf(tree).standing(below, IPHONE, TAP))).toEqual({ kind: 'offScreen', at: { x: 201, y: 1026 }, visible: 0 });
+    expect(said(sceneOf(tree).standing(below, IPHONE, COLOUR(below)))).toEqual({ kind: 'offScreen', box: box(402, 874) });
+  });
+
+  it('a row across the scroll view\'s edge, its centre outside it: the tap and the plain stop refuse it as the screen\'s edge would, what shows counted in the drawn part; fully: clipped at that edge', () => {
+    const across = node({ role: 'button', identifier: 'across', rect: r(24, 760, 354, 60) });
+    const { tree } = atRest(across);
+    for (const purpose of [TAP, PLAIN]) {
+      expect(said(sceneOf(tree).standing(across, IPHONE, purpose))).toEqual({ kind: 'offScreen', at: { x: 201, y: 790 }, visible: 20 / 60, scroller: 'form' });
+    }
+    // Its centre in the form: the plain stop and the tap at its centre; fully: true still cut at the form's bottom.
+    const inside = node({ role: 'button', identifier: 'inside', rect: r(24, 720, 354, 70) });
+    const t2 = atRest(inside).tree;
+    expect(said(sceneOf(t2).standing(inside, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 755 } });
+    expect(said(sceneOf(t2).standing(inside, IPHONE, PLAIN))).toEqual({ kind: 'reachable', at: { x: 201, y: 755 } });
+    expect(said(sceneOf(t2).standing(inside, IPHONE, FULLY))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+    expect(sceneOf(t2).standing(inside, IPHONE, PLAIN).facts.visible).toBeCloseTo(60 / 70);
+  });
+
+  it('one region for the judge and the sampler: what lies over only the UNDRAWN part covers nothing drawn — the tap, both stops and the colour and ocr asserts agree on the same node', () => {
+    // tall_row 600–840 in the form ending at 780, CONTINUE 780–824 over its undrawn part only.
+    const tall = node({ role: 'button', identifier: 'tall_row', rect: r(24, 600, 354, 240) });
+    const t1 = atRest(tall).tree;
+    expect(said(sceneOf(t1).standing(tall, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 720 } });
+    expect(said(sceneOf(t1).standing(tall, IPHONE, PLAIN))).toEqual({ kind: 'reachable', at: { x: 201, y: 720 } });
+    expect(said(sceneOf(t1).standing(tall, IPHONE, FULLY))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+    for (const reader of [COLOUR(tall), OCR(tall)]) expect(sceneOf(t1).standing(tall, IPHONE, reader).kind).toBe('reachable');
+    // A row across a form's TOP edge (116), a button listed after it over its undrawn 90–116 only.
+    const top30 = node({ role: 'button', identifier: 'top30', rect: r(24, 90, 100, 54) });
+    const above = node({ role: 'button', identifier: 'above', rect: r(24, 62, 100, 54) });
+    const t2 = wdaRoot([node({ role: 'scrollable', rect: r(0, 116, 402, 664), children: [top30, above] })]);
+    for (const reader of [COLOUR(top30), OCR(top30)]) expect(sceneOf(t2).standing(top30, IPHONE, reader).kind).toBe('reachable');
+    // A carousel's card past its right edge (378), the next card listed after it over its undrawn part only.
+    const cardB = node({ role: 'button', identifier: 'card_b', rect: r(340, 570, 300, 80) });
+    const peek = node({ role: 'button', identifier: 'card_peek', rect: r(390, 570, 300, 80) });
+    const t3 = wdaRoot([node({ role: 'scrollable', rect: r(0, 0, 402, 780), children: [node({ role: 'scrollable', rect: r(24, 560, 354, 100), children: [cardB, peek] })] })]);
+    expect(said(sceneOf(t3).standing(cardB, IPHONE, COLOUR(cardB)))).toMatchObject({ kind: 'reachable' });
+    // What lies over its DRAWN part still covers it.
+    const t4 = atRest(tall, node({ role: 'button', identifier: 'over', label: 'Over', rect: r(24, 700, 354, 60) })).tree;
+    expect(said(sceneOf(t4).standing(tall, IPHONE, COLOUR(tall)))).toMatchObject({ kind: 'covered', cover: 'over' });
+  });
+
+  it('the pushed SWIFT form, as WDA dumps it: details_toggle 342,749 36x36 runs past its form\'s 780 onto CONTINUE — the plain stop and the ocr assert both measure its drawn part, fully: true is clipped at that edge', async () => {
+    const tree = parseWdaSource(await fixture('wda-capture-swift-form-pushed.json'));
+    const toggle = byId(tree, 'swift_payment.form.details_toggle');
+    expect(sceneOf(tree).standing(toggle, IPHONE, PLAIN).kind).toBe('reachable');
+    expect(said(sceneOf(tree).standing(toggle, IPHONE, FULLY))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+    expect(sceneOf(tree).standing(toggle, IPHONE, OCR(toggle)).kind).toBe('reachable');
+  });
+
+  it('the thin sliver at the scroll view\'s edge as at the screen\'s (ADR 0002\'s slack): 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
+    const two = node({ role: 'button', identifier: 'two', rect: r(24, 778, 354, 52) });
+    const three = node({ role: 'button', identifier: 'three', rect: r(24, 777, 354, 52) });
+    const { tree } = atRest(two, three);
+    const sliver = sceneOf(tree).standing(two, IPHONE, OCR(two));
+    expect(said(sliver)).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
+    expect(sliver.kind === 'offScreen' && 'sliver' in sliver && sliver.sliver).toEqual(r(24, 778, 354, 2));
+    // 3 pt drawn: measured — CONTINUE lies over the undrawn rest only.
+    expect(sceneOf(tree).standing(three, IPHONE, OCR(three)).kind).toBe('reachable');
+  });
+
+  it('the country sheet\'s list ending at 811: its row `Ukraine` 31,825 340x43 is judged outside the list by every verb', () => {
+    const ukraine = node({ role: 'button', identifier: 'Ukraine', rect: r(31, 825, 340, 43) });
+    const list = node({ role: 'scrollable', identifier: 'countries', rect: r(31, 456, 340, 355), children: [node({ role: 'button', identifier: 'Uganda', rect: r(31, 768, 340, 43) }), ukraine] });
+    const tree = wdaRoot([node({ role: 'other', rect: r(0, 400, 402, 474), children: [list] })]);
+    for (const purpose of ALL) expect(sceneOf(tree).standing(ukraine, IPHONE, purpose as TouchPurpose)).toMatchObject({ kind: 'offScreen', scroller: list, remedy: { of: 'scroll' } });
+    expect(sceneOf(tree).standing(ukraine, IPHONE, COLOUR(ukraine))).toMatchObject({ kind: 'offScreen', scroller: list, remedy: { of: 'scroll' } });
+    expect(sceneOf(tree).standing(byId(tree, 'Uganda'), IPHONE, TAP).kind).toBe('reachable');
+  });
+
+  it('the dialect is the source\'s: WDA\'s parser marks its root, uiautomator\'s does not — an Android web view and a list with scrollable="false" (no clipsDescendants anywhere) judge their rows on the screen alone, as before', async () => {
+    expect(parseWdaSource(await fixture('wda-capture-swift-form-pushed.json')).unclippedFrames).toBe(true);
+    const android = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+      <node class="android.webkit.WebView" scrollable="false" resource-id="web" bounds="[0,200][1080,1600]">
+        <node class="android.view.View" text="In page" resource-id="inpage" bounds="[60,400][1020,520]" />
+        <node class="android.view.View" text="Past page" resource-id="pastpage" bounds="[60,1650][1020,1770]" />
+      </node>
+      <node class="android.widget.ListView" scrollable="false" resource-id="fits" bounds="[0,1800][1080,2000]">
+        <node class="android.widget.TextView" text="Fits row" resource-id="fitsrow" bounds="[0,1950][1080,2100]" />
+      </node></node></hierarchy>`);
+    expect(android.unclippedFrames).toBeUndefined();
+    const scene = sceneOf(android);
+    for (const id of ['pastpage', 'fitsrow']) {
+      const n = byId(android, id);
+      expect(scene.clips.drawnIn(n)).toBeUndefined();
+      expect(said(scene.standing(n, PIXEL, TAP))).toEqual({ kind: 'reachable', at: tapPoint(n) });
+      expect(scene.standing(n, PIXEL, COLOUR(n)).kind).toBe('reachable');
+    }
+  });
+
+  it('a centre outside its scroll view and under a WITNESSED keyboard line is no stop: the plain and the fully stop judge it short of a stop — outside the scroll view, clipped at its edge (a stroke brings it up), never "visible, its centre clear"', () => {
+    // MyPort-style: the login ScrollView ends at 500, the keyboard from 566; `deep` 480–660, its centre (301,570) under the line, 20 pt of it drawn.
+    const deep = node({ role: 'button', identifier: 'deep', rect: r(230, 480, 141, 180) });
+    const tree = wdaRoot([node({ role: 'scrollable', identifier: 'login', rect: r(0, 0, 402, 500), children: [node({ role: 'button', identifier: 'top', rect: r(36, 200, 330, 52) }), deep] })]);
+    expect(sceneOf(tree).standing(deep, IPHONE, { of: 'stop', keyboardTop: wda(566) })).toMatchObject({ kind: 'offScreen', scroller: { identifier: 'login' } });
+    expect(said(sceneOf(tree).standing(deep, IPHONE, { of: 'fully', keyboardTop: wda(566) }))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+  });
+
+  it('a scroll view laid out above the keyboard (ending at its line, 566): a covered field\'s tap is moved to a piece still said to lie above the soft keyboard', () => {
+    const field = node({ role: 'textfield', identifier: 'code', rect: r(36, 300, 330, 100) });
+    const scroll = node({ role: 'scrollable', rect: r(0, 0, 402, 566), children: [field, node({ role: 'button', label: 'Show', rect: r(36, 340, 330, 52) })] });
+    const tree = wdaRoot([scroll]);
+    expect(said(sceneOf(tree).standing(field, IPHONE, { of: 'tap', keyboardTop: wda(566) }))).toMatchObject({ kind: 'reachable', moved: { aboveKeyboard: true } });
+  });
+
+  it('unchanged where frames are already cut or nothing scrolls: the same rows on a tree with nothing that scrolls, on Android (a clipsDescendants scroller) and on idb\'s flat list', () => {
+    const { tree, name, street } = atRest();
+    const [form, bar] = tree.children;
+    const plain = wdaRoot([node({ role: 'other', rect: form.rect, children: form.children }), bar]);
+    // Android's dialect: no unclipped-frames mark, whatever it flags (its bounds are cut already).
+    const android = node({ role: 'container', rect: box(402, 874), children: [{ ...form, clipsDescendants: true as const }, bar] });
+    const flat = { ...node({ role: 'container', rect: box(402, 874), children: [form, ...form.children, name, street, bar] }), flatList: true as const };
+    // Judged on the screen alone, as before: the name field's centre (201,827) on it — tapped where nothing covers it
+    // (idb's CONTINUE, pinned at a flat list's bottom, reaches down over it) — and 5 pt of the street field measured.
+    expect(said(sceneOf(plain).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
+    expect(said(sceneOf(android).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
+    expect(said(sceneOf(flat).standing(name, IPHONE, TAP))).toEqual({ kind: 'covered', cover: 'continue' });
+    for (const t of [plain, android, flat]) {
+      for (const purpose of [PLAIN, FULLY]) expect(sceneOf(t).standing(name, IPHONE, purpose).kind).not.toBe('offScreen');
+      expect(sceneOf(t).standing(street, IPHONE, COLOUR(street)).kind).toBe(t === flat ? 'covered' : 'reachable');
+    }
   });
 });

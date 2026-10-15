@@ -1575,13 +1575,23 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
 /**
  * Whether the tree's nesting is its nodes' ancestry: false for idb's flat
  * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
- * tree's dialect is read here and nowhere else outside draw order — what
- * geometry.ts#clipsOf's `inScroller` asks it, through
- * ui-tree/standing.ts#sceneOf, and the pixel standing's flat-list root
- * (ui-tree/standing.ts#Standing, `covered.overRoot`).
+ * tree's dialect is read here and nowhere else outside draw order — this
+ * and `listsUnclippedFrames` — what geometry.ts#clipsOf's `inScroller` and
+ * `drawnIn` ask, through ui-tree/standing.ts#sceneOf, and the pixel
+ * standing's flat-list root (ui-tree/standing.ts#Standing,
+ * `covered.overRoot`).
  */
 export function listsAncestry(tree: UiNode): boolean {
   return tree.flatList !== true;
+}
+
+/**
+ * Whether the tree's source reports every frame unclipped (`UiNode.unclippedFrames`: WDA's) — a scroll view's
+ * content at its laid-out rect past the scroll view's frame — so what a scroll view draws of a node is asked of its
+ * frames (geometry.ts#Clips.drawnIn). The second half of the tree's dialect (`listsAncestry`'s doc).
+ */
+export function listsUnclippedFrames(tree: UiNode): boolean {
+  return tree.unclippedFrames === true;
 }
 
 export function drawOrder(tree: UiNode): DrawOrder {

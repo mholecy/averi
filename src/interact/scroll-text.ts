@@ -1,5 +1,5 @@
 import { rectArea, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
-import { drawnOverText, frameText, nodeText, rectText, type Edge } from '../ui-tree/geometry.js';
+import { drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -431,6 +431,8 @@ function notInViewportText(judged: Judged, viewport: Rect): string {
   const { standing, node } = judged;
   if (standing.kind === 'underKeyboard') return `element lies ${underKeyboardText(tapPoint(node), standing.line.y)}`;
   if (standing.facts.visible === 0) {
+    // On the screen, but nothing of it drawn: its scroll view's frame, not the viewport's, is what it lies outside of.
+    if (standing.kind === 'offScreen' && standing.scroller !== undefined) return `element lies ${outsideScrollViewText(standing.scroller)}: nothing of it is drawn`;
     const side = wholePast(node.rect, viewport);
     return `element lies ${side === undefined ? 'outside the viewport' : pastSideText(side, node.clippedOut === side)}`;
   }
@@ -545,15 +547,17 @@ function shortText(short: Shortfall): string {
       }
       return `element was in the tree ${whenInFrame(short.inTreeAfter)} (off the viewport, or under the soft keyboard), never in the viewport, and is no longer in the tree — a swipe carried it out (a fling?) and a lazy list drops what scrolls away`;
     case 'offFrame': {
-      const offFrame = `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
+      const offFrame = short.outside !== undefined ? outsideScrollViewText(short.outside) : `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
       const rect = `(last rect ${JSON.stringify(short.rect)})`;
-      const past = short.past !== undefined ? ` — it lay ${pastText(short.past)}: ${revealText(short.past.side)}` : '';
+      const past = short.past !== undefined ? ` — it lay ${pastText(short.past, short.outside)}: ${revealText(short.past.side)}` : '';
       return short.inFrameAfter !== undefined
-        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, off ${offFrame} at the last read ${rect}${past}`
-        : `element in tree but never intersected ${offFrame} ${rect}${past}`;
+        ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, ${short.outside !== undefined ? '' : 'off '}${offFrame} at the last read ${rect}${past}`
+        : short.outside !== undefined
+          ? `element in tree but never drawn: it lies ${offFrame} ${rect}${past}`
+          : `element in tree but never intersected ${offFrame} ${rect}${past}`;
     }
   }
 }
 
 /** Where a target last read past the far edge lay: `clipped out above its scroll container, past the edge the swipes push it out through`. */
-const pastText = ({ side, clippedOut }: PastSide): string => `${pastSideText(side, clippedOut)}, past the edge the swipes push it out through`;
+const pastText = ({ side, clippedOut }: PastSide, scrollView?: UiNode): string => `${pastSideText(side, clippedOut, scrollView)}, past the edge the swipes push it out through`;

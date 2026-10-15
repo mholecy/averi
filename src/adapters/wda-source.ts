@@ -111,6 +111,8 @@ export function parseWdaSourceValue(value: unknown): UiNode {
   const tree = toUiNode(root, { ...keyboardMarks(root), hiddenRoots: hiddenRoots(root) }, { hidden: false, cell: undefined, scroller: undefined });
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
+  // The source's dialect (UiNode.unclippedFrames): every frame as laid out, a scroll view's content past its frame too.
+  tree.unclippedFrames = true;
   return tree;
 }
 
@@ -312,10 +314,11 @@ const isZero = (flag: string | number | null | undefined): boolean => flag !== u
  *   asked for `isAccessible`, the button goes with its Image.
  * - Why every descendant's `isVisible`: Account Detail with the bar SHOWN has the same buttons at y 755 `1/1`, under
  *   a host `Other 0,0 402x874` that is `0/0` in both states with an `isVisible "1"` content child.
- * - Why NO STRUCTURAL ROOT: WDA's flags are no proof that nothing is drawn. The SWIFT form's `payee_name_input`
- *   row, `Other 24,801 354x52`, lies drawn under CONTINUE and is `0/0` with an all-invisible subtree; as a root it
- *   took its label and its text field (each `isAccessible "1"`) with it, and the text field stopped holding the
- *   label's centre for the dismissal picker. The screen beneath a modal is reported the same way: Finportal's login
+ * - Why NO STRUCTURAL ROOT: a wrapper's flags say nothing of what it holds. The SWIFT form's `payee_name_input`
+ *   row, `Other 24,801 354x52`, is `0/0` with an all-invisible subtree (truthfully: it lies below its form's
+ *   ScrollView, which draws none of it — the standing's drawn frame judges that, ui-tree/geometry.ts#Clips.drawnIn);
+ *   as a root it took its label and its text field (each `isAccessible "1"`) with it, and the text field stopped
+ *   holding the label's centre for the dismissal picker. The screen beneath a modal is reported the same way: Finportal's login
  *   screen under its RN modal, the Contacts list under the New Contact sheet, the sheet under its discard popover —
  *   whole layers `0/0`, drawn chrome a wrapper root would have dropped wholesale. A control, an image or a text is
  *   one thing on screen; a wrapper is a region whose flags say nothing of what it holds. `isAccessible` on the root

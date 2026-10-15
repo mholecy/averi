@@ -1,5 +1,5 @@
 import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { drawnOverText, nodeText, rectText, type Cut } from '../ui-tree/geometry.js';
+import { drawnOverText, nodeText, outsideScrollViewText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive } from '../ui-tree/selectors.js';
 import type { Remedy, Scene, ScrollableRemedy, SystemBar, TapStanding } from '../ui-tree/standing.js';
@@ -45,6 +45,19 @@ import { cutRemedy, cutSliverText, PRESENTED_OVER, underKeyboardText } from './t
  * bar's own words (`underSystemBar`, and `systemBarRemedy`: scroll it out
  * only where it can be) — "off screen" would contradict a rect the reader
  * sees on it.
+ *
+ * OUTSIDE ITS SCROLL VIEW — a centre on the screen that its scroll view
+ * draws nothing at (ui-tree/standing.ts, the drawn frame: WDA lists a scroll
+ * view's content at its laid-out rect past the scroll view's frame) is
+ * refused as at the screen's edge, naming the scroll view, with the same
+ * remedies (OffScreenRefusal) — but AFTER the guard, by `TapJudge.aim`, with
+ * no fresh read of the screen: a scroll view laid out above the keyboard
+ * (React Native's keyboard-avoiding view, MyPort's login `ScrollView` ending
+ * at the band's top) grows back once the guard hides it, and the target is
+ * judged again on the look the guard hands back. Measured: the at-rest SWIFT
+ * form's `payee_name_input` `24,801 354x52`, below its form's `0,0
+ * 402x780`, was reported tapped at (201,827), 3 pt below CONTINUE on the
+ * bare background.
  *
  * CLEAR OF THE APP'S CHROME AND THE KEYBOARD — `TapJudge.aim`, applied LAST,
  * to the look the guard hands back (or the first look, when the guard let
@@ -216,9 +229,13 @@ export interface Aim {
  */
 export const movedTapText = (what: string, moved: string): string => `${what} tapped ${moved}`;
 
-/** The standings the on-screen rule refuses: a centre off the screen, or under a system bar. */
+/**
+ * The standings the on-screen rule refuses: a centre off the screen, or under a system bar — not one on the screen but
+ * outside what its scroll views draw (`offScreen` with a `scroller`), refused after the guard (`TapJudge.aim`): hiding
+ * the keyboard may lay its scroll view out taller (the module's doc).
+ */
 type OffTheScreen = Extract<TapStanding, { kind: 'offScreen' | 'systemBar' }>;
-const offTheScreen = (s: TapStanding): s is OffTheScreen => s.kind === 'offScreen' || s.kind === 'systemBar';
+const offTheScreen = (s: TapStanding): s is OffTheScreen => (s.kind === 'offScreen' && s.scroller === undefined) || s.kind === 'systemBar';
 
 /**
  * THE tap judgement of a look (the module's doc): the on-screen rule now —
@@ -360,6 +377,14 @@ function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { jud
     return new OffScreenRefusal(refusal(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${advice(standing.remedy, (bar) => systemBarRemedy(edge, bar))}`));
   }
   const { at, visible } = standing;
+  if (standing.scroller !== undefined) {
+    // On the screen, but outside what its scroll view draws: that scroll view's edge is the edge.
+    const drawn =
+      visible > 0
+        ? `only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is drawn, and a tap goes to its centre — ${advice(standing.remedy, () => 'scroll_until it with fully: true first')}`
+        : `nothing of it is drawn (rect ${rectText(node.rect)}) — ${advice(standing.remedy, () => 'scroll_until it first')}`;
+    return new OffScreenRefusal(refusal(`${outsideScrollViewText(standing.scroller)} at (${at.x},${at.y}): ${drawn}`));
+  }
   const size = `${judged.box.width}x${judged.box.height}`;
   const where = `at (${at.x},${at.y}) on a ${size} screen${judged.boxes.length > 1 ? ' either way up' : ''}${reread}`;
   const part =

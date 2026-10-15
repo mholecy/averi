@@ -743,6 +743,20 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
     );
   });
 
+  it('samples only the part of the element its scroll view draws (a WDA tree\'s drawn frame): a card running past its list\'s bottom at 240 is read above it, not on what shows below', async () => {
+    resetLayout();
+    const list = node({ role: 'scrollable', identifier: 'list', rect: { x: 0, y: 0, width: 1000, height: 240 }, children: [node({ identifier: 'card', rect: { ...CARD } })] });
+    const fake = new FakeAdapter({ detail: { ...screen(list), unclippedFrames: true } }, 'detail');
+    // The card's drawn part (200–240) in its fill; below the list, 240–300, the screen's own background.
+    fake.nextScreenshot = png(1000, 320, (p) => {
+      fill(p, '#FDFDFD', { ...CARD, height: 40 });
+      fill(p, '#20242C', { ...CARD, y: 240, height: 60 });
+    });
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
+    expect(result.pass).toBe(true);
+    expect(result.detail).toContain('sampled #FDFDFD (dominant, 100% of region)');
+  });
+
   it('measures the FIRST of duplicate matches — the rect-parity duplicate-id rule, owned by the pixel poll', async () => {
     resetLayout();
     const second = { x: 100, y: 20, width: 800, height: 100 };

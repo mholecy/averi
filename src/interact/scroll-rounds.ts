@@ -306,6 +306,9 @@ export interface TouchedOn {
  * not "off the viewport, or under the soft keyboard … (a fling?)". Only
  * while no stroke was drawn that way (`strokedToward`): once one was — a
  * turn — that direction was tried, and the turn's own sentence says why.
+ * `outside` on `offFrame`: the last read judged it on the screen but outside
+ * what its scroll view draws (ui-tree/standing.ts, the drawn frame) — that
+ * scroll view, which the failure names in place of the viewport.
  */
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
@@ -313,7 +316,7 @@ export type Shortfall =
   | { of: 'absent'; unsearched?: Edge }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
-  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide };
+  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
 
 /** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
 export interface PastSide {
@@ -800,14 +803,17 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
  */
 function beyondFarEdgeIn(found: FarFacts, direction: Direction, frames: readonly Rect[]): boolean {
   const { far } = FAR_EDGE[direction];
-  return found.clippedOut === far || found.slicedAt === far || frames.every((f) => beyondFarEdge(found.rect, direction, f));
+  // Each frame cut to what the target's scroll views draw: their edge is the far edge as the screen's is.
+  const cut = (f: Rect): Rect => (found.drawn === undefined ? f : (rectIntersection(f, found.drawn) ?? f));
+  return found.clippedOut === far || found.slicedAt === far || frames.every((f) => beyondFarEdge(found.rect, direction, cut(f)));
 }
 
-/** What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, and the edge its scroll container cuts it to a sliver at. */
+/** What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, the edge its scroll container cuts it to a sliver at, and the frame its scroll views draw it in (ui-tree/standing.ts#StandingFacts.drawn). */
 interface FarFacts {
   readonly rect: Rect;
   readonly clippedOut?: ClippedSide;
   readonly slicedAt?: Edge;
+  readonly drawn?: Rect;
 }
 
 /** A judged match's `FarFacts`, its rect copied. */
@@ -815,6 +821,7 @@ const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   rect: { ...node.rect },
   ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
   ...(facts.sliver !== undefined && { slicedAt: facts.sliver.edge }),
+  ...(facts.drawn !== undefined && { drawn: { ...facts.drawn } }),
 });
 
 /**
@@ -1538,5 +1545,6 @@ function shortfall(s: State, { readError, found, best, viewport, cover }: BoundR
     ...(cover !== undefined && { cover }),
     eitherWayUp: s.frame.boxes.length > 1 && cover?.above === undefined,
     ...(past !== undefined && { past }),
+    ...(best?.standing.kind === 'offScreen' && best.standing.scroller !== undefined && { outside: best.standing.scroller }),
   };
 }

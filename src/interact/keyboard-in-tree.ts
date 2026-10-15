@@ -1,5 +1,5 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
-import { frameText } from '../ui-tree/geometry.js';
+import { frameText, outsideScrollViewText } from '../ui-tree/geometry.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
@@ -332,6 +332,8 @@ function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
       return presses === undefined ? undefined : `covered by ${coverName(presses)}`;
     }
     case 'offScreen':
+      if (standing.scroller !== undefined) return `${outsideScrollViewText(standing.scroller)} at (${standing.at.x},${standing.at.y})`;
+      return `off screen at (${standing.at.x},${standing.at.y})`;
     case 'systemBar':
       return `off screen at (${standing.at.x},${standing.at.y})`;
     case 'covered':

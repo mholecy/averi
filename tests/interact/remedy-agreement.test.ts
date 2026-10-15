@@ -171,12 +171,10 @@ describe('one remedy for a target beneath a presented screen — the tap, the pi
     );
   });
 
-  it('a target off the screen beneath a presented screen: the tap says close it first, not "scroll_until it with fully: true first"', async () => {
+  it('a target off the screen beneath a presented screen: the tap says close it first, not "scroll_until it with fully: true first" — and none of it is drawn: its 5 pt on the screen lie below its form\'s 780', async () => {
     const screens = await stacked();
     const target = byRect(screens.swiftFeesSheet, { x: 24, y: 869, width: 354, height: 52 });
-    expect(await tapSaid(screens.swiftFeesSheet, target)).toMatch(
-      /^id:t is off screen at \(201,895\) on a 402x874 screen — only \d+% of it \(rect 24,869 354x52\) is on screen, and a tap goes to its centre — a screen is presented over it \(a modal or a sheet\) — close it first; no scroll moves it out from under that screen; nothing was tapped$/,
-    );
+    expect(await tapSaid(screens.swiftFeesSheet, target)).toBe(`id:t is off screen at (201,895) on a 402x874 screen (rect 24,869 354x52) — ${PRESENTED_OVER}; nothing was tapped`);
   });
 
   it('every target of every tree with a presented screen: where a verb\'s standing names a presented surface, its remedy is the presented one, whatever its kind', async () => {
@@ -340,11 +338,11 @@ describe('a target wholly out of the judged frame beneath a presented screen —
     }
   });
 
-  it('a colour assert on a sliver beneath a presented sheet never measures the sheet: payee_street_input 24,869 354x52, 5 pt of it on the 402x874 screen beneath the Fees dim, misses with "close it first"', async () => {
+  it('a colour assert on a sliver beneath a presented sheet never measures the sheet: payee_street_input 24,869 354x52, 5 pt of it on the 402x874 screen beneath the Fees dim — none of them drawn, its form ending at 780 — misses with "close it first"', async () => {
     const screens = await stacked();
     const target = byRect(screens.swiftFeesSheet, { x: 24, y: 869, width: 354, height: 52 });
     expect(await colourSaid(screens.swiftFeesSheet, target)).toBe(
-      `container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 24,869 354x52) — the capture would show it, not the element; ${PRESENTED_FOR_THE_ELEMENT}`,
+      `nothing of the element is drawn: it lies outside its scroll view scrollable (0,0 402x780) (element 24,869 354x52, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`,
     );
   });
 
@@ -385,15 +383,23 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
     return { tree: copy, target: target! };
   };
 
+  /** The Fees sheet's tree with its form laid out to the screen's bottom (`0,0 402x874`), so the screen's edge alone cuts the row moved to `y`. */
+  const toTheBottom = async (y: number) => {
+    const moved = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', y);
+    const grow = (n: UiNode): UiNode => ({ ...n, rect: n.role === 'scrollable' && n.rect.height === 780 ? { ...n.rect, height: 874 } : n.rect, children: n.children.map(grow) });
+    const tree = grow(moved.tree);
+    return { tree, target: [...everyNode(tree)].find((n) => n.identifier === 'swift_payment.form.payee_street_input')! };
+  };
+
   it('payee_street_input at y 872 beneath the Fees dim: the colour and the ocr assert fail closed with "close it first", word for word', async () => {
-    const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', 872);
+    const { tree, target } = await toTheBottom(872);
     const said = `only a sliver of the element lies on the screen, too thin to measure (element 24,872 354x52, on the screen 24,872 354x2, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`;
     expect(await colourSaid(tree, target)).toBe(said);
     expect(await pixelSaid(tree, target)).toBe(said);
   });
 
   it('the slack\'s edge: at y 871, 3 pt on the screen, the sliver is measurable, and the dim over it is named — close it first', async () => {
-    const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', 871);
+    const { tree, target } = await toTheBottom(871);
     const said = `container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 24,871 354x52) — the capture would show it, not the element; ${PRESENTED_FOR_THE_ELEMENT}`;
     expect(await colourSaid(tree, target)).toBe(said);
     expect(await pixelSaid(tree, target)).toBe(said);
@@ -401,9 +407,18 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
 
   it('…at y 872.5, 873 and 873.7: the same, never measured', async () => {
     for (const y of [872.5, 873, 873.7]) {
-      const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', y);
+      const { tree, target } = await toTheBottom(y);
       for (const said of [await colourSaid(tree, target), await pixelSaid(tree, target)]) {
         expect({ y, said: said?.startsWith('only a sliver of the element lies on the screen, too thin to measure') && said.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ y, said: true });
+      }
+    }
+  });
+
+  it('…and as the form ends, at 780: the same rows lie outside it, never measured — close it first', async () => {
+    for (const y of [871, 872, 873.7]) {
+      const { tree, target } = movedTo((await stacked()).swiftFeesSheet, 'swift_payment.form.payee_street_input', y);
+      for (const said of [await colourSaid(tree, target), await pixelSaid(tree, target)]) {
+        expect({ y, said: said?.startsWith('nothing of the element is drawn: it lies outside its scroll view scrollable (0,0 402x780)') && said.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ y, said: true });
       }
     }
   });
@@ -456,5 +471,61 @@ describe('residual: an undimmed partial sheet — the tap and the pixel assert s
       expect({ y, stroked: played.steps.some((s) => s.do === 'stroke'), stop: played.outcome?.kind }).toMatchObject({ y, stroked: true });
       expect(played.outcome?.kind).not.toBe('presented');
     }
+  });
+});
+
+/**
+ * A target listed in its scroll view but outside the scroll view's frame, on a tree of unclipped frames (WDA's): its
+ * scroll view draws none of it there, or not its centre (ui-tree/standing.ts, the drawn frame; geometry.ts
+ * #Clips.drawnIn). One standing for every verb, its remedy the off-screen one: the tap refuses naming the scroll view,
+ * the colour and ocr asserts fail closed naming it, `scroll_until` strokes — and beneath a presented screen each says
+ * close it first. The at-rest SWIFT form's shape, synthetic: its form `0,0 402x780`, CONTINUE pinned below it,
+ * `payee_name_input` `24,801 354x52` and `payee_street_input` `24,869 354x52` listed below the form.
+ */
+describe('a target outside what its scroll view draws — the tap, the pixel assert and scroll_until agree', () => {
+  const atRest = (dimmed: boolean, ...more: UiNode[]) => {
+    const name = node({ role: 'textfield', identifier: 't', rect: { x: 24, y: 801, width: 354, height: 52 } });
+    const street = node({ role: 'textfield', identifier: 'street', rect: { x: 24, y: 869, width: 354, height: 52 } });
+    const form = node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 300, width: 354, height: 52 } }), name, street, ...more] });
+    // A WDA screen: its source's mark, every frame unclipped (UiNode.unclippedFrames).
+    const tree: UiNode = { ...beneathDim(BOX, [form, node({ role: 'button', label: 'Continue to summary', rect: { x: 24, y: 780, width: 354, height: 44 } })], dimmed), unclippedFrames: true };
+    return { tree, name, street };
+  };
+  const OUTSIDE = 'nothing of the element is drawn: it lies outside its scroll view scrollable id:form (0,0 402x780)';
+  const INTO_VIEW = 'scroll it into view: scroll_until the element first and re-run';
+
+  it('the tap refuses payee_name_input, its centre (201,827) on the bare background below the form: never "Tapped"', async () => {
+    const { tree, name } = atRest(false);
+    expect(await tapSaid(tree, name)).toBe('id:t is outside its scroll view scrollable id:form (0,0 402x780) at (201,827): nothing of it is drawn (rect 24,801 354x52) — scroll_until it first; nothing was tapped');
+  });
+
+  it('the colour and the ocr assert fail closed on payee_street_input, 5 pt of it on the screen and none drawn: never measured on the background', async () => {
+    const { tree, street } = atRest(false);
+    const said = `${OUTSIDE} (element 24,869 354x52, screen 0,0 402x874) — ${INTO_VIEW}`;
+    expect(await colourSaid(tree, street)).toBe(said);
+    expect(await pixelSaid(tree, street)).toBe(said);
+  });
+
+  it('scroll_until payee_name_input strokes — never "visible after 0 swipes"', () => {
+    const { tree, name } = atRest(false);
+    const played = stopOf(tree, name);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(true);
+    expect(played.outcome?.kind).not.toBe('visible');
+  });
+
+  it('a sliver its scroll view\'s edge leaves, no thicker than the slack: the ocr assert fails closed naming the scroll view', async () => {
+    const sliver = node({ role: 'button', identifier: 's', rect: { x: 24, y: 778, width: 354, height: 52 } });
+    const { tree } = atRest(false, sliver);
+    expect(await pixelSaid(tree, sliver)).toBe(
+      `only a sliver of the element is drawn, too thin to measure: the rest lies outside its scroll view scrollable id:form (0,0 402x780) (element 24,778 354x52, drawn 24,778 354x2, screen 0,0 402x874) — ${INTO_VIEW}`,
+    );
+  });
+
+  it('beneath a presented screen, each says close it first: the tap, the colour and ocr asserts, scroll_until stops `presented`', async () => {
+    const { tree, name, street } = atRest(true);
+    expect(await tapSaid(tree, name)).toBe(`id:t is outside its scroll view scrollable id:form (0,0 402x780) at (201,827): nothing of it is drawn (rect 24,801 354x52) — ${PRESENTED_OVER}; nothing was tapped`);
+    expect(await colourSaid(tree, street)).toBe(`${OUTSIDE} (element 24,869 354x52, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`);
+    expect(await pixelSaid(tree, name)).toBe(`${OUTSIDE} (element 24,801 354x52, screen 0,0 402x874) — ${PRESENTED_FOR_THE_ELEMENT}`);
+    expect(stopOf(tree, name).outcome?.kind).toBe('presented');
   });
 });

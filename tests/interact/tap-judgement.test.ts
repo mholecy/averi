@@ -254,6 +254,56 @@ describe('judgeTap(…).aim() — cut, cover, keyboard, after the guard', () => 
  * the two bug notes it answers (docs/bugs/2026-10-13-ios-wda-*), each a tap reported "Tapped"
  * that landed on the layer, on the real ui_snapshots of those calls (tests/fixtures/wda-ui-snapshot-stacked-layers.json).
  */
+describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree\'s drawn frame), after the guard', () => {
+  /** The at-rest SWIFT form's shape under WDA: its ScrollView `0,0 402x780`, CONTINUE pinned below it, `rows` listed in the form. */
+  const atRest = (...rows: UiNode[]): UiNode =>
+    node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: rows }),
+        node({ role: 'button', label: 'Continue to summary', identifier: 'continue', rect: { x: 24, y: 780, width: 354, height: 44 } }),
+      ],
+    });
+  const name = () => node({ role: 'textfield', identifier: 'payee_name_input', rect: { x: 24, y: 801, width: 354, height: 52 } });
+
+  it('payee_name_input, listed below the form, its centre (201,827) on the bare background: refused naming the scroll view — never "Tapped", and no fresh read of the screen', async () => {
+    const { outcome, freshReads } = await judge(atRest(name()), 'payee_name_input', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'OffScreenRefusal: payee_name_input is outside its scroll view scrollable id:form (0,0 402x780) at (201,827): nothing of it is drawn (rect 24,801 354x52) — scroll_until it first; nothing was tapped',
+    );
+    expect(freshReads).toEqual([]);
+  });
+
+  it('a card partly drawn, its centre outside what its scroll views draw (a carousel at the form\'s foot): refused as at the screen\'s edge, "fully: true first" — not tapped on its drawn part (ADR 0010, "Amendment: the drawn frame")', async () => {
+    // low_card 750–830 in the carousel 740–840, inside the form ending at 780: 30 of its 80 pt drawn, its centre (124,790) not.
+    const low = node({ role: 'button', identifier: 'low_card', rect: { x: 24, y: 750, width: 200, height: 80 } });
+    const carousel = node({ role: 'scrollable', identifier: 'carousel_low', rect: { x: 0, y: 740, width: 402, height: 100 }, children: [low] });
+    const { outcome } = await judge(atRest(carousel), 'low_card', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'OffScreenRefusal: low_card is outside its scroll view scrollable id:form (0,0 402x780) at (124,790): only 38% of it (rect 24,750 200x80) is drawn, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped',
+    );
+  });
+
+  it('not by the on-screen rule before the guard: judgeTap lets the look through (the guard may hide a keyboard its scroll view was laid out above), and aim() refuses it', async () => {
+    const tree = atRest(name());
+    const look = { node: find(tree, 'payee_name_input'), tree, scene: sceneOf(tree) };
+    const { adapter } = viewport(IPHONE);
+    const screen = await usableScreen(adapter, { tree });
+    const judged = await judgeTap(adapter, 'payee_name_input', look, screen, { position: keyboardPosition(look.scene.order, reading(undefined).reading), remedy: BACK });
+    await expect(judged.aim()).rejects.toBeInstanceOf(OffScreenRefusal);
+  });
+
+  it('a row across the form\'s bottom edge, its centre outside it: refused as at the screen\'s edge, what is drawn of it quoted', async () => {
+    const across = node({ role: 'button', identifier: 'across', rect: { x: 24, y: 760, width: 354, height: 60 } });
+    const { outcome } = await judge(atRest(across), 'across', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'OffScreenRefusal: across is outside its scroll view scrollable id:form (0,0 402x780) at (201,790): only 33% of it (rect 24,760 354x60) is drawn, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped',
+    );
+  });
+});
+
 describe('judgeTap(…).aim() — a later stacked screen layer over the target (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', () => {
   const screens = async () =>
     (JSON.parse(await readFile(new URL('../fixtures/wda-ui-snapshot-stacked-layers.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> }).screens;

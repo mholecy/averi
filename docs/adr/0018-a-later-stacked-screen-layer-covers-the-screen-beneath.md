@@ -352,7 +352,8 @@ decides a remedy any more. And the colour assert's region is ONE region for the 
 (`verify/capture.ts#clipThenInset`): clipped to the screen, then inset — measured, `payee_street_input 24,869 354x52`
 beneath the Fees dim was judged on the inset of its unclipped rect (y 875–915, off the screen, nothing over it) while
 the sampler read its 5-pt sliver, the sheet's grey, and a colour assert expecting that grey PASSED; it now fails closed
-naming the dim, "close it first". The review of that change found the same false PASS a little lower: moved to y
+naming the dim, "close it first" (since ADR 0010's "Amendment: the drawn frame", the same day: naming its form's
+`ScrollView 0,0 402x780`, which draws none of it, still "close it first"). The review of that change found the same false PASS a little lower: moved to y
 872–873.7 the field's sliver on the screen (2 pt or less) lies within the 2-unit slack, so the dim's overlap was not
 counted and the sampler read ~6 px rows of the dim. So a sliver of the element on the screen no thicker than
 PIXEL_OVERLAP_SLACK, on a side the screen's edge cuts, is the off-screen kind's case too ("only a sliver of the element
