@@ -406,6 +406,11 @@ frame, the alert's texts and backdrop leaves — is drawn on it and no cover of 
 an alert is modal (UIKit's `UIAlertController` and SwiftUI's `.alert` alike), so an alert laid in a later Window covers
 the Window before it too (a residual 3 shape, closed for alerts). The alert's own buttons and texts are judged as before.
 `drawnOver` (the stroke box) does not read the mark.
+Only an alert ON THE SCREEN counts (owner decision, 2026-10-15, on the slice's review): one whose rect shares no area
+with the screen — 0x0, or wholly off it, as WDA may keep a dismissed alert in its tree — presents nothing, and the
+screen beneath is judged as before. Judged by the rect only, never by WDA's `isVisible`/`UiNode.hidden`: an alert
+mid-animation may read hidden while it already takes every touch, and reading the flag would turn it into a false
+`Tapped` on the screen beneath.
 
 Wording (Q2): the presented remedy names the alert by its label (`ui-tree/standing.ts#presentedRemedy`, the remedy's
 `layer`) — the tap `… is under container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) at its centre

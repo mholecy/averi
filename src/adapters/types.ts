@@ -497,8 +497,8 @@ export interface UiNode {
    * form beneath was reported done.
    *
    * Its readers, all of them:
-   * - ui-tree/draw-order.ts (`presentedLayerOf`): the marked element covers every node drawn before it — not its
-   *   ancestors, nor its own subtree — through the whole screen, as the one cover of its layer and the surface of a
+   * - ui-tree/draw-order.ts (`markedLayers`): the marked element, when its rect has area on the screen (never judged
+   *   by `hidden`), covers every node drawn before it — not its ancestors, nor its own subtree — through the whole screen, as the one cover of its layer and the surface of a
    *   screen presented over the target (`Exposure.presented`, `presentedAt`, `presentedOver`).
    * - ui-tree/standing.ts#presentedRemedy, which names it ("an alert is presented over it ("Exit confirmation")").
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.

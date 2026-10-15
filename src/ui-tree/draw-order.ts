@@ -1695,8 +1695,17 @@ export function drawOrder(tree: UiNode): DrawOrder {
     return !flatList && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);
   };
 
-  /** The elements a tree source marks as presentations (`UiNode.presentation`), in the walk's order. */
-  const marked = order.filter((p) => p.node.presentation !== undefined);
+  /**
+   * The elements a tree source marks as presentations (`UiNode.presentation`) that lie ON the screen, in the walk's
+   * order: one whose rect shares no area with the screen (0x0, or wholly off it — WDA keeps a dismissed element in
+   * its tree) presents nothing. Judged by the rect alone, never by WDA's visibility flags (`UiNode.hidden`): an alert
+   * mid-animation may read hidden while it already takes every touch.
+   */
+  const marked = order.filter((p) => {
+    if (p.node.presentation === undefined) return false;
+    const on = rectIntersection(p.node.rect, screen);
+    return on !== undefined && rectArea(on) > 0;
+  });
   /**
    * The PRESENTED LAYERS over the node at `places` that the tree source marks (`UiNode.presentation`: WDA's `Alert`) —
    * the source's fact, read here and nowhere else: each marked element drawn after the node (never its ancestor, nor

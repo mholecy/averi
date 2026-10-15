@@ -82,4 +82,26 @@ describe('an alert covers the whole screen beneath it', () => {
     expect(exposed(tree, later)).toMatchObject({ covers: [], shows: 1 });
     expect(drawOrder(tree).presentedOver(later)).toBeUndefined();
   });
+
+  /** A row of a screen, then a later layer holding an alert at `rect` (hidden or not): the shapes the on-screen guard is asked of. */
+  const rowUnder = (alertRect: { x: number; y: number; width: number; height: number }, hidden = false) => {
+    const row = node({ role: 'button', identifier: 'row', rect: rect(20, 700, 362, 52) });
+    const alert = node({ role: 'container', label: 'Session expired', rect: alertRect, presentation: 'alert', ...(hidden && { hidden: true as const }) });
+    const tree = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE, children: [row] }), node({ role: 'container', rect: IPHONE, children: [alert] })] });
+    return { tree, row };
+  };
+
+  it('only an alert ON the screen: one of no area (0x0) or wholly off the screen covers nothing — the row is reached as before', () => {
+    for (const r of [rect(0, 0, 0, 0), rect(41, 900, 320, 172), rect(-400, 365, 320, 172)]) {
+      const { tree, row } = rowUnder(r);
+      expect(exposed(tree, row)).toMatchObject({ covers: [], presented: [], shows: 1, tapAt: { moved: false } });
+      expect(drawOrder(tree).presentedOver(row)).toBeUndefined();
+      expect(drawOrder(tree).presentedAt(row, { x: 201, y: 699 })).toBeUndefined();
+    }
+  });
+
+  it('…but an alert on the screen WDA reports hidden still covers: its flags are not read (an alert mid-animation may read hidden)', () => {
+    const { tree, row } = rowUnder(rect(41, 365, 320, 172), true);
+    expect(exposed(tree, row)).toMatchObject({ covers: ['container Session expired 41,365 320x172'], shows: 0, tapAt: undefined });
+  });
 });
