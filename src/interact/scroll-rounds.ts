@@ -182,8 +182,9 @@ export type RoundStep =
  *   touch down on a surface of that screen (`PresentedTouchDown`,
  *   ui-tree/draw-order.ts#DrawOrder.presentedAt), carried whole.
  *   `judged` undefined: no target in the tree, and the next stroke would
- *   touch down on a marked presented layer's element (an alert,
- *   ui-tree/draw-order.ts#DrawOrder.markedAt) — no stroke is sent under it.
+ *   touch down on a typed presented layer's element (an alert, an action
+ *   sheet, a popover: ui-tree/draw-order.ts#DrawOrder.markedAt) — no stroke
+ *   is sent under it.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -1402,9 +1403,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (onPresented !== undefined && best !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: onPresented }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
-  // And on behalf of NO target (none in the tree): a stroke that would touch down on an alert the tree marks
-  // (`DrawOrder.markedAt`; its reach is the whole screen) lands on the alert, not on any screen beneath it — the
-  // same hold and stop, the alert named. Other presented screens are still stroked over for a target not in the tree.
+  // And on behalf of NO target (none in the tree): a stroke that would touch down on a layer the tree marks by its type
+  // — an alert, an action sheet, a popover (`DrawOrder.markedAt`; its reach is the whole screen) — lands on it, not on
+  // any screen beneath it — the same hold and stop, it named. Other presented screens are still stroked over for a
+  // target not in the tree.
   const onMarked = best === undefined ? markedTouchDown(stroke, now) : undefined;
   if (onMarked !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: undefined, viewport, next: onMarked }, current === 'settle' && presentedBefore, seen.elapsedMs);

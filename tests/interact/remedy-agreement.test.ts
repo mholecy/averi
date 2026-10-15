@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { keyboardPosition, type KeyboardLine, type KeyboardPosition } from '../../src/ui-tree/keyboard-position.js';
 import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
+import type { MarkedLayer } from '../../src/ui-tree/draw-order.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
@@ -119,7 +120,9 @@ const PRESENTED_OVER = presentedRemedy('it');
 
 describe('one remedy for a target beneath a presented screen — the tap, the pixel assert and scroll_until agree', () => {
   /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */
-  const cases = async (): Promise<[string, UiNode, UiNode][]> => {
+  /** The action sheet WDA types in the discard popover's layer, as the remedy names it. */
+  const DISCARD_SHEET: MarkedLayer = { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' };
+  const cases = async (): Promise<[string, UiNode, UiNode, MarkedLayer?][]> => {
     const screens = await stacked();
     const { tree, target } = probe();
     return [
@@ -299,13 +302,15 @@ describe('a target wholly out of the judged frame beneath a presented screen —
     const copy = moved(tree);
     return { tree: copy, target: target! };
   };
-  const cases = async (): Promise<[string, UiNode, UiNode][]> => {
+  /** The action sheet WDA types in the discard popover's layer, as the remedy names it. */
+  const DISCARD_SHEET: MarkedLayer = { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' };
+  const cases = async (): Promise<[string, UiNode, UiNode, MarkedLayer?][]> => {
     const screens = await stacked();
     const discard = await popover();
     const band = inStatusBand(screens.swiftFeesSheet);
     return [
       ['the SWIFT form beneath the Fees half sheet: bank_country_select 24,1209 354x52, wholly below the screen', screens.swiftFeesSheet, byRect(screens.swiftFeesSheet, { x: 24, y: 1209, width: 354, height: 52 })],
-      ['the New Contact sheet beneath the discard popover\'s dim: its text `add instant message` 20,1306, wholly below the screen', discard, [...everyNode(discard)].find((n) => n.role === 'text' && n.label === 'add instant message')!],
+      ['the New Contact sheet beneath the discard popover\'s action sheet: its text `add instant message` 20,1306, wholly below the screen', discard, [...everyNode(discard)].find((n) => n.role === 'text' && n.label === 'add instant message')!, DISCARD_SHEET],
       ['the SWIFT form beneath the Fees sheet: priority_select at 24,-20 354x52, wholly inside the status band', band.tree, band.target],
     ];
   };
@@ -326,14 +331,15 @@ describe('a target wholly out of the judged frame beneath a presented screen —
   });
 
   it('each verb says "close it first": the tap refuses, the ocr and colour asserts miss, scroll_until stops before any swipe', async () => {
-    for (const [name, tree, target] of await cases()) {
-      expect({ name, tap: (await tapSaid(tree, target)).endsWith(` — ${PRESENTED_OVER}; nothing was tapped`) }).toEqual({ name, tap: true });
-      expect({ name, ocr: (await pixelSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ name, ocr: true });
-      expect({ name, colour: (await colourSaid(tree, target))?.endsWith(PRESENTED_FOR_THE_ELEMENT) }).toEqual({ name, colour: true });
+    for (const [name, tree, target, layer] of await cases()) {
+      const [over, forTheElement] = [presentedRemedy('it', layer), presentedRemedy('the element', layer)];
+      expect({ name, tap: (await tapSaid(tree, target)).endsWith(` — ${over}; nothing was tapped`) }).toEqual({ name, tap: true });
+      expect({ name, ocr: (await pixelSaid(tree, target))?.endsWith(forTheElement) }).toEqual({ name, ocr: true });
+      expect({ name, colour: (await colourSaid(tree, target))?.endsWith(forTheElement) }).toEqual({ name, colour: true });
       for (const direction of ['down', 'up'] as const) {
         const row: Row = { tree, found: [target], screen: USABLE };
         const message = failureOf(play({ direction, fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row, row]), 'id:t').message;
-        expect({ name, direction, stop: message.includes(PRESENTED_OVER) && message.includes('stopped before any swipe') }).toEqual({ name, direction, stop: true });
+        expect({ name, direction, stop: message.includes(over) && message.includes('stopped before any swipe') }).toEqual({ name, direction, stop: true });
       }
     }
   });

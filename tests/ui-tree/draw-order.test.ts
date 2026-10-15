@@ -1605,12 +1605,14 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
   /** The touch-down of a 60 % stroke down over the 402x874 screen (swipe.ts#scrollStroke). */
   const TOUCH_DOWN = { x: 201, y: 699 };
 
-  it('measured, Contacts\' discard popover with the keyboard down: the sheet\'s cell "add instant message" at y 1306, below the fold, has no covers — and the stroke\'s touch-down lies on the popover\'s dim `dismiss popup 0,0 402x874`', () => {
+  it('measured, Contacts\' discard popover with the keyboard down: the sheet\'s cell "add instant message" at y 1306, below the fold, has no covers — and the stroke\'s touch-down lies on the action sheet WDA types in the popover\'s layer, reaching the whole screen (not on the popover\'s own dim, a node of that layer)', () => {
     const tree = DISCARD_POPOVER_KEYBOARD_DOWN;
     const cell = find(tree, (n) => n.role === 'container' && n.label === 'add instant message');
     const order = drawOrder(tree);
     expect(order.exposure(cell, IPHONE_BOX)).toMatchObject({ covers: [], presented: [] });
-    expect(order.presentedAt(cell, TOUCH_DOWN)).toMatchObject({ label: 'dismiss popup', identifier: 'PopoverDismissRegion', rect: rect(0, 0, 402, 874) });
+    const surface = order.presentedAt(cell, TOUCH_DOWN)!;
+    expect(surface).toMatchObject({ label: 'Are you sure you want to discard this new contact?', rect: rect(10, 78, 240, 169) });
+    expect(order.presentedPress(surface)).toMatchObject({ reach: IPHONE_BOX, layer: { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' } });
   });
 
   it('measured, the SWIFT form under the Fees half sheet: `payee_city_input` at y 937 — the last surface at the point is named, the sheet\'s form `scrollable 31,456 340x355` over the dim `-402,-874 1206x2622`; above the sheet only the dim', () => {
@@ -1669,9 +1671,9 @@ describe('presentedOver — the presented screen\'s surface over a node, geometr
   const screen = (key: string) => STACKED.screens[key];
   const find = (tree: UiNode, keep: (n: UiNode) => boolean) => [...everyNode(tree)].find(keep)!;
 
-  it('measured: a cell wholly below the fold beneath Contacts\' discard popover — the last surface drawn, the popover\'s own scroll view (after its dim); a field wholly below beneath the Fees half sheet — the sheet\'s form, drawn last', () => {
+  it('measured: a cell wholly below the fold beneath Contacts\' discard popover — the action sheet WDA types in the popover\'s layer, its one cover; a field wholly below beneath the Fees half sheet — the sheet\'s form, drawn last', () => {
     const popover = DISCARD_POPOVER_KEYBOARD_DOWN;
-    expect(drawOrder(popover).presentedOver(find(popover, (n) => n.role === 'container' && n.label === 'add instant message'))).toMatchObject({ role: 'scrollable', rect: rect(10, 166, 240, 81) });
+    expect(drawOrder(popover).presentedOver(find(popover, (n) => n.role === 'container' && n.label === 'add instant message'))).toMatchObject({ label: 'Are you sure you want to discard this new contact?', rect: rect(10, 78, 240, 169) });
     const fees = screen('swiftFeesSheet');
     expect(drawOrder(fees).presentedOver(find(fees, (n) => n.identifier === 'swift_payment.form.bank_country_select'))).toMatchObject({ role: 'scrollable', rect: rect(31, 456, 340, 355) });
   });

@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, iosRoleOf, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, STRUCTURAL_ROLES, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type PresentationKind, type Rect, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -64,13 +64,16 @@ const ROLE_MAP: Record<string, string> = {
 };
 
 /**
- * WDA element `type` → the PRESENTED LAYER it is the element of (`UiNode.presentation`): the one place the adapter
- * says a layer is presented over the screen beneath, by the source's own type — never by shape. `Alert` only: its
- * role stays `container` (ROLE_MAP), the mark says the rest. Measured on mp-native's SWIFT form with its exit alert up,
- * whose dimming leaf is a bare frame no shape tells from a dismissed sheet's leftover dim. Other presentations (a
- * `Sheet`, a `Popover`) are judged by draw order's shapes, as before.
+ * WDA element `type` → the kind of PRESENTED LAYER a layer holding it is (`UiNode.presentation`), in precedence order:
+ * a layer holding several is the first's — a UIKit action sheet presented in a `Popover` is an action sheet, named by
+ * its message. Roles stay what ROLE_MAP says (`container`); the mark says the rest. Measured: mp-native's SwiftUI exit
+ * alert (`Alert`), Contacts' discard prompt (`Popover` → `Sheet "Are you sure…"`), iPhone 17, iOS 27.
  */
-const PRESENTATIONS: Readonly<Record<string, NonNullable<UiNode['presentation']>>> = { Alert: 'alert' };
+const PRESENTATIONS: readonly (readonly [string, Exclude<PresentationKind, 'screen'>])[] = [
+  ['Alert', 'alert'],
+  ['Sheet', 'actionSheet'],
+  ['Popover', 'popover'],
+];
 
 /**
  * Relevant subset of a WDA source node. `rawIdentifier` is THE
@@ -117,7 +120,9 @@ export function parseWdaSource(json: string): UiNode {
  */
 export function parseWdaSourceValue(value: unknown): UiNode {
   const root = unwrapEnvelope(value);
-  const tree = toUiNode(root, { ...keyboardMarks(root), hiddenRoots: hiddenRoots(root) }, { hidden: false, cell: undefined, scroller: undefined });
+  const keyboard = keyboardMarks(root);
+  const tree = toUiNode(root, { ...keyboard, hiddenRoots: hiddenRoots(root), presented: presentedLayers(root, keyboard.roots) }, { hidden: false, cell: undefined, scroller: undefined });
+  if (carriesFlags(root)) tree.presentationsJudged = true;
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
   return markUnclippedFrames(tree);
@@ -155,9 +160,10 @@ interface KeyboardMarks {
   roots: ReadonlySet<WdaElement>;
 }
 
-/** Every raw element the parser singles out, read once per payload: the keyboard's (`keyboardMarks`) and the roots of the hidden subtrees (`hiddenRoots`). */
+/** Every raw element the parser singles out, read once per payload: the keyboard's (`keyboardMarks`), the roots of the hidden subtrees (`hiddenRoots`) and the presented layers (`presentedLayers`). */
 interface SourceMarks extends KeyboardMarks {
   hiddenRoots: ReadonlySet<WdaElement>;
+  presented: PresentedLayers;
 }
 
 /** What an element's ancestors hand down to it: it lies in a hidden subtree (`UiNode.hidden`); its nearest `Cell` ancestor, as placed, with the scroll view that cell lies in (`parkedIn`); its nearest scroll view. */
@@ -187,8 +193,9 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
     (el.children ?? []).map((child) => toUiNode(child, marks, { hidden, cell, scroller })),
   );
   if (hidden) node.hidden = true;
-  const presentation = el.type !== undefined && Object.hasOwn(PRESENTATIONS, el.type) ? PRESENTATIONS[el.type] : undefined;
+  const presentation = marks.presented.layers.get(el);
   if (presentation !== undefined) node.presentation = presentation;
+  if (marks.presented.elements.has(el)) node.presentationElement = true;
   // The band node is an `Other` (or, in the fallback, the `Keyboard` itself)
   // whose measured rect IS the covered band — the role changes, the rect,
   // label, identifier and children stay what WDA reported.
@@ -317,6 +324,99 @@ function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined
 
 /** WDA's "0" — a string in the JSON format, compared as `onScreen` compares `isVisible`; a missing or null flag is never "0". */
 const isZero = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '0';
+
+/** The presented layers of a payload (`presentedLayers`): each marked layer with its kind, and the elements naming the typed ones. */
+interface PresentedLayers {
+  layers: ReadonlyMap<WdaElement, PresentationKind>;
+  elements: ReadonlySet<WdaElement>;
+}
+
+/** The payload carries WDA's visibility flags (the root's `isVisible`): its source judged presented layers (`UiNode.presentationsJudged`). */
+const carriesFlags = (root: WdaElement): boolean => root.isVisible !== undefined && root.isVisible !== null;
+
+/** `el` or some element of its subtree passes `test`. */
+const someIn = (el: WdaElement, test: (e: WdaElement) => boolean): boolean => test(el) || (el.children ?? []).some((c) => someIn(c, test));
+/** `el` and every element of its subtree pass `test`. */
+const allIn = (el: WdaElement, test: (e: WdaElement) => boolean): boolean => test(el) && (el.children ?? []).every((c) => allIn(c, test));
+/** The first element of `el`'s subtree, pre-order, passing `test`. */
+const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement | undefined => {
+  if (test(el)) return el;
+  for (const c of el.children ?? []) {
+    const found = firstIn(c, test);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+};
+
+/**
+ * The PRESENTED LAYERS of a payload (`UiNode.presentation`), each a direct child of a `Window` (the root's child when
+ * the payload has no Window). Read once per payload, beside `keyboardMarks`; the keyboard's Windows and the input
+ * host's (`keyboardMarks`' roots) are never searched.
+ * - BY TYPE (`PRESENTATIONS`): a layer holding an `Alert`, a `Sheet` or a `Popover` is that kind, the element
+ *   (the first of the first type in precedence) naming it.
+ * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them: one layer per Window at most.
+ * A layer typed is not also `screen` (one mark a layer).
+ */
+function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>): PresentedLayers {
+  const layers = new Map<WdaElement, PresentationKind>();
+  const elements = new Set<WdaElement>();
+  const windows: WdaElement[] = [];
+  const visit = (el: WdaElement): void => {
+    if (el.type === 'Window' && el !== root) windows.push(el);
+    else for (const c of el.children ?? []) visit(c);
+  };
+  visit(root);
+  for (const window of windows.length > 0 ? windows : [root]) {
+    if (keyboardWindows.has(window)) continue;
+    for (const layer of window.children ?? []) {
+      for (const [type, kind] of PRESENTATIONS) {
+        const element = firstIn(layer, (e) => e.type === type);
+        if (element === undefined) continue;
+        layers.set(layer, kind);
+        elements.add(element);
+        break;
+      }
+    }
+    const shown = carriesFlags(root) ? presentedScreen(window) : undefined;
+    if (shown !== undefined && !layers.has(shown)) layers.set(shown, 'screen');
+  }
+  return { layers, elements };
+}
+
+/**
+ * The layer of `window` WDA's flags show presented over the screen beneath (`UiNode.presentation` `screen`), or
+ * undefined: walking the Window's layers in order, past every one that is not screen-sized (`SCREEN_SIZED_FRACTION`
+ * of the Window) or carries no content (no element of a non-structural role below it: a bare dimming leaf, the input
+ * host's placeholder), the first that has VISIBLE CONTENT ON THE SCREEN — an element of a non-structural role,
+ * `isVisible="1"`, sharing area with the Window — when at least one layer walked past before it has every element
+ * `isVisible="0"`; and none when a layer with content is neither wholly invisible nor shown (a beneath only partly
+ * `0`, or visible content parked off the screen: a dismissed sheet's leftover).
+ *
+ * Measured (iPhone 17 simulator, iOS 27.0, WDA): over every raw capture of a page sheet, a SwiftUI half or expanded
+ * sheet, an RN transparent modal, an alert and a popover, the screen beneath reads wholly `0` while the presented
+ * layer shows; over every capture with nothing presented (a pushed form, Account Detail, Safari with its capsule
+ * layer, Settings, a dismissed sheet), the first content layer shows. It reads a whole LAYER's flags and a visible later
+ * layer beside it — never one node's flag, never a target's own (a node's `isVisible` alone is no geometric truth:
+ * the pushed form's phantom tab bar reads `0` on screen).
+ */
+function presentedScreen(window: WdaElement): WdaElement | undefined {
+  const screen = usableRect(window.rect);
+  if (screen === undefined) return undefined;
+  const content = (e: WdaElement): boolean => !STRUCTURAL_ROLES.has(iosRoleOf(e.type, ROLE_MAP));
+  const shownContent = (e: WdaElement): boolean => content(e) && String(e.isVisible) === '1' && usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen);
+  let beneath = false;
+  for (const layer of window.children ?? []) {
+    const rect = usableRect(layer.rect);
+    if (rect === undefined || rectArea(rect) < rectArea(screen) * SCREEN_SIZED_FRACTION) continue;
+    if (!(layer.children ?? []).some((c) => someIn(c, content))) continue;
+    if (allIn(layer, (e) => isZero(e.isVisible))) {
+      beneath = true;
+      continue;
+    }
+    return beneath && someIn(layer, shownContent) ? layer : undefined;
+  }
+  return undefined;
+}
 
 /**
  * The roots of the HIDDEN SUBTREES (`UiNode.hidden`): an element of NO STRUCTURAL ROLE (`STRUCTURAL_ROLES` over this

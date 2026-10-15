@@ -5,10 +5,11 @@ import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { node } from '../helpers/fake.js';
 
-// A layer holding an element the tree source marks as a presentation (`UiNode.presentation`: WDA's `Alert`) is
-// presented over every screen drawn before it, the WHOLE screen — whatever the frames of the nodes around it: its dim a
-// bare frame, a full-screen toolbar of the form beneath with the dim's exact frame. Its alert is the layer's one cover,
-// named; the alert's own buttons and texts are reached as before.
+// A layer the tree source marks as an alert's (`UiNode.presentation` on the layer, its `Alert` the element naming it)
+// is presented over every screen drawn before it, the WHOLE screen — whatever the frames of the nodes around it: its dim
+// a bare frame, a full-screen toolbar of the form beneath with the dim's exact frame. Its alert is the layer's one
+// cover, named; the alert's own buttons and texts are reached as before. (A hand-built layer marked with no element
+// marked in it is its own cover.)
 
 const IPHONE = { x: 0, y: 0, width: 402, height: 874 };
 const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
@@ -67,7 +68,8 @@ describe('an alert covers the whole screen beneath it', () => {
     const sheet = node({ role: 'container', rect: rect(0, 400, 402, 474) });
     expect(order.presentedPress(sheet)).toEqual({ surface: sheet, reach: rect(0, 400, 402, 474) });
     const unlabelled = node({ role: 'container', rect: rect(41, 365, 320, 172), presentation: 'alert' });
-    expect(order.presentedPress(unlabelled).layer).toEqual({ kind: 'alert' });
+    const withIt = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE }), unlabelled] });
+    expect(drawOrder(withIt).presentedPress(unlabelled).layer).toEqual({ kind: 'alert' });
   });
 
   it('a pixel assert on the field reads the alert over the whole screen', async () => {

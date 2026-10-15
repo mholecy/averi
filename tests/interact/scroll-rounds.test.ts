@@ -1991,18 +1991,18 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     /** The same cell, read where no screen is presented over it (the popover closed): a tree of the cell alone. */
     const unpresented: Row = { found: [node({ role: 'container', label: 'add instant message', rect: { x: 20, y: 1306, width: 362, height: 52 } })] };
 
-    it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the dim at the touch-down (201,699)', () => {
+    it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the action sheet WDA types in the popover\'s layer — reaching the whole screen — at the touch-down (201,699)', () => {
       const played = play(IPHONE, [BELOW, BELOW]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'role:container label:"add instant message"').message).toBe(
         'scroll_until role:container label:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ' +
-          'container "dismiss popup" (0,0 402x874) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, ' +
-          'and a swipe on it may dismiss it, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport',
+          'other "Are you sure you want to discard this new contact?" (10,78 240x169, reaching 0,0 402x874) — an action sheet is presented over it ("Are you sure you want to discard this new contact?") — close it first, ' +
+          'and a swipe would land on the action sheet, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport',
       );
     });
 
-    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the dim at the touch-down (201,699)', () => {
+    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the action sheet at the touch-down (201,699)', () => {
       const tree = screens.contactsDiscardPopoverKeyboardDown;
       const text = [...everyNode(tree)].find((x) => x.role === 'text' && x.label === 'add instant message')!;
       expect(text.rect).toEqual({ x: 20, y: 1306, width: 362, height: 52 });
@@ -2011,7 +2011,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'text:"add instant message"').message).toMatch(
-        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
+        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it /,
       );
     });
 
@@ -2091,7 +2091,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
       expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 1 });
       expect(failureOf(played, 'role:container label:"add instant message"').message).toMatch(
-        /^scroll_until role:container label:"add instant message" stopped after 1 swipe, without swiping further — element lies below the viewport, .*, and a swipe on it may dismiss it, so no further swipe was sent\. Last rect /,
+        /^scroll_until role:container label:"add instant message" stopped after 1 swipe, without swiping further — element lies below the viewport, .*, and a swipe would land on the action sheet, so no further swipe was sent\. Last rect /,
       );
     });
 
@@ -2146,7 +2146,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [unpresented, unpresented, BELOW]);
       expect(played.outcome?.kind).toBe('bound');
       expect(failureOf(played, 'role:container label:"add instant message"').message).toMatch(
-        /\. The next swipe would have touched down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; no scroll moves it out from under that screen$/,
+        /\. The next swipe would have touched down at \(201,699\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it \("Are you sure you want to discard this new contact\?"\) — close it first$/,
       );
     });
 

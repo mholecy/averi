@@ -76,18 +76,17 @@ describe('a hidden subtree is no cover of a target', () => {
   });
 });
 
-describe('…except the surface of a screen presented over the target\'s (ADR 0018), which covers as before', () => {
-  it('the Contacts New Contact sheet under the discard popover: WDA marks the whole sheet layer hidden, its form `Table` (scrollable 0,62 402x812) included — that Table is still a cover, and a presented surface, of the list\'s rows beneath', async () => {
+describe('…except the surface of a screen presented over the target\'s, which covers as before', () => {
+  it('the Contacts New Contact sheet under the discard popover, as WDA judged it: the sheet\'s layer is a marked presented screen over the list, so its hidden form `Table` (scrollable 0,62 402x812) need not cover — the layer reaches the whole screen, its visible controls are named where they lie, and the action sheet is on top', async () => {
     const tree = await capture('contacts-discard-popover');
     const table = [...everyNode(tree)].find((n) => n.role === 'scrollable' && desc(n) === 'scrollable 0,62 402x812')!;
     expect(table.hidden).toBe(true);
     const row = [...everyNode(tree)].find((n) => n.label === 'a' && n.role === 'container')!; // the list's section header `a`, 0,116 402x38
     const seen = drawOrder(tree).exposure(row, IPHONE);
-    expect(seen.covers).toContain(table);
-    expect(seen.presented).toContain(table);
-    // The sheet layer itself, a structural wrapper, roots no hidden subtree: its accessible controls over the row
-    // (close, Done) are not hidden and cover as before.
-    expect(seen.covers.map(desc).filter((d) => /close|Done/.test(d))).toEqual(['button close 20,82 36x36', 'button Done 346,82 36x36']);
+    expect(seen.covers).not.toContain(table);
+    expect(seen.covers.map(desc)).toEqual(['container 0,0 402x874', 'container New Contact 0,78 402x54', 'button close 20,82 36x36', 'button Done 346,82 36x36', 'other Are you sure you want to discard this new contact? 10,78 240x169']);
+    expect(seen.presented).toEqual(seen.covers);
+    expect(seen.shows).toBe(0);
   });
 
   it('a sheet layer over a list, marked hidden, with no other dim: its scroll view still covers the row beneath at its centre — the tap is refused, not sent through the sheet', () => {
