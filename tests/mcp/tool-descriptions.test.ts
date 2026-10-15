@@ -79,6 +79,12 @@ vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   TOO_THIN_IN_ITS_SCROLL_VIEW: '<the scroll view\'s thin-sliver miss, as verify/pixel-poll.ts renders it>',
 }));
 
+// The pixel slack a description quotes (a sliver no thicker than it, an overlap no thicker than it) has one owner too.
+vi.mock('../../src/ui-tree/geometry.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/ui-tree/geometry.js')>()),
+  PIXEL_OVERLAP_SLACK: 2.25,
+}));
+
 vi.mock('../../src/adapters/ios-foreground.js', async (orig) => ({
   ...(await orig<typeof import('../../src/adapters/ios-foreground.js')>()),
   FOREGROUND_WAIT_MS: 3_250,
@@ -276,6 +282,11 @@ async function actualSentences(): Promise<{
   return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW };
 }
 
+/** The real pixel slack, for the troubleshooting reference (no import reaches it). */
+async function actualSlack(): Promise<number> {
+  return (await vi.importActual<typeof import('../../src/ui-tree/geometry.js')>('../../src/ui-tree/geometry.js')).PIXEL_OVERLAP_SLACK;
+}
+
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
 describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
@@ -352,9 +363,10 @@ describe('tool descriptions on a screen presented over the target', () => {
   it('color/ocr and tap: an element on the screen that its scroll view draws none of (WDA) is never measured nor tapped — the description and the troubleshooting entries quote the misses', async () => {
     const { OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await actualSentences();
     expect(description('assert')).toContain(
-      "On iOS with treeSource: wda an element on the screen that its scroll view draws none of (listed past the scroll view's frame, as WebDriverAgent lists a scroll view's content) fails closed likewise with '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it> <the scroll view> (element …, screen …)', and one its scroll view's edge leaves a sliver of no thicker than 2 pt with '<the scroll view's thin-sliver miss, as verify/pixel-poll.ts renders it> <the scroll view> (element …, drawn …, screen …)'",
+      "On iOS with treeSource: wda an element on the screen that its scroll view draws none of (listed past the scroll view's frame, as WebDriverAgent lists a scroll view's content) fails closed likewise with '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it> <the scroll view> (element …, screen …)', and one its scroll view's edge leaves a sliver no thicker than 2.25 pt with '<the scroll view's thin-sliver miss, as verify/pixel-poll.ts renders it> <the scroll view> (element …, drawn …, screen …)'",
     );
     expect(TROUBLESHOOTING).toContain(`- **\`color\`/\`ocr\` fails with \`${OUTSIDE_ITS_SCROLL_VIEW} <scroll view> (element …, screen …)\`** or **\`${TOO_THIN_IN_ITS_SCROLL_VIEW} <scroll view> (element …, drawn …, screen …)\`**`);
+    expect(TROUBLESHOOTING).toContain(`or only a sliver no thicker than ${await actualSlack()} pt at the scroll view's edge`);
     expect(description('tap')).toContain('is REFUSED as off screen, naming the scroll view, nothing tapped — scroll_until it first — after the keyboard is hidden');
     expect(TROUBLESHOOTING).toContain('- **`… is outside its scroll view <scroll view> at (x,y): nothing of it is drawn (rect …) — scroll_until it first; nothing was tapped`**');
   });
@@ -362,9 +374,12 @@ describe('tool descriptions on a screen presented over the target', () => {
   it('color/ocr: an element nothing of which lies on the screen fails closed saying so — scroll it on-screen, or close the presented screen first — and color is judged over the region its sampler reads', async () => {
     const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN } = await actualSentences();
     expect(description('assert')).toContain(
-      "An element nothing of which (of what the assert reads) lies on the screen fails closed with '<the off-screen miss, as verify/pixel-poll.ts renders it> (element …, screen …)', and one of which the screen's edge leaves a sliver no thicker than 2 units (pt on iOS, px on Android) with '<the thin-sliver miss, as verify/pixel-poll.ts renders it> (element …, on the screen …, screen …)' — scroll it on-screen (scroll_until it first), or, under a presented screen, close that screen first; the poll goes on, so one scrolled on-screen before the deadline is measured.",
+      "An element nothing of which (of what the assert reads) lies on the screen fails closed with '<the off-screen miss, as verify/pixel-poll.ts renders it> (element …, screen …)', and one of which the screen's edge leaves a sliver no thicker than 2.25 units (pt on iOS, px on Android) with '<the thin-sliver miss, as verify/pixel-poll.ts renders it> (element …, on the screen …, screen …)' — scroll it on-screen (scroll_until it first), or, under a presented screen, close that screen first; the poll goes on, so one scrolled on-screen before the deadline is measured.",
     );
     expect(TROUBLESHOOTING).toContain(`or **\`${TOO_THIN_ON_THE_SCREEN} (element …, on the screen …, screen …)\`**: nothing of what the assert reads lies on the screen`);
+    expect(TROUBLESHOOTING).toContain(`or the screen's edge leaves only a sliver of it no thicker than ${await actualSlack()} units (pt on iOS, px on Android)`);
+    expect(description('assert')).toContain('and an overlap of 2.25 units or less are not counted');
+    expect(description('scroll_until')).toContain('past 2.25 units (pt on iOS, px on Android)');
     expect(description('assert')).toContain('Judged over what the assert reads: the whole rect for ocr; for color the part of the rect on the screen, inset 12% a side — the region its sampler reads — so');
     expect(TROUBLESHOOTING).toContain(`- **\`color\`/\`ocr\` fails with \`${OFF_THE_SCREEN} (element …, screen …)\`** or`);
     expect(TROUBLESHOOTING).toContain(`the message ends \`… ${PRESENTED_OVER_THE_ELEMENT.slice(0, PRESENTED_OVER_THE_ELEMENT.indexOf(' — close it first') + ' — close it first'.length)}; …\` instead: close that screen first.`);
