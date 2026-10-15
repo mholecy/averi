@@ -749,13 +749,11 @@ function drawnPlace(place: PointPlace, { scene, node, centre }: Judged): PointPl
 const scrollerOf = (drawn: Drawn, leaves: (frame: Rect) => boolean): UiNode => drawn.scrollers.find((s) => leaves(s.rect)) ?? drawn.scrollers[0];
 
 /**
- * `frame` cut by the node's drawn frame (geometry.ts#Clips.drawnIn): `frame` itself when nothing cuts it (the same
+ * `frame` cut by the node's drawn frame (geometry.ts#drawnPart): `frame` itself when nothing cuts it (the same
  * object); of no area, at `frame`'s origin, when nothing of `frame` is drawn.
  */
 function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
-  const drawn = scene.clips.drawnIn(node);
-  if (drawn === undefined) return frame;
-  return (drawn.frame === undefined ? undefined : rectIntersection(frame, drawn.frame)) ?? { ...frame, width: 0, height: 0 };
+  return drawnPart(frame, scene.clips.drawnIn(node)) ?? { ...frame, width: 0, height: 0 };
 }
 
 /**
