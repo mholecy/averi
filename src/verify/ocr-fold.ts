@@ -160,11 +160,14 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
 /**
  * Whether `source` names no character the fold changes — neither literally nor
  * by an escape (`\u2019`, `\xe9`; a doubled backslash before one counts too,
- * erring safe) — so a READING's fold may be matched by it as written: the
- * pattern then holds no opinion on typographic or accented characters the
- * fold could take from under it. A pattern that names one is written as the
- * screen reads (`ocrFoldPattern` folds it instead): `(?<!’)s$` must still see
- * the `’` a reading has.
+ * erring safe). Such a pattern is also tried, as written, on the folded
+ * reading, so what it accepts of a typographic or accented character it
+ * accepts of that character's ASCII form too: a literal `'` matches a `’`
+ * read, and so does a class or escape that leaves typographic and accented
+ * characters out — `^[a-z]+$` passes on `résumé`, `^\w+$` on `café`, with a
+ * note. A pattern that names one is written as the screen reads
+ * (`ocrFoldPattern` folds it instead): `(?<!’)s$` must still see the `’` a
+ * reading has.
  */
 export function foldFree(source: string): boolean {
   if (ocrFold(source) !== source) return false;
