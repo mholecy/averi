@@ -15,6 +15,7 @@ import {
   type OcrRegionResult,
 } from './ocr.js';
 import { failClosed } from './fail-closed.js';
+import { differsOnlyByOcrFold, differsOnlyIn, foldMarks, RECOGNIZER_DIFFERENCE } from './ocr-fold.js';
 import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
 
@@ -253,8 +254,6 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  * strings — a row's message must keep both sides verbatim so the reader sees
  * the real difference, and never for drift, which stays exact.
  */
-/** Strip combining marks only (NFD, then U+0300–U+036F): `ť` → `t`, case and spacing untouched. */
-const foldMarks = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const looseForm = (s: string): string =>
   // Diacritics folded: the recognizer reads Slovak `Prihlásiť sa` as
@@ -1068,9 +1067,15 @@ export function evaluateOcrAssert(
   let pass = true;
   if (expectation.text !== undefined) {
     const want = normalizeText(expectation.text);
-    const ok = seen === want;
+    // Exact first; equal only under the recognizer's fold is a pass that says
+    // which characters it took on trust (ocr-fold.ts) — both strings verbatim.
+    const folded = differsOnlyByOcrFold(want, seen);
+    const ok = seen === want || folded;
     if (!ok) pass = false;
-    parts.push(`vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}`);
+    parts.push(
+      `vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}` +
+        (folded ? ` (${differsOnlyIn(want, seen)} — ${RECOGNIZER_DIFFERENCE})` : ''),
+    );
   }
   if (expectation.match !== undefined) {
     const ok = new RegExp(expectation.match).test(seen);

@@ -746,6 +746,44 @@ describe('evaluateOcrAssert', () => {
   });
 });
 
+describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
+  it('passes a typographic apostrophe read as a straight one, naming both characters and keeping both strings', () => {
+    const r = evaluateOcrAssert({ text: 'Payee’s name' }, [line("Payee's name", 30)], 1080);
+    expect(r.pass).toBe(true);
+    expect(r.detail).toBe(
+      `read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — ` +
+        'the recognizer reads typographic punctuation as ASCII and drops diacritics)',
+    );
+  });
+
+  it.each([
+    ['“Quoted”', '"Quoted"', '“ vs ", ” vs "'],
+    ['10–20', '10-20', '– vs -'],
+    ['Wait — no', 'Wait - no', '— vs -'],
+    ['Loading…', 'Loading...', '… vs ...'],
+    ['Prihlásiť sa', 'Prihlásit sa', 'ť vs t'],
+  ])('passes %j read as %j, naming %s', (want, read, pairs) => {
+    const r = evaluateOcrAssert({ text: want }, [line(read, 30)], 1080);
+    expect(r.pass).toBe(true);
+    expect(r.detail).toContain(`read ${JSON.stringify(read)}; vs expected ${JSON.stringify(want)} = (differs only in ${pairs} — `);
+  });
+
+  it('an exact reading carries no fold note', () => {
+    const r = evaluateOcrAssert({ text: 'Payee’s name' }, [line('Payee’s name', 30)], 1080);
+    expect(r).toEqual({ pass: true, detail: 'read "Payee’s name"; vs expected "Payee’s name" =' });
+  });
+
+  it('a difference outside the fold still fails, both strings verbatim and no fold note', () => {
+    const r = evaluateOcrAssert({ text: 'Payee’s name' }, [line("Payee's game", 30)], 1080);
+    expect(r).toEqual({ pass: false, detail: `read "Payee's game"; vs expected "Payee’s name" ≠` });
+  });
+
+  it('case is not folded', () => {
+    expect(evaluateOcrAssert({ text: 'Payee’s Name' }, [line("Payee's name", 30)], 1080).pass).toBe(false);
+    expect(evaluateOcrAssert({ text: 'CONTINUE' }, [line('Continue', 30)], 1080).pass).toBe(false);
+  });
+});
+
 describe('measureOcrAssert — the ocr assert\'s one measurement, every "not read" failing closed', () => {
   /**
    * Review 2026-10-07 (assert-capture-ocr C2): the crop → recognize → region
