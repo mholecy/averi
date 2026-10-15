@@ -742,10 +742,10 @@ export interface Drawn {
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
  * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
- * tree's nesting is its nodes' ancestry — draw-order.ts#listsAncestry says,
- * the one reader of the tree's dialect; `unclipped`: whether its source
- * reports frames unclipped (draw-order.ts#listsUnclippedFrames), which
- * `drawnIn` asks.
+ * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry);
+ * `unclipped`: whether its source reports frames unclipped, which `drawnIn`
+ * asks (draw-order.ts#listsUnclippedFrames) — the two readers of the tree's
+ * dialect, both in draw order.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
