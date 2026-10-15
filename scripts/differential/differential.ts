@@ -8,6 +8,7 @@ import type { Platform, Recording, Screen } from './corpus.js';
 import { resetClock, wallNow } from './clock.js';
 import { deviceCalls, paintFrame, resetDevice, type DeviceProfile, type Paint } from './fake-device.js';
 import { ANDROID_SERIAL, IOS_UDID, recordedAdapter, type Side } from './side.js';
+import type { CellConfig } from '../truth/schema.js';
 
 /**
  * The differential itself: every recording replayed on two sides through the
@@ -388,14 +389,19 @@ export async function connect(side: Side, recording: Recording, profile: DeviceP
 let configDir: string | undefined;
 let configs = 0;
 
-export async function configFor(recording: Recording, dismiss: unknown[] | undefined): Promise<string> {
+/**
+ * An averi.yaml for one recording: its tree source, the dismissal a variant asks for, and — the golden mode's — a lab
+ * cell's own settings per platform (schema.ts#CellConfig, merged last: a cell's `ios.keyboardDismiss` is its variant).
+ */
+export async function configFor(recording: Recording, dismiss: unknown[] | undefined, cell?: CellConfig): Promise<string> {
   configDir ??= join(tmpdir(), `averi-differential-${process.pid}`);
   await mkdir(configDir, { recursive: true });
   const kind = recording.source === 'uiautomator' ? undefined : recording.source;
-  const ios = { bundleId: 'differential.app', ...(kind !== undefined && { treeSource: kind }), ...(dismiss !== undefined && { keyboardDismiss: dismiss }) };
+  const ios = { bundleId: 'differential.app', ...(kind !== undefined && { treeSource: kind }), ...(dismiss !== undefined && { keyboardDismiss: dismiss }), ...cell?.ios };
+  const android = { package: 'differential.app', ...cell?.android };
   const path = join(configDir, `averi-${configs++}.yaml`);
   // JSON is YAML: the config needs no YAML writer.
-  await writeFile(path, JSON.stringify({ app: { android: { package: 'differential.app' }, ios } }));
+  await writeFile(path, JSON.stringify({ app: { android, ios } }));
   return path;
 }
 

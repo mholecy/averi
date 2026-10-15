@@ -84,11 +84,11 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     screenshot,
     ...(recording.app !== undefined && { app: recording.app }),
   };
-  const config = await configFor(recording, undefined);
+  const config = await configFor(recording, undefined, truth.config);
   const c = await connect(side, recording, profile);
   try {
     for (const t of truth.targets) {
-      const why = consistency(t);
+      const why = consistency(t, recording.platform);
       if (why !== undefined) {
         result.broken.push(`${t.tag}: ${why}`);
         continue;

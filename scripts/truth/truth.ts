@@ -1,4 +1,4 @@
-import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type LabState, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
+import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type Geometry, type Insets, type LabState, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
 /**
  * The truth's arithmetic, free of any device (docs/plans/2026-10-15-ground-truth-lab-app.md): where a form control
@@ -92,17 +92,145 @@ export function readControlProbe(
  * the presented-over class), and a touch is the positive control.
  */
 export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): ProbeEvent[] {
-  return probe.filter((e) => e.kind === 'submit' || e.kind === 'select' || e.kind === 'button' || (e.kind === 'tap' && e.tag !== tag));
+  return probe.filter((e) => e.kind === 'submit' || e.kind === 'select' || e.kind === 'button' || e.kind === 'tab' || (e.kind === 'tap' && e.tag !== tag));
 }
 
 const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive control): it was not delivered, so "not reached" says nothing';
 
-/** Whether a target's sources tell one story: the tap was delivered; an `open` target is reached and drawn; a covered one is not reached. */
-export function consistency(t: TargetTruth): string | undefined {
+/**
+ * Whether a target's sources tell one story: the tap was delivered; an `open` target is reached and drawn; a covered
+ * one is not reached. With a measured geometry (phase 3; `whole` or absent is the rule above): an `off-screen` target is
+ * never probed; on Android a probe in a system band is swallowed by the system bar — no touch reaches the app, and it
+ * must not be reached (systemBarSwallows); an open target cut with its centre in what shows is reached; one whose
+ * centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a sliver and a centre under chrome may be
+ * either (what fires there is the truth the rows read).
+ */
+export function consistency(t: TargetTruth, platform?: 'ios' | 'android'): string | undefined {
+  const g = t.geometry ?? 'whole';
+  if (g === 'off-screen') return t.reached || t.probe.length > 0 || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
+  if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
   if (touchesAt(t.probe, probePoint(t.frame)).length === 0) return NOT_DELIVERED;
-  if (t.declared === 'open' && !(t.reached && t.drawn >= DRAWN)) return `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
-  if (t.declared === 'presented-over' && t.reached) return 'declared presented-over, but the probe tap reached it';
+  if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
+  if (g === 'whole') return t.reached && t.drawn >= DRAWN ? undefined : `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
+  if (g === 'partly-centre-in' && !t.reached) return 'declared open, cut with its centre showing, but the probe tap did not reach it';
+  if ((g === 'centre-out' || g === 'outside-scroll-view') && t.reached) return `${g}, but the probe tap at its centre reached it`;
   return undefined;
+}
+
+/**
+ * Android's system bars are the system's windows: a raw tap in one never reaches the app (calibration.json #21 — "the
+ * swallowed probe accepted"). iOS's status bar passes a tap through to the app's window (its touch is logged), so it
+ * swallows nothing.
+ */
+export const systemBarSwallows = (platform: 'ios' | 'android' | undefined, g: Geometry) => platform === 'android' && (g === 'status-band' || g === 'nav-band');
+
+// --- the measured geometry (phase 3) ---
+
+export const area = (r: Rect) => Math.max(0, r.width) * Math.max(0, r.height);
+export const centreOf = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+/** The overlap of two rects, or null when they share no area. */
+export function intersect(a: Rect, b: Rect): Rect | null {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const r = { x, y, width: Math.min(a.x + a.width, b.x + b.width) - x, height: Math.min(a.y + a.height, b.y + b.height) - y };
+  return r.width > 0 && r.height > 0 ? r : null;
+}
+/** What of `r` lies outside `cut`: up to four rects (above, below, left, right of it). */
+export function subtract(r: Rect, cut: Rect): Rect[] {
+  const o = intersect(r, cut);
+  if (o === null) return [r];
+  const parts: Rect[] = [
+    { x: r.x, y: r.y, width: r.width, height: o.y - r.y },
+    { x: r.x, y: o.y + o.height, width: r.width, height: r.y + r.height - (o.y + o.height) },
+    { x: r.x, y: o.y, width: o.x - r.x, height: o.height },
+    { x: o.x + o.width, y: o.y, width: r.x + r.width - (o.x + o.width), height: o.height },
+  ];
+  return parts.filter((p) => p.width > 0 && p.height > 0);
+}
+
+/** What a target's geometry is measured against: the screen, and what the state reported (LabState). */
+export interface GeometryContext {
+  screen: Rect;
+  safeArea?: Insets;
+  /** The clip of the target's scroll view, when it lies in one. */
+  clip?: Rect;
+  chrome?: Record<string, Rect>;
+}
+
+/** The system bands as rects — the status band over the top inset, the navigation band over the bottom one; none for a zero inset. */
+export function bandsOf(screen: Rect, safeArea: Insets | undefined): { status?: Rect; nav?: Rect } {
+  if (safeArea === undefined) return {};
+  return {
+    ...(safeArea.top > 0 && { status: { x: screen.x, y: screen.y, width: screen.width, height: safeArea.top } }),
+    ...(safeArea.bottom > 0 && { nav: { x: screen.x, y: screen.y + screen.height - safeArea.bottom, width: screen.width, height: safeArea.bottom } }),
+  };
+}
+
+/**
+ * The tap minimum a piece must reach, in either dimension: 6 % of the screen's shorter side — ADR 0013's sliver
+ * (averi's `MIN_TAP_PIECE_FRACTION`, ui-tree/draw-order.ts). Restated here, not imported: the truth does not depend on
+ * the code it judges.
+ */
+export const SLIVER_FRACTION = 0.06;
+export const minPiece = (screen: Rect) => Math.round(SLIVER_FRACTION * Math.min(screen.width, screen.height));
+
+/** The frame clipped by the screen and the scroll view's clip: what of it can be drawn. */
+export function visibleOf(frame: Rect, ctx: GeometryContext): Rect | null {
+  const on = intersect(frame, ctx.screen);
+  return on === null || ctx.clip === undefined ? on : intersect(on, ctx.clip);
+}
+
+/** The largest part of what shows clear of the system bands and the app's chrome — where a tap can land on the target. */
+export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
+  const visible = visibleOf(frame, ctx);
+  if (visible === null) return null;
+  const bands = bandsOf(ctx.screen, ctx.safeArea);
+  const covers = [bands.status, bands.nav, ...Object.values(ctx.chrome ?? {})].filter((r): r is Rect => r !== undefined);
+  const pieces = covers.reduce<Rect[]>((ps, c) => ps.flatMap((p) => subtract(p, c)), [visible]);
+  return pieces.reduce<Rect | null>((best, p) => (best === null || area(p) > area(best) ? p : best), null);
+}
+
+/**
+ * Where a target's frame lies (schema.ts#Geometry), in averi's judging order (ADR 0005): off the screen; outside its
+ * scroll view's clip; its centre in the status band, then the navigation band (ADR 0008, ADR 0009 N-a: the tap and the
+ * plain stop are centre-based); cut — by the screen's edge or its clip — to a sliver under the tap minimum (ADR 0013),
+ * else with its centre inside or outside what shows; its centre under the app's chrome (the first by name); else whole.
+ */
+export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
+  if (intersect(frame, ctx.screen) === null) return 'off-screen';
+  const visible = visibleOf(frame, ctx);
+  if (visible === null) return 'outside-scroll-view';
+  const c = centreOf(frame);
+  const bands = bandsOf(ctx.screen, ctx.safeArea);
+  if (bands.status !== undefined && inside(c, bands.status)) return 'status-band';
+  if (bands.nav !== undefined && inside(c, bands.nav)) return 'nav-band';
+  if (area(visible) < area(frame)) {
+    const min = minPiece(ctx.screen);
+    if (visible.width < min || visible.height < min) return 'sliver';
+    return inside(c, visible) ? 'partly-centre-in' : 'centre-out';
+  }
+  const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => inside(c, r));
+  return chrome === undefined ? 'whole' : `under-chrome:${chrome[0]}`;
+}
+
+/** Whether a state reports anything a geometry is measured from — else the targets carry none (every capture before phase 3). */
+export const measuresGeometry = (s: Pick<LabState, 'safeArea' | 'scrollViews' | 'chrome'>) => s.safeArea !== undefined || s.scrollViews !== undefined || s.chrome !== undefined;
+
+/** A target's measured geometry from the state, or nothing when the state reports none of what it is measured from. */
+export function measuredGeometry(frame: Rect, s: LabState, scrollView: string | undefined): Pick<TargetTruth, 'geometry' | 'visible' | 'piece'> {
+  if (!measuresGeometry(s)) return {};
+  const clip = scrollView === undefined ? undefined : s.scrollViews?.[scrollView];
+  if (scrollView !== undefined && clip === undefined) throw new Error(`the state reports no scroll view ${scrollView}`);
+  const ctx: GeometryContext = { screen: s.screen, ...(s.safeArea !== undefined && { safeArea: s.safeArea }), ...(clip !== undefined && { clip }), ...(s.chrome !== undefined && { chrome: s.chrome }) };
+  return { geometry: geometryOf(frame, ctx), visible: visibleOf(frame, ctx), piece: pieceOf(frame, ctx) };
+}
+
+/** Where the second probe taps (TargetTruth.reachedAtPiece): the piece's centre, when it is more than TOUCH_SLACK from the frame's. */
+export function pieceProbePoint(frame: Rect, piece: Rect | null | undefined): { x: number; y: number } | undefined {
+  if (piece === null || piece === undefined) return undefined;
+  const a = probePoint(frame);
+  const b = probePoint(piece);
+  return Math.abs(a.x - b.x) <= TOUCH_SLACK && Math.abs(a.y - b.y) <= TOUCH_SLACK ? undefined : b;
 }
 
 /**

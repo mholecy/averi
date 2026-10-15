@@ -27,6 +27,14 @@ export interface CatalogTarget {
   /** `layer`: the target lies on the cell's layer (inside the sheet), not on the screen beneath it. */
   in?: 'layer';
   declared: Declared;
+  /**
+   * A text target (calibration.json #8, a Compose button's own text): the target is this text drawn on its coloured
+   * rectangle, identified as lab.<cell>.<tag>, its rectangle lab.<cell>.<tag>.box — the selector a row asks by is the
+   * text's. Phase 3 (B5) builds the first; no app draws one yet.
+   */
+  text?: string;
+  /** The scroll view the target lies in: an id of LabState.scrollViews, whose clip the measured geometry cuts it by. */
+  scrollView?: string;
 }
 
 /**
@@ -49,6 +57,18 @@ export interface CatalogCell {
   targets: CatalogTarget[];
   /** A form cell (phase 1b): fields, a submit, maybe a picker — no coloured targets. */
   form?: CatalogForm;
+  /**
+   * The averi.yaml the golden mode replays the cell under (differential.ts#configFor): merged into its `app.ios` /
+   * `app.android` — a config variant (calibration.json #7, #19: `ios.keyboardDismiss`). Copied into the truth file
+   * (CellTruth.config), so a capture is replayed as it was captured.
+   */
+  config?: CellConfig;
+}
+
+/** averi.yaml settings per platform, merged over the golden mode's own (`bundleId`, `treeSource`, `package`). */
+export interface CellConfig {
+  ios?: Record<string, unknown>;
+  android?: Record<string, unknown>;
 }
 
 /** `amount` a decimal pad, `pin` a secure field on a number pad, `country` a button opening the form's picker sheet. */
@@ -109,6 +129,14 @@ export interface Rect {
   height: number;
 }
 
+/** The screen's system bands as insets, in the tree's units: the status band `top`, the navigation band `bottom`. */
+export interface Insets {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}
+
 /**
  * What the lab app writes (fixtures/apps/ios/AveriLab/Lab.swift#LabState, fixtures/apps/android/…/Lab.kt): screen
  * coordinates in the tree's units — points on iOS, pixels on Android.
@@ -135,6 +163,14 @@ export interface LabState {
   /** The last `keyboardWillChangeFrame`, its end frame in screen coordinates; null before any. */
   keyboard?: KeyboardState | null;
   submits?: { at: number; valid: boolean; values: Record<string, string> }[];
+  // Phase 3's geometry (truth.ts#geometryOf) — optional: an app that writes none (every phase-1/1b/2 capture) has no
+  // measured geometry, and its targets are judged by `declared` alone, as before.
+  /** The window's safe-area insets — the system bands: iOS's status bar and home indicator, Android's system bars. */
+  safeArea?: Insets;
+  /** Each scroll view of the cell by id, its clip on the screen: what of its content can show (CatalogTarget.scrollView). */
+  scrollViews?: Record<string, Rect>;
+  /** The app's chrome by name, each frame on the screen: `tabBar`, `navBar`, `toolbar`, `fab`, a pinned bar — app UI drawn over content. */
+  chrome?: Record<string, Rect>;
 }
 
 /** One field as the app's model holds it — not as any tree reports it. */
@@ -154,7 +190,11 @@ export interface KeyboardState {
   field: string | null;
 }
 
-export type EventKind = 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select' | 'touch';
+/**
+ * `tab` a tab bar's item was chosen (`tag` its name) — app chrome firing, phase 3's bars. A chrome's own button (a
+ * toolbar's, a FAB) logs `button`, `tag` `<chrome>.<name>` (the chrome's name in LabState.chrome).
+ */
+export type EventKind = 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select' | 'touch' | 'tab';
 
 /** One thing the app logged, as the truth keeps it. */
 export interface ProbeEvent {
@@ -178,7 +218,40 @@ export interface TargetTruth {
   drawn: number;
   /** The colour most of the frame shows in the screenshot, `#RRGGBB` — what the user sees there. */
   seen: string;
+  // Measured from the app's frames when the state reports the screen's bands, scroll views or chrome (truth.ts#geometryOf);
+  // absent on every capture before phase 3, whose targets are judged by `declared` alone.
+  /** Where the frame lies against the screen, its scroll view's clip, the system bands and the app's chrome. */
+  geometry?: Geometry;
+  /** The frame clipped by the screen and its scroll view's clip — what of it can be drawn; null when nothing. */
+  visible?: Rect | null;
+  /** The largest part of `visible` clear of the system bands and the app's chrome — where a tap can land on it; null when none. */
+  piece?: Rect | null;
+  /** The scroll view the target lies in (CatalogTarget.scrollView). */
+  scrollView?: string;
+  /**
+   * A second probe, at the piece's centre (probePoint(piece)), when it is not the frame's: fired the target's action.
+   * Absent when not probed — the piece's centre is the frame's, or there is no piece.
+   */
+  reachedAtPiece?: boolean;
 }
+
+/**
+ * Where a target's frame lies, measured (truth.ts#geometryOf), in averi's judging order (ADR 0005: off the screen, the
+ * system bands, cut, covered): `off-screen` none of it on the screen; `outside-scroll-view` on the screen but none of
+ * it in its scroll view's clip; `status-band` / `nav-band` its centre in the top / bottom system band; `sliver` cut (by
+ * the screen or its clip) to a piece under the tap minimum (ADR 0013); `partly-centre-in` / `centre-out` cut, its centre
+ * inside / outside what shows; `under-chrome:<name>` whole, its centre under the app's chrome of that name; `whole`.
+ */
+export type Geometry =
+  | 'whole'
+  | 'partly-centre-in'
+  | 'centre-out'
+  | 'sliver'
+  | 'outside-scroll-view'
+  | 'off-screen'
+  | 'status-band'
+  | 'nav-band'
+  | `under-chrome:${string}`;
 
 export interface CellTruth {
   cell: string;
@@ -189,6 +262,12 @@ export interface CellTruth {
   targets: TargetTruth[];
   /** A form cell's truth (its `targets` empty). */
   form?: FormTruth;
+  /** As the state reported them (LabState): what the targets' geometry was measured against. Absent before phase 3. */
+  safeArea?: Insets;
+  scrollViews?: Record<string, Rect>;
+  chrome?: Record<string, Rect>;
+  /** The cell's averi.yaml variant (CatalogCell.config): golden replays it under this. */
+  config?: CellConfig;
 }
 
 /**

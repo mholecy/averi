@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, outOfProcessKeyboard, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
+import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -16,6 +16,11 @@ import { consistency, controlConsistency, outOfProcessKeyboard, probeEvents, pro
  * and tap its centre with a raw tap — the probe: did its action fire, and (the positive control) did the tap reach the
  * app at all? — and, for a target, measure from the screenshot how much of it is drawn as itself. Writes a differential
  * corpus run: one capture per tree, sharing the cell's screenshot and truth.
+ *
+ * When the state reports the screen's bands, scroll views or chrome (phase 3's cells), each target also carries its
+ * measured geometry (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not
+ * centred where its frame is gets a second probe at the piece's centre (`reachedAtPiece`). A state reporting none of it
+ * — every cell before phase 3 — captures as before.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown and
  * its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus per
@@ -72,17 +77,43 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     for (const t of trees) await writeFile(join(opts.out, `${cell.id}${t.suffix}`), t.payload);
     await writeFile(join(opts.out, `${cell.id}.state.json`), JSON.stringify(s, null, 2) + '\n');
 
-    const truth: CellTruth = { cell: cell.id, layer: cell.layer, device, screen: { width: s.screen.width, height: s.screen.height }, scale: s.scale, targets: [] };
+    const truth: CellTruth = {
+      cell: cell.id,
+      layer: cell.layer,
+      device,
+      screen: { width: s.screen.width, height: s.screen.height },
+      scale: s.scale,
+      targets: [],
+      ...(s.safeArea !== undefined && { safeArea: s.safeArea }),
+      ...(s.scrollViews !== undefined && { scrollViews: s.scrollViews }),
+      ...(s.chrome !== undefined && { chrome: s.chrome }),
+      ...(cell.config !== undefined && { config: cell.config }),
+    };
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
       const { drawn, seen } = measure(png, frame, s.scale, t.color);
-      const events = await probe(lab, cell.id, frame);
-      const target: TargetTruth = { tag: t.tag, id: `lab.${cell.id}.${t.tag}`, color: t.color, declared: t.declared, frame, ...readTargetProbe(events.events, t.tag), drawn: Math.round(drawn * 1000) / 1000, seen };
+      const geometry = measuredGeometry(frame, s, t.scrollView);
+      const read = geometry.geometry === 'off-screen' ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
+      const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
+      const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;
+      const target: TargetTruth = {
+        tag: t.tag,
+        id: `lab.${cell.id}.${t.tag}`,
+        color: t.color,
+        declared: t.declared,
+        frame,
+        ...read,
+        drawn: Math.round(drawn * 1000) / 1000,
+        seen,
+        ...geometry,
+        ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
+        ...(reachedAtPiece !== undefined && { reachedAtPiece }),
+      };
       truth.targets.push(target);
-      const bad = consistency(target);
+      const bad = consistency(target, lab.platform);
       if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
-      log(`${cell.id}/${t.tag}: reached ${target.reached}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
+      log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
     }
     if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, broken, log);
     await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
@@ -98,10 +129,13 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   return { broken, skipped, manifest };
 }
 
-/** Relaunch the cell, tap the frame's centre, give the app 1 s to log — the events the tap produced, the launch's own left out. */
-async function probe(lab: LabDevice, cell: string, frame: Rect): Promise<{ events: ReturnType<typeof probeEvents>; after: LabState | undefined }> {
+/**
+ * Relaunch the cell, tap the frame's centre (or the point given), give the app 1 s to log — the events the tap
+ * produced, the launch's own left out.
+ */
+async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y: number }): Promise<{ events: ReturnType<typeof probeEvents>; after: LabState | undefined }> {
   const before = (await lab.launch(cell)).events.length;
-  const at = probePoint(frame);
+  const at = 'width' in where ? probePoint(where) : where;
   await lab.tap(at.x, at.y);
   await new Promise((r) => setTimeout(r, 1_000));
   const after = await lab.state();
