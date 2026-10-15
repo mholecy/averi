@@ -63,7 +63,8 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * One fact is the tree source's, not a shape's: an element it MARKS as a presented layer's (`UiNode.presentation`,
  * WDA's `Alert`) covers every node drawn before it through the whole screen, as its layer's one cover and that
  * screen's surface (`markedLayers`) — for `exposure`, `paintsOver`, `coversOf`, `presentedAt` and `presentedOver`
- * alike; the `drawnOver` column (the stroke box) does not read it.
+ * alike; the `drawnOver` column (the stroke box) does not read it. The mark is read here and nowhere else
+ * (`markOf`): a verb learns of it from `presentedPress` (`MarkedLayer`: its kind and label), never from the node.
  *
  * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
@@ -79,6 +80,26 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * rect arithmetic it asks — the
  * subtraction of a cover from a target included — is geometry.ts's.
  */
+/** A presented layer the tree source marks (`UiNode.presentation`), as a sentence names it: its kind and its label. */
+export interface MarkedLayer {
+  readonly kind: NonNullable<UiNode['presentation']>;
+  readonly label?: string;
+}
+
+/**
+ * A presented surface as a sentence quotes it (`DrawOrder.presentedPress`): the `surface` `presentedAt`,
+ * `presentedOver` or `markedAt` named, where it presses (`reach`: the whole screen for the element of a marked
+ * presented layer, else its rect), and that marked `layer` when it is one's element.
+ */
+export interface PresentedPress {
+  readonly surface: UiNode;
+  readonly reach: Rect;
+  readonly layer?: MarkedLayer;
+}
+
+/** THE reading of the tree source's presented-layer mark (`UiNode.presentation`): the layer `node` is the element of, as `MarkedLayer`; undefined for any other node. */
+const markOf = (node: UiNode): MarkedLayer | undefined => (node.presentation === undefined ? undefined : { kind: node.presentation, ...(node.label ? { label: node.label } : {}) });
+
 export interface DrawOrder {
   /**
    * The nodes drawn over a clipping container, in pre-order: every node
@@ -156,11 +177,12 @@ export interface DrawOrder {
    */
   presentedOver(node: UiNode): UiNode | undefined;
   /**
-   * Where a presented surface `presentedAt` or `presentedOver` named presses — the reach `presentedAt` holds its point
-   * against: the whole screen for the element of a marked presented layer (`markedLayers`), else its rect. What a
-   * sentence naming it at a touch-down quotes (geometry.ts#coverText).
+   * A presented surface `presentedAt`, `presentedOver` or `markedAt` named, as a sentence quotes it (`PresentedPress`):
+   * where it presses — the reach `presentedAt` holds its point against: the whole screen for the element of a marked
+   * presented layer (`markedLayers`), else its rect (geometry.ts#coverText quotes it) — and that marked layer, which
+   * the remedy names (ui-tree/standing.ts#presentedRemedy). The verbs' one view of the tree source's mark.
    */
-  presentedReach(surface: UiNode): Rect;
+  presentedPress(surface: UiNode): PresentedPress;
   /**
    * The element of a marked presented layer (`markedLayers`: WDA's `Alert`, on the screen) a touch-down at `point`
    * lands on, asked for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the
@@ -1710,7 +1732,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
    * mid-animation may read hidden while it already takes every touch.
    */
   const marked = order.filter((p) => {
-    if (p.node.presentation === undefined) return false;
+    if (markOf(p.node) === undefined) return false;
     const on = rectIntersection(p.node.rect, screen);
     return on !== undefined && rectArea(on) > 0;
   });
@@ -1787,7 +1809,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
     presentedOver: (node) => lastPresentedSurface(node),
     markedAt: (point) =>
       marked.filter((element) => !order.slice(element.at + 1, element.end).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point))).at(-1)?.node,
-    presentedReach: (surface) => (surface.presentation !== undefined ? { ...screen } : { ...surface.rect }),
+    presentedPress(surface) {
+      const layer = markOf(surface);
+      return { surface, reach: layer === undefined ? { ...surface.rect } : { ...screen }, ...(layer !== undefined && { layer }) };
+    },
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);

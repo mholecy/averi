@@ -1,5 +1,6 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { nodeText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import type { MarkedLayer } from '../ui-tree/draw-order.js';
 import { presentedRemedy } from '../ui-tree/standing.js';
 import { SIDES } from './swipe.js';
 
@@ -103,7 +104,7 @@ export function cutRemedy(edge: Edge): string {
 export const PRESENTED_OVER = presentedRemedy('it');
 
 /** `PRESENTED_OVER` for a presented layer the tree source marks (ui-tree/standing.ts#Remedy's `layer`): it names it — an alert and its title. */
-export const presentedOver = (layer?: UiNode): string => presentedRemedy('it', layer);
+export const presentedOver = (layer?: MarkedLayer): string => presentedRemedy('it', layer);
 
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts
