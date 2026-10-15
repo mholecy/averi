@@ -437,6 +437,11 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // "the swipe toward it": a turn, or a caller's direction away from the target, strokes the other way.
       const { judged, cover, viewport } = o;
       const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
+      if (judged === undefined) {
+        // No target in the tree: the next swipe would have landed on an alert the tree marks (`DrawOrder.markedAt`).
+        const at = o.touchDown === undefined ? '' : `, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${coverText(cover, o.reach)}`;
+        return { message: `scroll_until ${describe} stopped ${when} — element is not in the tree${at} — ${presentedStop(o.layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent.` };
+      }
       const where =
         o.touchDown === undefined
           ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(judged.standing.facts.shows)}% of it shows`

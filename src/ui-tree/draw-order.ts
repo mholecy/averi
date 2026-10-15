@@ -162,6 +162,14 @@ export interface DrawOrder {
    */
   presentedReach(surface: UiNode): Rect;
   /**
+   * The element of a marked presented layer (`markedLayers`: WDA's `Alert`, on the screen) a touch-down at `point`
+   * lands on, asked for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the
+   * last such element, whose reach is the whole screen — unless the point lies on a scroll view of the element's own
+   * (a stroke scrolling the alert's own content). Undefined when none. One reader: `scroll_until`'s stroke
+   * (interact/scroll-rounds.ts#round), which sends no stroke that would land on it.
+   */
+  markedAt(point: Point): UiNode | undefined;
+  /**
    * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
    * node after `node`'s subtree (its first place in the tree, as
    * `exposure`) whose rect meets `region` with area and that draws for a
@@ -1777,6 +1785,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
     },
     presentedAt: (node, point) => lastPresentedSurface(node, (reach) => containsPoint(reach, point)),
     presentedOver: (node) => lastPresentedSurface(node),
+    markedAt: (point) =>
+      marked.filter((element) => !order.slice(element.at + 1, element.end).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point))).at(-1)?.node,
     presentedReach: (surface) => (surface.presentation !== undefined ? { ...screen } : { ...surface.rect }),
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);

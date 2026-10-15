@@ -429,8 +429,16 @@ leaf `41,365 402x874`, a rect that runs off the screen. The alert is named with 
 point a sentence names — a centre at (44,84), a touch-down at (201,699) — lies on the reach, not on the card; so does
 every cover whose reach is not its rect (idb's pinned CONTINUE, run down to the screen's bottom or the keyboard's top,
 and a floating tab bar's item raised by its lift, now `button "Continue to summary" (24,780 354x44, reaching 24,780
-354x94)` in the tap's and `scroll_until`'s sentences too). Residual 11's disagreement does not arise under an alert: its
-reach is the whole screen, so every touch-down `presentedAt` asks lies on it, as every verb's `presentedOver` says.
+354x94)` in the tap's and `scroll_until`'s sentences too). What holds of residual 11 under an alert: the tap,
+the pixel assert and `scroll_until` agree — its reach is the whole screen, so every touch-down `presentedAt` asks for a
+target beneath it lies on it, where every verb's `presentedOver` names it. And — owner decision on the slice's review,
+2026-10-15, "stop before the swipe" — for a target NOT in the tree too (residual 6's first case, closed for alerts):
+a stroke whose touch-down lies beneath an alert the tree marks (`DrawOrder.markedAt`; not on a scroll view of the
+alert's own) is not sent, with the same confirming read — `scroll_until text:"Nothing like this" stopped before any
+swipe — element is not in the tree, and the next swipe would touch down at (201,699) on container "Exit confirmation"
+(41,365 320x172, reaching 0,0 402x874) — an alert is presented over it ("Exit confirmation") — close it first, and a
+swipe would land on the alert, so none was sent.` (a plain failure, not "not present": the alert, not the selector, is
+what stops it).
 
 `ui_snapshot` prints the mark (Q3), as it prints `hidden`, so later device trees carry it into the corpus (the
 normalized twin of the capture, `swift-exit-alert-after.snapshot.json`, predates it and reads as before).
@@ -481,6 +489,7 @@ became `Tapped`, visible or PASS; on NEW no tap, swipe or screenshot is sent und
    keyboard that this residual first named (the device check: a stroke for a cell below the fold closed Contacts'
    discard popover and read "fully visible"). Still stroked for:
    - a target NOT YET IN THE TREE — there is nothing to ask on behalf of; its strokes may land on a presented screen
+     (but not on an alert the tree marks: see "Amendment: a layer holding an alert")
      (Q-A option (b), judging the touch-down against surfaces presented over the stroked container's screen, was not
      taken: a search whose target lies in the presented sheet itself, stroked over a container picked from the screen
      beneath, would stop); a bound that ends such a scroll says nothing of it either;

@@ -583,4 +583,16 @@ describe('a target beneath an alert — the tap, the pixel assert and scroll_unt
         `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":1200,"width":354,"height":52} in a 402x874 viewport`,
     );
   });
+
+  it('a target not in the tree: scroll_until sends no swipe under the alert — its touch-down lies on the alert, wherever it would land', async () => {
+    const tree = await alertForm();
+    const row: Row = { tree, found: [], screen: USABLE };
+    const played = play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    expect(failureOf(played, 'text:"Nothing like this"').message).toBe(
+      `scroll_until text:"Nothing like this" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent.`,
+    );
+  });
 });
+
