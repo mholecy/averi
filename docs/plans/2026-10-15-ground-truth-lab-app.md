@@ -1,0 +1,125 @@
+# Plan: a ground-truth lab app and a golden mode for the harness
+
+Answers `2026-10-15-proposal-find-bugs-in-batches.md` (P1 + P2, with P3/P5/P6 placed around them). Written 2026-10-15
+on `truth/phase-0-1`, branched from `arch/round-18` @ `dda435b`. Separate from the round-19 fix work: it touches no
+file under `src/`.
+
+## Goal
+
+Test averi against screens whose truth is known — no login, no bank data, committable, runnable without the owner —
+so that a visibility bug is found by a test, not by the next device round, and a fix is checked against the whole
+neighbourhood of its bug at once.
+
+## Shape
+
+| piece | where | what |
+|---|---|---|
+| cell catalog | `fixtures/apps/cells.json` | one entry per screen: `id`, the layer over the targets, the geometry, the targets (tag, colour, what the cell declares about it) |
+| iOS lab app (SwiftUI) | `fixtures/apps/ios/` (xcodegen) | renders a cell chosen by launch argument (`-cell <id>`) or deep link (`averilab://cell/<id>`); writes its state file |
+| Android lab app (Compose) | `fixtures/apps/android/` | the same catalog, phase 2 |
+| capture | `scripts/truth/capture.ts` | per cell: launch, wait for `ready`, save raw trees (WDA, idb / uiautomator), the screenshot, the app's state, then the tap probe |
+| truth corpus | `tests/fixtures/truth/<platform>/` | a differential corpus run (manifest + payloads) plus `screenshot` and `truth` per capture — committed |
+| golden mode | `scripts/differential/golden.ts` | replays the truth corpus through ONE side, serves the captured screenshot, compares each verb's answer with what the truth implies |
+| expected replies | `scripts/differential/golden-spec.ts` | the table: truth → expected outcome class per verb |
+
+Not in the npm package (`package.json` `files` lists only `dist`, `skill`, docs).
+
+## Truth: three sources, each answering one question
+
+| source | from | answers |
+|---|---|---|
+| declared | the catalog | what kind of situation the cell builds (open, beneath a presented layer, outside its scroll view, …) — names the expected remedy |
+| reached | the tap probe: the capture script taps each target's centre with a raw `idb ui tap` / `adb input tap`, reads the app's tap log, relaunches | whether a tap at its centre reaches the target |
+| drawn | the screenshot: the fraction of the target's frame (as the app reports it, `.frame(in: .global)`) painted the target's own colour | how much of it the user sees as itself |
+
+The app reports its own frames, so the truth does not depend on what WDA, idb or uiautomator list — a disagreement
+between the app's frame and the tree's rect is itself a finding. A cell whose three sources disagree with each other
+(declared open, but not reached) is a broken cell, reported as such, not a verdict on averi.
+
+The tap probe is empirical rather than a `hitTest` replica: SwiftUI's hit testing is not UIView hit testing, and what
+matters for `Tapped` is whether the action fired.
+
+## Golden mode
+
+- Same corpus format, two optional fields per capture: `screenshot` (PNG beside the payload) and `truth` (JSON).
+- One side (NEW). The fake device answers the screenshot with the captured PNG (iOS: at the device's scale; the
+  frame is what the device returned).
+- Per target, the verbs the spec covers. Outcomes are compared as classes, not wording — wording stays the
+  differential's job:
+
+| truth | tap | colour assert | scroll_until (down) |
+|---|---|---|---|
+| reached, drawn ≥ 95 % | `Tapped` | pass with its own colour | reached, 0 swipes |
+| not reached, declared `presented-over` | refused, `close it first`, nothing tapped | fail (asked with the colour the screenshot shows there, so a pass means it measured the cover) | stopped before any swipe, `close it first` |
+
+  New rows are added with the cells that need them (outside its scroll view → scroll advice; partly drawn with centre
+  out → `fully: true first`; …). The table lives in code (`golden-spec.ts`), each row citing the ADR that decides it;
+  an ADR records only the principle (the truth outranks a hand-written expectation).
+- Report: per cell × target × verb `ok` / `MISMATCH` (expected class, actual reply) / `broken cell`.
+- Runs in vitest over the committed truth corpus (no device), like `tests/differential/`.
+
+## Phases
+
+### Phase 0 — decisions and schemas (this branch)
+
+- Answers to the proposal's questions: Q2 in this repo (`fixtures/apps/`); Q3 in code, principle in an ADR; Q1 (P3's
+  inversion) after golden exists, measured against truth rather than as a count of `Tapped → refused`.
+- `fixtures/apps/cells.json` schema, the app's state file schema, the truth file schema (`scripts/truth/schema.ts`).
+- The golden spec's first rows.
+
+### Phase 1 — iOS walking skeleton (this branch)
+
+- SwiftUI lab app, three cells:
+  - `open` — three coloured targets, no layer;
+  - `sheet-medium` — a form of coloured targets, a sheet at the medium detent presented on appear (targets under the
+    dim above it and under the sheet; a target inside the sheet);
+  - `alert-dim` — the form beneath a SwiftUI alert (the round-18 note
+    `2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md`).
+- Capture on a dedicated simulator (`averi-lab iPhone 17`, iOS 27.0, 402×874) and a WDA port of its own, never the
+  device-check simulator.
+- Golden mode + vitest over the committed captures.
+- **Acceptance:** golden reports the round-18 bug on `alert-dim` at `dda435b` (tap `Tapped`, colour pass on the dim,
+  `scroll_until` fully visible), and the cell is green once round 19's alert fix (`fix/r19-alert`) lands. `open` is
+  green at `dda435b`.
+
+### Phase 2 — Android (Compose, the same three cells, uiautomator)
+
+The tap log is a `Modifier.clickable` per target; state file read with `adb exec-out run-as`. Emulator use only with
+the owner's go (device-check rules: no adb server commands without it).
+
+### Phase 3 — calibration on the bug notes
+
+Every visibility note (36 of 72) gets a cell. Golden must fail on the commit before its fix and pass after. A note
+that does not fail shows a hole in the truth or the spec table.
+
+### Phase 4 — the matrix, generated
+
+One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells
+for P5's sample. OCR judged against real pixels (the macOS recognizer on the captured screenshot; skipped where it
+is unavailable). The RN modal cases only if the existing RN trees do not cover them.
+
+### Phase 5 — live golden
+
+averi's verbs run on the simulator against the lab app, the app's tap log and scroll offset as the oracle: covers
+what a static tree cannot (`scroll_until` dynamics, strokes, the keyboard).
+
+### Alongside
+
+- P5 (text inventory) is independent and small — any time.
+- P3 / P4 after phase 3, judged on the golden corpus as well as the 580-tree differential.
+
+## Workflow per bug, once phase 3 is in
+
+1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,
+   other tree source).
+2. Capture → golden red.
+3. Fix in the usual pipeline; golden green over the whole truth corpus, and the OLD/NEW differential over the
+   device corpus shows no `refused → Tapped`.
+4. The device round on the real apps confirms; a lab-app round can be run by an agent alone (no login, `clearState`
+   allowed).
+
+## Risks
+
+- Compose hit testing / tap logging is harder than SwiftUI's — Android follows the iOS skeleton.
+- Xcode / API upgrades shift trees: the manifest records the device and OS; recapture is one script run.
+- The lab app is not the bank app: fewer and shorter device rounds, not none.
