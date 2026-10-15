@@ -89,11 +89,12 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
   const cps = [...source];
   const folded: [string, string][] = [];
   let out = '';
+  let boundary = false;
   for (let i = 0; i < cps.length; i++) {
     const c = cps[i];
     if (c === '\\') {
       const next = cps[i + 1];
-      if (next === 'b' || next === 'B') return undefined;
+      if (next === 'b' || next === 'B') boundary = true;
       const lit = escapedLiteral(next);
       if (lit !== undefined) {
         out += `(?:${literal(foldChar(lit))})`;
@@ -136,7 +137,12 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
       folded.push([c, f]);
     }
   }
-  return folded.length === 0 ? undefined : { source: out, folded };
+  if (folded.length === 0) return undefined;
+  // Without the `u` flag a word character is ASCII: a folded punctuation mark
+  // stays a non-word character, but a folded letter (`é` → `e`) becomes a word
+  // character, which would move a word boundary.
+  if (boundary && folded.some(([, f]) => /\w/.test(f))) return undefined;
+  return { source: out, folded };
 }
 
 /**

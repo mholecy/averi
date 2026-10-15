@@ -934,6 +934,10 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ["^(?=.*’)(?=.*')a.$", "a'", false],
     ['(?<=’)s', "Payee's", false],
     ['(?<!’)s$', "x’s", false],
+    ['\\bPayee’s name\\b', "Payee's name", true],
+    ['^Payee’s\\B', "Payee's", false],
+    ['\\bcafé\\b', 'café', false],
+    ['^x\\B[é]$', 'xe', false],
   ])('/%s/ against %j under the fold: pass %s', (match, read, pass) => {
     expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(pass);
   });
