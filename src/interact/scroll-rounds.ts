@@ -182,9 +182,9 @@ export type RoundStep =
  *   touch down on a surface of that screen (`PresentedTouchDown`,
  *   ui-tree/standing.ts#Scene.presentedAt), carried whole.
  *   `judged` undefined: no target in the tree, and the next stroke would
- *   touch down on a typed presented layer's element (an alert, an action
- *   sheet, a popover: the same question asked for no target) — no stroke is
- *   sent under it.
+ *   touch down on a layer the tree marks as presented, off its own scroll
+ *   views (an alert, an action sheet, a popover, a `screen` layer: the same
+ *   question asked for no target) — no stroke is sent under it.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -1401,10 +1401,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // strokes moved the sheet to another detent and read "content exhausted". So, as for a target judged under such a
   // screen (above): one more read with no stroke between, then stop `presented` — or, should the screen be gone from
   // the touch-down by then, stroke as before. And on behalf of NO target (none in the tree): a stroke that would touch
-  // down on a layer the tree marks by its type — an alert, an action sheet, a popover (its reach is the whole screen) —
-  // lands on it, not on any screen beneath it — the same hold and stop, it named. Other presented screens are still
-  // stroked over for a target not in the tree: it has nothing to ask on behalf of. One question of the scene, at the touch-down (`presentedTouchDown`,
-  // ui-tree/standing.ts#Scene.presentedAt).
+  // down on a layer the tree marks as presented — an alert, an action sheet, a popover, a `screen` layer (its reach is
+  // the whole screen) — lands on it, not on any screen beneath it — the same hold and stop, it named; one on a scroll
+  // view of that layer's own (a search inside a sheet's list) is sent. A screen presented by shape alone is still
+  // stroked over for a target not in the tree: it has nothing to ask on behalf of. One question of the scene, at the
+  // touch-down (`presentedTouchDown`, ui-tree/standing.ts#Scene.presentedAt).
   const onPresented = presentedTouchDown(stroke, now, best?.node);
   if (onPresented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: onPresented }, current === 'settle' && presentedBefore, seen.elapsedMs);
@@ -1458,8 +1459,8 @@ function plannedStroke(
 /**
  * Where `stroke` would touch down — the driver's own point (swipe.ts#scrollStroke's `from`) — when that point lies on
  * a presented screen, asked of the scene (ui-tree/standing.ts#Scene.presentedAt): on behalf of `target`, a surface of
- * a screen presented over the target's own; with no target (none in the tree), the element of a layer the tree marks
- * by its type.
+ * a screen presented over the target's own; with no target (none in the tree), the cover of a layer the tree marks as
+ * presented, off that layer's own scroll views.
  * Undefined when it does not, when this round did not read, or when the stroke has no box. Only the touch-down is
  * asked: it is where the gesture is recognised.
  */

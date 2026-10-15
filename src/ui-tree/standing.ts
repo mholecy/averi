@@ -292,11 +292,12 @@ export interface Scene {
   /**
    * THE presented question a stroke asks at its touch-down (`point`), as a sentence quotes the answer
    * (draw-order.ts#PresentedPress): on behalf of `target`, the surface of a screen presented over the target's own
-   * that holds the point (draw-order.ts#DrawOrder.presentedAt) — or, with NO target (one not in the tree), the
-   * element of a layer the tree marks by its type the point lands on (draw-order.ts#DrawOrder.markedAt: an alert, an
-   * action sheet, a popover; a `screen` layer or a screen presented by shape alone is not asked of no target). Undefined when none. The point is kept: a surface judged by shape only
-   * where it lies is not one at every touch-down (a dismissed sheet parked off screen is no stop). One reader:
-   * `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
+   * that holds the point (draw-order.ts#DrawOrder.presentedAt) — or, with NO target (one not in the tree), the cover
+   * of a layer the tree marks as presented the point lands on, off that layer's own scroll views
+   * (draw-order.ts#DrawOrder.markedAt: an alert's, an action sheet's or a popover's element, what of a `screen` layer
+   * draws there; a screen presented by shape alone is not asked of no target). Undefined when none. The point is
+   * kept: a surface judged by shape only where it lies is not one at every touch-down (a dismissed sheet parked off
+   * screen is no stop). One reader: `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
    */
   presentedAt(point: Point, target?: UiNode): PresentedPress | undefined;
 }

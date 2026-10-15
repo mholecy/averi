@@ -139,10 +139,77 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     }
   });
 
-  it('a stroke for NO target is not stopped by a `screen` layer (`markedAt` reads the typed layers only)', () => {
+  it('a stroke for NO target lands on a `screen` layer (`markedAt`): what of the layer draws at the touch-down, the layer where nothing does', () => {
+    const { layer: beneath } = list();
+    const { cancel, layer } = sheet();
+    const order = drawOrder(judged(beneath, layer));
+    expect(desc(order.markedAt({ x: 40, y: 80 }))).toBe(desc(cancel));
+    expect(desc(order.markedAt({ x: 300, y: 40 }))).toBe(LAYER);
+    expect(order.presentedPress(order.markedAt({ x: 300, y: 40 })!)).toEqual({ surface: layer, reach: IPHONE, layer: { kind: 'screen' } });
+  });
+
+  it('…but not on a scroll view of the layer itself: a search inside the sheet\'s own list keeps stroking', () => {
     const { layer: beneath } = list();
     const { layer } = sheet();
-    expect(drawOrder(judged(beneath, layer)).markedAt({ x: 201, y: 40 })).toBeUndefined();
+    const order = drawOrder(judged(beneath, layer));
+    expect(order.markedAt({ x: 201, y: 699 })).toBeUndefined();
+    expect(order.markedAt({ x: 201, y: 320 })).toBeUndefined();
+  });
+
+  it('a bare full-screen wrapper of the layer is not what is named there: it draws nothing of its own', () => {
+    const { layer: beneath } = list();
+    const { layer } = sheet();
+    const wrapper = node({ role: 'container', rect: IPHONE, children: [...layer.children] });
+    layer.children.splice(0, layer.children.length, wrapper);
+    const named = drawOrder(judged(beneath, layer)).markedAt({ x: 300, y: 40 });
+    expect(named).toBe(layer);
+    expect(named).not.toBe(wrapper);
+  });
+
+  /** A sheet whose form is no scroll view, holding `extra` over the list's row; the touch-down at (201,699). */
+  const formSheet = (extra: UiNode) => {
+    const { row, layer: beneath } = list();
+    const form = node({ role: 'container', identifier: 'form', rect: rect(0, 118, 402, 756), children: [extra] });
+    const layer = node({ role: 'container', rect: IPHONE, presentation: 'screen', children: [form] });
+    return { row, form, order: drawOrder(judged(beneath, layer)) };
+  };
+  const TOUCH_DOWN = { x: 201, y: 699 };
+
+  it('a hidden node of the layer at the touch-down is not named for no target: what of the layer shows there is, as for a target', () => {
+    const { row, form, order } = formSheet(node({ role: 'text', label: 'Parked', hidden: true, rect: rect(0, 690, 402, 30) }));
+    expect(order.markedAt(TOUCH_DOWN)).toBe(form);
+    expect(order.markedAt(TOUCH_DOWN)).toBe(order.presentedAt(row, TOUCH_DOWN));
+  });
+
+  it('a HIDDEN scroll view of the layer at the touch-down keeps no stroke going: the stroke lands on the layer, as for a target', () => {
+    const scroll = node({ role: 'scrollable', hidden: true, rect: rect(0, 600, 402, 200), children: [node({ role: 'text', label: 'x', hidden: true, rect: rect(0, 610, 402, 30) })] });
+    const { row, form, order } = formSheet(scroll);
+    expect(order.markedAt(TOUCH_DOWN)).toBe(form);
+    expect(order.markedAt(TOUCH_DOWN)).toBe(order.presentedAt(row, TOUCH_DOWN));
+  });
+
+  it('a typed layer over a `screen` one, the touch-down on the typed layer\'s own scroll view: the stroke scrolls it — the sheet beneath, its list hidden under the popover, never takes the touch', () => {
+    const { layer: beneath } = list();
+    const { layer: sheetLayer, form } = sheet();
+    form.hidden = true;
+    const { layer } = popover();
+    layer.children[1].children.push(node({ role: 'scrollable', rect: rect(10, 166, 240, 81), children: [node({ role: 'button', label: 'Keep Editing', rect: rect(10, 166, 240, 44) })] }));
+    expect(drawOrder(judged(beneath, sheetLayer, layer)).markedAt({ x: 100, y: 175 })).toBeUndefined();
+  });
+
+  it('a `screen` layer under a typed one: a stroke for no target lands on the typed element on top', () => {
+    const { layer: beneath } = list();
+    const { layer: sheetLayer } = sheet();
+    const { layer } = popover();
+    expect(desc(drawOrder(judged(beneath, sheetLayer, layer)).markedAt({ x: 40, y: 80 }))).toBe(SHEET_PROMPT);
+  });
+
+  it('a tree whose source judged nothing: a shape presented by its frames alone is not asked of no target', () => {
+    const { layer: beneath } = list();
+    const { layer } = sheet();
+    const { presentation: _, ...unmarked } = layer;
+    const tree = node({ role: 'container', label: 'Example', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE, children: [beneath, node(unmarked)] })] });
+    expect(drawOrder(tree).markedAt({ x: 40, y: 80 })).toBeUndefined();
   });
 
   it('a lower layer marked `screen` under a typed one: a row beneath both is covered by the typed element on top, a node of the sheet by the typed element only', () => {
