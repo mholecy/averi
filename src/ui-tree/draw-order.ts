@@ -150,9 +150,9 @@ export interface DrawOrder {
    * column, as `exposure` asks before it asks `presentedSurface`); undefined when none, or for a node not in this tree.
    * `exposure` cannot answer it for a node outside the box: it judges only what of the node shows, so a target below
    * the fold has no covers and no presented surface (`presentedOver` asks the same less the point). One reader:
-   * `scroll_until`'s stroke
-   * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which asks it at the stroke's touch-down for a target it has not judged in the
-   * viewport — a stroke that would touch down on such a screen is not sent (it may dismiss the screen, as one closed
+   * `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which asks it at
+   * the stroke's touch-down for a target it has not judged in the viewport — a stroke that would touch down on such a
+   * screen is not sent (it may dismiss the screen, as one closed
    * Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN screen is
    * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before. An element the tree
    * source marks as a presented layer's (`markedLayers`, WDA's `Alert`) holds every point of the screen: with an alert
