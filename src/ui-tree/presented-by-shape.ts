@@ -5,8 +5,8 @@ import { scrolls } from './scroll-containers.js';
 /**
  * A PRESENTED SCREEN INFERRED FROM SHAPE: the fallback draw order asks (draw-order.ts#drawOrder) only of a tree whose
  * source did not judge presented layers itself — no `UiNode.presentationsJudged` on its root: Android's uiautomator
- * tree, idb's flat list, a WDA payload carrying no visibility flags, and a tree printed before the source marked its
- * presented layers (the normalized snapshots kept as fixtures and in the differential corpus). A tree whose source
+ * tree, idb's flat list, a WDA payload carrying no visibility flags, and a normalized snapshot whose root carries no
+ * such mark (as the snapshots kept as fixtures and in the differential corpus do not). A tree whose source
  * judged never reaches it: there the marked layers are the presented ones (draw-order.ts#markOf), and a later
  * screen-sized layer the source did not mark presents nothing.
  *

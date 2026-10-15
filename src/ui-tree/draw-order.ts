@@ -132,7 +132,7 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * stroke box) does not read it. The mark is read here and nowhere else (`markOf`): a verb learns of it from
  * `presentedPress` (`MarkedLayer`: its kind and label), never from the node. On a tree whose source judged presented
  * layers (`UiNode.presentationsJudged`) its marks are the presented layers, and no shape is asked; on any other tree
- * (Android, idb, a flagless WDA payload, a snapshot printed before the source's marks) a presented screen is still
+ * (Android, idb, a flagless WDA payload, a snapshot without `presentationsJudged`) a presented screen is still
  * inferred from shape by ONE fallback, asked from here only then (`Seen.byShape`, presented-by-shape.ts: a frame
  * row's excuse giving way over a presented screen, and that screen's surface).
  *
