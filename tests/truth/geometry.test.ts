@@ -165,12 +165,19 @@ describe('consistency with a measured geometry', () => {
     // Its rounded centre on the screen's last row is on it: probed as ever.
     expect(consistency(T({ frame: rect(51, 810, 300, 127), geometry: 'partly-centre-in', reached: true, probe: [ev('touch', '201,874')] }), 'ios', { width: 402, height: 875 })).toBeUndefined();
   });
-  it('a system band on Android swallows the probe (no touch, not reached); on iOS the touch is the app\'s', () => {
+  it('the status bar on Android swallows the probe (no touch, not reached); on iOS the touch is the app\'s, reached or not', () => {
     const band = T({ frame: rect(51, 10, 300, 64), geometry: 'status-band', reached: false, probe: [] });
     expect(consistency(band, 'android')).toBeUndefined();
     expect(consistency({ ...band, reached: true }, 'android')).toMatch(/through the system bar/);
     expect(consistency(band, 'ios')).toMatch(/left no touch/);
     expect(consistency({ ...band, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
+    expect(consistency({ ...band, reached: true, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
+  });
+  it('the navigation band on Android is unmeasured (gesture or three buttons): never probed; on iOS probed as the status band', () => {
+    const nav = T({ frame: rect(51, 820, 300, 64), geometry: 'nav-band', reached: false, probe: [] });
+    expect(consistency(nav, 'android')).toBeUndefined();
+    expect(consistency({ ...nav, probe: [ev('touch', '201,852')] }, 'android')).toBe('nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe');
+    expect(consistency(nav, 'ios')).toMatch(/left no touch/);
   });
   it('cut with its centre showing must be reached; with its centre out, or outside its clip, must not; a sliver either', () => {
     expect(consistency(T({ geometry: 'partly-centre-in', drawn: 0.6 }))).toBeUndefined();
@@ -266,6 +273,17 @@ describe('capture with a measured geometry', () => {
     expect(t.targets[2].probe).toEqual([]);
     expect(t.targets.map((x) => x.unprobed)).toEqual([undefined, 'its centre (20,40) lies off the 40x40 screen', 'its centre (20,60) lies off the 40x40 screen']);
     expect(t.targets[1].probe).toEqual([]);
+  });
+
+  it('on Android never taps a centre in the navigation band (unmeasured), only its piece above the band', async () => {
+    const lab = new GeometryLab({ safeArea: { top: 4, left: 0, bottom: 21, right: 0 } });
+    const cell = { ...CELL, targets: CELL.targets.slice(0, 1), config: undefined };
+    const { broken } = await capture(lab, [cell], { out, note: 't', catalog: [cell], log: () => undefined });
+    expect(broken).toEqual([]);
+    expect(lab.taps).toEqual([[20, 15]]);
+    const [a] = (await truthOf()).targets;
+    expect([a.geometry, a.reached, a.probe, a.piece, a.reachedAtPiece]).toEqual(['nav-band', false, [], rect(10, 10, 20, 9), true]);
+    expect(a.unprobed).toMatch(/^its centre lies in the navigation band: .* unmeasured$/);
   });
 
   it('a state reporting none of it captures as before: no geometry, no second probe', async () => {
