@@ -2,9 +2,10 @@
 
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33`, captured by scripts/truth/capture-android.ts on a dedicated
-`averi_lab` AVD, Pixel 3a profile, Android 13 / API 33, 1080x2220, Gboard hidden). averi = mobile-verify `truth/android`
-on `dda435b`'s `src/` (no `src/` change on the branch). The stroke's effect was then reproduced on the emulator with
-the same raw `adb shell input swipe` averi sent.
+`averi_lab` AVD, Pixel 3a profile, Android 13 / API 33, 1080x2220, Gboard hidden). averi = mobile-verify
+`truth/phase-0-1` on `arch/round-20`'s `src/` (`debc9b2`; no other `src/` change on the branch — first seen on
+`truth/android` with `dda435b`'s, unchanged since). The stroke's effect was then reproduced on the emulator with the
+same raw `adb shell input swipe` averi sent.
 
 ## Why the tree does not show the targets
 

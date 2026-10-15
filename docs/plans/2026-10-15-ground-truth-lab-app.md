@@ -111,8 +111,9 @@ that, so forms are a cell family of their own, with an oracle of their own — t
 | `form-picker` | a country field opening a sheet with a long list (the SWIFT form's country sheet) | `scroll_until` in a sheet, a row tap, the value back in the field |
 
 Text cells for P5's sample (typographic quotes, NBSP, diacritics) are fields and labels here too, so `fill` and the
-tree's text are judged on the same strings. `ocr` on them moved to phase 4, with OCR against real pixels. The golden spec gains rows per verb: the field's value after
-`fill` equals what was asked, an error the app shows is the one `assert … error:` reads, and so on.
+tree's text are judged on the same strings. `ocr` on them moved to phase 4, with OCR against real pixels. The golden
+spec gains rows per verb: the field's value after `fill` equals what was asked, an error the app shows is the one
+`assert … error:` reads, and so on.
 
 A replayed tree is static: typing changes nothing in it, so `fill` / `type_text` / `clear` cannot be judged by replay.
 The form cells therefore bring the **live** golden mode forward (phase 5's): averi runs on the lab simulator, and the
@@ -143,11 +144,12 @@ that does not fail shows a hole in the truth or the spec table.
 
 ### Phase 4 — the matrix, generated
 
-One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells
-for P5's sample. OCR judged against real pixels (the macOS recognizer on the captured screenshot; skipped where it
-is unavailable), phase 1b's text samples included. The covering layer per target (the proposal's P1, "the covering
-layer, if any") is recorded in the truth file here; until then the cell's `layer`, the declared kind and the probe's
-events (`dismissed`, another target's `tap`) stand for it (ADR 0020, residuals). The RN modal cases only if the existing RN trees do not cover them.
+One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells for
+P5's sample. OCR judged against real pixels (the macOS recognizer on the captured screenshot; skipped where it is
+unavailable), phase 1b's text samples included. The covering layer per target (the proposal's P1, "the covering layer,
+if any") is recorded in the truth file here; until then the cell's `layer`, the declared kind and the probe's events
+(`dismissed`, another target's `tap`) stand for it (ADR 0020, residuals). The RN modal cases only if the existing RN
+trees do not cover them.
 
 ### Phase 5 — live golden
 
