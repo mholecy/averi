@@ -409,6 +409,46 @@ describe('parseUiautomatorXml — bounds dumped inverted are a node clipped out 
   });
 });
 
+describe('parseUiautomatorXml — character references in attribute values', () => {
+  // uiautomator writes a newline, a tab and any code point outside the BMP (an emoji) as a numeric
+  // character reference; the tree holds the character, as the same string reads on iOS.
+  const xml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="app" content-desc="" bounds="[0,0][1080,2220]">
+    <node index="0" text="Welcome.&#10;&#10;Sign in to continue." resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,100][1080,300]"/>
+    <node index="1" text="" resource-id="app:id/account" class="android.widget.FrameLayout" package="app" content-desc="Signed in as Jane Doe&#10;Account and settings." clickable="true" bounds="[900,100][1040,200]"/>
+    <node index="2" text="Name&#9;Value" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,300][1080,350]"/>
+    <node index="3" text="&#x1F1FA;&#x1F1F8; +1" resource-id="" class="android.widget.TextView" package="app" content-desc="&#127482;&#127480;" bounds="[0,350][1080,400]"/>
+    <node index="4" text="&amp;#10; is how XML spells a newline" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,400][1080,450]"/>
+    <node index="5" text="Wallpaper &amp; style &lt;new&gt;" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,450][1080,500]"/>
+    <node index="6" text="" hint="Line one&#10;line two" resource-id="app:id/notes&#46;input" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,600]"/>
+  </node>
+</hierarchy>`;
+  const [welcome, account, tabbed, flag, literal, named, notes] = parseDump(xml).children;
+
+  it('a newline in text and in content-desc is the newline itself', () => {
+    expect(welcome.label).toBe('Welcome.\n\nSign in to continue.');
+    expect(account.label).toBe('Signed in as Jane Doe\nAccount and settings.');
+  });
+
+  it('a tab, a hex and a decimal reference to an emoji decode alike', () => {
+    expect(tabbed.label).toBe('Name\tValue');
+    expect(flag.label).toBe('\u{1F1FA}\u{1F1F8}');
+  });
+
+  it('every attribute: resource-id and hint too', () => {
+    expect(notes).toMatchObject({ identifier: 'notes.input', placeholder: 'Line one\nline two' });
+  });
+
+  it('text that really reads `&#10;` (dumped as `&amp;#10;`) stays those five characters — decoded once, not twice', () => {
+    expect(literal.label).toBe('&#10; is how XML spells a newline');
+  });
+
+  it('the XML named entities decode as before', () => {
+    expect(named.label).toBe('Wallpaper & style <new>');
+  });
+});
+
 describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
   // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: the
   // API 33 dump of an EMPTY EditText carries its hint as `text` and no `hint`
