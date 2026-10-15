@@ -187,7 +187,7 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
     (el.children ?? []).map((child) => toUiNode(child, marks, { hidden, cell, scroller })),
   );
   if (hidden) node.hidden = true;
-  const presentation = el.type === undefined ? undefined : PRESENTATIONS[el.type];
+  const presentation = el.type !== undefined && Object.hasOwn(PRESENTATIONS, el.type) ? PRESENTATIONS[el.type] : undefined;
   if (presentation !== undefined) node.presentation = presentation;
   // The band node is an `Other` (or, in the fallback, the `Keyboard` itself)
   // whose measured rect IS the covered band — the role changes, the rect,
