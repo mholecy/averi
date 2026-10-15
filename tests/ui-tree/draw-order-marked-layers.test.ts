@@ -188,6 +188,15 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     expect(order.markedAt(TOUCH_DOWN)).toBe(order.presentedAt(row, TOUCH_DOWN));
   });
 
+  it('a typed layer over a `screen` one, the touch-down on the typed layer\'s own scroll view: the stroke scrolls it — the sheet beneath, its list hidden under the popover, never takes the touch', () => {
+    const { layer: beneath } = list();
+    const { layer: sheetLayer, form } = sheet();
+    form.hidden = true;
+    const { layer } = popover();
+    layer.children[1].children.push(node({ role: 'scrollable', rect: rect(10, 166, 240, 81), children: [node({ role: 'button', label: 'Keep Editing', rect: rect(10, 166, 240, 44) })] }));
+    expect(drawOrder(judged(beneath, sheetLayer, layer)).markedAt({ x: 100, y: 175 })).toBeUndefined();
+  });
+
   it('a `screen` layer under a typed one: a stroke for no target lands on the typed element on top', () => {
     const { layer: beneath } = list();
     const { layer: sheetLayer } = sheet();
