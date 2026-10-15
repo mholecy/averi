@@ -262,6 +262,12 @@ export const SCREEN_SIZED_FRACTION = 0.9;
  */
 export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'screen';
 
+/** A kind a source TYPES by an element the layer holds (`UiNode.presentationElement`) — every kind but `screen`. */
+export type TypedPresentationKind = Exclude<PresentationKind, 'screen'>;
+
+/** `kind` is typed by an element (`TypedPresentationKind`), not a `screen` the source shows by its visibility flags. */
+export const isTyped = (kind: PresentationKind): kind is TypedPresentationKind => kind !== 'screen';
+
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
   role: string; // normalized: button, text, textfield, image, container, keyboard (KEYBOARD_ROLE), ...
@@ -475,14 +481,14 @@ export interface UiNode {
    * lies below its form's ScrollView, undrawn — the standing's drawn frame, not this flag, judges that).
    *
    * Its readers, all of them:
-   * - ui-tree/draw-order.ts's `hidden` row, in the `target` column only: such a node is no cover of a target unless,
-   *   on a tree whose source did not judge presented layers (`presentationsJudged`), it is the surface of a screen
-   *   presented over the target's by shape (ui-tree/presented-by-shape.ts#presentedSurface); on a judged tree a marked
-   *   layer covers through its own cover instead. Through that column it reaches every caller of `exposure`,
-   *   `paintsOver` and `coversOf`: the tap's aim (interact/tap-judgement.ts), `scroll_until`'s standing and the pixel
-   *   assert's covers (ui-tree/standing.ts), the in-tree dismissal picker (interact/keyboard-in-tree.ts, which still
-   *   sees an excused hidden node in `Exposure.centreExcused`), and the uiautomator parser's strip question (never
-   *   met: only WDA sets the mark).
+   * - ui-tree/draw-order.ts's `hidden` row, in the `target` column only: such a node is no cover of a target unless, on
+   *   a tree whose source did not judge presented layers (`presentationsJudged`), it is the surface of a screen
+   *   presented over the target's by shape (ui-tree/presented-by-shape.ts#PresentedByShape.presentedSurface); on a
+   *   judged tree a marked layer covers through its own cover instead. Through that column it reaches every caller of
+   *   `exposure`, `paintsOver` and `coversOf`: the tap's aim (interact/tap-judgement.ts), `scroll_until`'s standing and
+   *   the pixel assert's covers (ui-tree/standing.ts), the in-tree dismissal picker (interact/keyboard-in-tree.ts,
+   *   which still sees an excused hidden node in `Exposure.centreExcused`), and the uiautomator parser's strip question
+   *   (never met: only WDA sets the mark).
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees can be swept for it.
    * Nothing else: a TARGET's own flag is never read (a target under a modal is `isVisible="0"` too), and selectors,
    * asserts and the stroke box's `drawnOver` column are as before.
@@ -535,8 +541,8 @@ export interface UiNode {
    * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
    * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
    * (`presentation`), so draw order never asks its shape fallback of it (ui-tree/presented-by-shape.ts). Absent on a
-   * tree whose source says nothing of presentation (idb, Android, a flagless WDA payload, a snapshot printed before the
-   * mark existed): there draw order still infers a presented screen from shape, through that fallback. Read by
+   * tree whose source says nothing of presentation (idb, Android, a flagless WDA payload, a normalized
+   * snapshot without it): there draw order still infers a presented screen from shape, through that fallback. Read by
    * ui-tree/draw-order.ts#drawOrder, which builds the fallback only without it (so on a judged tree the `hidden` row's
    * shape guard holds of no node); printed by `ui_snapshot`.
    */

@@ -597,7 +597,7 @@ alert, and a non-modal sheet.
 
 ### New residuals and risks
 
-Residuals 12–16 below are this amendment's. Risks, none measured (the device probes above are for them):
+Residuals 12–17 below are this amendment's. Risks, none measured (the device probes above are for them):
 
 - **Mid-animation.** While a sheet presents, the screen beneath may still read `1`: no mark, nothing presented, a tap
   beneath is `Tapped`. While it dismisses, the beneath may still read `0` with the sheet sliding out: a false refusal
@@ -762,6 +762,11 @@ Residuals 12–16 below are this amendment's. Risks, none measured (the device p
 16. **A hidden node of a marked layer is never named** (2026-10-15): on a judged tree the `hidden` row still excuses
    every node WDA reports hidden, inside a marked `screen` layer too — the verdicts hold by the layer's cover, but a
    naming rule is needed before such a node may be named (ADR 0019's residual 6).
+17. **No target: a later, unmarked layer over a marked one does not take the touch** (2026-10-15, the final review).
+   With any marked layer on the screen, a touch-down is asked of the topmost marked layer alone (`markedAt`): only a
+   scroll view of that layer's own lets the stroke go. A scroll view of a LATER layer or Window the source did not
+   mark, drawn above the marked one, holds the point all the same and is not asked, so the stroke stops there
+   (toward refusal). No tree of the corpus lays one so.
 
 ## Bug notes
 

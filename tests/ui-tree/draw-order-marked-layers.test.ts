@@ -232,7 +232,7 @@ describe('a judged tree asks no shape: a later screen-sized layer the source did
     return { tree, row };
   };
 
-  it('unjudged (a source that says nothing of presentation, an old snapshot): the dim covers by its shape, a presented surface', () => {
+  it('unjudged (a tree without presentationsJudged: a source that says nothing of presentation): the dim covers by its shape, a presented surface', () => {
     const { tree, row } = modalShape({});
     expect(exposed(tree, row)).toMatchObject({ covers: ['container overlay 0,0 402x874'], presented: ['container overlay 0,0 402x874'], shows: 0 });
   });

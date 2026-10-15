@@ -15,7 +15,10 @@ export interface Placed {
   readonly at: number;
   /** The index just past its subtree in the walk's order. */
   end: number;
-  /** It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`) or its band (`KEYBOARD_ROLE`, the tree source's mark — inside the keyboard's Window on WDA). */
+  /**
+   * It or an ancestor is the keyboard's own UI (`UiNode.ofKeyboard`) or its band (`KEYBOARD_ROLE`, the tree source's
+   * mark — inside the keyboard's Window on WDA).
+   */
   readonly inKeyboard: boolean;
   /** Its nearest ancestor that scrolls (scroll-containers.ts#scrolls), if any. */
   readonly scroller: Placed | undefined;
@@ -23,13 +26,19 @@ export interface Placed {
   readonly parent: Placed | undefined;
 }
 
-/** A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none, the caller asks. */
+/**
+ * A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none,
+ * the caller asks.
+ */
 export const fillsScreen = (r: Rect, screenArea: number): boolean => rectArea(r) >= screenArea * SCREEN_SIZED_FRACTION;
 
 /** `inner` lies in `outer`'s subtree (or is it). */
 export const within = (inner: Placed, outer: Placed): boolean => inner.at >= outer.at && inner.at < outer.end;
 
-/** Some node from `from` up to, not including, `above` `fillsScreen`: a screen-sized layer around `from` below `above`. */
+/**
+ * Some node from `from` up to, not including, `above` `fillsScreen`: a screen-sized layer around `from` below
+ * `above`.
+ */
 const screenLayerBelow = (from: Placed | undefined, above: Placed, screenArea: number): boolean => {
   for (let p = from; p !== undefined && p !== above; p = p.parent) if (fillsScreen(p.node.rect, screenArea)) return true;
   return false;
@@ -44,13 +53,11 @@ export const holderOf = (later: Placed, target: Placed): Placed | undefined => {
 
 /**
  * `scroller` and `target` lie in two STACKED SCREENS (draw-order.ts's `scrolledContent` row; the shape fallback,
- * presented-by-shape.ts, asks it of any node, inside one window): below the
- * nearest node holding both, each lies in a screen-sized layer of its own —
- * the later one, the scroller's, drawn over the earlier
- * (an RN transparent Modal presented over the screen, a full-screen sheet)
- * — or that node is a root of no area, the parser's holder of several
- * WINDOWS, each drawn over the ones before it. `both`: the node holding
- * both (`holderOf`), when the caller has already found it.
+ * presented-by-shape.ts, asks it of any node, inside one window): below the nearest node holding both, each lies in a
+ * screen-sized layer of its own — the later one, the scroller's, drawn over the earlier (an RN transparent Modal
+ * presented over the screen, a full-screen sheet) — or that node is a root of no area, the parser's holder of several
+ * WINDOWS, each drawn over the ones before it. `both`: the node holding both (`holderOf`), when the caller has already
+ * found it.
  */
 export const stackedScreens = (scroller: Placed, target: Placed, screenArea: number, both = holderOf(scroller, target)): boolean => {
   if (both === undefined) return false;
@@ -59,10 +66,9 @@ export const stackedScreens = (scroller: Placed, target: Placed, screenArea: num
 };
 
 /**
- * The roles whose frame is not a surface: a node of one, non-interactive and
- * with children, covers a point only through its content (draw-order.ts's
- * `contentFramed` row). One role, deliberately — see the rejected ones there.
- * A draw rule, not a scroll predicate (scroll-containers.ts says why).
+ * The roles whose frame is not a surface: a node of one, non-interactive and with children, covers a point only
+ * through its content (draw-order.ts's `contentFramed` row). One role, deliberately — see the rejected ones there. A
+ * draw rule, not a scroll predicate (scroll-containers.ts says why).
  */
 export const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 

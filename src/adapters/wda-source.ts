@@ -1,6 +1,6 @@
 import { IOS_ROLE_MAP, iosRoleOf, normalizeIosElement } from './ios-node.js';
 import { attachFieldErrors } from './field-errors.js';
-import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type PresentationKind, type Rect, type UiNode } from './types.js';
+import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type PresentationKind, type Rect, type TypedPresentationKind, type UiNode } from './types.js';
 
 /**
  * Parser for WebDriverAgent's sessionless `GET /source?format=json` — the
@@ -69,7 +69,7 @@ const ROLE_MAP: Record<string, string> = {
  * its message. Roles stay what ROLE_MAP says (`container`); the mark says the rest. Measured: mp-native's SwiftUI exit
  * alert (`Alert`), Contacts' discard prompt (`Popover` → `Sheet "Are you sure…"`), iPhone 17, iOS 27.
  */
-const PRESENTATIONS: readonly (readonly [string, Exclude<PresentationKind, 'screen'>])[] = [
+const PRESENTATIONS: readonly (readonly [string, TypedPresentationKind])[] = [
   ['Alert', 'alert'],
   ['Sheet', 'actionSheet'],
   ['Popover', 'popover'],
@@ -121,8 +121,9 @@ export function parseWdaSource(json: string): UiNode {
 export function parseWdaSourceValue(value: unknown): UiNode {
   const root = unwrapEnvelope(value);
   const keyboard = keyboardMarks(root);
-  const tree = toUiNode(root, { ...keyboard, hiddenRoots: hiddenRoots(root), presented: presentedLayers(root, keyboard.roots) }, { hidden: false, cell: undefined, scroller: undefined });
-  if (carriesFlags(root)) tree.presentationsJudged = true;
+  const judged = carriesFlags(root);
+  const tree = toUiNode(root, { ...keyboard, hiddenRoots: hiddenRoots(root), presented: presentedLayers(root, keyboard.roots, judged) }, { hidden: false, cell: undefined, scroller: undefined });
+  if (judged) tree.presentationsJudged = true;
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
   return markUnclippedFrames(tree);
@@ -325,7 +326,10 @@ function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined
   return !rectsOverlap(own, at) && rectsOverlap(own, view) && !rectsOverlap(at, view) ? at : undefined;
 }
 
-/** WDA's "0" — a string in the JSON format, compared as `onScreen` compares `isVisible`; a missing or null flag is never "0". */
+/**
+ * WDA's "0" — a string in the JSON format, compared as `onScreen` (the module's, `isVisible` against "1") compares; a
+ * missing or null flag is never "0".
+ */
 const isZero = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '0';
 
 /**
@@ -364,10 +368,11 @@ const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement |
  * - BY TYPE (`PRESENTATIONS`): a layer holding an `Alert`, a `Sheet` or a `Popover` whose rect shares area with the
  *   Window is that kind, the element (the first of the first type in precedence) naming it; one parked off the
  *   screen (a dismissed alert WDA keeps) types nothing, and the flags judge its layer.
- * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them: one layer per Window at most.
+ * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them (`flags`, `carriesFlags`): one
+ *   layer per Window at most.
  * A layer typed is not also `screen` (one mark a layer).
  */
-function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>): PresentedLayers {
+function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>, flags: boolean): PresentedLayers {
   const layers = new Map<WdaElement, PresentationKind>();
   const elements = new Set<WdaElement>();
   const windows: WdaElement[] = [];
@@ -380,17 +385,18 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
     if (keyboardWindows.has(window)) continue;
     // An element types its layer only ON the screen: WDA keeps a dismissed alert in its tree, parked off it.
     const screen = usableRect(window.rect) ?? usableRect(root.rect);
-    const onScreen = (e: WdaElement): boolean => screen === undefined || (usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen));
+    // Its rect only, whatever its flags (a flagless payload types too) — unlike the module's `onScreen`.
+    const onWindow = (e: WdaElement): boolean => screen === undefined || (usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen));
     for (const layer of window.children ?? []) {
       for (const [type, kind] of PRESENTATIONS) {
-        const element = firstIn(layer, (e) => e.type === type && onScreen(e));
+        const element = firstIn(layer, (e) => e.type === type && onWindow(e));
         if (element === undefined) continue;
         layers.set(layer, kind);
         elements.add(element);
         break;
       }
     }
-    const shown = carriesFlags(root) ? presentedScreen(window) : undefined;
+    const shown = flags ? presentedScreen(window) : undefined;
     if (shown !== undefined && !layers.has(shown)) layers.set(shown, 'screen');
   }
   return { layers, elements };
@@ -416,7 +422,7 @@ function presentedScreen(window: WdaElement): WdaElement | undefined {
   const screen = usableRect(window.rect);
   if (screen === undefined) return undefined;
   const content = (e: WdaElement): boolean => !STRUCTURAL_ROLES.has(iosRoleOf(e.type, ROLE_MAP));
-  const shownContent = (e: WdaElement): boolean => content(e) && String(e.isVisible) === '1' && usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen);
+  const shownContent = (e: WdaElement): boolean => content(e) && onScreen(e, screen);
   let beneath = false;
   for (const layer of window.children ?? []) {
     const rect = usableRect(layer.rect);
