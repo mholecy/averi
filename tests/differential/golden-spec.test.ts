@@ -80,7 +80,7 @@ describe('a target beneath a presented layer', () => {
     expect(tap.judge(out('ERROR … a screen is presented over it (a modal or a sheet) — close it first; nothing was tapped'))).toBeUndefined();
     expect(tap.judge(out('ERROR … close it first', ['adb shell input tap 540 391']))).toMatch(/^refused, but sent adb shell input tap 540 391/);
     expect(tap.judge(out('Tapped id:"lab.alert-dim.A"'))).toMatch(/^Tapped/);
-    expect(tap.judge(out('ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.A" to appear'))).toMatch(/^not in the tree: refused without "close it first"/);
+    expect(tap.judge(out('ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.A" to appear'))).toMatch(/^refused without "close it first": ERROR Timed out/);
   });
 
   it('colour: a pass measured the cover; a fail because the element is not in the tree is no evidence', () => {
@@ -96,7 +96,7 @@ describe('a target beneath a presented layer', () => {
     const scroll = row(rows, 'scroll_until');
     expect(scroll.judge(out('ERROR scroll_until … stopped before any swipe … close it first'))).toBeUndefined();
     expect(scroll.judge(out('ERROR scroll_until … never appeared in the tree', ['adb shell input swipe 540 1776 540 444 1334', 'adb shell input swipe 540 1776 540 444 1334']))).toMatch(
-      /^not in the tree: swiped 2× beneath a presented layer/,
+      /^swiped 2× beneath a presented layer/,
     );
   });
 });
@@ -128,7 +128,7 @@ describe('a field under the keyboard', () => {
     const tap = row(rows, 'tap');
     expect(tap.judge(out('ERROR The soft keyboard covers id:"lab.form-keyboard.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) …'))).toBeUndefined();
     expect(tap.judge(out('ERROR Timed out after 5000ms waiting for element id:"lab.form-keyboard.vs" to appear'))).toBe(
-      'not in the tree: refused without naming the keyboard: ERROR Timed out after 5000ms waiting for element id:"lab.form-keyboard.vs" to appear',
+      'refused without naming the keyboard: ERROR Timed out after 5000ms waiting for element id:"lab.form-keyboard.vs" to appear',
     );
     expect(tap.judge(out('ERROR id:"lab.form-keyboard.vs" is under container "keyboard" …'))).toMatch(/^refused without naming the keyboard/);
     expect(tap.judge(out('Tapped id:"lab.form-keyboard.vs"', ['idb ui tap 201 621']))).toMatch(/^Tapped/);

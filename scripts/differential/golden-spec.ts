@@ -13,12 +13,14 @@ import { otherControlsFired } from '../truth/truth.js';
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
  * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
  *
- * A row is added with the cells that need it. Every row's judge goes through one classification (classed): wherever a
- * reply says the target is not in the tree (a tap timing out "waiting for element … to appear", scroll_until's "never
- * appeared in the tree", an assert's "not found within"), the reply is no evidence of what the truth implies — a judge
- * that would accept it (a refusal, a FAIL) is overruled, and the mismatch is of one class, said first — `not in the
- * tree:` — so the known list names one cause for all of them. Only a row whose truth says the target may be missing
- * from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply.
+ * A row is added with the cells that need it. Every row's judge goes through one classification (classed). A reply
+ * that says the target is not in the tree (a tap timing out "waiting for element … to appear", scroll_until's "never
+ * appeared in the tree", an assert's "not found within") is judged by its effect first: where the row's own judge
+ * rejects it (a tap refused without "close it first", a swipe beneath the presented layer, a touch-down under the
+ * keyboard), the mismatch is the judge's own reason, as for any other reply — so the ratchet sees what the reply DID.
+ * Only where the judge would accept it (a refusal, a FAIL) is the reply vacuous — no evidence of what the truth implies
+ * — and the judge overruled: a mismatch of one class, said first — `not in the tree:`. A row whose truth says the
+ * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply.
  *
  * The form cells (phase 1b) add rows a replayed tree CAN judge — see formExpectations. What it cannot judge (a fill, a
  * clear: typing changes nothing in a recorded tree) is the live golden's (scripts/truth/live.ts).
@@ -33,7 +35,10 @@ export interface Expectation {
   call: Call;
   /** undefined: the outcome is what the truth implies; else why it is not. Already classed (see classed). */
   judge(outcome: Outcome): string | undefined;
-  /** Why the truth allows the target to be missing from the tree; unset, a "not in the tree" reply is a mismatch. */
+  /**
+   * Why the truth allows the target to be missing from the tree; unset, a "not in the tree" reply the judge accepts is
+   * a mismatch (vacuous).
+   */
   absent?: string;
 }
 
@@ -63,9 +68,9 @@ export const notInTree = (o: Outcome) => /waiting for element .* to appear|never
 const said = (o: Outcome, what: string) => `${what}: ${first(o)}`;
 const NOT_IN_TREE = 'not in the tree: ';
 /**
- * The one classification every row's judge goes through: a reply that says the target is not in the tree is a
- * mismatch of that class, said first — even where the row's own judge would accept it (a refusal, an expected FAIL:
- * no evidence either way) — unless the row's truth allows the target to be absent.
+ * The one classification every row's judge goes through: the row's judge first — a reply it rejects is a mismatch of
+ * the judge's own reason, whatever else it says; a reply it accepts that says the target is not in the tree is vacuous,
+ * a mismatch of that class, said first — unless the row's truth allows the target to be absent.
  */
 export function classed<E extends Expectation>(e: E): E {
   const judge = e.judge;
@@ -73,12 +78,12 @@ export function classed<E extends Expectation>(e: E): E {
     ...e,
     judge: (o: Outcome) => {
       const why = judge(o);
-      if (!notInTree(o)) return why;
-      if (why === undefined) return e.absent === undefined ? `${NOT_IN_TREE}${first(o)}` : undefined;
-      return `${NOT_IN_TREE}${why}`;
+      return why !== undefined || e.absent !== undefined || !notInTree(o) ? why : `${NOT_IN_TREE}${first(o)}`;
     },
   };
 }
+/** The taps and swipes the device was sent — what a reply DID, recorded on every golden check. */
+export const sent = (o: Outcome) => o.device.filter((c) => /^(idb ui|adb shell input) (tap|swipe) /.test(c));
 /** A tap that must not land: not `Tapped`, and no tap sent. */
 export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 const closeFirst = (o: Outcome) => /close it first/.test(o.reply);

@@ -4,8 +4,9 @@ import { expectations, formExpectations, type Expectation, type FormExpectation 
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
 // Every judge of the golden spec (scripts/differential/golden-spec.ts), each on replies it must accept and replies it
-// must reject — including the "not in the tree" replies, which only a row whose truth allows the target to be absent
-// may accept. The ratchet (golden.test.ts) guards only the judges that mismatch today; this table pins the rest, so a
+// must reject — including the "not in the tree" replies: judged by their effect where the row's judge rejects them
+// (its own reason), vacuous (`not in the tree:`) where it would accept them, and accepted only by a row whose truth
+// allows the target to be absent. The ratchet (golden.test.ts) guards only the judges that mismatch today; this table pins the rest, so a
 // judge gone vacuous (`() => undefined`) fails here.
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
@@ -49,15 +50,15 @@ const pick = <E extends Expectation>(rows: readonly E[], verb: string, tag?: str
 describe('a coloured target, open', () => {
   const rows = expectations('ios', target({}));
   it.each<[string, readonly Case[]]>([
-    ['tap', [['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'], ['ERROR id:"lab.x" is under …; nothing was tapped', [], /^not tapped/], [TIMED_OUT, [], NOT_IN_TREE]]],
-    ['colour', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], NOT_IN_TREE]]],
+    ['tap', [['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'], ['ERROR id:"lab.x" is under …; nothing was tapped', [], /^not tapped/], [TIMED_OUT, [], /^not tapped: ERROR Timed out/]]],
+    ['colour', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
     [
       'scroll_until',
       [
         ['Element id:"lab.x" fully visible after 0 swipes', [], 'ok'],
         ['Element id:"lab.x" fully visible after 1 swipe', [IDB_SWIPE(459)], /^swiped 1×/],
         ['ERROR scroll_until … stopped before any swipe', [], /^stopped/],
-        [NEVER, [IDB_SWIPE(459)], NOT_IN_TREE],
+        [NEVER, [IDB_SWIPE(459)], /^stopped: .*never appeared in the tree/],
       ],
     ],
   ])('%s', (verb, cases) => check(pick(rows, verb).judge, cases));
@@ -73,7 +74,9 @@ describe('a coloured target beneath a presented layer', () => {
         ['ERROR … close it first', ['idb ui tap 201 142'], /^refused, but sent idb ui tap/],
         ['Tapped id:"lab.x"', [], /^Tapped/],
         ['ERROR id:"lab.x" is under container … scroll_until it first', [], /^refused without "close it first"/],
-        [TIMED_OUT, [], NOT_IN_TREE],
+        [TIMED_OUT, [], /^refused without "close it first": ERROR Timed out/],
+        [TIMED_OUT, ['idb ui tap 201 142'], /^refused, but sent idb ui tap/],
+        [`${TIMED_OUT} — close it first; nothing was tapped`, [], NOT_IN_TREE],
       ],
     ],
     ['colour', [[FAIL.replace('expected … got …', 'container … is drawn over the element … close it first'), [], 'ok'], [PASS, [], /^passed on #B72E2A/], [NOT_FOUND, [], NOT_IN_TREE]]],
@@ -83,7 +86,7 @@ describe('a coloured target beneath a presented layer', () => {
         ['ERROR scroll_until … stopped before any swipe … close it first', [], 'ok'],
         ['ERROR scroll_until … stopped before any swipe', [], /^no "close it first"/],
         ['Element id:"lab.x" fully visible after 0 swipes', [], /^no "close it first"/],
-        [NEVER, [IDB_SWIPE(459)], /^not in the tree: swiped 1× beneath a presented layer/],
+        [NEVER, [IDB_SWIPE(459)], /^swiped 1× beneath a presented layer/],
         ['ERROR scroll_until id:"lab.x" never appeared in the tree — close it first', [], NOT_IN_TREE],
       ],
     ],
@@ -134,6 +137,7 @@ const form: CellTruth = {
       control('vs', { frame: rect(20, 604, 362, 34), situation: 'under-keyboard', reached: false }),
       control('country', { situation: 'presented-over', reached: false }),
       control('row.ST', { kind: 'row', frame: undefined, situation: 'not-rendered', reached: false, probe: [] }),
+      control('row.AL', { kind: 'row', frame: rect(20, 900, 362, 44), situation: 'off-screen', reached: false, probe: [] }),
       control('phone', { frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [{ kind: 'touch', tag: '201.0,547.0' }, { kind: 'submit', tag: 'invalid' }] }),
     ],
     keyboard: { frame: rect(0, 573, 402, 301), field: 'name' },
@@ -165,19 +169,21 @@ describe('the form rows', () => {
       'country scroll_until',
       'row.ST tap',
       'row.ST scroll_until',
+      'row.AL tap',
+      'row.AL scroll_until',
       'phone tap',
       'phone scroll_until',
     ]);
   });
 
   it.each<[string, string, readonly Case[]]>([
-    ['a paired field error passes', 'name error', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], NOT_IN_TREE]]],
+    ['a paired field error passes', 'name error', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
     ['an error named neither way fails', 'iban error', [[FAIL, [], 'ok'], [PASS, [], /^passed/], [NOT_FOUND, [], NOT_IN_TREE]]],
     ['a screen-level error pairs with no field', 'screenError error', [[FAIL, [], 'ok'], [PASS, [], /^passed/], [NOT_FOUND, [], NOT_IN_TREE]]],
-    ['a title reads as drawn', 'name.title text', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], NOT_IN_TREE]]],
-    ["a value reads as the model's", 'name text', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], NOT_IN_TREE]]],
+    ['a title reads as drawn', 'name.title text', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
+    ["a value reads as the model's", 'name text', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
     ['a secure value never reads back', 'pin text', [[FAIL, [], 'ok'], [PASS, [], /^passed: the secure field/], [NOT_FOUND, [], NOT_IN_TREE]]],
-    ['an open control is tapped', 'name tap', [['Tapped id:"lab.f.name"', ['idb ui tap 201 177'], 'ok'], ['ERROR … nothing was tapped', [], /^not tapped/], [TIMED_OUT, [], NOT_IN_TREE]]],
+    ['an open control is tapped', 'name tap', [['Tapped id:"lab.f.name"', ['idb ui tap 201 177'], 'ok'], ['ERROR … nothing was tapped', [], /^not tapped/], [TIMED_OUT, [], /^not tapped: ERROR Timed out/]]],
     [
       'the pinned submit is reached with no swipe',
       'submit scroll_until',
@@ -185,7 +191,7 @@ describe('the form rows', () => {
         ['Element id:"lab.f.submit" fully visible after 0 swipes', [], 'ok'],
         ['Element … after 1 swipe', [IDB_SWIPE(459)], /^swiped 1×/],
         ['ERROR scroll_until … under the soft keyboard', [], /^stopped/],
-        [NEVER, [], NOT_IN_TREE],
+        [NEVER, [], /^stopped: .*never appeared in the tree/],
       ],
     ],
     [
@@ -196,7 +202,7 @@ describe('the form rows', () => {
         ['ERROR The soft keyboard covers id:"lab.f.vs"', ['idb ui tap 201 621'], /^refused, but sent/],
         ['Tapped id:"lab.f.vs"', [], /^Tapped/],
         ['ERROR id:"lab.f.vs" is under container …', [], /^refused without naming the keyboard/],
-        [TIMED_OUT, [], NOT_IN_TREE],
+        [TIMED_OUT, [], /^refused without naming the keyboard: ERROR Timed out/],
       ],
     ],
     [
@@ -208,6 +214,7 @@ describe('the form rows', () => {
         ['Element id:"lab.f.vs" fully visible after 0 swipes', [], /^reached with no swipe, under the keyboard/],
         ['Element id:"lab.f.vs" fully visible after 1 swipe', [IDB_SWIPE(700)], /^touched down under the keyboard at \(201,700\)/],
         [NEVER, [IDB_SWIPE(459)], NOT_IN_TREE],
+        [NEVER, [IDB_SWIPE(700)], /^touched down under the keyboard at \(201,700\)/],
       ],
     ],
     [
@@ -217,7 +224,7 @@ describe('the form rows', () => {
         ['ERROR … a screen is presented over it — close it first; nothing was tapped', [], 'ok'],
         ['Tapped id:"lab.f.country"', [], /^Tapped/],
         ['ERROR … under button "Albania"', [], /^refused without "close it first"/],
-        [TIMED_OUT, [], NOT_IN_TREE],
+        [TIMED_OUT, [], /^refused without "close it first": ERROR Timed out/],
       ],
     ],
     [
@@ -227,7 +234,9 @@ describe('the form rows', () => {
         ['ERROR scroll_until … stopped before any swipe … close it first', [], 'ok'],
         ['ERROR … close it first', [IDB_SWIPE(459)], /^swiped 1× beneath the sheet/],
         ['Element … fully visible after 0 swipes', [], /^no "close it first"/],
-        [NEVER, [], NOT_IN_TREE],
+        [NEVER, [], /^no "close it first": .*never appeared in the tree/],
+        [NEVER, [IDB_SWIPE(459), IDB_SWIPE(459)], /^swiped 2× beneath the sheet/],
+        ['ERROR scroll_until id:"lab.x" never appeared in the tree — close it first', [], NOT_IN_TREE],
       ],
     ],
     [
@@ -241,8 +250,17 @@ describe('the form rows', () => {
       [
         [NEVER, [IDB_SWIPE(459), IDB_SWIPE(459)], 'ok'],
         ['Element id:"lab.f.row.ST" fully visible after 1 swipe', [IDB_SWIPE(459)], 'ok'],
-        [NEVER, [], /^not in the tree: no swipe/],
+        [NEVER, [], /^no swipe: /],
         ['Element … after 1 swipe', [IDB_SWIPE(200)], /^touched down off the sheet at \(201,200\)/],
+      ],
+    ],
+    ['a row off the screen: no tap sent — absent from the tree is allowed', 'row.AL tap', [[TIMED_OUT, [], 'ok'], ['Tapped id:"lab.f.row.AL"', [], /^Tapped/]]],
+    [
+      'a row off the screen: scroll_until swipes for it on the sheet — absent from the tree is allowed',
+      'row.AL scroll_until',
+      [
+        [NEVER, [IDB_SWIPE(459)], 'ok'],
+        [NEVER, [], /^no swipe: /],
       ],
     ],
     [

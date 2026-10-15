@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
 import type { Recording } from './corpus.js';
 import { configFor, connect } from './differential.js';
-import { expectations, formExpectations, type Verb } from './golden-spec.js';
+import { expectations, formExpectations, sent, type Verb } from './golden-spec.js';
 import type { Side } from './side.js';
 import { pct, type CellTruth } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
@@ -30,6 +30,8 @@ export interface GoldenCheck {
   /** undefined: as the truth implies. */
   mismatch?: string;
   reply: string;
+  /** The taps and swipes the device was sent (golden-spec.ts#sent): the ratchet pins them for a known mismatch. */
+  calls: string[];
 }
 
 export interface GoldenResult {
@@ -64,7 +66,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       for (const e of expectations(recording.platform, t)) {
         const outcome = await c.call(e.call, config);
         const mismatch = e.judge(outcome);
-        result.checks.push({ recording: recording.id, target: t.tag, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply });
+        result.checks.push({ recording: recording.id, target: t.tag, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, calls: sent(outcome) });
       }
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
@@ -77,7 +79,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       for (const e of formExpectations(recording.platform, truth)) {
         const outcome = await c.call(e.call, config);
         const mismatch = e.judge(outcome);
-        result.checks.push({ recording: recording.id, target: e.target, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply });
+        result.checks.push({ recording: recording.id, target: e.target, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, calls: sent(outcome) });
       }
     }
   } finally {
