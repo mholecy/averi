@@ -111,6 +111,8 @@ export function parseWdaSourceValue(value: unknown): UiNode {
   const tree = toUiNode(root, { ...keyboardMarks(root), hiddenRoots: hiddenRoots(root) }, { hidden: false, cell: undefined, scroller: undefined });
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
+  // The source's dialect (UiNode.unclippedFrames): every frame as laid out, a scroll view's content past its frame too.
+  tree.unclippedFrames = true;
   return tree;
 }
 

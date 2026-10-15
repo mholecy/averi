@@ -708,8 +708,9 @@ export interface Clips {
   inScroller(node: UiNode): boolean | undefined;
   /**
    * Where the node can be DRAWN as far as what scrolls above it says (`Drawn`): the frames of every ancestor that
-   * scroll-containers.ts#scrolls, intersected — on a tree of UNCLIPPED frames only, one that lists ancestry and marks
-   * no node `clipsDescendants` (WDA's). There a scroll view's content keeps its laid-out rect wherever it lies, and the
+   * scroll-containers.ts#scrolls, intersected — on a tree of UNCLIPPED frames only, as its source says
+   * (adapters/types.ts#UiNode.unclippedFrames, WDA's; `clipsOf`'s `unclipped`). An ancestor of no area cuts nothing
+   * (it fails open, as a root of no area does). There a scroll view's content keeps its laid-out rect wherever it lies, and the
    * scroll view draws none of it outside its own frame (UIKit's `UIScrollView` clips to its bounds, so do a table, a
    * collection view and SwiftUI's `ScrollView`). Measured: the at-rest SWIFT form lists `payee_name_input` at
    * `24,801 354x52`, below its `ScrollView 0,0 402x780`; the capture shows the bare background from CONTINUE's bottom
@@ -742,9 +743,11 @@ export interface Drawn {
  * clipping chain (shared along a branch), for nodes under a clip only;
  * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
  * tree's nesting is its nodes' ancestry — draw-order.ts#listsAncestry says,
- * the one reader of the tree's dialect.
+ * the one reader of the tree's dialect; `unclipped`: whether its source
+ * reports frames unclipped (draw-order.ts#listsUnclippedFrames), which
+ * `drawnIn` asks.
  */
-export function clipsOf(tree: UiNode, { ancestry }: { readonly ancestry: boolean }): Clips {
+export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
   const parents = new Map<UiNode, UiNode>();
   const walk = (n: UiNode, chain: readonly Rect[]): void => {
@@ -802,10 +805,11 @@ export function clipsOf(tree: UiNode, { ancestry }: { readonly ancestry: boolean
   const drawnIn = (node: UiNode): Drawn | undefined => {
     if (drawn === undefined) {
       const found = new Map<UiNode, Drawn>();
-      if (ancestry && ![...everyNode(tree)].some(clips)) {
+      if (ancestry && unclipped) {
         const mark = (n: UiNode, within: Drawn | undefined): void => {
           if (within !== undefined) found.set(n, within);
-          const below = !scrolls(n)
+          // An ancestor of no area cuts nothing: it fails open, as a root of no area does.
+          const below = !scrolls(n) || rectArea(n.rect) === 0
             ? within
             : within === undefined
               ? { frame: { ...n.rect }, scrollers: [n] }

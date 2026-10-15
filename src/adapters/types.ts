@@ -446,6 +446,18 @@ export interface UiNode {
    */
   paddedTouchTargets?: true;
   /**
+   * Set on the ROOT of a tree whose source reports every frame UNCLIPPED: WDA's (adapters/wda-source.ts
+   * #parseWdaSourceValue). It lists a scroll view's content at its laid-out rect even past the scroll view's frame,
+   * where the scroll view draws none of it (UIKit's `UIScrollView` clips to its bounds; so do a table, a collection
+   * view and SwiftUI's `ScrollView`) — measured: the at-rest SWIFT form lists `payee_name_input` at `24,801 354x52`,
+   * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read by
+   * ui-tree/draw-order.ts#listsUnclippedFrames, so geometry.ts#Clips.drawnIn cuts a node's frame by what scrolls
+   * above it. A mark of the source, like `flatList`: ui-tree knows no platform. Absent on Android's trees
+   * (uiautomator cuts every node's bounds to its ancestors' visible rects: nothing is left to cut) and on idb's flat
+   * list (no scroll view listed).
+   */
+  unclippedFrames?: true;
+  /**
    * Set on every node of a HIDDEN SUBTREE of a WDA tree (adapters/wda-source.ts#hiddenRoots): a node of no structural
    * role (`STRUCTURAL_ROLES`: not WDA's `Other`, `Cell`, `Window`, … — a control, an image, a text, a scroll view, a
    * toolbar) that WDA reports `isVisible="0"` AND `isAccessible="0"`, whose every descendant is `isVisible="0"`, roots

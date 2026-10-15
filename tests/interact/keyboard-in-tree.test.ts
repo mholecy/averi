@@ -51,6 +51,7 @@ function swiftFormFake(toolbar: boolean): FakeAdapter {
     {
       form: node({
         role: 'application',
+        unclippedFrames: true,
         rect: full,
         children: [
           node({
@@ -593,7 +594,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 
       it('a title listed in a scroll view but outside its frame — nothing of it drawn there — is skipped naming that scroll view, as the tap refuses it', async () => {
         const list = node({ role: 'scrollable', identifier: 'list', rect: { x: 0, y: 100, width: 402, height: 150 }, children: [loginTitle()] }); // centre (201,303), below the list's 250
-        expect(await pickOn(screenOf(list), 'login_title')).toBe('outside its scroll view scrollable id:list (0,100 402x150) at (201,303)');
+        expect(await pickOn({ ...screenOf(list), unclippedFrames: true }, 'login_title')).toBe('outside its scroll view scrollable id:list (0,100 402x150) at (201,303)');
       });
 
       it('a later sibling drawn on the title (narrower, inside it) is its own content — measured: the RN screen\'s text "Scaffold is running." 138,479 126x18 on `placeholder_screen` 0,116 402x758 (WDA lists a view\'s texts as its siblings): picked', async () => {

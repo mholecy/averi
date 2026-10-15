@@ -715,6 +715,8 @@ describe('clipsOf(tree).inScroller — some ancestor scrolls (scroll-containers.
 });
 
 describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every ancestor that scrolls, on a tree of unclipped frames', () => {
+  /** A nested tree whose source reports its frames unclipped (WDA's, draw-order.ts#listsUnclippedFrames). */
+  const UNCLIPPED = { ancestry: true, unclipped: true } as const;
   const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const SCREEN_RECT = r(0, 0, 402, 874);
   /** The at-rest SWIFT form's shape: a ScrollView ending at 780 above the pinned CONTINUE, a payee row listed below it. */
@@ -728,7 +730,7 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
 
   it("a row listed below its scroll view: drawn only in the scroll view's frame, the scroll view named", () => {
     const { tree, scroll, row, field } = form();
-    const clips = clipsOf(tree, NESTED);
+    const clips = clipsOf(tree, UNCLIPPED);
     expect(clips.drawnIn(row)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll] });
     expect(clips.drawnIn(field)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll] });
   });
@@ -737,27 +739,35 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
     const card = fakeNode({ role: 'button', rect: r(378, 138, 354, 120) });
     const carousel = fakeNode({ role: 'scrollable', rect: r(0, 100, 402, 200), children: [card] });
     const page = fakeNode({ role: 'scrollable', rect: r(0, 116, 402, 664), children: [carousel] });
-    const clips = clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [page] }), NESTED);
+    const clips = clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [page] }), UNCLIPPED);
     expect(clips.drawnIn(card)).toEqual({ frame: r(0, 116, 402, 184), scrollers: [carousel, page] });
     const below = fakeNode({ role: 'button', rect: r(0, 900, 402, 50) });
     const lower = fakeNode({ role: 'scrollable', rect: r(0, 880, 402, 200), children: [below] });
     const list = fakeNode({ role: 'scrollable', rect: r(0, 0, 402, 780), children: [lower] });
-    expect(clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [list] }), NESTED).drawnIn(below)).toEqual({ frame: undefined, scrollers: [lower, list] });
+    expect(clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [list] }), UNCLIPPED).drawnIn(below)).toEqual({ frame: undefined, scrollers: [lower, list] });
   });
 
   it('undefined for a node under nothing that scrolls, the scroller itself, a node of another tree', () => {
     const { tree, scroll } = form();
-    const clips = clipsOf(tree, NESTED);
+    const clips = clipsOf(tree, UNCLIPPED);
     expect(clips.drawnIn(tree.children[1])).toBeUndefined();
     expect(clips.drawnIn(scroll)).toBeUndefined();
     expect(clips.drawnIn(fakeNode({}))).toBeUndefined();
   });
 
-  it("undefined on a tree whose source cut its rects already (Android's, any node clipsDescendants) and on a flat list (idb's)", () => {
+  it('undefined unless the source reports its frames unclipped: a nested tree not so marked (Android\'s, whatever it flags — a list with scrollable="false", a web view) and a flat list (idb\'s)', () => {
     const { tree, row } = form();
-    const android = { ...tree, children: [...tree.children, { ...fakeNode({ role: 'container', rect: r(0, 0, 402, 10) }), clipsDescendants: true as const }] };
-    expect(clipsOf(android, NESTED).drawnIn(row)).toBeUndefined();
-    expect(clipsOf(tree, { ancestry: false }).drawnIn(row)).toBeUndefined();
+    expect(clipsOf(tree, NESTED).drawnIn(row)).toBeUndefined();
+    expect(clipsOf(tree, { ancestry: false, unclipped: true }).drawnIn(row)).toBeUndefined();
+  });
+
+  it('an ancestor of no area cuts nothing — it fails open, as a root of no area does: a ScrollView WDA reports 0,0 0x0', () => {
+    const { tree, scroll, row } = form();
+    const zero = fakeNode({ role: 'scrollable', rect: r(0, 0, 0, 0), children: [row] });
+    scroll.children = [zero];
+    expect(clipsOf(tree, UNCLIPPED).drawnIn(row)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll] });
+    const alone = fakeNode({ role: 'container', rect: SCREEN_RECT, children: [fakeNode({ role: 'scrollable', rect: r(0, 0, 0, 0), children: [row] })] });
+    expect(clipsOf(alone, UNCLIPPED).drawnIn(row)).toBeUndefined();
   });
 });
 

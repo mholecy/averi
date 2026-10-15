@@ -259,6 +259,7 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
   const atRest = (...rows: UiNode[]): UiNode =>
     node({
       role: 'container',
+      unclippedFrames: true,
       rect: { x: 0, y: 0, width: 402, height: 874 },
       children: [
         node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: rows }),

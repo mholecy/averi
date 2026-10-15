@@ -18,7 +18,10 @@ import type { Recording } from './corpus.js';
  *    WdaServer.source()'s `res.json()`. WDA has no narrower seam to replay
  *    at: below WdaTreeSource is WdaServer's process lifecycle.
  *  - a NORMALIZED capture of either kind (a `ui_snapshot` tree): served as
- *    it is; the parser is not exercised.
+ *    it is; the parser is not exercised — but a WDA tree's root is given the
+ *    mark the WDA parser sets on every tree now (UiNode.unclippedFrames,
+ *    which a `ui_snapshot` saved before it lacks), so the sweep judges it as
+ *    the live source's tree; an OLD side ignores a field it does not know.
  * A RAW idb capture does not: idb's source has a narrower seam already — its
  * `exec` — so it is replayed by the side's own IdbTreeSource over the fake
  * device (fake-device.ts answers `ui describe-all`), empty-tree error and
@@ -48,7 +51,8 @@ export class RecordedTreeSource implements IosTreeSource {
   async read(): Promise<UiNode> {
     this.onRead(`${this.kind} tree read (${this.recording.form})`);
     const value: unknown = JSON.parse(this.recording.payload);
-    return this.recording.form === 'raw' ? this.parseWdaSourceValue(value) : (value as UiNode);
+    if (this.recording.form === 'raw') return this.parseWdaSourceValue(value);
+    return this.kind === 'wda' ? { ...(value as UiNode), unclippedFrames: true } : (value as UiNode);
   }
 
   /** As WdaTreeSource answers (declined, no read); a normalized tree keeps no element types to answer from. */

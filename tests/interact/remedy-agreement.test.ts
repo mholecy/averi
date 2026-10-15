@@ -487,7 +487,8 @@ describe('a target outside what its scroll view draws — the tap, the pixel ass
     const name = node({ role: 'textfield', identifier: 't', rect: { x: 24, y: 801, width: 354, height: 52 } });
     const street = node({ role: 'textfield', identifier: 'street', rect: { x: 24, y: 869, width: 354, height: 52 } });
     const form = node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 300, width: 354, height: 52 } }), name, street, ...more] });
-    const tree = beneathDim(BOX, [form, node({ role: 'button', label: 'Continue to summary', rect: { x: 24, y: 780, width: 354, height: 44 } })], dimmed);
+    // A WDA screen: its source's mark, every frame unclipped (UiNode.unclippedFrames).
+    const tree: UiNode = { ...beneathDim(BOX, [form, node({ role: 'button', label: 'Continue to summary', rect: { x: 24, y: 780, width: 354, height: 44 } })], dimmed), unclippedFrames: true };
     return { tree, name, street };
   };
   const OUTSIDE = 'nothing of the element is drawn: it lies outside its scroll view scrollable id:form (0,0 402x780)';

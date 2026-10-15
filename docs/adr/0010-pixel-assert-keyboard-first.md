@@ -48,8 +48,12 @@ the capture shows there (`sampled #DEE0E6 … clipped 90% off-png`), and a tap o
 was reported done at (201,827), 3 pt below CONTINUE.
 
 - **The drawn frame** (`ui-tree/geometry.ts#Clips.drawnIn`): the intersection of the frames of every ancestor that
-  scrolls, on a tree that lists ancestry and marks no node `clipsDescendants`. Android's rects are already cut to their
-  ancestors, and idb lists no scroll view, so neither has one: both are unchanged by construction.
+  scrolls (an ancestor of no area cuts nothing: it fails open), on a tree whose SOURCE says its frames are unclipped:
+  the WDA parser marks its root (`UiNode.unclippedFrames`), as idb's marks `flatList` and uiautomator's
+  `paddedTouchTargets`, and `draw-order.ts#listsUnclippedFrames` reads it. Android's rects are already cut to their
+  ancestors and carry no mark — whatever they flag: a web view or a `scrollable="false"` list with no scroller flagged
+  is unchanged — and idb lists no scroll view: both are unchanged by construction. A normalized WDA tree saved before
+  the mark (the differential corpus's `ui_snapshot` trees) is given it when the harness serves it.
 - **Outside its scroll view** comes after off the screen: an element nothing of which lies on the screen is off the
   screen, whatever its scroll view. An element on the screen nothing of which is drawn there is `offScreen` with its
   scroll view named (`OUTSIDE_ITS_SCROLL_VIEW`), with the off-screen remedies (a scroll; beneath a presented screen,

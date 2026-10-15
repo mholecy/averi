@@ -1,5 +1,5 @@
 import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder, listsAncestry, type DrawOrder, type Exposure } from './draw-order.js';
+import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure } from './draw-order.js';
 import {
   aboveNavigationBand,
   belowStatusBand,
@@ -265,7 +265,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
 export interface Scene {
   /** The tree's draw order (draw-order.ts#drawOrder). */
   readonly order: DrawOrder;
-  /** The tree's clip facts (geometry.ts#clipsOf), their ancestry as draw order reads it (draw-order.ts#listsAncestry). */
+  /** The tree's clip facts (geometry.ts#clipsOf), its dialect as draw order reads it (draw-order.ts#listsAncestry, #listsUnclippedFrames). */
   readonly clips: Clips;
   /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
@@ -533,7 +533,7 @@ export function sceneOf(tree: UiNode): Scene {
       return (order ??= drawOrder(tree));
     },
     get clips() {
-      return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree) }));
+      return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree) }));
     },
     standing,
   };

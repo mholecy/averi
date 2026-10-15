@@ -2161,6 +2161,7 @@ describe('round — the far edge at the edge of what the target\'s scroll view d
     const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y, width: 354, height: 60 } });
     const tree = node({
       role: 'container',
+      unclippedFrames: true,
       rect: { x: 0, y: 0, width: 402, height: 874 },
       children: [node({ role: 'scrollable', rect: { x: 0, y: 116, width: 402, height: 664 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 400, width: 354, height: 52 } }), row] }), node({ role: 'other', label: 'Header', rect: { x: 0, y: 0, width: 402, height: 116 } })],
     });
@@ -2183,6 +2184,7 @@ describe('round — a target the strokes never bring into what its scroll view d
     const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: { x: 24, y: 801, width: 354, height: 52 } });
     const tree = node({
       role: 'container',
+      unclippedFrames: true,
       rect: { x: 0, y: 0, width: 402, height: 874 },
       children: [node({ role: 'scrollable', identifier: 'form', rect: { x: 0, y: 0, width: 402, height: 780 }, children: [node({ role: 'button', identifier: 'top', rect: { x: 24, y: 300, width: 354, height: 52 } }), name] })],
     });

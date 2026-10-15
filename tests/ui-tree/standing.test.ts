@@ -9,6 +9,7 @@ import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
+import { tapPoint } from '../../src/ui-tree/selectors.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
 const box = (width: number, height: number) => ({ x: 0, y: 0, width, height });
@@ -1233,6 +1234,8 @@ describe('Scene.standing for the pixel assert — off the screen', () => {
 
 describe('Scene.standing — the drawn frame: what of a node its scroll views draw, on a tree of unclipped frames (WDA\'s)', () => {
   const r = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
+  /** A WDA screen's root over `children`: its source's mark, every frame unclipped (UiNode.unclippedFrames). */
+  const wdaRoot = (children: UiNode[]): UiNode => ({ ...node({ role: 'container', rect: box(402, 874), children }), unclippedFrames: true });
   /**
    * The at-rest SWIFT form's shape under WDA, synthetic: the form's ScrollView `0,0 402x780` above the pinned CONTINUE
    * `24,780 354x44`; `payee_name_input`'s row `24,801 354x52` and the street field `24,869 354x52` listed below the
@@ -1242,7 +1245,7 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: r(24, 801, 354, 52) });
     const street = node({ role: 'textfield', identifier: 'payee_street_input', rect: r(24, 869, 354, 52) });
     const form = node({ role: 'scrollable', identifier: 'form', rect: r(0, 0, 402, 780), children: [node({ role: 'other', rect: r(24, 801, 354, 52), children: [name] }), street, ...extra] });
-    const tree = node({ role: 'container', rect: box(402, 874), children: [form, node({ role: 'button', identifier: 'continue', label: 'Continue to summary', rect: r(24, 780, 354, 44) })] });
+    const tree = wdaRoot([form, node({ role: 'button', identifier: 'continue', label: 'Continue to summary', rect: r(24, 780, 354, 44) })]);
     return { tree, name, street, form };
   };
   const ALL: readonly Purpose[] = [TAP, PLAIN, FULLY];
@@ -1306,23 +1309,44 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
   it('the country sheet\'s list ending at 811: its row `Ukraine` 31,825 340x43 is judged outside the list by every verb', () => {
     const ukraine = node({ role: 'button', identifier: 'Ukraine', rect: r(31, 825, 340, 43) });
     const list = node({ role: 'scrollable', identifier: 'countries', rect: r(31, 456, 340, 355), children: [node({ role: 'button', identifier: 'Uganda', rect: r(31, 768, 340, 43) }), ukraine] });
-    const tree = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'other', rect: r(0, 400, 402, 474), children: [list] })] });
+    const tree = wdaRoot([node({ role: 'other', rect: r(0, 400, 402, 474), children: [list] })]);
     for (const purpose of ALL) expect(sceneOf(tree).standing(ukraine, IPHONE, purpose as TouchPurpose)).toMatchObject({ kind: 'offScreen', scroller: list, remedy: { of: 'scroll' } });
     expect(sceneOf(tree).standing(ukraine, IPHONE, COLOUR(ukraine))).toMatchObject({ kind: 'offScreen', scroller: list, remedy: { of: 'scroll' } });
     expect(sceneOf(tree).standing(byId(tree, 'Uganda'), IPHONE, TAP).kind).toBe('reachable');
   });
 
+  it('the dialect is the source\'s: WDA\'s parser marks its root, uiautomator\'s does not — an Android web view and a list with scrollable="false" (no clipsDescendants anywhere) judge their rows on the screen alone, as before', async () => {
+    expect(parseWdaSource(await fixture('wda-capture-swift-form-pushed.json')).unclippedFrames).toBe(true);
+    const android = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+      <node class="android.webkit.WebView" scrollable="false" resource-id="web" bounds="[0,200][1080,1600]">
+        <node class="android.view.View" text="In page" resource-id="inpage" bounds="[60,400][1020,520]" />
+        <node class="android.view.View" text="Past page" resource-id="pastpage" bounds="[60,1650][1020,1770]" />
+      </node>
+      <node class="android.widget.ListView" scrollable="false" resource-id="fits" bounds="[0,1800][1080,2000]">
+        <node class="android.widget.TextView" text="Fits row" resource-id="fitsrow" bounds="[0,1950][1080,2100]" />
+      </node></node></hierarchy>`);
+    expect(android.unclippedFrames).toBeUndefined();
+    const scene = sceneOf(android);
+    for (const id of ['pastpage', 'fitsrow']) {
+      const n = byId(android, id);
+      expect(scene.clips.drawnIn(n)).toBeUndefined();
+      expect(said(scene.standing(n, PIXEL, TAP))).toEqual({ kind: 'reachable', at: tapPoint(n) });
+      expect(scene.standing(n, PIXEL, COLOUR(n)).kind).toBe('reachable');
+    }
+  });
+
   it('a scroll view laid out above the keyboard (ending at its line, 566): a covered field\'s tap is moved to a piece still said to lie above the soft keyboard', () => {
     const field = node({ role: 'textfield', identifier: 'code', rect: r(36, 300, 330, 100) });
     const scroll = node({ role: 'scrollable', rect: r(0, 0, 402, 566), children: [field, node({ role: 'button', label: 'Show', rect: r(36, 340, 330, 52) })] });
-    const tree = node({ role: 'container', rect: box(402, 874), children: [scroll] });
+    const tree = wdaRoot([scroll]);
     expect(said(sceneOf(tree).standing(field, IPHONE, { of: 'tap', keyboardTop: wda(566) }))).toMatchObject({ kind: 'reachable', moved: { aboveKeyboard: true } });
   });
 
   it('unchanged where frames are already cut or nothing scrolls: the same rows on a tree with nothing that scrolls, on Android (a clipsDescendants scroller) and on idb\'s flat list', () => {
     const { tree, name, street } = atRest();
     const [form, bar] = tree.children;
-    const plain = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'other', rect: form.rect, children: form.children }), bar] });
+    const plain = wdaRoot([node({ role: 'other', rect: form.rect, children: form.children }), bar]);
+    // Android's dialect: no unclipped-frames mark, whatever it flags (its bounds are cut already).
     const android = node({ role: 'container', rect: box(402, 874), children: [{ ...form, clipsDescendants: true as const }, bar] });
     const flat = { ...node({ role: 'container', rect: box(402, 874), children: [form, ...form.children, name, street, bar] }), flatList: true as const };
     // Judged on the screen alone, as before: the name field's centre (201,827) on it — tapped where nothing covers it

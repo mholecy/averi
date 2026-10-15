@@ -12,8 +12,9 @@ import type { UiNode } from '../adapters/types.js';
  *   and the container a drawn-over question names
  *   (draw-order.ts#DrawOrder.drawnOver). Only Android supplies it; iOS
  *   frames are unclipped, so no iOS node clips and no iOS clip chain is
- *   invented. Its absence from a whole nested tree is what marks the tree's
- *   frames unclipped (geometry.ts#Clips.drawnIn).
+ *   invented. Not what marks a tree's frames unclipped: the source says
+ *   that on the root (UiNode.unclippedFrames, geometry.ts#Clips.drawnIn) —
+ *   an Android tree with no scroller flagged is cut all the same.
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
  *   (geometry.ts#Clips.inScroller), and, for draw order, a node's nearest

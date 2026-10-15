@@ -79,12 +79,12 @@ describe('a raw uiautomator dump is read by the side\'s AndroidAdapter, the dump
 });
 
 describe('a normalized capture is served as it is', () => {
-  it('iOS and Android alike, a fresh copy per read', async () => {
+  it('iOS and Android alike, a fresh copy per read — a WDA tree\'s root given the mark its parser sets now (UiNode.unclippedFrames), which a ui_snapshot taken before it lacks', async () => {
     const tree = { role: 'container', label: null, identifier: 'root', value: null, rect: { x: 0, y: 0, width: 10, height: 10 }, children: [] };
     for (const [platform, source] of [['ios', 'wda'], ['ios', 'idb'], ['android', 'uiautomator']] as const) {
       const adapter = recordedAdapter(side, recording({ platform, source, form: 'normalized', payload: JSON.stringify(tree) }), { platform, screen: IPHONE, frame: IPHONE });
       const read = await adapter.uiTree();
-      expect([platform, source, read]).toEqual([platform, source, tree]);
+      expect([platform, source, read]).toEqual([platform, source, source === 'wda' ? { ...tree, unclippedFrames: true } : tree]);
       read.identifier = 'written';
       expect((await adapter.uiTree()).identifier).toBe('root');
     }
