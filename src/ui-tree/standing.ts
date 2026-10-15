@@ -487,7 +487,11 @@ type TouchKind =
   | { readonly kind: 'offScreen'; readonly at: Point; readonly visible: number; readonly scroller?: UiNode }
   /** `band`: the band's rect on the box, only when the node's rect (not its centre) lies in it past the slack — a `fully` stop's region rule. */
   | { readonly kind: 'systemBar'; readonly at: Point; readonly bar: SystemBar; readonly band?: Rect }
-  | { readonly kind: 'clipped'; readonly edges: readonly Edge[] }
+  /**
+   * `scroller`: every edge it is clipped at is its scroll view's, inside the box (`Scene`'s contract, the drawn frame) —
+   * the scroll view clips it there, not the screen — the scroll view a sentence names (`scrollerOf`).
+   */
+  | { readonly kind: 'clipped'; readonly edges: readonly Edge[]; readonly scroller?: UiNode }
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
   /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
   | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
@@ -1032,12 +1036,29 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
 function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): TouchJudgement {
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
-  if (facts.clipped.length > 0) return { facts, kind: 'clipped', edges: facts.clipped };
+  if (facts.clipped.length > 0) {
+    const scroller = clippedByScrollView(judged, box, facts);
+    return { facts, kind: 'clipped', edges: facts.clipped, ...(scroller !== undefined && { scroller }) };
+  }
   // The system bands as a region, as the pixel assert judges them — any of the node past the slack.
   // docs/adr/0009-android-navigation-band.md
   // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
   const placed = place === 'on' && pinnedSurface(judged.node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(judged.node.rect, box, bands) ?? place) : place;
   return stopOrdered(facts, placed, undefined, facts.centreCover ?? facts.covers.at(-1), line);
+}
+
+/**
+ * The scroll view whose edge clips the node at every edge it is clipped at (`facts.clipped`), or undefined: each of
+ * them the frame judged in ends at the drawn frame's edge (geometry.ts#Clips.drawnIn), and the box does not — a scroll
+ * view ending at the screen's edge, or a keyboard line above its edge, leaves the screen's or the keyboard's cut.
+ */
+function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: StandingFacts): UiNode | undefined {
+  const drawn = scene.clips.drawnIn(node);
+  const frame = drawn?.frame;
+  if (drawn === undefined || frame === undefined) return undefined;
+  const line = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);
+  const atScrollView = (edge: Edge): boolean => line(facts.screen, edge) === line(frame, edge) && line(box, edge) !== line(frame, edge);
+  return facts.clipped.every(atScrollView) ? scrollerOf(drawn, (f) => !rectWithin(node.rect, f)) : undefined;
 }
 
 /**

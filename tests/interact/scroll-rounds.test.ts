@@ -2198,3 +2198,34 @@ describe('round — a target the strokes never bring into what its scroll view d
     expect(failureOf(played, 'id:payee_name_input').message).toContain('element in tree but never drawn: it lies outside its scroll view scrollable id:form (0,0 402x780) (last rect');
   });
 });
+
+describe('round — fully: true on a row its scroll view cuts, the content exhausted', () => {
+  // The country sheet's list ends at 811 inside the 402x874 screen: row_7 (779–822) is drawn 32 of its 43 pt.
+  const listRow = (list: { y: number; height: number }, y: number): Row => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [node({ role: 'scrollable', identifier: 'country_list', rect: { x: 31, ...list, width: 340 }, children: [node({ role: 'button', identifier: 'row_1', rect: { x: 31, y: list.y + 10, width: 340, height: 43 } }), row] })],
+    });
+    return { tree, found: [row] };
+  };
+
+  it('cut at its scroll view\'s edge (the country sheet\'s row_7, 74% drawn above the list\'s 811): the failure names that scroll view, and diagnoses no layout defect', () => {
+    const row = listRow({ y: 456, height: 355 }, 779);
+    const message = failureOf(play({ ...IPHONE, fully: true }, [row, row, row, row]), 'id:row_7').message;
+    expect(message).toContain(
+      'element is in the viewport but CLIPPED at bottom, at the edge of its scroll view scrollable id:country_list (31,456 340x355): 74% of it is drawn, and the content is exhausted',
+    );
+    expect(message).toContain('The rest lies outside that scroll view, which clips its content at its edge — not a layout defect: the swipes did not scroll it into view there.');
+    expect(message).not.toContain('layout defect (no clearance');
+  });
+
+  it('cut at the screen\'s edge, its scroll view reaching it too: the screen\'s wording, unchanged — the layout defect', () => {
+    const row = listRow({ y: 456, height: 418 }, 850);
+    const message = failureOf(play({ ...IPHONE, fully: true }, [row, row, row, row]), 'id:row_7').message;
+    expect(message).toContain('element is in the viewport but CLIPPED at bottom, 56% of it is in the viewport, and the content is exhausted');
+    expect(message).toContain('The element cannot be fully revealed — that is a layout defect (no clearance for an overlay?)');
+  });
+});

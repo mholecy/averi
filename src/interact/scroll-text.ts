@@ -355,6 +355,16 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
             `stays clipped with the keyboard down is it a layout defect. ${last}`,
         );
       }
+      // Clipped at its scroll view's edge, inside the screen: scrollable content that scroll view clips — no layout defect.
+      const { standing } = judged;
+      if (standing.kind === 'clipped' && standing.scroller !== undefined) {
+        return new Error(
+          `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${clipped.join('/')}, ` +
+            `${outsideScrollViewText(standing.scroller, 'at the edge of')}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
+            `swiping ${o.lastStroke} no longer moves it${neither}. The rest lies outside that scroll view, which clips its content at its edge — ` +
+            `not a layout defect: the swipes did not scroll it into view there. ${last}`,
+        );
+      }
       return new Error(
         `scroll_until ${describe} failed after ${n} — ` +
           `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
