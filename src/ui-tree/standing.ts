@@ -1,5 +1,13 @@
 import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { drawOrder, listsAncestry, listsUnclippedFrames, type DrawOrder, type Exposure, type MarkedLayer, type PresentedPress } from './draw-order.js';
+import {
+  drawOrder,
+  listsAncestry,
+  listsUnclippedFrames,
+  type DrawOrder,
+  type Exposure,
+  type MarkedLayer,
+  type PresentedPress,
+} from './draw-order.js';
 import {
   aboveNavigationBand,
   belowStatusBand,

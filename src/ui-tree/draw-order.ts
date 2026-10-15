@@ -188,7 +188,8 @@ export interface DrawOrder {
    * lands on, asked for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the
    * last such element, whose reach is the whole screen — unless the point lies on a scroll view of the element's own
    * (a stroke scrolling the alert's own content). Undefined when none. One reader: `scroll_until`'s stroke
-   * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no stroke that would land on it.
+   * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no stroke that would land
+   * on it.
    */
   markedAt(point: Point): UiNode | undefined;
   /**

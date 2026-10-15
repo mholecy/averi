@@ -1362,9 +1362,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     }
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s, now.facts);
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
-    // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`). Asked only
-    // on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe would land.
-    const onPresented = best === undefined ? undefined : presentedTouchDown(plannedStroke(s, now, gesture).step, now, best.node);
+    // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`).
+    // Asked only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe
+    // would land.
+    const heldBack = plannedStroke(s, now, gesture).step;
+    const onPresented = best === undefined ? undefined : presentedTouchDown(heldBack, now, best.node);
     const by: BoundBy =
       exhausted !== undefined
       ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
@@ -1459,7 +1461,11 @@ function plannedStroke(
  * Undefined when it does not, when this round did not read, or when the stroke has no box. Only the touch-down is
  * asked: it is where the gesture is recognised.
  */
-function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, now: ThisRead | undefined, target: UiNode | undefined): PresentedTouchDown | undefined {
+function presentedTouchDown(
+  stroke: Extract<RoundStep, { do: 'stroke' }>,
+  now: ThisRead | undefined,
+  target: UiNode | undefined,
+): PresentedTouchDown | undefined {
   if (now === undefined || stroke.box === undefined) return undefined;
   const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
   const press = now.facts.scene.presentedAt(touchDown, target);
