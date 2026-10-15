@@ -64,8 +64,9 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   the screen outside it is `offScreen` with that scroll view (`scroller`,
  *   `drawnPlace`), its edge judged as the screen's — off the screen first,
  *   then outside the scroll view, then a system band; the pixel assert's
- *   region likewise (below). Not a centre under a witnessed keyboard line:
- *   hiding the keyboard may lay the scroll view out taller. Android's
+ *   region likewise (below). The tap judges it after its keyboard guard
+ *   (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay the
+ *   scroll view out taller; a stop judges it under any line. Android's
  *   trees (rects already cut), idb's flat list (no scroll view listed: a
  *   residual) and a node under nothing that scrolls have none: unchanged.
  *   Measured: the at-rest SWIFT form lists `payee_name_input` at `24,801
@@ -557,10 +558,10 @@ export function sceneOf(tree: UiNode): Scene {
     }
     const touch = touchScreen(screen, tree);
     if (purpose.of === 'tap') {
-      const tap = tapStanding(judged, drawnPlace(placeOf(judged.centre, touch?.boxes, touch), judged, purpose.keyboardTop), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
+      const tap = tapStanding(judged, drawnPlace(placeOf(judged.centre, touch?.boxes, touch), judged), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
       return tap.kind === 'reachable' ? tap : remedied({ touch: tap }, judged);
     }
-    const place = drawnPlace(placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch), judged, purpose.keyboardTop);
+    const place = drawnPlace(placeOf(judged.centre, touch === undefined ? undefined : [touch.box], touch), judged);
     const box = touch?.box ?? node.rect;
     const stop = purpose.of === 'fully' ? fullyStanding(judged, place, box, touch, purpose.keyboardTop) : stopStanding(judged, place, box, touch, purpose.keyboardTop);
     return stop.kind === 'reachable' ? stop : remedied({ touch: stop }, judged);
@@ -731,13 +732,14 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * screen, or in a system band, that lies outside what the node's scroll views draw is `outside` the scroll view
  * `scrollerOf` names — off the screen as a touch judges it, its edge the scroll view's: nothing a tap there presses is
  * the node. Off the screen stays off the screen, judged first. A tree whose frames are already cut (Android's), idb's
- * flat list and a node under nothing that scrolls have no drawn frame: `place` as it is. Nor a centre under a
- * WITNESSED keyboard line (`line`): the guard hides that keyboard before a tap, and a scroll view laid out above the
- * keyboard (React Native's keyboard-avoiding view: MyPort's login `ScrollView` ends at the band's top, 566) may grow
- * back over the centre — judged again then, on the look the guard hands back.
+ * flat list and a node under nothing that scrolls have no drawn frame: `place` as it is. Under a witnessed keyboard
+ * line too: a stop never stops on a centre its scroll view does not draw — a stroke brings it up into the scroll view
+ * laid out above the keyboard. Only the TAP defers it past its keyboard guard
+ * (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay that scroll view out taller (React Native's
+ * keyboard-avoiding view, MyPort's login `ScrollView` ending at the band's top, 566).
  */
-function drawnPlace(place: PointPlace, { scene, node, centre }: Judged, line: KeyboardLine | undefined): PointPlace {
-  if (place === 'off' || (line?.witnessed === true && centre.y >= line.y)) return place;
+function drawnPlace(place: PointPlace, { scene, node, centre }: Judged): PointPlace {
+  if (place === 'off') return place;
   const drawn = scene.clips.drawnIn(node);
   if (drawn === undefined || (drawn.frame !== undefined && containsPoint(drawn.frame, centre))) return place;
   return { outside: scrollerOf(drawn, (frame) => !containsPoint(frame, centre)) };

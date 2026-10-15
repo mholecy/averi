@@ -1357,6 +1357,14 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     }
   });
 
+  it('a centre outside its scroll view and under a WITNESSED keyboard line is no stop: the plain and the fully stop judge it short of a stop — outside the scroll view, clipped at its edge (a stroke brings it up), never "visible, its centre clear"', () => {
+    // MyPort-style: the login ScrollView ends at 500, the keyboard from 566; `deep` 480–660, its centre (301,570) under the line, 20 pt of it drawn.
+    const deep = node({ role: 'button', identifier: 'deep', rect: r(230, 480, 141, 180) });
+    const tree = wdaRoot([node({ role: 'scrollable', identifier: 'login', rect: r(0, 0, 402, 500), children: [node({ role: 'button', identifier: 'top', rect: r(36, 200, 330, 52) }), deep] })]);
+    expect(sceneOf(tree).standing(deep, IPHONE, { of: 'stop', keyboardTop: wda(566) })).toMatchObject({ kind: 'offScreen', scroller: { identifier: 'login' } });
+    expect(said(sceneOf(tree).standing(deep, IPHONE, { of: 'fully', keyboardTop: wda(566) }))).toEqual({ kind: 'clipped', edges: ['bottom'] });
+  });
+
   it('a scroll view laid out above the keyboard (ending at its line, 566): a covered field\'s tap is moved to a piece still said to lie above the soft keyboard', () => {
     const field = node({ role: 'textfield', identifier: 'code', rect: r(36, 300, 330, 100) });
     const scroll = node({ role: 'scrollable', rect: r(0, 0, 402, 566), children: [field, node({ role: 'button', label: 'Show', rect: r(36, 340, 330, 52) })] });

@@ -276,6 +276,15 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
     expect(freshReads).toEqual([]);
   });
 
+  it('not by the on-screen rule before the guard: judgeTap lets the look through (the guard may hide a keyboard its scroll view was laid out above), and aim() refuses it', async () => {
+    const tree = atRest(name());
+    const look = { node: find(tree, 'payee_name_input'), tree, scene: sceneOf(tree) };
+    const { adapter } = viewport(IPHONE);
+    const screen = await usableScreen(adapter, { tree });
+    const judged = await judgeTap(adapter, 'payee_name_input', look, screen, { position: keyboardPosition(look.scene.order, reading(undefined).reading), remedy: BACK });
+    await expect(judged.aim()).rejects.toBeInstanceOf(OffScreenRefusal);
+  });
+
   it('a row across the form\'s bottom edge, its centre outside it: refused as at the screen\'s edge, what is drawn of it quoted', async () => {
     const across = node({ role: 'button', identifier: 'across', rect: { x: 24, y: 760, width: 354, height: 60 } });
     const { outcome } = await judge(atRest(across), 'across', { first: IPHONE });
