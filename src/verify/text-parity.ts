@@ -17,7 +17,7 @@ import {
 import { failClosed } from './fail-closed.js';
 import {
   differsOnlyByOcrFold,
-  foldedCharacters,
+  foldDifference,
   namePairs,
   ocrFold,
   ocrFoldPattern,
@@ -767,7 +767,8 @@ export function compareTextParity(
         source === 'ocr' && differsOnlyByOcrFold(x, y);
       if (a !== undefined && i !== undefined && a !== i) {
         if (recognizerDifference(a, i)) {
-          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in ${foldedCharacters(a, i)} (${RECOGNIZER_DIFFERENCE}) — not drift.`);
+          const { characters, reason } = foldDifference(a, i);
+          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in ${characters} (${reason}) — not drift.`);
         } else {
           findings.push({
             anchor: id,
@@ -782,7 +783,8 @@ export function compareTextParity(
           const got = seen(p) as string;
           if (got === expected) continue;
           if (recognizerDifference(got, expected)) {
-            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — differs only in ${foldedCharacters(expected, got)} (${RECOGNIZER_DIFFERENCE}); not drift.`);
+            const { characters, reason } = foldDifference(expected, got);
+            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — differs only in ${characters} (${reason}); not drift.`);
             continue;
           }
           findings.push({
@@ -1095,12 +1097,12 @@ export function evaluateOcrAssert(
     const want = normalizeText(expectation.text);
     // Exact first; equal only under the recognizer's fold is a pass that says
     // which characters it took on trust (ocr-fold.ts) — both strings verbatim.
-    const folded = differsOnlyByOcrFold(want, seen);
-    const ok = seen === want || folded;
+    const folded = differsOnlyByOcrFold(want, seen) ? foldDifference(want, seen) : undefined;
+    const ok = seen === want || folded !== undefined;
     if (!ok) pass = false;
     parts.push(
       `vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}` +
-        (folded ? ` (differs only in ${foldedCharacters(want, seen)} — ${RECOGNIZER_DIFFERENCE})` : ''),
+        (folded !== undefined ? ` (differs only in ${folded.characters} — ${folded.reason})` : ''),
     );
   }
   if (expectation.match !== undefined) {

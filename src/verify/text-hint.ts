@@ -1,5 +1,5 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
-import { differsOnlyByOcrFold, foldedCharacters } from './ocr-fold.js';
+import { differsOnlyByOcrFold, foldDifference } from './ocr-fold.js';
 
 /**
  * Why an exact-text expectation missed when the string is nonetheless ON the
@@ -120,7 +120,7 @@ function foldedTextHint(candidates: UiNode[], expected: string): string | undefi
     if (text !== undefined) hits.push({ node, text });
   }
   if (hits.length === 0) return undefined;
-  const pairs = [...new Set(hits.flatMap(({ text }) => foldedCharacters(expected, text).split(', ')))];
+  const pairs = [...new Set(hits.flatMap(({ text }) => foldDifference(expected, text).characters.split(', ')))];
   const shown = hits
     .slice(0, 3)
     .map(({ node, text }) => `    id=${node.identifier ?? '(none)'} label=${JSON.stringify(text)}`)

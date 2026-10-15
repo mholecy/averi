@@ -320,6 +320,21 @@ describe('compareTextParity — the occlusion guard', () => {
     expect(r.rows[0].android?.ocr).toBe('Prihlásit sa');
   });
 
+  it('a drift-table pair that differs only in how a letter is encoded gives that reason, not the recognizer\'s', () => {
+    const c = contract([{ id: 'cafe', text: 'Caf\u00e9' }]);
+    const r = compareTextParity(c, {
+      android: {
+        tree: root(1080, [text('cafe', 'Caf\u00e9')]),
+        ocr: { byId: ocrMap({ cafe: [line('Cafe\u0301', 30)] }), pngWidth: 1080 },
+      },
+    });
+    expect(r.findings).toEqual([]);
+    expect(r.notes).toEqual([
+      'cafe: android read "Cafe\u0301" for contract "Caf\u00e9" — differs only in composed vs decomposed characters ' +
+        '(the same letters, encoded differently); not drift.',
+    ]);
+  });
+
   it('a reading of typographic punctuation as ASCII is READ and not drift — the same fold as the ocr assert', () => {
     const c = contract([{ id: 'payee', text: 'Payee’s name' }]);
     const r = compareTextParity(c, {
@@ -858,7 +873,7 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
   it('a reading that differs only in how a letter is composed says so, rather than naming no character', () => {
     const r = evaluateOcrAssert({ text: 'Caf\u0065\u0301' }, [line('Caf\u00e9', 30)], 1080);
     expect(r.pass).toBe(true);
-    expect(r.detail).toContain('= (differs only in composed vs decomposed characters — ');
+    expect(r.detail).toContain('= (differs only in composed vs decomposed characters — the same letters, encoded differently)');
   });
 
   // The folded pattern accepts only what the pattern accepted, modulo the fold.

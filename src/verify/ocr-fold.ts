@@ -218,15 +218,18 @@ export const RECOGNIZER_DIFFERENCE =
   'the recognizer reads typographic punctuation as ASCII and drops diacritics';
 
 /**
- * `’ vs '` — the folded characters a fold-equal pair differs in, for a note
- * to name. Two strings that differ only in how a letter is encoded (`é` as one
- * code point or as `e` + a combining acute) have no such character; that is
- * said instead of naming nothing.
+ * What a fold-equal pair differs in and why that is forgiven, for a note:
+ * `characters` is `’ vs '`, `reason` the recognizer's. Two strings that differ
+ * only in how a letter is encoded (`é` as one code point or as `e` + a
+ * combining acute) have no such character and are not the recognizer's doing;
+ * that is said instead.
  */
-export const foldedCharacters = (want: string, read: string): string => {
+export function foldDifference(want: string, read: string): { characters: string; reason: string } {
   const pairs = foldedPairs(want, read);
-  return pairs.length > 0 ? namePairs(pairs) : 'composed vs decomposed characters';
-};
+  return pairs.length > 0 ?
+      { characters: namePairs(pairs), reason: RECOGNIZER_DIFFERENCE }
+    : { characters: 'composed vs decomposed characters', reason: 'the same letters, encoded differently' };
+}
 
 /** A combining mark shown on a dotted circle, so a note can print it on its own. */
 const shown = (c: string): string => (c === '' ? 'nothing' : /^\p{M}/u.test(c) ? `◌${c}` : c);
