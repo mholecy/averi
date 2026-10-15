@@ -208,7 +208,7 @@ export type ScrollOutcome = (
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point; layer?: UiNode }
+  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point; reach?: Rect; layer?: UiNode }
   | {
       kind: 'bound';
       swipes: number;
@@ -221,7 +221,7 @@ export type ScrollOutcome = (
       unlocated: boolean;
       evidence: WaitEvidence;
       /** The swipe the bound held back would have touched down at `touchDown` on `surface`, a screen presented over the target's (`presentedTouchDown`). */
-      presented?: { surface: UiNode; touchDown: Point };
+      presented?: { surface: UiNode; touchDown: Point; reach: Rect };
     }
 ) & { detent?: DetentMove };
 
@@ -1388,7 +1388,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const onPresented = presentedTouchDown(stroke, best, now);
   if (onPresented !== undefined && best !== undefined) {
     const layer = markedLayer(onPresented.surface);
-    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown, ...(layer !== undefined && { layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown, reach: onPresented.reach, ...(layer !== undefined && { layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
   const { toward } = stroke;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
@@ -1442,11 +1442,11 @@ function plannedStroke(
  * on behalf of the target this read holds; undefined when it does not, when this round did not read, or when the
  * stroke has no box. Only the touch-down is asked: it is where the gesture is recognised.
  */
-function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): { surface: UiNode; touchDown: Point } | undefined {
+function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): { surface: UiNode; touchDown: Point; reach: Rect } | undefined {
   if (best === undefined || now === undefined || stroke.box === undefined) return undefined;
   const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
   const surface = now.facts.scene.order.presentedAt(best.node, touchDown);
-  return surface === undefined ? undefined : { surface, touchDown };
+  return surface === undefined ? undefined : { surface, touchDown, reach: now.facts.scene.order.presentedReach(surface) };
 }
 
 /**

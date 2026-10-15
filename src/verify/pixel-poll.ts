@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import { readKeyboard } from '../ui-tree/keyboard-cover.js';
 import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { pollTree } from '../ui-tree/read-tree.js';
@@ -538,8 +538,7 @@ async function judgeOver(
       return `${cut} — ${advice(standing.remedy, () => 'scroll it up: scroll_until the element with `fully: true` first and re-run')}`;
     }
     case 'covered': {
-      const reach = sameRect(standing.reach, standing.cover.rect) ? '' : `, reaching ${rectText(standing.reach)}`;
-      const named = `${nodeText(standing.cover).slice(0, -1)}${reach})`;
+      const named = coverText(standing.cover, standing.reach);
       return `${named} is drawn over the element ${at}) — ${coverRemedy(standing.remedy)}`;
     }
     default: {

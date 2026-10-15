@@ -156,6 +156,12 @@ export interface DrawOrder {
    */
   presentedOver(node: UiNode): UiNode | undefined;
   /**
+   * Where a presented surface `presentedAt` or `presentedOver` named presses — the reach `presentedAt` holds its point
+   * against: the whole screen for the element of a marked presented layer (`markedLayers`), else its rect. What a
+   * sentence naming it at a touch-down quotes (geometry.ts#coverText).
+   */
+  presentedReach(surface: UiNode): Rect;
+  /**
    * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
    * node after `node`'s subtree (its first place in the tree, as
    * `exposure`) whose rect meets `region` with area and that draws for a
@@ -1760,6 +1766,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     },
     presentedAt: (node, point) => lastPresentedSurface(node, (reach) => containsPoint(reach, point)),
     presentedOver: (node) => lastPresentedSurface(node),
+    presentedReach: (surface) => (surface.presentation !== undefined ? { ...screen } : { ...surface.rect }),
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);

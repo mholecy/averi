@@ -1,5 +1,5 @@
 import { rectArea, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
-import { drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
+import { coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -8,7 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, presentedOver, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { markedLayer, outsideItsScrollView } from '../ui-tree/standing.js';
+import { markedLayer, outsideItsScrollView, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -150,7 +150,7 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  */
 function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): string {
   const { centreCover, shows } = judged.standing.facts;
-  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
+  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(shows)}% of it shows`;
 }
 
 /** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (target-text.ts#cutSliverText). */
@@ -439,8 +439,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
       const where =
         o.touchDown === undefined
-          ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
-          : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${nodeText(cover)}`;
+          ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(judged.standing.facts.shows)}% of it shows`
+          : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${coverText(cover, o.reach)}`;
       return {
         message:
           `scroll_until ${describe} stopped ${when} — ${where} — ${presentedStop(o.layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
@@ -464,7 +464,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       const presented =
         o.presented === undefined
           ? ''
-          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${nodeText(o.presented.surface)} — ${presentedOver(markedLayer(o.presented.surface))}`;
+          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedOver(markedLayer(o.presented.surface))}`;
       return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
   }

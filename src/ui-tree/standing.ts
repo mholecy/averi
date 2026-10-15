@@ -390,6 +390,9 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: UiNode): str
     ? `an alert is presented over ${what}${layer.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 
+/** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
+export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
+
 /** The element of the presented layer the tree source marks (`UiNode.presentation`) when `surface` is one — what `presentedRemedy` names; else undefined. */
 export const markedLayer = (surface: UiNode): UiNode | undefined => (surface.presentation !== undefined ? surface : undefined);
 

@@ -408,14 +408,20 @@ the Window before it too (a residual 3 shape, closed for alerts). The alert's ow
 `drawnOver` (the stroke box) does not read the mark.
 
 Wording (Q2): the presented remedy names the alert by its label (`ui-tree/standing.ts#presentedRemedy`, the remedy's
-`layer`) — the tap `… is under container "Exit confirmation" (41,365 320x172) at its centre (201,602), drawn over it;
+`layer`) — the tap `… is under container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) at its centre
+(201,602), drawn over it;
 nothing of it shows — an alert is presented over it ("Exit confirmation") — close it first; nothing was tapped`; the
 colour and ocr asserts `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) is drawn over the element
 (…) — the capture would show it, not the element; an alert is presented over the element ("Exit confirmation") — close
 it first`; `scroll_until` `stopped before any swipe — … — an alert is presented over it ("Exit confirmation") — close it
 first, and a swipe would land on the alert, so none was sent`. Not "a modal or a sheet" and no "no scroll moves it out"
 clause (an alert is no screen a scroll could move anything out from under), and never the alert's internal backdrop
-leaf `41,365 402x874`, a rect that runs off the screen. Residual 11's disagreement does not arise under an alert: its
+leaf `41,365 402x874`, a rect that runs off the screen. The alert is named with its REACH, the whole screen
+(`geometry.ts#coverText`, one spelling for the tap, `scroll_until` and the pixel assert, which said it already): the
+point a sentence names — a centre at (44,84), a touch-down at (201,699) — lies on the reach, not on the card; so does
+every cover whose reach is not its rect (idb's pinned CONTINUE, run down to the screen's bottom or the keyboard's top,
+and a floating tab bar's item raised by its lift, now `button "Continue to summary" (24,780 354x44, reaching 24,780
+354x94)` in the tap's and `scroll_until`'s sentences too). Residual 11's disagreement does not arise under an alert: its
 reach is the whole screen, so every touch-down `presentedAt` asks lies on it, as every verb's `presentedOver` says.
 
 `ui_snapshot` prints the mark (Q3), as it prints `hidden`, so later device trees carry it into the corpus (the

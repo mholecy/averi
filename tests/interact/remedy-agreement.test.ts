@@ -538,7 +538,8 @@ describe('a target outside what its scroll view draws — the tap, the pixel ass
 describe('a target beneath an alert — the tap, the pixel assert and scroll_until name the alert', () => {
   const alertForm = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-synthetic-alert-over-form.json', import.meta.url), 'utf8'));
   const ofId = (tree: UiNode, id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
-  const ALERT = 'container "Leave the form" (41,365 320x172)';
+  // Named with its reach, the whole screen: the point a sentence names lies on the reach, not always on the card.
+  const ALERT = 'container "Leave the form" (41,365 320x172, reaching 0,0 402x874)';
   const CLOSE_IT = 'an alert is presented over it ("Leave the form") — close it first';
 
   it('the tap refuses a field of the form, under the alert at its centre: never "Tapped"', async () => {
@@ -559,7 +560,7 @@ describe('a target beneath an alert — the tap, the pixel assert and scroll_unt
 
   it('the colour and the ocr assert fail closed naming the alert, which reaches the whole screen', async () => {
     const tree = await alertForm();
-    const said = `${ALERT.slice(0, -1)}, reaching 0,0 402x874) is drawn over the element (element 24,576 354x52) — the capture would show it, not the element; an alert is presented over the element ("Leave the form") — close it first`;
+    const said = `${ALERT} is drawn over the element (element 24,576 354x52) — the capture would show it, not the element; an alert is presented over the element ("Leave the form") — close it first`;
     expect(await colourSaid(tree, ofId(tree, 'form.note_input'))).toBe(said);
     expect(await pixelSaid(tree, ofId(tree, 'form.note_input'))).toBe(said);
   });

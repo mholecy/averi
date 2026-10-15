@@ -2,7 +2,7 @@ import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, 
 import { drawnOverText, nodeText, outsideScrollViewText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive } from '../ui-tree/selectors.js';
-import { outsideItsScrollView, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
+import { outsideItsScrollView, reachOf, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -322,7 +322,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       const above = moved.aboveKeyboard ? ' above the soft keyboard' : '';
       return {
         point,
-        moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${drawnOverText(moved.cover)}; tapped the uncovered part ${moved.piece.width}x${moved.piece.height}${above}`,
+        moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${drawnOverText(moved.cover, undefined, reachOf(standing.facts, moved.cover))}; tapped the uncovered part ${moved.piece.width}x${moved.piece.height}${above}`,
       };
     }
     case 'covered': {
@@ -334,7 +334,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint.
       const remedy = advice(standing.remedy, () => positionerRemedy(standing.cover) ?? 'scroll_until it first');
-      throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre)}; ${shows} — ${remedy}`));
+      throw new CoveredRefusal(told.refusal(`${drawnOverText(standing.cover, centre, reachOf(standing.facts, standing.cover))}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band — the only line no guard acts on — is found only in a flat
