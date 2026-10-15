@@ -78,6 +78,7 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['whole: 2 pt into the navigation band (840)', rect(51, 640, 300, 202), ctx(), 'whole'],
     ['band-overlap:nav: 3 pt into the navigation band', rect(51, 640, 300, 203), ctx(), 'band-overlap:nav'],
     ['band-overlap:status: 3 pt into the status band, its centre clear', rect(51, 59, 300, 64), ctx(), 'band-overlap:status'],
+    ['chrome-overlap names the first chrome by name where two overlap it', rect(51, 600, 300, 200), ctx({ safeArea: undefined, chrome: { tabBar: TAB, fab: rect(300, 600, 60, 60) } }), 'chrome-overlap:fab'],
     ['the status band before the navigation band before the chrome', rect(51, 59, 300, 784), ctx({ chrome: { a: rect(0, 300, 402, 10) } }), 'band-overlap:status'],
   ] as const)('%s', (_name, frame, c, expected: Geometry) => {
     expect(geometryOf(frame, c)).toBe(expected);
