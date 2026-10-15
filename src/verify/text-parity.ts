@@ -1051,19 +1051,18 @@ export async function measureOcrAssert(
 /**
  * The folded pattern against the folded reading (ocr-fold.ts): the characters
  * it folded when that matches, else undefined. A pattern the fold leaves
- * uncompilable is not folded — the assert fails on the reading as read, it
- * never throws.
+ * uncompilable, or too large for the engine to run (V8 compiles a pattern
+ * lazily: a long folded one overflows the stack on its first test), is not
+ * folded — the assert fails on the reading as read, it never throws.
  */
 function foldedMatch(pattern: string, seen: string): [string, string][] | undefined {
   const fold = ocrFoldPattern(pattern);
   if (fold === undefined) return undefined;
-  let folded: RegExp;
   try {
-    folded = new RegExp(fold.source);
+    return new RegExp(fold.source).test(ocrFold(seen)) ? fold.folded : undefined;
   } catch {
     return undefined;
   }
-  return folded.test(ocrFold(seen)) ? fold.folded : undefined;
 }
 
 /**

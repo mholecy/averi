@@ -955,6 +955,12 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(false);
   });
 
+  it('a folded pattern too long for the regex engine to run (it compiles, and overflows the stack on its first test) never throws — the assert fails on the reading as read', () => {
+    const match = '’'.repeat(10_000);
+    expect(() => evaluateOcrAssert({ match }, [line('x', 30)], 1080)).not.toThrow();
+    expect(evaluateOcrAssert({ match }, [line('x', 30)], 1080)).toMatchObject({ pass: false });
+  });
+
   it('letters without Latin combining marks are not folded: a Hangul or kana pattern still matches its reading', () => {
     expect(evaluateOcrAssert({ match: '^[가-힣]+$' }, [line('합계', 30)], 1080).pass).toBe(true);
     expect(evaluateOcrAssert({ match: '^が$' }, [line('か', 30)], 1080).pass).toBe(false);
