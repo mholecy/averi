@@ -397,13 +397,18 @@ export interface StandingFacts {
 }
 
 /** A presented layer the source TYPES, as the words name it (`presentedRemedy`): its article and its noun. */
-const TYPED_WORDS: Readonly<Record<TypedPresentationKind, readonly [string, string]>> = {
-  alert: ['an', 'alert'],
-  actionSheet: ['an', 'action sheet'],
-  popover: ['a', 'popover'],
+interface TypedWords {
+  readonly article: string;
+  readonly noun: string;
+}
+/** The words for each typed kind (`TypedWords`). */
+const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
+  alert: { article: 'an', noun: 'alert' },
+  actionSheet: { article: 'an', noun: 'action sheet' },
+  popover: { article: 'a', noun: 'popover' },
 };
 /** The words for `layer` when the source typed it; undefined for a `screen` layer, or none. */
-const typedWords = (layer: MarkedLayer | undefined): readonly [string, string] | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
+const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
 
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
@@ -417,7 +422,7 @@ const typedWords = (layer: MarkedLayer | undefined): readonly [string, string] |
 export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
   const typed = typedWords(layer);
   return typed !== undefined
-    ? `${typed[0]} ${typed[1]} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
+    ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 };
 
@@ -429,7 +434,7 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
  */
 export const presentedStop = (layer?: MarkedLayer): string => {
   const typed = typedWords(layer);
-  return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed[1]}`}`;
+  return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
