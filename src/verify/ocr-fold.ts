@@ -170,7 +170,10 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
     if (f !== c && [...f].length === 1 && !listed) added.push([c, f]);
   }
   if (added.length === 0) return { text, end, added };
-  return { text: text.slice(0, -1) + added.map(([, f]) => classMember(f)).join('') + ']', end, added };
+  // The added members form a class of their own, an alternative beside the
+  // class as written: appended inside it, a member after a trailing `-`
+  // would turn that `-` into a range.
+  return { text: `(?:${text}|[${added.map(([, f]) => classMember(f)).join('')}])`, end, added };
 }
 
 /**

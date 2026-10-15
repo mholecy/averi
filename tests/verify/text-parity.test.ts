@@ -921,6 +921,12 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
     ['^[ぁ-ゖ]+$', 'abc', false],
     ['^합계$', '합게', false],
     ['^Total: [0-9]+ Kč$', 'Total: 12 CZK', false],
+    ['^[A-Za-z’ -]+$', 'Bob&Co', false],
+    ['^[A-Za-z’ -]+$', "O'Neil", true],
+    ['^x[’ -]y$', 'x!y', false],
+    ['^x[’-]y$', "x'y", true],
+    ['^x[–+-]y$', 'x,y', false],
+    ['^x[–+-]y$', 'x-y', true],
   ])('/%s/ against %j under the fold: pass %s', (match, read, pass) => {
     expect(evaluateOcrAssert({ match }, [line(read, 30)], 1080).pass).toBe(pass);
   });
