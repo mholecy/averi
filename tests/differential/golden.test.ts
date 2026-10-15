@@ -69,8 +69,8 @@ const KNOWN: Record<string, Known> = Object.fromEntries([
   // LAB FINDING, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
   // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
   // the tree, as on idb. The tap waits 5 s "to appear" (no false Tapped, no "close it first"); the colour assert fails
-  // "not found" (vacuous); scroll_until strokes 1776 → 444 twice, and on the device that stroke dismisses the dialog (it
-  // lands on its dim) or expands the sheet.
+  // "not found" (vacuous); scroll_until strokes 1776 → 444 twice, and on the device that stroke dismisses the dialog
+  // (it lands on its dim) or expands the sheet.
   ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
     ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, [], 'lab finding: uiautomator lists only the presented window; the tap times out'),
     ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, [], 'lab finding: uiautomator lists only the presented window'),

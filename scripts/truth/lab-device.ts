@@ -84,10 +84,10 @@ export class IosLab implements LabDevice {
   private wdaServer: WdaServer | undefined;
 
   private guarded: Promise<string> | undefined;
-  /** Set once guard() has resolved: until then close() runs nothing — a refused device is not touched, not even there. */
+  /** Set once guard() has resolved: until then close() runs nothing — a refused simulator is left as it was. */
   private cleared = false;
 
-  /** `wdaPort`: never 8100/8101 (the device-check simulator's, refused here); capture.ts and live.ts default to 8120. */
+  /** `wdaPort`: never 8100/8101 (the device-check simulator's: refused); capture.ts and live.ts default to 8120. */
   constructor(
     readonly udid: string,
     private readonly opts: { wdaPort?: number; exec?: Exec } = {},
