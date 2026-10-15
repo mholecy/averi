@@ -1,0 +1,531 @@
+{
+  "corpus": "tests/fixtures/truth",
+  "notes": [
+    {
+      "n": "1",
+      "note": "2026-10-05-android-floating-gboard-keyboard.md",
+      "status": "needs-2b",
+      "fix": ["cb77485", "9131730"],
+      "before": "7d9a783",
+      "verified": "merge-subject",
+      "remark": "Android IME window: the fake device serves no dumpsys input_method/window insets, and no Android form-keyboard cell exists. Golden over the corpus is identical at 7d9a783 and cb77485."
+    },
+    {
+      "n": "2",
+      "note": "2026-10-05-ios-tap-lands-on-soft-keyboard.md",
+      "status": "calibrate",
+      "fix": ["6f41787", "0036762"],
+      "before": "73eea5f",
+      "after": "6f41787",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/form-keyboard.wda.json vs tap",
+        "ios-iphone17-ios27/form-keyboard.wda.json ks tap",
+        "ios-iphone17-ios27/form-keyboard.wda.json ss tap",
+        "ios-iphone17-ios27/form-keyboard.wda.json note tap"
+      ],
+      "remark": "Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a config variant. The same fields' scroll_until rows stay red here: they are #5's (iOS leg, 9131730)."
+    },
+    {
+      "n": "3",
+      "note": "2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md",
+      "status": "needs-2b",
+      "fix": ["95f75f4"],
+      "before": "926b826",
+      "verified": "merge-subject",
+      "remark": "The fix is the Android keyboard oracle's (colour/ocr on an element under the Android soft keyboard). Golden is identical at 926b826 and 95f75f4: no Android keyboard cell; the iOS form-keyboard cell has no colour rows."
+    },
+    {
+      "n": "4",
+      "note": "2026-10-08-ios-tap-off-screen-reported-done.md",
+      "status": "needs-cell:edges",
+      "fix": ["1221b0f"],
+      "before": "2ae8b10",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-bounded: a laid-out row in the tree whose centre is below the screen (form-picker's off-screen rows are not in the tree, WDA or idb, so its tap rows accept 'not found'). Rows: R-off (tap refused, nothing sent).",
+      "remark": "Golden is identical at 2ae8b10 and 1221b0f."
+    },
+    {
+      "n": "5",
+      "note": "2026-10-08-scroll-until-ignores-android-soft-keyboard.md",
+      "status": "calibrate",
+      "fix": ["9131730", "1bc603a", "565b747"],
+      "before": "98e49b7",
+      "after": "9131730",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/form-keyboard.wda.json vs scroll_until",
+        "ios-iphone17-ios27/form-keyboard.wda.json ks scroll_until",
+        "ios-iphone17-ios27/form-keyboard.wda.json ss scroll_until",
+        "ios-iphone17-ios27/form-keyboard.wda.json note scroll_until"
+      ],
+      "needs": "The note's Android leg needs phase 2b (an Android form-keyboard cell with the IME served).",
+      "remark": "The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus."
+    },
+    {
+      "n": "6",
+      "note": "2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md",
+      "status": "calibrate",
+      "fix": ["13d68a2", "8a55d2b"],
+      "before": "16ae6bb",
+      "after": "13d68a2",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/form-keyboard.wda.json phone tap",
+        "ios-iphone17-ios27/form-keyboard.wda.json phone scroll_until",
+        "ios-iphone17-ios27/form-keyboard.idb.json phone tap",
+        "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
+      ],
+      "regressions": [
+        { "rows": "ios-iphone17-ios27/sheet-medium.wda.json S tap, S scroll_until", "broke": "13d68a2", "fixed": "81a7d62", "why": "the sheet's frames-only background container read as a cover over its own button (#18)" },
+        { "rows": "ios-iphone17-ios27/form-keyboard.idb.json phone tap, phone scroll_until", "broke": "b75b8b5", "fixed": "8c0fb41", "why": "first-parent bisect: green at 13d68a2, Tapped at b75b8b5 (fix/r5-cr) … dff7381, green again at 8c0fb41 (fix/r6-ios-top)" },
+        { "rows": "ios-iphone17-ios27/form-keyboard.idb.json phone tap, phone scroll_until", "broke": "8a55d2b", "why": "fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2" }
+      ],
+      "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."
+    },
+    {
+      "n": "7",
+      "note": "2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md",
+      "status": "needs-cell:false-covers",
+      "fix": ["c3ebc62", "7542021"],
+      "before": "d928789",
+      "verified": "merge-subject",
+      "needs": "false-covers/toolbar-dismiss with a config variant (CatalogCell.config → configFor: app.ios.keyboardDismiss) — a screen-sized SwiftUI toolbar host and a scroll view after the title; rows: R-dismiss.",
+      "remark": "First try 7542021 (before 5cff2ad). Golden is identical across both pairs."
+    },
+    {
+      "n": "8",
+      "note": "2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md",
+      "status": "needs-cell:false-covers",
+      "fix": ["cccf6b8", "c8c06a8"],
+      "before": "dd50327",
+      "verified": "unverified",
+      "needs": "false-covers/own-parts on Android: a Compose button's text as the target (CatalogTarget.text); rows: tap Tapped on the label.",
+      "remark": "The analysis calls it a regression of 13d68a2, green at 86eb42d — not checked: no cell has text targets. Golden is identical at dd50327/cccf6b8 and 2f98900/c8c06a8."
+    },
+    {
+      "n": "9",
+      "note": "2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md",
+      "status": "needs-cell:edges",
+      "fix": ["d2b7744"],
+      "before": "10fb02b",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-sticky (Android): a row cut at a sticky header inside its scroll container; rows: R-fully.",
+      "remark": "Golden is identical at 10fb02b and d2b7744."
+    },
+    {
+      "n": "10",
+      "note": "2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md",
+      "status": "needs-cell:edges",
+      "fix": ["d2b7744"],
+      "before": "10fb02b",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-sticky (Android) — only if Compose reproduces inverted bounds in the lab; otherwise a recorded-tree unit test stays its only check.",
+      "remark": "The merge subject names it ('inverted bounds read as clipped out'). Whether the lab app can produce the inverted bounds is unverified."
+    },
+    {
+      "n": "11",
+      "note": "2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md",
+      "status": "needs-cell:bars",
+      "fix": ["bd06470", "16ae6bb"],
+      "before": "188740b",
+      "verified": "merge-subject",
+      "needs": "bars/tabbar-floating (Android) with a target below the fold; rows: R-stroke (every touch-down in the strokeable region).",
+      "remark": "Golden is identical at 188740b and bd06470."
+    },
+    {
+      "n": "12",
+      "note": "2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md",
+      "status": "needs-cell:edges",
+      "fix": ["9c7885e"],
+      "before": "d043e65",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-bounded (Android): a row cut flush at its scroll container's edge; rows: R-fully.",
+      "remark": "At 9c7885e only the wording of the presented cells' scroll_until rows changes (Android strokes drag); every such row stays red as not in the tree."
+    },
+    {
+      "n": "13",
+      "note": "2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md",
+      "status": "needs-cell:edges",
+      "fix": ["29a5c30"],
+      "before": "f4ff4be",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-bounded (Android): a row showing a sliver at the container's edge; rows: R-sliver (tap refused).",
+      "remark": "Golden is identical at f4ff4be and 29a5c30."
+    },
+    {
+      "n": "14",
+      "note": "2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md",
+      "status": "needs-cell:bars",
+      "fix": ["81a7d62"],
+      "before": "d2b7744",
+      "verified": "merge-subject",
+      "needs": "bars/tabbar-floating (iOS): a row under the floating bar's surface above its buttons; rows: R-under-chrome.",
+      "remark": "81a7d62 does flip sheet-medium.wda S — that is #18's half of the merge, not this note's."
+    },
+    {
+      "n": "15",
+      "note": "2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md",
+      "status": "needs-cell:presented",
+      "fix": ["8a55d2b"],
+      "before": "20053ae",
+      "verified": "merge-subject",
+      "needs": "presented/blur-menu or a chooser idb lists before the content behind it; the lab's idb presented cells list only the presented layer, so the order is never asked.",
+      "remark": "The analysis' 'regression dd50327→2f98900 (8c0fb41?)' is the idb pinned-bar row (L2): Tapped from b75b8b5 to dff7381, refused at 8c0fb41 — verified by a first-parent bisect over golden. 8a55d2b itself re-breaks it (#6's regressions)."
+    },
+    {
+      "n": "16",
+      "note": "2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md",
+      "status": "calibrate",
+      "fix": ["f4ff4be"],
+      "before": "81a7d62",
+      "after": "f4ff4be",
+      "verified": "golden",
+      "defect": "touched down under the keyboard",
+      "checks": [
+        "ios-iphone17-ios27/form-keyboard.idb.json vs scroll_until",
+        "ios-iphone17-ios27/form-keyboard.idb.json ks scroll_until",
+        "ios-iphone17-ios27/form-keyboard.idb.json ss scroll_until",
+        "ios-iphone17-ios27/form-keyboard.idb.json note scroll_until"
+      ],
+      "expect": "CALIBRATED-ON-DEFECT",
+      "remark": "idb lists nothing under the keyboard, so these rows are 'not in the tree' at every commit (golden.test.ts KNOWN); the note's defect — touch-downs at (201,699) on the keyboard — is in the mismatch before and gone after."
+    },
+    {
+      "n": "17",
+      "note": "2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md",
+      "status": "needs-live",
+      "fix": ["21f1deb", "b940052"],
+      "before": "8a55d2b",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-top-edge for the static half (a row resting in the status band); the turn-back itself is a dynamic (phase 5).",
+      "remark": "At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431)."
+    },
+    {
+      "n": "18",
+      "note": "2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md",
+      "status": "calibrate",
+      "fix": ["81a7d62"],
+      "before": "d2b7744",
+      "after": "81a7d62",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/sheet-medium.wda.json S tap",
+        "ios-iphone17-ios27/sheet-medium.wda.json S scroll_until"
+      ],
+      "regressions": [
+        { "rows": "ios-iphone17-ios27/sheet-medium.wda.json S tap, S scroll_until", "broke": "13d68a2", "fixed": "81a7d62", "why": "green at 16ae6bb: the cover judgement 13d68a2 introduced read the sheet's frames-only background (8,415 386x451) as drawn over its own button" }
+      ],
+      "needs": "The text field's scroll indicator half needs a false-covers/own-parts cell.",
+      "remark": "The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note."
+    },
+    {
+      "n": "19",
+      "note": "2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md",
+      "status": "needs-cell:false-covers",
+      "fix": ["470dafe", "cd4d177"],
+      "before": "bd06470",
+      "verified": "merge-subject",
+      "needs": "false-covers/toolbar-dismiss with a config variant (an itemless WDA toolbar over the dismissal tap); rows: R-dismiss.",
+      "remark": "First fix cd4d177 (before c11d179). Golden is identical at bd06470 and 470dafe."
+    },
+    {
+      "n": "20",
+      "note": "2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md",
+      "status": "needs-cell:presented",
+      "fix": ["83e282a"],
+      "before": "7566443",
+      "verified": "merge-subject",
+      "needs": "presented/sheet-long-list: a sheet whose below-the-fold cells WDA lists (form-picker's ST is not in the tree, WDA or idb); rows: R-off, R-outside-sv.",
+      "remark": "Golden is identical at 7566443 and 83e282a."
+    },
+    {
+      "n": "21",
+      "note": "2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md",
+      "status": "needs-cell:bars",
+      "fix": ["5e47ff4"],
+      "before": "0cb8b62",
+      "verified": "merge-subject",
+      "needs": "bars/bands (Android, edge-to-edge): a target under the status bar; rows: R-band; the swallowed probe accepted in consistency().",
+      "remark": "Golden is identical at 0cb8b62 and 5e47ff4."
+    },
+    {
+      "n": "22",
+      "note": "2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md",
+      "status": "calibrate",
+      "fix": ["596a379"],
+      "before": "ad7ed11",
+      "after": "596a379",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/sheet-medium.wda.json A colour",
+        "ios-iphone17-ios27/sheet-medium.wda.json B colour",
+        "ios-iphone17-ios27/sheet-medium.wda.json C colour",
+        "ios-iphone17-ios27/sheet-medium.wda.json D colour"
+      ],
+      "needs": "The note's own shapes — the status bar and a pinned button drawn over the element — need bars/bands and a pinned-bar colour row.",
+      "remark": "Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element."
+    },
+    {
+      "n": "23",
+      "note": "2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md",
+      "status": "needs-ocr",
+      "fix": ["e85bcdf"],
+      "before": "94bae14",
+      "verified": "merge-subject",
+      "needs": "bars/bands (Android navigation bar) and OCR judged on real pixels (phase 4).",
+      "remark": "The merge message names D7's pixel part: the navigation band fails a pixel assert closed. Golden is identical at 94bae14 and e85bcdf."
+    },
+    {
+      "n": "24",
+      "note": "2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md",
+      "status": "residual:accepted (round 13: the FAB host layer is a cover)",
+      "verified": "unverified",
+      "needs": "bars/fab — to pin the accepted behaviour as KNOWN, not to turn it green."
+    },
+    {
+      "n": "25",
+      "note": "2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped.md",
+      "status": "residual:ADR 0007 (idb's QuickType bar)",
+      "verified": "unverified",
+      "remark": "The lab's form-keyboard capture shows no QuickType bar; not reproducible with existing cells."
+    },
+    {
+      "n": "26",
+      "note": "2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md",
+      "status": "needs-cell:bars",
+      "fix": ["83e282a"],
+      "before": "7566443",
+      "verified": "merge-subject",
+      "needs": "bars/tabbar-hidden-push: a pushed screen over a hidden host tab bar; rows: tap Tapped on the rows behind the phantom bar.",
+      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows')."
+    },
+    {
+      "n": "27",
+      "note": "2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md",
+      "status": "needs-cell:presented",
+      "fix": ["15896c5"],
+      "before": "53da035",
+      "verified": "merge-subject",
+      "needs": "presented/dim-cover: an RN-style transparent modal's screen-filling dimming leaf (unless the existing RN trees cover it).",
+      "remark": "15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped."
+    },
+    {
+      "n": "28",
+      "note": "2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md",
+      "status": "calibrate",
+      "fix": ["15896c5"],
+      "before": "53da035",
+      "after": "15896c5",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/form-picker.wda.json name tap",
+        "ios-iphone17-ios27/form-picker.wda.json name scroll_until",
+        "ios-iphone17-ios27/form-picker.wda.json country tap",
+        "ios-iphone17-ios27/form-picker.wda.json country scroll_until",
+        "ios-iphone17-ios27/form-picker.wda.json submit tap",
+        "ios-iphone17-ios27/form-picker.wda.json submit scroll_until"
+      ],
+      "remark": "The country picker sheet over the form. At 2ae8b10 these rows answered Tapped / fully visible beneath the sheet (the note's symptom); by 53da035 they were refused as under a sheet row with 'scroll_until it first' — still red; 15896c5 says 'close it first'."
+    },
+    {
+      "n": "29",
+      "note": "2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md",
+      "status": "needs-cell:edges",
+      "fix": ["b7eac90"],
+      "before": "ec2893a",
+      "verified": "merge-subject",
+      "needs": "edges/scroll-bounded: a row outside its scroll view's clip but on the screen; rows: R-outside-sv (colour fails closed).",
+      "remark": "Golden is identical at ec2893a and b7eac90."
+    },
+    {
+      "n": "30",
+      "note": "2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md",
+      "status": "needs-cell:presented",
+      "fix": ["753b560"],
+      "before": "4655113",
+      "verified": "merge-subject",
+      "needs": "presented/sheet-medium-edges: a target showing a sliver beside the sheet; rows: R-sliver, R-presented colour.",
+      "remark": "sheet-medium's targets are wholly beneath the sheet; golden is identical at 4655113 and 753b560."
+    },
+    {
+      "n": "31",
+      "note": "2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md",
+      "status": "residual:open (the blur overlay has no node in either tree)",
+      "verified": "unverified",
+      "needs": "presented/blur-menu — to pin it as KNOWN."
+    },
+    {
+      "n": "32",
+      "note": "2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md",
+      "status": "needs-cell:presented",
+      "fix": ["0c439ad"],
+      "before": "83e282a",
+      "verified": "merge-subject",
+      "needs": "presented/sheet-medium-edges: a target below the fold beneath a sheet; rows: R-presented scroll_until (no stroke).",
+      "remark": "Golden is identical at 83e282a and 0c439ad."
+    },
+    {
+      "n": "33",
+      "note": "2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md",
+      "status": "calibrate",
+      "fix": ["ce33431"],
+      "before": "23fb824",
+      "after": "ce33431",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/sheet-medium.wda.json A tap",
+        "ios-iphone17-ios27/sheet-medium.wda.json A scroll_until",
+        "ios-iphone17-ios27/sheet-medium.wda.json B tap",
+        "ios-iphone17-ios27/sheet-medium.wda.json B scroll_until",
+        "ios-iphone17-ios27/sheet-medium.wda.json C tap",
+        "ios-iphone17-ios27/sheet-medium.wda.json C scroll_until",
+        "ios-iphone17-ios27/sheet-medium.wda.json D tap",
+        "ios-iphone17-ios27/sheet-medium.wda.json D scroll_until"
+      ]
+    },
+    {
+      "n": "34",
+      "note": "2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md",
+      "status": "needs-cell:presented",
+      "fix": ["753b560"],
+      "before": "4655113",
+      "verified": "merge-subject",
+      "needs": "presented/sheet-medium-edges: a target beneath a sheet wholly off screen or wholly under the status bar; rows: R-presented tap and colour.",
+      "remark": "Golden is identical at 4655113 and 753b560."
+    },
+    {
+      "n": "35",
+      "note": "2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md",
+      "status": "calibrate",
+      "fix": ["92f2a46"],
+      "before": "173023f",
+      "after": "92f2a46",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/alert-dim.wda.json A tap",
+        "ios-iphone17-ios27/alert-dim.wda.json A colour",
+        "ios-iphone17-ios27/alert-dim.wda.json A scroll_until",
+        "ios-iphone17-ios27/alert-dim.wda.json B tap",
+        "ios-iphone17-ios27/alert-dim.wda.json B colour",
+        "ios-iphone17-ios27/alert-dim.wda.json B scroll_until",
+        "ios-iphone17-ios27/alert-dim.wda.json D tap",
+        "ios-iphone17-ios27/alert-dim.wda.json D colour",
+        "ios-iphone17-ios27/alert-dim.wda.json D scroll_until"
+      ],
+      "remark": "The green tip of the fix branch, e10219e, is the merge's second parent."
+    },
+    {
+      "n": "36",
+      "note": "2026-08-26-ios-ocr-crop-scale.md",
+      "status": "needs-ocr",
+      "verified": "unverified",
+      "remark": "The analysis' likely 36th visibility note: the OCR crop's scale. OCR on real pixels is phase 4."
+    },
+    {
+      "n": "FE1",
+      "note": "2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field.md",
+      "status": "calibrate",
+      "fix": ["7566443"],
+      "before": "e1384aa",
+      "after": "7566443",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/form-errors.wda.json email error",
+        "ios-iphone17-ios27/form-errors.wda.json pin error",
+        "ios-iphone17-ios27/form-errors.idb.json email error",
+        "ios-iphone17-ios27/form-errors.idb.json pin error"
+      ],
+      "remark": "A text field error, not visibility; in the table because the form-errors cell reproduces it."
+    },
+    {
+      "n": "FE2",
+      "note": "2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md",
+      "status": "calibrate",
+      "fix": ["dfe63da"],
+      "before": "d407256",
+      "after": "dfe63da",
+      "verified": "merge-subject",
+      "checks": [
+        "ios-iphone17-ios27/form-errors.wda.json name error",
+        "ios-iphone17-ios27/form-errors.wda.json amount error",
+        "ios-iphone17-ios27/form-errors.idb.json name error",
+        "ios-iphone17-ios27/form-errors.idb.json amount error"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "needs": "forms: a cell whose fields and their titles all share ONE identifier (a design-system component id), pristine (no error shown); rows: each field's `error` assert fails / ui_snapshot shows no error. form-errors gives every title its own id (`<field>.title`), so the same-identifier rule never meets another field's title.",
+      "remark": "The same-identifier rows (name, amount) are the nearest the cell asks; they pass on both sides."
+    },
+    {
+      "n": "L1",
+      "note": "2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "swiped \\d+× beneath a presented layer",
+      "checks": [
+        "android-averi_lab-api33/alert-dim.xml A scroll_until",
+        "android-averi_lab-api33/alert-dim.xml B scroll_until",
+        "android-averi_lab-api33/alert-dim.xml C scroll_until",
+        "android-averi_lab-api33/alert-dim.xml D scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml A scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml B scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml C scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml D scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD, with the stroke beneath the presented layer in the mismatch. Red at every commit swept (7d9a783 … 92f2a46)."
+    },
+    {
+      "n": "L2",
+      "note": "2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md",
+      "status": "open",
+      "verified": "golden",
+      "checks": [
+        "ios-iphone17-ios27/form-keyboard.idb.json phone tap",
+        "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
+      ],
+      "regressions": [
+        { "rows": "phone tap, phone scroll_until", "broke": "b75b8b5", "fixed": "8c0fb41", "why": "first-parent bisect: refused at 13d68a2, Tapped from b75b8b5 (fix/r5-cr)" },
+        { "rows": "phone tap, phone scroll_until", "broke": "8a55d2b", "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since" }
+      ],
+      "remark": "No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed row."
+    }
+  ],
+  "excluded": [
+    { "note": "2026-08-26-ensure-state-no-recovery-pass.md", "why": "flow: ensure_state recovery" },
+    { "note": "2026-08-26-png-scale-needs-out-of-tree-screen-size.md", "why": "screenshot scale, not what a target shows" },
+    { "note": "2026-08-26-recovery-pass-skips-throwing-last-rung.md", "why": "flow: ensure_state recovery" },
+    { "note": "2026-08-27-user-settings-run-four-findings.md", "why": "flow and config findings of one run" },
+    { "note": "2026-09-18-handoff-run5-and-finportal-login-findings.md", "why": "flow findings of one run" },
+    { "note": "2026-09-18-wda-orphan-after-server-restart.md", "why": "WDA process lifecycle" },
+    { "note": "2026-10-06-bare-tree-misses-wda-rn-splash.md", "why": "launch: bare-tree detection" },
+    { "note": "2026-10-06-destructive-rung-warning-false-positive.md", "why": "flow: warning wording" },
+    { "note": "2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md", "why": "tree source: idb's empty tree" },
+    { "note": "2026-10-06-pixel-assert-default-timeout-fits-no-round-on-device.md", "why": "timing: the pixel assert's default timeout" },
+    { "note": "2026-10-06-second-look-reads-android-decor-as-not-in-state.md", "why": "flow: ensure_state's second look" },
+    { "note": "2026-10-06-ui-snapshot-empty-right-after-launch.md", "why": "launch: an empty tree after launch" },
+    { "note": "2026-10-06-wait-timeout-no-hint-for-ids-idb-cannot-see.md", "why": "flow: wait timeout wording" },
+    { "note": "2026-10-06-wda-read-wakes-stuck-idb-tree.md", "why": "tree source: a stuck idb tree" },
+    { "note": "2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md", "why": "screen stability, not visibility" },
+    { "note": "2026-10-07-idb-empty-tree-advice-relaunch-does-not-restart.md", "why": "tree source: empty-tree advice" },
+    { "note": "2026-10-07-ios-fill-empty-value-fails-in-idb.md", "why": "fill: live golden (phase 5)" },
+    { "note": "2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md", "why": "tree source: a stuck idb tree" },
+    { "note": "2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md", "why": "fill: live golden (phase 5)" },
+    { "note": "2026-10-08-ios-launch-transition-tree-reads-as-rendered.md", "why": "launch: SpringBoard's launch tree" },
+    { "note": "2026-10-09-android-clear-reads-edittext-hint-as-content.md", "why": "fill/clear: live golden (phase 5)" },
+    { "note": "2026-10-09-android-scroll-until-default-budget-too-short-at-drag-speed.md", "why": "scroll dynamics: the time budget (live)" },
+    { "note": "2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md", "why": "fill: mismatch wording" },
+    { "note": "2026-10-09-ios-fill-screen-changed-from-fields-own-clear-button.md", "why": "fill: live golden (phase 5)" },
+    { "note": "2026-10-09-ios-inert-keyboard-dismiss-note-says-idb-carries-no-keyboard.md", "why": "config note wording" },
+    { "note": "2026-10-09-ios-launch-app-reads-previous-apps-tree.md", "why": "launch: a stale tree" },
+    { "note": "2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md", "why": "launch: note wording" },
+    { "note": "2026-10-09-ios-launch-note-blames-previous-app-when-launched-process-tree-is-empty.md", "why": "launch: note wording" },
+    { "note": "2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md", "why": "scroll dynamics: a fling (live)" },
+    { "note": "2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md", "why": "lab finding about typing: live golden (phase 5)" },
+    { "note": "2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md", "why": "lab finding about typing: live golden (phase 5)" },
+    { "note": "2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md", "why": "fill: live golden (phase 5); fix 5e5a3d1→10fb02b per the analysis" },
+    { "note": "2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md", "why": "timing: the hold-still wait" },
+    { "note": "2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md", "why": "scroll dynamics: a bouncing list end (live)" },
+    { "note": "2026-10-15-android-numeric-character-references-in-uiautomator-attributes-are-not-decoded.md", "why": "text: phase 2b (08df145→dda435b per the analysis)" },
+    { "note": "2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md", "why": "text: OCR on real pixels, phase 4 (35321b4→92f2a46 per the analysis)" }
+  ]
+}
