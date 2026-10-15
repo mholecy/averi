@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { cellOf, parseOnly, selectRecordings } from '../../scripts/differential/golden.js';
+import { cellOf, faultsOf, parseOnly, selectRecordings } from '../../scripts/differential/golden.js';
 import { loadSide, takesDeps } from '../../scripts/differential/side.js';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
@@ -117,5 +117,16 @@ describe("an older side's registry (side.ts#registry)", () => {
 
   it("this checkout's registry reads as the new constructor", async () => {
     expect(await takesDeps(AdapterRegistry)).toBe(true);
+  });
+});
+
+describe('golden --json: the faults a check carries (faultsOf)', () => {
+  it("what golden marks as a fault: a JavaScript or harness error in the reply, an UNMODELLED call; a tool's own refusal is none", () => {
+    expect(faultsOf({ reply: 'ERROR this.factory is not a function', device: [] })).toEqual(['ERROR this.factory is not a function']);
+    expect(faultsOf({ reply: "ERROR Cannot read properties of undefined (reading 'x')", device: [] })).toHaveLength(1);
+    expect(faultsOf({ reply: 'THROW MCP error -32001: Request timed out', device: [] })).toHaveLength(1);
+    expect(faultsOf({ reply: 'ERROR differential: no device for idb describe', device: [] })).toHaveLength(1);
+    expect(faultsOf({ reply: 'Tapped id:"a"', device: ['idb ui tap 1 2', 'UNMODELLED xcrun foo'] })).toEqual(['UNMODELLED xcrun foo']);
+    expect(faultsOf({ reply: 'ERROR id:"a" is under button "B" … close it first; nothing was tapped', device: ['idb ui describe-all --json'] })).toEqual([]);
   });
 });

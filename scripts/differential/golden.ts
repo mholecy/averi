@@ -22,7 +22,9 @@ import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/
  *
  * The side defaults to this checkout; an older commit's src is loaded by this checkout's harness (side.ts). `--only`
  * keeps the captures a token names (selectRecordings); `--json` prints the results as data (GoldenJson) in place of the
- * report — scripts/truth/calibrate.ts reads it. Exit code 1 on a mismatch or a broken target.
+ * report — scripts/truth/calibrate.ts reads it. A check whose reply is a harness or JavaScript error, or whose call sent a
+ * command the fake device does not model, carries it as `faults` (faultsOf), in the JSON and the report. Exit code 1 on a
+ * mismatch, a broken target or a fault.
  */
 
 export interface GoldenCheck {
@@ -33,7 +35,30 @@ export interface GoldenCheck {
   /** undefined: as the truth implies. */
   mismatch?: string;
   reply: string;
+  /** What says the HARNESS failed, not the tool (`faultsOf`): absent when none. */
+  faults?: string[];
 }
+
+/**
+ * A reply that is a JavaScript error or the harness's own, not a tool's answer: thrown through the MCP client
+ * (`THROW`), a TypeError/ReferenceError of a side loaded wrong ("this.factory is not a function"), or the fake device's
+ * refusal (`differential: …`).
+ */
+export const HARNESS_ERROR = /^THROW |\bis not a (?:function|constructor)\b|\bCannot read properties of\b|\bis not defined\b|\bdifferential: /;
+
+/**
+ * Why a call's outcome is no evidence about the side's tool: its reply a harness error (HARNESS_ERROR), and each
+ * device command the fake does not model (`UNMODELLED …`) — the tool asked something no recording answers.
+ */
+export function faultsOf(o: { reply: string; device: readonly string[] }): string[] {
+  const line = o.reply.split('\n').find((l) => HARNESS_ERROR.test(l));
+  return [...(line === undefined ? [] : [line.slice(0, 200)]), ...o.device.filter((d) => d.startsWith('UNMODELLED '))];
+}
+
+const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: { reply: string; device: readonly string[] }): GoldenCheck => {
+  const faults = faultsOf(outcome);
+  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, ...(faults.length > 0 && { faults }) };
+};
 
 export interface GoldenResult {
   recording: string;
@@ -66,8 +91,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       }
       for (const e of expectations(recording.platform, t)) {
         const outcome = await c.call(e.call, config);
-        const mismatch = e.judge(outcome);
-        result.checks.push({ recording: recording.id, target: t.tag, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply });
+        result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));
       }
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
@@ -79,8 +103,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     if (brokenControls.length === 0) {
       for (const e of formExpectations(recording.platform, truth)) {
         const outcome = await c.call(e.call, config);
-        const mismatch = e.judge(outcome);
-        result.checks.push({ recording: recording.id, target: e.target, verb: e.verb, says: e.says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply });
+        result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome));
       }
     }
   } finally {
@@ -93,11 +116,18 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
 export function goldenReport(results: readonly GoldenResult[]): string {
   const checks = results.flatMap((r) => r.checks);
   const bad = checks.filter((c) => c.mismatch !== undefined);
-  const lines = [`# Golden: ${checks.length} checks, ${bad.length} mismatches, ${results.reduce((a, r) => a + r.broken.length, 0)} broken targets`, ''];
+  const faulted = checks.filter((c) => c.faults !== undefined);
+  const lines = [
+    `# Golden: ${checks.length} checks, ${bad.length} mismatches, ${results.reduce((a, r) => a + r.broken.length, 0)} broken targets${faulted.length > 0 ? `, ${faulted.length} with a harness fault` : ''}`,
+    '',
+  ];
   for (const r of results) {
     lines.push(`## ${r.recording}`);
     for (const b of r.broken) lines.push(`- BROKEN ${b}`);
-    for (const c of r.checks) lines.push(c.mismatch === undefined ? `- ok ${c.target} ${c.verb}: ${c.says}` : `- MISMATCH ${c.target} ${c.verb}: expected ${c.says} — ${c.mismatch}`);
+    for (const c of r.checks) {
+      lines.push(c.mismatch === undefined ? `- ok ${c.target} ${c.verb}: ${c.says}` : `- MISMATCH ${c.target} ${c.verb}: expected ${c.says} — ${c.mismatch}`);
+      for (const f of c.faults ?? []) lines.push(`  - FAULT ${f}`);
+    }
     lines.push('');
   }
   return lines.join('\n');
@@ -163,7 +193,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
     console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results));
-    if (results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined))) process.exitCode = 1;
+    if (results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined || c.faults !== undefined))) process.exitCode = 1;
   } finally {
     cleanup?.();
   }
