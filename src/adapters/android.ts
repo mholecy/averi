@@ -1235,7 +1235,8 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     attributeNamePrefix: '',
     // uiautomator writes a newline, a tab and every code point beyond the BMP (an emoji) as a numeric character
     // reference (`&#10;`, `&#127482;`); the parser decodes those with the named ones, once — `&amp;#10;` stays `&#10;`.
-    // Here, not after parsing: a second pass could not tell an app's literal `&#10;` from a reference.
+    // Here, not after parsing: a second pass could not tell an app's literal `&#10;` from a reference. HTML's named
+    // entities (`&nbsp;`, `&copy;` …) decode too — harmless, as uiautomator escapes every `&` it does not mean as one.
     htmlEntities: true,
     isArray: (name) => name === 'node',
   }).parse(xml);
