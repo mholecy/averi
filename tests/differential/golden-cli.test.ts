@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cellOf, parseOnly, selectRecordings } from '../../scripts/differential/golden.js';
-import { loadSide } from '../../scripts/differential/side.js';
+import { loadSide, takesDeps } from '../../scripts/differential/side.js';
+import { AdapterRegistry } from '../../src/mcp/registry.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
 
 // golden.ts's command line (--only) and the side seam an older checkout is loaded through (side.ts#registry): what the
@@ -72,9 +73,10 @@ describe("an older side's registry (side.ts#registry)", () => {
     return root;
   }
 
+  // The constructor is told by its behaviour, not by a sibling export: the new one without `defaultDiscovery`, the old
+  // one with it.
   it('since the discovery seam (8413120): constructed with { factory, discovery }', async () => {
     const root = await fakeSide(`
-      export const defaultDiscovery = async () => [];
       export const defaultFactory = () => undefined;
       export class AdapterRegistry {
         constructor(deps) { this.deps = deps; }
@@ -93,6 +95,7 @@ describe("an older side's registry (side.ts#registry)", () => {
 
   it("before it: the factory alone, devices listed by an unbound adapter's listDevices — answered by the discovery", async () => {
     const root = await fakeSide(`
+      export const defaultDiscovery = async () => [];
       export const defaultFactory = () => undefined;
       export class AdapterRegistry {
         constructor(factory = defaultFactory) { this.factory = factory; }
@@ -110,5 +113,9 @@ describe("an older side's registry (side.ts#registry)", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it("this checkout's registry reads as the new constructor", async () => {
+    expect(await takesDeps(AdapterRegistry)).toBe(true);
   });
 });
