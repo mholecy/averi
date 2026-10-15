@@ -33,9 +33,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * WORDS: each verb owns its sentences, save one clause — the presented
  * screen's (`presentedRemedy`, and `scroll_until`'s stop on it,
  * `presentedStop`), which lives here because interact/ and verify/ both say
- * it and verify/ may not import interact/; each verb's constant built on it
- * (interact/target-text.ts#PRESENTED_OVER,
- * verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT) owns its full sentence.
+ * it and verify/ may not import interact/; each verb calls it inside its own
+ * sentence.
  * The keyboard actions stay with the callers, and the keyboard guard (K1)
  * alone acts on the keyboard.
  *
@@ -380,7 +379,7 @@ export interface StandingFacts {
 
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
- * `what` — `it` in the tap's refusal and `scroll_until`'s stop (interact/target-text.ts#PRESENTED_OVER), `the element`
+ * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
  * since no scroll moves the node out from under it. The one clause of a remedy kept here, in the UI-tree layer both
  * verbs and the pixel assert may import, as system-bar.ts's words are (the module's doc: who owns a remedy's words).

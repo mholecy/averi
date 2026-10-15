@@ -6,9 +6,9 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, presentedOver, revealText, underKeyboardText, untriedSideText } from './target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { outsideItsScrollView, presentedStop, reachOf } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type PresentedTouchDown, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -464,7 +464,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       const presented =
         o.presented === undefined
           ? ''
-          : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedOver(o.presented.layer)}`;
+          : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedRemedy('it', o.presented.layer)}`;
       return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
   }

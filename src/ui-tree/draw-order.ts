@@ -351,7 +351,7 @@ export interface Exposure {
    * marks as a presented layer's, `markedLayers`: WDA's `Alert`, reaching the whole screen), in `covers`' order; empty
    * when none — never a control, a bar the layer carries or any other labelled node, which cover anyway (Safari's
    * capsule bar). What the sentences read: a target under one lies under a
-   * presented screen no scroll moves it out from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
+   * presented screen no scroll moves it out from under — close it first (ui-tree/standing.ts#presentedRemedy; ADR 0018).
    */
   readonly presented: readonly UiNode[];
   /**

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AdapterOpts, AdapterRegistry } from './registry.js';
 import { BARE_TREE_CONTENTS } from '../ui-tree/bare-tree.js';
 import { findAll } from '../ui-tree/selectors.js';
-import { presentedStop } from '../ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../ui-tree/standing.js';
 import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
@@ -12,7 +12,6 @@ import type { GuardOptions } from '../interact/keyboard.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
-import { PRESENTED_OVER } from '../interact/target-text.js';
 import { launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
 import { EngineSession, launchApp } from '../flow/launch.js';
 import { appBuildPath } from '../flow/load.js';
@@ -23,7 +22,7 @@ import { DEFAULT_ENSURE_TIMEOUT_MS } from '../flow/engine.js';
 import { formatSeconds } from '../util/duration.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
-import { OFF_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, PRESENTED_OVER_THE_ELEMENT, TOO_THIN_IN_ITS_SCROLL_VIEW, TOO_THIN_ON_THE_SCREEN } from '../verify/pixel-poll.js';
+import { OFF_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW, TOO_THIN_ON_THE_SCREEN } from '../verify/pixel-poll.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run/commands.js';
 import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES, runVerification } from '../run/verify.js';
@@ -384,7 +383,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'A wrapper with children (a `container` or an `other`) laid after the content counts as drawn over all of its rect, unless, among others, it is the screen\'s size (90 % of it or more), or it has no label and no value and holds the target together with the target\'s whole scroll view, or it has no label, value or identifier and holds only empty frames — since the tree cannot tell a host that swallows touches (a tab bar\'s) from a transparent one that only positions its child (an Android floating action button\'s full-width host, e.g. Clock\'s fab_container): a target beside or under such a FAB can be refused naming the container. ' +
         'When such a wrapper holds one child only, a control of at most a quarter of its area, the refusal says so in place of "scroll_until it first": \'the wrapper may only position its one child, <child>: tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first\'; a wrapper of several children (a tab bar\'s host) gets no such line. ' +
         'Under a screen presented over the target — a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +
-        `'${PRESENTED_OVER}'. Close that screen first. ` +
+        `'${presentedRemedy('it')}'. Close that screen first. ` +
         'A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers. ' +
         'when several match taps the only interactive one and says so; if several interactive elements match it refuses and lists them — narrow the selector. ' +
         'On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first, and the response says so; coordinate taps are sent as given. ' +
@@ -598,7 +597,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'rendered text read back off the screenshot ({"element":{...},"ocr":{"text":"CONTINUE","heightPct":2.96}} — what the user SEES, which the tree often does not carry: on iOS SwiftUI collapses a button into one node whose label is an authored a11y summary, so the visible string is absent; text is compared exactly — whitespace runs folded, case kept — except that a reading that differs only in what the recognizer cannot tell apart (typographic punctuation ’ “ – … read as ASCII, dropped diacritics) passes with a note naming the characters, and a match pattern written with them matches such a reading (write a pattern as the text reads on screen: only the pattern\'s own typographic and accented characters are folded, so an ASCII pattern does not match a typographic reading); heightPct is rendered ink height in % of screen width, the type-size check, single-line only; macOS-only, fails closed elsewhere), ' +
         'and screenshot pixel-diff vs. a stored baseline (auto-created on first use under .averi/baselines/). Prefer element asserts (deterministic, cheap) over screenshots. ' +
         'A color/ocr assert never samples what lies over its element: one under the soft keyboard (Android; iOS with treeSource: wda, or idb\'s band read by its shape), under the status bar (the top band the device reports — on iOS its top safe-area inset, 62 pt on a 402x874 iPhone; on Android the visible system status bar, 66 px on a 1080x2220 phone, which an app drawn edge-to-edge lays its top under), or under another element of the app drawn over any part of it (a pinned button bar and the area below it, a floating tab bar, a top bar over a scrolled row — judged over the whole rect, not only its centre; the element\'s own content listed beside it, a transparent clickable layer, and an overlap of ' + SLACK + ' units or less are not counted) fails closed naming what covers it and its rect, and the poll goes on, so one moved out before the deadline is measured; scroll_until it with fully: true first, or assert something in it that lies clear of that. Under a screen presented over the element (a modal\'s full-screen dimming view or a sheet\'s scroll view, as for tap) no scroll helps, and the failure says so instead: \'' +
-        PRESENTED_OVER_THE_ELEMENT +
+        presentedRemedy('the element') +
         '\' (whatever else lies over it — the status bar, a possible cut at the navigation bar — in place of its own advice, and wherever the element lies, nothing of it on the screen included; a keyboard the device reports is still named first, with its own). ' +
         'An element nothing of which (of what the assert reads) lies on the screen fails closed with \'' +
         OFF_THE_SCREEN +

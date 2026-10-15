@@ -5,7 +5,6 @@ import { keyboardPosition, type KeyboardLine, type KeyboardPosition } from '../.
 import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
-import { PRESENTED_OVER } from '../../src/interact/target-text.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
@@ -116,6 +115,7 @@ function beneathDim(box: Rect, content: UiNode[], dimmed = true): UiNode {
 }
 
 const PRESENTED_FOR_THE_ELEMENT = presentedRemedy('the element');
+const PRESENTED_OVER = presentedRemedy('it');
 
 describe('one remedy for a target beneath a presented screen — the tap, the pixel assert and scroll_until agree', () => {
   /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */

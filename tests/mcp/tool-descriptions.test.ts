@@ -58,21 +58,17 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
   DEFAULT_ENSURE_TIMEOUT_MS: 20_250,
 }));
 
-// The remedy sentences a description quotes have one owner too — the module that renders them: the tap's presented
-// remedy (interact/target-text.ts#PRESENTED_OVER), scroll_until's presented stop (ui-tree/standing.ts#presentedStop)
-// and the pixel assert's (verify/pixel-poll.ts#PRESENTED_OVER_THE_ELEMENT). Replaced by sentinels the descriptions must quote; the
-// troubleshooting reference, a file no import reaches, is pinned against the real sentences (`actualSentences`).
-vi.mock('../../src/interact/target-text.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/interact/target-text.js')>()),
-  PRESENTED_OVER: '<the presented remedy, as interact/target-text.ts renders it>',
-}));
+// The presented remedy a description quotes has one owner too — ui-tree/standing.ts, whose words every verb says:
+// `presentedRemedy` (of "it" for the tap, of "the element" for the pixel assert) and scroll_until's stop on it
+// (`presentedStop`). Replaced by sentinels the descriptions must quote; the troubleshooting reference, a file no import
+// reaches, is pinned against the real sentences (`actualSentences`).
 vi.mock('../../src/ui-tree/standing.js', async (orig) => ({
   ...(await orig<typeof import('../../src/ui-tree/standing.js')>()),
+  presentedRemedy: (what: 'it' | 'the element') => (what === 'it' ? '<the presented remedy, as ui-tree/standing.ts renders it of "it">' : '<the presented remedy, as ui-tree/standing.ts renders it of "the element">'),
   presentedStop: () => '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>',
 }));
 vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
-  PRESENTED_OVER_THE_ELEMENT: '<the presented remedy, as verify/pixel-poll.ts renders it>',
   OFF_THE_SCREEN: '<the off-screen miss, as verify/pixel-poll.ts renders it>',
   TOO_THIN_ON_THE_SCREEN: '<the thin-sliver miss, as verify/pixel-poll.ts renders it>',
   OUTSIDE_ITS_SCROLL_VIEW: '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it>',
@@ -275,9 +271,9 @@ async function actualSentences(): Promise<{
   OUTSIDE_ITS_SCROLL_VIEW: string;
   TOO_THIN_IN_ITS_SCROLL_VIEW: string;
 }> {
-  const { PRESENTED_OVER } = await vi.importActual<typeof import('../../src/interact/target-text.js')>('../../src/interact/target-text.js');
-  const PRESENTED_STOP = (await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js')).presentedStop();
-  const { PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
+  const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+  const [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT] = [presentedRemedy('it'), presentedStop(), presentedRemedy('the element')];
+  const { OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
     '../../src/verify/pixel-poll.js',
   );
   return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW };
@@ -291,8 +287,8 @@ async function actualSlack(): Promise<number> {
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
 describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
-  const TAP_SENTINEL = '<the presented remedy, as interact/target-text.ts renders it>';
-  const PIXEL_SENTINEL = '<the presented remedy, as verify/pixel-poll.ts renders it>';
+  const TAP_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "it">';
+  const PIXEL_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "the element">';
   const STOP_SENTINEL = '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>';
 
   it('every description quotes the owners\' sentences, never a copy of them', async () => {
