@@ -23,8 +23,8 @@ alert" below; residual 8 amended). Amended again 2026-10-15 (owner decisions Q1�
 review): the presented layer is the tree source's fact — the WDA parser marks it, by type or by its visibility flags,
 and a marked layer covers what lies outside it through the whole screen; the Decision's conditions and the amendment
 "a labelled dim" are the fallback for a tree whose source did not judge presented layers; residuals 1, 2, 5 (iOS),
-6, 7, 8 and 11 closed for WDA, 3, 4, 9 and 10 stand, 12–16 added (see "Amendment: the presented layer is the
-source's fact" below).
+6, 8 and 11 closed for WDA, 7 partly (a layer of only empty frames stands), 3, 4, 9 and 10 stand, 12–16 added (see
+"Amendment: the presented layer is the source's fact" below).
 
 ## Context
 
@@ -589,7 +589,7 @@ alert, and a non-modal sheet.
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
 | 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands |
-| 7 a layer of only empty frames | **closed** when the screen beneath reads `0` (the alert's bare dim) | stands |
+| 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **stands** for a layer of only empty frames: the flags rule skips a layer with no non-structural element, so it is not marked | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
 | 10 a strip with no node at a list's bottom | stands (no presentation) | stands |
@@ -678,7 +678,11 @@ Residuals 12–16 below are this amendment's. Risks, none measured (the device p
    stand on a tree whose source did not judge.
 7. **A layer whose content is only empty frames or itemless toolbars** reads as drawing nothing (a bare dimming view
    with no card), as before.
-   **Closed for WDA** (2026-10-15) when the screen beneath reads wholly `0`: the layer is marked, whatever it holds.
+   Partly closed for WDA (2026-10-15), when the screen beneath reads wholly `0`: a layer of itemless toolbars is
+   marked (a toolbar is content to the flags rule), and a bare dim inside a typed layer or a content-carrying one is
+   covered through that layer's mark (the alert's bare dim, by the typed mark). Stands for a layer of ONLY empty frames
+   (`container`/`other`, no non-structural element): `wda-source.ts#presentedScreen` skips a layer with no content, so
+   it is not marked, and the screen beneath reads as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
    unidentified, unlabelled frame) — except in a layer holding an alert, which covers the whole screen by the adapter's
    mark whatever its dim is (see "Amendment: a layer holding an alert"). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath
