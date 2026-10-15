@@ -180,10 +180,10 @@ export type RoundStep =
  *   remedy's), or — `next` set — it was not judged in the frame (below the
  *   fold, under the soft keyboard, cut or clipped) and the next stroke would
  *   touch down on a surface of that screen (`PresentedTouchDown`,
- *   ui-tree/draw-order.ts#DrawOrder.presentedAt), carried whole.
+ *   ui-tree/standing.ts#Scene.presentedAt), carried whole.
  *   `judged` undefined: no target in the tree, and the next stroke would
  *   touch down on a marked presented layer's element (an alert,
- *   ui-tree/draw-order.ts#DrawOrder.markedAt) — no stroke is sent under it.
+ *   the same question asked for no target) — no stroke is sent under it.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -1363,7 +1363,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s, now.facts);
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
     // since the reader's next step would otherwise be another scroll that lands there (`presentedTouchDown`).
-    const onPresented = presentedTouchDown(plannedStroke(s, now, gesture).step, best, now);
+    // Asked only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe
+    // would land.
+    const heldBack = plannedStroke(s, now, gesture).step;
+    const onPresented = best === undefined ? undefined : presentedTouchDown(heldBack, now, best.node);
     const by: BoundBy =
       exhausted !== undefined
       ? { of: 'exhausted', lastStroke: s.lastStroke, unchanged: exhausted, ...(touched !== undefined && { touched }) }
@@ -1396,18 +1399,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // popover over it, and read the cell "fully visible after 1 swipe"; under the SWIFT form's Fees half sheet two
   // strokes moved the sheet to another detent and read "content exhausted". So, as for a target judged under such a
   // screen (above): one more read with no stroke between, then stop `presented` — or, should the screen be gone from
-  // the touch-down by then, stroke as before. Only for a target this read holds: one not in the tree has nothing to
-  // ask on behalf of, and is still stroked for (ADR 0018, residual 6).
-  const onPresented = presentedTouchDown(stroke, best, now);
-  if (onPresented !== undefined && best !== undefined) {
+  // the touch-down by then, stroke as before. And on behalf of NO target (none in the tree): a stroke that would touch
+  // down on an alert the tree marks (its reach is the whole screen) lands on the alert, not on any screen beneath it —
+  // the same hold and stop, the alert named. Other presented screens are still stroked over for a target not in the
+  // tree: it has nothing to ask on behalf of. One question of the scene, at the touch-down (`presentedTouchDown`,
+  // ui-tree/standing.ts#Scene.presentedAt).
+  const onPresented = presentedTouchDown(stroke, now, best?.node);
+  if (onPresented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: onPresented }, current === 'settle' && presentedBefore, seen.elapsedMs);
-  }
-  // And on behalf of NO target (none in the tree): a stroke that would touch down on an alert the tree marks
-  // (`DrawOrder.markedAt`; its reach is the whole screen) lands on the alert, not on any screen beneath it — the
-  // same hold and stop, the alert named. Other presented screens are still stroked over for a target not in the tree.
-  const onMarked = best === undefined ? markedTouchDown(stroke, now) : undefined;
-  if (onMarked !== undefined) {
-    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: undefined, viewport, next: onMarked }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
   const { toward } = stroke;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
@@ -1456,24 +1455,21 @@ function plannedStroke(
 }
 
 /**
- * Where `stroke` would touch down — the driver's own point (swipe.ts#scrollStroke's `from`) — when that point lies
- * on a surface of a screen presented over `best`'s own (ui-tree/draw-order.ts#DrawOrder.presentedAt, ADR 0018), asked
- * on behalf of the target this read holds; undefined when it does not, when this round did not read, or when the
- * stroke has no box. Only the touch-down is asked: it is where the gesture is recognised.
+ * Where `stroke` would touch down — the driver's own point (swipe.ts#scrollStroke's `from`) — when that point lies on
+ * a presented screen, asked of the scene (ui-tree/standing.ts#Scene.presentedAt): on behalf of `target`, a surface of
+ * a screen presented over the target's own; with no target (none in the tree), a marked presented layer's element.
+ * Undefined when it does not, when this round did not read, or when the stroke has no box. Only the touch-down is
+ * asked: it is where the gesture is recognised.
  */
-function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): PresentedTouchDown | undefined {
-  if (best === undefined || now === undefined || stroke.box === undefined) return undefined;
-  const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
-  const surface = now.facts.scene.order.presentedAt(best.node, touchDown);
-  return surface === undefined ? undefined : { ...now.facts.scene.order.presentedPress(surface), touchDown };
-}
-
-/** Where `stroke` would touch down when that lands on a marked presented layer's element (`DrawOrder.markedAt`), asked for no target; undefined when it does not, when this round did not read, or when the stroke has no box. */
-function markedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, now: ThisRead | undefined): PresentedTouchDown | undefined {
+function presentedTouchDown(
+  stroke: Extract<RoundStep, { do: 'stroke' }>,
+  now: ThisRead | undefined,
+  target: UiNode | undefined,
+): PresentedTouchDown | undefined {
   if (now === undefined || stroke.box === undefined) return undefined;
   const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
-  const surface = now.facts.scene.order.markedAt(touchDown);
-  return surface === undefined ? undefined : { ...now.facts.scene.order.presentedPress(surface), touchDown };
+  const press = now.facts.scene.presentedAt(touchDown, target);
+  return press === undefined ? undefined : { ...press, touchDown };
 }
 
 /**

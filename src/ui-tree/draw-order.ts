@@ -71,7 +71,7 @@ const markOf = (node: UiNode): MarkedLayer | undefined => (node.presentation ===
  *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
  *   drawn over the strip a node cut short of its own content would gain?
  * - `presentedAt(node, point)` — `scroll_until`'s stroke
- *   (interact/scroll-rounds.ts#presentedTouchDown): is the touch-down of a
+ *   (standing.ts#Scene.presentedAt): is the touch-down of a
  *   stroke for a target not judged in the viewport on a surface of a screen
  *   presented over the target's own (`exposure`'s column, then
  *   `presentedSurface`, ADR 0018)?
@@ -150,9 +150,9 @@ export interface DrawOrder {
    * column, as `exposure` asks before it asks `presentedSurface`); undefined when none, or for a node not in this tree.
    * `exposure` cannot answer it for a node outside the box: it judges only what of the node shows, so a target below
    * the fold has no covers and no presented surface (`presentedOver` asks the same less the point). One reader:
-   * `scroll_until`'s stroke
-   * (interact/scroll-rounds.ts#round), which asks it at the stroke's touch-down for a target it has not judged in the
-   * viewport — a stroke that would touch down on such a screen is not sent (it may dismiss the screen, as one closed
+   * `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which asks it at
+   * the stroke's touch-down for a target it has not judged in the viewport — a stroke that would touch down on such a
+   * screen is not sent (it may dismiss the screen, as one closed
    * Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN screen is
    * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before. An element the tree
    * source marks as a presented layer's (`markedLayers`, WDA's `Alert`) holds every point of the screen: with an alert
@@ -188,7 +188,8 @@ export interface DrawOrder {
    * lands on, asked for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the
    * last such element, whose reach is the whole screen — unless the point lies on a scroll view of the element's own
    * (a stroke scrolling the alert's own content). Undefined when none. One reader: `scroll_until`'s stroke
-   * (interact/scroll-rounds.ts#round), which sends no stroke that would land on it.
+   * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no stroke that would land
+   * on it.
    */
   markedAt(point: Point): UiNode | undefined;
   /**
