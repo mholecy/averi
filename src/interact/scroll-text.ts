@@ -435,7 +435,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       const layer = next === undefined ? o.layer : next.layer;
       if (judged === undefined) {
         // No target in the tree: the next swipe would have landed on a layer the tree marks by its type
-        // (`DrawOrder.markedAt`).
+        // (`Scene.presentedAt`, asked for no target).
         return { message: `scroll_until ${describe} stopped ${when} — element is not in the tree${touchDownText(next)} — ${presentedStop(layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent.` };
       }
       const where =

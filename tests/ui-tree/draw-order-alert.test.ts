@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
 
 // A layer the tree source marks as an alert's (`UiNode.presentation` on the layer, its `Alert` the element naming it)
@@ -127,5 +128,43 @@ describe('an alert covers the whole screen beneath it', () => {
     const tree = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE }), keyboard, node({ role: 'container', rect: IPHONE, children: [alert] })] });
     expect(exposed(tree, key)).toMatchObject({ covers: [], presented: [], shows: 1, tapAt: { moved: false } });
     expect(drawOrder(tree).presentedOver(key)).toBeUndefined();
+  });
+});
+
+describe('the scene\'s presented question at a touch-down (`Scene.presentedAt`): the surface a stroke at a point lands on, as a sentence quotes it', () => {
+  it('for a target beneath the alert, at any point — on the card, above it, below it: the alert, reaching the whole screen, handed on as its layer', async () => {
+    const tree = await alertTree();
+    const scene = sceneOf(tree);
+    const field = byId(tree, 'form.note_input');
+    const alert = drawOrder(tree).presentedOver(field)!;
+    for (const point of [{ x: 201, y: 175 }, { x: 201, y: 459 }, { x: 201, y: 699 }]) {
+      expect(scene.presentedAt(point, field)).toEqual({ surface: alert, reach: IPHONE, layer: { kind: 'alert', label: 'Leave the form' } });
+    }
+  });
+
+  it('for a target of the alert itself: none', async () => {
+    const tree = await alertTree();
+    expect(sceneOf(tree).presentedAt({ x: 201, y: 699 }, byLabel(tree, 'Leave'))).toBeUndefined();
+  });
+
+  it('with no target (one not in the tree): the alert, wherever the point lies on the screen', async () => {
+    const tree = await alertTree();
+    const alert = drawOrder(tree).presentedOver(byId(tree, 'form.note_input'))!;
+    for (const point of [{ x: 201, y: 175 }, { x: 201, y: 699 }]) expect(sceneOf(tree).presentedAt(point)).toEqual({ surface: alert, reach: IPHONE, layer: { kind: 'alert', label: 'Leave the form' } });
+  });
+
+  it('with no target, at a point on a scroll view of the alert\'s own: none — a stroke scrolling the alert\'s content is sent', () => {
+    const list = node({ role: 'scrollable', rect: rect(41, 400, 320, 100) });
+    const alert = node({ role: 'container', label: 'Terms', rect: rect(41, 365, 320, 172), presentation: 'alert', children: [list] });
+    const tree = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE }), node({ role: 'container', rect: IPHONE, children: [alert] })] });
+    expect(sceneOf(tree).presentedAt({ x: 201, y: 450 })).toBeUndefined();
+    expect(sceneOf(tree).presentedAt({ x: 201, y: 699 })).toMatchObject({ surface: alert, reach: IPHONE });
+  });
+
+  it('none with nothing presented, with a target or without', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: rect(20, 700, 362, 52) });
+    const tree = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE, children: [row] })] });
+    expect(sceneOf(tree).presentedAt({ x: 201, y: 699 }, row)).toBeUndefined();
+    expect(sceneOf(tree).presentedAt({ x: 201, y: 699 })).toBeUndefined();
   });
 });

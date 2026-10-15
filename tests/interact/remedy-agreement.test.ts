@@ -600,5 +600,14 @@ describe('a target beneath an alert — the tap, the pixel assert and scroll_unt
         `${CLOSE_IT}, and a swipe would land on the alert, so none was sent.`,
     );
   });
+
+  it('a target not in the tree with the bound already reached: the bound says nothing of where its held-back swipe would touch down — that is asked only on behalf of a target', async () => {
+    const tree = await alertForm();
+    const row: Row = { tree, found: [], screen: USABLE };
+    const played = play({ direction: 'down', fully: false, maxSwipes: 0, timeoutMs: 30_000, screen: IPHONE }, [row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' } });
+    expect(played.outcome).not.toHaveProperty('presented');
+  });
 });
 
