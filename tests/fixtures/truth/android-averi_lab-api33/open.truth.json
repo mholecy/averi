@@ -1,0 +1,76 @@
+{
+  "cell": "open",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.open.A",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 303,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#E53935"
+    },
+    {
+      "tag": "B",
+      "id": "lab.open.B",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#1E88E5"
+    },
+    {
+      "tag": "C",
+      "id": "lab.open.C",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 1293,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#43A047"
+    },
+    {
+      "tag": "D",
+      "id": "lab.open.D",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 1788,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [],
+      "drawn": 1,
+      "seen": "#FB8C00"
+    }
+  ]
+}

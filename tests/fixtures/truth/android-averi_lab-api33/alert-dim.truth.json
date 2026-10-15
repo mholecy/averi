@@ -1,0 +1,80 @@
+{
+  "cell": "alert-dim",
+  "layer": "alert",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.alert-dim.A",
+      "color": "#E53935",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 303,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        "dismissed alert"
+      ],
+      "drawn": 0,
+      "seen": "#5C1715"
+    },
+    {
+      "tag": "B",
+      "id": "lab.alert-dim.B",
+      "color": "#1E88E5",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#ECE6F0"
+    },
+    {
+      "tag": "C",
+      "id": "lab.alert-dim.C",
+      "color": "#43A047",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 1293,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#1B401C"
+    },
+    {
+      "tag": "D",
+      "id": "lab.alert-dim.D",
+      "color": "#FB8C00",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 1788,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        "dismissed alert"
+      ],
+      "drawn": 0,
+      "seen": "#643800"
+    }
+  ]
+}
