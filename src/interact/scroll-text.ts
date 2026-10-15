@@ -1,4 +1,4 @@
-import { rectArea, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
+import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -10,7 +10,7 @@ import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, presentedOver, 
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import type { MarkedLayer } from '../ui-tree/draw-order.js';
 import { outsideItsScrollView, reachOf } from '../ui-tree/standing.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type PresentedTouchDown, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**
@@ -301,6 +301,11 @@ export const PRESENTED_STOP = `${PRESENTED_OVER}, and a swipe on it may dismiss 
 /** `PRESENTED_STOP` for a presented layer the tree source marks (an alert, the outcome's `layer`): it is named, and a swipe would land on it. */
 const presentedStop = (layer: MarkedLayer | undefined): string => (layer === undefined ? PRESENTED_STOP : `${presentedOver(layer)}, and a swipe would land on the ${layer.kind}`);
 
+/** `, and the next swipe would touch down at (x,y) on <the surface>` — where the `presented` stop's held-back stroke would have landed (`next`); empty when it was judged in the frame. */
+const touchDownText = (next: PresentedTouchDown | undefined): string => (next === undefined ? '' : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${coverText(next.surface, next.reach)}`);
+
+const pointText = (p: Point): string => `(${p.x},${p.y})`;
+
 /**
  * The failure for every outcome but `visible`, and its class: `stuck` and
  * `presented` a plain Error (the element was there and seen); `covered` and `bound`
@@ -436,20 +441,20 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // viewport under that screen, the sentence says what is over it; not judged there (`touchDown`), why not
       // and where the next swipe would have landed — on that screen (`notInViewportText`). "The next swipe", not
       // "the swipe toward it": a turn, or a caller's direction away from the target, strokes the other way.
-      const { judged, cover, viewport } = o;
+      const { judged, viewport, next } = o;
       const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
+      const layer = next === undefined ? o.layer : next.layer;
       if (judged === undefined) {
         // No target in the tree: the next swipe would have landed on an alert the tree marks (`DrawOrder.markedAt`).
-        const at = o.touchDown === undefined ? '' : `, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${coverText(cover, o.reach)}`;
-        return { message: `scroll_until ${describe} stopped ${when} — element is not in the tree${at} — ${presentedStop(o.layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent.` };
+        return { message: `scroll_until ${describe} stopped ${when} — element is not in the tree${touchDownText(next)} — ${presentedStop(layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent.` };
       }
       const where =
-        o.touchDown === undefined
-          ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(judged.standing.facts.shows)}% of it shows`
-          : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${coverText(cover, o.reach)}`;
+        next === undefined
+          ? `element is in the viewport but ${drawnOverText(o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, o.cover))} — ${percent(judged.standing.facts.shows)}% of it shows`
+          : `${notInViewportText(judged, viewport)}${touchDownText(next)}`;
       return {
         message:
-          `scroll_until ${describe} stopped ${when} — ${where} — ${presentedStop(o.layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+          `scroll_until ${describe} stopped ${when} — ${where} — ${presentedStop(layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }
@@ -470,7 +475,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       const presented =
         o.presented === undefined
           ? ''
-          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedOver(o.presented.layer)}`;
+          : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedOver(o.presented.layer)}`;
       return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
   }

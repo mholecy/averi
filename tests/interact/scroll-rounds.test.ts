@@ -1994,7 +1994,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the dim at the touch-down (201,699)', () => {
       const played = play(IPHONE, [BELOW, BELOW]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'role:container label:"add instant message"').message).toBe(
         'scroll_until role:container label:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ' +
           'container "dismiss popup" (0,0 402x874) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, ' +
@@ -2009,7 +2009,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const row: Row = { tree, found: [text] };
       const played = play(IPHONE, [row, row]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'text:"add instant message"').message).toMatch(
         /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
       );
@@ -2043,7 +2043,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [field, field]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       // Asked where the stroke would touch down above the keyboard (swipe.ts#strokeRoom's cut), not on its keys at (201,699).
-      expect(played.outcome).toMatchObject({ kind: 'presented', touchDown: { x: 201, y: 459 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', next: { touchDown: { x: 201, y: 459 } } });
       expect(failureOf(played, 'role:container label:"add field"').message).toMatch(
         /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
       );
@@ -2114,7 +2114,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const row: Row = { tree, found: [twin], screen: eitherWayUp };
       const played = play({ ...IPHONE, direction: 'up', maxSwipes: 5, timeoutMs: 30_000 }, [row, row, row, row]);
       expect(played.steps.map((st) => (st.do === 'stroke' ? st.toward : st.do))).toEqual(['up', 'up', 'confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 2, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 2, next: { touchDown: { x: 201, y: 699 } } });
       expect(failureOf(played, 'label:"dismiss popup"').message).toMatch(
         /^scroll_until label:"dismiss popup" stopped after 2 swipes, without swiping further — element is in the viewport but CLIPPED at [a-z/]+, 10% of it is in the viewport, and the next swipe would touch down at \(201,699\) on scrollable \(31,456 340x355\) — a screen is presented over it /,
       );
@@ -2124,7 +2124,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const failed: Row = { error: 'WDA /source returned 500' };
       const played = play(IPHONE, [BELOW, failed, failed, failed]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'confirm', 'confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, touchDown: { x: 201, y: 699 } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
     });
 
     it('sideways (synthetic: a carousel of the screen beneath, a presented dim over the screen): a card wholly right of the viewport, or left of it, is named on that side, and the next swipe would touch down on the dim', () => {
