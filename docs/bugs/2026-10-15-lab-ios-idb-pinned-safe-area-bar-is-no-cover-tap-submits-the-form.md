@@ -2,8 +2,9 @@
 
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/form-keyboard.*`, captured by scripts/truth/capture.ts on the dedicated
-`averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `truth/phase-0-1` on `dda435b`'s `src/` (no
-`src/` change on the branch). Replayed only; the tap's effect is the capture's own probe on the simulator.
+`averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `truth/phase-0-1` on `arch/round-20`'s
+`src/` (`debc9b2`; no other `src/` change on the branch — first seen on `dda435b`'s, unchanged since). Replayed only;
+the tap's effect is the capture's own probe on the simulator.
 
 ## The screen
 
@@ -91,7 +92,9 @@ keyboard`: it is not inside by 1 pt. The golden rows above are the fix's check.
 - Kept in tests/differential/golden.test.ts's KNOWN list as `lab finding: …` (`form-keyboard.idb.json phone tap`,
   `… phone scroll_until`) until fixed.
 - The four fields wholly under the keyboard (`vs`, `ks`, `ss`, `note`) are absent from idb's list: their `tap` times out
-  "waiting for element … to appear" — the known "idb lists nothing under the keyboard" class (tools.ts says so), not
-  this bug.
+  "waiting for element … to appear" — the known "idb lists nothing under the keyboard" (tools.ts says so), not this
+  bug. Their `scroll_until` rows are KNOWN too: two swipes touching down at y 472, above the keyboard, then "never
+  appeared in the tree" — vacuous (a replayed tree cannot show whether the swipes would bring the field out), and
+  pinned with those swipes, so a stroke moved under the keyboard fails the ratchet.
 - Re-verified by replay at `8600176` (`arch/round-20` merged): unchanged — idb `tap` answers `Tapped
   id:"lab.form-keyboard.phone"` and sends `idb ui tap 201 547`; `scroll_until` answers `fully visible after 0 swipes`.

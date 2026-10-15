@@ -10,18 +10,19 @@ import type { Catalog } from './schema.js';
  * The truth capture's command lines (capture-run.ts does the work; README.md beside scripts/differential, "Golden mode"):
  *
  *   node --import tsx scripts/truth/capture.ts --udid <lab simulator> --out tests/fixtures/truth/<run>
- *        [--device "<name>, iOS <version>"] [--wda-port 8120] [--cells open,alert-dim]
+ *        [--wda-port 8120] [--cells open,alert-dim]
  *   node --import tsx scripts/truth/capture-android.ts --serial <lab emulator> --out tests/fixtures/truth/<run>
- *        [--device "<avd>, Android <version> (API <N>)"] [--cells open,alert-dim]
+ *        [--cells open,alert-dim]
  *
  * iOS: the raw WDA `/source?format=json` body (averi's own WdaServer, only its process lifecycle, on a port of its own —
  * never 8100/8101, the device-check simulator's — and a derived-data directory of its own) and the raw idb `ui
  * describe-all --json` list; probes with `idb ui tap`. Android: the raw `uiautomator dump /dev/tty` output; probes with
  * `adb -s <serial> shell input tap`; never restarts the adb server. The device must be the lab's — a simulator named
  * `averi-lab …` (never the device-check simulator), the `averi_lab` AVD — or the capture refuses before touching it
- * (lab-device.ts#IosLab.guard, #AndroidLab.guard); the manifest's device is what simctl / adb report (`--device`
- * relabels it, the guard still runs). A run of `--cells` adds to (or replaces those cells
- * in) the run's manifest, from the same device only. Exit code 1 when a cell is broken (its truth's sources disagree).
+ * (lab-device.ts#IosLab.guard, #AndroidLab.guard); the manifest's device is what simctl / adb report, no label of
+ * the caller's. A run of `--cells` adds to (or replaces those cells in) the run's manifest, from the same device only —
+ * the description the guard reports equal to the manifest's. Exit code 1 when a cell is broken (its truth's sources
+ * disagree).
  */
 
 export async function main(platform: 'ios' | 'android', argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -31,17 +32,15 @@ export async function main(platform: 'ios' | 'android', argv: string[] = process
       udid: { type: 'string' },
       serial: { type: 'string' },
       out: { type: 'string' },
-      device: { type: 'string' },
       'wda-port': { type: 'string' },
       cells: { type: 'string' },
     },
   });
   const id = platform === 'ios' ? values.udid : values.serial;
   if (id === undefined || values.out === undefined) {
-    throw new Error(platform === 'ios' ? 'usage: capture.ts --udid <udid> --out <dir> [--device …] [--wda-port N] [--cells a,b]' : 'usage: capture-android.ts --serial <serial> --out <dir> [--device …] [--cells a,b]');
+    throw new Error(platform === 'ios' ? 'usage: capture.ts --udid <udid> --out <dir> [--wda-port N] [--cells a,b]' : 'usage: capture-android.ts --serial <serial> --out <dir> [--cells a,b]');
   }
-  const device = values.device === undefined ? {} : { device: values.device };
-  const lab: LabDevice = platform === 'ios' ? new IosLab(id, { ...device, wdaPort: Number(values['wda-port'] ?? 8120) }) : new AndroidLab(id, device);
+  const lab: LabDevice = platform === 'ios' ? new IosLab(id, { wdaPort: Number(values['wda-port'] ?? 8120) }) : new AndroidLab(id);
   const catalog = JSON.parse(await readFile(join(fileURLToPath(new URL('.', import.meta.url)), '../../fixtures/apps/cells.json'), 'utf8')) as Catalog;
   const only = values.cells?.split(',');
   const cells = catalog.cells.filter((c) => only === undefined || only.includes(c.id));

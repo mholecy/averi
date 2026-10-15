@@ -23,18 +23,23 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 2. **Golden judges classes, not wording.** Tapped or refused and the remedy named; passed or failed; reached or stopped;
    a tap or a stroke sent or not. The table that maps a truth to its classes lives in code
    (scripts/differential/golden-spec.ts), each row citing the rule or ADR that decides it. A reply saying the target is
-   not in the tree is no evidence either way: every row classes it as the "not in the tree" mismatch, never a pass —
-   unless the row's truth allows the target to be absent (a lazy row not laid out). Wording stays the OLD/NEW
-   differential's business.
+   not in the tree is judged by its effect first: where the row rejects it (a tap refused without its remedy, a stroke
+   beneath the presented layer), the mismatch is the row's own reason; where the row would accept it, it is no evidence
+   either way — the "not in the tree" mismatch, never a pass — unless the row's truth allows the target to be absent (a
+   lazy row not laid out). Wording stays the OLD/NEW differential's business.
 3. **A broken cell is reported, not judged.** When a capture's sources disagree with each other — declared open but not
    reached, a probe tap that left no touch in the app, an open control the probe did not reach (the consistency checks
    of scripts/truth/truth.ts) — it says nothing about averi: it is listed broken and the run fails until the cell is
    fixed or recaptured. What is not asked: on a coloured-target cell, the broken target's rows (its other targets are
    still judged); on a form cell, every row of the cell, once any control is broken.
 4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch by
-   `<run>/<file> <target> <verb>` with its note (the bug note, or the class: "not in the tree"). A listed mismatch that
-   stops occurring fails the test until it is struck off; a new one fails it until it is fixed or listed with its note.
-   The checks per capture are pinned too, so a row that silently stops being asked fails.
+   `<run>/<file> <target> <verb>` with its class (what its mismatch says first), its reply's kind (one of a closed set:
+   not found, Tapped, visible, PASS, FAIL, refused, other — `replyKind` in scripts/differential/golden-spec.ts), the
+   taps and swipes it sent, and its note (the bug note, or why). A listed mismatch that stops occurring fails the test
+   until it is struck off; a new one fails it until it is fixed or listed with its note; a listed one whose class,
+   reply kind or device calls change fails it too — it still mismatches, but differently (a timeout turned into a
+   refusal with the wrong remedy keeps its class and its calls, but not its kind). The checks per capture are pinned,
+   so a row that silently stops being asked fails.
 
 ## Consequences
 

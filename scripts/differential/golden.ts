@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
 import type { Recording } from './corpus.js';
-import { configFor, connect } from './differential.js';
-import { expectations, formExpectations, type Verb } from './golden-spec.js';
+import { configFor, connect, type Outcome } from './differential.js';
+import { expectations, formExpectations, replyKind, sent, type ReplyKind, type Verb } from './golden-spec.js';
 import type { Side } from './side.js';
 import { pct, type CellTruth } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
@@ -35,6 +35,10 @@ export interface GoldenCheck {
   /** undefined: as the truth implies. */
   mismatch?: string;
   reply: string;
+  /** What kind of reply it is (golden-spec.ts#replyKind): the ratchet pins it for a known mismatch. */
+  kind: ReplyKind;
+  /** The taps and swipes the device was sent (golden-spec.ts#sent): the ratchet pins them for a known mismatch. */
+  calls: string[];
   /** What says the HARNESS failed, not the tool (`faultsOf`): absent when none. */
   faults?: string[];
 }
@@ -55,9 +59,9 @@ export function faultsOf(o: { reply: string; device: readonly string[] }): strin
   return [...(line === undefined ? [] : [line.slice(0, 200)]), ...o.device.filter((d) => d.startsWith('UNMODELLED '))];
 }
 
-const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: { reply: string; device: readonly string[] }): GoldenCheck => {
+const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: Outcome): GoldenCheck => {
   const faults = faultsOf(outcome);
-  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, ...(faults.length > 0 && { faults }) };
+  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
 };
 
 export interface GoldenResult {

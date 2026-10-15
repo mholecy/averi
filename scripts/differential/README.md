@@ -101,8 +101,10 @@ control that the tap reached the app at all — and how much of the target the s
 fake device serves that screenshot instead of the grey frame (and refuses a profile whose frame is not its size);
 `golden-spec.ts` says what each verb must answer for each kind of truth (tapped or refused and the remedy, colour pass
 or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. A reply that says the
-target is not in the tree (a tap "waiting for element … to appear", an assert's "not found within") is no evidence
-either way: its mismatch is said to be of that class first (`not in the tree: …`).
+target is not in the tree (a tap "waiting for element … to appear", scroll_until's "never appeared in the tree", an
+assert's "not found within") is judged by its effect first — a tap refused without its remedy, a stroke beneath the
+presented layer is the row's own mismatch; only where the row would accept it is it no evidence either way, its
+mismatch said to be of that class first (`not in the tree: …`).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
@@ -115,8 +117,9 @@ whose reply is a harness or JavaScript error (`THROW`, "is not a function", "Can
 device's `differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
 (`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault. `tests/differential/golden.test.ts` runs it over the committed truth on
 this checkout: no broken target, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target>
-<verb>` with their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or
-listed).
+<verb>` with their class, their reply's kind (`golden-spec.ts#replyKind`: not found, Tapped, visible, PASS, FAIL,
+refused, other), the taps and swipes they sent and their notes — a ratchet both ways (one fixed fails until struck off;
+a new one fails until fixed or listed; one whose class, reply kind or device calls change fails until re-noted).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no coloured
 targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it shows with

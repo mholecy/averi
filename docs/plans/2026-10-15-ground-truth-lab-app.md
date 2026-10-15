@@ -85,7 +85,12 @@ matters for `Tapped` is whether the action fired.
   green at `dda435b`. Measured: red at `dda435b` as stated, green at `fix/r19-alert` `e10219e` (commit 9604314's message
   says `5ac759f`; that SHA is wrong — the green tip was `e10219e`). On this branch: green from the merge of
   `arch/round-20` (round 19's alert fix and round 20's presented layer) at `8600176` — golden 237 checks, 69 → 60
-  mismatches, the 9 WDA `alert-dim` rows struck off KNOWN, no other row's verdict changed.
+  mismatches, the 9 WDA `alert-dim` rows struck off KNOWN, no other row's verdict changed. With phases 1b and 2: 237
+  checks, 64 mismatches, all KNOWN and each pinned by its class, its reply's kind (62 not found, 1 Tapped, 1 visible)
+  and the taps and swipes it sent (a "not in the tree" reply is classed by its effect where its row rejects it): 19
+  tap refused without "close it first", 4 tap refused without naming the keyboard, 1 Tapped, 16 swiped 2× beneath a
+  presented layer, 3 swiped 2× beneath the sheet, 1 reached with no swipe where a tap fires submit, and 20 vacuous
+  "not in the tree" (16 colour, 4 keyboard `scroll_until`).
 
 ### Phase 1b — forms and validation (iOS)
 
@@ -106,8 +111,9 @@ that, so forms are a cell family of their own, with an oracle of their own — t
 | `form-picker` | a country field opening a sheet with a long list (the SWIFT form's country sheet) | `scroll_until` in a sheet, a row tap, the value back in the field |
 
 Text cells for P5's sample (typographic quotes, NBSP, diacritics) are fields and labels here too, so `fill` and the
-tree's text are judged on the same strings. `ocr` on them moved to phase 4, with OCR against real pixels. The golden spec gains rows per verb: the field's value after
-`fill` equals what was asked, an error the app shows is the one `assert … error:` reads, and so on.
+tree's text are judged on the same strings. `ocr` on them moved to phase 4, with OCR against real pixels. The golden
+spec gains rows per verb: the field's value after `fill` equals what was asked, an error the app shows is the one
+`assert … error:` reads, and so on.
 
 A replayed tree is static: typing changes nothing in it, so `fill` / `type_text` / `clear` cannot be judged by replay.
 The form cells therefore bring the **live** golden mode forward (phase 5's): averi runs on the lab simulator, and the
@@ -145,11 +151,12 @@ builds (scripts/differential/README.md, Calibration on the bug notes).
 
 ### Phase 4 — the matrix, generated
 
-One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells
-for P5's sample. OCR judged against real pixels (the macOS recognizer on the captured screenshot; skipped where it
-is unavailable), phase 1b's text samples included. The covering layer per target (the proposal's P1, "the covering
-layer, if any") is recorded in the truth file here; until then the cell's `layer`, the declared kind and the probe's
-events (`dismissed`, another target's `tap`) stand for it (ADR 0020, residuals). The RN modal cases only if the existing RN trees do not cover them.
+One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells for
+P5's sample. OCR judged against real pixels (the macOS recognizer on the captured screenshot; skipped where it is
+unavailable), phase 1b's text samples included. The covering layer per target (the proposal's P1, "the covering layer,
+if any") is recorded in the truth file here; until then the cell's `layer`, the declared kind and the probe's events
+(`dismissed`, another target's `tap`) stand for it (ADR 0020, residuals). The RN modal cases only if the existing RN
+trees do not cover them.
 
 ### Phase 5 — live golden
 

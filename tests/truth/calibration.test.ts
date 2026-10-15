@@ -126,7 +126,7 @@ const KX = 'ios-iphone17-ios27/sheet-medium.wda.json S tap';
 const OPEN = 'ios-iphone17-ios27/open.wda.json A tap';
 const check = (key: string, mismatch: string | undefined, more: Partial<GoldenCheck> = {}): GoldenCheck => {
   const [recording, target, verb] = key.split(' ');
-  return { recording, target, verb: verb as GoldenCheck['verb'], says: '', reply: `reply of ${key}`, ...(mismatch !== undefined && { mismatch }), ...more };
+  return { recording, target, verb: verb as GoldenCheck['verb'], says: '', reply: `reply of ${key}`, kind: 'other', calls: [], ...(mismatch !== undefined && { mismatch }), ...more };
 };
 /** A side whose rows are `rows` (key → mismatch, undefined green). */
 const side = (rows: Record<string, string | undefined>): SideRun => ({ checks: new Map(Object.entries(rows).map(([k, m]) => [k, check(k, m)])) });

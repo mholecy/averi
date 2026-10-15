@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Outcome } from '../../scripts/differential/differential.js';
-import { expectations, formExpectations, pairingOf, taps, touchDowns, type Expectation } from '../../scripts/differential/golden-spec.js';
+import { expectations, formExpectations, pairingOf, replyKind, taps, touchDowns, type Expectation } from '../../scripts/differential/golden-spec.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
 // The golden spec's judges (scripts/differential/golden-spec.ts), each on the replies that decide it — the real ones,
@@ -80,7 +80,7 @@ describe('a target beneath a presented layer', () => {
     expect(tap.judge(out('ERROR … a screen is presented over it (a modal or a sheet) — close it first; nothing was tapped'))).toBeUndefined();
     expect(tap.judge(out('ERROR … close it first', ['adb shell input tap 540 391']))).toMatch(/^refused, but sent adb shell input tap 540 391/);
     expect(tap.judge(out('Tapped id:"lab.alert-dim.A"'))).toMatch(/^Tapped/);
-    expect(tap.judge(out('ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.A" to appear'))).toMatch(/^not in the tree: refused without "close it first"/);
+    expect(tap.judge(out('ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.A" to appear'))).toMatch(/^refused without "close it first": ERROR Timed out/);
   });
 
   it('colour: a pass measured the cover; a fail because the element is not in the tree is no evidence', () => {
@@ -96,7 +96,7 @@ describe('a target beneath a presented layer', () => {
     const scroll = row(rows, 'scroll_until');
     expect(scroll.judge(out('ERROR scroll_until … stopped before any swipe … close it first'))).toBeUndefined();
     expect(scroll.judge(out('ERROR scroll_until … never appeared in the tree', ['adb shell input swipe 540 1776 540 444 1334', 'adb shell input swipe 540 1776 540 444 1334']))).toMatch(
-      /^not in the tree: swiped 2× beneath a presented layer/,
+      /^swiped 2× beneath a presented layer/,
     );
   });
 });
@@ -128,7 +128,7 @@ describe('a field under the keyboard', () => {
     const tap = row(rows, 'tap');
     expect(tap.judge(out('ERROR The soft keyboard covers id:"lab.form-keyboard.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) …'))).toBeUndefined();
     expect(tap.judge(out('ERROR Timed out after 5000ms waiting for element id:"lab.form-keyboard.vs" to appear'))).toBe(
-      'not in the tree: refused without naming the keyboard: ERROR Timed out after 5000ms waiting for element id:"lab.form-keyboard.vs" to appear',
+      'refused without naming the keyboard: ERROR Timed out after 5000ms waiting for element id:"lab.form-keyboard.vs" to appear',
     );
     expect(tap.judge(out('ERROR id:"lab.form-keyboard.vs" is under container "keyboard" …'))).toMatch(/^refused without naming the keyboard/);
     expect(tap.judge(out('Tapped id:"lab.form-keyboard.vs"', ['idb ui tap 201 621']))).toMatch(/^Tapped/);
@@ -160,5 +160,26 @@ describe('a field partly hidden whose probe fired another control (the phone fie
 
   it('a covered control whose probe fired nothing else has no row', () => {
     expect(formExpectations('ios', formTruth([{ ...phone, probe: [{ kind: 'touch', tag: '201.0,547.0' }, { kind: 'focus', tag: '' }] }]))).toEqual([]);
+  });
+});
+
+describe('replyKind: what kind of reply it is, pinned on every known mismatch (golden.test.ts)', () => {
+  it.each([
+    ['ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear', 'not found'],
+    ['ERROR scroll_until id:"lab.x" failed after 2 swipes (…) — element never appeared in the tree', 'not found'],
+    ['1/1 asserts FAILED\nFAIL  element id:"lab.x" fill … — not found within 1 s', 'not found'],
+    ['Tapped id:"lab.x"', 'Tapped'],
+    ['Tapped id:"lab.x" (2 matches; …)', 'Tapped'],
+    ['Element id:"lab.x" fully visible after 2 swipes', 'visible'],
+    ['Element id:"lab.x" visible after 1 swipe — clipped at the bottom edge …', 'visible'],
+    ['All 1 asserts passed\nPASS  element id:"lab.x" …', 'PASS'],
+    ['1/1 asserts FAILED\nFAIL  element id:"lab.x" … — expected … got …', 'FAIL'],
+    ['ERROR id:"lab.x" is under container (0,0 402x874) — scroll_until it first; nothing was tapped', 'refused'],
+    ['ERROR id:"lab.x" is under a presented layer — close it first; nothing was tapped', 'refused'],
+    ['ERROR The soft keyboard covers id:"lab.x" …', 'refused'],
+    ['ERROR scroll_until id:"lab.x" failed after 2 swipes — under button "Continue"', 'refused'],
+    ['something else', 'other'],
+  ] as const)('%s → %s', (reply, kind) => {
+    expect(replyKind(out(reply))).toBe(kind);
   });
 });

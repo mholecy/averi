@@ -52,7 +52,8 @@ const only = values.cases?.split(',');
 /** Where a case that is not ok leaves its screenshot (`--shots <dir>`), for the evidence. */
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
-const lab = new IosLab(udid);
+// The WDA port too: 8100/8101 are refused (lab-device.ts#DEVICE_CHECK_WDA_PORTS).
+const lab = new IosLab(udid, { wdaPort: port });
 // The lab simulator or nothing (lab-device.ts#IosLab.guard): refused before any tool binds it.
 console.error(`lab: ${await lab.guard()}`);
 

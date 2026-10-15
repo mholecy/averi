@@ -169,7 +169,7 @@
       "before": "d043e65",
       "verified": "merge-subject",
       "needs": "edges/scroll-bounded (Android): a row cut flush at its scroll container's edge; rows: R-fully.",
-      "remark": "At 9c7885e only the wording of the presented cells' scroll_until rows changes (Android strokes drag); every such row stays red as not in the tree."
+      "remark": "At 9c7885e only the wording of the presented cells' scroll_until rows changes (Android strokes drag); every such row stays red (\"swiped 2× beneath a presented layer\": the target is not in the tree, and the stroke lands beneath the layer)."
     },
     {
       "n": "13",
@@ -217,7 +217,7 @@
         "ios-iphone17-ios27/form-keyboard.idb.json note scroll_until"
       ],
       "expect": "CALIBRATED-ON-DEFECT",
-      "remark": "idb lists nothing under the keyboard, so these rows are 'not in the tree' at every commit (golden.test.ts KNOWN); the note's defect — touch-downs at (201,699) on the keyboard — is in the mismatch before and gone after."
+      "remark": "idb lists nothing under the keyboard, so these rows stay red at every commit (golden.test.ts KNOWN): before the fix their mismatch is the judge's own \"touched down under the keyboard at (201,699)\" — the note's defect; after it, the vacuous \"not in the tree\" with both swipes above the keyboard."
     },
     {
       "n": "17",
