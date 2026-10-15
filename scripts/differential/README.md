@@ -107,6 +107,16 @@ xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphones
 node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/<run>
 ```
 
+Android (fixtures/apps/android, Compose; an emulator of its own — the committed run is a dedicated `averi_lab` AVD,
+Pixel 3a profile, API 33 — never the device-check AVD; JDK 17, the Gradle wrapper's 8.13). The truth is in screen
+pixels, uiautomator's units (`scale` 1); the golden profile is the fake device's API 33 Pixel_3a, keyboard hidden:
+
+```sh
+cd fixtures/apps/android && ANDROID_HOME=~/Library/Android/sdk ./gradlew assembleDebug
+adb -s <serial> install -r fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk
+node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests/fixtures/truth/android-<avd>-api<N>
+```
+
 ## Corpus format
 
 One directory per capture run, one file per tree, and a `manifest.json` (`corpus.ts`). The directory's name is the run —

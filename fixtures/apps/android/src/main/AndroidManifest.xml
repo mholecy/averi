@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md): one cell of fixtures/apps/cells.json per
+     launch, chosen by the string intent extra `cell` (scripts/truth/capture-android.ts starts it with `am start`) or
+     the deep link averilab://cell/<id>. No login, no network, no data. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:label="AveriLab"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="averilab" android:host="cell" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

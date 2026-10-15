@@ -1,0 +1,41 @@
+{
+  "platform": "android",
+  "app": "AveriLab",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "note": "Ground truth: the Android lab app (fixtures/apps/android), captured by scripts/truth/capture-android.ts",
+  "captures": [
+    {
+      "file": "open.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "open.png",
+      "truth": "open.truth.json"
+    },
+    {
+      "file": "sheet-medium.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "sheet-medium.png",
+      "truth": "sheet-medium.truth.json"
+    },
+    {
+      "file": "alert-dim.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "alert-dim.png",
+      "truth": "alert-dim.truth.json"
+    }
+  ]
+}
