@@ -2287,3 +2287,35 @@ describe('round — fully: true on a row its scroll view cuts, the content exhau
     expect(message).toContain('The element cannot be fully revealed — that is a layout defect (no clearance for an overlay?)');
   });
 });
+
+describe('round — a sheet whose detent the swipes changed', () => {
+  // A sheet's grabber says its detent in its value (`Sheet Grabber`, `Half screen` / `Expanded`): a stroke on a half
+  // sheet's list at its top drags the sheet up before it scrolls the list.
+  const sheet = (detent: string | undefined, y: number): Row => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+    const grabber = detent === undefined ? [] : [node({ role: 'button', label: 'Sheet Grabber', value: detent, rect: { x: 152, y: 58, width: 98, height: 24 } })];
+    return { tree: node({ role: 'container', rect: IPHONE_BOX, children: [...grabber, row] }), found: [row] };
+  };
+  const MOVED = '; the sheet moved from its Half screen detent to Expanded';
+
+  it('a stop says the sheet moved from the detent the first read showed to the one the last read showed', () => {
+    const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Expanded', 300)])));
+    expect(reply).toBe(`fully visible after 1 swipe${MOVED}`);
+  });
+
+  it('a failure says it too, after the rest of its sentence — the verdict unchanged', () => {
+    const message = failureOf(play(IPHONE, [sheet('Half screen', 5_000), sheet('Expanded', 4_990), sheet('Expanded', 4_980), sheet('Expanded', 4_970), sheet('Expanded', 4_960)]), 'id:row_7').message;
+    expect(message).toMatch(/^scroll_until id:row_7 failed after 4 swipes \(maxSwipes\) — element in tree but never intersected the 402x874 viewport/);
+    expect(message.endsWith(MOVED)).toBe(true);
+  });
+
+  it('a detent the same at the first and last read is not mentioned, whatever it was between', () => {
+    const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Half screen', 300)])));
+    expect(reply).toBe('fully visible after 1 swipe');
+  });
+
+  it('a grabber only one of the two reads holds (a sheet presented or closed) says nothing of a detent', () => {
+    expect(describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet(undefined, 300), sheet(undefined, 300)])))).toBe('fully visible after 1 swipe');
+    expect(describeScrollResult(resultOf(play(IPHONE, [sheet(undefined, 900), sheet('Expanded', 300), sheet('Expanded', 300)])))).toBe('fully visible after 1 swipe');
+  });
+});
