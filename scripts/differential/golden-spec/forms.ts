@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { otherControlsFired } from '../../truth/truth.js';
-import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, said, swipes, touchDowns, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, reachedWithNoSwipe, said, swipes, touchDowns, type Expectation } from './judges.js';
 
 /** The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formExpectations. */
 
@@ -84,7 +84,7 @@ export function formExpectations(platform: Platform, truth: CellTruth): FormExpe
         verb: 'text',
         says: `passes: reads ${JSON.stringify(f.title)}`,
         call: assertCall({ element: { id: f.titleId }, text: f.title }),
-        judge: (o) => (passed(o) ? undefined : `failed: ${first(o)}`),
+        judge: passes,
       });
     }
     if (f.value !== '' && f.kind !== 'country') {
@@ -136,7 +136,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           verb: 'scroll_until',
           says: 'reached with no swipe (pinned above the keyboard)',
           call: scroll,
-          judge: (o) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined),
+          judge: reachedWithNoSwipe,
         });
       }
       return rows;

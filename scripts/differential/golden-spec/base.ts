@@ -1,6 +1,6 @@
 import type { Platform } from '../corpus.js';
 import type { TargetTruth } from '../../truth/schema.js';
-import { BUDGET_MS, classed, first, passed, swipes, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, first, passes, reachedWithNoSwipe, type Expectation } from './judges.js';
 
 /**
  * The base family's rows (fixtures/apps/cells/base.json): a coloured target open — reached by its probe and drawn as
@@ -24,13 +24,13 @@ export function openRows(platform: Platform, t: TargetTruth): Expectation[] {
       verb: 'colour',
       says: `passes on its own colour ${t.color}`,
       call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: t.color }, timeout: BUDGET_MS }] } },
-      judge: (o) => (passed(o) ? undefined : `failed: ${first(o)}`),
+      judge: passes,
     },
     {
       verb: 'scroll_until',
       says: 'reached with no swipe',
       call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
-      judge: (o) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined),
+      judge: reachedWithNoSwipe,
     },
   ] satisfies Expectation[]).map(classed);
 }

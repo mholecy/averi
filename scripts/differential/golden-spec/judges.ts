@@ -90,6 +90,10 @@ export function replyKind(o: Outcome): ReplyKind {
 /** A tap that must not land: not `Tapped`, and no tap sent. */
 export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 export const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
+/** A plain stop that must reach the target where it is: not an ERROR, and no swipe. */
+export const reachedWithNoSwipe = (o: Outcome) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined);
+/** An assert that must pass. */
+export const passes = (o: Outcome) => (passed(o) ? undefined : `failed: ${first(o)}`);
 
 // --- points and regions (phase 3's rows) ---
 

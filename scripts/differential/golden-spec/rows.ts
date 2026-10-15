@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { regionOverlap, sampleOf } from '../../truth/truth.js';
-import { BUDGET_MS, first, landed, notTapped, passed, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
+import { BUDGET_MS, first, landed, notTapped, passed, passes, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
 
 /**
  * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
@@ -175,7 +175,7 @@ export function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTrut
     verb: 'scroll_until',
     says: `${row}: reached with no swipe (its centre clear)`,
     call: scrollCall(platform, t, directionOf(t, cell)),
-    judge: (o) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined),
+    judge: reachedWithNoSwipe,
   };
 }
 
@@ -191,6 +191,6 @@ export function overlapColour(platform: Platform, t: TargetTruth, cell: CellTrut
     verb: 'colour',
     says: `R-overlap: passes on its own colour ${t.color} (what it samples is clear)`,
     call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: BUDGET_MS }] } },
-    judge: (o) => (passed(o) ? undefined : `failed: ${first(o)}`),
+    judge: passes,
   };
 }
