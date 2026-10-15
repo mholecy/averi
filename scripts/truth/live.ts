@@ -53,6 +53,8 @@ const only = values.cases?.split(',');
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
 const lab = new IosLab(udid);
+// The lab simulator or nothing (lab-device.ts#IosLab.guard): refused before any tool binds it.
+console.error(`lab: ${await lab.guard()}`);
 
 // --- the cases ---
 

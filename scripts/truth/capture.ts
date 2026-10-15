@@ -17,7 +17,10 @@ import type { Catalog } from './schema.js';
  * iOS: the raw WDA `/source?format=json` body (averi's own WdaServer, only its process lifecycle, on a port of its own —
  * never 8100/8101, the device-check simulator's — and a derived-data directory of its own) and the raw idb `ui
  * describe-all --json` list; probes with `idb ui tap`. Android: the raw `uiautomator dump /dev/tty` output; probes with
- * `adb -s <serial> shell input tap`; never restarts the adb server. A run of `--cells` adds to (or replaces those cells
+ * `adb -s <serial> shell input tap`; never restarts the adb server. The device must be the lab's — a simulator named
+ * `averi-lab …` (never the device-check simulator), the `averi_lab` AVD — or the capture refuses before touching it
+ * (lab-device.ts#IosLab.guard, #AndroidLab.guard); the manifest's device is what simctl / adb report (`--device`
+ * relabels it, the guard still runs). A run of `--cells` adds to (or replaces those cells
  * in) the run's manifest, from the same device only. Exit code 1 when a cell is broken (its truth's sources disagree).
  */
 

@@ -15,6 +15,9 @@ import type { CatalogCell, LabState } from './schema.js';
  */
 
 const run = promisify(execFile);
+/** How a lab runs a command — injectable, so the device guards are tested without a device. */
+export type Exec = (file: string, args: string[]) => Promise<{ stdout: string }>;
+const exec: Exec = (file, args) => run(file, args, { maxBuffer: 64 << 20 });
 export const BUNDLE = 'dev.averi.lab';
 export const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -60,6 +63,13 @@ async function settled(lab: Pick<LabDevice, 'state'>, cell: string): Promise<Lab
 
 // --- iOS: simctl, idb, WDA ---
 
+/** The lab simulator's name starts so (`averi-lab iPhone 17`); any other simulator is refused. */
+export const LAB_SIMULATOR_PREFIX = 'averi-lab ';
+/** The device-check simulator: refused whatever it is named (its settings and WDA are device-check's). */
+export const DEVICE_CHECK_SIMULATOR = '37956039-94EA-4F51-93E5-94F7723A4578';
+/** The lab's AVD (`adb emu avd name`); any other emulator or device is refused. */
+export const LAB_AVD = 'averi_lab';
+
 /**
  * The lab's own WebDriverAgent build: never the default `averi-wda` derived data, which device-check builds use — a
  * lab capture must not rebuild or replace theirs.
@@ -71,22 +81,46 @@ export class IosLab implements LabDevice {
   private stateFile: string | undefined;
   private wdaServer: WdaServer | undefined;
 
+  private guarded: Promise<string> | undefined;
+
   /** `wdaPort`: never 8100/8101 (the device-check simulator's); capture.ts and live.ts default to 8120. */
   constructor(
     readonly udid: string,
-    private readonly opts: { wdaPort?: number; device?: string } = {},
+    private readonly opts: { wdaPort?: number; device?: string; exec?: Exec } = {},
   ) {}
 
   simctl(...args: string[]) {
-    return run('xcrun', ['simctl', ...args], { maxBuffer: 64 << 20 });
+    return (this.opts.exec ?? exec)('xcrun', ['simctl', ...args]);
   }
 
   idb(...args: string[]) {
-    return run('idb', [...args, '--udid', this.udid], { maxBuffer: 64 << 20 });
+    return (this.opts.exec ?? exec)('idb', [...args, '--udid', this.udid]);
+  }
+
+  /**
+   * The simulator is the lab's, or nothing is done to it (launch writes its accessibility and keyboard defaults): its
+   * udid listed by `simctl list devices -j` under a name starting `averi-lab `, and never the device-check simulator.
+   * Resolves to its description — name and runtime as simctl reports them (`averi-lab iPhone 17 simulator, iOS 27.0`).
+   */
+  guard(): Promise<string> {
+    this.guarded ??= (async () => {
+      if (this.udid.toUpperCase() === DEVICE_CHECK_SIMULATOR) throw new Error(`${this.udid} is the device-check simulator — the lab runs on its own (averi-lab …) only`);
+      const { devices } = JSON.parse((await this.simctl('list', 'devices', '-j')).stdout) as { devices: Record<string, { udid: string; name: string }[]> };
+      for (const [runtime, list] of Object.entries(devices)) {
+        const d = list.find((x) => x.udid === this.udid);
+        if (d === undefined) continue;
+        if (!d.name.startsWith(LAB_SIMULATOR_PREFIX)) throw new Error(`simulator ${this.udid} is "${d.name}", not the lab's (${LAB_SIMULATOR_PREFIX}…): refused`);
+        const os = /SimRuntime\.(\w+)-(\d+)-(\d+)$/.exec(runtime);
+        return `${d.name} simulator, ${os === null ? runtime : `${os[1]} ${os[2]}.${os[3]}`}`;
+      }
+      throw new Error(`no simulator ${this.udid} in simctl's list: refused`);
+    })();
+    return this.guarded;
   }
 
   async describe(): Promise<string> {
-    return this.opts.device ?? 'averi-lab iPhone 17 simulator, iOS 27.0';
+    const reported = await this.guard();
+    return this.opts.device ?? reported;
   }
 
   unsupported(): string | undefined {
@@ -107,6 +141,7 @@ export class IosLab implements LabDevice {
    * before the new process has drawn anything.
    */
   async launch(cell: string): Promise<LabState> {
+    await this.guard();
     await this.simctl('terminate', this.udid, BUNDLE).catch(() => undefined);
     // As averi's own launch does (src/adapters/ios.ts#enableAccessibilityAutomation): after a WebDriverAgent session
     // on the simulator, an app launched without these reads as an empty idb tree (docs/bugs/2026-10-07-one-wda-session-
@@ -172,22 +207,33 @@ const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert']);
 export class AndroidLab implements LabDevice {
   readonly platform = 'android';
 
+  private guarded: Promise<void> | undefined;
+
   /** Every adb command names the serial; nothing restarts the adb server. */
   constructor(
     readonly serial: string,
-    private readonly opts: { device?: string } = {},
+    private readonly opts: { device?: string; exec?: Exec } = {},
   ) {}
 
   adb(...args: string[]) {
-    return run('adb', ['-s', this.serial, ...args], { maxBuffer: 64 << 20 });
+    return (this.opts.exec ?? exec)('adb', ['-s', this.serial, ...args]);
+  }
+
+  /** The emulator is the lab's AVD (`adb emu avd name` says `averi_lab`), or nothing is done to it. */
+  guard(): Promise<void> {
+    this.guarded ??= (async () => {
+      const avd = (await this.adb('emu', 'avd', 'name').catch(() => ({ stdout: '' }))).stdout.split(/\r?\n/)[0].trim();
+      if (avd !== LAB_AVD) throw new Error(`${this.serial} is ${avd === '' ? 'no emulator adb can name' : `AVD "${avd}"`}, not the lab's ${LAB_AVD}: refused`);
+    })();
+    return this.guarded;
   }
 
   async describe(): Promise<string> {
+    await this.guard();
     if (this.opts.device !== undefined) return this.opts.device;
     const sdk = (await this.adb('shell', 'getprop', 'ro.build.version.sdk')).stdout.trim();
     const release = (await this.adb('shell', 'getprop', 'ro.build.version.release')).stdout.trim();
-    const avd = (await this.adb('emu', 'avd', 'name').catch(() => ({ stdout: 'emulator' }))).stdout.split(/\r?\n/)[0].trim();
-    return `${avd} emulator, Android ${release} (API ${sdk})`;
+    return `${LAB_AVD} emulator, Android ${release} (API ${sdk})`;
   }
 
   unsupported(cell: CatalogCell): string | undefined {
@@ -206,6 +252,7 @@ export class AndroidLab implements LabDevice {
 
   /** A fresh process: `am force-stop`, the last state file removed (see IosLab.launch), `am start … --es cell <id>`. */
   async launch(cell: string): Promise<LabState> {
+    await this.guard();
     await this.adb('shell', 'am', 'force-stop', BUNDLE);
     await this.adb('shell', 'run-as', BUNDLE, 'rm', '-f', 'files/lab-state.json');
     await this.adb('shell', 'am', 'start', '-W', '-n', `${BUNDLE}/.MainActivity`, '--es', 'cell', cell);
