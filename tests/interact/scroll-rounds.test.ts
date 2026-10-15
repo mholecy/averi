@@ -2176,6 +2176,10 @@ describe('round — the far edge at the edge of what the target\'s scroll view d
   it('a row wholly above the form\'s top edge (40–100), nothing of it drawn: off the frame, as one wholly above the screen — the caller\'s direction on a first read', () => {
     const played = play({ ...IPHONE, maxSwipes: 1 }, [formRow(40), formRow(40)]);
     expect(strokesToward(played)).toEqual(['down']);
+    // The failure says where it lay: above its scroll view, which is on the screen — not above the viewport.
+    const message = failureOf(played, 'id:row').message;
+    expect(message).toContain('it lay above its scroll view scrollable (0,116 402x664), past the edge the swipes push it out through: scroll_until it with direction: "up"');
+    expect(message).not.toContain('the viewport, past');
   });
 });
 

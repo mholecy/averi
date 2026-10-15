@@ -549,7 +549,7 @@ function shortText(short: Shortfall): string {
     case 'offFrame': {
       const offFrame = short.outside !== undefined ? outsideScrollViewText(short.outside) : `the ${frameWords(short.viewport, short.cover)}${short.eitherWayUp ? ' either way up' : ''}`;
       const rect = `(last rect ${JSON.stringify(short.rect)})`;
-      const past = short.past !== undefined ? ` — it lay ${pastText(short.past)}: ${revealText(short.past.side)}` : '';
+      const past = short.past !== undefined ? ` — it lay ${pastText(short.past, short.outside)}: ${revealText(short.past.side)}` : '';
       return short.inFrameAfter !== undefined
         ? `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay (a fling?) — in tree, ${short.outside !== undefined ? '' : 'off '}${offFrame} at the last read ${rect}${past}`
         : short.outside !== undefined
@@ -560,4 +560,4 @@ function shortText(short: Shortfall): string {
 }
 
 /** Where a target last read past the far edge lay: `clipped out above its scroll container, past the edge the swipes push it out through`. */
-const pastText = ({ side, clippedOut }: PastSide): string => `${pastSideText(side, clippedOut)}, past the edge the swipes push it out through`;
+const pastText = ({ side, clippedOut }: PastSide, scrollView?: UiNode): string => `${pastSideText(side, clippedOut, scrollView)}, past the edge the swipes push it out through`;

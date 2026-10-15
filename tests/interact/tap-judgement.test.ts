@@ -276,6 +276,16 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
     expect(freshReads).toEqual([]);
   });
 
+  it('a card partly drawn, its centre outside what its scroll views draw (a carousel at the form\'s foot): refused as at the screen\'s edge, "fully: true first" — not tapped on its drawn part (ADR 0010, "Amendment: the drawn frame")', async () => {
+    // low_card 750–830 in the carousel 740–840, inside the form ending at 780: 30 of its 80 pt drawn, its centre (124,790) not.
+    const low = node({ role: 'button', identifier: 'low_card', rect: { x: 24, y: 750, width: 200, height: 80 } });
+    const carousel = node({ role: 'scrollable', identifier: 'carousel_low', rect: { x: 0, y: 740, width: 402, height: 100 }, children: [low] });
+    const { outcome } = await judge(atRest(carousel), 'low_card', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'OffScreenRefusal: low_card is outside its scroll view scrollable id:form (0,0 402x780) at (124,790): only 38% of it (rect 24,750 200x80) is drawn, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped',
+    );
+  });
+
   it('not by the on-screen rule before the guard: judgeTap lets the look through (the guard may hide a keyboard its scroll view was laid out above), and aim() refuses it', async () => {
     const tree = atRest(name());
     const look = { node: find(tree, 'payee_name_input'), tree, scene: sceneOf(tree) };
