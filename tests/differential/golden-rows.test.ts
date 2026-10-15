@@ -118,22 +118,22 @@ describe('R-stroke: every touch-down on the screen, clear of the bands and the c
   });
 });
 
-describe('R-sliver, R-band, R-under-chrome: scroll_until does not call it reached where it is', () => {
+describe('R-sliver, R-band, R-under-chrome: scroll_until does not call it reached where it is, whatever it swiped', () => {
   const rs = rows(target('sliver', { visible: rect(51, 670, 300, 20) }));
   it.each([
-    ['stops at once, "visible after 0 swipes" (the note: Tapped and does nothing)', out(VISIBLE), 'reached with no swipe where it is sliver: Element id:"lab.edges.A" visible after 0 swipes'],
-    ['swipes toward it first', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), undefined],
+    ['stops at once, "visible after 0 swipes" (the note: Tapped and does nothing)', out(VISIBLE), 'reached where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 0 swipes'],
+    ['"visible after 1 swipe": a replayed tree never moves, so it stopped where it is', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), 'reached where it is sliver, after 1 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 1 swipe'],
     ['refuses (stuck)', out('ERROR: stuck'), undefined],
   ])('%s', (_n, o, expected) => {
     expect(verdict(rs, 'scroll_until', o)).toBe(expected);
   });
 });
 
-describe('R-fully: fully: true never stops on a cut target without a swipe', () => {
+describe('R-fully: fully: true never calls a cut target "visible" where it is, whatever it swiped', () => {
   const rs = rows(target('partly-centre-in', { visible: rect(51, 670, 300, 50) }));
   it.each([
-    ['fully visible after 0 swipes (the notes #9, #12)', out(VISIBLE), 'fully visible with no swipe where it is partly-centre-in: Element id:"lab.edges.A" visible after 0 swipes'],
-    ['after a swipe', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), undefined],
+    ['fully visible after 0 swipes (the notes #9, #12)', out(VISIBLE), 'fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 0 swipes'],
+    ['"visible after 1 swipe": a replayed tree never moves, so it stopped where it is', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), 'fully visible where it is partly-centre-in, after 1 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 1 swipe'],
     ['stuck', out('ERROR: stuck'), undefined],
   ])('%s', (_n, o, expected) => {
     expect(verdict(rs, 'scroll_until', o, true)).toBe(expected);

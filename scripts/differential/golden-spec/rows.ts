@@ -19,16 +19,16 @@ import { BUDGET_MS, first, landed, notTapped, passed, said, scrollAdvice, stroke
  * | R-outside-sv | outside-scroll-view | colour | fails closed: it would measure the background | docs/bugs/2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md |
  * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it | swipes, every touch-down on the screen clear of the system bands and the chrome | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md |
  * | R-sliver | sliver | tap | refused naming scroll_until, nothing tapped | ADR 0013; docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md |
- * | R-sliver | sliver | scroll_until | not reached without a swipe (the plain stop does not stop on a sliver) | ADR 0013 |
+ * | R-sliver | sliver | scroll_until | not reached where it is — the stop fails, whatever it swiped (the plain stop does not stop on a sliver; a replayed tree never moves) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
- * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | not "visible" without a swipe: it is cut | ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
+ * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | never "visible" where it is, whatever it swiped: it is cut | ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
  * | R-band | status-band, nav-band | tap | refused, nothing tapped | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
  * | R-band | status-band, nav-band | colour | fails: a system band over what it reads | ADR 0001 |
- * | R-band | status-band, nav-band | scroll_until | not reached without a swipe | ADR 0009 (N-a: neither stop stops on a centre in the band) |
+ * | R-band | status-band, nav-band | scroll_until | not reached where it is (the stop fails) | ADR 0009 (N-a: neither stop stops on a centre in the band) |
  * | R-under-chrome | under-chrome:<name> | tap | R-land on its piece | docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md; ADR 0005 |
  * | R-under-chrome | under-chrome:<name> | colour | fails: the chrome is a pixel cover over what it reads | ADR 0001, ADR 0003 |
- * | R-under-chrome | under-chrome:<name> | scroll_until | not reached without a swipe | docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
+ * | R-under-chrome | under-chrome:<name> | scroll_until | not reached where it is (the stop fails) | docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-overlap | band-overlap:<band>, chrome-overlap:<name> (whole, centre clear, its edge overlapped past ADR 0002's slack) | tap | `Tapped`, inside what shows (R-land at its centre) | ADR 0009 (N-a: the tap is centre-based) |
  * | R-overlap | band-overlap:<band>, chrome-overlap:<name> | colour | fails closed when what it samples (the 12 %-inset rect) is overlapped past the slack, else passes on its own colour | ADR 0001, ADR 0002 |
  * | R-overlap | band-overlap:<band>, chrome-overlap:<name> | scroll_until | reached with no swipe | ADR 0009 (N-a: the plain stop is centre-based) |
@@ -85,23 +85,27 @@ export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, r
   };
 }
 
-/** R-sliver, R-band, R-under-chrome: the plain stop does not call it reached where it is. */
+/**
+ * R-sliver, R-band, R-under-chrome: the plain stop does not call it reached where it is. In a replayed tree no stroke
+ * moves it, so a stop after N swipes stopped where it is just the same: the stop must fail (an ERROR), whatever it
+ * swiped.
+ */
 export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
   return {
     verb: 'scroll_until',
-    says: `${row}: not reached without a swipe`,
+    says: `${row}: not reached where it is (the stop fails; a replayed tree never moves)`,
     call: scrollCall(platform, t, directionOf(t, cell)),
-    judge: (o) => (!o.reply.startsWith('ERROR') && swipes(o) === 0 ? said(o, `reached with no swipe where it is ${t.geometry}`) : undefined),
+    judge: (o) => (o.reply.startsWith('ERROR') ? undefined : said(o, `reached where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing`)),
   };
 }
 
-/** R-fully: `fully: true` never stops on a cut target without a swipe. */
+/** R-fully: `fully: true` never calls it "visible" where it is — after no swipe, or after swipes that move nothing in a replayed tree. */
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   return {
     verb: 'scroll_until',
-    says: `R-fully: fully: true is not reached without a swipe where it is ${t.geometry}`,
+    says: `R-fully: fully: true is not "visible" where it is ${t.geometry}`,
     call: scrollCall(platform, t, directionOf(t, cell), true),
-    judge: (o) => (/^Element .* visible after /.test(o.reply) && swipes(o) === 0 ? said(o, `fully visible with no swipe where it is ${t.geometry}`) : undefined),
+    judge: (o) => (/^Element .* visible after /.test(o.reply) ? said(o, `fully visible where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing`) : undefined),
   };
 }
 
