@@ -60,6 +60,11 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   target's own at all, wherever the target lies — `presentedAt` less the
  *   point?
  *
+ * One fact is the tree source's, not a shape's: an element it MARKS as a presented layer's (`UiNode.presentation`,
+ * WDA's `Alert`) covers every node drawn before it through the whole screen, as its layer's one cover and that
+ * screen's surface (`markedLayers`) — for `exposure`, `paintsOver`, `coversOf`, `presentedAt` and `presentedOver`
+ * alike; the `drawnOver` column (the stroke box) does not read it.
+ *
  * The two columns read the rows differently on purpose — each column of
  * `NOT_DRAWN` is what that question has been measured against, and where
  * they differ the row says why. Only nodes of the tree are covers: what a
@@ -128,7 +133,9 @@ export interface DrawOrder {
    * (interact/scroll-rounds.ts#round), which asks it at the stroke's touch-down for a target it has not judged in the
    * viewport — a stroke that would touch down on such a screen is not sent (it may dismiss the screen, as one closed
    * Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN screen is
-   * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before.
+   * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before. An element the tree
+   * source marks as a presented layer's (`markedLayers`, WDA's `Alert`) holds every point of the screen: with an alert
+   * up, every touch-down for a target beneath it lies on it — so `scroll_until` stops wherever `presentedOver` names it.
    */
   presentedAt(node: UiNode, point: Point): UiNode | undefined;
   /**
@@ -142,11 +149,26 @@ export interface DrawOrder {
    * which asks it when the frame named no presented surface — so the tap and the pixel assert tell a target wholly
    * off screen, or wholly under the status bar, beneath a sheet "close that screen first". `scroll_until` stops on it
    * only where `presentedAt` holds at its stroke's touch-down (or the surface lies over the target in its read's
-   * frame): beneath a dim filling the screen it does, as the others say; beneath an UNDIMMED partial sheet the
-   * touch-down misses, it strokes while they say close it first (ADR 0018's residual 11).
+   * frame): beneath a dim filling the screen it does, as the others say — and beneath a marked presented layer
+   * (`markedLayers`, WDA's `Alert`), which reaches the whole screen; beneath an UNDIMMED partial sheet the touch-down
+   * misses, it strokes while they say close it first (ADR 0018's residual 11).
    * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
    */
   presentedOver(node: UiNode): UiNode | undefined;
+  /**
+   * Where a presented surface `presentedAt` or `presentedOver` named presses — the reach `presentedAt` holds its point
+   * against: the whole screen for the element of a marked presented layer (`markedLayers`), else its rect. What a
+   * sentence naming it at a touch-down quotes (geometry.ts#coverText).
+   */
+  presentedReach(surface: UiNode): Rect;
+  /**
+   * The element of a marked presented layer (`markedLayers`: WDA's `Alert`, on the screen) a touch-down at `point`
+   * lands on, asked for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the
+   * last such element, whose reach is the whole screen — unless the point lies on a scroll view of the element's own
+   * (a stroke scrolling the alert's own content). Undefined when none. One reader: `scroll_until`'s stroke
+   * (interact/scroll-rounds.ts#round), which sends no stroke that would land on it.
+   */
+  markedAt(point: Point): UiNode | undefined;
   /**
    * The nodes drawn over `region` of `node` as a TARGET, in pre-order: every
    * node after `node`'s subtree (its first place in the tree, as
@@ -303,9 +325,10 @@ export interface Exposure {
   readonly centreExcused: readonly UiNode[];
   /**
    * The covers that are the SURFACE of a screen presented over the node (`presentedSurface`: a dimming leaf, labelled or
-   * not, a sheet's scroll view, on a later screen-sized layer stacked over its own), in `covers`' order; empty when
-   * none — never a control, a bar the layer carries or any other labelled node, which cover anyway (Safari's capsule
-   * bar). What the sentences read: a target under one lies under a
+   * not, a sheet's scroll view, on a later screen-sized layer stacked over its own; or the element the tree source
+   * marks as a presented layer's, `markedLayers`: WDA's `Alert`, reaching the whole screen), in `covers`' order; empty
+   * when none — never a control, a bar the layer carries or any other labelled node, which cover anyway (Safari's
+   * capsule bar). What the sentences read: a target under one lies under a
    * presented screen no scroll moves it out from under — close it first (interact/target-text.ts#PRESENTED_OVER; ADR 0018).
    */
   readonly presented: readonly UiNode[];
@@ -1681,14 +1704,57 @@ export function drawOrder(tree: UiNode): DrawOrder {
   };
 
   /**
-   * The last node drawn after `node` that `where` keeps, draws for it as a target and is the surface of a screen
-   * presented over its own — `presentedAt` keeps those holding its point, `presentedOver` every one.
+   * The elements a tree source marks as presentations (`UiNode.presentation`) that lie ON the screen, in the walk's
+   * order: one whose rect shares no area with the screen (0x0, or wholly off it — WDA keeps a dismissed element in
+   * its tree) presents nothing. Judged by the rect alone, never by WDA's visibility flags (`UiNode.hidden`): an alert
+   * mid-animation may read hidden while it already takes every touch.
    */
-  const lastPresentedSurface = (node: UiNode, where: (p: Placed) => boolean = () => true): UiNode | undefined => {
+  const marked = order.filter((p) => {
+    if (p.node.presentation === undefined) return false;
+    const on = rectIntersection(p.node.rect, screen);
+    return on !== undefined && rectArea(on) > 0;
+  });
+  /**
+   * The PRESENTED LAYERS over the node at `places` that the tree source marks (`UiNode.presentation`: WDA's `Alert`) —
+   * the source's fact, read here and nowhere else: each marked element drawn after the node (never its ancestor, nor
+   * in its subtree; never over the keyboard's own nodes, `Placed.inKeyboard`), with its LAYER — the child of the
+   * nearest node holding both on the element's branch (`layerOf`; the element itself when it is that child). Such a layer is presented over the node whatever the frames around it
+   * (an alert is modal): its element covers the node through the WHOLE screen, as the layer's one cover — what else
+   * the layer holds (its dim, a bare frame or not; the alert's texts, buttons and backdrop leaves) is drawn on it and
+   * no cover of its own (`markedLayers`'s readers: `laterFor`). No stacked-screens, window or bare-frame condition:
+   * those are draw order's inferences from shape (`presentedOver`), which the mark makes moot.
+   */
+  const markedLayers = (places: readonly Placed[]): readonly { readonly element: Placed; readonly layer: Placed }[] =>
+    marked.flatMap((element) => {
+      // The keyboard's own nodes are never beneath: the keyboard is drawn over the app's windows, wherever WDA lists its Window.
+      if (places[0].inKeyboard) return [];
+      if (element.at < places[0].end || places.some((place) => within(element, place))) return [];
+      const both = holderOf(element, places[0]);
+      return [{ element, layer: both === undefined ? element : layerOf(element, both) }];
+    });
+  /**
+   * What is drawn after the node at `places` (`laterThan`) as a TARGET meets it, less what a marked presented layer
+   * holds besides its element (`markedLayers`) — and which of it is such an element (`marks`: it covers through the
+   * whole screen, drawn whatever the rows say, and is that screen's surface).
+   */
+  const laterFor = (places: readonly Placed[]): { readonly later: readonly Placed[]; readonly marks: (p: Placed) => boolean } => {
+    const layers = markedLayers(places);
+    if (layers.length === 0) return { later: laterThan(places, () => true), marks: () => false };
+    const elements = new Set(layers.map(({ element }) => element));
+    return { later: laterThan(places, (p) => elements.has(p) || !layers.some(({ layer }) => within(p, layer))), marks: (p) => elements.has(p) };
+  };
+
+  /**
+   * The last node drawn after `node` whose reach `where` keeps (a marked presented layer's element reaches the whole
+   * screen, `laterFor`), that draws for it as a target and is the surface of a screen presented over its own — or that
+   * element — `presentedAt` keeps those holding its point, `presentedOver` every one.
+   */
+  const lastPresentedSurface = (node: UiNode, where: (reach: Rect) => boolean = () => true): UiNode | undefined => {
     const places = placesOf(node);
     if (places.length === 0) return undefined;
     const about = asTarget(places[0]);
-    return laterThan(places, (p) => where(p) && drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea)).at(-1)?.node;
+    const { later, marks } = laterFor(places);
+    return later.filter((p) => (marks(p) ? where(screen) : where(p.node.rect) && drawsOverTarget(p, about) && presentedSurface(p, places[0], seen.screenArea))).at(-1)?.node;
   };
 
   const api: DrawOrder = {
@@ -1714,10 +1780,14 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const places = placesOf(node);
       if (places.length === 0) return [];
       const about = asTarget(places[0]);
-      return laterThan(places, (p) => rectIntersection(p.node.rect, region) !== undefined && drawsOverTarget(p, about)).map((p) => p.node);
+      const { later, marks } = laterFor(places);
+      return later.filter((p) => (marks(p) ? rectIntersection(screen, region) !== undefined : rectIntersection(p.node.rect, region) !== undefined && drawsOverTarget(p, about))).map((p) => p.node);
     },
-    presentedAt: (node, point) => lastPresentedSurface(node, (p) => containsPoint(p.node.rect, point)),
+    presentedAt: (node, point) => lastPresentedSurface(node, (reach) => containsPoint(reach, point)),
     presentedOver: (node) => lastPresentedSurface(node),
+    markedAt: (point) =>
+      marked.filter((element) => !order.slice(element.at + 1, element.end).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point))).at(-1)?.node,
+    presentedReach: (surface) => (surface.presentation !== undefined ? { ...screen } : { ...surface.rect }),
     exposure(node, box) {
       const shown = rectIntersection(node.rect, box);
       const places = placesOf(node);
@@ -1738,10 +1808,15 @@ export function drawOrder(tree: UiNode): DrawOrder {
       // A flat list has no nesting, so no item listed before the target is its ancestor.
       const before = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
+      // A marked presented layer's element reaches the whole screen and draws whatever the rows say (`laterFor`).
+      const { later, marks } = places.length === 0 ? { later: [], marks: () => false } : laterFor(places);
+      const reachOf = (p: Placed): Rect => (marks(p) ? { ...screen } : reach(p));
       const met =
         shown === undefined || about === undefined
           ? []
-          : [...before, ...laterThan(places, () => true)].filter((p) => rectIntersection(reach(p), shown) !== undefined).map((p) => ({ placed: p, node: p.node, reach: reach(p), draws: drawsOverTarget(p, about) }));
+          : [...before, ...later]
+              .filter((p) => rectIntersection(reachOf(p), shown) !== undefined)
+              .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: marks(p) || drawsOverTarget(p, about), marks: marks(p) }));
       const over = met.filter((c) => c.draws);
       const covers = over.map((c) => c.node);
       const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
@@ -1766,7 +1841,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        presented: over.filter((c) => presentedSurface(c.placed, places[0], seen.screenArea)).map((c) => c.node),
+        presented: over.filter((c) => c.marks || presentedSurface(c.placed, places[0], seen.screenArea)).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,

@@ -64,6 +64,15 @@ const ROLE_MAP: Record<string, string> = {
 };
 
 /**
+ * WDA element `type` → the PRESENTED LAYER it is the element of (`UiNode.presentation`): the one place the adapter
+ * says a layer is presented over the screen beneath, by the source's own type — never by shape. `Alert` only: its
+ * role stays `container` (ROLE_MAP), the mark says the rest. Measured on mp-native's SWIFT form with its exit alert up,
+ * whose dimming leaf is a bare frame no shape tells from a dismissed sheet's leftover dim. Other presentations (a
+ * `Sheet`, a `Popover`) are judged by draw order's shapes, as before.
+ */
+const PRESENTATIONS: Readonly<Record<string, NonNullable<UiNode['presentation']>>> = { Alert: 'alert' };
+
+/**
  * Relevant subset of a WDA source node. `rawIdentifier` is THE
  * accessibilityIdentifier; `name` merely mirrors it with label fallbacks —
  * never read `name`. `rect` is points with clean numbers (the string `frame`
@@ -178,6 +187,8 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
     (el.children ?? []).map((child) => toUiNode(child, marks, { hidden, cell, scroller })),
   );
   if (hidden) node.hidden = true;
+  const presentation = el.type !== undefined && Object.hasOwn(PRESENTATIONS, el.type) ? PRESENTATIONS[el.type] : undefined;
+  if (presentation !== undefined) node.presentation = presentation;
   // The band node is an `Other` (or, in the fallback, the `Keyboard` itself)
   // whose measured rect IS the covered band — the role changes, the rect,
   // label, identifier and children stay what WDA reported.

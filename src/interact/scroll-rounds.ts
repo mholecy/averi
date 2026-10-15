@@ -2,7 +2,7 @@ import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
-import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { markedLayer, outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -179,6 +179,11 @@ export type RoundStep =
  *   judged in the frame (below the fold, under the soft keyboard, cut or
  *   clipped) and the next stroke would touch down at `touchDown` on `cover`,
  *   a surface of that screen (ui-tree/draw-order.ts#DrawOrder.presentedAt).
+ *   `judged` undefined: no target in the tree, and the next stroke would
+ *   touch down on a marked presented layer's element (an alert,
+ *   ui-tree/draw-order.ts#DrawOrder.markedAt) — no stroke is sent under it.
+ *   `layer`: the presented layer's element the tree source marks (an alert,
+ *   ui-tree/standing.ts#markedLayer), which the sentence names.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -206,7 +211,7 @@ export type ScrollOutcome = (
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point }
+  | { kind: 'presented'; swipes: number; judged: Judged | undefined; cover: UiNode; viewport: Rect; touchDown?: Point; reach?: Rect; layer?: UiNode }
   | {
       kind: 'bound';
       swipes: number;
@@ -219,7 +224,7 @@ export type ScrollOutcome = (
       unlocated: boolean;
       evidence: WaitEvidence;
       /** The swipe the bound held back would have touched down at `touchDown` on `surface`, a screen presented over the target's (`presentedTouchDown`). */
-      presented?: { surface: UiNode; touchDown: Point };
+      presented?: { surface: UiNode; touchDown: Point; reach: Rect };
     }
 ) & { detent?: DetentMove };
 
@@ -1278,7 +1283,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
     // ask, at its touch-down (`presentedTouchDown`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the
@@ -1385,7 +1390,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // ask on behalf of, and is still stroked for (ADR 0018, residual 6).
   const onPresented = presentedTouchDown(stroke, best, now);
   if (onPresented !== undefined && best !== undefined) {
-    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    const layer = markedLayer(onPresented.surface);
+    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown, reach: onPresented.reach, ...(layer !== undefined && { layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+  }
+  // And on behalf of NO target (none in the tree): a stroke that would touch down on an alert the tree marks
+  // (`DrawOrder.markedAt`; its reach is the whole screen) lands on the alert, not on any screen beneath it — the
+  // same hold and stop, the alert named. Other presented screens are still stroked over for a target not in the tree.
+  const onMarked = best === undefined ? markedTouchDown(stroke, now) : undefined;
+  if (onMarked !== undefined) {
+    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: undefined, cover: onMarked.surface, viewport, touchDown: onMarked.touchDown, reach: onMarked.reach, layer: onMarked.surface }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
   const { toward } = stroke;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };
@@ -1439,11 +1452,19 @@ function plannedStroke(
  * on behalf of the target this read holds; undefined when it does not, when this round did not read, or when the
  * stroke has no box. Only the touch-down is asked: it is where the gesture is recognised.
  */
-function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): { surface: UiNode; touchDown: Point } | undefined {
+function presentedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, best: Judged | undefined, now: ThisRead | undefined): { surface: UiNode; touchDown: Point; reach: Rect } | undefined {
   if (best === undefined || now === undefined || stroke.box === undefined) return undefined;
   const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
   const surface = now.facts.scene.order.presentedAt(best.node, touchDown);
-  return surface === undefined ? undefined : { surface, touchDown };
+  return surface === undefined ? undefined : { surface, touchDown, reach: now.facts.scene.order.presentedReach(surface) };
+}
+
+/** Where `stroke` would touch down when that lands on a marked presented layer's element (`DrawOrder.markedAt`), asked for no target; undefined when it does not, when this round did not read, or when the stroke has no box. */
+function markedTouchDown(stroke: Extract<RoundStep, { do: 'stroke' }>, now: ThisRead | undefined): { surface: UiNode; touchDown: Point; reach: Rect } | undefined {
+  if (now === undefined || stroke.box === undefined) return undefined;
+  const touchDown = scrollStroke({ ...stroke, box: stroke.box }).from;
+  const surface = now.facts.scene.order.markedAt(touchDown);
+  return surface === undefined ? undefined : { surface, touchDown, reach: now.facts.scene.order.presentedReach(surface) };
 }
 
 /**

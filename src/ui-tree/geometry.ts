@@ -1053,8 +1053,17 @@ export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect
  * chrome refusal and move (interact/tap-judgement.ts#TapJudge.aim) and
  * `scroll_until`'s covered sentences (interact/scroll-text.ts).
  */
-export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point): string =>
-  `under ${nodeText(cover)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
+export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point, reach?: Rect): string =>
+  `under ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
+
+/**
+ * A cover as a sentence names it, with where it presses when that is not its rect (draw-order.ts#Exposure.reaches: a
+ * pinned bar run down to the screen's bottom, a tab bar's item raised by its lift, an alert over the whole screen):
+ * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the
+ * cover's own rect still lies on what it names. One spelling for the tap, `scroll_until` and the pixel assert.
+ */
+export const coverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, reach?: Rect): string =>
+  reach === undefined || sameRect(reach, cover.rect) ? nodeText(cover) : `${nodeText(cover).slice(0, -1)}, reaching ${rectText(reach)})`;
 
 /**
  * How a sentence quotes the KEYBOARD's frame: `[x,y][x2,y2]`, as dumpsys

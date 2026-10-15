@@ -802,6 +802,13 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     );
   });
 
+  it('ui_snapshot prints the mark of a presented layer\'s element (an alert WDA types `Alert`), as it prints `hidden`, so a device tree carries it', async () => {
+    const alert = node({ role: 'container', label: 'Leave the form', rect: { x: 41, y: 365, width: 320, height: 172 }, presentation: 'alert', children: [node({ role: 'button', label: 'Leave', rect: { x: 205, y: 473, width: 140, height: 48 } })] });
+    const { call } = await connect({ ios: new FakeAdapter({ alert: node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [alert] }) }, 'alert'), android: home() });
+    const result = await call('ui_snapshot', { platform: 'ios', filter: 'label:"Leave the form"', configPath: missing() });
+    expect(result.texts[0]).toContain('"presentation": "alert"');
+  });
+
   it('ui_snapshot: a filter nothing matches in a tree WITH content returns `[]` and a second block with the tree size — no warning', async () => {
     const { call } = await connect({ android: pin(), ios: home() });
     const result = await call('ui_snapshot', { platform: 'android', filter: 'role:textfield' });

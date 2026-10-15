@@ -529,3 +529,70 @@ describe('a target outside what its scroll view draws — the tap, the pixel ass
     expect(stopOf(tree, name).outcome?.kind).toBe('presented');
   });
 });
+
+/**
+ * A form beneath an ALERT (tests/fixtures/wda-synthetic-alert-over-form.json, the measured shape of a SwiftUI alert over
+ * a pushed form): the alert's layer covers the whole screen (UiNode.presentation, the WDA parser's mark), so every verb
+ * refuses the form's targets — no tap, no measurement, no swipe — naming the alert, and reaches the alert's own buttons.
+ */
+describe('a target beneath an alert — the tap, the pixel assert and scroll_until name the alert', () => {
+  const alertForm = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-synthetic-alert-over-form.json', import.meta.url), 'utf8'));
+  const ofId = (tree: UiNode, id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
+  // Named with its reach, the whole screen: the point a sentence names lies on the reach, not always on the card.
+  const ALERT = 'container "Leave the form" (41,365 320x172, reaching 0,0 402x874)';
+  const CLOSE_IT = 'an alert is presented over it ("Leave the form") — close it first';
+
+  it('the tap refuses a field of the form, under the alert at its centre: never "Tapped"', async () => {
+    const tree = await alertForm();
+    expect(await tapSaid(tree, ofId(tree, 'form.note_input'))).toBe(`id:t is under ${ALERT} at its centre (201,602), drawn over it; nothing of it shows — ${CLOSE_IT}; nothing was tapped`);
+  });
+
+  it('…and the form\'s full-screen Toolbar, of the dim\'s exact frame: refused, not moved', async () => {
+    const tree = await alertForm();
+    expect(await tapSaid(tree, ofId(tree, 'Toolbar'))).toBe(`id:t is under ${ALERT} at its centre (201,437), drawn over it; nothing of it shows — ${CLOSE_IT}; nothing was tapped`);
+  });
+
+  it('the alert\'s own buttons are tapped at their centre', async () => {
+    const tree = await alertForm();
+    const leave = [...everyNode(tree)].find((n) => n.role === 'button' && n.label === 'Leave')!;
+    expect(JSON.parse(await tapSaid(tree, leave))).toEqual({ point: { x: 275, y: 497 } });
+  });
+
+  it('the colour and the ocr assert fail closed naming the alert, which reaches the whole screen', async () => {
+    const tree = await alertForm();
+    const said = `${ALERT} is drawn over the element (element 24,576 354x52) — the capture would show it, not the element; an alert is presented over the element ("Leave the form") — close it first`;
+    expect(await colourSaid(tree, ofId(tree, 'form.note_input'))).toBe(said);
+    expect(await pixelSaid(tree, ofId(tree, 'form.note_input'))).toBe(said);
+  });
+
+  it('scroll_until stops before any swipe, naming the alert', async () => {
+    const tree = await alertForm();
+    expect(failureOf(stopOf(tree, ofId(tree, 'form.note_input')), 'id:t').message).toBe(
+      `scroll_until id:t stopped before any swipe — element is in the viewport but under ${ALERT} at its centre (201,602), drawn over it — 0% of it shows — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":576,"width":354,"height":52} in a 402x874 viewport`,
+    );
+  });
+
+  it('a field below the fold beneath the alert: the tap says close it first, and scroll_until does not swipe — every touch-down lies on the alert', async () => {
+    const tree = await alertForm();
+    const field = ofId(tree, 'form.note_input');
+    field.rect = { x: 24, y: 1200, width: 354, height: 52 };
+    expect(await tapSaid(tree, field)).toBe(`id:t is off screen at (201,1226) on a 402x874 screen (rect 24,1200 354x52) — ${CLOSE_IT}; nothing was tapped`);
+    expect(failureOf(stopOf(tree, field), 'id:t').message).toBe(
+      `scroll_until id:t stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":1200,"width":354,"height":52} in a 402x874 viewport`,
+    );
+  });
+
+  it('a target not in the tree: scroll_until sends no swipe under the alert — its touch-down lies on the alert, wherever it would land', async () => {
+    const tree = await alertForm();
+    const row: Row = { tree, found: [], screen: USABLE };
+    const played = play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    expect(failureOf(played, 'text:"Nothing like this"').message).toBe(
+      `scroll_until text:"Nothing like this" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+        `${CLOSE_IT}, and a swipe would land on the alert, so none was sent.`,
+    );
+  });
+});
+

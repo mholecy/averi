@@ -1,0 +1,476 @@
+{
+ "_comment": [
+  "SYNTHETIC — not a device capture. A WebDriverAgent `/source?format=json` tree in the measured SHAPE of a SwiftUI alert",
+  "presented over a pushed form (iPhone 17 simulator, iOS 27.0, 402x874 pt, WDA 16.1.7): in the app's Window, the form's layer (every node",
+  "isVisible \"0\", a full-screen `Toolbar` among them), then a later layer holding a BARE dimming leaf `0,0 402x874`, an empty frame and the",
+  "`Alert` — its texts and buttons, and two backdrop leaves laid at the alert's origin with the screen's size (`41,365 402x874`). Labels,",
+  "identifiers and the form are invented; the frames and the flags are the capture's."
+ ],
+ "value": {
+  "type": "Application",
+  "rawIdentifier": null,
+  "label": "Example",
+  "value": null,
+  "rect": {
+   "x": 0,
+   "y": 0,
+   "width": 402,
+   "height": 874
+  },
+  "isVisible": "1",
+  "isAccessible": "0",
+  "children": [
+   {
+    "type": "Window",
+    "rawIdentifier": null,
+    "label": null,
+    "value": null,
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "width": 402,
+     "height": 874
+    },
+    "isVisible": "1",
+    "isAccessible": "0",
+    "children": [
+     {
+      "type": "Other",
+      "rawIdentifier": null,
+      "label": null,
+      "value": null,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 402,
+       "height": 874
+      },
+      "isVisible": "0",
+      "isAccessible": "0",
+      "children": [
+       {
+        "type": "NavigationBar",
+        "rawIdentifier": null,
+        "label": null,
+        "value": null,
+        "rect": {
+         "x": 0,
+         "y": 62,
+         "width": 402,
+         "height": 54
+        },
+        "isVisible": "0",
+        "isAccessible": "1",
+        "children": [
+         {
+          "type": "Button",
+          "rawIdentifier": "BackButton",
+          "label": "Back",
+          "value": null,
+          "rect": {
+           "x": 30,
+           "y": 70,
+           "width": 28,
+           "height": 28
+          },
+          "isVisible": "0",
+          "isAccessible": "1",
+          "children": []
+         },
+         {
+          "type": "StaticText",
+          "rawIdentifier": "form.title",
+          "label": "NEW PAYMENT",
+          "value": null,
+          "rect": {
+           "x": 135,
+           "y": 73,
+           "width": 131,
+           "height": 22
+          },
+          "isVisible": "0",
+          "isAccessible": "1",
+          "children": []
+         }
+        ]
+       },
+       {
+        "type": "Other",
+        "rawIdentifier": null,
+        "label": null,
+        "value": null,
+        "rect": {
+         "x": 0,
+         "y": 0,
+         "width": 402,
+         "height": 874
+        },
+        "isVisible": "0",
+        "isAccessible": "0",
+        "children": [
+         {
+          "type": "ScrollView",
+          "rawIdentifier": null,
+          "label": null,
+          "value": null,
+          "rect": {
+           "x": 0,
+           "y": 0,
+           "width": 402,
+           "height": 780
+          },
+          "isVisible": "0",
+          "isAccessible": "1",
+          "children": [
+           {
+            "type": "Other",
+            "rawIdentifier": "form.note_input",
+            "label": null,
+            "value": null,
+            "rect": {
+             "x": 24,
+             "y": 576,
+             "width": 354,
+             "height": 52
+            },
+            "isVisible": "0",
+            "isAccessible": "0",
+            "children": [
+             {
+              "type": "StaticText",
+              "rawIdentifier": null,
+              "label": "Note",
+              "value": null,
+              "rect": {
+               "x": 42,
+               "y": 591,
+               "width": 103,
+               "height": 22
+              },
+              "isVisible": "0",
+              "isAccessible": "1",
+              "children": []
+             },
+             {
+              "type": "TextField",
+              "rawIdentifier": null,
+              "label": null,
+              "value": null,
+              "rect": {
+               "x": 42,
+               "y": 592,
+               "width": 318,
+               "height": 20
+              },
+              "isVisible": "0",
+              "isAccessible": "1",
+              "children": []
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "Button",
+          "rawIdentifier": "form.continue_button",
+          "label": "Continue",
+          "value": null,
+          "rect": {
+           "x": 24,
+           "y": 780,
+           "width": 354,
+           "height": 44
+          },
+          "isVisible": "0",
+          "isAccessible": "1",
+          "children": []
+         }
+        ]
+       },
+       {
+        "type": "Toolbar",
+        "rawIdentifier": "Toolbar",
+        "label": "Toolbar",
+        "value": null,
+        "rect": {
+         "x": 0,
+         "y": 0,
+         "width": 402,
+         "height": 874
+        },
+        "isVisible": "0",
+        "isAccessible": "1",
+        "children": [
+         {
+          "type": "Other",
+          "rawIdentifier": null,
+          "label": null,
+          "value": null,
+          "rect": {
+           "x": 0,
+           "y": 0,
+           "width": 402,
+           "height": 874
+          },
+          "isVisible": "0",
+          "isAccessible": "0",
+          "children": []
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "Other",
+      "rawIdentifier": null,
+      "label": null,
+      "value": null,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 402,
+       "height": 874
+      },
+      "isVisible": "1",
+      "isAccessible": "0",
+      "children": [
+       {
+        "type": "Other",
+        "rawIdentifier": null,
+        "label": null,
+        "value": null,
+        "rect": {
+         "x": 0,
+         "y": 0,
+         "width": 402,
+         "height": 874
+        },
+        "isVisible": "1",
+        "isAccessible": "0",
+        "children": []
+       },
+       {
+        "type": "Other",
+        "rawIdentifier": null,
+        "label": null,
+        "value": null,
+        "rect": {
+         "x": 0,
+         "y": 0,
+         "width": 402,
+         "height": 874
+        },
+        "isVisible": "0",
+        "isAccessible": "0",
+        "children": []
+       },
+       {
+        "type": "Alert",
+        "rawIdentifier": null,
+        "label": "Leave the form",
+        "value": null,
+        "rect": {
+         "x": 41,
+         "y": 365,
+         "width": 320,
+         "height": 172
+        },
+        "isVisible": "1",
+        "isAccessible": "0",
+        "children": [
+         {
+          "type": "Other",
+          "rawIdentifier": null,
+          "label": null,
+          "value": null,
+          "rect": {
+           "x": 41,
+           "y": 365,
+           "width": 320,
+           "height": 172
+          },
+          "isVisible": "1",
+          "isAccessible": "0",
+          "children": [
+           {
+            "type": "ScrollView",
+            "rawIdentifier": null,
+            "label": null,
+            "value": null,
+            "rect": {
+             "x": 41,
+             "y": 365,
+             "width": 320,
+             "height": 92
+            },
+            "isVisible": "1",
+            "isAccessible": "1",
+            "children": [
+             {
+              "type": "StaticText",
+              "rawIdentifier": null,
+              "label": "Leave the form",
+              "value": null,
+              "rect": {
+               "x": 71,
+               "y": 387,
+               "width": 260,
+               "height": 21
+              },
+              "isVisible": "1",
+              "isAccessible": "1",
+              "children": []
+             },
+             {
+              "type": "StaticText",
+              "rawIdentifier": null,
+              "label": "What you entered will be lost.",
+              "value": null,
+              "rect": {
+               "x": 71,
+               "y": 414,
+               "width": 260,
+               "height": 39
+              },
+              "isVisible": "1",
+              "isAccessible": "1",
+              "children": []
+             }
+            ]
+           },
+           {
+            "type": "ScrollView",
+            "rawIdentifier": null,
+            "label": null,
+            "value": null,
+            "rect": {
+             "x": 41,
+             "y": 457,
+             "width": 320,
+             "height": 80
+            },
+            "isVisible": "1",
+            "isAccessible": "1",
+            "children": [
+             {
+              "type": "Other",
+              "rawIdentifier": null,
+              "label": null,
+              "value": null,
+              "rect": {
+               "x": 57,
+               "y": 473,
+               "width": 288,
+               "height": 48
+              },
+              "isVisible": "1",
+              "isAccessible": "0",
+              "children": [
+               {
+                "type": "Button",
+                "rawIdentifier": null,
+                "label": "Stay",
+                "value": null,
+                "rect": {
+                 "x": 57,
+                 "y": 473,
+                 "width": 140,
+                 "height": 48
+                },
+                "isVisible": "1",
+                "isAccessible": "1",
+                "children": []
+               },
+               {
+                "type": "Button",
+                "rawIdentifier": null,
+                "label": "Leave",
+                "value": null,
+                "rect": {
+                 "x": 205,
+                 "y": 473,
+                 "width": 140,
+                 "height": 48
+                },
+                "isVisible": "1",
+                "isAccessible": "1",
+                "children": []
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "Other",
+          "rawIdentifier": null,
+          "label": null,
+          "value": null,
+          "rect": {
+           "x": 41,
+           "y": 365,
+           "width": 320,
+           "height": 172
+          },
+          "isVisible": "1",
+          "isAccessible": "0",
+          "children": [
+           {
+            "type": "Other",
+            "rawIdentifier": null,
+            "label": null,
+            "value": null,
+            "rect": {
+             "x": 41,
+             "y": 365,
+             "width": 402,
+             "height": 874
+            },
+            "isVisible": "1",
+            "isAccessible": "0",
+            "children": []
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "Window",
+    "rawIdentifier": null,
+    "label": null,
+    "value": null,
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "width": 402,
+     "height": 874
+    },
+    "isVisible": "0",
+    "isAccessible": "0",
+    "children": [
+     {
+      "type": "Other",
+      "rawIdentifier": null,
+      "label": null,
+      "value": null,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 402,
+       "height": 874
+      },
+      "isVisible": "0",
+      "isAccessible": "0",
+      "children": []
+     }
+    ]
+   }
+  ]
+ },
+ "sessionId": null
+}

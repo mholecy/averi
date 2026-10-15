@@ -134,6 +134,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('ui_snapshot')).toContain('at its cell\'s rect');
   });
 
+  it('ui_snapshot: says what WDA\'s `"presentation": "alert"` means (adapters/types.ts#UiNode.presentation): the alert covers the whole screen beneath it', () => {
+    expect(description('ui_snapshot')).toContain('"presentation": "alert"');
+    expect(description('ui_snapshot')).toContain('covers the whole screen beneath it');
+  });
+
   it('ui_snapshot: says what the root\'s dialect marks mean — WDA\'s `"unclippedFrames": true` (adapters/types.ts#UiNode.unclippedFrames) and idb\'s `"flatList": true`', () => {
     expect(description('ui_snapshot')).toContain('"unclippedFrames": true under iOS wda');
     expect(description('ui_snapshot')).toContain('"flatList": true under iOS idb');
@@ -327,11 +332,15 @@ describe('tool descriptions on a screen presented over the target', () => {
 
   it('scroll_until: a target not judged in the viewport whose swipe would touch down on that screen fails without the swipe — the description and the troubleshooting entry say so, and that a target not yet in the tree is still swiped for', () => {
     expect(description('scroll_until')).toContain(
-      'The same holds, with the same confirming read, for a target in the tree that is NOT judged in the viewport (below the fold, under the soft keyboard, cut, or under a bar of its own screen) when the next swipe would touch down on such a screen: it fails without that swipe, saying why the target is not in the viewport and where the swipe would have landed — e.g. "element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is presented over it …" — since that swipe would land on the presented screen, not on the target\'s (a popover closed, a sheet moved to another detent); a read that fails meanwhile is retried, never answered with a swipe. When a bound (maxSwipes, the timeout, content exhausted) ends the scroll first, the failure adds "The next swipe would have touched down at (x,y) on … — a screen is presented over it …". A row of the presented sheet itself is still swiped for on the sheet, and a target not yet in the tree is still swiped for.',
+      'The same holds, with the same confirming read, for a target in the tree that is NOT judged in the viewport (below the fold, under the soft keyboard, cut, or under a bar of its own screen) when the next swipe would touch down on such a screen: it fails without that swipe, saying why the target is not in the viewport and where the swipe would have landed — e.g. "element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (0,0 402x874) — a screen is presented over it …" — since that swipe would land on the presented screen, not on the target\'s (a popover closed, a sheet moved to another detent); a read that fails meanwhile is retried, never answered with a swipe. When a bound (maxSwipes, the timeout, content exhausted) ends the scroll first, the failure adds "The next swipe would have touched down at (x,y) on … — a screen is presented over it …". A row of the presented sheet itself is still swiped for on the sheet, and a target not yet in the tree is still swiped for — except under an alert',
     );
     expect(TROUBLESHOOTING).toContain(
       '`scroll_until` says the same when the target is in the tree but not in the viewport (below the fold, under the soft keyboard, cut) and the next swipe would touch down on such a screen: `… — element lies below the viewport, and the next swipe would touch down at (x,y) on <that screen\'s dimming view or scroll view> — a screen is presented over it …`, and no swipe was sent, because that swipe would land on the modal or sheet (closing a popover, moving a sheet to another size) and not on the target\'s screen. A failure at a bound adds `The next swipe would have touched down at (x,y) on … — a screen is presented over it …` for the same reason. Close that screen first here too.',
     );
+  });
+
+  it('scroll_until: under an alert no swipe is sent for a target not in the tree either — the description says so', () => {
+    expect(description('scroll_until')).toContain('except under an alert (iOS wda), where no swipe is sent for any target');
   });
 
   it('troubleshooting: the entry, the wrapper sentence as the code has it, and the picker\'s exception over another screen', async () => {
