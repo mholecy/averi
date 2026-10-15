@@ -126,6 +126,9 @@ frame from `WindowInsets.ime`, submits), captured through uiautomator, the stati
 (`live.ts` against the `averi_lab` emulator: `fill` / `type_text` / `clear`, Android's one-character-per-`input
 text` typing). Android sets no `error` on a field (docs/verification.md): its error rows assert the message's text.
 Owner request 2026-10-15.
+The pinned submit's bar is measured today from iOS's padding in points (scripts/truth/truth.ts#PINNED_BAR_PADDING,
+`situationOf`); phase 2b has the app report its bar's frame (e.g. `frames["submit.bar"]`) and `situationOf` read it
+on both platforms, the constant dropped.
 
 ### Phase 3 — calibration on the bug notes
 

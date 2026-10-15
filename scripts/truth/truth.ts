@@ -7,7 +7,12 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, typ
  * both read it; tests/truth/truth.test.ts pins it.
  */
 
-/** The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it (Form.swift). */
+/**
+ * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it (Form.swift).
+ * iOS's, in points: Android's forms (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2b) need the bar in pixels —
+ * deferred to phase 2b, where the app should report its bar's frame (e.g. `frames["submit.bar"]`) for situationOf to
+ * read instead of this guess (round-2 review, MINOR-4).
+ */
 export const PINNED_BAR_PADDING = 10;
 
 /** A probe's touch counts as the tap's when it lies this close to the tapped point (the tree's units). */
