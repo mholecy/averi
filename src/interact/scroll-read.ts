@@ -2,7 +2,7 @@ import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
+import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 
@@ -125,12 +125,17 @@ export interface TreeFacts {
    * unchanged fingerprint does not say the content is exhausted.
    */
   loading: boolean;
+  /**
+   * The tree's top sheet's grabber: its detent and how many grabbers the tree holds (ui-tree/read-tree.ts#sheetDetent),
+   * undefined when it holds none — compared between the scroll's first and last reads (scroll-rounds.ts#DetentMove).
+   */
+  detent: SheetDetent | undefined;
 }
 
 /**
  * `TreeFacts` of a tree: the scene's draw order and clip facts (each
- * derived on first use), the largest scroller, the fingerprint and the
- * progress check. Derived ONCE per `judgeRead` — once per call of
+ * derived on first use), the largest scroller, the fingerprint, the
+ * progress check and the sheet's detent. Derived ONCE per `judgeRead` — once per call of
  * scroll-rounds.ts#round that read — BEFORE the judgement, and handed to it
  * and along (`ReadJudgement.facts`, which the round keeps for the steps
  * after the judgement) — each fact from one derivation. A call that
@@ -148,6 +153,7 @@ function factsOf(tree: UiNode): TreeFacts {
     mainScroller: largestScroller(tree),
     fingerprint: treeFingerprint(tree),
     loading: showsProgress(tree),
+    detent: sheetDetent(tree),
   };
 }
 
