@@ -32,8 +32,6 @@ const ROOT = join(import.meta.dirname, '..', '..');
  * (the test then says so) or its references are gone.
  */
 const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
-  // Untracked in the main checkout; cited by the decision record's amendment "a layer holding an alert".
-  'docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md',
   'docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md',
   'docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md',
   'docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md',
@@ -61,6 +59,8 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   // Untracked in the main checkout; cited by ADR 0018's amendment "presented judged of the node" and capture.ts#clipThenInset.
   'docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md',
   'docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md',
+  // Untracked in the main checkout; cited by the decision record's amendment "a layer holding an alert".
+  'docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>
