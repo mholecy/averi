@@ -361,6 +361,16 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
+  it('troubleshooting: under an alert — the tap\'s, scroll_until\'s (its swipe would land on the alert; a target not in the tree included), the picker\'s and color/ocr\'s words, as the owner renders them', async () => {
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    const alert = { kind: 'alert', label: '…' } as const;
+    expect(TROUBLESHOOTING).toContain(`- **\`… ${presentedRemedy('it', alert)}\`** (tap or \`scroll_until\`; iOS with \`treeSource: wda\`)`);
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${presentedStop(alert)}, so none was sent\` (or \`so no further swipe was sent\`)`);
+    expect(TROUBLESHOOTING).toContain(`\`scroll_until … stopped before any swipe — element is not in the tree, and the next swipe would touch down at (x,y) on … — ${presentedStop(alert)}, so none was sent\``);
+    expect(TROUBLESHOOTING).toContain(`  - \`${presentedRemedy('it', alert)}\` (iOS with \`treeSource: wda\`): an alert is up over the entry's screen`);
+    expect(TROUBLESHOOTING).toContain(`the message ends \`… ${presentedRemedy('the element', alert)}\` instead: tap the alert's button that closes it`);
+  });
+
   it('color/ocr: under a presented screen the assert fails closed saying to close it first, not to scroll — in the description and the troubleshooting entry', async () => {
     const { PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
     expect(description('assert')).toContain(
