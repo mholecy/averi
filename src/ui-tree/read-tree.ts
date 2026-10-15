@@ -329,3 +329,20 @@ export function showsProgress(tree: UiNode): boolean {
   for (const n of everyNode(tree)) if (n.role === 'progress' && n.rect.width > 0 && n.rect.height > 0) return true;
   return false;
 }
+
+/** The accessibility label iOS gives a sheet's grabber — WDA's `label`, idb's `AXLabel` — whose value is the sheet's detent. */
+const SHEET_GRABBER = 'Sheet Grabber';
+
+/**
+ * The detent a sheet's grabber reports (`Half screen`, `Expanded`): the value of the LAST node labelled
+ * `Sheet Grabber` with one — in tree order the sheet presented on top — undefined when the tree holds none (Android,
+ * a screen with no sheet, a sheet without a grabber). Both iOS sources give it. A stroke on a half sheet's list at its
+ * top drags the sheet up before it scrolls the list; `scroll_until` asks this of its first and last reads to say the
+ * sheet moved (interact/scroll-rounds.ts#ScrollOutcome's `detent`). The label is matched as the devices measured dump it (English);
+ * a label in another language is not read. One walk.
+ */
+export function sheetDetent(tree: UiNode): string | undefined {
+  let detent: string | undefined;
+  for (const n of everyNode(tree)) if (n.label === SHEET_GRABBER && n.value !== null) detent = n.value;
+  return detent;
+}
