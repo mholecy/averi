@@ -16,6 +16,8 @@ import {
   pieceOf,
   pieceProbePoint,
   subtract,
+  systemBarSwallows,
+  unprobedBand,
   visibleOf,
   type GeometryContext,
 } from '../../scripts/truth/truth.js';
@@ -178,6 +180,9 @@ describe('consistency with a measured geometry', () => {
     expect(consistency(nav, 'android')).toBeUndefined();
     expect(consistency({ ...nav, probe: [ev('touch', '201,852')] }, 'android')).toBe('nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe');
     expect(consistency(nav, 'ios')).toMatch(/left no touch/);
+    // What is measured swallows; what is not is unprobed — the two never both claim a band.
+    expect([systemBarSwallows('android', 'status-band'), systemBarSwallows('android', 'nav-band'), systemBarSwallows('ios', 'status-band')]).toEqual([true, false, false]);
+    expect([unprobedBand('android', 'nav-band'), unprobedBand('android', 'status-band'), unprobedBand('ios', 'nav-band')]).toEqual([true, false, false]);
   });
   it('cut with its centre showing must be reached; with its centre out, or outside its clip, must not; a sliver either', () => {
     expect(consistency(T({ geometry: 'partly-centre-in', drawn: 0.6 }))).toBeUndefined();
