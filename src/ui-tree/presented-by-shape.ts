@@ -19,8 +19,9 @@ import { scrolls } from './scroll-containers.js';
  *
  * Two questions, one rule (`givesWay`): does a frame row's excuse of a node give way because the node lies on a
  * screen presented over the target's (`givesWay`, asked by draw-order.ts's `structural`, `screenSizedHost` and
- * `contentFramed` rows), and is a node a cover of the target that is such a screen's SURFACE (`surface`: what
- * `Exposure.presented`, the presented questions and the `hidden` row's guard read on such a tree).
+ * `contentFramed` rows), and is a node a cover of the target that is such a screen's SURFACE
+ * (`presentedSurface`: what `Exposure.presented`, the presented questions and the `hidden` row's guard read on such a
+ * tree).
  * The decision and its residuals: docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
 export interface PresentedByShape {
@@ -28,8 +29,8 @@ export interface PresentedByShape {
    * `row`'s excuse of `placed` for `target` gives way: it lies on a screen presented over the target's (`givesWay`).
    */
   givesWay(row: FrameRow, placed: Placed, target: Placed): boolean;
-  /** `placed` is the SURFACE of a screen presented over `target`'s (`presentedSurface`). */
-  surface(placed: Placed, target: Placed): boolean;
+  /** `placed` is the SURFACE of a screen presented over `target`'s. */
+  presentedSurface(placed: Placed, target: Placed): boolean;
 }
 
 /** The three frame rows of draw order's `target` column (draw-order.ts#FRAME_EXCUSES) the shape rule may take back. */
@@ -108,10 +109,10 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
  * (`excuses`).
  *
  * `givesWay` — A SURFACE OVER THE SCREEN BENEATH: the exception to the frame rows — a node a frame row excuses, or one
- * a row would name as a presented surface (`surface`, through the row's `surfaceCandidate`: for `structural` any
- * structural node, excused or not), whose own `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN,
+ * a row would name as a presented surface (`presentedSurface`, through the row's `surfaceCandidate`: for `structural`
+ * any structural node, excused or not), whose own `overPresented` holds (`structural`: a LEAF that FILLS THE SCREEN,
  * `fillsScreen`; `screenSizedHost` and `contentFramed`: a scroll view, drawing only through its rows), covers a target
- * (or, asked by `surface`, is named a presented surface) when it lies on a screen presented over the target's
+ * (or, asked by `presentedSurface`, is named a presented surface) when it lies on a screen presented over the target's
  * (`presentedOver`) and is no bare frame (`emptyFrame` with nothing drawable in it — a spacer of the layer stays
  * excused, so a leaf the app named, the RN Modal's dimming root `forgot_overlay`, covers and an anonymous one does
  * not). Only surfaces that draw their whole rect: a dimming leaf, a sheet's scroll view. A smaller leaf stays excused:
@@ -123,7 +124,7 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
  * form `scrollable 0,62 402x812`, 0.929 of the screen), each laid in the app's Window after the screen beneath, which a
  * tap was sent to through the layer.
  *
- * `surface` — `presentedSurface`: a cover of `target` that is the SURFACE of a screen presented over it: a node some
+ * `presentedSurface` — a cover of `target` that is the SURFACE of a screen presented over it: a node some
  * frame row names as a candidate (`surfaceCandidate`) and whose exception over a presented screen holds (that row's
  * `givesWay`). For `structural`, a STRUCTURAL leaf that fills the screen on a presented layer, whether that row
  * excuses it or not — labelled or valued, it covers anyway, so only what the sentences say of it is the exception's:
@@ -137,5 +138,5 @@ export function presentedByShape(screenArea: number, excuses: FrameExcuse): Pres
     OVER_PRESENTED[row].overPresented(placed.node, screenArea) && !(emptyFrame(placed.node) && !carriesContent(placed.node)) && presentedOver(placed, target, screenArea);
   const presentedSurface = (placed: Placed, target: Placed): boolean =>
     (Object.keys(OVER_PRESENTED) as FrameRow[]).some((row) => OVER_PRESENTED[row].surfaceCandidate(placed.node, () => excuses(row, placed, target)) && givesWay(row, placed, target));
-  return { givesWay, surface: presentedSurface };
+  return { givesWay, presentedSurface };
 }

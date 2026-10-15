@@ -103,11 +103,11 @@ presented (`UiNode.presentation` `screen`); draw order covers the screen beneath
   Settings, the pushed SWIFT form, Account Detail, MyPort, the Contacts list, a dismissed country sheet).
 - **Decision 1's guard.** "Except a node that is the surface of a screen presented over the target's
   (`presentedSurface`)" now holds only on a tree whose source did not judge presented layers (no
-  `UiNode.presentationsJudged` on its root — for `hidden`, which only a flagged payload sets, a snapshot printed
-  before the marks): there the surface is the shape fallback's (`presented-by-shape.ts#presentedSurface`). On a judged
-  tree no hidden node is excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover, must
-  still cover the list beneath — holds by the mark instead: a marked layer covers the screen beneath through its own
-  cover, which no row excuses, whatever its hidden nodes. Reading the marks in the guard (a hidden node of a marked
+  `UiNode.presentationsJudged` on its root — for `hidden`, which only a flagged payload sets, a snapshot printed before
+  the marks): there the surface is the shape fallback's (`presented-by-shape.ts#PresentedByShape.presentedSurface`). On
+  a judged tree no hidden node is excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover,
+  must still cover the list beneath — holds by the mark instead: a marked layer covers the screen beneath through its
+  own cover, which no row excuses, whatever its hidden nodes. Reading the marks in the guard (a hidden node of a marked
   layer covering as before) was measured and not taken: 36 replies on the three expanded country-sheet trees, wording
   only, each naming a hidden child where its visible control lies — `text "Kosovo" (42,67 55x21)`, WDA-hidden, for the
   row's `button "Kosovo" (24,55 354x45)` — so it waits on a naming rule (residual 6).
