@@ -48,23 +48,43 @@ bar, …) is tapped on a part of it nothing is drawn over … with less showing 
 tapped". ADR 0004 ("the pinned CONTINUE still covers `priority_select`") and draw-order.ts#bottomPinned ("a bar LIFTED
 onto idb's keyboard … reaches the keyboard's top", measured run2-ios #250) say the same for idb's flat list.
 
-## Suspected cause (src/ui-tree/draw-order.ts — not changed here)
+## Cause (verified by replay at `8600176`; src/ui-tree/soft-keyboard.ts, geometry.ts, draw-order.ts — not changed here)
 
-idb lists the screen flat (`form-keyboard.idb.json`): the form, then `Continue` `20,517 362x46` right after `phone`
-`20,530 362x34`, then the keys, the keyboard's background `GenericElement 0,590 402x284`, and LAST two buttons of the
-keyboard's bottom inset, `Next keyboard` `8,806 68x69` and `Dictate` `325,805 68x69`.
+idb lists the screen flat (`form-keyboard.idb.json`): the form, `Continue` `20,517 362x46` (listed right after
+`phone` `20,530 362x34`), then the keys, the keyboard's background `GenericElement 0,590 402x284` (ending at the
+screen's bottom, 874), and LAST two buttons of the keyboard's bottom inset, `Next keyboard` and `Dictate`.
 
-`bottomPinned` counts `Continue` as a bar lifted onto the keyboard only when nothing listed after it starts at or below
-its bottom, the keyboard's keys left out (`keyboard.keys`). `Next keyboard` and `Dictate` are evidently not among
-`keyboardOf`'s keys (they lie below the key rows, in the keyboard's bottom inset), so `Continue` is not pinned. It then
-starts ABOVE `phone` (517 < 530) and is listed after it — `flatListReadingOrder`'s reading break — so it is excused
-as the next container's, and nothing covers the field.
+`bottomPinned` (draw-order.ts) counts `Continue` as a bar lifted onto the keyboard only when nothing listed after it
+starts at or below its bottom, the keyboard's keys left out (`keyboardOf`'s `keys`: the run `flatListKeyboardBand`
+returns). Here the run leaves out both trailing buttons, so `Continue` is not pinned; it then starts ABOVE `phone`
+(517 < 530) and is listed after it — `flatListReadingOrder`'s reading break — so it is excused as the next
+container's, and nothing covers the field.
 
-Checked by replaying edited copies of the idb list through the same harness: without `Next keyboard` and `Dictate`
-the tap is refused, `under button "Continue" … nothing was tapped`; without the whole keyboard it is `Tapped` again (no
-keyboard floor to pin to, and the bar is no bottom-of-screen bar). The run2-ios #250 dump the rule was measured on
-evidently had no such trailing buttons. A fix is the round's to choose (count the buttons inside the keyboard's
-background rect as its keys, or measure the floor from the background); the golden rows above are its check.
+Why the run leaves them out — a 1-pt overhang, not their place under the key rows:
+
+- idb's raw frame of `Next keyboard` is `{8.48, 805.70}, {68.09, 68.74}`: it ends at 874.43, a fraction of a point
+  past the screen. ios-node.ts rounds origin and size separately (`Math.round` of each), so the parsed rect is
+  `8,806 68x69`, ending at **875** — 1 pt past the background's (and the screen's) bottom, 874. `Dictate`
+  (`{325.44, 805.37}, {68.09, 68.74}`) parses to `325,805 68x69`, ending at 874: inside.
+- `flatListKeyboardBand` (soft-keyboard.ts, lines 94–109) tests membership with `rectWithin` (geometry.ts, line 522),
+  which has no slack, and its `to` scan (lines 104–105) stops at the first node listed after the background that is
+  not inside it. `Next keyboard` is that node, so `Dictate`, inside, is dropped with it.
+- Replayed: `flatListKeyboardBand` over the parsed list (pre-order, the synthetic root first, as draw-order.ts passes
+  it) gives `{ top: 590, from: 16, to: 49, at: 48 }` — keys 16..48, the background at 48; `Next keyboard` (49) and
+  `Dictate` (50) are outside the run; `Continue` is node 15, right before it. (The round-2 review's
+  `{from 15, to 48, at 47}` is the same band counted without the root.)
+
+Checked by replaying an edited copy of the idb list through the same harness (scratchpad, not committed): with only
+`Next keyboard`'s y moved up 0.33 pt to `Dictate`'s (805.37, so it parses to `8,805 68x69`, ending at 874), the tap is
+refused — `under button "Continue" (20,517 362x46, reaching 20,517 362x73) … nothing was tapped`, no tap sent — and
+scroll_until stops `under button "Continue"` after 3 swipes, touching down at y 472 and 175, as WDA does.
+
+A fix is the round's to choose; the measurement says what it needs: membership of the band with a slack
+(`PIXEL_OVERLAP_SLACK`, 2 pt) or the node clamped to the screen first — that alone admits `Next keyboard`; not
+stopping the `to` scan at the first outlier only keeps `Dictate` and would not fix this tree by itself. (Rounding the
+frame's END rather than its size — 874.43 → 874 — would remove the overhang here, but is a parser change with a wider
+reach.) The earlier suggestion, "count the buttons inside the keyboard's background rect", would still miss `Next
+keyboard`: it is not inside by 1 pt. The golden rows above are the fix's check.
 
 ## Notes
 
