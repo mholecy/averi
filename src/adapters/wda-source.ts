@@ -325,7 +325,10 @@ function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined
   return !rectsOverlap(own, at) && rectsOverlap(own, view) && !rectsOverlap(at, view) ? at : undefined;
 }
 
-/** WDA's "0" — a string in the JSON format, compared as `onScreen` compares `isVisible`; a missing or null flag is never "0". */
+/**
+ * WDA's "0" — a string in the JSON format, compared as `onScreen` (the module's, `isVisible` against "1") compares; a
+ * missing or null flag is never "0".
+ */
 const isZero = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '0';
 
 /**
@@ -380,10 +383,11 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
     if (keyboardWindows.has(window)) continue;
     // An element types its layer only ON the screen: WDA keeps a dismissed alert in its tree, parked off it.
     const screen = usableRect(window.rect) ?? usableRect(root.rect);
-    const onScreen = (e: WdaElement): boolean => screen === undefined || (usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen));
+    // Its rect only, whatever its flags (a flagless payload types too) — unlike the module's `onScreen`.
+    const onWindow = (e: WdaElement): boolean => screen === undefined || (usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen));
     for (const layer of window.children ?? []) {
       for (const [type, kind] of PRESENTATIONS) {
-        const element = firstIn(layer, (e) => e.type === type && onScreen(e));
+        const element = firstIn(layer, (e) => e.type === type && onWindow(e));
         if (element === undefined) continue;
         layers.set(layer, kind);
         elements.add(element);
@@ -416,7 +420,7 @@ function presentedScreen(window: WdaElement): WdaElement | undefined {
   const screen = usableRect(window.rect);
   if (screen === undefined) return undefined;
   const content = (e: WdaElement): boolean => !STRUCTURAL_ROLES.has(iosRoleOf(e.type, ROLE_MAP));
-  const shownContent = (e: WdaElement): boolean => content(e) && String(e.isVisible) === '1' && usableRect(e.rect) !== undefined && rectsOverlap(e.rect!, screen);
+  const shownContent = (e: WdaElement): boolean => content(e) && onScreen(e, screen);
   let beneath = false;
   for (const layer of window.children ?? []) {
     const rect = usableRect(layer.rect);
