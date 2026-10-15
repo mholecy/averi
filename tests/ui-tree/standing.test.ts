@@ -1317,7 +1317,7 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(sceneOf(tree).standing(toggle, IPHONE, OCR(toggle)).kind).toBe('reachable');
   });
 
-  it('the thin sliver at the scroll view\'s edge as at the screen\'s (ADR 0002\'s slack): 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
+  it('the thin sliver at the scroll view\'s edge as at the screen\'s, the same slack: 2 pt drawn above 780 is too thin for the ocr crop, 3 pt is measured', () => {
     const two = node({ role: 'button', identifier: 'two', rect: r(24, 778, 354, 52) });
     const three = node({ role: 'button', identifier: 'three', rect: r(24, 777, 354, 52) });
     const { tree } = atRest(two, three);

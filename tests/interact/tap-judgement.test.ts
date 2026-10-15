@@ -276,7 +276,7 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
     expect(freshReads).toEqual([]);
   });
 
-  it('a card partly drawn, its centre outside what its scroll views draw (a carousel at the form\'s foot): refused as at the screen\'s edge, "fully: true first" — not tapped on its drawn part (ADR 0010, "Amendment: the drawn frame")', async () => {
+  it('a card partly drawn, its centre outside what its scroll views draw (a carousel at the form\'s foot): refused as at the screen\'s edge, "fully: true first" — not tapped on its drawn part', async () => {
     // low_card 750–830 in the carousel 740–840, inside the form ending at 780: 30 of its 80 pt drawn, its centre (124,790) not.
     const low = node({ role: 'button', identifier: 'low_card', rect: { x: 24, y: 750, width: 200, height: 80 } });
     const carousel = node({ role: 'scrollable', identifier: 'carousel_low', rect: { x: 0, y: 740, width: 402, height: 100 }, children: [low] });
