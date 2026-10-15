@@ -385,8 +385,13 @@ export interface StandingFacts {
  * since no scroll moves the node out from under it. The one clause of a remedy kept here, in the UI-tree layer both
  * verbs and the pixel assert may import, as system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
-export const presentedRemedy = (what: 'it' | 'the element'): string =>
-  `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+export const presentedRemedy = (what: 'it' | 'the element', layer?: UiNode): string =>
+  layer?.presentation === 'alert'
+    ? `an alert is presented over ${what}${layer.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
+    : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
+
+/** The element of the presented layer the tree source marks (`UiNode.presentation`) when `surface` is one — what `presentedRemedy` names; else undefined. */
+export const markedLayer = (surface: UiNode): UiNode | undefined => (surface.presentation !== undefined ? surface : undefined);
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
@@ -440,7 +445,7 @@ export const presentedRemedy = (what: 'it' | 'the element'): string =>
  * words those and the compiler refuses one it cannot (a keyboard remedy under a bar, say).
  */
 export type Remedy =
-  | { readonly of: 'presented'; readonly cover: UiNode }
+  | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: UiNode }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
   | { readonly of: 'pinned' }
@@ -624,7 +629,10 @@ function remedied(
   // covers in the frame, else one judged of the node itself (draw-order.ts#DrawOrder.presentedOver) — a node with
   // nothing in the frame (below the fold, inside the status band) has no covers there.
   const surface = judgement.facts.presented?.at(-1) ?? scene.order.presentedOver(node);
-  if (surface !== undefined) return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface } };
+  if (surface !== undefined) {
+    const layer = markedLayer(surface);
+    return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface, ...(layer !== undefined && { layer }) } };
+  }
   if ('touch' in judging) {
     const touch = judging.touch;
     switch (touch.kind) {

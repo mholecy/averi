@@ -8,7 +8,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutRemedy, cutSliverText, PRESENTED_OVER, underKeyboardText } from './target-text.js';
+import { cutRemedy, cutSliverText, presentedOver, underKeyboardText } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -417,11 +417,11 @@ function systemBarRemedy(edge: SystemBar['edge'], remedy: ScrollableRemedy): str
 
 /**
  * The tap's advice for a standing's remedy (ui-tree/standing.ts#Remedy): beneath a presented screen, that screen's
- * (`PRESENTED_OVER`), whatever the kind; else `otherwise`, told the remedy's other case — what each kind words
+ * (target-text.ts#presentedOver, naming an alert the tree marks), whatever the kind; else `otherwise`, told the remedy's other case — what each kind words
  * (a scroll, the system bar's three, the keyboard's hiding).
  */
 function advice<R extends Exclude<Remedy, { readonly of: 'presented' }>>(remedy: Extract<Remedy, { readonly of: 'presented' }> | R, otherwise: (remedy: R) => string): string {
-  return remedy.of === 'presented' ? PRESENTED_OVER : otherwise(remedy);
+  return remedy.of === 'presented' ? presentedOver(remedy.layer) : otherwise(remedy);
 }
 
 /** The way past a cut the node's own content evidences, should it only READ cut (geometry.ts#evidentCut's residual). */

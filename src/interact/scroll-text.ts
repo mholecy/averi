@@ -6,9 +6,9 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, presentedOver, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { outsideItsScrollView } from '../ui-tree/standing.js';
+import { markedLayer, outsideItsScrollView } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -287,6 +287,9 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  */
 export const PRESENTED_STOP = `${PRESENTED_OVER}, and a swipe on it may dismiss it`;
 
+/** `PRESENTED_STOP` for a presented layer the tree source marks (an alert, the outcome's `layer`): it is named, and a swipe would land on it. */
+const presentedStop = (layer: UiNode | undefined): string => (layer === undefined ? PRESENTED_STOP : `${presentedOver(layer)}, and a swipe would land on the ${layer.presentation ?? 'screen'}`);
+
 /**
  * The failure for every outcome but `visible`, and its class: `stuck` and
  * `presented` a plain Error (the element was there and seen); `covered` and `bound`
@@ -415,7 +418,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
           ? `element is in the viewport but ${drawnOverText(cover, cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
           : `${notInViewportText(judged, viewport)}, and the next swipe would touch down at (${o.touchDown.x},${o.touchDown.y}) on ${nodeText(cover)}`;
       return new Error(
-        `scroll_until ${describe} stopped ${when} — ${where} — ${PRESENTED_STOP}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+        `scroll_until ${describe} stopped ${when} — ${where} — ${presentedStop(o.layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
           `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       );
     }
@@ -436,7 +439,7 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
       const presented =
         o.presented === undefined
           ? ''
-          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${nodeText(o.presented.surface)} — ${PRESENTED_OVER}`;
+          : `. The next swipe would have touched down at (${o.presented.touchDown.x},${o.presented.touchDown.y}) on ${nodeText(o.presented.surface)} — ${presentedOver(markedLayer(o.presented.surface))}`;
       return absenceError(`scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, o.evidence);
     }
   }

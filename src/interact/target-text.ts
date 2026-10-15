@@ -102,6 +102,9 @@ export function cutRemedy(edge: Edge): string {
  */
 export const PRESENTED_OVER = presentedRemedy('it');
 
+/** `PRESENTED_OVER` for a presented layer the tree source marks (ui-tree/standing.ts#Remedy's `layer`): it names it — an alert and its title. */
+export const presentedOver = (layer?: UiNode): string => presentedRemedy('it', layer);
+
 /**
  * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts
  * #whyNotTapped): `button "Sign in"`, `toolbar` — its role and its label

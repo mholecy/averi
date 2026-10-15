@@ -1,7 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { markedLayer, outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -178,6 +178,8 @@ export type RoundStep =
  *   judged in the frame (below the fold, under the soft keyboard, cut or
  *   clipped) and the next stroke would touch down at `touchDown` on `cover`,
  *   a surface of that screen (ui-tree/draw-order.ts#DrawOrder.presentedAt).
+ *   `layer`: the presented layer's element the tree source marks (an alert,
+ *   ui-tree/standing.ts#markedLayer), which the sentence names.
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
@@ -201,7 +203,7 @@ export type ScrollOutcome =
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point }
+  | { kind: 'presented'; swipes: number; judged: Judged; cover: UiNode; viewport: Rect; touchDown?: Point; layer?: UiNode }
   | {
       kind: 'bound';
       swipes: number;
@@ -1243,7 +1245,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
     // ask, at its touch-down (`presentedTouchDown`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the
@@ -1350,7 +1352,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // ask on behalf of, and is still stroked for (ADR 0018, residual 6).
   const onPresented = presentedTouchDown(stroke, best, now);
   if (onPresented !== undefined && best !== undefined) {
-    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    const layer = markedLayer(onPresented.surface);
+    return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: onPresented.surface, viewport, touchDown: onPresented.touchDown, ...(layer !== undefined && { layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
   const { toward } = stroke;
   s.strokeWithin = room === undefined ? undefined : { ...room.within };

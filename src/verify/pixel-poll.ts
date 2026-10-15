@@ -593,11 +593,11 @@ export const PRESENTED_OVER_THE_ELEMENT = presentedRemedy('the element');
 
 /**
  * The pixel assert's advice for a standing's remedy (ui-tree/standing.ts#Remedy) where the sentence names the keyboard
- * or the navigation bar's cut: beneath a presented screen, that screen's (`PRESENTED_OVER_THE_ELEMENT`); else
+ * or the navigation bar's cut: beneath a presented screen, that screen's (`presentedRemedy('the element')`, naming an alert the tree marks); else
  * `otherwise`, told the remedy's other case. A bar or a cover words its own (`coverRemedy`).
  */
 function advice<R extends Exclude<Remedy, { readonly of: 'presented' }>>(remedy: Extract<Remedy, { readonly of: 'presented' }> | R, otherwise: (remedy: R) => string): string {
-  return remedy.of === 'presented' ? PRESENTED_OVER_THE_ELEMENT : otherwise(remedy);
+  return remedy.of === 'presented' ? presentedRemedy('the element', remedy.layer) : otherwise(remedy);
 }
 
 /**
@@ -618,7 +618,7 @@ const coverRemedy = (remedy: CoverRemedy): string => {
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   switch (remedy.of) {
     case 'presented':
-      return `the capture would show it, not the element; ${PRESENTED_OVER_THE_ELEMENT}`;
+      return `the capture would show it, not the element; ${presentedRemedy('the element', remedy.layer)}`;
     case 'fixed':
       return FIXED_REMEDY[remedy.what];
     case 'pinned':
