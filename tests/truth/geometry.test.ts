@@ -35,6 +35,8 @@ const LIST = rect(0, 100, 402, 600);
 const TAB = rect(0, 790, 402, 84);
 /** A horizontal carousel's clip: 300 pt wide, ending inside the screen. */
 const CAROUSEL = rect(0, 250, 300, 100);
+/** A carousel's clip inset 100 pt from the screen's left edge: what cuts a target at its left is the clip, not the screen. */
+const INSET = rect(100, 250, 300, 100);
 const ctx = (over: Partial<GeometryContext> = {}): GeometryContext => ({ screen: SCREEN, safeArea: SAFE, ...over });
 
 describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
@@ -65,6 +67,10 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['sliver: a tall target cut across its width by a carousel\'s clip, 10 pt across the cut', rect(290, 260, 40, 80), ctx({ clip: CAROUSEL }), 'sliver'],
     ['sliver: a tall row cut at its clip\'s bottom, 20 pt across the cut', rect(51, 680, 300, 200), ctx({ clip: LIST }), 'sliver'],
     ['sliver: a 20-pt icon cut by 1 pt at its clip\'s top — what shows across the cut, 19 pt, is under the minimum', rect(51, 99, 20, 20), ctx({ clip: LIST }), 'sliver'],
+    ['sliver: cut at its clip\'s top, 4 pt of 64 showing (100..104)', rect(51, 40, 300, 64), ctx({ clip: LIST }), 'sliver'],
+    ['centre-out: cut at its clip\'s top, 30 pt of 64 showing (100..130), its centre at 98 above them', rect(51, 66, 300, 64), ctx({ clip: LIST }), 'centre-out'],
+    ['sliver: cut at its clip\'s left edge, 20 pt across the cut (100..120)', rect(80, 260, 40, 80), ctx({ clip: INSET }), 'sliver'],
+    ['not a sliver: cut at its clip\'s left edge, 30 pt across the cut (100..130), its centre at 100 showing', rect(70, 260, 60, 80), ctx({ clip: INSET }), 'partly-centre-in'],
     ['under-chrome: whole, its centre under the tab bar', rect(51, 780, 300, 64), ctx({ safeArea: undefined, chrome: { tabBar: TAB } }), 'under-chrome:tabBar'],
     ['under-chrome names the first chrome by name where two overlap', rect(51, 780, 300, 64), ctx({ safeArea: undefined, chrome: { toolbar: TAB, fab: TAB } }), 'under-chrome:fab'],
     ['a cut before a cover: cut by its clip, its centre under the tab bar too', rect(51, 670, 300, 64), ctx({ clip: LIST, chrome: { tabBar: rect(0, 690, 402, 84) } }), 'centre-out'],
