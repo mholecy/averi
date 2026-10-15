@@ -41,6 +41,19 @@ interface PresentedLayer {
 }
 
 /**
+ * What is drawn after a target as draw order reads it (`laterFor`): the `later` nodes, which of them is a marked
+ * presented layer's cover (`marks`), and which lies in a marked `screen` layer (`inScreen`).
+ */
+interface LaterRead {
+  readonly later: readonly Placed[];
+  readonly marks: (p: Placed) => boolean;
+  readonly inScreen: (p: Placed) => boolean;
+}
+
+/** `LaterRead` with nothing after the node and no marked layer over it. */
+const NOTHING_LATER: LaterRead = { later: [], marks: () => false, inScreen: () => false };
+
+/**
  * THE reading of the tree source's presented-layer marks (`UiNode.presentation` on the layer,
  * `UiNode.presentationElement` on a typed layer's element): the presented layer `layer` is, among the walk's `order`;
  * undefined for any other node. A typed layer whose element is not marked (a hand-built tree) is its own cover, named
@@ -1656,11 +1669,13 @@ export function drawOrder(tree: UiNode): DrawOrder {
    * that screen's surface; a TYPED layer (an alert, an action sheet, a popover) is its element alone — what else it
    * holds (its dim, a bare frame or not; the element's backdrop leaves) is drawn on it, no cover of its own; a `screen`
    * layer's own nodes stay covers, judged by the rows, and each one is a presented surface (`inScreen`), so the cover
-   * named at a point is what of the layer is on top there, the layer itself only where nothing of it draws.
+   * named at a point is what of the layer is on top there, the layer itself only where nothing of it draws. A node not
+   * in the walk (no `places`) has nothing after it (`NOTHING_LATER`).
    */
-  const laterFor = (places: readonly Placed[]): { readonly later: readonly Placed[]; readonly marks: (p: Placed) => boolean; readonly inScreen: (p: Placed) => boolean } => {
+  const laterFor = (places: readonly Placed[]): LaterRead => {
+    if (places.length === 0) return NOTHING_LATER;
     const layers = markedLayers(places);
-    if (layers.length === 0) return { later: laterThan(places, () => true), marks: () => false, inScreen: () => false };
+    if (layers.length === 0) return { ...NOTHING_LATER, later: laterThan(places, () => true) };
     const covers = new Set(layers.map(({ cover }) => cover));
     const typed = layers.filter(({ kind }) => isTyped(kind));
     const screens = layers.filter(({ kind }) => !isTyped(kind));
@@ -1754,7 +1769,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const before = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
       // A marked presented layer's cover reaches the whole screen and draws whatever the rows say (`laterFor`).
-      const { later, marks, inScreen } = places.length === 0 ? { later: [], marks: () => false, inScreen: () => false } : laterFor(places);
+      const { later, marks, inScreen } = laterFor(places);
       const reachOf = (p: Placed): Rect => (marks(p) ? { ...screen } : reach(p));
       const met =
         shown === undefined || about === undefined
