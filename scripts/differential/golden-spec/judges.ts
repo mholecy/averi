@@ -1,4 +1,6 @@
 import type { Call, Outcome } from '../differential.js';
+import type { CellTruth, Rect } from '../../truth/schema.js';
+import { bandsOf } from '../../truth/truth.js';
 
 /**
  * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an expectation's
@@ -19,6 +21,12 @@ export interface Expectation {
    * a mismatch (vacuous).
    */
   absent?: string;
+  /**
+   * Why only the live golden (scripts/truth/live.ts, phase 5) can judge it — a dynamic a replayed tree cannot show (a
+   * stroke's effect, a turn back). Set, the golden mode never asks the row (golden.ts); it is declared here so the table
+   * is whole.
+   */
+  live?: string;
 }
 
 export const BUDGET_MS = 1_000;
@@ -82,3 +90,50 @@ export function replyKind(o: Outcome): ReplyKind {
 /** A tap that must not land: not `Tapped`, and no tap sent. */
 export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 export const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
+
+// --- points and regions (phase 3's rows) ---
+
+export type Point = { x: number; y: number };
+export const within = (p: Point, r: Rect) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
+/** The points the device was sent taps at (taps): `idb ui tap x y`, `adb shell input tap x y` — the truth's units. */
+export const tapPoints = (o: Outcome): Point[] =>
+  taps(o).flatMap((c) => {
+    const m = /tap (-?[\d.]+) (-?[\d.]+)/.exec(c);
+    return m === null ? [] : [{ x: Number(m[1]), y: Number(m[2]) }];
+  });
+const at = (ps: readonly Point[]) => ps.map((p) => `(${p.x},${p.y})`).join(' ');
+
+/**
+ * Where a stroke may touch down on a cell: on the screen, clear of the system bands (CellTruth.safeArea) and of every
+ * piece of the app's chrome (CellTruth.chrome) — a touch-down there presses the bar or the chrome instead of moving the
+ * content (calibration.json #11: an Android stroke touching down on the floating tab bar; #16: idb's on the keyboard).
+ */
+export function strokeable(cell: Pick<CellTruth, 'screen' | 'safeArea' | 'chrome'>): (p: Point) => boolean {
+  const screen = { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
+  const bands = bandsOf(screen, cell.safeArea);
+  const off = [bands.status, bands.nav, ...Object.values(cell.chrome ?? {})].filter((r): r is Rect => r !== undefined);
+  return (p) => within(p, screen) && !off.some((r) => within(p, r));
+}
+
+/** R-stroke's judge: every touch-down strokeable; undefined when so. */
+export function strokesOff(o: Outcome, cell: Pick<CellTruth, 'screen' | 'safeArea' | 'chrome'>): string | undefined {
+  const ok = strokeable(cell);
+  const off = touchDowns(o).filter((p) => !ok(p));
+  return off.length === 0 ? undefined : `touched down off the strokeable region at ${at(off)}: ${first(o)}`;
+}
+
+/**
+ * R-land's judge: a `Tapped` reply landed — every tap sent lies in `where` (what of the target shows, or its piece clear
+ * of chrome), and a probe there fired its action (`fired`). `mustTap`: the target is plainly reachable, so a refusal
+ * is a mismatch too; else a refusal that sent nothing is as good (a cut target averi may refuse, ADR 0005).
+ */
+export function landed(o: Outcome, where: Rect | null | undefined, fired: boolean, mustTap: boolean): string | undefined {
+  if (!o.reply.startsWith('Tapped')) return mustTap ? `not tapped: ${first(o)}` : notTapped(o);
+  if (!fired || where === null || where === undefined) return `Tapped where no probe fired it: ${first(o)}`;
+  const out = tapPoints(o).filter((p) => !within(p, where));
+  return out.length > 0 ? `Tapped outside what shows of it at ${at(out)}: ${first(o)}` : undefined;
+}
+
+/** The reply names scroll_until as the remedy (the off-screen, outside-its-scroll-view and sliver refusals do). */
+export const scrollAdvice = (o: Outcome) => /scroll_until/.test(ownWords(o));
+

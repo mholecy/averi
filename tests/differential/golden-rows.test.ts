@@ -1,0 +1,204 @@
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
+import { configFor, type Outcome } from '../../scripts/differential/differential.js';
+import { directionRow, dismissRow, expectations, landed, strokeable, strokesOff, type Expectation } from '../../scripts/differential/golden-spec.js';
+import type { CellTruth, Geometry, Rect, TargetTruth } from '../../scripts/truth/schema.js';
+
+// Phase 3's row types (scripts/differential/golden-spec/rows.ts, wired by geometry in edges.ts and bars.ts), each judge
+// on the replies that decide it, and the guarantee that they ask nothing of a capture with no measured geometry — the
+// whole corpus before phase 3 (tests/differential/golden.test.ts pins its counts).
+
+const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
+const out = (reply: string, device: string[] = []): Outcome => ({ reply, device });
+const CELL: CellTruth = {
+  cell: 'edges',
+  layer: 'none',
+  device: 'iPhone 17 simulator, iOS 27.0',
+  screen: { width: 402, height: 874 },
+  scale: 3,
+  targets: [],
+  safeArea: { top: 62, left: 0, bottom: 34, right: 0 },
+  chrome: { tabBar: rect(0, 790, 402, 84) },
+};
+const target = (geometry: Geometry | undefined, over: Partial<TargetTruth> = {}): TargetTruth => ({
+  tag: 'A',
+  id: 'lab.edges.A',
+  color: '#43A047',
+  declared: 'open',
+  frame: rect(51, 670, 300, 64),
+  reached: true,
+  probe: [{ kind: 'touch', tag: '201,702' }],
+  drawn: 1,
+  seen: '#43A047',
+  ...(geometry !== undefined && { geometry }),
+  ...over,
+});
+const rows = (t: TargetTruth) => expectations('ios', t, CELL);
+const verdict = (rs: readonly Expectation[], verb: string, o: Outcome, fully = false) => {
+  const r = rs.find((x) => x.verb === verb && ((x.call.args as { fully?: boolean }).fully === true) === fully);
+  if (r === undefined) throw new Error(`no ${verb}${fully ? ' fully' : ''} row`);
+  return r.judge(o);
+};
+const says = (rs: readonly Expectation[]) => rs.map((r) => `${r.verb}${(r.call.args as { fully?: boolean }).fully === true ? ' fully' : ''}: ${r.says}`);
+
+const TAPPED = 'Tapped id:"lab.edges.A"';
+const OFF_REFUSAL = 'ERROR: off screen at (201,940) on a 402x874 screen (rect 51,908 300x64) — scroll_until it first';
+const FAILED = '1/1 asserts FAILED\n✗ colour: covered';
+const PASSED = 'All 1 asserts passed';
+const VISIBLE = 'Element id:"lab.edges.A" visible after 0 swipes';
+const IDB_STROKE = 'idb ui swipe 201 699 201 175 --duration 0.3';
+
+describe('the rows ask nothing of a capture with no measured geometry', () => {
+  it('an open target with no geometry or a whole one: the open rows, as before; one cut but unmeasured: none', () => {
+    expect(rows(target(undefined)).map((r) => r.verb)).toEqual(['tap', 'colour', 'scroll_until']);
+    expect(says(rows(target('whole')))).toEqual(says(rows(target(undefined))));
+    expect(rows(target(undefined, { drawn: 0.5 }))).toEqual([]);
+  });
+  it('a geometry row needs the capture its bands and chrome are read from', () => {
+    expect(expectations('ios', target('off-screen'))).toEqual([]);
+  });
+  it('a presented-over target keeps the presented rows whatever its geometry (ADR 0018 first)', () => {
+    const t = target('sliver', { declared: 'presented-over', reached: false });
+    expect(rows(t).map((r) => r.says)).toEqual(rows({ ...t, geometry: undefined }).map((r) => r.says));
+  });
+});
+
+describe('the rows each geometry asks', () => {
+  it.each([
+    ['off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }, ['tap: R-off', 'colour: fails (R-off', 'scroll_until: R-off, R-stroke: swipes down']],
+    ['outside-scroll-view', { frame: rect(51, 720, 300, 64), reached: false, visible: null }, ['tap: R-outside-sv', 'colour: fails (R-outside-sv', 'scroll_until: R-outside-sv, R-stroke: swipes down']],
+    ['sliver', { visible: rect(51, 670, 300, 20) }, ['tap: R-sliver', 'scroll_until: R-sliver', 'scroll_until fully: R-fully']],
+    ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'scroll_until fully: R-fully']],
+    ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'scroll_until fully: R-fully']],
+    ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
+    ['nav-band', { frame: rect(51, 820, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the navigation band', 'scroll_until: R-band']],
+    ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
+  ] as const)('%s', (g, over, expected) => {
+    const got = says(rows(target(g, over as Partial<TargetTruth>)));
+    expect(got).toHaveLength(expected.length);
+    got.forEach((s, i) => expect(s.startsWith(expected[i])).toBe(true));
+  });
+});
+
+describe('R-off, R-outside-sv, R-sliver: the tap refused naming scroll_until, nothing sent', () => {
+  const rs = rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }));
+  it.each([
+    ['the off-screen refusal', out(OFF_REFUSAL), undefined],
+    ['Tapped (the note: reported done)', out(TAPPED, ['idb ui tap 201 940']), 'Tapped: Tapped id:"lab.edges.A"'],
+    ['refused, but a tap sent', out('ERROR: refused', ['idb ui tap 201 940']), 'refused, but sent idb ui tap 201 940'],
+    ['refused with another remedy', out('ERROR: covered by Button "x" — close it first'), 'refused without scroll_until: ERROR: covered by Button "x" — close it first'],
+    ['"not in the tree": the judge accepts the refusal, so it is vacuous', out('ERROR: timed out waiting for element id:"lab.edges.A" to appear — scroll_until it'), 'not in the tree: ERROR: timed out waiting for element id:"lab.edges.A" to appear — scroll_until it'],
+  ])('%s', (_n, o, expected) => {
+    expect(verdict(rs, 'tap', o)).toBe(expected);
+  });
+  it('the colour assert must not pass: nothing of it is on the screen', () => {
+    expect(verdict(rs, 'colour', out(FAILED))).toBeUndefined();
+    expect(verdict(rs, 'colour', out(PASSED))).toBe('passed on #43A047: All 1 asserts passed');
+  });
+});
+
+describe('R-stroke: every touch-down on the screen, clear of the bands and the chrome', () => {
+  const rs = rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }));
+  it.each([
+    ['above the tab bar and under the status band', ['idb ui swipe 201 699 201 175 --duration 0.3'], undefined],
+    ['on the tab bar (the note: #11)', ['idb ui swipe 201 800 201 175 --duration 0.3'], 'touched down off the strokeable region at (201,800): x'],
+    ['in the status band', ['idb ui swipe 201 40 201 600 --duration 0.3'], 'touched down off the strokeable region at (201,40): x'],
+    ['in the home indicator\'s band', ['adb shell input swipe 201 850 201 300 300'], 'touched down off the strokeable region at (201,850): x'],
+    ['no swipe at all', [], 'no swipe: x'],
+  ])('%s', (_n, device, expected) => {
+    expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
+  });
+  it('the region itself: the screen less the bands and the chrome; with neither, the whole screen', () => {
+    const ok = strokeable(CELL);
+    expect([ok({ x: 201, y: 61 }), ok({ x: 201, y: 62 }), ok({ x: 201, y: 789 }), ok({ x: 201, y: 790 }), ok({ x: 402, y: 400 })]).toEqual([false, true, true, false, false]);
+    expect(strokesOff(out('x', ['idb ui swipe 201 870 201 10 --duration 0.3']), { screen: CELL.screen })).toBeUndefined();
+  });
+});
+
+describe('R-sliver, R-band, R-under-chrome: scroll_until does not call it reached where it is', () => {
+  const rs = rows(target('sliver', { visible: rect(51, 670, 300, 20) }));
+  it.each([
+    ['stops at once, "visible after 0 swipes" (the note: Tapped and does nothing)', out(VISIBLE), 'reached with no swipe where it is sliver: Element id:"lab.edges.A" visible after 0 swipes'],
+    ['swipes toward it first', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), undefined],
+    ['refuses (stuck)', out('ERROR: stuck'), undefined],
+  ])('%s', (_n, o, expected) => {
+    expect(verdict(rs, 'scroll_until', o)).toBe(expected);
+  });
+});
+
+describe('R-fully: fully: true never stops on a cut target without a swipe', () => {
+  const rs = rows(target('partly-centre-in', { visible: rect(51, 670, 300, 50) }));
+  it.each([
+    ['fully visible after 0 swipes (the notes #9, #12)', out(VISIBLE), 'fully visible with no swipe where it is partly-centre-in: Element id:"lab.edges.A" visible after 0 swipes'],
+    ['after a swipe', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), undefined],
+    ['stuck', out('ERROR: stuck'), undefined],
+  ])('%s', (_n, o, expected) => {
+    expect(verdict(rs, 'scroll_until', o, true)).toBe(expected);
+  });
+  it('asks toward the cut: down when its centre is below what shows, up when above', () => {
+    const call = (t: TargetTruth) => rows(t).find((r) => r.verb === 'scroll_until')!.call.args as { direction: string; fully: boolean };
+    expect(call(target('partly-centre-in', { visible: rect(51, 670, 300, 30) }))).toMatchObject({ direction: 'down', fully: true });
+    expect(call(target('partly-centre-in', { frame: rect(51, 80, 300, 64), visible: rect(51, 100, 300, 44) }))).toMatchObject({ direction: 'up', fully: true });
+  });
+});
+
+describe('R-land: a Tapped point inside what shows, where a probe fired', () => {
+  const visible = rect(51, 670, 300, 30);
+  it.each([
+    ['reached at its centre: Tapped inside', true, true, out(TAPPED, ['idb ui tap 201 685']), undefined],
+    ['reached at its centre: Tapped outside what shows', true, true, out(TAPPED, ['idb ui tap 201 702']), 'Tapped outside what shows of it at (201,702): Tapped id:"lab.edges.A"'],
+    ['reached at its centre: refused', true, true, out('ERROR: cut'), 'not tapped: ERROR: cut'],
+    ['centre out, its piece fired: refused with nothing sent', true, false, out('ERROR: cut'), undefined],
+    ['centre out, its piece fired: Tapped inside', true, false, out(TAPPED, ['idb ui tap 201 685']), undefined],
+    ['centre out, its piece never fired: Tapped', false, false, out(TAPPED, ['idb ui tap 201 685']), 'Tapped where no probe fired it: Tapped id:"lab.edges.A"'],
+    ['centre out: refused, but a tap sent', false, false, out('ERROR: cut', ['idb ui tap 201 685']), 'refused, but sent idb ui tap 201 685'],
+  ])('%s', (_n, fired, mustTap, o, expected) => {
+    expect(landed(o, visible, fired, mustTap)).toBe(expected);
+  });
+  it('under chrome: R-land on its piece, by the second probe', () => {
+    const t = target('under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true });
+    expect(verdict(rows(t), 'tap', out(TAPPED, ['idb ui tap 201 775']))).toBeUndefined();
+    expect(verdict(rows(t), 'tap', out(TAPPED, ['idb ui tap 201 792']))).toMatch(/^Tapped outside what shows of it at \(201,792\)/);
+    expect(verdict(rows({ ...t, reachedAtPiece: false }), 'tap', out(TAPPED, ['idb ui tap 201 775']))).toMatch(/^Tapped where no probe fired it/);
+  });
+});
+
+describe('R-band: refused, never measured, never reached where it is', () => {
+  const rs = rows(target('nav-band', { frame: rect(51, 820, 300, 64), reached: false }));
+  it('the tap refused with nothing sent, whatever its remedy', () => {
+    expect(verdict(rs, 'tap', out('ERROR: under the navigation bar — scroll_until it first'))).toBeUndefined();
+    expect(verdict(rs, 'tap', out('ERROR: pinned under the navigation bar'))).toBeUndefined();
+    expect(verdict(rs, 'tap', out(TAPPED, ['adb shell input tap 201 852']))).toBe('Tapped: Tapped id:"lab.edges.A"');
+  });
+  it('the colour assert fails closed on the band (ADR 0001)', () => {
+    expect(verdict(rs, 'colour', out(PASSED))).toMatch(/^passed on/);
+  });
+});
+
+describe('R-dismiss and R-direction', () => {
+  const r = dismissRow('ios', { tag: 'vs', id: 'lab.f.vs' }, { label: 'Transfer details', frame: rect(120, 60, 162, 22) });
+  it('R-dismiss: the configured dismissal is tapped, inside its element', () => {
+    expect(r.judge(out(TAPPED, ['idb ui tap 201 71', 'idb ui tap 201 700']))).toBeUndefined();
+    expect(r.judge(out('ERROR: no keyboard dismissal: covered by Toolbar'))).toBe('no tap on the dismissal Transfer details (refused for a toolbar): ERROR: no keyboard dismissal: covered by Toolbar');
+    expect(r.judge(out(TAPPED, ['idb ui tap 201 700']))).toBe('no tap on the dismissal Transfer details: Tapped id:"lab.edges.A"');
+  });
+  it('R-direction is live only: declared, never asked by the golden mode', () => {
+    const d = directionRow('ios', target('off-screen', { frame: rect(51, 908, 300, 64) }), CELL);
+    expect(d.live).toMatch(/phase 5/);
+    expect(d.call.args).toMatchObject({ direction: 'down' });
+    for (const g of ['off-screen', 'outside-scroll-view', 'sliver', 'partly-centre-in', 'centre-out', 'status-band', 'nav-band', 'under-chrome:x'] as const) {
+      expect(rows(target(g, { visible: rect(51, 670, 300, 30) })).filter((x) => x.live !== undefined)).toEqual([]);
+    }
+  });
+});
+
+describe('a cell\'s averi.yaml variant (CellTruth.config)', () => {
+  const rec = { id: 'r/x.wda.json', run: 'r', file: 'x.wda.json', platform: 'ios' as const, source: 'wda' as const, form: 'raw' as const, payload: '/dev/null' };
+  it('without one, the config is what it always was', async () => {
+    expect(JSON.parse(await readFile(await configFor(rec, undefined), 'utf8'))).toEqual({ app: { android: { package: 'differential.app' }, ios: { bundleId: 'differential.app', treeSource: 'wda' } } });
+  });
+  it('with one, merged over the platform\'s settings — a keyboardDismiss variant (#7, #19)', async () => {
+    const c = JSON.parse(await readFile(await configFor(rec, undefined, { ios: { keyboardDismiss: [{ tap: 'text:"Transfer details"' }] }, android: { x: 1 } }), 'utf8'));
+    expect(c).toEqual({ app: { android: { package: 'differential.app', x: 1 }, ios: { bundleId: 'differential.app', treeSource: 'wda', keyboardDismiss: [{ tap: 'text:"Transfer details"' }] } } });
+  });
+});

@@ -1,6 +1,8 @@
 import type { Platform } from './corpus.js';
-import { DRAWN, type TargetTruth } from '../truth/schema.js';
+import { DRAWN, type CellTruth, type TargetTruth } from '../truth/schema.js';
+import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
+import { edgeRows } from './golden-spec/edges.js';
 import { presentedOverRows } from './golden-spec/presented.js';
 import type { Expectation } from './golden-spec/judges.js';
 
@@ -33,10 +35,16 @@ import type { Expectation } from './golden-spec/judges.js';
 
 export * from './golden-spec/judges.js';
 export { formExpectations, pairingOf, type FormExpectation, type PairingRule } from './golden-spec/forms.js';
+export * from './golden-spec/rows.js';
 
-/** A coloured target's rows, by its truth: open (base.ts) or beneath a presented layer (presented.ts). */
-export function expectations(platform: Platform, t: TargetTruth): Expectation[] {
-  if (t.declared === 'open' && t.reached && t.drawn >= DRAWN) return openRows(platform, t);
-  if (t.declared === 'presented-over' && !t.reached) return presentedOverRows(platform, t);
-  return [];
+/**
+ * A coloured target's rows, by its truth: beneath a presented layer (presented.ts); open and `whole` — or with no
+ * measured geometry, as every capture before phase 3 — reached and drawn as itself (base.ts); open with a measured
+ * geometry at an edge (edges.ts) or in a band or under chrome (bars.ts). `cell`, the target's capture, is what a
+ * geometry's rows read the bands and the chrome from; without it no geometry row is asked.
+ */
+export function expectations(platform: Platform, t: TargetTruth, cell?: CellTruth): Expectation[] {
+  if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
+  if (t.geometry === undefined || t.geometry === 'whole') return t.reached && t.drawn >= DRAWN ? openRows(platform, t) : [];
+  return cell === undefined ? [] : [...edgeRows(platform, t, cell), ...barRows(platform, t, cell)];
 }

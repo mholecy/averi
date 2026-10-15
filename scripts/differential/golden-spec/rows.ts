@@ -1,0 +1,146 @@
+import type { Platform } from '../corpus.js';
+import type { Call } from '../differential.js';
+import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
+import { BUDGET_MS, first, landed, notTapped, passed, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
+
+/**
+ * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an open
+ * target whose MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's direction.
+ * Shared by the families: edges.ts and bars.ts map a geometry to its rows; B2–B5 wire them to their cells. A target
+ * carries a geometry only when its capture's state reported the bands, scroll views or chrome — no capture before
+ * phase 3 does — so none of them asks anything of the existing corpus.
+ *
+ * | row | truth | verb | expected | decided by |
+ * |---|---|---|---|---|
+ * | R-off | off-screen | tap | refused naming scroll_until, nothing tapped | ADR 0005 (off the screen first); docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md |
+ * | R-off | off-screen | colour | fails: nothing of it is on the screen to measure | ADR 0020 (the screenshot is the truth) |
+ * | R-outside-sv | outside-scroll-view | tap | refused naming scroll_until, nothing tapped | ADR 0005 |
+ * | R-outside-sv | outside-scroll-view | colour | fails closed: it would measure the background | docs/bugs/2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md |
+ * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it | swipes, every touch-down on the screen clear of the system bands and the chrome | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md |
+ * | R-sliver | sliver | tap | refused naming scroll_until, nothing tapped | ADR 0013; docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md |
+ * | R-sliver | sliver | scroll_until | not reached without a swipe (the plain stop does not stop on a sliver) | ADR 0013 |
+ * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
+ * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
+ * | R-fully | partly-centre-in, centre-out, sliver | scroll_until `fully: true` | not "visible" without a swipe: it is cut | ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
+ * | R-band | status-band, nav-band | tap | refused, nothing tapped | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
+ * | R-band | status-band, nav-band | colour | fails: a system band over what it reads | ADR 0001 |
+ * | R-band | status-band, nav-band | scroll_until | not reached without a swipe | ADR 0009 (N-a: neither stop stops on a centre in the band) |
+ * | R-under-chrome | under-chrome:<name> | tap | R-land on its piece | docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md; ADR 0005 |
+ * | R-under-chrome | under-chrome:<name> | colour | fails: the chrome is a pixel cover over what it reads | ADR 0001, ADR 0003 |
+ * | R-under-chrome | under-chrome:<name> | scroll_until | not reached without a swipe | docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
+ * | R-dismiss | a field under the keyboard, the cell's `keyboardDismiss` (CellTruth.config) naming an element a bar lies over | tap | the dismissal is tapped (a tap sent inside the element), not refused for the bar | docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md, docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md; ADR 0016 |
+ * | R-direction | below / above what shows | scroll_until | each stroke brings it closer (LIVE ONLY: a replayed tree never moves) | docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md |
+ */
+
+const tapCall = (platform: Platform, t: Pick<TargetTruth, 'id'>): Call => ({ tool: 'tap', args: { platform, selector: `id:"${t.id}"` } });
+const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id'>, direction: 'up' | 'down', fully = false): Call => ({
+  tool: 'scroll_until',
+  args: { platform, selector: `id:"${t.id}"`, direction, ...(fully && { fully: true }) },
+});
+
+/** Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the screen), else `up`. */
+export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pick<CellTruth, 'screen'>): 'up' | 'down' {
+  const shown = t.visible ?? { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
+  return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
+}
+
+/** R-off, R-outside-sv, R-sliver: the tap refused, its remedy scroll_until, nothing sent. */
+export function refusedTap(platform: Platform, t: TargetTruth, row: string): Expectation {
+  return {
+    verb: 'tap',
+    says: `${row}: refused naming scroll_until, nothing tapped`,
+    call: tapCall(platform, t),
+    judge: (o) => notTapped(o) ?? (scrollAdvice(o) ? undefined : said(o, 'refused without scroll_until')),
+  };
+}
+
+/** R-band: the tap refused, nothing sent (its remedy depends on whether a scroll lifts it out: not judged). */
+export function bandTap(platform: Platform, t: TargetTruth): Expectation {
+  return { verb: 'tap', says: `R-band: refused (${t.geometry}), nothing tapped`, call: tapCall(platform, t), judge: notTapped };
+}
+
+/** R-off, R-outside-sv, R-band, R-under-chrome: the colour assert fails, asked for the target's own colour. */
+export function colourFails(platform: Platform, t: TargetTruth, why: string): Expectation {
+  return {
+    verb: 'colour',
+    says: `fails (${why})`,
+    call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: BUDGET_MS }] } },
+    judge: (o) => (passed(o) ? `passed on ${t.color}: ${first(o)}` : undefined),
+  };
+}
+
+/** R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable (judges.ts#strokeable). */
+export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+  const direction = directionOf(t, cell);
+  return {
+    verb: 'scroll_until',
+    says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome`,
+    call: scrollCall(platform, t, direction),
+    judge: (o) => (swipes(o) === 0 ? said(o, 'no swipe') : strokesOff(o, cell)),
+  };
+}
+
+/** R-sliver, R-band, R-under-chrome: the plain stop does not call it reached where it is. */
+export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+  return {
+    verb: 'scroll_until',
+    says: `${row}: not reached without a swipe`,
+    call: scrollCall(platform, t, directionOf(t, cell)),
+    judge: (o) => (!o.reply.startsWith('ERROR') && swipes(o) === 0 ? said(o, `reached with no swipe where it is ${t.geometry}`) : undefined),
+  };
+}
+
+/** R-fully: `fully: true` never stops on a cut target without a swipe. */
+export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
+  return {
+    verb: 'scroll_until',
+    says: 'R-fully: fully: true is not reached without a swipe (it is cut)',
+    call: scrollCall(platform, t, directionOf(t, cell), true),
+    judge: (o) => (/^Element .* visible after /.test(o.reply) && swipes(o) === 0 ? said(o, `fully visible with no swipe where it is ${t.geometry}`) : undefined),
+  };
+}
+
+/**
+ * R-land: the tap lands on what shows of the target. Reached at its centre (`partly-centre-in`): `Tapped`, inside
+ * `visible`. Else (`centre-out`, `under-chrome:<name>`): refused with nothing sent, or `Tapped` inside its piece where
+ * the second probe fired (`reachedAtPiece`).
+ */
+export function landRow(platform: Platform, t: TargetTruth): Expectation {
+  const atCentre = t.geometry === 'partly-centre-in' && t.reached;
+  const where = atCentre ? t.visible : t.piece;
+  const fired = atCentre || t.reachedAtPiece === true;
+  return {
+    verb: 'tap',
+    says: atCentre ? 'R-land: Tapped, inside what shows of it' : `R-land: ${fired ? 'refused, or Tapped inside its piece' : 'refused, nothing tapped'}`,
+    call: tapCall(platform, t),
+    judge: (o) => landed(o, where, fired, atCentre),
+  };
+}
+
+/**
+ * R-dismiss (B5 wires it, with a cell whose `config.ios.keyboardDismiss` names `dismissal`): a tap on `control`, under
+ * the keyboard, sends the configured dismissal — a tap inside the dismissal element's frame — and is not refused for
+ * a bar lying over that element.
+ */
+export function dismissRow(platform: Platform, control: { tag: string; id: string }, dismissal: { label: string; frame: Rect }): Expectation & { target: string } {
+  return {
+    target: control.tag,
+    verb: 'tap',
+    says: `R-dismiss: the keyboard dismissed by tapping ${dismissal.label}`,
+    call: tapCall(platform, control),
+    judge: (o) =>
+      tapPoints(o).some((p) => within(p, dismissal.frame)) ? undefined : said(o, `no tap on the dismissal ${dismissal.label}${/toolbar/i.test(o.reply) ? ' (refused for a toolbar)' : ''}`),
+  };
+}
+
+/** R-direction: LIVE ONLY — whether each stroke brings the target closer is a dynamic; declared so the table is whole. */
+export function directionRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
+  const direction = directionOf(t, cell);
+  return {
+    verb: 'scroll_until',
+    says: `R-direction: each stroke ${direction} brings it closer, and a stroke that does not turns back`,
+    call: scrollCall(platform, t, direction),
+    live: 'a stroke moves nothing in a replayed tree: the scroll offset the lab app reports is the oracle (phase 5)',
+    judge: () => undefined,
+  };
+}
