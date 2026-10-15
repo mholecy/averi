@@ -141,6 +141,9 @@ describe('tool descriptions quote each operation default from its owner', () => 
       'tap and scroll_until refuse a target there naming the alert (\'<the presented remedy, as ui-tree/standing.ts renders it of "it" under an alert titled …>\'), ' +
         'color/ocr fail closed likewise (\'<the presented remedy, as ui-tree/standing.ts renders it of "the element" under an alert titled …>\')',
     );
+    expect(description('ui_snapshot')).toContain(
+      'an action sheet or a popover is named the same way; under a "screen" layer they name what of that layer lies at the point — the layer itself where nothing of it draws — and say \'<the presented remedy, as ui-tree/standing.ts renders it of "it">\'',
+    );
     expect(description('scroll_until')).toContain('on … — <the presented stop\'s remedy, as ui-tree/standing.ts renders it under an alert titled …>, so none was sent"');
     for (const tool of ['ui_snapshot', 'scroll_until']) expect(description(tool)).not.toContain('an alert is presented over');
   });
