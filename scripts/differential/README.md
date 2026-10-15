@@ -193,8 +193,11 @@ mismatch or the reply — a red row that differs only in a remedy's wording does
 counts only when it passes the canary: no check with a fault, the `open` cell replayed and green — a side miswired
 still prints JSON, every row an error a refusal row would accept. Every row of the corpus is compared at each fix: one
 green before and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the
-note's `regressions` records it. An open note is judged on the working tree. Checkouts (`differential-cal-<sha>`) are
-kept for the next run and reused only when they are at that commit; `--remove` removes those this run created. Exit
+note's `regressions` records it. An open note is judged on the working tree; for the lab findings (L1, L2) KNOWN in
+`golden.test.ts` owns the ratchet and calibration.json only the note→rows link, so a fix that strikes their rows off
+KNOWN turns them OPEN-NOT-REPRODUCED, and calibrate exits 1, until the note becomes `calibrate` with its fix.
+Checkouts (`differential-cal-<sha>`) are kept for the next run and reused only when they are at that commit; `--remove`
+removes those this run created. Exit
 code 1 on a verdict other than the note's `expect`, or an unrecorded regression. A golden process that printed no JSON
 or was killed is run once more; a side that still does not load says why (the exit code or signal and the last lines of
 stderr, or git's stderr), and `--out` then leaves its file as it is and writes `<out>.failed`.

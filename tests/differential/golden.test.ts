@@ -45,6 +45,9 @@ const IDB_STROKE = 'idb ui swipe 201 699 201 175 --duration 0.3';
 const IDB_STROKE_ABOVE_KEYBOARD = 'idb ui swipe 201 472 201 118 --duration 0.3';
 const ADB_STROKE = 'adb shell input swipe 540 1776 540 444 1334';
 
+// KNOWN owns the ratchet for the lab findings' rows too (L1, L2); scripts/truth/calibration.json owns only the link from
+// their notes to the rows. A fix that strikes those rows off here turns L1/L2 OPEN-NOT-REPRODUCED, and calibrate.ts
+// exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
 const KNOWN: Record<string, Known> = Object.fromEntries([
   // alert-dim.wda.json — the round-18 bug (the alert's dim, a bare childless layer, was no cover: A, B, D answered
   // Tapped, passed the colour on the dim, and scroll_until called them fully visible) went green with round 19's alert
