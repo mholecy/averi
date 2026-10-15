@@ -61,6 +61,9 @@ describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
     ['under-chrome: whole, its centre under the tab bar', rect(51, 780, 300, 64), ctx({ safeArea: undefined, chrome: { tabBar: TAB } }), 'under-chrome:tabBar'],
     ['under-chrome names the first chrome by name where two overlap', rect(51, 780, 300, 64), ctx({ safeArea: undefined, chrome: { toolbar: TAB, fab: TAB } }), 'under-chrome:fab'],
     ['a cut before a cover: cut by its clip, its centre under the tab bar too', rect(51, 670, 300, 64), ctx({ clip: LIST, chrome: { tabBar: rect(0, 690, 402, 84) } }), 'centre-out'],
+    ['under-chrome: cut by its clip with its centre showing, under a FAB — the probe lands on the FAB', rect(51, 650, 300, 64), ctx({ clip: LIST, chrome: { fab: rect(150, 660, 120, 60) } }), 'under-chrome:fab'],
+    ['partly-centre-in: the same cut target, the FAB clear of its centre', rect(51, 650, 300, 64), ctx({ clip: LIST, chrome: { fab: rect(300, 660, 60, 60) } }), 'partly-centre-in'],
+    ['a sliver before a cover: cut to 20 pt by its clip, its centre under a FAB', rect(51, 680, 300, 64), ctx({ clip: LIST, chrome: { fab: rect(150, 660, 120, 60) } }), 'sliver'],
   ] as const)('%s', (_name, frame, c, expected: Geometry) => {
     expect(geometryOf(frame, c)).toBe(expected);
   });
@@ -153,6 +156,8 @@ describe('consistency with a measured geometry', () => {
     expect(consistency(T({ geometry: 'outside-scroll-view', drawn: 0 }))).toMatch(/outside-scroll-view, but/);
     expect(consistency(T({ geometry: 'sliver', reached: false, drawn: 0.2 }))).toBeUndefined();
     expect(consistency(T({ geometry: 'sliver', drawn: 0.2 }))).toBeUndefined();
+    // Cut with its centre showing under chrome: the probe lands on the chrome — not held to reached.
+    expect(consistency(T({ geometry: 'under-chrome:fab', reached: false, drawn: 0.6 }))).toBeUndefined();
   });
 });
 

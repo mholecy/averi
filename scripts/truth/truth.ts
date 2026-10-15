@@ -213,9 +213,11 @@ export function clipCuts(frame: Rect, visible: Rect, clip: Rect | undefined): { 
  * Where a target's frame lies (schema.ts#Geometry), in averi's judging order (ADR 0005): off the screen; outside its
  * scroll view's clip; its centre in the status band, then the navigation band (ADR 0008, ADR 0009 N-a: the tap and the
  * plain stop are centre-based); cut — by the screen's edge or its clip — with what shows across a clip's cut edge under
- * the tap minimum (a sliver, ADR 0013: clipCuts), else with its centre inside or outside what shows; its centre under
- * the app's chrome (the first by name); else whole. A target under the minimum whole (a 20-pt icon) cut by its clip by
- * any amount is a sliver: what shows across the cut is under the minimum, as Clips.cutSliver judges it.
+ * the tap minimum (a sliver, ADR 0013: clipCuts), else with its centre outside what shows; its centre — of a whole
+ * target, or of a cut one where it shows — under the app's chrome (the first by name): the probe at the centre lands on
+ * the chrome, as averi's tap judges it covered (ADR 0005: cut, then covered); else partly-centre-in, or whole. A target
+ * under the minimum whole (a 20-pt icon) cut by its clip by any amount is a sliver: what shows across the cut is under
+ * the minimum, as Clips.cutSliver judges it.
  */
 export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   if (intersect(frame, ctx.screen) === null) return 'off-screen';
@@ -225,12 +227,14 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   const bands = bandsOf(ctx.screen, ctx.safeArea);
   if (bands.status !== undefined && inside(c, bands.status)) return 'status-band';
   if (bands.nav !== undefined && inside(c, bands.nav)) return 'nav-band';
+  const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => inside(c, r));
+  const underChrome = chrome === undefined ? undefined : (`under-chrome:${chrome[0]}` as const);
   if (area(visible) < area(frame)) {
     if (clipCuts(frame, visible, ctx.clip).some((cut) => cut.depth < minPiece(ctx.screen))) return 'sliver';
-    return inside(c, visible) ? 'partly-centre-in' : 'centre-out';
+    if (!inside(c, visible)) return 'centre-out';
+    return underChrome ?? 'partly-centre-in';
   }
-  const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => inside(c, r));
-  return chrome === undefined ? 'whole' : `under-chrome:${chrome[0]}`;
+  return underChrome ?? 'whole';
 }
 
 /** Whether a state reports anything a geometry is measured from — else the targets carry none (every capture before phase 3). */
