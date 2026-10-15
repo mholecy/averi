@@ -333,6 +333,12 @@ export function showsProgress(tree: UiNode): boolean {
 /** The accessibility label iOS gives a sheet's grabber — WDA's `label`, idb's `AXLabel` — whose value is the sheet's detent. */
 const SHEET_GRABBER = 'Sheet Grabber';
 
+/** The top sheet's grabber as `sheetDetent` reads it: the detent it reports and how many grabbers the tree holds. */
+export interface SheetDetent {
+  detent: string;
+  grabbers: number;
+}
+
 /**
  * The top sheet's grabber in a tree: the detent it reports (`Half screen`, `Expanded`) and how many grabbers the tree
  * holds — one per sheet that shows one. The top sheet's is the LAST node labelled `Sheet Grabber` in tree order (a
@@ -342,11 +348,6 @@ const SHEET_GRABBER = 'Sheet Grabber';
  * sheet's in both. The label is matched as the devices measured dump it (English); a label in another language is
  * not read. One walk.
  */
-export interface SheetDetent {
-  detent: string;
-  grabbers: number;
-}
-
 export function sheetDetent(tree: UiNode): SheetDetent | undefined {
   let top: UiNode | undefined;
   let grabbers = 0;
