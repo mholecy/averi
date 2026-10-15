@@ -161,7 +161,9 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     const { layer } = sheet();
     const wrapper = node({ role: 'container', rect: IPHONE, children: [...layer.children] });
     layer.children.splice(0, layer.children.length, wrapper);
-    expect(desc(drawOrder(judged(beneath, layer)).markedAt({ x: 300, y: 40 }))).toBe(LAYER);
+    const named = drawOrder(judged(beneath, layer)).markedAt({ x: 300, y: 40 });
+    expect(named).toBe(layer);
+    expect(named).not.toBe(wrapper);
   });
 
   it('a `screen` layer under a typed one: a stroke for no target lands on the typed element on top', () => {
