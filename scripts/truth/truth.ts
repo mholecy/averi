@@ -1,3 +1,4 @@
+import type { Platform } from '../differential/corpus.js';
 import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type Geometry, type Insets, type LabState, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
 /**
@@ -116,7 +117,7 @@ const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive cont
  * app's window's) may be either (what fires there is the truth the rows read). Unmeasured, a declared-open target whose
  * centre lies off the screen is broken, as the phase-1 rule has it: never probed, it is never reached.
  */
-export function consistency(t: TargetTruth, platform?: 'ios' | 'android', screen?: { width: number; height: number }): string | undefined {
+export function consistency(t: TargetTruth, platform?: Platform, screen?: { width: number; height: number }): string | undefined {
   const g = t.geometry ?? 'whole';
   if (g === 'off-screen') return t.reached || t.probe.length > 0 || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
   if (screen !== undefined && !centreOnScreen(t.frame, screen)) {
@@ -142,7 +143,7 @@ export function consistency(t: TargetTruth, platform?: 'ios' | 'android', screen
  * view to its top (UIKit's scroll-to-top); the probe is still taken: the capture relaunches the cell before every
  * probe, so that scroll cannot reach the next one, and the touch it logs is the evidence the rows need.
  */
-export const systemBarSwallows = (platform: 'ios' | 'android' | undefined, g: Geometry) => platform === 'android' && g === 'status-band';
+export const systemBarSwallows = (platform: Platform | undefined, g: Geometry) => platform === 'android' && g === 'status-band';
 
 /**
  * Android's navigation band is NOT measured — an OPEN ASSUMPTION for B4 (bars) to measure: under gesture navigation a
@@ -150,7 +151,7 @@ export const systemBarSwallows = (platform: 'ios' | 'android' | undefined, g: Ge
  * would leave the app, not probe it. So the capture never taps a centre in it (capture-run.ts: `unprobed`), and
  * consistency holds such a target to no probe — until B4 measures what a tap there does in each mode.
  */
-export const unprobedBand = (platform: 'ios' | 'android' | undefined, g: Geometry) => platform === 'android' && g === 'nav-band';
+export const unprobedBand = (platform: Platform | undefined, g: Geometry) => platform === 'android' && g === 'nav-band';
 
 // --- the measured geometry (phase 3) ---
 
@@ -365,7 +366,7 @@ export function pieceProbePoint(frame: Rect, piece: Rect | null | undefined): { 
  * on it leaves no touch in the app (phase 2b's form cells). iOS's keyboard host window is the app's — its touches are
  * logged (the committed form-keyboard probes of vs, ks, ss and note hold their touch) — so it has none.
  */
-export function outOfProcessKeyboard(platform: 'ios' | 'android', keyboard: Rect | undefined): Rect | undefined {
+export function outOfProcessKeyboard(platform: Platform, keyboard: Rect | undefined): Rect | undefined {
   return platform === 'android' ? keyboard : undefined;
 }
 
