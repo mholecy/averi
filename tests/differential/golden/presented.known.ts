@@ -17,9 +17,9 @@ export const presented: KnownFile = {
     // no false Tapped, but no "close it first"; the colour assert fails "not found" (no evidence either way: vacuous);
     // and scroll_until swipes twice beneath the presented layer looking for it.
     ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, 'not found', [], 'idb lists only the presented layer: the tap times out'),
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, 'not found', [], 'idb lists only the presented layer'),
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], 'swiped 2× beneath a presented layer', 'not found', twice(IDB_STROKE), 'idb lists only the presented layer: scroll_until swipes twice beneath it'),
+      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
+      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
+      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it' }),
     ]),
     // LAB FINDING, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
     // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
@@ -27,9 +27,9 @@ export const presented: KnownFile = {
     // fails "not found" (vacuous); scroll_until strokes 1776 → 444 twice, and on the device that stroke dismisses the
     // dialog (it lands on its dim) or expands the sheet.
     ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
-      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['tap'], NO_CLOSE_IT_FIRST, 'not found', [], 'lab finding: uiautomator lists only the presented window; the tap times out', LAB_ANDROID),
-      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], NOT_IN_TREE, 'not found', [], 'lab finding: uiautomator lists only the presented window', LAB_ANDROID),
-      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['scroll_until'], 'swiped 2× beneath a presented layer', 'not found', twice(ADB_STROKE), 'lab finding: strokes beneath the presented layer (dismisses the dialog / expands the sheet)', LAB_ANDROID),
+      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'lab finding: uiautomator lists only the presented window; the tap times out', as: LAB_ANDROID }),
+      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'lab finding: uiautomator lists only the presented window', as: LAB_ANDROID }),
+      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(ADB_STROKE), note: 'lab finding: strokes beneath the presented layer (dismisses the dialog / expands the sheet)', as: LAB_ANDROID }),
     ]),
   ]),
   counts: {

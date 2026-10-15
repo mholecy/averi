@@ -35,8 +35,9 @@ export interface KnownFile {
   counts: Record<string, number>;
 }
 
-export const keys = (file: string, tags: readonly string[], verbs: readonly string[], cls: string, kind: ReplyKind, calls: readonly string[], note: string, as?: Classed) =>
-  tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, { cls, kind, calls, note, ...(as !== undefined && { as }) }] as const));
+/** The rows `<file> <tag> <verb>` of every tag and verb, each known as `k`. */
+export const keys = (file: string, tags: readonly string[], verbs: readonly string[], k: Known) =>
+  tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, { cls: k.cls, kind: k.kind, calls: k.calls, note: k.note, ...(k.as !== undefined && { as: k.as }) }] as const));
 
 export const NOT_IN_TREE = 'not in the tree';
 export const NO_CLOSE_IT_FIRST = 'refused without "close it first"';

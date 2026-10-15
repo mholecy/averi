@@ -11,21 +11,21 @@ export const forms: KnownFile = {
   family: 'forms',
   known: Object.fromEntries([
     // The form beneath the country picker sheet: the same, a form's fields and its submit.
-    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], NO_CLOSE_IT_FIRST, 'not found', [], 'idb lists only the presented sheet: the tap times out'),
-    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], 'swiped 2× beneath the sheet', 'not found', twice(IDB_STROKE), 'idb lists only the presented sheet: scroll_until swipes twice beneath it'),
+    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented sheet: the tap times out' }),
+    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented sheet: scroll_until swipes twice beneath it' }),
     // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the
     // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice;
     // scroll_until swipes twice ABOVE the keyboard (pinned: a stroke moved under it fails here) and stops "never
     // appeared in the tree" — its touch-downs are right, but a replayed tree cannot show whether they would bring the
     // field out (vacuous).
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], 'refused without naming the keyboard', 'not found', [], 'idb lists nothing under the keyboard: the tap times out'),
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], NOT_IN_TREE, 'not found', twice(IDB_STROKE_ABOVE_KEYBOARD), 'idb lists nothing under the keyboard'),
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: 'idb lists nothing under the keyboard: the tap times out' }),
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE_ABOVE_KEYBOARD), note: 'idb lists nothing under the keyboard' }),
     // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under
     // idb the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers
     // Tapped and sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0
     // swipes.
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['tap'], 'Tapped', 'Tapped', ['idb ui tap 201 547'], 'lab finding: idb reads the pinned submit bar as no cover — the tap submits the form', LAB_IOS),
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['scroll_until'], 'reached with no swipe where a tap fires submit invalid', 'visible', [], 'lab finding: idb reads the pinned submit bar as no cover', LAB_IOS),
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 547'], note: 'lab finding: idb reads the pinned submit bar as no cover — the tap submits the form', as: LAB_IOS }),
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['scroll_until'], { cls: 'reached with no swipe where a tap fires submit invalid', kind: 'visible', calls: [], note: 'lab finding: idb reads the pinned submit bar as no cover', as: LAB_IOS }),
   ]),
   counts: {
     [`${IOS}/form-basic.idb.json`]: 11,
