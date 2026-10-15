@@ -592,6 +592,13 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         expect(await pickOn(screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })), 'login_title', { width: 402, height: 874 })).toBe('tapped (201,32)');
       });
 
+      it('a title beneath an alert the tree marks — clear of the alert\'s card — is skipped naming the alert, as the tap refuses it, not "covered by" the card; the same layer unmarked is no cover there, and the title is tapped', async () => {
+        const alertLayer = (mark: Partial<UiNode>) => node({ role: 'container', rect: FULL, children: [node({ role: 'container', label: 'Leave the form', rect: { x: 41, y: 365, width: 320, height: 172 }, ...mark })] });
+        const form = node({ role: 'container', rect: FULL, children: [loginTitle()] });
+        expect(await pickOn(screenOf(form, alertLayer({ presentation: 'alert' })), 'login_title')).toBe('an alert is presented over it ("Leave the form") — close it first');
+        expect(await pickOn(screenOf(form, alertLayer({})), 'login_title')).toBe('tapped (201,303)');
+      });
+
       it('a title listed in a scroll view but outside its frame — nothing of it drawn there — is skipped naming that scroll view, as the tap refuses it', async () => {
         const list = node({ role: 'scrollable', identifier: 'list', rect: { x: 0, y: 100, width: 402, height: 150 }, children: [loginTitle()] }); // centre (201,303), below the list's 250
         expect(await pickOn({ ...screenOf(list), unclippedFrames: true }, 'login_title')).toBe('outside its scroll view scrollable id:list (0,100 402x150) at (201,303)');
