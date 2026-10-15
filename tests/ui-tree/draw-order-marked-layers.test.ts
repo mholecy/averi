@@ -166,6 +166,28 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     expect(named).not.toBe(wrapper);
   });
 
+  /** A sheet whose form is no scroll view, holding `extra` over the list's row; the touch-down at (201,699). */
+  const formSheet = (extra: UiNode) => {
+    const { row, layer: beneath } = list();
+    const form = node({ role: 'container', identifier: 'form', rect: rect(0, 118, 402, 756), children: [extra] });
+    const layer = node({ role: 'container', rect: IPHONE, presentation: 'screen', children: [form] });
+    return { row, form, order: drawOrder(judged(beneath, layer)) };
+  };
+  const TOUCH_DOWN = { x: 201, y: 699 };
+
+  it('a hidden node of the layer at the touch-down is not named for no target: what of the layer shows there is, as for a target', () => {
+    const { row, form, order } = formSheet(node({ role: 'text', label: 'Parked', hidden: true, rect: rect(0, 690, 402, 30) }));
+    expect(order.markedAt(TOUCH_DOWN)).toBe(form);
+    expect(order.markedAt(TOUCH_DOWN)).toBe(order.presentedAt(row, TOUCH_DOWN));
+  });
+
+  it('a HIDDEN scroll view of the layer at the touch-down keeps no stroke going: the stroke lands on the layer, as for a target', () => {
+    const scroll = node({ role: 'scrollable', hidden: true, rect: rect(0, 600, 402, 200), children: [node({ role: 'text', label: 'x', hidden: true, rect: rect(0, 610, 402, 30) })] });
+    const { row, form, order } = formSheet(scroll);
+    expect(order.markedAt(TOUCH_DOWN)).toBe(form);
+    expect(order.markedAt(TOUCH_DOWN)).toBe(order.presentedAt(row, TOUCH_DOWN));
+  });
+
   it('a `screen` layer under a typed one: a stroke for no target lands on the typed element on top', () => {
     const { layer: beneath } = list();
     const { layer: sheetLayer } = sheet();
