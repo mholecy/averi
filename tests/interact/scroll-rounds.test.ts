@@ -1936,6 +1936,12 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     );
   });
 
+  it('a sheet that moved to another detent between the two reads of a stop that sent no swipe: the failure says the sheet moved, not that a swipe moved it', () => {
+    const played = play(IPHONE, [rowOf('swiftFeesSheet', 'swift_payment.form.debit_select'), rowOf('swiftFeesSheetExpanded', 'swift_payment.form.debit_select')]);
+    expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
+    expect(failureOf(played, 'id:swift_payment.form.debit_select').message).toMatch(/^scroll_until id:swift_payment\.form\.debit_select stopped before any swipe — .* so none was sent\. Last rect .* viewport; the sheet moved from its Half screen detent to Expanded$/);
+  });
+
   it('Contacts\' discard popover over a row of the New Contact sheet: no stroke (one would close the popover), the stop is `presented`', () => {
     const played = play(IPHONE, [rowOf('contactsDiscardPopover', 'Insert add instant message'), rowOf('contactsDiscardPopover', 'Insert add instant message')]);
     expect(strokesToward(played)).toEqual([]);
@@ -2285,5 +2291,56 @@ describe('round — fully: true on a row its scroll view cuts, the content exhau
     const message = failure(listRow({ y: 456, height: 418 }, 850));
     expect(message).toContain('element is in the viewport but CLIPPED at bottom, 56% of it is in the viewport, and the content is exhausted');
     expect(message).toContain('The element cannot be fully revealed — that is a layout defect (no clearance for an overlay?)');
+  });
+});
+
+describe('round — a sheet whose detent the swipes changed', () => {
+  // A sheet's grabber says its detent in its value (`Sheet Grabber`, `Half screen` / `Expanded`): a stroke on a half
+  // sheet's list at its top drags the sheet up before it scrolls the list.
+  const sheet = (detent: string | undefined, y: number): Row => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+    const grabber = detent === undefined ? [] : [node({ role: 'button', label: 'Sheet Grabber', value: detent, rect: { x: 152, y: 58, width: 98, height: 24 } })];
+    return { tree: node({ role: 'container', rect: IPHONE_BOX, children: [...grabber, row] }), found: [row] };
+  };
+  const MOVED = '; the sheet moved from its Half screen detent to Expanded';
+
+  it('a stop says the sheet moved from the detent the first read showed to the one the last read showed', () => {
+    const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Expanded', 300)])));
+    expect(reply).toBe(`fully visible after 1 swipe${MOVED}`);
+  });
+
+  it('a failure says it too, after the rest of its sentence — the verdict unchanged', () => {
+    const message = failureOf(play(IPHONE, [sheet('Half screen', 5_000), sheet('Expanded', 4_990), sheet('Expanded', 4_980), sheet('Expanded', 4_970), sheet('Expanded', 4_960)]), 'id:row_7').message;
+    expect(message).toMatch(/^scroll_until id:row_7 failed after 4 swipes \(maxSwipes\) — element in tree but never intersected the 402x874 viewport/);
+    expect(message.endsWith(MOVED)).toBe(true);
+  });
+
+  it('a failure judged by absence keeps its class with the clause attached: a target no read held is ElementNotFoundError', () => {
+    const empty = (detent: string): Row => ({ tree: node({ role: 'container', rect: IPHONE_BOX, children: [node({ role: 'button', label: 'Sheet Grabber', value: detent, rect: { x: 152, y: 58, width: 98, height: 24 } })] }), found: [] });
+    const played = play(IPHONE, [empty('Half screen'), empty('Expanded'), empty('Expanded'), empty('Expanded')]);
+    expect(played.outcome?.kind).toBe('bound');
+    const error = failureOf(played, 'id:row_7');
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message.endsWith(MOVED)).toBe(true);
+  });
+
+  it('a detent the same at the first and last read is not mentioned, whatever it was between', () => {
+    const reply = describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet('Expanded', 300), sheet('Half screen', 300)])));
+    expect(reply).toBe('fully visible after 1 swipe');
+  });
+
+  it('two sheets stacked, the top one closed meanwhile: the lower sheet\'s grabber is last at the end — another sheet, not a detent change, so nothing is said', () => {
+    const stacked = (detents: readonly string[], y: number): Row => {
+      const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y, width: 340, height: 43 } });
+      const grabbers = detents.map((value) => node({ role: 'button', label: 'Sheet Grabber', value, rect: { x: 151, y: 58, width: 100, height: 24 } }));
+      return { tree: node({ role: 'container', rect: IPHONE_BOX, children: [row, ...grabbers] }), found: [row] };
+    };
+    const played = play(IPHONE, [stacked(['Half screen', 'Expanded'], 900), stacked(['Half screen'], 300), stacked(['Half screen'], 300)]);
+    expect(describeScrollResult(resultOf(played))).toBe('fully visible after 1 swipe');
+  });
+
+  it('a grabber only one of the two reads holds (a sheet presented or closed) says nothing of a detent', () => {
+    expect(describeScrollResult(resultOf(play(IPHONE, [sheet('Half screen', 900), sheet(undefined, 300), sheet(undefined, 300)])))).toBe('fully visible after 1 swipe');
+    expect(describeScrollResult(resultOf(play(IPHONE, [sheet(undefined, 900), sheet('Expanded', 300), sheet('Expanded', 300)])))).toBe('fully visible after 1 swipe');
   });
 });
