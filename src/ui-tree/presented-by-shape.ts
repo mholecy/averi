@@ -10,10 +10,12 @@ import { scrolls } from './scroll-containers.js';
  * judged never reaches it: there the marked layers are the presented ones (draw-order.ts#markOf), and a later
  * screen-sized layer the source did not mark presents nothing.
  *
- * Why it still exists: those trees carry no presented-layer fact, and without the shape a screen presented over the
- * target's — an RN transparent Modal's dimming leaf, a sheet's form — reads as not covering it: its dim and its scroll
- * view are what the frame rows excuse. On idb's flat list it never holds (every node's holder is the root, no window
- * of its own); on Android it reads a Compose overlay stacked in one window.
+ * Why it still exists: those trees carry no presented-layer fact, and without the shape a screen presented over
+ * the target's — an RN transparent Modal's dimming leaf, a sheet's form — reads as not covering it: its dim and its
+ * scroll view are what the frame rows excuse. On idb's flat list it never holds (every node's holder is the root, no
+ * window of its own). On Android a dialog's or a bottom sheet's window is dumped alone, so the screen beneath is
+ * absent, not covered; the rule fires on SystemUI's notification shade, where it misreads the shade's notification
+ * stack as a screen presented over its own quick settings.
  *
  * Two questions, one rule (`givesWay`): does a frame row's excuse of a node give way because the node lies on a
  * screen presented over the target's (`givesWay`, asked by draw-order.ts's `structural`, `screenSizedHost` and
@@ -22,7 +24,9 @@ import { scrolls } from './scroll-containers.js';
  * The decision and its residuals: docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
 export interface PresentedByShape {
-  /** `row`'s excuse of `placed` for `target` gives way: it lies on a screen presented over the target's (`givesWay`). */
+  /**
+   * `row`'s excuse of `placed` for `target` gives way: it lies on a screen presented over the target's (`givesWay`).
+   */
   givesWay(row: FrameRow, placed: Placed, target: Placed): boolean;
   /** `placed` is the SURFACE of a screen presented over `target`'s (`presentedSurface`). */
   surface(placed: Placed, target: Placed): boolean;
