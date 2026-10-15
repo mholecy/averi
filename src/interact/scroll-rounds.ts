@@ -1400,8 +1400,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // the touch-down by then, stroke as before. And on behalf of NO target (none in the tree): a stroke that would touch
   // down on an alert the tree marks (its reach is the whole screen) lands on the alert, not on any screen beneath it —
   // the same hold and stop, the alert named. Other presented screens are still stroked over for a target not in the
-  // tree: it has nothing to ask on behalf of (ADR 0018, residual 6). One question of the scene, at the touch-down
-  // (`presentedTouchDown`, ui-tree/standing.ts#Scene.presentedAt).
+  // tree: it has nothing to ask on behalf of. One question of the scene, at the touch-down (`presentedTouchDown`,
+  // ui-tree/standing.ts#Scene.presentedAt).
   const onPresented = presentedTouchDown(stroke, now, best?.node);
   if (onPresented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: onPresented }, current === 'settle' && presentedBefore, seen.elapsedMs);
