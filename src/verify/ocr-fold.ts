@@ -165,7 +165,7 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
   }
   const end = Math.min(i, cps.length - 1);
   const text = cps.slice(start, end + 1).join('');
-  if (negated || i >= cps.length) return { text, end, added: [] };
+  if (i >= cps.length) return { text, end, added: [] };
   const added: [string, string][] = [];
   for (let k = 0; k < members.length; k++) {
     if (members[k + 1] === '-' && k + 2 < members.length) {
@@ -180,10 +180,12 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
     if (f !== c && [...f].length === 1 && !listed) added.push([c, f]);
   }
   if (added.length === 0) return { text, end, added };
-  // The added members form a class of their own, an alternative beside the
-  // class as written: appended inside it, a member after a trailing `-`
-  // would turn that `-` into a range.
-  return { text: `(?:${text}|[${added.map(([, f]) => classMember(f)).join('')}])`, end, added };
+  // The added members form a class of their own beside the class as written —
+  // appended inside it, a member after a trailing `-` would turn that `-` into
+  // a range. A listed character's fold is one more character the class
+  // accepts, or, negated, one more it refuses.
+  const extra = `[${added.map(([, f]) => classMember(f)).join('')}]`;
+  return { text: negated ? `(?:(?!${extra})${text})` : `(?:${text}|${extra})`, end, added };
 }
 
 /**
