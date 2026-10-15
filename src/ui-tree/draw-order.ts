@@ -4,6 +4,26 @@ import { isInteractive, tapPoint } from './selectors.js';
 import { clips, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
+/** A presented layer the tree source marks (`UiNode.presentation`), as a sentence names it: its kind and its label. */
+export interface MarkedLayer {
+  readonly kind: NonNullable<UiNode['presentation']>;
+  readonly label?: string;
+}
+
+/**
+ * A presented surface as a sentence quotes it (`DrawOrder.presentedPress`): the `surface` `presentedAt`,
+ * `presentedOver` or `markedAt` named, where it presses (`reach`: the whole screen for the element of a marked
+ * presented layer, else its rect), and that marked `layer` when it is one's element.
+ */
+export interface PresentedPress {
+  readonly surface: UiNode;
+  readonly reach: Rect;
+  readonly layer?: MarkedLayer;
+}
+
+/** THE reading of the tree source's presented-layer mark (`UiNode.presentation`): the layer `node` is the element of, as `MarkedLayer`; undefined for any other node. */
+const markOf = (node: UiNode): MarkedLayer | undefined => (node.presentation === undefined ? undefined : { kind: node.presentation, ...(node.label ? { label: node.label } : {}) });
+
 /**
  * DRAW ORDER: what a tree says is drawn on top of what — and, for a target,
  * what of it still shows and where a tap on it goes (`exposure`). One walk of the
@@ -80,26 +100,6 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * rect arithmetic it asks — the
  * subtraction of a cover from a target included — is geometry.ts's.
  */
-/** A presented layer the tree source marks (`UiNode.presentation`), as a sentence names it: its kind and its label. */
-export interface MarkedLayer {
-  readonly kind: NonNullable<UiNode['presentation']>;
-  readonly label?: string;
-}
-
-/**
- * A presented surface as a sentence quotes it (`DrawOrder.presentedPress`): the `surface` `presentedAt`,
- * `presentedOver` or `markedAt` named, where it presses (`reach`: the whole screen for the element of a marked
- * presented layer, else its rect), and that marked `layer` when it is one's element.
- */
-export interface PresentedPress {
-  readonly surface: UiNode;
-  readonly reach: Rect;
-  readonly layer?: MarkedLayer;
-}
-
-/** THE reading of the tree source's presented-layer mark (`UiNode.presentation`): the layer `node` is the element of, as `MarkedLayer`; undefined for any other node. */
-const markOf = (node: UiNode): MarkedLayer | undefined => (node.presentation === undefined ? undefined : { kind: node.presentation, ...(node.label ? { label: node.label } : {}) });
-
 export interface DrawOrder {
   /**
    * The nodes drawn over a clipping container, in pre-order: every node
