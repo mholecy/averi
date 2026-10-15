@@ -217,12 +217,15 @@ export interface DrawOrder {
    */
   presentedPress(surface: UiNode): PresentedPress;
   /**
-   * The element of a TYPED presented layer (`markedLayers`: an alert, an action sheet, a popover, on the screen) a
-   * touch-down at `point` lands on, asked for a stroke on behalf of NO target — one not in the tree, which
-   * `presentedAt` cannot ask for: the last such element, whose reach is the whole screen — unless the point lies on a
-   * scroll view of that layer's own (a stroke scrolling the alert's own content). A `screen` layer is not asked here.
-   * Undefined when none. One reader: `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through
-   * standing.ts#Scene.presentedAt), which sends no stroke that would land on it.
+   * The presented layer the tree source marks (`markedLayers`, on the screen) a touch-down at `point` lands on, asked
+   * for a stroke on behalf of NO target — one not in the tree, which `presentedAt` cannot ask for: the last such
+   * layer, whose reach is the whole screen — unless the point lies on a scroll view of that layer's own (a stroke
+   * scrolling the alert's own content, a search inside a sheet's own list). Named by its cover: a typed layer's
+   * element (an alert, an action sheet, a popover); for a `screen` layer, the last node of it at the point that
+   * draws by the column that needs no target (`drawnOver`'s), else the layer itself. A screen presented by shape
+   * alone is not asked here. Undefined when none. One reader: `scroll_until`'s stroke
+   * (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which sends no stroke that would land on
+   * it.
    */
   markedAt(point: Point): UiNode | undefined;
   /**
@@ -1854,8 +1857,15 @@ export function drawOrder(tree: UiNode): DrawOrder {
     },
     presentedAt: (node, point) => lastPresentedSurface(node, (reach) => containsPoint(reach, point)),
     presentedOver: (node) => lastPresentedSurface(node),
-    markedAt: (point) =>
-      marked.filter(({ kind, layer }) => kind !== 'screen' && !order.slice(layer.at + 1, layer.end).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point))).at(-1)?.cover.node,
+    markedAt(point) {
+      const own = (layer: Placed): readonly Placed[] => order.slice(layer.at + 1, layer.end);
+      const scrolledAt = (layer: Placed): boolean => own(layer).some((p) => scrolls(p.node) && containsPoint(p.node.rect, point));
+      const on = marked.filter(({ layer }) => !scrolledAt(layer)).at(-1);
+      if (on === undefined || on.kind !== 'screen') return on?.cover.node;
+      // No target to judge a cover for: what of the layer draws at the point by the column that needs none
+      // (`drawnOver`'s), the layer itself where nothing of it does.
+      return own(on.layer).filter((p) => containsPoint(p.node.rect, point) && draws(p)).at(-1)?.node ?? on.cover.node;
+    },
     presentedPress(surface) {
       const layer = marked.find(({ cover }) => cover.node === surface)?.marked;
       return { surface, reach: layer === undefined ? { ...surface.rect } : { ...screen }, ...(layer !== undefined && { layer }) };

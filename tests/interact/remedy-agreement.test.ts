@@ -6,6 +6,7 @@ import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
 import type { MarkedLayer } from '../../src/ui-tree/draw-order.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
+import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
@@ -611,3 +612,47 @@ describe('a target beneath an alert — the tap, the pixel assert and scroll_unt
   });
 });
 
+
+/**
+ * A screen beneath a layer the tree source marks `screen` (UiNode.presentation): a list screen whose list fills the
+ * screen, and over it a sheet — its nav bar with Cancel, then either a form with no scroll view of its own, or its own
+ * list over the lower part of the screen. A stroke for a target not in the tree touches down on the screen's largest
+ * scroll view, the list beneath, at (201,699).
+ */
+describe('a target not in the tree beneath a marked presented screen — scroll_until stops unless it strokes the sheet\'s own list', () => {
+  const sheetOver = (own: 'form' | 'list'): UiNode => {
+    const rows = Array.from({ length: 12 }, (_, i) => node({ role: 'text', label: `Row ${i}`, rect: { x: 0, y: 100 + 70 * i, width: 402, height: 60 } }));
+    const beneath = node({ role: 'container', rect: { ...BOX }, children: [node({ role: 'scrollable', rect: { ...BOX }, children: rows })] });
+    const bar = node({ role: 'container', rect: { x: 0, y: 62, width: 402, height: 56 }, children: [node({ role: 'button', label: 'Cancel', rect: { x: 16, y: 72, width: 70, height: 36 } })] });
+    const body =
+      own === 'form'
+        ? node({ role: 'container', identifier: 'sheet.form', rect: { x: 0, y: 118, width: 402, height: 756 }, children: [node({ role: 'textfield', identifier: 'name', rect: { x: 20, y: 300, width: 362, height: 44 } })] })
+        : node({ role: 'scrollable', identifier: 'sheet.list', rect: { x: 0, y: 118, width: 402, height: 700 }, children: [node({ role: 'text', label: 'Austria', rect: { x: 0, y: 130, width: 402, height: 44 } })] });
+    const layer = node({ role: 'container', rect: { ...BOX }, presentation: 'screen', children: [bar, body] });
+    return node({ role: 'container', label: 'App', rect: { ...BOX }, presentationsJudged: true, children: [node({ role: 'container', rect: { ...BOX }, children: [beneath, layer] })] });
+  };
+  const RULES = { direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE } as const;
+
+  it('the touch-down on the sheet, off any scroll view of its own: no swipe — the stop names what of the sheet is there', () => {
+    const row: Row = { tree: sheetOver('form'), found: [], screen: USABLE };
+    const played = play(RULES, [row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    const failure = failureOf(played, 'text:"Nothing like this"');
+    expect(failure.message).toBe(
+      'scroll_until text:"Nothing like this" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (201,699) on ' +
+        `container id:sheet.form (0,118 402x756) — ${presentedRemedy('it')}, and a swipe on it may dismiss it, so none was sent.`,
+    );
+  });
+
+  it('…a plain failure, not absence: an optional step fails there, as beneath an alert', () => {
+    const row: Row = { tree: sheetOver('form'), found: [], screen: USABLE };
+    expect(failureOf(play(RULES, [row, row]), 'text:"Nothing like this"')).not.toBeInstanceOf(ElementNotFoundError);
+  });
+
+  it('the touch-down on the sheet\'s own list: a search inside the sheet keeps stroking', () => {
+    const row: Row = { tree: sheetOver('list'), found: [], screen: USABLE };
+    const played = play(RULES, [row, row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(true);
+    expect(played.outcome?.kind).not.toBe('presented');
+  });
+});

@@ -139,10 +139,44 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     }
   });
 
-  it('a stroke for NO target is not stopped by a `screen` layer (`markedAt` reads the typed layers only)', () => {
+  it('a stroke for NO target lands on a `screen` layer (`markedAt`): what of the layer draws at the touch-down, the layer where nothing does', () => {
+    const { layer: beneath } = list();
+    const { cancel, layer } = sheet();
+    const order = drawOrder(judged(beneath, layer));
+    expect(desc(order.markedAt({ x: 40, y: 80 }))).toBe(desc(cancel));
+    expect(desc(order.markedAt({ x: 300, y: 40 }))).toBe(LAYER);
+    expect(order.presentedPress(order.markedAt({ x: 300, y: 40 })!)).toEqual({ surface: layer, reach: IPHONE, layer: { kind: 'screen' } });
+  });
+
+  it('…but not on a scroll view of the layer itself: a search inside the sheet\'s own list keeps stroking', () => {
     const { layer: beneath } = list();
     const { layer } = sheet();
-    expect(drawOrder(judged(beneath, layer)).markedAt({ x: 201, y: 40 })).toBeUndefined();
+    const order = drawOrder(judged(beneath, layer));
+    expect(order.markedAt({ x: 201, y: 699 })).toBeUndefined();
+    expect(order.markedAt({ x: 201, y: 320 })).toBeUndefined();
+  });
+
+  it('a bare full-screen wrapper of the layer is not what is named there: it draws nothing of its own', () => {
+    const { layer: beneath } = list();
+    const { layer } = sheet();
+    const wrapper = node({ role: 'container', rect: IPHONE, children: [...layer.children] });
+    layer.children.splice(0, layer.children.length, wrapper);
+    expect(desc(drawOrder(judged(beneath, layer)).markedAt({ x: 300, y: 40 }))).toBe(LAYER);
+  });
+
+  it('a `screen` layer under a typed one: a stroke for no target lands on the typed element on top', () => {
+    const { layer: beneath } = list();
+    const { layer: sheetLayer } = sheet();
+    const { layer } = popover();
+    expect(desc(drawOrder(judged(beneath, sheetLayer, layer)).markedAt({ x: 40, y: 80 }))).toBe(SHEET_PROMPT);
+  });
+
+  it('a tree whose source judged nothing: a shape presented by its frames alone is not asked of no target', () => {
+    const { layer: beneath } = list();
+    const { layer } = sheet();
+    const { presentation: _, ...unmarked } = layer;
+    const tree = node({ role: 'container', label: 'Example', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE, children: [beneath, node(unmarked)] })] });
+    expect(drawOrder(tree).markedAt({ x: 40, y: 80 })).toBeUndefined();
   });
 
   it('a lower layer marked `screen` under a typed one: a row beneath both is covered by the typed element on top, a node of the sheet by the typed element only', () => {
