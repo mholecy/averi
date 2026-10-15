@@ -8,6 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, PRESENTED_OVER, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
+import { outsideItsScrollView } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
@@ -432,7 +433,7 @@ function notInViewportText(judged: Judged, viewport: Rect): string {
   if (standing.kind === 'underKeyboard') return `element lies ${underKeyboardText(tapPoint(node), standing.line.y)}`;
   if (standing.facts.visible === 0) {
     // On the screen, but nothing of it drawn: its scroll view's frame, not the viewport's, is what it lies outside of.
-    if (standing.kind === 'offScreen' && standing.scroller !== undefined) return `element lies ${outsideScrollViewText(standing.scroller)}: nothing of it is drawn`;
+    if (outsideItsScrollView(standing)) return `element lies ${outsideScrollViewText(standing.scroller)}: nothing of it is drawn`;
     const side = wholePast(node.rect, viewport);
     return `element lies ${side === undefined ? 'outside the viewport' : pastSideText(side, node.clippedOut === side)}`;
   }

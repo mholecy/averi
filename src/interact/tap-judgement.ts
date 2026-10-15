@@ -2,7 +2,7 @@ import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, 
 import { drawnOverText, nodeText, outsideScrollViewText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive } from '../ui-tree/selectors.js';
-import type { Remedy, Scene, ScrollableRemedy, SystemBar, TapStanding } from '../ui-tree/standing.js';
+import { outsideItsScrollView, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -235,7 +235,7 @@ export const movedTapText = (what: string, moved: string): string => `${what} ta
  * the keyboard may lay its scroll view out taller (the module's doc).
  */
 type OffTheScreen = Extract<TapStanding, { kind: 'offScreen' | 'systemBar' }>;
-const offTheScreen = (s: TapStanding): s is OffTheScreen => (s.kind === 'offScreen' && s.scroller === undefined) || s.kind === 'systemBar';
+const offTheScreen = (s: TapStanding): s is OffTheScreen => (s.kind === 'offScreen' || s.kind === 'systemBar') && !outsideItsScrollView(s);
 
 /**
  * THE tap judgement of a look (the module's doc): the on-screen rule now —
@@ -377,7 +377,7 @@ function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { jud
     return new OffScreenRefusal(refusal(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${advice(standing.remedy, (bar) => systemBarRemedy(edge, bar))}`));
   }
   const { at, visible } = standing;
-  if (standing.scroller !== undefined) {
+  if (outsideItsScrollView(standing)) {
     // On the screen, but outside what its scroll view draws: that scroll view's edge is the edge.
     const drawn =
       visible > 0

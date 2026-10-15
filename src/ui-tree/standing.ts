@@ -522,6 +522,13 @@ type PixelKind =
 /** Where the node stands for the pixel assert (`Scene`'s contract: a region, never clipped), and why — and, not reachable, its `remedy`. */
 export type PixelStanding = { readonly facts: StandingFacts } & Remedied<PixelKind, PixelRemedies>;
 
+/**
+ * Whether the standing is `offScreen` on the screen but outside what its scroll views draw (`Scene`'s contract, the
+ * drawn frame): it names the scroll view (`scroller`). THE test every sentence and refusal asks — not the screen's edge.
+ */
+export const outsideItsScrollView = <S extends Standing | PixelStanding>(s: S): s is Extract<S, { readonly kind: 'offScreen' }> & { readonly scroller: UiNode } =>
+  s.kind === 'offScreen' && s.scroller !== undefined;
+
 /** A touch standing before its remedy is decided. */
 type TouchJudgement = { readonly facts: StandingFacts } & TouchKind;
 /** A tap standing before its remedy is decided. */

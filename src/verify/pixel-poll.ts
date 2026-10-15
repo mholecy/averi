@@ -6,7 +6,7 @@ import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-positio
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { presentedRemedy, sceneOf, type PixelRegionOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, sceneOf, type PixelRegionOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -515,7 +515,7 @@ async function judgeOver(
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
     case 'offScreen': {
-      if (standing.scroller !== undefined) {
+      if (outsideItsScrollView(standing)) {
         // On the screen, but outside what its scroll view draws: what lies there is not the element.
         const view = nodeText(standing.scroller);
         const where = standing.sliver === undefined ? `${OUTSIDE_ITS_SCROLL_VIEW} ${view} ${at}` : `${TOO_THIN_IN_ITS_SCROLL_VIEW} ${view} ${at}, drawn ${rectText(standing.sliver)}`;

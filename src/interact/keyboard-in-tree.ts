@@ -4,7 +4,7 @@ import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js
 import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
-import type { TapStanding } from '../ui-tree/standing.js';
+import { outsideItsScrollView, type TapStanding } from '../ui-tree/standing.js';
 import { usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
 import {
@@ -332,7 +332,7 @@ function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
       return presses === undefined ? undefined : `covered by ${coverName(presses)}`;
     }
     case 'offScreen':
-      if (standing.scroller !== undefined) return `${outsideScrollViewText(standing.scroller)} at (${standing.at.x},${standing.at.y})`;
+      if (outsideItsScrollView(standing)) return `${outsideScrollViewText(standing.scroller)} at (${standing.at.x},${standing.at.y})`;
       return `off screen at (${standing.at.x},${standing.at.y})`;
     case 'systemBar':
       return `off screen at (${standing.at.x},${standing.at.y})`;

@@ -1,7 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import type { StandingScreen, SystemBar } from '../ui-tree/standing.js';
+import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -1545,6 +1545,6 @@ function shortfall(s: State, { readError, found, best, viewport, cover }: BoundR
     ...(cover !== undefined && { cover }),
     eitherWayUp: s.frame.boxes.length > 1 && cover?.above === undefined,
     ...(past !== undefined && { past }),
-    ...(best?.standing.kind === 'offScreen' && best.standing.scroller !== undefined && { outside: best.standing.scroller }),
+    ...(best !== undefined && outsideItsScrollView(best.standing) && { outside: best.standing.scroller }),
   };
 }
