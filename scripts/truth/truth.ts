@@ -97,35 +97,64 @@ export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): P
 }
 
 /**
- * Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (capture-run.ts).
+ * Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (unprobedReason).
  */
 export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => inside(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
 const at = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
+
+/**
+ * Why the capture never taps a target's centre — the one rule the capture (capture-run.ts: TargetTruth.unprobed) and
+ * consistency both read: `off-screen` an off-screen target; `centre-off-screen` its probe point (probePoint) off the
+ * `screen`, given — a raw tap there reaches no window of the app, so it would log no touch and say nothing; `nav-band`
+ * a centre in Android's navigation band (unprobedBand: unmeasured whether a tap there reaches the app). `says` is the
+ * truth's `unprobed`. undefined: the centre is probed.
+ */
+export function unprobedReason(
+  t: Pick<TargetTruth, 'frame' | 'geometry'>,
+  platform: Platform | undefined,
+  screen: { width: number; height: number } | undefined,
+): { why: 'off-screen' | 'centre-off-screen' | 'nav-band'; says: string } | undefined {
+  const offScreen = (why: 'off-screen' | 'centre-off-screen') => ({ why, says: `its centre ${at(probePoint(t.frame))} lies off the ${screen === undefined ? '' : `${screen.width}x${screen.height} `}screen` });
+  if (t.geometry === 'off-screen') return offScreen('off-screen');
+  if (screen !== undefined && !centreOnScreen(t.frame, screen)) return offScreen('centre-off-screen');
+  if (t.geometry !== undefined && unprobedBand(platform, t.geometry)) {
+    return {
+      why: 'nav-band',
+      says: 'its centre lies in the navigation band: whether a tap there reaches the app (gesture navigation) or presses Back, Home or Recents (three buttons) is unmeasured',
+    };
+  }
+  return undefined;
+}
 
 const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive control): it was not delivered, so "not reached" says nothing';
 
 /**
  * Whether a target's sources tell one story: the tap was delivered; an `open` target is reached and drawn; a covered
- * one is not reached. With a measured geometry (phase 3; `whole` or absent is the rule above): an `off-screen` target
- * is never probed, nor the centre of one cut by the screen's edge with its probe point past it (given the `screen`:
- * centreOnScreen — a raw tap there reaches no window of the app, so it would leave no touch and say nothing); on
- * Android a probe in the status band is swallowed by the status bar — no touch reaches the app, and it must not be
- * reached (systemBarSwallows) — and a centre in the navigation band is never probed (unprobedBand, unmeasured); an open
- * target cut with its centre in what shows is reached, and so is one overlapped at its edge by a band or the chrome
- * (its centre clear; what of it is drawn is not held to DRAWN); one whose centre lies outside what shows (`centre-out`,
- * `outside-scroll-view`) is not; a sliver, a centre under chrome and, on iOS, a centre in a band (the touch is the
- * app's window's) may be either (what fires there is the truth the rows read). Unmeasured, a declared-open target whose
- * centre lies off the screen is broken, as the phase-1 rule has it: never probed, it is never reached.
+ * one is not reached; a centre the capture never taps (unprobedReason, the capture's own rule) holds no probe. With a
+ * measured geometry (phase 3; `whole` or absent is the rule above): an `off-screen` target is never probed, nor the
+ * centre of one cut by the screen's edge with its probe point past it (given the `screen`: centreOnScreen — a raw tap
+ * there reaches no window of the app, so it would leave no touch and say nothing); on Android a probe in the status
+ * band is swallowed by the status bar — no touch reaches the app, and it must not be reached (systemBarSwallows) — and
+ * a centre in the navigation band is never probed (unprobedBand, unmeasured); an open target cut with its centre in
+ * what shows is reached, and so is one overlapped at its edge by a band or the chrome (its centre clear; what of it is
+ * drawn is not held to DRAWN); one whose centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a
+ * sliver, a centre under chrome and, on iOS, a centre in a band (the touch is the app's window's) may be either (what
+ * fires there is the truth the rows read). Unmeasured, a declared-open target whose centre lies off the screen is
+ * broken, as the phase-1 rule has it: never probed, it is never reached.
  */
 export function consistency(t: TargetTruth, platform?: Platform, screen?: { width: number; height: number }): string | undefined {
   const g = t.geometry ?? 'whole';
-  if (g === 'off-screen') return t.reached || t.probe.length > 0 || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
-  if (screen !== undefined && !centreOnScreen(t.frame, screen)) {
-    // Unmeasured (no geometry): the phase-1 rule — an open target must be reached, and one never probed is not.
-    if (t.geometry === undefined && t.declared === 'open') return `declared open, but its centre ${at(probePoint(t.frame))} lies off the screen: never probed`;
-    return t.reached || t.probe.length > 0 ? `its centre ${at(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
+  const probed = t.reached || t.probe.length > 0;
+  switch (unprobedReason(t, platform, screen)?.why) {
+    case 'off-screen':
+      return probed || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
+    case 'centre-off-screen':
+      // Unmeasured (no geometry): the phase-1 rule — an open target must be reached, and one never probed is not.
+      if (t.geometry === undefined && t.declared === 'open') return `declared open, but its centre ${at(probePoint(t.frame))} lies off the screen: never probed`;
+      return probed ? `its centre ${at(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
+    case 'nav-band':
+      return probed ? 'nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe' : undefined;
   }
-  if (unprobedBand(platform, g)) return t.reached || t.probe.length > 0 ? 'nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe' : undefined;
   if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
   if (touchesAt(t.probe, probePoint(t.frame)).length === 0) return NOT_DELIVERED;
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;

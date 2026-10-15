@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { centreOnScreen, consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf, unprobedBand } from './truth.js';
+import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -25,6 +25,7 @@ import { centreOnScreen, consistency, controlConsistency, measuredGeometry, outO
  * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
  * phase 3: truth.ts#consistency); so is an Android target whose centre lies in the navigation band
  * (truth.ts#unprobedBand: what a tap there does is unmeasured, and on three-button navigation it would leave the app).
+ * One rule decides it, for the capture and consistency both: truth.ts#unprobedReason.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown
  * and its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus
@@ -99,16 +100,9 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
       const { drawn, seen } = measure(png, frame, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
-      // The centre is never tapped where it lies off the screen (an off-screen target, or one the screen's edge cuts
-      // with its centre past it): a raw tap there reaches no window of the app — no touch, so its "not reached" says
-      // nothing. Nor in Android's navigation band: unmeasured whether a tap there reaches the app or presses Back, Home
-      // or Recents (truth.ts#unprobedBand, B4's to measure).
-      const off = geometry.geometry === 'off-screen' || !centreOnScreen(frame, s.screen);
-      const unprobed = off
-        ? `its centre (${probePoint(frame).x},${probePoint(frame).y}) lies off the ${s.screen.width}x${s.screen.height} screen`
-        : geometry.geometry !== undefined && unprobedBand(lab.platform, geometry.geometry)
-          ? 'its centre lies in the navigation band: whether a tap there reaches the app (gesture navigation) or presses Back, Home or Recents (three buttons) is unmeasured'
-          : undefined;
+      // The centre is never tapped where it lies off the screen, nor in Android's navigation band
+      // (truth.ts#unprobedReason, the rule consistency holds the target to).
+      const unprobed = unprobedReason({ frame, ...geometry }, lab.platform, s.screen)?.says;
       const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
       const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;

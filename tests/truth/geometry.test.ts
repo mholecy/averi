@@ -20,6 +20,7 @@ import {
   subtract,
   systemBarSwallows,
   unprobedBand,
+  unprobedReason,
   visibleOf,
   type GeometryContext,
 } from '../../scripts/truth/truth.js';
@@ -172,6 +173,26 @@ describe('consistency with a measured geometry', () => {
     drawn: 1,
     seen: '#43A047',
     ...over,
+  });
+  it('unprobedReason: the one rule for which centres the capture never taps — consistency and the capture both read it', () => {
+    const screen = { width: 402, height: 874 };
+    // `null`: no screen given (a default parameter would take `undefined` for the screen).
+    const why = (over: Partial<TargetTruth>, platform: 'ios' | 'android' = 'ios', s: typeof screen | null = screen) => unprobedReason(T(over), platform, s ?? undefined);
+    expect(why({})).toBeUndefined();
+    expect(why({ geometry: 'whole' })).toBeUndefined();
+    // An off-screen target, with or without the screen; a centre past the screen's edge, measured or not.
+    expect(why({ frame: rect(51, 900, 300, 64), geometry: 'off-screen' })).toEqual({ why: 'off-screen', says: 'its centre (201,932) lies off the 402x874 screen' });
+    expect(why({ frame: rect(51, 900, 300, 64), geometry: 'off-screen' }, 'ios', null)?.why).toBe('off-screen');
+    expect(why({ frame: rect(51, 850, 300, 64) })).toEqual({ why: 'centre-off-screen', says: 'its centre (201,882) lies off the 402x874 screen' });
+    expect(why({ frame: rect(51, 850, 300, 64), geometry: 'centre-out' })?.why).toBe('centre-off-screen');
+    expect(why({ frame: rect(51, 850, 300, 64) }, 'ios', null)).toBeUndefined();
+    // A centre ON the last row of the screen is probed (the screen is [0, height)).
+    expect(why({ frame: rect(51, 810, 300, 127) }, 'ios', { width: 402, height: 875 })).toBeUndefined();
+    // Android's navigation band only: the status band is probed (systemBarSwallows judges it), iOS's bands too.
+    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'android')?.why).toBe('nav-band');
+    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'android')?.says).toMatch(/^its centre lies in the navigation band: .* unmeasured$/);
+    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'ios')).toBeUndefined();
+    expect(why({ frame: rect(51, 20, 300, 24), geometry: 'status-band' }, 'android')).toBeUndefined();
   });
   it('whole or absent: the phase-1 rule — delivered, reached and drawn', () => {
     expect(consistency(T({}))).toBeUndefined();
