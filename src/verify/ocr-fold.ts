@@ -11,7 +11,8 @@
  *
  * The fold is deliberately narrow: punctuation look-alikes and combining
  * marks, nothing else. Case is NOT folded (a case difference renders, and the
- * recognizer reads it); letters and digits are never folded. And it applies to
+ * recognizer reads it); a letter keeps its base letter (only a Latin combining
+ * mark comes off), digits never change. And it applies to
  * recognizer readings ONLY — the tree carries the app's characters exactly, so
  * a `’` → `'` change there is a copy change the tree can see.
  */
