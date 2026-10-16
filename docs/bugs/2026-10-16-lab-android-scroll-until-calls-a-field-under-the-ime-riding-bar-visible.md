@@ -33,7 +33,7 @@ lab.form-keyboard.submit  android.view.View      [55,1238][1025,1370]
 lab.form-keyboard.phone   android.widget.EditText [55,1370][1025,1412]
 ```
 
-Compose reports phone's bounds (its 48-dp touch target, `1279–1411`) with what the later clickable `Continue` covers
+Compose reports phone's bounds (its 48-dp touch target, 132 px: `1280–1412`, the dump's bottom edge 1412) with what the later clickable `Continue` covers
 taken out (as `docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md` measured on
 `pinned-bar`). The bar's own surface has no semantics node: nothing in the dump covers `1370–1398`.
 
@@ -61,7 +61,7 @@ same cell so under WDA (the lab's L2 is idb's miss of it).
 ## Cause (not changed here)
 
 The tree the stop judges never shows the cover: the bar is a background with no semantics, and Compose cuts the field's
-rect at the button, so the field reads as a 970x42 strip with nothing over it, 28 px of it above the IME. averi has no
+rect at the button, so the field reads as a 970x42 strip (`1370–1412`) with nothing over it, 28 px of it above the IME. averi has no
 way to see the bar from the dump; the screenshot shows it (grey `#F2F2F7` over the strip). Whether that is averi's to
 fix (judge a field whose rect was cut by a later sibling as covered at its uncut centre, as the `pinned-bar` note
 suggests; or not stop on a rect cut to under the tap minimum by a cover) or a residual of the tree is the round's to
