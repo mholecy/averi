@@ -31,7 +31,7 @@ import {
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, 'utf8')) as Calibration;
 const SHA = /^[0-9a-f]{7}$/;
-const VERBS = new Set(['tap', 'colour', 'scroll_until', 'error', 'text']);
+const VERBS = new Set(['tap', 'colour', 'scroll_until', 'fully', 'error', 'text']);
 const captures = new Set(
   readdirSync(`${ROOT}${table.corpus}`).flatMap((run) => {
     const manifest = JSON.parse(readFileSync(`${ROOT}${table.corpus}/${run}/manifest.json`, 'utf8')) as { captures: { file: string; truth?: string }[] };

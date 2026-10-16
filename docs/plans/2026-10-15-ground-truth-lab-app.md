@@ -216,6 +216,20 @@ target's `unprobed`), and consistency holds such a target to no probe; only the 
 measured (calibration.json #21, `systemBarSwallows`). An iOS status-band probe is taken: its touch is the app's, and
 the scroll-to-top it may also fire cannot reach the next probe (each relaunches the cell).
 
+**B2 (edges) — built 2026-10-16.** Three cells in both apps (Edges.swift, Edges.kt; the apps' `Lab` gained the
+`safeArea`, `scrollViews` and `chrome` writers): `scroll-bounded` (two bounded scroll views — a whole row, a row cut
+with its centre showing, a sliver, a row below its scroll view but on the screen, a row laid out below the screen),
+`scroll-sticky` (a lazy list whose pinned section header overlaps its first row, the header reported as chrome) and
+`scroll-top-edge` (a row resting in the status band, a row above the screen). Calibrated: #4 and #29; #9 and #17's
+static half DOES-NOT-FAIL, #12 and #13 STILL-RED-AFTER (the lab's Compose does not cut uiautomator's bounds flush with
+the container, the shape their fixes judge), #10 not reproduced (no inverted bounds); three lab findings LE1–LE3. What
+changed in the shared rows: `fully: true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops
+keys two rows; the R-outside-sv colour asks for the colour the screen shows there (a pass measured the background); on
+Android an off-screen or outside-scroll-view target may be missing from the tree (edges.ts#notListed: uiautomator dumps
+no node not visible to the user). Measured for B4: on iOS 27 a raw tap in the status bar itself (y 12, 30 at x 201)
+reaches no window of the app — it scrolls the page to its top — so truth.ts#systemBarSwallows' "iOS's status bar passes
+a tap through" holds only below the bar (y 54 delivered); scroll-top-edge's iOS row rests at 22–86 pt for that reason.
+
 ### Phase 4 — the matrix, generated
 
 One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells for
