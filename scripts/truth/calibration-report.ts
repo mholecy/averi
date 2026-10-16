@@ -42,7 +42,10 @@ export function calibrationReport(rs: readonly NoteResult[]): string {
   ];
   for (const r of rs) {
     const e = r.entry;
-    const sides = e.status === 'open' ? WORKING_TREE : e.before === undefined ? '—' : `${e.before} → ${e.after ?? e.fix?.join(', ') ?? '?'}`;
+    const sides =
+      e.status === 'open' ? WORKING_TREE
+      : e.before === undefined ? '—'
+      : `${e.before} → ${e.after ?? e.fix?.join(', ') ?? '?'}${e.afterNotFix === undefined ? '' : ` (the note's fix ${e.fix?.join(', ') ?? '—'} does not cure this cell)`}`;
     lines.push(`| ${e.n} | ${e.note.replace(/\.md$/, '')} | ${e.status} | ${sides} | ${verdictCell(r)} |`);
   }
   lines.push('');
@@ -52,7 +55,7 @@ export function calibrationReport(rs: readonly NoteResult[]): string {
     lines.push(`## ${e.n}: ${r.verdict}${e.partial === undefined ? '' : ` (partial: ${e.partial})`}`, '', `${e.note}${e.defect === undefined ? '' : ` — defect: \`${e.defect}\``}`, '');
     for (const [label, run] of [
       [e.status === 'open' ? WORKING_TREE : `before ${e.before}`, r.before],
-      ...(e.status === 'open' ? [] : [[`after ${e.after}`, r.after] as const]),
+      ...(e.status === 'open' ? [] : [[`after ${e.after}${e.afterNotFix === undefined ? '' : ` (not the note's fix: ${e.afterNotFix})`}`, r.after] as const]),
     ] as const) {
       if (run === undefined) continue;
       if ('error' in run) {

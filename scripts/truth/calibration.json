@@ -309,12 +309,13 @@
       "before": "7566443",
       "after": "83e282a",
       "verified": "golden",
+      "partial": "R-off only",
       "defect": "^Tapped|no swipe",
       "checks": [
         "ios-iphone17-ios27/sheet-long-list.wda.json F tap",
         "ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until"
       ],
-      "remark": "presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Before: tap Tapped at the parked point, scroll_until 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). idb lists neither target by its id (KNOWN)."
+      "remark": "presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Only R-off is asked: F lies off the screen, which takes precedence over outside its scroll view (truth.ts#geometryOf) — the note's own call, `fully: true`, is R-fully's and not asked of an off-screen target (partial); the plain stop asked by R-stroke shows the same 'fully visible after 0 swipes'. Before: tap Tapped at the parked point, scroll_until (R-stroke) 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). No idb evidence: idb lists the table's labels without their identifiers and no row below the fold (KNOWN)."
     },
     {
       "n": "21",
@@ -394,9 +395,10 @@
       "n": "27",
       "note": "2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md",
       "status": "calibrate",
-      "fix": ["15896c5", "41c394a"],
+      "fix": ["15896c5"],
       "before": "53da035",
       "after": "41c394a",
+      "afterNotFix": "15896c5 fixed the note's Finportal tree, not this SwiftUI cover: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it",
       "verified": "golden",
       "defect": "^Tapped|measured the layer over the target as the target|fully visible",
       "checks": [
@@ -413,15 +415,16 @@
         "ios-iphone17-ios27/dim-cover.wda.json D colour",
         "ios-iphone17-ios27/dim-cover.wda.json D scroll_until"
       ],
-      "remark": "presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root a screen-sized identified container dimming the screen and holding a card (an RN transparent Modal's shape). 15896c5 fixed the note's Finportal tree, not this one: still Tapped / PASS / fully visible at 15896c5 and every first-parent commit to 20b800a; green from 41c394a (fix/r20-marks: WDA marks the presented layer), so the lab shape calibrates there. 15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped."
+      "remark": "presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root a screen-sized identified container dimming the screen and holding a card (an RN transparent Modal's shape). The note's own fix, 15896c5, is NOT verified on this cell (afterNotFix): the after side is 41c394a, the commit that cured the cell's shape. 15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped."
     },
     {
       "n": "28",
       "note": "2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md",
       "status": "calibrate",
-      "fix": ["15896c5", "41c394a"],
+      "fix": ["15896c5"],
       "before": "53da035",
       "after": "41c394a",
+      "afterNotFix": "15896c5 fixed the note's Contacts tree, not this SwiftUI sheet: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it",
       "verified": "golden",
       "defect": "^Tapped|fully visible",
       "checks": [
@@ -432,7 +435,7 @@
         "ios-iphone17-ios27/sheet-background.wda.json D tap",
         "ios-iphone17-ios27/sheet-background.wda.json D scroll_until"
       ],
-      "remark": "presented/sheet-background: a large sheet whose only content, S, lies at its top over A; B, C, D lie under its bare background. Before (53da035): Tapped, fully visible. 15896c5 fixed the note's Contacts tree, not this one: still red there and at every first-parent commit to 20b800a; green from 41c394a (fix/r20-marks), so the lab shape calibrates there. Was DOES-NOT-FAIL on form-picker (whose picker rows lie over every target, so a refusal named a row; the first B0 run's CALIBRATED there was corrected by review round 1) — the cell this note needed."
+      "remark": "presented/sheet-background: a large sheet whose only content, S, lies at its top over A; B, C, D lie under its bare background. Before (53da035): Tapped, fully visible. The note's own fix, 15896c5, is NOT verified on this cell (afterNotFix): the after side is 41c394a, the commit that cured the cell's shape. Was DOES-NOT-FAIL on form-picker (whose picker rows lie over every target, so a refusal named a row; the first B0 run's CALIBRATED there was corrected by review round 1) — the cell this note needed."
     },
     {
       "n": "29",
@@ -461,7 +464,7 @@
       "note": "2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md",
       "status": "residual:open (the blur overlay has no node in either tree)",
       "verified": "golden",
-      "remark": "Pinned as KNOWN residual (tests/differential/golden/presented.known.ts) on presented/blur-menu and blur-menu-grouped: A–D beneath the backdrop answer Tapped, a colour PASS on the blur and fully visible under idb and WDA (on the grouped WDA tree C is refused under the menu row W drawn over its centre, without 'close it first')."
+      "remark": "ADR 0018 residual 9. Pinned as KNOWN residual (tests/differential/golden/presented.known.ts) on presented/blur-menu and blur-menu-grouped: A, B, D beneath the backdrop answer Tapped, a colour PASS on the blur and fully visible under idb and WDA; on the grouped WDA tree C is refused under the menu row W drawn over its centre, without 'close it first'. C's other rows (Tapped at a point that fires W) are L4's."
     },
     {
       "n": "32",
@@ -657,16 +660,25 @@
       "note": "2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md",
       "status": "open",
       "verified": "golden",
-      "defect": "under button|button \"Target C\"",
+      "defect": "under button|button \"Target C\"|^Tapped|passed on #00897B|fully visible",
       "checks": [
         "ios-iphone17-ios27/blur-menu.idb.json W tap",
         "ios-iphone17-ios27/blur-menu.idb.json W colour",
         "ios-iphone17-ios27/blur-menu.idb.json W scroll_until",
         "ios-iphone17-ios27/blur-menu.wda.json W tap",
         "ios-iphone17-ios27/blur-menu.wda.json W colour",
-        "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
+        "ios-iphone17-ios27/blur-menu.wda.json W scroll_until",
+        "ios-iphone17-ios27/blur-menu.idb.json C tap",
+        "ios-iphone17-ios27/blur-menu.idb.json C colour",
+        "ios-iphone17-ios27/blur-menu.idb.json C scroll_until",
+        "ios-iphone17-ios27/blur-menu.wda.json C tap",
+        "ios-iphone17-ios27/blur-menu.wda.json C colour",
+        "ios-iphone17-ios27/blur-menu.wda.json C scroll_until",
+        "ios-iphone17-ios27/blur-menu-grouped.idb.json C tap",
+        "ios-iphone17-ios27/blur-menu-grouped.idb.json C colour",
+        "ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD. Tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none."
+      "remark": "No fix yet: red at HEAD, both ways. W (the menu row, listed just before C) refused under C: tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b — a false refusal. C (listed after W, which is drawn over its centre) Tapped / a PASS on W's colour / fully visible — the unsafe direction, also on blur-menu-grouped's idb list. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none."
     }
   ],
   "excluded": [
