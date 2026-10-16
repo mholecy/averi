@@ -10,12 +10,17 @@ const LAB_ANDROID = 'bug:2026-10-15-lab-android-scroll-until-strokes-the-present
 // Phase 3 (B3): the lab findings of the presented cells, open — and the residual of calibration.json #31.
 const LAB_EDGES = 'bug:2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md';
 const LAB_MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
-const BLUR = 'residual:open — the SwiftUI blur overlay has no node in either tree (calibration.json #31)';
+const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
+/** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
+const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
-/** The slot targets' probe points (Base.swift#Slot) and the colour each shows under the blur menu's backdrop. */
+/**
+ * The slot targets' probe points (Base.swift#Slot) and the colour the screenshot shows over each under the blur menu:
+ * A, B, D their own blurred and dimmed; C (#00897B) the menu row W's own colour — W is drawn over C's centre.
+ */
 const SLOT_TAP: Record<string, string> = { A: 'idb ui tap 201 142', B: 'idb ui tap 201 322', C: 'idb ui tap 201 502', D: 'idb ui tap 201 682' };
 const BLURRED: Record<string, string> = { A: '#AC2B28', B: '#1766AC', C: '#00897B', D: '#BC6900' };
-/** A–D beneath the blur menu's backdrop, which no tree lists: Tapped, a colour PASS on the blur, fully visible (#31). */
+/** A, B, D beneath the blur menu's backdrop, which no tree lists: Tapped, a colour PASS on the blur, fully visible (#31). */
 const beneathTheBlur = (file: string, tags: readonly string[]) =>
   tags.flatMap((t) => [
     ...keys(file, [t], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: [SLOT_TAP[t]], note: 'no node for the blur backdrop: tapped through it', as: BLUR }),
@@ -35,7 +40,7 @@ export const presented: KnownFile = {
     ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
       ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
       ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it' }),
+      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
     ]),
     // LAB FINDING, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
     // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
@@ -55,7 +60,7 @@ export const presented: KnownFile = {
       return [
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
-        ...keys(`${IOS}/${cell}.idb.json`, tags, ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it' }),
+        ...keys(`${IOS}/${cell}.idb.json`, tags, ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
       ];
     }),
     // LAB FINDING (calibration.json L3): beneath the medium sheet over a scrolled host, WDA's targets wholly above, wholly
@@ -74,17 +79,25 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['tap'], { cls: 'refused without scroll_until', kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists no row below the fold' }),
-    // RESIDUAL #31: the blur menu's backdrop has no node in either tree — A–D beneath it read as open. On the grouped
-    // variant's WDA tree C is refused under the menu row W (drawn over its centre, truly), but not "close it first".
-    ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'C', 'D']),
-    ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'C', 'D']),
-    ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'C', 'D']),
+    // RESIDUAL #31 (ADR 0018 residual 9): the blur menu's backdrop has no node in either tree — A, B, D beneath it read
+    // as open. C's centre lies under the menu row W (its probe fires W): on the grouped variant's WDA tree C is refused
+    // under W, truly, but not "close it first" (#31's); elsewhere C reads as open — L4's misreading, below.
+    ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'D']),
+    ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'D']),
+    ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.wda.json`, ['A', 'B', 'D']),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused under the menu row W drawn over its centre; the backdrop has no node', as: BLUR }),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the menu row W; the backdrop has no node', as: BLUR }),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, 'idb ui swipe 201 699 201 568 --duration 0.3'], note: 'strokes for C under the menu row W; the backdrop has no node', as: BLUR }),
     // LAB FINDING (calibration.json L4): the menu row W, listed in reading order just before C, which it is drawn over,
-    // reads as covered by C under idb and WDA (no reading break, ADR 0015).
+    // reads as covered by C under idb and WDA (no reading break, ADR 0015) — a false refusal; and C, listed after W,
+    // reads as drawn over W: Tapped at its centre, which fires W, a colour PASS on W's colour, fully visible — the unsafe
+    // direction (also on the grouped variant's idb list, where W's rows are right).
+    ...[`${IOS}/blur-menu.idb.json`, `${IOS}/blur-menu.wda.json`, `${IOS}/blur-menu-grouped.idb.json`].flatMap((file) => [
+      ...keys(file, ['C'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: [SLOT_TAP.C], note: 'lab finding: C read as drawn over the menu row W over its centre — the tap fires W', as: LAB_MENU }),
+      ...keys(file, ['C'], ['colour'], { cls: `passed on ${BLURRED.C}`, kind: 'PASS', calls: [], note: "lab finding: W's colour measured as C's", as: LAB_MENU }),
+      ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'visible', calls: [], note: 'lab finding: C fully visible under the menu row W', as: LAB_MENU }),
+    ]),
     ...['idb', 'wda'].flatMap((src) => [
       ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: 'lab finding: the menu row read as under the row it is drawn over', as: LAB_MENU }),
       ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: 'lab finding: the menu row read as under the row it is drawn over', as: LAB_MENU }),

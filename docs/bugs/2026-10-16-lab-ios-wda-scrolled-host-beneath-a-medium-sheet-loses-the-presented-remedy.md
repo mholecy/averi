@@ -72,5 +72,6 @@ sheet. As at 753b560 … 20b800a.
 - Kept in tests/differential/golden/presented.known.ts as `bug:` this note (the 12 WDA rows of sheet-medium-edges).
 - idb lists only the presented layer (as on `sheet-medium`): its rows are the KNOWN "not in the tree" shapes, not this
   note's.
-- G's probe: on iOS the status bar swallows a raw tap in the top of its band (y < ~55 of 62 pt; truth.ts
-  `statusBarMaySwallow`), measured with this cell.
+- G's probe: on iOS the status bar swallows a raw tap in the top of its band — measured on the `open` cell with raw
+  `idb ui tap 201 y` (no touch at y ≤ 50, a touch at y ≥ 55 of the 62-pt band; truth.ts `IOS_STATUS_BAR_SWALLOWS_ABOVE`,
+  `statusBarMaySwallow`), and G's probe at (201,12) here left none.

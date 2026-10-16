@@ -1,4 +1,4 @@
-# BUG: an in-screen SwiftUI menu's row, listed in reading order just before a row of the screen it is drawn over, reads as covered by that row — `tap` refuses it ("under button Target C"), the colour assert fails and `scroll_until` swipes, under idb AND WDA, while a raw tap on it fires it
+# BUG: an in-screen SwiftUI menu's row, listed in reading order just before a row of the screen it is drawn over, reads as covered by that row — `tap` refuses it ("under button Target C"), the colour assert fails and `scroll_until` swipes, under idb AND WDA, while a raw tap on it fires it; and the row beneath reads as drawn over the menu row — `Tapped` at its centre, which fires the menu row
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/blur-menu.*`, captured by scripts/truth/capture.ts on the dedicated
@@ -36,6 +36,19 @@ scroll_until W      → failed after 3 swipes — element is in the viewport but
 C, listed after W, is read as drawn over it. On the device the strokes would land on the backdrop, which closes the
 menu.
 
+The same misreading the other way round, for C — the UNSAFE direction. C's centre (201,502) lies under W, and C's probe
+there fired W; the screenshot shows W's colour (#00897B) over most of C. Read as drawn over W, C is open:
+
+```
+tap C (idb and WDA)  → Tapped id:"lab.blur-menu.C"                          (idb ui tap 201 502 — on the device it fires W)
+colour C, asked #00897B → PASS … sampled #00897B …                             (W's colour measured as C's)
+scroll_until C       → Element id:"lab.blur-menu.C" fully visible after 0 swipes
+```
+
+So on the grouped variant's idb list (`K, W, A, B, C, D`): W's rows are right there (ADR 0015's break at A), but C,
+listed after W, still reads as uncovered — `Tapped` at a point that fires the menu row. Only the grouped variant's WDA
+tree refuses C under W (without "close it first": #31's residual, the backdrop has no node).
+
 ## Why (ADR 0015)
 
 ADR 0015 ends a content target's covers at a READING BREAK in idb's flat list: the first node listed after the target
@@ -56,7 +69,8 @@ reaches it with no swipe — or, if a flat reading-order list cannot tell what i
 
 ## Notes
 
-- Kept in tests/differential/golden/presented.known.ts as `bug:` this note (W's tap, colour and `scroll_until`, on idb
-  and WDA). A false refusal — the safe direction — but it blocks a flow that taps the menu, as #15 did.
-- A–D beneath the backdrop answer `Tapped` / colour PASS / `fully visible`: no tree lists anything over them — #31's
-  residual (calibration.json #31), pinned as such.
+- Kept in tests/differential/golden/presented.known.ts as `bug:` this note: W's tap, colour and `scroll_until` on idb
+  and WDA — a false refusal, the safe direction, but it blocks a flow that taps the menu, as #15 did — and C's on idb
+  and WDA, and on the grouped variant's idb list — a false `Tapped` that fires the menu row, the unsafe direction.
+- A, B and D beneath the backdrop answer `Tapped` / colour PASS / `fully visible`: no tree lists anything over them —
+  #31's residual (ADR 0018 residual 9; calibration.json #31), pinned as such.
