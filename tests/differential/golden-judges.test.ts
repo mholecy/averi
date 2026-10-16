@@ -283,3 +283,100 @@ describe('the form rows', () => {
     check(pick(rows, verb, tag).judge, cases);
   });
 });
+
+// Phase 2b's Android form rows: an error asserted as text, the under-keyboard tap after `back` (reached, or not — the
+// bar dropped back over it), the colour asked with the keyboard's, and a covered field's tap moved to its piece.
+const KEY = (y: number) => `adb shell input tap 540 ${y}`;
+const BACK = 'adb shell input keyevent 4';
+const ANDROID_FORM: CellTruth = {
+  cell: 'form-keyboard',
+  layer: 'none',
+  device: 'test',
+  screen: { width: 1080, height: 2220 },
+  scale: 1,
+  targets: [],
+  form: {
+    fields: [field('name', 330, { frame: rect(55, 330, 970, 99), error: { id: 'IbanError', text: 'Enter the recipient’s name' }, errorFrame: rect(55, 440, 600, 40) })],
+    controls: [
+      control('vs', { frame: rect(55, 1478, 970, 99), situation: 'under-keyboard', reached: false, probe: [], seen: '#FFFFFF', reachedAfterBack: true, probeAfterBack: [{ kind: 'touch', tag: '540,1528' }, { kind: 'focus', tag: 'vs' }] }),
+      control('note', { frame: rect(55, 2024, 970, 99), situation: 'under-keyboard', reached: false, probe: [], reachedAfterBack: false, probeAfterBack: [{ kind: 'touch', tag: '540,2074' }, { kind: 'submit', tag: 'invalid' }] }),
+      control('phone', { frame: rect(55, 1296, 970, 99), situation: 'covered', reached: false, probe: [{ kind: 'touch', tag: '540,1346' }, { kind: 'submit', tag: 'invalid' }], piece: rect(55, 1370, 970, 25), reachedAtPiece: true }),
+    ],
+    keyboard: { frame: rect(0, 1398, 1080, 822), field: 'postcode' },
+    screenError: { id: 'lab.f.banner_error', text: 'Payment wasn’t sent', frame: rect(55, 1700, 970, 50) },
+    submits: [],
+  },
+};
+
+describe('the Android form rows (phase 2b)', () => {
+  const rows = formExpectations('android', ANDROID_FORM, 'uiautomator');
+  const row = (key: string) => {
+    const [tag, verb] = key.split(' ');
+    return pick(rows, verb, tag);
+  };
+
+  it('every kind of row is asked', () => {
+    expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual([
+      'name error',
+      'screenError error',
+      'vs tap',
+      'vs colour',
+      'vs scroll_until',
+      'note tap',
+      'note scroll_until',
+      'phone tap',
+      'phone scroll_until',
+    ]);
+  });
+
+  it('errors are asserted as text, not as a field\'s error', () => {
+    expect(row('name error').call.args.asserts).toEqual([{ element: { text: 'Enter the recipient’s name' }, timeout: 1_000 }]);
+    expect(row('screenError error').call.args.asserts).toEqual([{ element: { text: 'Payment wasn’t sent' }, timeout: 1_000 }]);
+  });
+
+  it.each<[string, string, readonly Case[]]>([
+    ['an error read as text passes', 'name error', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
+    ['a screen-level message read as text passes', 'screenError error', [[PASS, [], 'ok'], [FAIL, [], /^failed/]]],
+    [
+      'under the keyboard, reached after back: Tapped after one back, one tap inside it',
+      'vs tap',
+      [
+        ['Tapped id:"lab.f.vs" (the soft keyboard covered …; hidden before tapping)', [BACK, KEY(1528)], 'ok'],
+        ['Tapped id:"lab.f.vs"', [KEY(1528)], /^Tapped without a back before the tap/],
+        ['Tapped id:"lab.f.vs"', [KEY(1528), BACK], /^Tapped without a back before the tap/],
+        ['Tapped id:"lab.f.vs"', [BACK, KEY(1300)], /^Tapped at \(540,1300\), not once inside its frame/],
+        ['Tapped id:"lab.f.vs"', [BACK, KEY(1528), KEY(1530)], /not once inside its frame/],
+        ['Tapped id:"lab.f.vs"', [BACK], /^Tapped without a back before the tap|not once inside/],
+        ['ERROR … nothing was tapped', [], /^not tapped/],
+      ],
+    ],
+    ['the colour under the keyboard fails: a pass measured the keyboard', 'vs colour', [[FAIL, [], 'ok'], [PASS, [], /^passed on #FFFFFF, the keyboard's/]]],
+    [
+      'under the keyboard, NOT reached after back (the bar dropped over it; live only): not tapped, nothing sent',
+      'note tap',
+      [
+        ['ERROR … nothing was tapped', [], 'ok'],
+        ['Tapped id:"lab.f.note"', [BACK, KEY(2074)], /^Tapped/],
+        ['ERROR …', [BACK, KEY(2074)], /^refused, but sent/],
+      ],
+    ],
+    [
+      'covered, its piece reached: refused, or Tapped inside the piece',
+      'phone tap',
+      [
+        ['ERROR … nothing was tapped', [], 'ok'],
+        ['Tapped id:"lab.f.phone"', [KEY(1391)], 'ok'],
+        ['Tapped id:"lab.f.phone"', [KEY(1346)], /^Tapped outside its piece at \(540,1346\)/],
+        ['Tapped id:"lab.f.phone"', [KEY(1391), KEY(1346)], /^Tapped outside its piece at \(540,1346\)/],
+        ['Tapped id:"lab.f.phone"', [], /^Tapped with no tap sent/],
+        ['ERROR …', [KEY(1391)], /^refused, but sent/],
+      ],
+    ],
+  ])('%s', (_name, key, cases) => check(row(key).judge, cases));
+
+  it('note\'s row says what the tap after back fired, and is the live golden\'s (the layout after back is not in a replayed tree)', () => {
+    expect(row('note tap').says).toMatch(/after one back a tap at its centre fires submit invalid/);
+    expect(row('note tap').live).toMatch(/live\.ts k5/);
+    expect(row('vs tap').live).toBeUndefined();
+  });
+});
