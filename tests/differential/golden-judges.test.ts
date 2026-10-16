@@ -417,6 +417,7 @@ describe('the Android form rows (phase 2b)', () => {
       'screenError error',
       'vs tap',
       'vs colour',
+      'vs ocr',
       'vs scroll_until',
       'note tap',
       'note scroll_until',

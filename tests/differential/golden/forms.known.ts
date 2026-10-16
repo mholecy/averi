@@ -30,6 +30,9 @@ export const forms: KnownFile = {
     // …and the colour assert asked for the keyboard's colour over it (ControlTruth.seen, in the iOS truth since the
     // phase-3 round-3 recapture) finds no node: vacuous, as the tap.
     ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the assert finds no node` }),
+    // …and so does its ocr half (phase 4, golden-spec/text.ts#ocrFailsClosed: asked only where the host's recognizer
+    // reads — golden.ts#ocrAvailability).
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['ocr'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the ocr assert finds no node` }),
     // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under
     // idb the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers
     // Tapped and sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0
@@ -50,8 +53,8 @@ export const forms: KnownFile = {
   counts: {
     [`${ANDROID}/form-basic.xml`]: 11,
     [`${ANDROID}/form-errors.xml`]: 12,
-    [`${ANDROID}/form-keyboard.xml`]: 21,
-    [`${ANDROID}/form-keyboard-floating.xml`]: 18,
+    [`${ANDROID}/form-keyboard.xml`]: 25,
+    [`${ANDROID}/form-keyboard-floating.xml`]: 22,
     [`${ANDROID}/form-picker.xml`]: 9,
     [`${ANDROID}/form-prefilled.xml`]: 11,
     [`${ANDROID}/form-shared-id.xml`]: 5,
@@ -59,8 +62,8 @@ export const forms: KnownFile = {
     [`${IOS}/form-basic.wda.json`]: 11,
     [`${IOS}/form-errors.idb.json`]: 12,
     [`${IOS}/form-errors.wda.json`]: 12,
-    [`${IOS}/form-keyboard.idb.json`]: 21,
-    [`${IOS}/form-keyboard.wda.json`]: 21,
+    [`${IOS}/form-keyboard.idb.json`]: 25,
+    [`${IOS}/form-keyboard.wda.json`]: 25,
     [`${IOS}/form-picker.idb.json`]: 9,
     [`${IOS}/form-picker.wda.json`]: 9,
     [`${IOS}/form-prefilled.idb.json`]: 11,

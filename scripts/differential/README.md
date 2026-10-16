@@ -101,7 +101,7 @@ control that the tap reached the app at all — and how much of the target the s
 fake device serves that screenshot instead of the grey frame (and refuses a profile whose frame is not its size);
 `golden-spec.ts` says what each verb must answer for each kind of truth (tapped or refused and the remedy, colour pass
 or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. It is a façade over one
-file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars, false-covers), the judges
+file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars, false-covers, text), the judges
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
@@ -162,6 +162,25 @@ over the title in the tree) in place of the form's under-keyboard tap row; the f
 capture's source for it (the keyboardDismiss list is inert under idb). A replayed tree shows the dismissal sent, not the
 keyboard going and the field then tapped (live golden, phase 5).
 
+OCR on the real pixels (phase 4): an `ocr` row is judged by the host's own recognizer reading the captured screenshot.
+golden.ts#ocrAvailability decides once per process with the harness's own minimal recognizer
+(scripts/differential/ocr-probe.ts, never the src under test): the `ocr` rows are skipped only when the host is not
+macOS, has no `swiftc`, or Vision answers `nilError` (inside a sandbox); any other failure asks them, so a side whose
+recognizer does not compile or reads wrong is red, not skipped. When asked, the fake device passes `swiftc` and the
+recognizer binary averi caches under `<tmpdir>/averi-ocr-bin/` through to the host (fake-device.ts#useRecognizer), so
+each side compiles and runs its own on the screenshot the fake serves. A skipped row is a check marked `skipped` (its
+reply says why, never a mismatch, the report counts them); golden.test.ts holds a skipped row's KNOWN entry where it
+is and shows `the ocr rows are asked` as a skipped test; calibrate reads a skipped named row as NOT-ASKED. Run golden
+and calibrate outside the sandbox to judge them; `GOLDEN_OCR=require` makes a skip an error (golden, golden.test.ts).
+`golden-spec/text.ts` holds the rows, asked of any text target (CatalogTarget.text) by its string: the tree's `text`
+and `ocr` pass on an open one (`ocr` exactly, or equal under the recognizer's fold, src/verify/ocr-fold.ts); under the
+status band, the chrome or Android's three-button bar `ocr` fails closed — a PASS or a reading measured what lies over
+it (its "not found" right only where the capture's tree of that source lists no node carrying the string:
+TargetTruth.textListed); across the gesture navigation band (the app's) a PASS or failing closed, never a FAIL on a
+reading. The text family
+(`text-sample`, `text-under-bar`, `text-nav-cut`) carries P5's sample strings; the under-keyboard form row gains its
+OCR half beside its colour row (golden-spec/forms.ts).
+
 What a replayed tree cannot judge — a fill, a clear, typing into the focused field, a dismissal — the live golden runs
 on the lab simulator through averi's MCP tools, the app's model as the oracle (not a vitest test; it needs the
 simulator; HID typing hides the soft keyboard, which `lab-device.ts` restores per launch through the simulator's own
@@ -186,7 +205,7 @@ must be up for the lab simulator on its domain socket (`idb_companion --udid <ud
 /tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
-false-covers — scripts/truth/schema.ts#FAMILIES); both apps bundle `fixtures/apps/cells.json`, which
+false-covers, text — scripts/truth/schema.ts#FAMILIES); both apps bundle `fixtures/apps/cells.json`, which
 `node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1 when it is stale;
 tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app routes it to its
 family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged into the averi.yaml
@@ -375,7 +394,7 @@ tool call can express:
 | section | at the tool level | how, and what not |
 |---|---|---|
 | TAP | **covered** for addressable nodes | `tap` per target, screen / no screen, Android keyboard hidden / docked / floating / API 36, iOS dismissal configs, many-matches texts. Not: nodes no selector addresses (no unique id, text, label, value or role pairing — the unlabelled headers and content containers); the "sent" sentence variant; a synthetic keyboard line over trees without one. The status-bar sentence beneath a presented screen in particular: the real status-band headers of the device trees (`0,0 402x102`, `0,0 402x116`) carry no identifier or label, so no selector addresses them, and it is covered only on the two synthetic header-id trees |
-| PIXEL | **covered** for addressable nodes | `assert` colour (on a painted target) and ocr per target, with and without a screen, at real scale and on another screen for the first three. Not: the turned device; OCR content (the fake recognizer reads no text) |
+| PIXEL | **covered** for addressable nodes | `assert` colour (on a painted target) and ocr per target, with and without a screen, at real scale and on another screen for the first three. Not: the turned device; OCR content (the fake recognizer reads no text — the golden mode's `ocr` rows read the real pixels with the host's recognizer, above) |
 | ROUNDS | **partly** | `scroll_until` down, up and down `fully` on the recorded static tree with real strokes. Not: plays with a synthetic corroborated or vetoed keyboard cover, `found` pairs, the band and two-way-screen variants — reducer inputs a static recorded tree cannot produce |
 | GUARD | **partly** | `tap` under the iOS dismissal configs on trees with an in-tree keyboard; Android's oracle hidden, docked, floating, API 36 (no IME entry), back hides. Not: the synthetic WDA band on keyboard-less iOS trees; a witness that answers unknown |
 | PICK | **partly** | the dismissal tap inside `tap` under `[tap: first unique text]` — one candidate per tree, not every non-interactive node |

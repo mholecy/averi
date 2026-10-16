@@ -2,6 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
+import { ocrFailsClosed } from './text.js';
 import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
@@ -77,6 +78,7 @@ export type FormExpectation = Expectation & { target: string };
  * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.afterBack.reached) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") |
  * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: afterBack.probe says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (afterBack.piece, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
  * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
+ * | the same | ocr, asked for the field's own copy (its value, else its title) | fails closed: a reading measured the keyboard (the note's `ocr CONTINUE` read the keyboard's `?123`; golden-spec/text.ts#ocrFailsClosed; skipped where the host has no recognizer) |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
  * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.atPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
@@ -273,6 +275,9 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           call: { tool: 'assert', args: { platform, asserts: [{ element: { id: c.id }, color: { expected }, timeout: BUDGET_MS }] } },
           judge: (o) => (passed(o) ? `passed on ${expected}, the keyboard's: ${first(o)}` : undefined),
         });
+        // Its OCR half (phase 4): the recognizer on the real pixels reads the keyboard there.
+        const field = truth.form?.fields.find((f) => f.tag === c.tag);
+        rows.push({ target, ...ocrFailsClosed(platform, { id: c.id }, field === undefined ? c.tag : field.value !== '' ? field.value : field.title, 'the soft keyboard over it') });
       }
       return [
         ...rows,

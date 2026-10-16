@@ -10,6 +10,8 @@ import { expectations, formExpectations, replyKind, sent, type ReplyKind, type V
 import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
+import { hostExec, useRecognizer } from './fake-device.js';
+import { ocrDecision, ocrSkip, probeRecognizer } from './ocr-probe.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -43,6 +45,11 @@ export interface GoldenCheck {
   calls: string[];
   /** What says the HARNESS failed, not the tool (`faultsOf`): absent when none. */
   faults?: string[];
+  /**
+   * Why the row was not asked: an `ocr` row on a host whose recognizer cannot read (ocrAvailability) — no verdict either
+   * way, never a mismatch; its reply says so. Absent on every row asked.
+   */
+  skipped?: string;
 }
 
 /**
@@ -66,6 +73,38 @@ export const checkOf = (recording: string, target: string, verb: Verb, says: str
   const faults = faultsOf(outcome);
   return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
 };
+
+/** The image the probe reads (any committed screenshot: only whether Vision runs at all is asked of it). */
+const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-iphone17-ios27/form-basic.png', import.meta.url));
+
+/**
+ * Whether the `ocr` rows can be judged here, once per process: undefined to ask them — the fake device then runs the
+ * host's recognizer for every side (useRecognizer('vision')) — else why not. Decided by the harness's own probe
+ * (ocr-probe.ts#ocrSkip, never the src under test): skipped only when the host is not macOS, has no `swiftc`, or Vision
+ * answers `nilError` (a sandbox); any other failure asks the rows, so a side whose recognizer does not compile or reads
+ * wrong is red, not skipped. `GOLDEN_OCR=require` makes a skip an error: the ratchet then cannot pass without them.
+ */
+let ocrProbe: Promise<string | undefined> | undefined;
+export function ocrAvailability(): Promise<string | undefined> {
+  ocrProbe ??= probeRecognizer(hostExec, OCR_PROBE_PNG).then((o) => {
+    const d = ocrDecision(ocrSkip(o), process.env);
+    if (d.ask) useRecognizer('vision');
+    return d.ask ? undefined : d.skip;
+  });
+  return ocrProbe;
+}
+
+/** An `ocr` row not asked (ocrAvailability): no call made, no mismatch, the reason in its reply. */
+export const skippedCheck = (recording: string, target: string, verb: Verb, says: string, why: string): GoldenCheck => ({
+  recording,
+  target,
+  verb,
+  says,
+  reply: `SKIPPED — no OCR on this host: ${why}`,
+  kind: 'other',
+  calls: [],
+  skipped: why,
+});
 
 export interface GoldenResult {
   recording: string;
@@ -111,6 +150,11 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       // A live-only row (its truth a dynamic: golden-spec/judges.ts#Expectation.live) is the live golden's, never asked
       // here.
       for (const e of expectations(recording.platform, t, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
+        const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
+        if (why !== undefined) {
+          result.checks.push(skippedCheck(recording.id, t.tag, e.verb, e.says, why));
+          continue;
+        }
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));
       }
@@ -124,6 +168,11 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     if (brokenControls.length === 0) {
       // A live-only form row (Expectation.live) is the live golden's, never asked here — as a target's.
       for (const e of formExpectations(recording.platform, truth, recording.source).filter((x) => x.live === undefined)) {
+        const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
+        if (why !== undefined) {
+          result.checks.push(skippedCheck(recording.id, e.target, e.verb, e.says, why));
+          continue;
+        }
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome));
       }
@@ -139,15 +188,16 @@ export function goldenReport(results: readonly GoldenResult[]): string {
   const checks = results.flatMap((r) => r.checks);
   const bad = checks.filter((c) => c.mismatch !== undefined);
   const faulted = checks.filter((c) => c.faults !== undefined);
+  const skipped = checks.filter((c) => c.skipped !== undefined);
   const lines = [
-    `# Golden: ${checks.length} checks, ${bad.length} mismatches, ${results.reduce((a, r) => a + r.broken.length, 0)} broken targets${faulted.length > 0 ? `, ${faulted.length} with a harness fault` : ''}`,
+    `# Golden: ${checks.length} checks, ${bad.length} mismatches, ${results.reduce((a, r) => a + r.broken.length, 0)} broken targets${faulted.length > 0 ? `, ${faulted.length} with a harness fault` : ''}${skipped.length > 0 ? `, ${skipped.length} skipped (no OCR on this host: ${skipped[0].skipped})` : ''}`,
     '',
   ];
   for (const r of results) {
     lines.push(`## ${r.recording}`);
     for (const b of r.broken) lines.push(`- BROKEN ${b}`);
     for (const c of r.checks) {
-      lines.push(c.mismatch === undefined ? `- ok ${c.target} ${c.verb}: ${c.says}` : `- MISMATCH ${c.target} ${c.verb}: expected ${c.says} — ${c.mismatch}`);
+      lines.push(c.skipped !== undefined ? `- skipped ${c.target} ${c.verb}: ${c.says}` : c.mismatch === undefined ? `- ok ${c.target} ${c.verb}: ${c.says}` : `- MISMATCH ${c.target} ${c.verb}: expected ${c.says} — ${c.mismatch}`);
       for (const f of c.faults ?? []) lines.push(`  - FAULT ${f}`);
     }
     lines.push('');

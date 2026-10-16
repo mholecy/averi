@@ -46,9 +46,10 @@ export interface CatalogTarget {
  * cells of different families are written apart. `base` the open control; `presented` a layer presented over the
  * targets (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the
  * screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar
- * that is no cover. In this order in the generated catalog (scripts/truth/catalog.ts).
+ * that is no cover; `text` text targets carrying P5's sample strings, open and under the bands and chrome (phase 4: the
+ * tree's text and OCR on the real pixels). In this order in the generated catalog (scripts/truth/catalog.ts).
  */
-export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers'] as const;
+export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text'] as const;
 export type Family = (typeof FAMILIES)[number];
 
 export interface CatalogCell {
@@ -313,6 +314,13 @@ export interface TargetTruth {
    * geometry only (absent before B2's review too): a target without it is held to be listed.
    */
   listed?: Partial<Record<SourceKind, boolean>>;
+  /**
+   * A text target (`text`): whether each raw tree the capture read lists a node carrying its string
+   * (truth.ts#textListedIn) — uiautomator dumps no node the user cannot see, so a string wholly under the chrome may be
+   * missing though its box is listed. golden-spec/text.ts accepts a covered `ocr` row's "not found" only where it is
+   * false. Absent on captures before phase 4's review (backfilled from their committed trees).
+   */
+  textListed?: Partial<Record<SourceKind, boolean>>;
   /**
    * A second probe, at the piece's centre (probePoint(piece)), when it is not the frame's: fired the target's action.
    * Absent when not probed — the piece's centre is the frame's, or there is no piece.

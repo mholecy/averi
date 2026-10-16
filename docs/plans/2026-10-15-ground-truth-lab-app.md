@@ -347,6 +347,23 @@ if any") is recorded in the truth file here; until then the cell's `layer`, the 
 (`dismissed`, another target's `tap`) stand for it (ADR 0020, residuals). The RN modal cases only if the existing RN
 trees do not cover them.
 
+Text and OCR done 2026-10-16 (`truth/r4-ocr`, round 4): the `text` family (fixtures/apps/cells/text.json; AveriLab/
+Text.swift, Text.kt) — `text-sample` (P5's sample: Slovak and Czech diacritics, ’ “ ” ‘ – — …, amounts with NBSP and
+narrow-NBSP thousands separators and U+2212, an IBAN), `text-under-bar` (a string in the status band, one open, one
+under a pinned Continue), `text-nav-cut` (Android, a string drawn across the gesture band's top) — captured on both
+platforms. golden-spec/text.ts asks any text target, by its string, the tree's `text` and the `ocr` assert; the
+under-keyboard form row gains its OCR half. OCR is judged by the host's own recognizer on the captured screenshot
+(golden.ts#ocrAvailability, fake-device.ts#useRecognizer): each side compiles and runs its own; where Vision cannot
+read (not macOS, or inside a sandbox: `nilError`) the `ocr` rows are skipped and said so, counted, never red, and
+calibrate reads them NOT-ASKED. Golden with the recognizer 879 → 1087 checks, 257 → 285 mismatches, 0 broken. Lab
+notes OC1 (both platforms: Ľ read L', ĺ read í — no fold reaches them) and OC2 (iOS: an NBSP thousands separator read
+as nothing). Calibrated: #3's and #22's OCR halves, #23's band on a text across it (T colour; its cut-glyph OCR half
+still needs a node the tree cuts at the band — Compose dumps none: calibration.json), and the typographic-apostrophe
+note (TX1, 35321b4) on own-parts' N and text-sample's E and A. Typing the sample (F2A2, Android `type_text` non-ASCII;
+`2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md`) stays the live golden's: a replayed tree shows no typing —
+text-sample's strings are its inputs, not static rows. #36 (OCR in a presented sheet under WDA) needs a text target on
+a sheet's layer.
+
 ### Phase 5 — live golden
 
 averi's verbs run on the simulator against the lab app, the app's tap log and scroll offset as the oracle: covers

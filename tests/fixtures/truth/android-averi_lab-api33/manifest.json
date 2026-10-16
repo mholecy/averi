@@ -256,6 +256,39 @@
       },
       "screenshot": "own-parts.png",
       "truth": "own-parts.truth.json"
+    },
+    {
+      "file": "text-sample.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "text-sample.png",
+      "truth": "text-sample.truth.json"
+    },
+    {
+      "file": "text-under-bar.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "text-under-bar.png",
+      "truth": "text-under-bar.truth.json"
+    },
+    {
+      "file": "text-nav-cut.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "text-nav-cut.png",
+      "truth": "text-nav-cut.truth.json"
     }
   ]
 }

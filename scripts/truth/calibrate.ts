@@ -26,7 +26,8 @@ import { FAMILIES } from './schema.js';
  *   STILL-RED-AFTER       a row still red after with the defect
  *   OPEN-RED              an open note (no fix): every row red with the defect in the working tree
  *   OPEN-NOT-REPRODUCED   an open note with a row green, or red without the defect, in the working tree
- *   NOT-ASKED             a named row the run did not ask (a wrong key, or a cell that went broken)
+ *   NOT-ASKED             a named row the run did not ask (a wrong key, or a cell that went broken), or skipped (an
+ *                         `ocr` row on a host with no working recognizer: golden.ts#ocrAvailability)
  *   SIDE-DOES-NOT-LOAD    golden could not run over that commit's src, or its run fails the canary (`sideRunOf`: a
  *                         harness or JavaScript error in a reply, a device command the fake does not model, or the
  *                         `open` cell not green) — the reason is reported
@@ -246,7 +247,11 @@ export function verdictOf(e: CalibrationEntry, before: SideRun, after?: SideRun)
   if ('error' in before || (after !== undefined && 'error' in after)) return 'SIDE-DOES-NOT-LOAD';
   const defect = e.defect === undefined ? undefined : new RegExp(e.defect);
   const red = (c: GoldenCheck) => c.mismatch !== undefined && (defect === undefined || defect.test(c.mismatch) || defect.test(c.reply));
-  const at = (run: { checks: Map<string, GoldenCheck> }, k: string) => run.checks.get(k);
+  // A skipped row (golden.ts#ocrAvailability) was not asked: no verdict either way.
+  const at = (run: { checks: Map<string, GoldenCheck> }, k: string) => {
+    const c = run.checks.get(k);
+    return c?.skipped === undefined ? c : undefined;
+  };
   if (rows.some((k) => at(before, k) === undefined || (after !== undefined && at(after, k) === undefined))) return 'NOT-ASKED';
   if (e.status === 'open') return rows.every((k) => red(at(before, k)!)) ? 'OPEN-RED' : 'OPEN-NOT-REPRODUCED';
   if (after === undefined) throw new Error(`calibrate: note ${e.n} has no after side`);

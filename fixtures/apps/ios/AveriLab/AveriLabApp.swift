@@ -3,7 +3,7 @@ import SwiftUI
 // The iOS lab app (docs/plans/2026-10-15-ground-truth-lab-app.md): one cell of fixtures/apps/cells.json per launch,
 // chosen by the launch argument `-cell <id>` or the deep link `averilab://cell/<id>`. No login, no network, no data.
 // One file per cell family (fixtures/apps/cells/<family>.json): Base.swift, Presented.swift, Forms.swift, Edges.swift,
-// Bars.swift, FalseCovers.swift; CellRouter below sends a cell to its family's screen.
+// Bars.swift, FalseCovers.swift, Text.swift; CellRouter below sends a cell to its family's screen.
 
 @main
 struct AveriLabApp: App {
@@ -61,6 +61,7 @@ enum CellRouter {
         case "edges": EdgesScreen(cell: cell)
         case "bars": BarsScreen(cell: cell)
         case "false-covers": FalseCoversScreen(cell: cell)
+        case "text": TextScreen(cell: cell)
         // The coloured-target host (Base.swift); a presented cell's host and layer (Presented.swift).
         case "base": CellScreen(cell: cell)
         case "presented": PresentedScreen(cell: cell)

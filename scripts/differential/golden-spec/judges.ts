@@ -11,9 +11,10 @@ import { bandsOf, pointText, within } from '../../truth/truth.js';
 /**
  * `fully` is scroll_until with `fully: true` (rows.ts#fullyRow): a verb of its own, so that a target asked both stops
  * (a sliver, an overlapped row: the plain stop and the `fully` one) keys two rows (`<file> <tag> scroll_until`,
- * `<file> <tag> fully`), not one.
+ * `<file> <tag> fully`), not one. `ocr` is the `ocr` assert, judged against the real pixels (phase 4: the host's
+ * recognizer reading the captured screenshot) — skipped, and said so, where the host has none (golden.ts#ocrAvailability).
  */
-export type Verb = 'tap' | 'colour' | 'scroll_until' | 'fully' | 'error' | 'text';
+export type Verb = 'tap' | 'colour' | 'scroll_until' | 'fully' | 'error' | 'text' | 'ocr';
 
 export interface Expectation {
   verb: Verb;
