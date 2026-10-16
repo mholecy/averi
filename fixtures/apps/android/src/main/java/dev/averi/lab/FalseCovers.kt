@@ -5,8 +5,8 @@ package dev.averi.lab
 // The false-covers family (fixtures/apps/cells/false-covers.json): what lies over a target in a tree yet is no cover.
 // Android builds `own-parts` — text targets (CatalogTarget.text) drawn on their own control: `L` a Material button's
 // own label (a Compose button lists its text before an unlabelled clickable of its size: calibration.json #8), `N` a
-// text field's own label with the empty field over it (#18's shape on iOS). A tap on either text fires its control,
-// logged as the target's `tap`. The toolbar cells are form cells: phase 2b on Android (the capture skips them).
+// text field's own label drawn over the empty field, as a placeholder is (on iOS the field lies over the label: #18).
+// A tap on either text fires its control, logged as the target's `tap`. The toolbar cells are form cells: phase 2b on Android (the capture skips them).
 
 import android.graphics.Rect
 import androidx.compose.foundation.background
@@ -93,7 +93,6 @@ private fun OwnPart(cell: Cell, t: Target, lab: Lab, modifier: Modifier) {
     } else {
         var value by remember { mutableStateOf("") }
         Box(box.background(Color(t.color)).testTag("$id.box"), contentAlignment = Alignment.CenterStart) {
-            Text(t.text ?: "", fontSize = 15.sp, modifier = Modifier.padding(start = 18.dp).height(22.dp).testTag(id).reportFrame(t.tag, lab))
             BasicTextField(
                 value = value,
                 onValueChange = { value = it },
@@ -105,6 +104,10 @@ private fun OwnPart(cell: Cell, t: Target, lab: Lab, modifier: Modifier) {
                     .testTag("$id.field")
                     .onFocusChanged { if (it.isFocused) lab.event("tap", t.tag) },
             )
+            // After the field: a label the field lies under is not listed by uiautomator at all (measured: the
+            // field's 48 dp touch target hides it), so the label is drawn over the empty field, as a placeholder is —
+            // it takes no touch, a tap on it focuses the field.
+            Text(t.text ?: "", fontSize = 15.sp, modifier = Modifier.padding(start = 18.dp).height(22.dp).testTag(id).reportFrame(t.tag, lab))
         }
     }
 }

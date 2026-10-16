@@ -5,39 +5,33 @@ import UIKit
 //
 // - `own-parts`: text targets (CatalogTarget.text) drawn on their own control — `L` a button's own label (Android's
 //   Compose button lists its text before an unlabelled button of its size: calibration.json #8), `N` a text field's
-//   own floating label, the empty field laid over it, its rect a point inside the label's (the field's own scroll
-//   indicator under WDA: #18). A tap on either text fires its control: logged as the target's `tap`.
+//   own label, an empty UIKit field 14 pt tall laid over it and after it in the accessibility order, the label's text
+//   reaching past the field at the top and the bottom (#18's text-field half: the field over its own label). A tap
+//   on either text fires its control: logged as the target's `tap`.
 // - `toolbar-dismiss` (layer `toolbar-screen`) and `toolbar-dismiss-bar` (`toolbar-bar`): a form (Forms.swift's
-//   FormScreen, its principal title the cell's `keyboardDismiss` taps) with a UIKit toolbar laid over the screen after
-//   it — screen-sized (#7: SwiftUI's full-screen `Toolbar` host) or over the navigation bar (#19: an itemless bar).
-//   The toolbar draws nothing and takes no touch: a tap on the title still ends the editing (FormTruth.title).
+//   FormScreen, its principal title the cell's `keyboardDismiss` taps). The principal item makes SwiftUI lay its own
+//   full-screen `Toolbar` host (one empty child) after the content in WDA's tree — #7's shape, on both cells;
+//   `toolbar-bar` adds an itemless UIKit toolbar over the navigation bar (#19). Neither draws anything or takes a
+//   touch: a tap on the title still ends the editing (FormTruth.title).
 
 struct FalseCoversScreen: View {
     let cell: Cell
 
     var body: some View {
         if let form = cell.form {
-            FormScreen(cell: cell, form: form).overlay(alignment: .top) { ShadowToolbar(layer: cell.layer) }
+            FormScreen(cell: cell, form: form).overlay(alignment: .top) { if cell.layer == "toolbar-bar" { ShadowToolbar() } }
         } else {
             OwnPartsScreen(cell: cell)
         }
     }
 }
 
-/// A UIToolbar with no items, clear and passing every touch through, laid after the form in the accessibility order
-/// — what WDA lists as a `Toolbar` over the title. `toolbar-screen`: the whole screen; `toolbar-bar`: the navigation
-/// bar's band (the status band's bottom, 54 pt).
+/// `toolbar-bar`'s UIToolbar: no items, clear and passing every touch through, laid after the form in the
+/// accessibility order at the navigation bar's top — WDA lists it as a 402×48 `Toolbar` with one empty child over the
+/// title (measured 0,65 402x48 on the iPhone 17, the title at 138,73 126x22).
 struct ShadowToolbar: View {
-    let layer: String
-
     var body: some View {
-        GeometryReader { geo in
-            let top = geo.safeAreaInsets.top
-            ToolbarHost()
-                .frame(width: geo.size.width, height: layer == "toolbar-screen" ? geo.size.height + top + geo.safeAreaInsets.bottom : 54)
-                .offset(y: layer == "toolbar-screen" ? -top : 0)
-        }
-        .allowsHitTesting(false)
+        ToolbarHost().frame(height: 54).allowsHitTesting(false)
     }
 }
 
@@ -89,8 +83,6 @@ struct OwnPart: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
     let target: Target
-    @State private var value = ""
-    @FocusState private var focused: Bool
 
     private var id: String { "lab.\(cell.id).\(target.tag)" }
 
@@ -116,23 +108,49 @@ struct OwnPart: View {
                     Rectangle().fill(Color(hex: target.color))
                     Text(target.text ?? "")
                         .font(.system(size: 15))
-                        .frame(height: 22)
                         .padding(.leading, 18)
                         .allowsHitTesting(false)
                         .accessibilityIdentifier(id)
+                        .accessibilitySortPriority(1)
                         .reportFrame(target.tag, to: lab)
-                    TextField("", text: $value)
-                        .frame(height: 20)
+                    // A UIKit text field, 14 pt tall: the label's text (18 pt) reaches past it at the top and the
+                    // bottom, and the field comes after the label in the accessibility order.
+                    LabTextField(id: "\(id).field") { lab.event("tap", target.tag) }
+                        .frame(height: 14)
                         .padding(.horizontal, 18)
-                        .focused($focused)
-                        .accessibilityIdentifier("\(id).field")
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("\(id).box")
-                .onChange(of: focused) { if focused { lab.event("tap", target.tag) } }
             }
         }
         .frame(width: Slot.size.width, height: Slot.size.height)
         .reportFrame("\(target.tag).box", to: lab)
+    }
+}
+
+/// An empty UITextField that logs when it takes the focus.
+struct LabTextField: UIViewRepresentable {
+    let id: String
+    let focused: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(focused: focused) }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.accessibilityIdentifier = id
+        field.autocorrectionType = .no
+        field.autocapitalizationType = .none
+        field.delegate = context.coordinator
+        field.setContentHuggingPriority(.defaultLow, for: .vertical)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {}
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        let focused: () -> Void
+        init(focused: @escaping () -> Void) { self.focused = focused }
+        func textFieldDidBeginEditing(_ textField: UITextField) { focused() }
     }
 }
