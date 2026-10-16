@@ -71,7 +71,7 @@ const control = (tag: string, situation: ControlTruth['situation'], y: number): 
   reached: situation === 'open',
   probe: [{ kind: 'touch', tag: `201.0,${y + 17}.0` }],
 });
-const TITLE = { id: 'lab.toolbar-dismiss.title', frame: rect(140, 73, 122, 22), reached: true, probe: [{ kind: 'touch', tag: '201.0,84.0' }] };
+const TITLE = { id: 'lab.toolbar-dismiss.title', frame: rect(140, 73, 122, 22), reached: true, probe: [{ kind: 'touch' as const, tag: '201.0,84.0' }] };
 const dismissCell = (over: { title?: typeof TITLE; dismiss?: unknown[] } = {}): CellTruth => ({
   cell: 'toolbar-dismiss',
   layer: 'toolbar-screen',

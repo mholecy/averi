@@ -209,6 +209,13 @@ How to add a cell (B2–B5):
    with its class, reply kind, calls, note and `as: bug:<note>` or `residual:<decision>`; then the note's rows in
    `scripts/truth/calibration.json` and a calibrate run.
 
+**B5 (false covers) — done on truth/b5-false-covers.** `own-parts` (both platforms: a button's own text, a text field
+over its own label), `toolbar-dismiss` (SwiftUI's own full-screen `Toolbar` host from a principal title) and
+`toolbar-dismiss-bar` (plus an itemless bar-sized UIToolbar over the title), iOS form cells with
+`config.ios.keyboardDismiss`, R-dismiss asked under WDA only; `form-shared-id` in `forms` (FE2). #7 (first fix), #8,
+#18 (wider, still partial: no lab text field lists a scroll indicator), #19 and FE2 calibrated
+(docs/truth/calibration.md).
+
 **B4 (bars) — an open assumption to measure first.** What a raw tap in Android's navigation band does is not measured:
 under gesture navigation it reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's
 context). Until B4 measures it in both modes, the capture never taps a centre there (`truth.ts#unprobedReason`, the
