@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -98,7 +98,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
-      const { drawn, seen } = measure(png, frame, s.scale, t.color);
+      // A text target is drawn on its control: how much of the control's box shows its colour (the text on it).
+      const box = t.text === undefined ? frame : s.frames[`${t.tag}.box`];
+      if (box === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for text target ${t.tag}'s box (${t.tag}.box)`);
+      const { drawn, seen } = measure(png, box, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
       // The centre is never tapped where it lies off the screen, nor in Android's navigation band
       // (truth.ts#unprobedReason, the rule consistency holds the target to).
@@ -109,6 +112,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       const target: TargetTruth = {
         tag: t.tag,
         id: `lab.${cell.id}.${t.tag}`,
+        ...(t.text !== undefined && { text: t.text }),
         color: t.color,
         declared: t.declared,
         frame,
@@ -165,17 +169,18 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     if (st === undefined) throw new Error(`cell ${cell.id}: the app reported no state for field ${f.tag}`);
     return {
       tag: f.tag,
-      id: `lab.${cell.id}.${f.tag}`,
+      id: f.fieldId ?? `lab.${cell.id}.${f.tag}`,
       kind: f.kind,
       title: f.title,
       titleId: f.titleId ?? `lab.${cell.id}.${f.tag}.title`,
       frame: frameOf(f.tag),
       ...st,
       ...(st.error !== null && { errorFrame: frameOf(`${f.tag}.error`) }),
+      ...(s.frames[`${f.tag}.title`] !== undefined && { titleFrame: s.frames[`${f.tag}.title`] }),
     };
   });
   const wanted: { tag: string; id: string; kind: ControlTruth['kind']; inSheet: boolean; frame: string }[] = [
-    ...form.fields.map((f) => ({ tag: f.tag, id: `lab.${cell.id}.${f.tag}`, kind: 'field' as const, inSheet: false, frame: f.tag })),
+    ...form.fields.map((f) => ({ tag: f.tag, id: f.fieldId ?? `lab.${cell.id}.${f.tag}`, kind: 'field' as const, inSheet: false, frame: f.tag })),
     { tag: form.submit.tag, id: `lab.${cell.id}.${form.submit.tag}`, kind: 'button', inSheet: false, frame: form.submit.tag },
     ...(form.picker?.open === true ? form.picker.probe ?? [] : []).map((code) => ({
       tag: `${form.picker!.field}.${code}`,
@@ -201,6 +206,14 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
     log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${described(c.probe)}`);
   }
+  // The principal title a keyboard dismissal taps (CatalogForm.titleId): probed — a tap on it must end the editing.
+  let title: FormTruth['title'];
+  if (form.titleId !== undefined && s.frames.title !== undefined) {
+    const { events } = await probe(lab, cell.id, s.frames.title);
+    title = { id: form.titleId, frame: s.frames.title, ...readDismissalProbe(events) };
+    if (!title.reached) broken.push(`${cell.id}/title: a raw tap on the title did not end the editing — no dismissal to judge`);
+    log(`${cell.id}/title: reached ${title.reached}${described(title.probe)}`);
+  }
   const screenError = form.screenError !== undefined && s.frames.screenError !== undefined ? { ...form.screenError, frame: s.frames.screenError } : null;
   return {
     fields,
@@ -209,5 +222,6 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     screenError,
     submits: (s.submits ?? []).map((x) => ({ valid: x.valid })),
     ...(form.picker?.open === true && s.frames.sheet !== undefined && { sheet: s.frames.sheet }),
+    ...(title !== undefined && { title }),
   };
 }

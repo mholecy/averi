@@ -88,6 +88,15 @@ export function readControlProbe(
 }
 
 /**
+ * A keyboard dismissal's probe (FormTruth.title): reached when the tap ended the editing — a `focus` event with no
+ * field — and delivered (its touch logged); the probe is everything else it made the app log.
+ */
+export function readDismissalProbe(events: readonly ProbeEvent[]): { reached: boolean; probe: ProbeEvent[] } {
+  const hit = (e: ProbeEvent) => e.kind === 'focus' && e.tag === '';
+  return { reached: events.some(hit) && events.some((e) => e.kind === 'touch'), probe: events.filter((e) => !hit(e)) };
+}
+
+/**
  * The controls a probe fired that are NOT the one tapped: a submit, a chosen row, a layer's button, another target's
  * tap. A focus change and a dismissal are not a control firing (the first follows any tap off a field, the second is
  * the presented-over class), and a touch is the positive control.
