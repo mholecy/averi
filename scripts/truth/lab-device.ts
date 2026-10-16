@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import type { CatalogCell, ImeCapture, ImeReadings, LabState, NavigationMode } from './schema.js';
+import type { CatalogCell, ImeCapture, ImeWitness, LabState, NavigationMode } from './schema.js';
 
 /**
  * The lab app on one device, driven with the raw tools only (simctl, idb, WDA's own `/source`; adb) — what the truth
@@ -51,8 +51,9 @@ export interface LabDevice {
    */
   navigation?(): Promise<NavigationMode | undefined>;
   /**
-   * Android, with the IME up: what averi's keyboard queries answer now, then after one `back` hid it
-   * (schema.ts#ImeCapture). Leaves the keyboard hidden. Absent on iOS (its keyboard is in the tree).
+   * Android, with the IME up: what averi's keyboard queries answer now, then after one `back` hid it — all but the
+   * IME-down `dumpsys window displays`, which `displays` reads (schema.ts#ImeCapture). Leaves the keyboard hidden.
+   * Absent on iOS (its keyboard is in the tree).
    */
   ime?(): Promise<ImeCapture>;
   /**
@@ -314,14 +315,13 @@ export class AndroidLab implements LabDevice {
 
   async ime(): Promise<ImeCapture> {
     await this.guard();
-    const read = async (): Promise<ImeReadings> => ({
-      displays: (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout,
+    const witness = async (): Promise<ImeWitness> => ({
       inputShown: (await this.adb('shell', IME_INPUT_SHOWN).catch(() => ({ stdout: '' }))).stdout,
       touchable: (await this.adb('shell', IME_TOUCHABLE)).stdout,
     });
-    const shown = await read();
+    const shown = { displays: (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout, ...(await witness()) };
     await this.hideKeyboard();
-    return { shown, hidden: await read() };
+    return { shown, hidden: await witness() };
   }
 
   async displays(): Promise<string> {

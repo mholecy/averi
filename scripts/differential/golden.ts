@@ -80,20 +80,22 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   const screenshot = await readFile(recording.screenshot);
   const png = PNG.sync.read(screenshot);
   const result: GoldenResult = { recording: recording.id, checks: [], broken: [] };
-  // Android captured with the IME up: the device's own keyboard answers, the keyboard shown at each call's start.
-  const ime = truth.ime === undefined ? undefined : (JSON.parse(await readFile(join(dirname(recording.truth), truth.ime), 'utf8')) as ImeCapture);
-  // …and the screen after one back hid it, for the replayed tree's source (CellTruth.afterBack).
-  const backTree = truth.afterBack?.trees[recording.source];
-  const afterBackXml = backTree === undefined || recording.source !== 'uiautomator' ? undefined : await readFile(join(dirname(recording.truth), backTree), 'utf8');
-  // Android captured with the IME down: the device's own system bands (CellTruth.displays: the navigation mode's own bar).
-  const windowDisplays = truth.displays === undefined || recording.platform !== 'android' ? undefined : await readFile(join(dirname(recording.truth), truth.displays), 'utf8');
+  // Android (uiautomator) only — what the device itself answered beside its tree, each file beside the truth: the IME's
+  // answers when captured with it up (the fake then starts each call with the keyboard shown), the dump of the screen
+  // after one back hid it (CellTruth.afterBack), and its system bands with the IME down (CellTruth.displays: the
+  // navigation mode's own bar).
+  const beside = (file: string | undefined) => (file === undefined || recording.source !== 'uiautomator' ? undefined : readFile(join(dirname(recording.truth!), file), 'utf8'));
+  const imeJson = await beside(truth.ime);
+  const ime = imeJson === undefined ? undefined : (JSON.parse(imeJson) as ImeCapture);
+  const afterBackXml = await beside(truth.afterBack?.trees.uiautomator);
+  const windowDisplays = await beside(truth.displays);
   const profile = {
     platform: recording.platform,
     screen: recording.screen ?? truth.screen,
     frame: { width: png.width, height: png.height },
     screenshot,
     ...(recording.app !== undefined && { app: recording.app }),
-    ...(ime !== undefined && { ime, keyboard: 'shown' as const }),
+    ...(ime !== undefined && { ime }),
     ...(afterBackXml !== undefined && { afterBackXml }),
     ...(windowDisplays !== undefined && { windowDisplays }),
   };

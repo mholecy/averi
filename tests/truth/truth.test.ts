@@ -489,8 +489,11 @@ class FakeAndroidFormLab extends FakeIosFormLab {
   async ime() {
     this.imeReads++;
     this.hidden = true;
-    const r = (shown: boolean) => ({ displays: `displays ${shown}`, inputShown: `mInputShown=${shown}`, touchable: `touchable ${shown}` });
-    return { shown: r(true), hidden: r(false) };
+    const r = (shown: boolean) => ({ inputShown: `mInputShown=${shown}`, touchable: `touchable ${shown}` });
+    return { shown: { displays: 'displays true', ...r(true) }, hidden: r(false) };
+  }
+  async displays() {
+    return `displays ${!this.hidden}`;
   }
   async hideKeyboard() {
     this.hidden = true;
@@ -510,7 +513,10 @@ describe('capture of a form cell (Android)', () => {
     // The screen after ime()'s back, beside the truth: each tree and the state.
     expect(truth.afterBack).toEqual({ state: 'form-k.after-back.state.json', trees: { wda: 'form-k.after-back.wda.json', idb: 'form-k.after-back.idb.json' } });
     expect(JSON.parse(await readFile(join(out, 'form-k.after-back.state.json'), 'utf8')).cell).toBe('form-k');
-    expect(JSON.parse(await readFile(join(out, 'form-k.ime.json'), 'utf8')).hidden.inputShown).toBe('mInputShown=false');
+    expect(JSON.parse(await readFile(join(out, 'form-k.ime.json'), 'utf8')).hidden).toEqual({ inputShown: 'mInputShown=false', touchable: 'touchable false' });
+    // The dump with the IME down is CellTruth.displays, read after ime()'s back — not a second copy in the ime file.
+    expect(truth.displays).toBe('form-k.displays.txt');
+    expect(await readFile(join(out, 'form-k.displays.txt'), 'utf8')).toBe('displays false');
     const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
     expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', afterBack: { reached: true, probe: [ev('touch', '201.0,621.0')] } });
     expect(truth.form!.controls.filter((c) => c.afterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);

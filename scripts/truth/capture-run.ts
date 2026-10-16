@@ -152,9 +152,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       await writeFile(join(opts.out, `${cell.id}.after-back.state.json`), JSON.stringify(afterBack, null, 2) + '\n');
       truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
     }
-    // Android with the IME down: the device's own system bands (CellTruth.displays) — the navigation bar's top depends
-    // on the navigation mode, which the fake device's stock dump (gesture navigation) does not follow.
-    if (s.keyboard?.visible !== true && lab.displays !== undefined) {
+    // Android: the device's own system bands with the IME down (CellTruth.displays; a cell captured with it up has been
+    // hidden by ime()'s back by now) — the navigation bar's top depends on the navigation mode, which the fake device's
+    // stock dump (gesture navigation) does not follow.
+    if (lab.displays !== undefined) {
       await writeFile(join(opts.out, `${cell.id}.displays.txt`), await lab.displays());
       truth.displays = `${cell.id}.displays.txt`;
     }

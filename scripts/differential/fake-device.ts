@@ -39,9 +39,10 @@ import type { ImeCapture } from '../truth/schema.js';
  *    measurements), `screencap -p` the frame, every `input` accepted — and
  *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
  *    running (`pidof`), no log. A ground-truth capture with the IME up serves
- *    the device's own three keyboard answers instead (DeviceProfile.ime), one
- *    with the IME down its own `dumpsys window displays` (DeviceProfile.
- *    windowDisplays: its system bands, the navigation mode's own).
+ *    the device's own keyboard answers instead (DeviceProfile.ime), and a
+ *    capture's own `dumpsys window displays` with the IME down is served
+ *    while the keyboard is hidden (DeviceProfile.windowDisplays: its system
+ *    bands, the navigation mode's own).
  *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
  *    caller asks — what a colour assert on that rect must sample; or, for
  *    a ground-truth capture (golden.ts), the screenshot the device showed.
@@ -62,7 +63,7 @@ export interface DeviceProfile {
   idbPayload?: string;
   /** Android raw: what `uiautomator dump /dev/tty` prints (the status line is appended). */
   dumpXml?: string;
-  /** Android: the soft keyboard at the start of each call. */
+  /** Android: the soft keyboard at the start of each call — `shown` by default with `ime`, else `hidden`. */
   keyboard?: KeyboardState;
   /** Android: whose `dumpsys window displays` — the API 33 Pixel_3a (default) or the API 36 device with no IME source. */
   displays?: 'api33' | 'api36';
@@ -72,8 +73,9 @@ export interface DeviceProfile {
   screenshot?: Buffer;
   /**
    * Android, a ground-truth capture with the IME up (scripts/truth/schema.ts#ImeCapture): the device's own answers to
-   * the three keyboard queries, served in place of the stock dumps — `shown` while the keyboard is (set `keyboard:
-   * 'shown'`), `hidden` once a `back` hid it.
+   * the keyboard queries, served in place of the stock dumps — `shown` while the keyboard is (the profile's keyboard
+   * unless it says otherwise), `hidden`'s witness once a `back` hid it; `dumpsys window displays` then is
+   * windowDisplays (CellTruth.displays), else the stock dump.
    */
   ime?: ImeCapture;
   /**
@@ -84,8 +86,8 @@ export interface DeviceProfile {
    */
   afterBackXml?: string;
   /**
-   * Android, a ground-truth capture with the IME down (scripts/truth/schema.ts#CellTruth.displays): the device's own
-   * `dumpsys window displays`, answered in place of the stock dump while the keyboard is hidden — its system bands
+   * Android, a ground-truth capture (scripts/truth/schema.ts#CellTruth.displays): the device's own `dumpsys window
+   * displays` with the IME down, answered in place of the stock dump while the keyboard is hidden — its system bands
    * (a three-button capture's navigation bar from 2088, not the stock gesture band from 2154).
    */
   windowDisplays?: string;
@@ -111,7 +113,7 @@ let current: DeviceState | undefined;
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
   if (profile.screenshot !== undefined) servedScreenshot(profile.frame, profile.screenshot);
-  current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [], ...(profile.dumpXml !== undefined && { dumpXml: profile.dumpXml }) };
+  current = { profile, keyboard: profile.keyboard ?? (profile.ime !== undefined ? 'shown' : 'hidden'), calls: [], ...(profile.dumpXml !== undefined && { dumpXml: profile.dumpXml }) };
 }
 
 /** Paint `paint.rect` of every frame until the next reset (one call). */
@@ -207,8 +209,7 @@ const TOUCHABLE: Record<KeyboardState, string> = {
 const captured = (profile: DeviceProfile, keyboard: KeyboardState) => profile.ime?.[keyboard === 'hidden' ? 'hidden' : 'shown'];
 
 function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
-  const ime = captured(profile, keyboard);
-  if (ime !== undefined) return ime.displays;
+  if (profile.ime !== undefined && keyboard !== 'hidden') return profile.ime.shown.displays;
   if (profile.windowDisplays !== undefined && keyboard === 'hidden') return profile.windowDisplays;
   if (profile.displays === 'api36') return API36;
   return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;

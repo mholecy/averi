@@ -16,6 +16,7 @@
       "uiautomator": "form-keyboard.after-back.xml"
     }
   },
+  "displays": "form-keyboard.displays.txt",
   "form": {
     "fields": [
       {

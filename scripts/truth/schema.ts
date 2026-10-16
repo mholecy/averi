@@ -348,16 +348,18 @@ export interface CellTruth {
   navigation?: NavigationMode;
   /**
    * Android, a cell captured with the IME up (LabState.keyboard visible): the file beside the truth holding what the
-   * device answered to averi's own keyboard queries (ImeCapture) — the golden mode's fake device serves it in place of
-   * its stock dumps (scripts/differential/fake-device.ts#DeviceProfile.ime). Absent elsewhere.
+   * device answered to averi's own keyboard queries beyond `displays` (ImeCapture: the IME-up `dumpsys window displays`
+   * and both states' input-method witnesses) — the golden mode's fake device serves it in place of its stock dumps
+   * (scripts/differential/fake-device.ts#DeviceProfile.ime). Absent elsewhere.
    */
   ime?: string;
   /**
-   * Android, a cell captured with the IME down: the file beside the truth holding the device's own `dumpsys window
-   * displays` — the system bands averi reads (the navigation bar's top differs by navigation mode: [0,2154] under
-   * gestures, [0,2088] under three buttons on the lab AVD) — served by the golden mode's fake device in place of its
-   * stock gesture-mode dump (fake-device.ts#DeviceProfile.windowDisplays). A cell captured with the IME up has its
-   * dumps in `ime`. Absent on iOS and on captures before round 3.
+   * Android: the file beside the truth holding the device's own `dumpsys window displays` with the IME down — as
+   * captured, or, for a cell captured with the IME up, after one `back` hid it — the system bands averi reads (the
+   * navigation bar's top differs by navigation mode: [0,2154] under gestures, [0,2088] under three buttons on the lab
+   * AVD), served by the golden mode's fake device in place of its stock gesture-mode dump while the keyboard is hidden
+   * (fake-device.ts#DeviceProfile.windowDisplays). The one source of that dump: `ime` holds only the IME-up one. Absent
+   * on iOS and on captures before round 3 (served the stock dump).
    */
   displays?: string;
   /**
@@ -372,20 +374,26 @@ export interface CellTruth {
  * What an Android device answered to the three keyboard queries averi makes (src/adapters/android.ts: keyboardState's
  * `dumpsys window displays`, keyboardWitness's INPUT_SHOWN_COMMAND, keyboardTouchable's TOUCHABLE_COMMAND), raw, with
  * the IME up as captured (`shown`) and after one `input keyevent 4` hid it (`hidden`) — what a `back` the tools press
- * leaves.
+ * leaves. The IME-down `dumpsys window displays` is not here: it is CellTruth.displays, the one dump with the IME down
+ * whatever the capture.
  */
 export interface ImeCapture {
   shown: ImeReadings;
-  hidden: ImeReadings;
+  hidden: ImeWitness;
 }
 
-export interface ImeReadings {
-  /** `dumpsys window displays`. */
-  displays: string;
+/** The input method's own answers: whether it is shown, and its touchable region. */
+export interface ImeWitness {
   /** `dumpsys input_method | grep -m1 -w mInputShown`. */
   inputShown: string;
   /** `dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true`. */
   touchable: string;
+}
+
+/** The IME up: its witness and `dumpsys window displays` (the IME's inset in it). */
+export interface ImeReadings extends ImeWitness {
+  /** `dumpsys window displays`. */
+  displays: string;
 }
 
 /** Android's `navigation_mode`: 0 `three-button`, 1 `two-button`, 2 `gesture`. */

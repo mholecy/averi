@@ -68,4 +68,19 @@ describe('the fake device serving a capture\'s own dumpsys window displays (Cell
     useDevice({ platform: 'android', screen: { width: 1080, height: 2220 }, frame: { width: 1080, height: 2220 }, windowDisplays: OWN, keyboard: 'shown' });
     expect(await dump('dumpsys window displays')).not.toBe(OWN);
   });
+
+  it('an IME-up capture: the keyboard shown by default, its own IME-up dump, then — once back hid it — the one IME-down dump (CellTruth.displays) and the hidden witness', async () => {
+    const UP = '  InsetsSource type=ITYPE_IME frame=[0,1398][1080,2220] visible=true\n';
+    const ime = { shown: { displays: UP, inputShown: 'mInputShown=true\n', touchable: 'touchable up\n' }, hidden: { inputShown: 'mInputShown=false\n', touchable: 'touchable down\n' } };
+    useDevice({ platform: 'android', screen: { width: 1080, height: 2220 }, frame: { width: 1080, height: 2220 }, ime, windowDisplays: OWN });
+    expect(await dump('dumpsys window displays')).toBe(UP);
+    expect(await dump('dumpsys input_method | grep -m1 -w mInputShown')).toBe('mInputShown=true\n');
+    await dump('input keyevent 4');
+    expect(await dump('dumpsys window displays')).toBe(OWN);
+    expect(await dump('dumpsys input_method | grep -m1 -w mInputShown')).toBe('mInputShown=false\n');
+    // Without its own dump, the stock IME-down one.
+    useDevice({ platform: 'android', screen: { width: 1080, height: 2220 }, frame: { width: 1080, height: 2220 }, ime });
+    await dump('input keyevent 4');
+    expect(await dump('dumpsys window displays')).toMatch(/ITYPE_NAVIGATION_BAR frame=\[0,2154\]\[1080,2220\]/);
+  });
 });

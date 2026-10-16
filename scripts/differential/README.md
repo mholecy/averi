@@ -214,15 +214,17 @@ node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests
 
 The Android app builds the coloured-target cells and, since phase 2b, the form cells (Forms.kt: the IME drawn over the
 form, only the pinned submit's bar riding on it); another layer is skipped and said so. A cell captured with the IME up
-also writes `<cell>.ime.json` — what averi's three keyboard queries answered, shown and after one `back`
-(schema.ts#ImeCapture) — which golden's fake device serves in place of its stock Pixel_3a dumps (CellTruth.ime).
+also writes `<cell>.ime.json` — what averi's keyboard queries answered, shown and after one `back`, all but the
+IME-down `dumpsys window displays` (schema.ts#ImeCapture) — which golden's fake device serves in place of its stock
+Pixel_3a dumps (CellTruth.ime), starting each call with the keyboard shown.
 It also writes the screen after that `back` — `<cell>.after-back.xml` and `<cell>.after-back.state.json`
 (CellTruth.afterBack) — whose dump the fake device answers once a call sends `input keyevent 4`, so a tap the guard
 moves through `back` is replayed against the layout the app takes then.
 
-An Android cell captured with the IME down has the device's own `dumpsys window displays` written beside its truth
-(`<cell>.displays.txt`, CellTruth.displays), which the fake device answers in place of its stock gesture-navigation
-Pixel_3a dump while the keyboard is hidden (DeviceProfile.windowDisplays) — the system bands averi reads come from the
+An Android capture writes the device's own `dumpsys window displays` with the IME down beside its truth
+(`<cell>.displays.txt`, CellTruth.displays — for a cell captured with the IME up, read after that `back`: the one
+source of that dump), which the fake device answers in place of its stock gesture-navigation Pixel_3a dump while the
+keyboard is hidden (DeviceProfile.windowDisplays) — the system bands averi reads come from the
 capture, so `bands-three-button` (captured under three buttons) is replayed against its own bar `[0,2088][1080,2220]`,
 not the gesture band `[0,2154][1080,2220]`. A capture without the file (every Android cell captured before it) is
 served the stock dump, which is the gesture-mode lab AVD's own.
