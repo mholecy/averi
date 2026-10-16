@@ -123,7 +123,10 @@ export interface CalibrationEntry {
    * `before`/`after`/`checks`/`defect` are its first pair; a note without `pairs` has that one (pairsOf).
    */
   pairs?: CalibrationPair[];
-  /** The note's live calibration (phase 5): its live cases at a before and an after commit, on the lab device. */
+  /**
+   * The note's live calibration (phase 5): its live cases at a before and an after commit, on the lab device — each
+   * with the pair it calibrates (LiveCalibration.pair: the note's own unless it says so; pairsOf attaches it there).
+   */
   live?: LiveCalibration[];
 }
 
@@ -149,6 +152,11 @@ export interface CalibrationPair {
  */
 export interface LiveCalibration {
   platform: 'ios' | 'android';
+  /**
+   * The before/after pair it calibrates, numbered as pairsOf numbers them: 1 the note's own (the default), 2 … the
+   * further `pairs` in order. A number naming no pair of the note is an error (pairsOf), never another pair's.
+   */
+  pair?: number;
   /** The tree sources the cases ran under. */
   sources: string[];
   before: string;
@@ -209,16 +217,22 @@ export function sideRunOf(json: GoldenJson): SideRun {
  * note with that pair's sides, rows, symptom and expectation, numbered `<n>.<i>` from 2 (the note's own pair `<n>.1`
  * then). A pair keeps the note's `regressions` (each names the commit it broke at, so it counts only at the pair whose
  * after that is) and not its `needs`, `partial` or `remark`, which are the first pair's. A `live` calibration goes
- * with the further pair whose after it shares (#7's second fix live, 7542021 → c3ebc62, beside 7.2's d928789 →
- * c3ebc62), every other with the note's own pair.
+ * with the pair it names (LiveCalibration.pair, the note's own by default: #7's second fix live, `pair: 2`, beside
+ * 7.2's d928789 → c3ebc62); one naming a pair the note does not have is an error.
  */
 export function pairsOf(e: CalibrationEntry): CalibrationEntry[] {
   const { pairs, live, ...own } = e;
+  const count = 1 + (pairs?.length ?? 0);
+  for (const l of live ?? []) {
+    const p = l.pair ?? 1;
+    if (!Number.isInteger(p) || p < 1 || p > count) throw new Error(`calibration.json #${e.n}: a live calibration (${l.before} → ${l.after}) names pair ${p}; the note has ${count === 1 ? 'one pair' : `pairs 1–${count}`}`);
+  }
   if (pairs === undefined || pairs.length === 0) return [live === undefined ? own : { ...own, live }];
-  const liveOf = (i: number) => (live ?? []).filter((l) => pairs.findIndex((p) => p.after === l.after) === i);
+  /** The live calibrations of pair `i` (0 the note's own, 1 … its `pairs`). */
+  const liveOf = (i: number) => (live ?? []).filter((l) => (l.pair ?? 1) - 1 === i);
   const withLive = (entry: CalibrationEntry, ls: LiveCalibration[]): CalibrationEntry => (ls.length === 0 ? entry : { ...entry, live: ls });
   return [
-    withLive({ ...own, n: `${e.n}.1` }, liveOf(-1)),
+    withLive({ ...own, n: `${e.n}.1` }, liveOf(0)),
     ...pairs.map((p, i): CalibrationEntry =>
       withLive(
         {
@@ -230,7 +244,7 @@ export function pairsOf(e: CalibrationEntry): CalibrationEntry[] {
           ...(e.regressions !== undefined && { regressions: e.regressions }),
           ...p,
         },
-        liveOf(i),
+        liveOf(i + 1),
       ),
     ),
   ];

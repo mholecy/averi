@@ -285,13 +285,18 @@ describe('calibrate.ts — several fixes, one pair each (pairsOf)', () => {
     expect(plan(pairsOf(note))).toEqual(['aaaaaaa', 'bbbbbbb', 'ccccccc', 'ddddddd']);
   });
 
-  it("a live calibration goes with the further pair whose after it shares, every other with the note's own pair", () => {
-    const live = (before: string, after: string): LiveCalibration => ({ platform: 'ios', sources: ['wda'], before, after, cases: ['dismiss:c'], verdict: 'CALIBRATED', remark: 'r', summary: 's' });
-    const [own, second] = pairsOf({ ...note, live: [live('aaaaaaa', 'bbbbbbb'), live('bbbbbbb', 'ddddddd'), live('aaaaaaa', 'eeeeeee')] });
-    expect(own.live).toEqual([live('aaaaaaa', 'bbbbbbb'), live('aaaaaaa', 'eeeeeee')]);
-    expect(second.live).toEqual([live('bbbbbbb', 'ddddddd')]);
+  it("a live calibration goes with the pair it names (the note's own by default); a pair the note does not have is an error", () => {
+    const live = (before: string, after: string, pair?: number): LiveCalibration => ({ platform: 'ios', sources: ['wda'], ...(pair !== undefined && { pair }), before, after, cases: ['dismiss:c'], verdict: 'CALIBRATED', remark: 'r', summary: 's' });
+    const [own, second] = pairsOf({ ...note, live: [live('aaaaaaa', 'bbbbbbb'), live('ccccccc', 'ddddddd', 2), live('aaaaaaa', 'eeeeeee', 1)] });
+    expect(own.live).toEqual([live('aaaaaaa', 'bbbbbbb'), live('aaaaaaa', 'eeeeeee', 1)]);
+    expect(second.live).toEqual([live('ccccccc', 'ddddddd', 2)]);
     expect('live' in pairsOf(note)[1]).toBe(false);
+    // sharing a further pair's after is no claim on it: unnamed, it is the note's own pair's
+    expect(pairsOf({ ...note, live: [live('bbbbbbb', 'ddddddd')] })[0].live).toEqual([live('bbbbbbb', 'ddddddd')]);
     expect(pairsOf(entry({ live: [live('aaaaaaa', 'bbbbbbb')] }))[0].live).toEqual([live('aaaaaaa', 'bbbbbbb')]);
+    expect(() => pairsOf({ ...note, live: [live('ccccccc', 'ddddddd', 3)] })).toThrow(/#7: a live calibration \(ccccccc → ddddddd\) names pair 3; the note has pairs 1–2/);
+    expect(() => pairsOf(entry({ live: [live('aaaaaaa', 'bbbbbbb', 2)] }))).toThrow(/names pair 2; the note has one pair/);
+    expect(() => pairsOf({ ...note, live: [live('aaaaaaa', 'bbbbbbb', 0)] })).toThrow(/names pair 0/);
   });
 
   it("each pair judged alone: the second fix's own symptom required red at its before, a regression counted at the pair that broke it", () => {

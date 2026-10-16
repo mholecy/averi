@@ -266,8 +266,9 @@
         },
         {
           "platform": "ios",
+          "pair": 2,
           "sources": ["wda"],
-          "before": "7542021",
+          "before": "d928789",
           "after": "c3ebc62",
           "cases": [
             "dismiss:toolbar-dismiss-short.vs",
@@ -276,7 +277,7 @@
             "dismiss:toolbar-dismiss-short.note"
           ],
           "verdict": "CALIBRATED-ON-DEFECT",
-          "remark": "The second fix, on toolbar-dismiss-short: before, refused with the keyboard up (the focus on postcode); after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal (\"outside its scroll view … scroll_until it first\") — ok.",
+          "remark": "The second fix alone, on toolbar-dismiss-short, at the static pair 7.2's sides (d928789, c3ebc62's first parent → c3ebc62): before, refused with the keyboard up (the focus on postcode), the reply naming the note's defect (`tap id:\"lab.toolbar-dismiss-short.title\": covered by scrollable`) — as at 7542021, whose run this replaced (review round 4, P2: 7542021 → c3ebc62 spanned 11 first-parent commits); toolbar-dismiss's three ok at d928789, as at 7542021; after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal (\"outside its scroll view … scroll_until it first\") — ok.",
           "summary": "docs/truth/live-calibration-2026-10-16.md"
         }
       ]
@@ -339,7 +340,7 @@
       "before": "d043e65",
       "after": "9c7885e",
       "verified": "golden",
-      "partial": "the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)",
+      "partial": "the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is judged by the note's live calibration (recorded: `needs` says what it found)",
       "needs": "Done live, phase 5 (`live`): the probe reveals the cut rows in most runs, but moves the list 21–82 px a stroke, and a deep cut (S, 154 px) was left cut in one run of five at 9c7885e and one of three at debc9b2 when the budget ended the stop, \"fully visible … it may be cut there\" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).",
       "defect": "fully visible",
       "checks": [
