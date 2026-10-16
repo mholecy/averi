@@ -80,6 +80,8 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   // The target contract, decided once (target-contract.ts#contractOf); it asks nothing of a target its truth
   // contradicts (no tap clause: a presented-over one reached, an open whole one not reached or not drawn) —
   // consistency reports it broken.
+  // A measured geometry is judged on its capture's screen: without it (a unit test of one row) no geometry row is asked.
+  if (cell === undefined && t.declared !== 'presented-over' && t.geometry !== undefined && t.geometry !== 'whole') return [];
   const c = contractOf(platform, t, cell);
   if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap);
   const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));

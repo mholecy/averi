@@ -32,23 +32,23 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
   switch (c.geometry) {
     case 'off-screen':
       return [
-        tapRow(platform, t, c.tap, 'R-off', { absent }),
+        tapRow(platform, t, c, 'R-off', { absent }),
         colourFails(platform, t, 'R-off: nothing of it is on the screen', { absent }),
         strokeRow(platform, t, cell, 'R-off', c.stop, { absent }),
         directionRow(platform, t, cell),
       ].map(classed);
     case 'outside-scroll-view':
       return [
-        tapRow(platform, t, c.tap, 'R-outside-sv', { absent }),
+        tapRow(platform, t, c, 'R-outside-sv', { absent }),
         colourFails(platform, t, 'R-outside-sv: fails closed, never measuring the background', { expected: t.seen, absent }),
         strokeRow(platform, t, cell, 'R-outside-sv', c.stop, { absent }),
         directionRow(platform, t, cell),
       ].map(classed);
     case 'sliver':
-      return [tapRow(platform, t, c.tap, 'R-sliver'), stopRow(platform, t, cell, 'R-sliver', c.stop), ...fully].map(classed);
+      return [tapRow(platform, t, c, 'R-sliver'), stopRow(platform, t, cell, 'R-sliver', c.stop), ...fully].map(classed);
     case 'partly-centre-in':
     case 'centre-out':
-      return [tapRow(platform, t, c.tap, 'R-land'), ...fully].map(classed);
+      return [tapRow(platform, t, c, 'R-land'), ...fully].map(classed);
     default:
       return [];
   }

@@ -6,7 +6,7 @@ import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, type Expectation } from '../../scripts/differential/golden-spec.js';
 import { liveGeometry, visibilityCases, type VisibilityCase } from '../../scripts/truth/live-visibility.js';
 import type { CellTruth, LabState, TargetTruth } from '../../scripts/truth/schema.js';
-import { fullyAsked, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
+import { contractOf, fullyAsked, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
 import { geometryOf, probePoint } from '../../scripts/truth/truth.js';
 import { probeDelivered } from '../../scripts/differential/golden-spec/base.js';
 
@@ -36,8 +36,9 @@ describe('the contract\'s rules', () => {
     expect(judgedGeometry('android', target({ frame: { x: 0, y: 2160, width: 825, height: 50 }, geometry: 'nav-band' }), ANDROID)).toBe('nav-band');
     expect(judgedContext('ios', IOS, undefined).safeArea).toEqual({ top: 62, left: 0, bottom: 0, right: 0 });
     expect(judgedContext('android', ANDROID, undefined).safeArea).toEqual(ANDROID.safeArea);
-    // Without the capture's screen: as measured.
-    expect(judgedGeometry('ios', t, undefined)).toBe('band-overlap:nav');
+    // Without the capture's screen a measured geometry is not judged: an error, never the measured one silently.
+    expect(() => contractOf('ios', t, undefined)).toThrow(/judged on its capture's screen/);
+    expect(contractOf('ios', target({ geometry: 'whole' }), undefined).geometry).toBe('whole');
   });
   it('over the committed truth the judged geometry is the measured one but for iOS\'s home-indicator band: bands\' N and Q', () => {
     const differ = captures()

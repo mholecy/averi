@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { judgedContext, type StopAsk, type TapAsk } from '../../truth/target-contract.js';
+import { judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
@@ -66,17 +66,18 @@ export interface RowOptions {
  * The tap row that judges `ask`, the target's tap clause (target-contract.ts#contractOf), routed by the clause:
  * `refuse` naming scroll_until — R-off, R-outside-sv, R-sliver (refusedTap); `land-or-refuse` inside what shows — R-band,
  * a band whose probe fired (bandTap); `fire` inside what shows or `land-or-refuse` inside its piece — R-land (landRow);
- * `refuse` with no remedy — the row's name says which wording judges it (`R-band`: bandTap, else landRow): the same
- * clause, two mismatch texts the KNOWN files pin. The open target's tap (`fire` at its node) is base.ts#openRows', a
- * presented one's (`refuse`, close it first) presented.ts'. `absent` (unlistedBy) as refusedTap takes it.
+ * `refuse` with no remedy — the judged geometry says which wording judges it (a system band: bandTap, else landRow):
+ * the same clause, two mismatch texts the KNOWN files pin. The open target's tap (`fire` at its node) is base.ts#openRows', a
+ * presented one's (`refuse`, close it first) presented.ts'. `c`: the target's contract (its tap clause, its judged geometry); `absent` (unlistedBy) as refusedTap takes it.
  */
-export function tapRow(platform: Platform, t: TargetTruth, ask: TapAsk | undefined, row: string, opts: RowOptions = {}): Expectation {
+export function tapRow(platform: Platform, t: TargetTruth, c: Pick<TargetContract, 'tap' | 'geometry'>, row: string, opts: RowOptions = {}): Expectation {
+  const ask = c.tap;
   if (ask === undefined) throw new Error(`${t.id}: the target contract asks no tap of it (${t.geometry ?? t.declared}) — its rows are not asked`);
   switch (ask.must) {
     case 'refuse':
       if (ask.remedy === 'scroll_until') return refusedTap(platform, t, row, ask, opts);
       if (ask.remedy === 'close it first') throw new Error(`${t.id}: a presented target's tap is presented.ts's`);
-      return row === 'R-band' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+      return c.geometry === 'status-band' || c.geometry === 'nav-band' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
     case 'land-or-refuse':
       return ask.inside === 'visible' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
     case 'fire':

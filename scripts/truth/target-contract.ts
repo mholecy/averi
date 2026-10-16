@@ -84,12 +84,11 @@ export function judgedContext(platform: Platform, s: JudgedScreen, view: string 
  * in it, `band-overlap:nav` from regionOverlap, which tries the status band first and the chrome after): so a measured
  * geometry naming no navigation band is the judged one as measured, and one naming it on iOS is measured again in the
  * judged context. tests/truth/target-contract.test.ts holds this over the committed truth (every target's geometry in
- * the judged context equals this; it differs from the measured one for bands' N and Q on iOS only). Without the
- * capture's screen (`cell` undefined: a unit test of one row), or of a target measured nothing (`geometry` undefined,
- * every capture before phase 3), its measured geometry as recorded.
+ * the judged context equals this; it differs from the measured one for bands' N and Q on iOS only). A target measured
+ * nothing (`geometry` undefined, every capture before phase 3) has none to judge.
  */
-export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen | undefined): Geometry | undefined {
-  if (t.geometry === undefined || cell === undefined) return t.geometry;
+export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen): Geometry | undefined {
+  if (t.geometry === undefined) return undefined;
   const dropsTheNavigationBand = platform === 'ios' && (cell.safeArea?.bottom ?? 0) > 0;
   const namesIt = t.geometry === 'nav-band' || t.geometry === 'band-overlap:nav';
   return dropsTheNavigationBand && namesIt ? geometryOf(t.frame, judgedContext(platform, cell, t.scrollView)) : t.geometry;
@@ -205,6 +204,19 @@ export function fullyAsked(g: Geometry | undefined, scrollView: string | undefin
 // --- the whole contract of a target ---
 
 /**
+ * The geometry contractOf decides by. A presented-over target's is not judged — no clause reads it: the presented layer
+ * comes first whatever else lies there (ADR 0018, golden-spec/presented.ts). An unmeasured or `whole` one needs no
+ * screen: the judged context only drops a band, so a target whole among every band is whole among fewer. Any other
+ * needs its capture's screen (judgedGeometry): without it, an error — the replay asks no geometry row of a capture it
+ * has not got (golden-spec.ts#expectations returns none before asking the contract).
+ */
+function contractGeometry(platform: Platform, t: TargetTruth, cell: JudgedScreen | undefined): Geometry | undefined {
+  if (t.declared === 'presented-over' || t.geometry === undefined || t.geometry === 'whole') return t.geometry;
+  if (cell === undefined) throw new Error(`${t.id}: its measured geometry ${t.geometry} is judged on its capture's screen, and none was given`);
+  return judgedGeometry(platform, t, cell);
+}
+
+/**
  * What a target is asked, decided once — what both goldens read: its judged geometry, its tap clause, the plain stop's
  * clause where its capture lays it out, and `fully`'s where it is asked (undefined: not asked). The replay hands each
  * clause to the row that judges it (the row records the clause that chose it: Expectation.asks); the live golden to its
@@ -218,6 +230,6 @@ export interface TargetContract {
 }
 
 export function contractOf(platform: Platform, t: TargetTruth, cell: JudgedScreen | undefined): TargetContract {
-  const geometry = judgedGeometry(platform, t, cell);
+  const geometry = contractGeometry(platform, t, cell);
   return { geometry, tap: tapAsk(t, geometry), stop: stopAsk(geometry, false), fully: fullyAsked(geometry, t.scrollView) ? stopAsk(geometry, true) : undefined };
 }

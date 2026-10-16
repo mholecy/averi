@@ -39,14 +39,14 @@ export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, c: 
   const { kind, name } = parseGeometry(g);
   const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   if (g === 'status-band' || g === 'nav-band') {
-    return [tapRow(platform, t, c.tap, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop), ...fully].map(classed);
+    return [tapRow(platform, t, c, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop), ...fully].map(classed);
   }
   if (kind === 'under-chrome') {
     const chrome = name;
-    return [tapRow(platform, t, c.tap, 'R-under-chrome'), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`, c.stop)].map(classed);
+    return [tapRow(platform, t, c, 'R-under-chrome'), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`, c.stop)].map(classed);
   }
   if (isOverlap(g)) {
-    return [tapRow(platform, t, c.tap, 'R-overlap'), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`, c.stop), ...fully].map(classed);
+    return [tapRow(platform, t, c, 'R-overlap'), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`, c.stop), ...fully].map(classed);
   }
   return [];
 }
