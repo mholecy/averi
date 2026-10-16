@@ -1,0 +1,263 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 110}, {402, 450}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 110}, {402, 450}}",
+              "isVisible": "1",
+              "type": "ScrollView",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 86}, {402, 1072}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 86}, {402, 1072}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 110}, {402, 96}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{0, 110}, {402, 96}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{0, 110}, {402, 56}}",
+                    "label": "Sticky header",
+                    "rawIdentifier": "lab.scroll-sticky.header",
+                    "traits": "Header, StaticText",
+                    "frame": "{{0, 110}, {402, 56}}",
+                    "isVisible": "1",
+                    "type": "StaticText",
+                    "value": "Sticky header",
+                    "isEnabled": "1",
+                    "isAccessible": "1",
+                    "isNativeAccessibilityElement": "1",
+                    "isFocused": "0",
+                    "name": "lab.scroll-sticky.header",
+                    "rect": {
+                     "y": 110,
+                     "x": 0,
+                     "width": 402,
+                     "height": 56
+                    }
+                   },
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{51, 142}, {300, 64}}",
+                    "label": "Target R",
+                    "rawIdentifier": "lab.scroll-sticky.R",
+                    "traits": "Button",
+                    "frame": "{{51, 142}, {300, 64}}",
+                    "isVisible": "1",
+                    "type": "Button",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "1",
+                    "isNativeAccessibilityElement": "1",
+                    "isFocused": "0",
+                    "name": "lab.scroll-sticky.R",
+                    "rect": {
+                     "y": 142,
+                     "x": 51,
+                     "width": 300,
+                     "height": 64
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 110,
+                   "x": 0,
+                   "width": 402,
+                   "height": 96
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 86,
+                 "x": 0,
+                 "width": 402,
+                 "height": 1072
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 110,
+               "x": 0,
+               "width": 402,
+               "height": 450
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

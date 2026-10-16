@@ -1,0 +1,78 @@
+{
+  "cell": "scroll-top-edge",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.scroll-top-edge.A",
+      "color": "#6D4C41",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": -825,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "unprobed": "its centre (541,-737) lies off the 1080x2220 screen"
+    },
+    {
+      "tag": "T",
+      "id": "lab.scroll-top-edge.T",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": -55,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0.663,
+      "seen": "#3949AB",
+      "geometry": "status-band",
+      "visible": {
+        "x": 128,
+        "y": 0,
+        "width": 825,
+        "height": 121
+      },
+      "piece": {
+        "x": 128,
+        "y": 66,
+        "width": 825,
+        "height": 55
+      },
+      "scrollView": "page",
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "page": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    }
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "cell": "scroll-bounded",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "W",
+      "id": "lab.scroll-bounded.W",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 331,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,419"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#E53935",
+      "geometry": "whole",
+      "visible": {
+        "x": 128,
+        "y": 331,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 128,
+        "y": 331,
+        "width": 825,
+        "height": 176
+      },
+      "scrollView": "upper"
+    },
+    {
+      "tag": "P",
+      "id": "lab.scroll-bounded.P",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,886"
+        }
+      ],
+      "drawn": 0.625,
+      "seen": "#1E88E5",
+      "geometry": "partly-centre-in",
+      "visible": {
+        "x": 128,
+        "y": 798,
+        "width": 825,
+        "height": 110
+      },
+      "piece": {
+        "x": 128,
+        "y": 798,
+        "width": 825,
+        "height": 110
+      },
+      "scrollView": "upper",
+      "reachedAtPiece": true
+    },
+    {
+      "tag": "S",
+      "id": "lab.scroll-bounded.S",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 1519,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,1607"
+        }
+      ],
+      "drawn": 0.125,
+      "seen": "#FFFFFF",
+      "geometry": "sliver",
+      "visible": {
+        "x": 128,
+        "y": 1519,
+        "width": 825,
+        "height": 22
+      },
+      "piece": {
+        "x": 128,
+        "y": 1519,
+        "width": 825,
+        "height": 22
+      },
+      "scrollView": "lower",
+      "reachedAtPiece": true
+    },
+    {
+      "tag": "O",
+      "id": "lab.scroll-bounded.O",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 1706,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,1794"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#FFFFFF",
+      "geometry": "outside-scroll-view",
+      "visible": null,
+      "piece": null,
+      "scrollView": "lower"
+    },
+    {
+      "tag": "F",
+      "id": "lab.scroll-bounded.F",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 3796,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "lower",
+      "unprobed": "its centre (541,3884) lies off the 1080x2220 screen"
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "upper": {
+      "x": 0,
+      "y": 303,
+      "width": 1080,
+      "height": 605
+    },
+    "lower": {
+      "x": 0,
+      "y": 1046,
+      "width": 1080,
+      "height": 495
+    }
+  }
+}
