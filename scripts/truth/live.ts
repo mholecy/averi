@@ -58,8 +58,10 @@ import type { Catalog, CellTruth, LabState } from './schema.js';
  * under the keyboard on the false-covers toolbar cells, under the cell's own `keyboardDismiss` (CellConfig): the
  * control focused, nothing typed. A case not ok prints its whole replies, and every scroll case (and any case not ok)
  * the app's state beneath it. A case not ok that an existing note explains is KNOWN (live-known.ts) and marked so; the
- * exit code is 1 only on a MISMATCH not known. `--record <file>` writes every read (the launch state, the state between
- * the calls, after them) as JSON; `--rejudge <file>` judges such a record again with this checkout's judges, no device.
+ * exit code is 1 on a MISMATCH not known, and — in a run of this checkout, not a `--side` one — on a known case not
+ * `intermittent` that came out ok (fixed: strike it off, as the static ratchet asks). `--record <file>` writes every
+ * read (the launch state, the state between the calls, after them) as JSON; `--rejudge <file>` judges such a record
+ * again with this checkout's judges, no device (tests/truth/live-rejudge.test.ts).
  *
  * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
  * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
@@ -499,7 +501,8 @@ if (rejudging !== undefined) {
   }
 }
 
-// --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH ---
+// --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on
+// a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off) ---
 
 /** The note a not-ok case is known by — only when it failed by the rule its KNOWN entry pins (live-known.ts). */
 const known = (r: Result) => knownLive(platform, r.source, r.c.id, r.verdict.cls);
@@ -508,6 +511,10 @@ const otherRule = (r: Result) => (r.verdict.outcome !== 'ok' && known(r) === und
 const count = (o: LiveVerdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
 const unknown = results.filter((r) => r.verdict.outcome === 'MISMATCH' && known(r) === undefined);
 const cleared = results.filter((r) => r.verdict.outcome === 'ok' && knownEntry(platform, r.source, r.c.id) !== undefined);
+/** live-known.ts is HEAD's: a `--side` run (or a rejudged record of one) is a calibration, never held to it. */
+const ofThisCheckout = (rejudging?.side ?? values.side ?? 'this checkout') === 'this checkout';
+/** Known, ok this run, and not intermittent: fixed without being struck off (live-known.ts's ratchet). */
+const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
 const lines = [
   `<!-- averi: ${rejudging?.side ?? values.side ?? 'this checkout'}${rejudging !== undefined ? ` (rejudged from ${values.rejudge})` : ''} -->`,
   `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,
@@ -520,7 +527,7 @@ for (const source of sources) {
     const entry = knownEntry(platform, r.source, r.c.id);
     const other = otherRule(r);
     const mark =
-      r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known, ok this run: ${entry.note}]`)
+      r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known${entry.intermittent === true ? ' (intermittent)' : ''}, ok this run: ${entry.note}]`)
       : note !== undefined ? ` [known: ${note}]`
       : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'}, where KNOWN pins ${other.cls} (${other.note})]`
       : '';
@@ -531,5 +538,6 @@ for (const source of sources) {
   lines.push('');
 }
 if (cleared.length > 0) lines.push(`Known but ok this run: ${cleared.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
+if (fixed.length > 0) lines.push(`FIXED, not intermittent — strike off live-known.ts: ${fixed.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
 console.log(lines.join('\n'));
-if (unknown.length > 0) process.exitCode = 1;
+if (unknown.length > 0 || fixed.length > 0) process.exitCode = 1;

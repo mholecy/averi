@@ -1148,6 +1148,22 @@
         "ios-iphone17-ios27/text-sample.idb.json I ocr"
       ],
       "remark": "No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows."
+    },
+    {
+      "n": "NI1",
+      "note": "2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "to appear$|not found within|never appeared in the tree",
+      "checks": [
+        "ios-iphone17-ios27/sheet-long-list.idb.json R tap",
+        "ios-iphone17-ios27/sheet-long-list.idb.json R colour",
+        "ios-iphone17-ios27/sheet-long-list.idb.json R scroll_until",
+        "ios-iphone17-ios27/sheet-long-list-short.idb.json R tap",
+        "ios-iphone17-ios27/sheet-long-list-short.idb.json R colour",
+        "ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply says why (review round 4, P4). presented.known.ts owns the ratchet; this entry links the note to its rows. Live: scripts/truth/live-known.ts NO_ID (idb tap:sheet-long-list.R, tap:sheet-long-list-short.R, scroll:sheet-long-list-short.F)."
     }
   ],
   "excluded": [

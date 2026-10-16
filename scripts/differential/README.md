@@ -192,15 +192,18 @@ node --import tsx scripts/truth/live.ts --serial <averi_lab serial> [--cases k1,
 node --import tsx scripts/truth/live.ts --udid <lab udid> --groups visibility,dismissal [--cells scroll-bounded] [--side <checkout>]
 ```
 
-Phase 5 (`--groups`, all of forms, visibility and dismissal by default): the visibility cases are built from each
-coloured-target cell's static truth by `scripts/truth/live-visibility.ts` — taps judged by the app's tap log,
-scroll_until by the target's live geometry and by R-direction over the strokes the app logs (LabState.offsets,
+Phase 5 (`--groups forms,visibility,dismissal`, any of them; `forms` alone by default, so the reproduce lines of the
+earlier summaries stay true): the visibility cases are built from each coloured-target cell's static truth by
+`scripts/truth/live-visibility.ts` — taps judged by the app's tap log, scroll_until by the target's live geometry and by R-direction over the strokes the app logs (LabState.offsets,
 .strokes: both apps report them); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
 own keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
 calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs of
-one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`); the exit code is 1
-only on an unknown MISMATCH. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
-1's), and `--rejudge <file>` judges it again with this checkout's judges, no device. Under iOS, idb's companion
+one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case
+and verdict class — a weaker contract than ADR 0020 §4's, its header says why); the exit code is 1 on an unknown
+MISMATCH and, in a run of this checkout (not `--side`), on a known case not marked `intermittent` that comes out ok —
+fixed, to be struck off. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
+1's), and `--rejudge <file>` judges it again with this checkout's judges, no device
+(tests/truth/live-rejudge.test.ts does so for the two visibility records). Under iOS, idb's companion
 must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
 /tmp/idb/<udid>_companion.sock`).
 
