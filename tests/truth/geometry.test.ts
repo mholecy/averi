@@ -219,11 +219,13 @@ describe('consistency with a measured geometry', () => {
     // Measured, the same frame's geometry says what holds: its centre cut off by the screen's edge, never probed.
     expect(consistency({ ...off, geometry: 'centre-out' }, 'ios', { width: 402, height: 874 })).toBeUndefined();
   });
-  it('the status bar on Android swallows the probe (no touch, not reached); on iOS the touch is the app\'s, reached or not', () => {
+  it('the status bar on Android swallows the probe (no touch, not reached); on iOS it may (the top of its band): no touch, not reached — else the touch is the app\'s, reached or not', () => {
     const band = T({ frame: rect(51, 10, 300, 64), geometry: 'status-band', reached: false, probe: [] });
     expect(consistency(band, 'android')).toBeUndefined();
     expect(consistency({ ...band, reached: true }, 'android')).toMatch(/through the system bar/);
-    expect(consistency(band, 'ios')).toMatch(/left no touch/);
+    expect(consistency(band, 'ios')).toBeUndefined();
+    expect(consistency({ ...band, reached: true }, 'ios')).toMatch(/reached it with no touch logged/);
+    expect(consistency({ ...band, geometry: 'whole' }, 'ios')).toMatch(/left no touch/);
     expect(consistency({ ...band, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
     expect(consistency({ ...band, reached: true, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
   });

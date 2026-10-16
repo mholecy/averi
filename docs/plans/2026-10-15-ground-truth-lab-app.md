@@ -213,8 +213,10 @@ How to add a cell (B2–B5):
 under gesture navigation it reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's
 context). Until B4 measures it in both modes, the capture never taps a centre there (`truth.ts#unprobedReason`, the
 target's `unprobed`), and consistency holds such a target to no probe; only the status bar's swallowed probe is
-measured (calibration.json #21, `systemBarSwallows`). An iOS status-band probe is taken: its touch is the app's, and
-the scroll-to-top it may also fire cannot reach the next probe (each relaunches the cell).
+measured (calibration.json #21, `systemBarSwallows`). An iOS status-band probe is taken: below the status bar's own
+height its touch is the app's, and the scroll-to-top it may also fire cannot reach the next probe (each relaunches the
+cell); in the top of the band (y < ~55 of 62 pt, measured by B3) the bar swallows it — no touch, and not reached
+(`truth.ts#statusBarMaySwallow`).
 
 ### Phase 4 — the matrix, generated
 
