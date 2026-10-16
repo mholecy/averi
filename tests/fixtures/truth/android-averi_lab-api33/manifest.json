@@ -36,6 +36,50 @@
       },
       "screenshot": "alert-dim.png",
       "truth": "alert-dim.truth.json"
+    },
+    {
+      "file": "bands.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "bands.png",
+      "truth": "bands.truth.json"
+    },
+    {
+      "file": "pinned-bar.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "pinned-bar.png",
+      "truth": "pinned-bar.truth.json"
+    },
+    {
+      "file": "tabbar-floating.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "tabbar-floating.png",
+      "truth": "tabbar-floating.truth.json"
+    },
+    {
+      "file": "fab.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "fab.png",
+      "truth": "fab.truth.json"
     }
   ]
 }

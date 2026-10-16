@@ -1,0 +1,139 @@
+{
+  "cell": "fab",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "W",
+      "id": "lab.fab.W",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 496
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,528.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5",
+      "geometry": "whole",
+      "visible": {
+        "x": 51,
+        "y": 496,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 496,
+        "width": 300,
+        "height": 64
+      },
+      "scrollView": "list"
+    },
+    {
+      "tag": "L",
+      "id": "lab.fab.L",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 121,
+        "x": 16,
+        "y": 728
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "77.0,760.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#E53935",
+      "geometry": "whole",
+      "visible": {
+        "x": 16,
+        "y": 728,
+        "width": 121,
+        "height": 64
+      },
+      "piece": {
+        "x": 16,
+        "y": 728,
+        "width": 121,
+        "height": 64
+      },
+      "scrollView": "list"
+    },
+    {
+      "tag": "K",
+      "id": "lab.fab.K",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 121,
+        "x": 265,
+        "y": 728
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "326.0,760.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#FB8C00",
+      "geometry": "whole",
+      "visible": {
+        "x": 265,
+        "y": 728,
+        "width": 121,
+        "height": 64
+      },
+      "piece": {
+        "x": 265,
+        "y": 728,
+        "width": 121,
+        "height": 64
+      },
+      "scrollView": "list"
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "list": {
+      "height": 778,
+      "width": 402,
+      "x": 0,
+      "y": 62
+    }
+  },
+  "chrome": {
+    "fab": {
+      "height": 96,
+      "width": 96,
+      "x": 153,
+      "y": 712
+    }
+  }
+}
