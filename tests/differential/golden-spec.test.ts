@@ -92,6 +92,13 @@ describe('a target beneath a presented layer', () => {
     expect(colour.judge(out('1/1 asserts FAILED\nFAIL  element … — container (57,463 288x48) is drawn over the element … close it first'))).toBeUndefined();
   });
 
+  it('colour: a target measured wholly off the screen is asked for its own colour (nothing there shows another)', () => {
+    const off = row(expectations('ios', target({ geometry: 'off-screen', seen: '#000000', frame: rect(51, 1009, 300, 64) })), 'colour');
+    expect(off.call.args).toMatchObject({ asserts: [{ color: { expected: '#E53935' } }] });
+    expect(off.says).toMatch(/^fails \(nothing of it is on the screen\), asked for its own colour/);
+    expect(row(rows, 'colour').call.args).toMatchObject({ asserts: [{ color: { expected: '#B72E2A' } }] });
+  });
+
   it('colour: a fail with the element in the tree names the presented remedy, not the status bar\'s or the screen edge\'s (ADR 0018)', () => {
     const colour = row(rows, 'colour');
     expect(
