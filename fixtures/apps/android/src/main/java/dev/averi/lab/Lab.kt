@@ -58,6 +58,10 @@ class Lab(context: Context, private val screen: Rect) {
     private var ready = false
     private val frames = linkedMapOf<String, Rect>()
     private val events = mutableListOf<JSONObject>()
+    // Phase 3's geometry (scripts/truth/schema.ts#LabState): absent from the file on a cell that reports none.
+    private var safeArea: Rect? = null
+    private val scrollViews = linkedMapOf<String, Rect>()
+    private val chrome = linkedMapOf<String, Rect>()
 
     /** A fresh state for `id` (`unknown:<id>` / `unsupported:<id>` when this app cannot show it). */
     fun show(id: String, found: Cell?) {
@@ -69,6 +73,9 @@ class Lab(context: Context, private val screen: Rect) {
         ready = false
         frames.clear()
         events.clear()
+        safeArea = null
+        scrollViews.clear()
+        chrome.clear()
         write()
     }
 
@@ -78,6 +85,27 @@ class Lab(context: Context, private val screen: Rect) {
     fun frame(tag: String, r: Rect) {
         if (frames[tag] == r) return
         frames[tag] = Rect(r)
+        write()
+    }
+
+    /** The system bars' insets in pixels (left, top, right, bottom as a Rect's fields) — the state's `safeArea`. */
+    fun safeArea(insets: Rect) {
+        if (safeArea == insets) return
+        safeArea = Rect(insets)
+        write()
+    }
+
+    /** A scroll container's clip on the screen, by the id the catalog's targets name (`scrollView`). */
+    fun scrollView(id: String, r: Rect) {
+        if (scrollViews[id] == r) return
+        scrollViews[id] = Rect(r)
+        write()
+    }
+
+    /** App UI drawn over content (a sticky header, a bar), by name, its frame on the screen. */
+    fun chrome(name: String, r: Rect) {
+        if (chrome[name] == r) return
+        chrome[name] = Rect(r)
         write()
     }
 
@@ -107,6 +135,9 @@ class Lab(context: Context, private val screen: Rect) {
             .put("scale", 1)
             .put("frames", JSONObject().apply { frames.forEach { (k, v) -> put(k, rect(v)) } })
             .put("events", JSONArray(events))
+        safeArea?.let { json.put("safeArea", JSONObject().put("top", it.top).put("left", it.left).put("bottom", it.bottom).put("right", it.right)) }
+        if (scrollViews.isNotEmpty()) json.put("scrollViews", JSONObject().apply { scrollViews.forEach { (k, v) -> put(k, rect(v)) } })
+        if (chrome.isNotEmpty()) json.put("chrome", JSONObject().apply { chrome.forEach { (k, v) -> put(k, rect(v)) } })
         val tmp = File(file.parentFile, "lab-state.json.tmp")
         tmp.writeText(json.toString(2) + "\n")
         tmp.renameTo(file)

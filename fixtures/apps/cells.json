@@ -178,6 +178,35 @@
           "probe": ["AL", "ST"]
         }
       }
+    },
+    {
+      "id": "scroll-bounded",
+      "family": "edges",
+      "layer": "none",
+      "targets": [
+        { "tag": "W", "color": "#E53935", "slot": 0, "declared": "open", "scrollView": "upper" },
+        { "tag": "P", "color": "#1E88E5", "slot": 1, "declared": "open", "scrollView": "upper" },
+        { "tag": "S", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "lower" },
+        { "tag": "O", "color": "#FB8C00", "slot": 3, "declared": "open", "scrollView": "lower" },
+        { "tag": "F", "color": "#8E24AA", "slot": 4, "declared": "open", "scrollView": "lower" }
+      ]
+    },
+    {
+      "id": "scroll-sticky",
+      "family": "edges",
+      "layer": "none",
+      "targets": [
+        { "tag": "R", "color": "#00897B", "slot": 0, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "scroll-top-edge",
+      "family": "edges",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#6D4C41", "slot": 0, "declared": "open", "scrollView": "page" },
+        { "tag": "T", "color": "#3949AB", "slot": 1, "declared": "open", "scrollView": "page" }
+      ]
     }
   ]
 }

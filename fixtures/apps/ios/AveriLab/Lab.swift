@@ -156,6 +156,22 @@ struct LabState: Codable {
     var focus: String?
     var keyboard: KeyboardState?
     var submits: [Submit]?
+    // Phase 3's geometry (scripts/truth/schema.ts#LabState): nil (absent from the file) on a cell that reports none.
+    var safeArea: Insets?
+    var scrollViews: [String: Frame]?
+    var chrome: [String: Frame]?
+}
+
+/// The window's safe-area insets, in points — the system bands (scripts/truth/schema.ts#Insets).
+struct Insets: Codable, Equatable {
+    let top: Double
+    let left: Double
+    let bottom: Double
+    let right: Double
+
+    init(_ e: UIEdgeInsets) {
+        top = e.top; left = e.left; bottom = e.bottom; right = e.right
+    }
 }
 
 @MainActor
@@ -192,6 +208,34 @@ final class Lab: ObservableObject {
         state.focus = nil
         state.keyboard = nil
         state.submits = cell?.form == nil ? nil : []
+        state.safeArea = nil
+        state.scrollViews = nil
+        state.chrome = nil
+        write()
+    }
+
+    // --- phase 3's geometry: what a target's measured geometry is measured against (truth.ts#geometryOf) ---
+
+    func safeArea(_ e: UIEdgeInsets) {
+        let i = Insets(e)
+        guard state.safeArea != i else { return }
+        state.safeArea = i
+        write()
+    }
+
+    /// A scroll view's clip on the screen (global frame), by the id the catalog's targets name (`scrollView`).
+    func scrollView(_ id: String, _ rect: CGRect) {
+        let f = Frame(rect)
+        guard state.scrollViews?[id] != f else { return }
+        state.scrollViews = (state.scrollViews ?? [:]).merging([id: f]) { $1 }
+        write()
+    }
+
+    /// App UI drawn over content (a sticky header, a bar), by name, its global frame.
+    func chrome(_ name: String, _ rect: CGRect) {
+        let f = Frame(rect)
+        guard state.chrome?[name] != f else { return }
+        state.chrome = (state.chrome ?? [:]).merging([name: f]) { $1 }
         write()
     }
 
