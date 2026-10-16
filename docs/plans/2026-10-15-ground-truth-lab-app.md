@@ -157,23 +157,11 @@ identifier (form-errors gives every title its own). The first B0 run called #28 
 and history keeps it); review round 1 corrected it to DOES-NOT-FAIL: at its before commit, 53da035, its rows are
 already refused, red only on #33's defect.
 
-**B3 — presented (2026-10-16, iOS only: every note it calibrates is iOS's; the Android app builds none of its layers).**
-Six cells (fixtures/apps/cells/presented.json): `sheet-medium-edges` (the medium sheet over a scrolled host; targets
-wholly above, wholly under the status bar, a 5-pt sliver, wholly below, and one whole under the dim, the positive
-control), `sheet-background` (a large sheet's bare
-background over the targets — #28's cell; CALIBRATED, no longer DOES-NOT-FAIL), `sheet-long-list` (a UIKit table in a
-large sheet, WDA parking the label of a row below the fold at the sheet's origin, #20), `dim-cover` (an RN-style
-transparent cover, #27), `blur-menu` and `blur-menu-grouped` (a menu over a blurred backdrop no tree lists, #31's
-residual; its rows listed in reading order, or before the screen beneath, #15). #27 and #28 calibrate at 41c394a
-(fix/r20-marks), not at their notes' 15896c5, which fixed the device trees only; the same 41c394a re-breaks #30, #32
-and #34's shape (lab note L3). A presented-over target is asked the presented rows whatever its measured geometry,
-never R-off / R-sliver (golden-spec/presented.ts). Measured on the way: iOS's status bar swallows a raw tap in the top
-of its band (truth.ts#statusBarMaySwallow).
-
-**B1 — the families and the plumbing (no cell, no capture).** So that phase 3's batches (B2 edges, B3 presented, B4
-bars, B5 false covers) are written in parallel worktrees without touching each other's files, every shared file is
-split by cell family — `base` (`open`), `presented` (`sheet-medium`, `alert-dim`), `forms` (the five form cells),
-`edges`, `bars`, `false-covers` (scripts/truth/schema.ts#FAMILIES):
+**B1 — the families and the plumbing (no cell, no capture), committed on truth/phase-3 itself: the base B2–B5 branched
+from and were merged into.** So that phase 3's batches (B2 edges, B3 presented, B4 bars, B5 false covers) are written in
+parallel worktrees without touching each other's files, every shared file is split by cell family — `base` (`open`),
+`presented` (`sheet-medium`, `alert-dim`), `forms` (the five form cells), `edges`, `bars`, `false-covers`
+(scripts/truth/schema.ts#FAMILIES):
 
 | piece | per family | shared, B1's |
 |---|---|---|
@@ -223,21 +211,39 @@ How to add a cell (B2–B5):
    with its class, reply kind, calls, note and `as: bug:<note>` or `residual:<decision>`; then the note's rows in
    `scripts/truth/calibration.json` and a calibrate run.
 
-**B5 (false covers) — done on truth/b5-false-covers.** `own-parts` (both platforms: a button's own text, a text field
-over its own label), `toolbar-dismiss` (SwiftUI's own full-screen `Toolbar` host from a principal title) and
-`toolbar-dismiss-bar` (plus an itemless bar-sized UIToolbar over the title), iOS form cells with
-`config.ios.keyboardDismiss`, R-dismiss asked under WDA only; `form-shared-id` in `forms` (FE2). #7 (first fix), #8,
-#18 (wider, still partial: no lab text field lists a scroll indicator), #19 and FE2 (its assert half; `ui_snapshot`'s
-error column has no golden verb yet) calibrated (docs/truth/calibration.md). On Android `own-parts`' N is a green
-control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView
-[177,1351][443,1412]), so neither #8's shape nor #18's.
+**B2 — edges (2026-10-16), merged into truth/phase-3 (fe65922).** Three cells in both apps (Edges.swift, Edges.kt; the
+apps' `Lab` gained the `chrome` writer, and Android's the `safeArea` and `scrollViews` ones — iOS's are B3's, one of
+each): `scroll-bounded` (two bounded scroll views — a whole row, a row cut with its centre showing, a sliver, a row
+below its scroll view but on the screen, a row laid out below the screen), `scroll-sticky` (a lazy list whose pinned
+section header overlaps its first row, the header reported as chrome) and `scroll-top-edge` (a row resting in the status
+band — on iOS under the bar's own touch area, its probe swallowed: truth.ts#statusBarMaySwallow, measured by B3 and
+B4 below — and a row above the screen). Calibrated: #4 and #29; #9 and #17's static half DOES-NOT-FAIL; #12 and #13
+STILL-RED-AFTER, partial (the lab's Compose does not cut uiautomator's bounds flush with the container, the shape their
+fixes judge); #10 not reproduced (no inverted bounds); lab findings LE1–LE4. What changed in the shared rows:
+`fully: true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops keys two rows; the
+R-outside-sv colour asks for the colour the screen shows there (a pass measured the background); an edge row accepts a
+target missing from the tree only where its capture's tree of that source did not list it (TargetTruth.listed,
+edges.ts#notListed); R-stroke holds every touch-down inside the target's own scroll view where the truth names it;
+R-band's tap is not expected refused where the probe fired the target.
 
-**B4 (bars) — the band probes, measured (2026-10-16).** B1 left what a raw tap in Android's navigation band does
-unmeasured (gesture navigation or three buttons, ADR 0009's context) and never probed a centre there; it assumed iOS's
-status band passes every tap to the app. B4 measured both on the `bands` cell (S centred in the status band, N in the
-navigation band, O and Q 4 dp/pt into them) with the lab app's touch log as the witness — per tap: `am force-stop` and
-`am start … --es cell bands` (iOS: `simctl terminate`, `simctl launch … -cell bands`), the state file's event count,
-the raw tap, 1 s, the events since:
+**B3 — presented (2026-10-16, iOS only: every note it calibrates is iOS's; the Android app builds none of its layers),
+merged into truth/phase-3 (c86aa9e).** Six cells (fixtures/apps/cells/presented.json): `sheet-medium-edges` (the medium
+sheet over a scrolled host; targets wholly above, wholly under the status bar, a 5-pt sliver, wholly below, and one
+whole under the dim, the positive control), `sheet-background` (a large sheet's bare background over the targets — #28's
+cell; CALIBRATED, no longer DOES-NOT-FAIL), `sheet-long-list` (a UIKit table in a large sheet, WDA parking the label of
+a row below the fold at the sheet's origin, #20), `dim-cover` (an RN-style transparent cover, #27), `blur-menu` and
+`blur-menu-grouped` (a menu over a blurred backdrop no tree lists, #31's residual; its rows listed in reading order, or
+before the screen beneath, #15). #27 and #28 calibrate at 41c394a (fix/r20-marks), not at their notes' 15896c5, which
+fixed the device trees only; the same 41c394a re-breaks #30, #32 and #34's shape (lab note L3). A presented-over target
+is asked the presented rows whatever its measured geometry, never R-off / R-sliver (golden-spec/presented.ts). Measured
+on the way: iOS's status bar swallows a raw tap in the top of its band (truth.ts#statusBarMaySwallow).
+
+**B4 — bars (2026-10-16), merged into truth/phase-3 (73ff1f9): the band probes, measured.** B1 left what a raw tap in
+Android's navigation band does unmeasured (gesture navigation or three buttons, ADR 0009's context) and never probed a
+centre there; it assumed iOS's status band passes every tap to the app. B4 measured both on the `bands` cell (S centred
+in the status band, N in the navigation band, O and Q 4 dp/pt into them) with the lab app's touch log as the witness —
+per tap: `am force-stop` and `am start … --es cell bands` (iOS: `simctl terminate`, `simctl launch … -cell bands`), the
+state file's event count, the raw tap, 1 s, the events since:
 
 | device, mode | the band | raw taps (x,y) | the app logged |
 |---|---|---|---|
@@ -262,19 +268,14 @@ assumption did not hold: iOS's status bar swallows a tap in the top of its band 
 constant is 54 pt, borne out by both measurements (a probe from y 54 on with no touch is undelivered). averi refuses
 a tap in a band (ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts).
 
-**B2 (edges) — built 2026-10-16.** Three cells in both apps (Edges.swift, Edges.kt; the apps' `Lab` gained the `chrome`
-writer, and Android's the `safeArea` and `scrollViews` ones — iOS's are B3's, one of each): `scroll-bounded` (two
-bounded scroll views — a whole row, a row cut with its centre showing, a sliver, a row below its scroll view but on the
-screen, a row laid out below the screen), `scroll-sticky` (a lazy list whose pinned section header overlaps its first
-row, the header reported as chrome) and `scroll-top-edge` (a row resting in the status band — on iOS under the bar's own
-touch area, its probe swallowed as above — and a row above the screen). Calibrated: #4 and #29; #9 and #17's static half
-DOES-NOT-FAIL; #12 and #13 STILL-RED-AFTER, partial (the lab's Compose does not cut uiautomator's bounds flush with the
-container, the shape their fixes judge); #10 not reproduced (no inverted bounds); lab findings LE1–LE4. What changed in
-the shared rows: `fully: true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops keys two
-rows; the R-outside-sv colour asks for the colour the screen shows there (a pass measured the background); an edge row
-accepts a target missing from the tree only where its capture's tree of that source did not list it (TargetTruth.listed,
-edges.ts#notListed); R-stroke holds every touch-down inside the target's own scroll view where the truth names it;
-R-band's tap is not expected refused where the probe fired the target.
+**B5 — false covers (2026-10-16), merged into truth/phase-3 (d4281cc).** `own-parts` (both platforms: a button's own
+text, a text field over its own label), `toolbar-dismiss` (SwiftUI's own full-screen `Toolbar` host from a principal
+title) and `toolbar-dismiss-bar` (plus an itemless bar-sized UIToolbar over the title), iOS form cells with
+`config.ios.keyboardDismiss`, R-dismiss asked under WDA only; `form-shared-id` in `forms` (FE2). #7 (first fix), #8, #18
+(wider, still partial: no lab text field lists a scroll indicator), #19 and FE2 (its assert half; `ui_snapshot`'s error
+column has no golden verb yet) calibrated (docs/truth/calibration.md). On Android `own-parts`' N is a green control row,
+no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView
+[177,1351][443,1412]), so neither #8's shape nor #18's.
 
 ### Phase 4 — the matrix, generated
 
