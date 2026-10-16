@@ -6,25 +6,28 @@ open note on the working tree. See the script for the verdicts.
 
 | # | note | status | before → after | verdict |
 |---|---|---|---|---|
-| 1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)) |
+| 1.1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | CALIBRATED, regressed elsewhere: 1 row (recorded) |
+| 1.2 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the docked leg of the fix cb77485 was built on (fix/keyboard-aware-scroll, #5's fix): scroll_until judging the screen above the IME's band) |
 | 2 | 2026-10-05-ios-tap-lands-on-soft-keyboard | calibrate | 73eea5f → 6f41787 | CALIBRATED (partial: stage A only) |
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
 | 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
-| 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → c3ebc62 | CALIBRATED (partial: one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up) |
+| 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED; live ios: CALIBRATED |
+| 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED; live ios: CALIBRATED-ON-DEFECT |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
-| 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | STILL-RED-AFTER (partial: not the note's shape: Compose cuts the row's content at the header too, so d2b7744's descendants' extent finds nothing past the cut (lab finding VA1)) |
+| 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | CALIBRATED |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | calibrate | 188740b → bd06470 | CALIBRATED |
-| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)), regressed elsewhere: 1 row (recorded) |
+| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)); live android: CALIBRATED-ON-DEFECT (intermittent), regressed elsewhere: 1 row (recorded) |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | CALIBRATED |
 | 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | calibrate | d2b7744 → 81a7d62 | CALIBRATED |
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
-| 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic) |
+| 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is calibrated live (`live`)); live ios: CALIBRATED |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node) |
-| 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
+| 19.1 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED; live ios: CALIBRATED |
+| 19.2 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | c11d179 → cd4d177 | STILL-RED-AFTER |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only), regressed elsewhere: 1 row (recorded) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
 | 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts), regressed elsewhere: 6 rows (recorded) |
@@ -56,33 +59,71 @@ open note on the working tree. See the script for the verdicts.
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | open | working tree | OPEN-RED |
+| FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | open | working tree | OPEN-RED |
 
-## 1: DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime))
+## 1.1: CALIBRATED
 
-2026-10-05-android-floating-gboard-keyboard.md — defect: `^Tapped|reached with no swipe, under the keyboard`
+2026-10-05-android-floating-gboard-keyboard.md — defect: `^Tapped|reached with no swipe, under the keyboard|^passed on`
 
 - before 7d9a783:
-  - ok android-averi_lab-api33/form-keyboard.xml vs tap — Tapped id:"lab.form-keyboard.vs" (the soft keyboard covered id:"lab.form-keyboard.vs"; hidden before tapping)
-  - ok android-averi_lab-api33/form-keyboard.xml ks tap — Tapped id:"lab.form-keyboard.ks" (the soft keyboard covered id:"lab.form-keyboard.ks"; hidden before tapping)
-  - ok android-averi_lab-api33/form-keyboard.xml ss tap — Tapped id:"lab.form-keyboard.ss" (the soft keyboard covered id:"lab.form-keyboard.ss"; hidden before tapping)
-  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
-  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
-  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
-  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 scre
+  - RED android-averi_lab-api33/form-keyboard-floating.xml postcode tap — Tapped without a back before the tap: Tapped id:"lab.form-keyboard-floating.postcode"
+  - RED android-averi_lab-api33/form-keyboard-floating.xml postcode colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard-floating.postcode" fill within dE00 8 of #FFFFFF — sampled #F9F9FA (dominant, 92% of region) vs expected #FFFFFF → dE00 1.30 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard-floating.xml postcode scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard-floating.postcode" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard-floating.xml phone tap — Tapped without a back before the tap: Tapped id:"lab.form-keyboard-floating.phone"
+  - RED android-averi_lab-api33/form-keyboard-floating.xml phone colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard-floating.phone" fill within dE00 8 of #FFFFFF — sampled #F9F9FA (dominant, 98% of region) vs expected #FFFFFF → dE00 1.30 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard-floating.xml phone scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard-floating.phone" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard-floating.xml vs tap — Tapped without a back before the tap: Tapped id:"lab.form-keyboard-floating.vs"
+  - RED android-averi_lab-api33/form-keyboard-floating.xml vs colour — passed on #F0F0F3, the keyboard's: PASS  element id:"lab.form-keyboard-floating.vs" fill within dE00 8 of #F0F0F3 — sampled #F9F9FA (dominant, 90% of region) vs expected #F0F0F3 → dE00 2.10 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard-floating.xml vs scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard-floating.vs" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard-floating.xml ks tap — Tapped without a back before the tap: Tapped id:"lab.form-keyboard-floating.ks"
+  - RED android-averi_lab-api33/form-keyboard-floating.xml ks colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — sampled #FCFCFD (dominant, 68% of region) vs expected #FFFFFF → dE00 0.79 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard-floating.xml ks scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard-floating.ks" fully visible after 0 swipes
 - after cb77485:
-  - ok android-averi_lab-api33/form-keyboard.xml vs tap — Tapped id:"lab.form-keyboard.vs" (the soft keyboard covered id:"lab.form-keyboard.vs"; hidden before tapping)
-  - ok android-averi_lab-api33/form-keyboard.xml ks tap — Tapped id:"lab.form-keyboard.ks" (the soft keyboard covered id:"lab.form-keyboard.ks"; hidden before tapping)
-  - ok android-averi_lab-api33/form-keyboard.xml ss tap — Tapped id:"lab.form-keyboard.ss" (the soft keyboard covered id:"lab.form-keyboard.ss"; hidden before tapping)
-  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
-  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
-  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
-  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 scre
+  - ok android-averi_lab-api33/form-keyboard-floating.xml postcode tap — Tapped id:"lab.form-keyboard-floating.postcode" (the soft keyboard covered id:"lab.form-keyboard-floating.postcode"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard-floating.xml postcode colour — FAIL  element id:"lab.form-keyboard-floating.postcode" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1098 970x132, keyboard 71,1092 937x792) — dismiss it (e.g. `dismissKeyboard: true` o
+  - ok android-averi_lab-api33/form-keyboard-floating.xml postcode scroll_until — ERROR scroll_until id:"lab.form-keyboard-floating.postcode" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1
+  - ok android-averi_lab-api33/form-keyboard-floating.xml phone tap — Tapped id:"lab.form-keyboard-floating.phone" (the soft keyboard covered id:"lab.form-keyboard-floating.phone"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard-floating.xml phone colour — FAIL  element id:"lab.form-keyboard-floating.phone" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1280 970x132, keyboard 71,1092 937x792) — dismiss it (e.g. `dismissKeyboard: true` on t
+  - ok android-averi_lab-api33/form-keyboard-floating.xml phone scroll_until — ERROR scroll_until id:"lab.form-keyboard-floating.phone" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080
+  - ok android-averi_lab-api33/form-keyboard-floating.xml vs tap — Tapped id:"lab.form-keyboard-floating.vs" (the soft keyboard covered id:"lab.form-keyboard-floating.vs"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard-floating.xml vs colour — FAIL  element id:"lab.form-keyboard-floating.vs" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,1462 970x132, keyboard 71,1092 937x792) — dismiss it (e.g. `dismissKeyboard: true` on the 
+  - ok android-averi_lab-api33/form-keyboard-floating.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard-floating.vs" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x10
+  - ok android-averi_lab-api33/form-keyboard-floating.xml ks tap — Tapped id:"lab.form-keyboard-floating.ks" (the soft keyboard covered id:"lab.form-keyboard-floating.ks"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard-floating.xml ks colour — FAIL  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1644 970x132, keyboard 71,1092 937x792) — dismiss it (e.g. `dismissKeyboard: true` on the 
+  - ok android-averi_lab-api33/form-keyboard-floating.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard-floating.ks" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x10
 
-Needs: a floating-Gboard capture: form-keyboard on averi_lab with Gboard switched to floating (its ITYPE_IME inset only the 132-px collapse strip, the panel a second rect of `dumpsys window InputMethod`'s touchable region — the three readings CellTruth.ime serves, captured by AndroidLab.ime), a field under the panel and clear of the strip: its tap must not press a key, its scroll_until must not stop under the panel.
+Regressed elsewhere at cb77485 (green at 7d9a783):
 
-Docked, the fix leaves the band as it was by design (the touchable region equals the band, no panel): the tap rows (Tapped after one back, inside the field) and the scroll_until rows (touch-downs above y 1398) are green at 7d9a783 and at cb77485 alike, golden identical on the cell. The note's symptom (a guarded tap pressing Gboard's `d` key, a row behind the panel fully visible) needs the panel.
+  - RED android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — stopped: ERROR scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
+
+Regressions recorded:
+
+- android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until: broke at cb77485, not fixed — the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)
+
+forms/form-keyboard-floating (round 4): form-keyboard on averi_lab with Gboard switched to Floating by hand (its grid → the Floating tile; no adb command or setting switches it; docked again after, the touchable region back to `(0,1398,1080,2220)`): `ITYPE_IME` only the 132-px strip `[0,2088][1080,2220]`, the panel the second rect of `touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))` — the note's three readings, served by the fake device (CellTruth.ime) — and postcode, phone, vs, ks with their centres under the panel, clear of the strip (truth.ts#imePanels, situationOf: under-keyboard; each probe at its centre pressed a key, each after one back focused it). At 7d9a783 each is `Tapped` with no back (the key pressed), its colour PASSES on the panel, and scroll_until calls it `fully visible after 0 swipes`; at cb77485 one back then a tap inside it, the colour fails closed, and scroll_until swipes touching down above the panel (y 874), clear of it and the strip. The docked leg (form-keyboard under a docked Gboard): green at 7d9a783 and at cb77485 alike, golden identical on the cell — docked, the region is the band, nothing beyond it (by design); 1.2 judges the docked half the fix was built on.
+
+## 1.2: CALIBRATED (partial: the docked leg of the fix cb77485 was built on (fix/keyboard-aware-scroll, #5's fix): scroll_until judging the screen above the IME's band)
+
+2026-10-05-android-floating-gboard-keyboard.md — defect: `reached with no swipe, under the keyboard|touched down under the keyboard`
+
+- before 98e49b7:
+  - RED android-averi_lab-api33/form-keyboard.xml vs scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.vs" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml ks scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ks" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml ss scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ss" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml note scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.note" fully visible after 0 swipes
+- after 9131730:
+  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1462,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1644,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1826,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":2008,"width":970,"height":132}). The soft keyboard wa
+
+Regressions recorded:
+
+- android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until: broke at cb77485, not fixed — the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)
+
+1.2: 9131730, the scroll_until half fix/r2-d-gboard sits on (the note: 'on top of fix/keyboard-aware-scroll'), judged alone on the docked capture's under-IME fields — the same pair (98e49b7 → 9131730) and the same four rows as #5's Android leg, which calibrates them too — kept here because the floating note's fix is built on it. At 98e49b7 'fully visible after 0 swipes' behind the docked IME; at 9131730 a stop above the band naming the keyboard.
 
 ## 2: CALIBRATED (partial: stage A only)
 
@@ -160,6 +201,8 @@ edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (ab
   - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1826,"width":970,"height":132}). The soft keyboard was 
   - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":2008,"width":970,"height":132}). The soft keyboard wa
 
+Needs: Its further fixes, 1bc603a and 565b747, are not paired (several pairs per note, round 4): both cure a stale reading (1bc603a: a band the input method denies, or one that changes nothing, no longer moves the judgement; 565b747: a witness denial not kept for the whole call) — a window state read stale after a navigating tap, which no static capture holds; measured (golden --side over 9131730, 1bc603a and 565b747, round 4) the note's eight rows are green at all three, so either pair would read DOES-NOT-FAIL. They need a live run (phase 5) that reads the IME stale.
+
 The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus. The Android leg (phase 2b's form-keyboard, the IME's readings served): at 98e49b7 vs, ks, ss and note are "fully visible after 0 swipes" under the docked IME; at 9131730 each fails after 6 swipes (maxSwipes) touching down at y 1118, above the keyboard's top (1398), naming the keyboard (at HEAD: 2 swipes touching down at y 1034).
 
 ## 6: CALIBRATED
@@ -214,32 +257,43 @@ Regressions recorded:
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 
-## 7: CALIBRATED (partial: one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up)
+## 7.1: CALIBRATED
 
-2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a (toolbar|scrollable)\)`
+2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
 
 - before 5cff2ad:
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter cannot h
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter cannot h
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter cannot h
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapter cannot
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adap
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adap
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adap
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this ad
-- after c3ebc62:
+- after 7542021:
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.vs", but it is still up: the band [0,573][402,874] still contains the tap point (201,621) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 looks 30
+
+Live (phase 5, ios wda): **CALIBRATED**, 5cff2ad → 7542021, dismiss:toolbar-dismiss.ks, dismiss:toolbar-dismiss.ss, dismiss:toolbar-dismiss.note — The first fix alone, on toolbar-dismiss: refused before (the keyboard up, the focus on postcode), the title tapped and each field focused after. vs (straddling the keyboard's top) times out "to hold still" at 5cff2ad, 7542021 and c3ebc62 alike and is tapped at debc9b2 — not this note's. toolbar-dismiss-short stays refused at 7542021, as golden measured. (docs/truth/live-calibration-2026-10-16.md)
+
+A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
+
+## 7.2: CALIBRATED
+
+2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a scrollable\)`
+
+- before d928789:
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this a
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this a
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this a
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this
+- after c3ebc62:
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.vs", but it is still up: the band [0,573][402,874] still contains the tap point (201,621) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) o
 
-Needs: A before/after pair per fix (calibrate takes one pair per note): the first fix alone, 5cff2ad → 7542021 (toolbar-dismiss refused `covered by toolbar`, then the title tapped), and the second, d928789 → c3ebc62 (toolbar-dismiss-short refused `covered by scrollable`, then the title tapped) — each fix's own symptom required red before it and green after it.
+Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, 7542021 → c3ebc62, dismiss:toolbar-dismiss-short.vs, dismiss:toolbar-dismiss-short.ks, dismiss:toolbar-dismiss-short.ss, dismiss:toolbar-dismiss-short.note — The second fix, on toolbar-dismiss-short: before, refused with the keyboard up (the focus on postcode); after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal ("outside its scroll view … scroll_until it first") — ok. (docs/truth/live-calibration-2026-10-16.md)
 
-Both fixes on one pair, 5cff2ad → c3ebc62. toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at 5cff2ad for the toolbar, and at 7542021 and at d928789, c3ebc62's first parent, `covered by scrollable` (measured with golden --side over both, not part of this pair); the title tapped at c3ebc62. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
+7.2, the second fix alone (d928789, c3ebc62's first parent → c3ebc62), on toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at d928789 `covered by scrollable` (as at 7542021; at 5cff2ad for the toolbar), the title tapped at c3ebc62.
 
 ## 8: CALIBRATED
 
@@ -252,20 +306,20 @@ Both fixes on one pair, 5cff2ad → c3ebc62. toolbar-dismiss: the principal titl
   - ok android-averi_lab-api33/own-parts.xml L tap — Tapped text:"LOGIN"
   - ok android-averi_lab-api33/own-parts.xml L scroll_until — Element text:"LOGIN" fully visible after 0 swipes
 
+Needs: Its second fix, c8c06a8 (fix/r6b-icon: a Compose icon button's control, padded evenly round its label, is the label's own control), is not paired: no lab cell holds a Compose IconButton (own-parts' L is a text button). A pair 2f98900 → c8c06a8 needs an icon-button target in own-parts (Android), e.g. an IconButton with a content description — the note's B-1.7 shape: a 132-px wrapper, the icon, then an unlabelled clickable inset on all sides.
+
 own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes "a layout defect"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.
 
-## 9: STILL-RED-AFTER (partial: not the note's shape: Compose cuts the row's content at the header too, so d2b7744's descendants' extent finds nothing past the cut (lab finding VA1))
+## 9: CALIBRATED
 
 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md — defect: `fully visible`
 
 - before 10fb02b:
-  - RED android-averi_lab-api33/scroll-sticky-cut.xml R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky-cut.R" fully visible after 0 swipes
+  - RED android-averi_lab-api33/scroll-sticky-view.xml R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky-view.R" fully visible after 0 swipes
 - after d2b7744:
-  - RED android-averi_lab-api33/scroll-sticky-cut.xml R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky-cut.R" fully visible after 0 swipes
+  - ok android-averi_lab-api33/scroll-sticky-view.xml R fully — ERROR scroll_until id:"lab.scroll-sticky-view.R" failed after 3 swipes — element is in the viewport but under text "Sticky header" (400,347 281x66), drawn over it — 63% of it shows — and the content is exhausted: swiping
 
-Needs: A row whose container is cut at the sticky header while its content keeps its whole rect (mp-native's Account Detail: `row_0 66,480 948x84`, its children `66,403 948x143`) — the shape d2b7744 reads. Tried on the lab (round 3, bounded): scroll-sticky (a plain header container: uiautomator lists R whole, `[128,391][953,567]`, and averi refuses it under the header on both sides — DOES-NOT-FAIL); scroll-sticky-cut (the header one accessibility element, `semantics(mergeDescendants = true)`; R a non-clickable testTag container around a clickable box): Compose takes the header out of the container AND its content (`[128,457][953,567]` both), so the rect is cut at the header but no descendant reaches past it — red before and after. Which Compose setup leaves the children whole was not found.
-
-scroll-sticky-cut's R (frame 128,391 825x176, its top 66 px under the header 0,303 1080x154): the dump cuts R and its content at the header's bottom, 457. Red with the note's symptom (`fully visible after 0 swipes`) at 10fb02b and at d2b7744 — filed as lab finding VA1. The earlier variant, scroll-sticky (R listed whole, the header after it), is refused on both sides ('under text "Sticky header" … drawn over it — 63% of it shows'): DOES-NOT-FAIL, kept as the contrast.
+edges/scroll-sticky-view (round 4): scroll-sticky-cut's list and merged header (`semantics(mergeDescendants = true)`), the row R a testTag container whose content is an Android View (AndroidView: a clickable android.view.View labelled `Target R`) — uiautomator cuts the container at the header's bottom, `[128,457][953,567]`, and lists the View whole, `[128,391][953,567]` (the View system's bounds, which Compose's accessibility does not cut at the header): the note's shape (mp-native's `row_0 66,480 948x84`, its children `66,403 948x143`). R's frame 128,391 825x176, its top 66 px under the header 0,303 1080x154. At 10fb02b `fully: true` calls it `fully visible after 0 swipes`; at d2b7744 the descendants' extent past the cut refuses it. The earlier variants stay as the contrast: scroll-sticky (R listed whole, the header after it: refused on both sides, DOES-NOT-FAIL) and scroll-sticky-cut (the content a Compose node, cut with the container: red before and after — lab finding VA1).
 
 ## 11: CALIBRATED
 
@@ -297,7 +351,9 @@ Regressions recorded:
 
 - android-averi_lab-api33/tabbar-floating.xml F scroll_until: broke at 9c7885e, fixed at bd06470 — the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470, bisected without a device (golden --only tabbar-floating over the first-parent commits 9c7885e..bd06470): red at 9c7885e and at 188740b, bd06470's first parent, green at bd06470 (the strokes touch down at (540,1598), above the bar)
 
-Needs: The live reveal (phase 5's live golden): on the device the probe swipe toward a cut row's flush edge moves it, and the `fully` stop goes on until the row is whole — a replayed tree never moves, so whether the probe tells a cut row from a whole one is uncalibrated.
+Live (phase 5, android uiautomator): **CALIBRATED-ON-DEFECT** (intermittent), d043e65 → 9c7885e, scroll:scroll-bounded-flush.P.fully, scroll:scroll-bounded-flush.S.fully — Before: the stop calls a row cut flush at its container fully visible where it is (MISMATCH). After: it probes the flush edge and goes on — the note's defect gone in every run — but a deep cut (S, 154 px) is not always revealed before the budget ends the stop, which then still leads with "fully visible": red for another class in one run of five (LV2), so not every after-run is ok. Intermittent: 4 committed runs at d043e65, every one red ("fully visible after 0 swipes", P partly-centre-in, S a sliver); 5 at 9c7885e: four reveal both rows whole (P after one probe of 79–82 px; S after three of 57–61 px), one leaves S 71 px below its clip (probes of 38 and 45 px; "fully visible after 2 swipes; but … it may be cut there") — LV2; at debc9b2 the same in 1 of 3 runs (S 75 px below, probes of 21 and 58 px). (docs/truth/live-calibration-2026-10-16.md)
+
+Needs: Done live, phase 5 (`live`): the probe reveals the cut rows in most runs, but moves the list 21–82 px a stroke, and a deep cut (S, 154 px) was left cut in one run of five at 9c7885e and one of three at debc9b2 when the budget ended the stop, "fully visible … it may be cut there" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).
 
 edges/scroll-bounded-flush (round 3, Android only): scroll-bounded's layout, each target an app row with an identified container that is not clickable — uiautomator cuts its bounds FLUSH with the container's edge (P `[128,798][953,908]` on `upper` ending at 908; a clickable node runs on 66 px past a clip, the lab's scroll-bounded P/S: LE1). Red at d043e65 (`fully visible after 0 swipes`); at 9c7885e the stop probes the flush edge — one swipe toward it — and, the replayed tree never moving, says `a probe swipe toward it moved nothing`: the probe's answer is the device's, so R-fully accepts a probed flush stop where the truth bears it out (rows.ts#flushProbe: P's bottom edge 908 is `upper`'s, the probe 540,788 → 540,697 drags up from inside it; S's 1541 is `lower`'s, 1443 → 1369) and both rows are green. scroll-bounded's own P (cut but read whole, past its container) stays red on both sides: LE1.
 
@@ -364,7 +420,7 @@ presented/blur-menu-grouped: the menu card and the screen beneath it each an acc
 
 idb lists nothing under the keyboard, so these rows stay red at every commit (KNOWN, tests/differential/golden/forms.known.ts): before the fix their mismatch is the judge's own "touched down under the keyboard at (201,699)" — the note's defect; after it, the vacuous "not in the tree" with both swipes above the keyboard.
 
-## 17: DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic)
+## 17: DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is calibrated live (`live`))
 
 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md — defect: `reached where it is`
 
@@ -375,7 +431,7 @@ idb lists nothing under the keyboard, so these rows stay red at every commit (KN
   - ok ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 3 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
   - ok ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 3 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
 
-Needs: The turn-back (phase 5's live golden): a stroke that leaves the row in the status band, or clipped, must turn back.
+Live (phase 5, ios wda, idb): **CALIBRATED**, 8a55d2b → 21f1deb, turn:scroll-top-edge-end.T, turn:scroll-top-edge-end.T.fully — edges/scroll-top-edge-end (round 4: scroll-top-edge's page with its content ending at the screen's bottom, T in the status band). Before, on both sources: `direction: "down"` strokes that move nothing (page 382→382 ×3–5) and no turn back — "failed after N swipes — its centre stays under iOS's status bar … the content is exhausted" (plain), "CLIPPED at top … that is a layout defect" (fully): the note's own two replies, R-direction MISMATCH. After: one stroke up, "fully visible after 1 swipe", then Tapped (ok). On Android both commits answer "fully visible after 0 swipes" in the status band (no Android status-band rule then — a later note's), so the note is iOS's. (docs/truth/live-calibration-2026-10-16.md)
 
 The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431).
 
@@ -406,7 +462,7 @@ Needs: The text field's own scroll indicator (`container 'Horizontal scroll bar,
 
 The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412]).
 
-## 19: CALIBRATED
+## 19.1: CALIBRATED
 
 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
 
@@ -421,7 +477,26 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 lo
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 
 
-toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has.
+Live (phase 5, ios wda): **CALIBRATED**, bd06470 → 470dafe, dismiss:toolbar-dismiss-bar.vs, dismiss:toolbar-dismiss-bar.ks, dismiss:toolbar-dismiss-bar.ss, dismiss:toolbar-dismiss-bar.note — Before: every tap refused, the keyboard up, the focus left on postcode (LOUD). After: the title tapped, the keyboard dismissed and each field focused, nothing typed (ok). (docs/truth/live-calibration-2026-10-16.md)
+
+toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. The first fix, cd4d177 (children.length === 0), is judged alone as 19.2.
+
+## 19.2: STILL-RED-AFTER
+
+2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
+
+- before c11d179:
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapte
+- after cd4d177:
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapte
+
+19.2: the first fix, cd4d177 (fix/r3-p2, `children.length === 0`), judged alone (c11d179 → cd4d177) on the same rows: the note says it did not hold on a toolbar with an empty child, which toolbar-dismiss-bar's bar has — red before and after it.
 
 ## 20: CALIBRATED (partial: R-off only)
 
@@ -543,7 +618,7 @@ Regressions recorded:
 
 - ios-iphone17-ios27/sheet-long-list-short.wda.json F colour: broke at 83e282a, fixed at b7eac90 — the same merge as #20's fix (7566443 → 83e282a), the same row, recorded there: sheet-long-list-short's F, below its table's clip over the footer, read at its real rect from 83e282a and measured on the footer (PASS on #CFD8DC) until #29's fix, b7eac90, fails it closed
 
-The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap at its probe point (golden-spec/base.ts#atProbe, phase 3 round 3).
+The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap (golden-spec/base.ts#atProbe: at its probe point from phase 3 round 3, at its node's centre in the tree from round 4).
 
 ## 27: CALIBRATED
 
@@ -756,15 +831,15 @@ form-shared-id: a pristine form whose five fields and their floating titles (eac
 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md — defect: `≠`
 
 - before 92f2a46:
-  - RED ios-iphone17-ios27/own-parts.wda.json N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
-  - RED ios-iphone17-ios27/own-parts.idb.json N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
-  - RED android-averi_lab-api33/own-parts.xml N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
-  - RED ios-iphone17-ios27/text-sample.wda.json E ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
-  - RED ios-iphone17-ios27/text-sample.idb.json E ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
-  - RED android-averi_lab-api33/text-sample.xml E ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
-  - RED ios-iphone17-ios27/text-sample.wda.json A ocr — failed: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
-  - RED ios-iphone17-ios27/text-sample.idb.json A ocr — failed: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
-  - RED android-averi_lab-api33/text-sample.xml A ocr — failed: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" ≠
+  - RED ios-iphone17-ios27/own-parts.wda.json N ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/own-parts.idb.json N ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED android-averi_lab-api33/own-parts.xml N ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json E ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json E ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED android-averi_lab-api33/text-sample.xml E ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json A ocr — read "Prihlasit sa", not the string: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json A ocr — read "Prihlasit sa", not the string: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
+  - RED android-averi_lab-api33/text-sample.xml A ocr — read "Prihlásit sa", not the string: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" ≠
 - after 35321b4:
   - ok ios-iphone17-ios27/own-parts.wda.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
   - ok ios-iphone17-ios27/own-parts.idb.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
@@ -935,17 +1010,26 @@ No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links t
 
 No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row.
 
+## FU1: OPEN-RED
+
+2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md — defect: `never intersected the \d+x\d+ screen above the soft keyboard`
+
+- working tree:
+  - RED android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — stopped: ERROR scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
+
+No fix yet: red at HEAD and at cb77485, green at 7d9a783 (#1's regression elsewhere, recorded there). forms.known.ts owns the ratchet; this entry only links the note to its row.
+
 ## OC1: OPEN-RED
 
 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md — defect: `≠`
 
 - working tree:
-  - RED ios-iphone17-ios27/text-sample.wda.json B ocr — failed: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
-  - RED ios-iphone17-ios27/text-sample.wda.json C ocr — failed: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
-  - RED ios-iphone17-ios27/text-sample.idb.json B ocr — failed: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
-  - RED ios-iphone17-ios27/text-sample.idb.json C ocr — failed: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
-  - RED android-averi_lab-api33/text-sample.xml B ocr — failed: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" ≠
-  - RED android-averi_lab-api33/text-sample.xml C ocr — failed: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json B ocr — read "L'ubomír Stastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json C ocr — read "Makčeň, dižeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json B ocr — read "L'ubomír Stastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json C ocr — read "Makčeň, dižeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED android-averi_lab-api33/text-sample.xml B ocr — read "L'ubomír Sťastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED android-averi_lab-api33/text-sample.xml C ocr — read "Mäkčeň, dížeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
 
 No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
 
@@ -954,10 +1038,10 @@ No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none)
 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md — defect: `≠`
 
 - working tree:
-  - RED ios-iphone17-ios27/text-sample.wda.json H ocr — failed: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
-  - RED ios-iphone17-ios27/text-sample.wda.json I ocr — failed: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
-  - RED ios-iphone17-ios27/text-sample.idb.json H ocr — failed: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
-  - RED ios-iphone17-ios27/text-sample.idb.json I ocr — failed: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json H ocr — read "1234,56 €", not the string: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json H ocr — read "1234,56 €", not the string: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
 
 No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
 
