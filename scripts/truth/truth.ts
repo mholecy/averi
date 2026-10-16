@@ -149,8 +149,8 @@ const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive cont
  * drawn is not held to DRAWN); one whose centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a
  * sliver, a centre under chrome and, on iOS, a centre in a band (the touch is the app's window's) may be either (what
  * fires there is the truth the rows read) — though iOS's status bar swallows a probe in the top of its band
- * (statusBarMaySwallow: no touch, then not reached). Unmeasured, a declared-open target whose centre lies off the screen is
- * broken, as the phase-1 rule has it: never probed, it is never reached.
+ * (statusBarMaySwallow: above IOS_STATUS_BAR_SWALLOWS_ABOVE, no touch, then not reached). Unmeasured, a declared-open
+ * target whose centre lies off the screen is broken, as the phase-1 rule has it: never probed, it is never reached.
  */
 export function consistency(t: TargetTruth, platform?: Platform, screen?: { width: number; height: number }): string | undefined {
   const g = t.geometry ?? 'whole';
@@ -167,7 +167,7 @@ export function consistency(t: TargetTruth, platform?: Platform, screen?: { widt
   }
   if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
   if (touchesAt(t.probe, probePoint(t.frame)).length === 0) {
-    if (statusBarMaySwallow(platform, g)) return t.reached ? `${g}, but the probe tap reached it with no touch logged` : undefined;
+    if (statusBarMaySwallow(platform, g, probePoint(t.frame))) return t.reached ? `${g}, but the probe tap reached it with no touch logged` : undefined;
     return NOT_DELIVERED;
   }
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
@@ -188,13 +188,22 @@ export function consistency(t: TargetTruth, platform?: Platform, screen?: { widt
 export const systemBarSwallows = (platform: Platform | undefined, g: Geometry) => platform === 'android' && g === 'status-band';
 
 /**
- * iOS's status bar swallows a tap in the top of its band and passes one below through: measured 2026-10-16 on the lab
- * simulator (iPhone 17, iOS 27.0, top inset 62 pt) with raw `idb ui tap 201 y` on `open` — y 2, 12, 30, 40, 50 left no
- * touch in the app, y 55, 58, 61 did (and on sheet-medium-edges, presented-over G's probe at (201,12) left none). So on
- * iOS a status-band probe that left no touch is the bar's, not a broken cell — and must not have reached the target;
- * one that left its touch is judged as any other.
+ * Where iOS's status bar stops swallowing a raw tap: a probe point above this y (points) may be the bar's. Measured
+ * 2026-10-16 on the lab simulator ONLY (averi-lab iPhone 17, iOS 27.0, top inset 62 pt), raw `idb ui tap 201 y` on the
+ * `open` cell: y 2, 12, 30, 40, 50 left no touch in the app, y 55, 58, 61, 62, 64 did; and sheet-medium-edges' G
+ * (presented-over, its probe at (201,12)) left none. 51 lies strictly inside that measurement (no touch at 50, a touch
+ * at 55); another device or OS may draw its bar taller or shorter — remeasure there.
  */
-export const statusBarMaySwallow = (platform: Platform | undefined, g: Geometry) => platform === 'ios' && g === 'status-band';
+export const IOS_STATUS_BAR_SWALLOWS_ABOVE = 51;
+
+/**
+ * iOS's status bar swallows a tap in the top of its band and passes one below through (IOS_STATUS_BAR_SWALLOWS_ABOVE).
+ * So on iOS a status-band probe ABOVE that line that left no touch is the bar's, not a broken cell — and must not have
+ * reached the target; one below it with no touch is undelivered (a broken cell), and one that left its touch is judged
+ * as any other.
+ */
+export const statusBarMaySwallow = (platform: Platform | undefined, g: Geometry, at: { y: number }) =>
+  platform === 'ios' && g === 'status-band' && at.y < IOS_STATUS_BAR_SWALLOWS_ABOVE;
 
 /**
  * Android's navigation band is NOT measured — an OPEN ASSUMPTION for B4 (bars) to measure: under gesture navigation a
