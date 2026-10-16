@@ -6,13 +6,15 @@ open note on the working tree. See the script for the verdicts.
 
 | # | note | status | before → after | verdict |
 |---|---|---|---|---|
-| 1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)) |
+| 1.1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)) |
+| 1.2 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the docked leg of the fix cb77485 was built on (fix/keyboard-aware-scroll, #5's fix): scroll_until judging the screen above the IME's band) |
 | 2 | 2026-10-05-ios-tap-lands-on-soft-keyboard | calibrate | 73eea5f → 6f41787 | CALIBRATED (partial: stage A only) |
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED (partial: the colour assert) |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
 | 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
-| 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → c3ebc62 | CALIBRATED (partial: one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up) |
+| 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED |
+| 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | STILL-RED-AFTER (partial: not the note's shape: Compose cuts the row's content at the header too, so d2b7744's descendants' extent finds nothing past the cut (lab finding VA1)) |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
@@ -24,7 +26,8 @@ open note on the working tree. See the script for the verdicts.
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
 | 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic) |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node) |
-| 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
+| 19.1 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
+| 19.2 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | c11d179 → cd4d177 | STILL-RED-AFTER |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only), regressed elsewhere: 1 row (recorded) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
 | 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS)), regressed elsewhere: 6 rows (recorded) |
@@ -56,7 +59,7 @@ open note on the working tree. See the script for the verdicts.
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | open | working tree | OPEN-RED |
 
-## 1: DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime))
+## 1.1: DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime))
 
 2026-10-05-android-floating-gboard-keyboard.md — defect: `^Tapped|reached with no swipe, under the keyboard`
 
@@ -80,6 +83,23 @@ open note on the working tree. See the script for the verdicts.
 Needs: a floating-Gboard capture: form-keyboard on averi_lab with Gboard switched to floating (its ITYPE_IME inset only the 132-px collapse strip, the panel a second rect of `dumpsys window InputMethod`'s touchable region — the three readings CellTruth.ime serves, captured by AndroidLab.ime), a field under the panel and clear of the strip: its tap must not press a key, its scroll_until must not stop under the panel.
 
 Docked, the fix leaves the band as it was by design (the touchable region equals the band, no panel): the tap rows (Tapped after one back, inside the field) and the scroll_until rows (touch-downs above y 1398) are green at 7d9a783 and at cb77485 alike, golden identical on the cell. The note's symptom (a guarded tap pressing Gboard's `d` key, a row behind the panel fully visible) needs the panel.
+
+## 1.2: CALIBRATED (partial: the docked leg of the fix cb77485 was built on (fix/keyboard-aware-scroll, #5's fix): scroll_until judging the screen above the IME's band)
+
+2026-10-05-android-floating-gboard-keyboard.md — defect: `reached with no swipe, under the keyboard|touched down under the keyboard`
+
+- before 98e49b7:
+  - RED android-averi_lab-api33/form-keyboard.xml vs scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.vs" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml ks scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ks" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml ss scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ss" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml note scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.note" fully visible after 0 swipes
+- after 9131730:
+  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1462,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1644,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1826,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":2008,"width":970,"height":132}). The soft keyboard wa
+
+1.2: 9131730, the scroll_until half fix/r2-d-gboard sits on (the note: 'on top of fix/keyboard-aware-scroll'), judged alone on the docked capture's under-IME fields — the rows #5's Android leg names. At 98e49b7 'fully visible after 0 swipes' behind the docked IME; at 9131730 a stop above the band naming the keyboard.
 
 ## 2: CALIBRATED (partial: stage A only)
 
@@ -157,6 +177,8 @@ edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (ab
   - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1826,"width":970,"height":132}). The soft keyboard was 
   - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":2008,"width":970,"height":132}). The soft keyboard wa
 
+Needs: Its further fixes, 1bc603a and 565b747, are not paired (several pairs per note, round 4): both cure a stale reading (1bc603a: a band the input method denies, or one that changes nothing, no longer moves the judgement; 565b747: a witness denial not kept for the whole call) — a window state read stale after a navigating tap, which no static capture holds; at 9131730 → 1bc603a and 1bc603a → 565b747 the lab corpus's rows are green on both sides (DOES-NOT-FAIL by construction). They need a live run (phase 5) that reads the IME stale.
+
 The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus. The Android leg (phase 2b's form-keyboard, the IME's readings served): at 98e49b7 vs, ks, ss and note are "fully visible after 0 swipes" under the docked IME; at 9131730 each fails after 6 swipes (maxSwipes) touching down at y 1118, above the keyboard's top (1398), naming the keyboard (at HEAD: 2 swipes touching down at y 1034).
 
 ## 6: CALIBRATED
@@ -211,32 +233,39 @@ Regressions recorded:
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 
-## 7: CALIBRATED (partial: one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up)
+## 7.1: CALIBRATED
 
-2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a (toolbar|scrollable)\)`
+2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
 
 - before 5cff2ad:
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter cannot h
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter cannot h
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter cannot h
   - RED ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapter cannot
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adap
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adap
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adap
-  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this ad
-- after c3ebc62:
+- after 7542021:
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.vs", but it is still up: the band [0,573][402,874] still contains the tap point (201,621) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 looks 30
+
+A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
+
+## 7.2: CALIBRATED
+
+2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a scrollable\)`
+
+- before d928789:
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this a
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this a
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this a
+  - RED ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-short.title" (refused for a scrollable): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-short.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this
+- after c3ebc62:
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.vs", but it is still up: the band [0,573][402,874] still contains the tap point (201,621) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) o
 
-Needs: A before/after pair per fix (calibrate takes one pair per note): the first fix alone, 5cff2ad → 7542021 (toolbar-dismiss refused `covered by toolbar`, then the title tapped), and the second, d928789 → c3ebc62 (toolbar-dismiss-short refused `covered by scrollable`, then the title tapped) — each fix's own symptom required red before it and green after it.
-
-Both fixes on one pair, 5cff2ad → c3ebc62. toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at 5cff2ad for the toolbar, and at 7542021 and at d928789, c3ebc62's first parent, `covered by scrollable` (measured with golden --side over both, not part of this pair); the title tapped at c3ebc62. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
+7.2, the second fix alone (d928789, c3ebc62's first parent → c3ebc62), on toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at d928789 `covered by scrollable` (as at 7542021; at 5cff2ad for the toolbar), the title tapped at c3ebc62.
 
 ## 8: CALIBRATED
 
@@ -248,6 +277,8 @@ Both fixes on one pair, 5cff2ad → c3ebc62. toolbar-dismiss: the principal titl
 - after cccf6b8:
   - ok android-averi_lab-api33/own-parts.xml L tap — Tapped text:"LOGIN"
   - ok android-averi_lab-api33/own-parts.xml L scroll_until — Element text:"LOGIN" fully visible after 0 swipes
+
+Needs: Its second fix, c8c06a8 (fix/r6b-icon: a Compose icon button's control, padded evenly round its label, is the label's own control), is not paired: no lab cell holds a Compose IconButton (own-parts' L is a text button). A pair 2f98900 → c8c06a8 needs an icon-button target in own-parts (Android), e.g. an IconButton with a content description — the note's B-1.7 shape: a 132-px wrapper, the icon, then an unlabelled clickable inset on all sides.
 
 own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes "a layout defect"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.
 
@@ -403,7 +434,7 @@ Needs: The text field's own scroll indicator (`container 'Horizontal scroll bar,
 
 The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412]).
 
-## 19: CALIBRATED
+## 19.1: CALIBRATED
 
 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
 
@@ -418,7 +449,24 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 lo
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 
 
-toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has.
+toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. The first fix, cd4d177 (children.length === 0), is judged alone as 19.2.
+
+## 19.2: STILL-RED-AFTER
+
+2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
+
+- before c11d179:
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapte
+- after cd4d177:
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapte
+
+19.2: the first fix, cd4d177 (fix/r3-p2, `children.length === 0`), judged alone (c11d179 → cd4d177) on the same rows: the note says it did not hold on a toolbar with an empty child, which toolbar-dismiss-bar's bar has — red before and after it.
 
 ## 20: CALIBRATED (partial: R-off only)
 
@@ -534,7 +582,7 @@ Regressions recorded:
 
 - ios-iphone17-ios27/sheet-long-list-short.wda.json F colour: broke at 83e282a, fixed at b7eac90 — the same merge as #20's fix (7566443 → 83e282a), the same row, recorded there: sheet-long-list-short's F, below its table's clip over the footer, read at its real rect from 83e282a and measured on the footer (PASS on #CFD8DC) until #29's fix, b7eac90, fails it closed
 
-The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap at its probe point (golden-spec/base.ts#atProbe, phase 3 round 3).
+The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap (golden-spec/base.ts#atProbe: at its probe point from phase 3 round 3, at its node's centre in the tree from round 4).
 
 ## 27: CALIBRATED
 
