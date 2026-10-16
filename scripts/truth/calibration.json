@@ -40,12 +40,19 @@
     {
       "n": "4",
       "note": "2026-10-08-ios-tap-off-screen-reported-done.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["1221b0f"],
       "before": "2ae8b10",
-      "verified": "merge-subject",
-      "needs": "edges/scroll-bounded: a laid-out row in the tree whose centre is below the screen (form-picker's off-screen rows are not in the tree, WDA or idb, so its tap rows accept 'not found'). Rows: R-off (tap refused, nothing sent).",
-      "remark": "Golden is identical at 2ae8b10 and 1221b0f."
+      "after": "1221b0f",
+      "verified": "golden",
+      "defect": "^Tapped",
+      "checks": [
+        "ios-iphone17-ios27/scroll-bounded.wda.json F tap",
+        "ios-iphone17-ios27/scroll-bounded.idb.json F tap",
+        "ios-iphone17-ios27/scroll-top-edge.wda.json A tap",
+        "ios-iphone17-ios27/scroll-top-edge.idb.json A tap"
+      ],
+      "remark": "edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; golden-spec/edges.ts#notListed)."
     },
     {
       "n": "5",
@@ -153,12 +160,18 @@
     {
       "n": "9",
       "note": "2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["d2b7744"],
       "before": "10fb02b",
-      "verified": "merge-subject",
-      "needs": "edges/scroll-sticky (Android): a row cut at a sticky header inside its scroll container; rows: R-fully.",
-      "remark": "Golden is identical at 10fb02b and d2b7744."
+      "after": "d2b7744",
+      "verified": "golden",
+      "defect": "fully visible",
+      "checks": [
+        "android-averi_lab-api33/scroll-sticky.xml R fully"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "needs": "edges/scroll-sticky variant (Android) whose uiautomator node of the row is CUT at the sticky header's bottom (mp-native's Account Detail: the row's testTag container `66,480 948x84` while its own children carry `66,403 948x143`) — the lab's LazyColumn stickyHeader reports the row whole, so averi sees the header over it.",
+      "remark": "The lab's scroll-sticky R (its top 24 dp under the pinned header): uiautomator lists R whole (`[128,391][953,567]`) and the header after it, so `fully: true` refuses it on both sides ('under text \"Sticky header\" … drawn over it — 63% of it shows'). The note's shape — the row's rect cut at the header by the tree — is not what Compose's LazyColumn produced here."
     },
     {
       "n": "10",
@@ -167,8 +180,8 @@
       "fix": ["d2b7744"],
       "before": "10fb02b",
       "verified": "merge-subject",
-      "needs": "edges/scroll-sticky (Android) — only if Compose reproduces inverted bounds in the lab; otherwise a recorded-tree unit test stays its only check.",
-      "remark": "The merge subject names it ('inverted bounds read as clipped out'). Whether the lab app can produce the inverted bounds is unverified."
+      "needs": "edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.",
+      "remark": "The merge subject names it ('inverted bounds read as clipped out'). Not reproduced by the lab's Compose (2026-10-16, the edges cells on API 33): a row cut by the screen's top reads `[128,0][953,121]` (scroll-top-edge's T), cut, not inverted; rows off the screen or outside their container are not dumped at all. A recorded-tree unit test stays its only check."
     },
     {
       "n": "11",
@@ -183,22 +196,36 @@
     {
       "n": "12",
       "note": "2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["9c7885e"],
       "before": "d043e65",
-      "verified": "merge-subject",
-      "needs": "edges/scroll-bounded (Android): a row cut flush at its scroll container's edge; rows: R-fully.",
-      "remark": "At 9c7885e only the wording of the presented cells' scroll_until rows changes (Android strokes drag); every such row stays red (\"swiped 2× beneath a presented layer\": the target is not in the tree, and the stroke lands beneath the layer)."
+      "after": "9c7885e",
+      "verified": "golden",
+      "partial": "not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's)",
+      "defect": "fully visible",
+      "checks": [
+        "android-averi_lab-api33/scroll-bounded.xml P fully"
+      ],
+      "expect": "STILL-RED-AFTER",
+      "needs": "edges/scroll-bounded variant (Android) whose uiautomator bounds are cut FLUSH with the scroll container's edge (mp-native's SWIFT form: `{y:242, height:92}` on a container from 242) — the lab's verticalScroll in an edge-to-edge window does not cut P at all.",
+      "remark": "The lab's P is cut by its container's bottom (908) but uiautomator reports its whole frame (`[128,798][953,974]`): a rect past the container, not flush with it — the shape 9c7885e's flush probe does not suspect. Red on both sides with the note's symptom (`fully visible after 0 swipes`); filed as lab finding LE1."
     },
     {
       "n": "13",
       "note": "2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["29a5c30"],
       "before": "f4ff4be",
-      "verified": "merge-subject",
-      "needs": "edges/scroll-bounded (Android): a row showing a sliver at the container's edge; rows: R-sliver (tap refused).",
-      "remark": "Golden is identical at f4ff4be and 29a5c30."
+      "after": "29a5c30",
+      "verified": "golden",
+      "partial": "not the note's shape: the lab's S is cut 66 px past its container's edge instead of flush with it (the rows' red is LE1's)",
+      "defect": "^Tapped",
+      "checks": [
+        "android-averi_lab-api33/scroll-bounded.xml S tap"
+      ],
+      "expect": "STILL-RED-AFTER",
+      "needs": "edges/scroll-bounded variant (Android) whose sliver's uiautomator bounds are cut FLUSH with the container's edge (mp-native's `details_toggle 66,1924 948x55` on a container ending at 1978) — the lab's S is cut 66 px past its container's bottom.",
+      "remark": "The lab's S (22 px of it drawn above its container's bottom, 1541) reads `[128,1519][953,1607]`: past the container, not flush. Tapped at (541,1563) — below the container, where nothing of it is drawn — on both sides, the note's symptom; ADR 0013's refusal of a flush sliver does not reach it. Filed as lab finding LE1."
     },
     {
       "n": "14",
@@ -256,12 +283,20 @@
     {
       "n": "17",
       "note": "2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md",
-      "status": "needs-live",
+      "status": "calibrate",
       "fix": ["21f1deb", "b940052"],
       "before": "8a55d2b",
-      "verified": "merge-subject",
-      "needs": "edges/scroll-top-edge for the static half (a row resting in the status band); the turn-back itself is a dynamic (phase 5).",
-      "remark": "At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431)."
+      "after": "21f1deb",
+      "verified": "golden",
+      "partial": "the static half only (a row resting in the status band); the turn-back is a dynamic",
+      "defect": "reached where it is",
+      "checks": [
+        "ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until",
+        "ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "needs": "The turn-back (phase 5's live golden): a stroke that leaves the row in the status band, or clipped, must turn back.",
+      "remark": "The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431)."
     },
     {
       "n": "18",
@@ -440,12 +475,16 @@
     {
       "n": "29",
       "note": "2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["b7eac90"],
       "before": "ec2893a",
-      "verified": "merge-subject",
-      "needs": "edges/scroll-bounded: a row outside its scroll view's clip but on the screen; rows: R-outside-sv (colour fails closed).",
-      "remark": "Golden is identical at ec2893a and b7eac90."
+      "after": "b7eac90",
+      "verified": "golden",
+      "defect": "^passed on",
+      "checks": [
+        "ios-iphone17-ios27/scroll-bounded.wda.json O colour"
+      ],
+      "remark": "edges/scroll-bounded's O, wholly below its scroll view `lower` (0,380 402x180) and on the screen, asked for the colour the screen shows there (the white background): WDA's assert passed on it at ec2893a and fails closed at b7eac90. Under idb the same row still passes at HEAD — idb lists no scroll view: lab finding LE2."
     },
     {
       "n": "30",
@@ -682,6 +721,64 @@
         "ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until"
       ],
       "remark": "No fix yet: red at HEAD, both ways. W (the menu row, listed just before C) refused under C: tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b — a false refusal. C (listed after W, which is drawn over its centre) Tapped / a PASS on W's colour / fully visible — the unsafe direction, also on blur-menu-grouped's idb list. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none."
+    },
+    {
+      "n": "LE1",
+      "note": "2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "fully visible|^Tapped|reached where it is",
+      "checks": [
+        "android-averi_lab-api33/scroll-bounded.xml P fully",
+        "android-averi_lab-api33/scroll-bounded.xml S tap",
+        "android-averi_lab-api33/scroll-bounded.xml S scroll_until",
+        "android-averi_lab-api33/scroll-bounded.xml S fully"
+      ],
+      "remark": "No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30)."
+    },
+    {
+      "n": "LE2",
+      "note": "2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "fully visible|^Tapped|reached where it is|^passed on|no swipe|touched down outside",
+      "checks": [
+        "ios-iphone17-ios27/scroll-bounded.idb.json P fully",
+        "ios-iphone17-ios27/scroll-bounded.idb.json S tap",
+        "ios-iphone17-ios27/scroll-bounded.idb.json S scroll_until",
+        "ios-iphone17-ios27/scroll-bounded.idb.json S fully",
+        "ios-iphone17-ios27/scroll-bounded.idb.json O tap",
+        "ios-iphone17-ios27/scroll-bounded.idb.json O colour",
+        "ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until",
+        "ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it."
+    },
+    {
+      "n": "LE3",
+      "note": "2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^passed on|fully visible",
+      "checks": [
+        "ios-iphone17-ios27/scroll-sticky.wda.json R colour",
+        "ios-iphone17-ios27/scroll-sticky.wda.json R fully",
+        "ios-iphone17-ios27/scroll-sticky.idb.json R colour",
+        "ios-iphone17-ios27/scroll-sticky.idb.json R fully"
+      ],
+      "remark": "No fix yet: red at HEAD."
+    },
+    {
+      "n": "LE4",
+      "note": "2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "touched down outside its scroll view",
+      "checks": [
+        "ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until",
+        "ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view."
     }
   ],
   "excluded": [

@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, listedIn, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -106,9 +106,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
       const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;
+      const id = `lab.${cell.id}.${t.tag}`;
       const target: TargetTruth = {
         tag: t.tag,
-        id: `lab.${cell.id}.${t.tag}`,
+        id,
         color: t.color,
         declared: t.declared,
         frame,
@@ -117,6 +118,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         seen,
         ...geometry,
         ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
+        // Whether each tree lists it — read by the edge rows (golden-spec/edges.ts#notListed), so recorded with a geometry.
+        ...(geometry.geometry !== undefined && { listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, id)])) }),
         ...(reachedAtPiece !== undefined && { reachedAtPiece }),
         ...(unprobed !== undefined && { unprobed }),
       };

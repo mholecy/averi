@@ -36,6 +36,39 @@
       },
       "screenshot": "alert-dim.png",
       "truth": "alert-dim.truth.json"
+    },
+    {
+      "file": "scroll-bounded.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-bounded.png",
+      "truth": "scroll-bounded.truth.json"
+    },
+    {
+      "file": "scroll-sticky.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky.png",
+      "truth": "scroll-sticky.truth.json"
+    },
+    {
+      "file": "scroll-top-edge.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-top-edge.png",
+      "truth": "scroll-top-edge.truth.json"
     }
   ]
 }

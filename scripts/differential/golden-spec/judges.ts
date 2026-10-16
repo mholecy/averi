@@ -7,7 +7,12 @@ import { bandsOf } from '../../truth/truth.js';
  * expectation's shape, what a reply sent and said, and the one classification every row goes through (classed).
  */
 
-export type Verb = 'tap' | 'colour' | 'scroll_until' | 'error' | 'text';
+/**
+ * `fully` is scroll_until with `fully: true` (rows.ts#fullyRow): a verb of its own, so that a target asked both stops
+ * (a sliver, an overlapped row: the plain stop and the `fully` one) keys two rows (`<file> <tag> scroll_until`,
+ * `<file> <tag> fully`), not one.
+ */
+export type Verb = 'tap' | 'colour' | 'scroll_until' | 'fully' | 'error' | 'text';
 
 export interface Expectation {
   verb: Verb;

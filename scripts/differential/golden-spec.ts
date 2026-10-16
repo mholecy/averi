@@ -1,4 +1,4 @@
-import type { Platform } from './corpus.js';
+import type { Platform, SourceKind } from './corpus.js';
 import { DRAWN, type CellTruth, type TargetTruth } from '../truth/schema.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
@@ -52,10 +52,11 @@ export * from './golden-spec/rows.js';
  * A coloured target's rows, by its truth: beneath a presented layer (presented.ts); open and `whole` — or with no
  * measured geometry, as every capture before phase 3 — reached and drawn as itself (base.ts); open with a measured
  * geometry at an edge (edges.ts) or in a band or under chrome (bars.ts). `cell`, the target's capture, is what a
- * geometry's rows read the bands and the chrome from; without it no geometry row is asked.
+ * geometry's rows read the bands and the chrome from; without it no geometry row is asked. `source`, the replayed
+ * tree's: whether its capture listed the target (TargetTruth.listed) — an edge row accepts a target its tree did not.
  */
-export function expectations(platform: Platform, t: TargetTruth, cell?: CellTruth): Expectation[] {
+export function expectations(platform: Platform, t: TargetTruth, cell?: CellTruth, source?: SourceKind): Expectation[] {
   if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
   if (t.geometry === undefined || t.geometry === 'whole') return t.reached && t.drawn >= DRAWN ? openRows(platform, t) : [];
-  return cell === undefined ? [] : [...edgeRows(platform, t, cell), ...barRows(platform, t, cell)];
+  return cell === undefined ? [] : [...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell)];
 }

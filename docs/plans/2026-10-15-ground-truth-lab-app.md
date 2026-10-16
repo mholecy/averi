@@ -232,6 +232,20 @@ cell); in the top of the band — a probe point above y 51 of 62 pt (`truth.ts#I
 by B3 on the lab's iPhone 17, iOS 27.0, `open` cell: no touch at y ≤ 50, a touch at y ≥ 55) — the bar swallows it: no
 touch, and not reached (`truth.ts#statusBarMaySwallow`); a probe below that line with no touch is undelivered.
 
+**B2 (edges) — built 2026-10-16.** Three cells in both apps (Edges.swift, Edges.kt; the apps' `Lab` gained the
+`safeArea`, `scrollViews` and `chrome` writers): `scroll-bounded` (two bounded scroll views — a whole row, a row cut
+with its centre showing, a sliver, a row below its scroll view but on the screen, a row laid out below the screen),
+`scroll-sticky` (a lazy list whose pinned section header overlaps its first row, the header reported as chrome) and
+`scroll-top-edge` (a row resting in the status band — on iOS under the bar's own touch area, its probe swallowed as
+above — and a row above the screen). Calibrated: #4 and #29; #9 and #17's static half DOES-NOT-FAIL; #12 and #13
+STILL-RED-AFTER, partial (the lab's Compose does not cut uiautomator's bounds flush with the container, the shape their
+fixes judge); #10 not reproduced (no inverted bounds); lab findings LE1–LE4. What changed in the shared rows: `fully:
+true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops keys two rows; the R-outside-sv colour
+asks for the colour the screen shows there (a pass measured the background); an edge row accepts a target missing from
+the tree only where its capture's tree of that source did not list it (TargetTruth.listed, edges.ts#notListed); R-stroke
+holds every touch-down inside the target's own scroll view where the truth names it; R-band's tap is not expected
+refused where the probe fired the target.
+
 ### Phase 4 — the matrix, generated
 
 One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells for

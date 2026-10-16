@@ -311,6 +311,72 @@
       },
       "screenshot": "form-picker.png",
       "truth": "form-picker.truth.json"
+    },
+    {
+      "file": "scroll-bounded.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-bounded.png",
+      "truth": "scroll-bounded.truth.json"
+    },
+    {
+      "file": "scroll-bounded.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-bounded.png",
+      "truth": "scroll-bounded.truth.json"
+    },
+    {
+      "file": "scroll-sticky.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-sticky.png",
+      "truth": "scroll-sticky.truth.json"
+    },
+    {
+      "file": "scroll-sticky.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-sticky.png",
+      "truth": "scroll-sticky.truth.json"
+    },
+    {
+      "file": "scroll-top-edge.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-top-edge.png",
+      "truth": "scroll-top-edge.truth.json"
+    },
+    {
+      "file": "scroll-top-edge.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-top-edge.png",
+      "truth": "scroll-top-edge.truth.json"
     }
   ]
 }

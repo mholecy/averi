@@ -1,5 +1,32 @@
 {
   "family": "edges",
-  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it) — phase 3 B2 (calibration.json: #4, #6, #9, #10, #12, #13, #17, #29). App files: AveriLab/Edges.swift, Edges.kt.",
-  "cells": []
+  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it, resting in the status band) — phase 3 B2 (calibration.json: #4, #9, #10, #12, #13, #17, #29). Each target lies in a scroll view (`scrollView`, the clip LabState.scrollViews reports) at a fixed place in its content, scrolled to a fixed offset on appear, so its measured geometry (truth.ts#geometryOf) is what its comment in the app files says. `slot` is only the target's order. App files: AveriLab/Edges.swift, Edges.kt (the layout tables: the same numbers, points on iOS, dp on Android).",
+  "cells": [
+    {
+      "id": "scroll-bounded",
+      "layer": "none",
+      "targets": [
+        { "tag": "W", "color": "#E53935", "slot": 0, "declared": "open", "scrollView": "upper" },
+        { "tag": "P", "color": "#1E88E5", "slot": 1, "declared": "open", "scrollView": "upper" },
+        { "tag": "S", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "lower" },
+        { "tag": "O", "color": "#FB8C00", "slot": 3, "declared": "open", "scrollView": "lower" },
+        { "tag": "F", "color": "#8E24AA", "slot": 4, "declared": "open", "scrollView": "lower" }
+      ]
+    },
+    {
+      "id": "scroll-sticky",
+      "layer": "none",
+      "targets": [
+        { "tag": "R", "color": "#00897B", "slot": 0, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "scroll-top-edge",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#6D4C41", "slot": 0, "declared": "open", "scrollView": "page" },
+        { "tag": "T", "color": "#3949AB", "slot": 1, "declared": "open", "scrollView": "page" }
+      ]
+    }
+  ]
 }

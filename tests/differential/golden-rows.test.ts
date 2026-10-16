@@ -34,12 +34,12 @@ const target = (geometry: Geometry | undefined, over: Partial<TargetTruth> = {})
   ...over,
 });
 const rows = (t: TargetTruth) => expectations('ios', t, CELL);
-const verdict = (rs: readonly Expectation[], verb: string, o: Outcome, fully = false) => {
-  const r = rs.find((x) => x.verb === verb && ((x.call.args as { fully?: boolean }).fully === true) === fully);
-  if (r === undefined) throw new Error(`no ${verb}${fully ? ' fully' : ''} row`);
+const verdict = (rs: readonly Expectation[], verb: string, o: Outcome) => {
+  const r = rs.find((x) => x.verb === verb);
+  if (r === undefined) throw new Error(`no ${verb} row`);
   return r.judge(o);
 };
-const says = (rs: readonly Expectation[]) => rs.map((r) => `${r.verb}${(r.call.args as { fully?: boolean }).fully === true ? ' fully' : ''}: ${r.says}`);
+const says = (rs: readonly Expectation[]) => rs.map((r) => `${r.verb}: ${r.says}`);
 
 const TAPPED = 'Tapped id:"lab.edges.A"';
 const OFF_REFUSAL = 'ERROR: off screen at (201,940) on a 402x874 screen (rect 51,908 300x64) — scroll_until it first';
@@ -67,15 +67,15 @@ describe('the rows each geometry asks', () => {
   it.each([
     ['off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }, ['tap: R-off', 'colour: fails (R-off', 'scroll_until: R-off, R-stroke: swipes down', 'scroll_until: R-direction: each stroke down']],
     ['outside-scroll-view', { frame: rect(51, 720, 300, 64), reached: false, visible: null }, ['tap: R-outside-sv', 'colour: fails (R-outside-sv', 'scroll_until: R-outside-sv, R-stroke: swipes down', 'scroll_until: R-direction: each stroke down']],
-    ['sliver', { visible: rect(51, 670, 300, 20) }, ['tap: R-sliver', 'scroll_until: R-sliver', 'scroll_until fully: R-fully']],
-    ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'scroll_until fully: R-fully']],
-    ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'scroll_until fully: R-fully']],
+    ['sliver', { visible: rect(51, 670, 300, 20) }, ['tap: R-sliver', 'scroll_until: R-sliver', 'fully: R-fully']],
+    ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'fully: R-fully']],
+    ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'fully: R-fully']],
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
     ['nav-band', { frame: rect(51, 820, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the navigation band', 'scroll_until: R-band']],
     ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
-    ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'scroll_until fully: R-fully']],
+    ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'fully: R-fully']],
     ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203) }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached']],
-    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203), scrollView: 'list' }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached', 'scroll_until fully: R-fully']],
+    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203), scrollView: 'list' }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached', 'fully: R-fully']],
   ] as const)('%s', (g, over, expected) => {
     const got = says(rows(target(g, over as Partial<TargetTruth>)));
     expect(got).toHaveLength(expected.length);
@@ -97,6 +97,62 @@ describe('R-off, R-outside-sv, R-sliver: the tap refused naming scroll_until, no
   it('the colour assert must not pass: nothing of it is on the screen', () => {
     expect(verdict(rs, 'colour', out(FAILED))).toBeUndefined();
     expect(verdict(rs, 'colour', out(PASSED))).toBe('passed on #43A047: All 1 asserts passed');
+  });
+});
+
+describe('R-outside-sv colour: asked for the colour the screen shows there, so a pass measured the background (#29)', () => {
+  const rs = rows(target('outside-scroll-view', { frame: rect(51, 620, 300, 64), reached: false, visible: null, seen: '#FFFFFF' }));
+  it('the assert asks for the seen colour, and a pass on it is the defect', () => {
+    const colour = rs.find((r) => r.verb === 'colour')!;
+    expect(colour.call.args).toMatchObject({ asserts: [{ color: { expected: '#FFFFFF' } }] });
+    expect(colour.says).toMatch(/asked for the colour the screen shows there \(#FFFFFF\)$/);
+    expect(colour.judge(out(PASSED))).toBe('passed on #FFFFFF: All 1 asserts passed');
+    expect(colour.judge(out(FAILED))).toBeUndefined();
+  });
+  it('R-off still asks for the target\'s own colour', () => {
+    const off = rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, seen: '#000000' }));
+    expect(off.find((r) => r.verb === 'colour')!.call.args).toMatchObject({ asserts: [{ color: { expected: '#43A047' } }] });
+  });
+});
+
+describe('a target off the screen or outside its scroll view that its capture\'s tree did not list may be missing (notListed)', () => {
+  const NOT_FOUND = 'ERROR Timed out after 5000ms waiting for element id:"lab.edges.A" to appear';
+  // On CELL's 402x874 screen, beside the scroll view `list` (380–560): accepted, as averi never saw which holds it.
+  const ADB_STROKE = 'adb shell input swipe 201 699 201 175 300';
+  const unlisted = { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, scrollView: 'list', listed: { uiautomator: false } };
+  const android = (g: Geometry) => expectations('android', target(g, unlisted), { ...CELL, scrollViews: { list: rect(0, 380, 402, 180) } }, 'uiautomator');
+  it.each(['off-screen', 'outside-scroll-view'] as const)('%s: the tap that waited and sent nothing, the colour not found, the swipes for it — all accepted', (g) => {
+    const rs = android(g);
+    expect(verdict(rs, 'tap', out(NOT_FOUND))).toBeUndefined();
+    expect(verdict(rs, 'colour', out('1/1 asserts FAILED\nFAIL  element id:"lab.edges.A" … — not found within 1 s'))).toBeUndefined();
+    // Not listed, no scroll view to hold its strokes to: averi never saw which one holds it.
+    expect(verdict(rs, 'scroll_until', out(`ERROR scroll_until failed after 2 swipes — element never appeared in the tree`, [ADB_STROKE, ADB_STROKE]))).toBeUndefined();
+    expect(verdict(rs, 'tap', out(TAPPED, ['adb shell input tap 201 940']))).toBe(`Tapped: ${TAPPED}`);
+  });
+  it('listed by the replayed source (or not recorded, or another source unlisted): the same replies are no answer', () => {
+    for (const rs of [
+      expectations('android', target('off-screen', { ...unlisted, listed: { uiautomator: true } }), CELL, 'uiautomator'),
+      expectations('ios', target('off-screen', { ...unlisted, listed: { wda: true, idb: false } }), CELL, 'wda'),
+      rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null })),
+    ]) {
+      expect(verdict(rs, 'tap', out(NOT_FOUND))).toBe(`refused without scroll_until: ${NOT_FOUND}`);
+      expect(verdict(rs, 'colour', out('1/1 asserts FAILED\nFAIL  element id:"lab.edges.A" … — not found within 1 s'))).toMatch(/^not in the tree: /);
+    }
+  });
+});
+
+describe('R-stroke inside the target\'s own scroll view (where the truth names it and the capture its clip)', () => {
+  const cell: CellTruth = { ...CELL, scrollViews: { list: rect(0, 380, 402, 180) } };
+  const rs = expectations('ios', target('outside-scroll-view', { frame: rect(51, 620, 300, 64), reached: false, visible: null, scrollView: 'list' }), cell, 'wda');
+  it.each([
+    ['inside the scroll view', ['idb ui swipe 201 520 201 400 --duration 0.3'], undefined],
+    ['beside it, on the background (WDA on scroll-bounded)', [IDB_STROKE], 'touched down outside its scroll view list at (201,699): x'],
+  ])('%s', (_n, device, expected) => {
+    expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
+  });
+  it('a target in no scroll view, or one the state did not report: the screen\'s region only', () => {
+    const none = expectations('ios', target('outside-scroll-view', { frame: rect(51, 620, 300, 64), reached: false, visible: null, scrollView: 'other' }), cell, 'wda');
+    expect(verdict(none, 'scroll_until', out('x', [IDB_STROKE]))).toBeUndefined();
   });
 });
 
@@ -136,10 +192,10 @@ describe('R-fully: fully: true never calls a cut target "visible" where it is, w
     ['"visible after 1 swipe": a replayed tree never moves, so it stopped where it is', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), 'fully visible where it is partly-centre-in, after 1 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 1 swipe'],
     ['stuck', out('ERROR: stuck'), undefined],
   ])('%s', (_n, o, expected) => {
-    expect(verdict(rs, 'scroll_until', o, true)).toBe(expected);
+    expect(verdict(rs, 'fully', o)).toBe(expected);
   });
   it('asks toward the cut: down when its centre is below what shows, up when above', () => {
-    const call = (t: TargetTruth) => rows(t).find((r) => r.verb === 'scroll_until')!.call.args as { direction: string; fully: boolean };
+    const call = (t: TargetTruth) => rows(t).find((r) => r.verb === 'fully')!.call.args as { direction: string; fully: boolean };
     expect(call(target('partly-centre-in', { visible: rect(51, 670, 300, 30) }))).toMatchObject({ direction: 'down', fully: true });
     expect(call(target('partly-centre-in', { frame: rect(51, 80, 300, 64), visible: rect(51, 100, 300, 44) }))).toMatchObject({ direction: 'up', fully: true });
   });
@@ -175,6 +231,13 @@ describe('R-band: refused, never measured, never reached where it is', () => {
   });
   it('the colour assert fails closed on the band (ADR 0001)', () => {
     expect(verdict(rs, 'colour', out(PASSED))).toMatch(/^passed on/);
+  });
+  it('a band target whose probe fired (iOS, below the bar\'s touch area) is not expected refused: Tapped inside it, or nothing sent', () => {
+    const fired = rows(target('status-band', { frame: rect(51, 22, 300, 64), visible: rect(51, 22, 300, 64), reached: true }));
+    expect(verdict(fired, 'tap', out(TAPPED, ['idb ui tap 201 54']))).toBeUndefined();
+    expect(verdict(fired, 'tap', out('ERROR: under the status bar — scroll_until it first'))).toBeUndefined();
+    expect(verdict(fired, 'tap', out(TAPPED, ['idb ui tap 201 100']))).toBe(`Tapped outside what shows of it at (201,100): ${TAPPED}`);
+    expect(verdict(fired, 'tap', out('ERROR: refused', ['idb ui tap 201 54']))).toBe('refused, but sent idb ui tap 201 54');
   });
 });
 
@@ -234,7 +297,7 @@ describe('R-overlap: a whole target, its centre clear, its edge under a band or 
     expect(verdict(rs, 'scroll_until', out(VISIBLE))).toBeUndefined();
     expect(verdict(rs, 'scroll_until', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]))).toMatch(/^swiped 1×/);
     expect(verdict(rs, 'scroll_until', out('ERROR: stuck'))).toBe('stopped: ERROR: stuck');
-    expect(verdict(rs, 'scroll_until', out(VISIBLE), true)).toMatch(/^fully visible/);
-    expect(verdict(rs, 'scroll_until', out('ERROR: stuck under the tab bar'), true)).toBeUndefined();
+    expect(verdict(rs, 'fully', out(VISIBLE))).toMatch(/^fully visible/);
+    expect(verdict(rs, 'fully', out('ERROR: stuck under the tab bar'))).toBeUndefined();
   });
 });
