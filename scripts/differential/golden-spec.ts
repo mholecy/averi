@@ -1,6 +1,6 @@
 import type { Platform, SourceKind } from './corpus.js';
 import { DRAWN, type CellTruth, type TargetTruth } from '../truth/schema.js';
-import { nodeFramesIn } from '../truth/truth.js';
+import { elementOf, nodeFramesIn } from '../truth/truth.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
@@ -69,11 +69,11 @@ export * from './golden-spec/rows.js';
  */
 export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind, tree?: string): Expectation[] {
   if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
-  const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, t.text !== undefined ? { text: t.text } : { id: t.id });
+  const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
   // the screenshot) after the rows its geometry asks.
   const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, cell, source)]);
-  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, nodes)) : openRows(platform, t, undefined, nodes);
+  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, nodes)) : openRows(platform, t, nodes);
   return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell, nodes)]);
 }
 

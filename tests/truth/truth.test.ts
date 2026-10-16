@@ -10,6 +10,7 @@ import {
   consistency,
   controlPiece,
   controlConsistency,
+  elementOf,
   imePanels,
   listedIn,
   nodeFramesIn,
@@ -19,6 +20,7 @@ import {
   probePoint,
   readControlProbe,
   readTargetProbe,
+  selectorOf,
   situationOf,
   touchTargetOf,
   touchesAt,
@@ -52,6 +54,15 @@ const state = (over: Partial<LabState> = {}): LabState => ({
 const UNPINNED: CatalogForm = { ...FORM, submit: { tag: 'submit', title: 'Continue' } };
 const field = { tag: 'phone', inSheet: false };
 
+describe('elementOf / selectorOf — what a row asks a target by, replayed and live alike', () => {
+  it('a text target by its text, any other by its identifier', () => {
+    expect(elementOf({ id: 'lab.c.N', text: 'Payee’s name' })).toEqual({ text: 'Payee’s name' });
+    expect(elementOf({ id: 'lab.c.A' })).toEqual({ id: 'lab.c.A' });
+    expect(selectorOf({ id: 'lab.c.N', text: 'Payee’s name' })).toBe('text:"Payee’s name"');
+    expect(selectorOf({ id: 'lab.c.A' })).toBe('id:"lab.c.A"');
+  });
+});
+
 describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own reading', () => {
   const T = 'fixtures/truth/';
   const read = (f: string) => readFile(new URL(`../${T}${f}`, import.meta.url), 'utf8');
@@ -71,10 +82,25 @@ describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'LOGIN' })).toEqual([rect(10, 20, 100, 40)]);
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'A & B' })).toEqual([rect(0, 0, 5, 5)]);
   });
-  it('each frame once; an unreadable payload lists nothing', () => {
+  it('a text target found as textListedIn finds it: whitespace collapsed, a wrapped string one node', () => {
+    const wda = JSON.stringify({ value: { children: [{ label: 'Payee’s\nname', rect: rect(10, 20, 100, 40) }] } });
+    expect(nodeFramesIn(wda, 'wda', { text: 'Payee’s name' })).toEqual([rect(10, 20, 100, 40)]);
+    const xml = '<hierarchy><node text="  Jiří  Dvořák " bounds="[1,2][11,22]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { text: 'Jiří Dvořák' })).toEqual([rect(1, 2, 10, 20)]);
+    // an identifier is matched exactly, never collapsed
+    expect(nodeFramesIn('[{"AXUniqueId":"lab.c.A ","frame":{"x":0,"y":0,"width":1,"height":1}}]', 'idb', { id: 'lab.c.A' })).toEqual([]);
+  });
+  it('each frame once; an unreadable payload is an error, not an empty tree', () => {
     const xml = '<hierarchy><node resource-id="a" bounds="[0,0][5,5]"><node resource-id="a" bounds="[0,0][5,5]" /></node><node resource-id="a" bounds="[0,0][5,9]" /></hierarchy>';
     expect(nodeFramesIn(xml, 'uiautomator', { id: 'a' })).toEqual([rect(0, 0, 5, 5), rect(0, 0, 5, 9)]);
-    expect(nodeFramesIn('not json', 'wda', { id: 'a' })).toEqual([]);
+    expect(() => nodeFramesIn('not json', 'wda', { id: 'a' })).toThrow(/no JSON/);
+    expect(() => nodeFramesIn('{}', 'uiautomator', { id: 'a' })).toThrow(/no XML dump/);
+  });
+  it('uiautomator attributes decoded as textListedIn decodes them: numeric character references too', () => {
+    // uiautomator writes non-ASCII as numeric references (docs/bugs/2026-10-15-android-numeric-character-references-
+    // in-uiautomator-attributes-are-not-decoded.md); the text target's node is found by its string.
+    const xml = '<hierarchy><node text="&#352;&#357;astn&#xFD;" bounds="[1,2][11,22]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { text: 'Šťastný' })).toEqual([rect(1, 2, 10, 20)]);
   });
 });
 
@@ -652,10 +678,16 @@ describe('pieceAfterBack: a control\'s piece in the layout after back', () => {
 
 describe('listedIn: whether a raw tree lists a node identified as the target', () => {
   it('the id between quotes, as WDA, idb and uiautomator write it — not a longer id that starts with it', () => {
-    expect(listedIn('{"rawIdentifier": "lab.c.A", "rect": {}}', 'lab.c.A')).toBe(true);
-    expect(listedIn('[{"AXUniqueId":"lab.c.A"}]', 'lab.c.A')).toBe(true);
-    expect(listedIn('<node resource-id="lab.c.A" bounds="[0,0][1,1]"/>', 'lab.c.A')).toBe(true);
-    expect(listedIn('<node resource-id="lab.c.A.box"/>', 'lab.c.A')).toBe(false);
-    expect(listedIn('<node resource-id="lab.c.B"/>', 'lab.c.A')).toBe(false);
+    expect(listedIn('{"rawIdentifier": "lab.c.A", "rect": {}}', 'wda', 'lab.c.A')).toBe(true);
+    expect(listedIn('[{"AXUniqueId":"lab.c.A"}]', 'idb', 'lab.c.A')).toBe(true);
+    expect(listedIn('<node resource-id="lab.c.A" bounds="[0,0][1,1]"/>', 'uiautomator', 'lab.c.A')).toBe(true);
+    expect(listedIn('<node resource-id="lab.c.A.box"/>', 'uiautomator', 'lab.c.A')).toBe(false);
+    expect(listedIn('<node resource-id="lab.c.B"/>', 'uiautomator', 'lab.c.A')).toBe(false);
+  });
+  it("by the source's identifier field only: the id quoted in a label, a value or a text is not the node", () => {
+    expect(listedIn('[{"AXUniqueId":null,"AXLabel":"lab.c.A"}]', 'idb', 'lab.c.A')).toBe(false);
+    expect(listedIn('{"value":{"rawIdentifier":null,"label":"lab.c.A","value":"lab.c.A"}}', 'wda', 'lab.c.A')).toBe(false);
+    expect(listedIn('{"value":{"children":[{"name":"lab.c.A"}]}}', 'wda', 'lab.c.A')).toBe(true);
+    expect(listedIn('<hierarchy><node resource-id="" text="lab.c.A" content-desc="lab.c.A"/></hierarchy>', 'uiautomator', 'lab.c.A')).toBe(false);
   });
 });

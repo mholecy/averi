@@ -1,5 +1,6 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
+import { claimsTap, isError } from '../../truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
@@ -93,7 +94,7 @@ export type FormExpectation = Expectation & { target: string };
 export const tappedAfterBack =
   (frame: Rect) =>
   (o: Outcome): string | undefined => {
-    if (!o.reply.startsWith('Tapped')) return `not tapped: ${first(o)}`;
+    if (!claimsTap(o.reply)) return `not tapped: ${first(o)}`;
     const back = o.device.findIndex((d) => d.startsWith('adb shell input keyevent 4'));
     const tapAt = o.device.findIndex((d) => /^adb shell input tap /.test(d));
     if (back < 0 || back > tapAt) return said(o, 'Tapped without a back before the tap');
@@ -106,7 +107,7 @@ export const tappedAfterBack =
 export const notTappedOrInPiece =
   (piece: Rect) =>
   (o: Outcome): string | undefined => {
-    if (!o.reply.startsWith('Tapped')) return notTapped(o);
+    if (!claimsTap(o.reply)) return notTapped(o);
     return tappedInside(o, piece, 'its piece');
   };
 
@@ -121,7 +122,7 @@ export const tapAfterBackOnPiece =
   (o: Outcome): string | undefined => {
     const atCentre = tapPoints(o).filter((p) => nearPoint(p, centre));
     if (fires !== undefined && atCentre.length > 0) return said(o, `tapped at its centre ${pointsText(atCentre)}, which after back ${fires}`);
-    if (!o.reply.startsWith('Tapped')) return notTapped(o);
+    if (!claimsTap(o.reply)) return notTapped(o);
     if (piece === undefined) return said(o, 'Tapped, where no tap after back reached it');
     return tappedInside(o, piece, 'its piece after back');
   };
@@ -210,7 +211,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
   switch (c.situation) {
     case 'open': {
       const rows: FormExpectation[] = [
-        { target, verb: 'tap', says: 'Tapped', call: tap, judge: (o) => (o.reply.startsWith('Tapped') ? undefined : `not tapped: ${first(o)}`) },
+        { target, verb: 'tap', says: 'Tapped', call: tap, judge: (o) => (claimsTap(o.reply) ? undefined : `not tapped: ${first(o)}`) },
       ];
       if (c.kind === 'button' && keyboard !== null && keyboard !== undefined) {
         rows.push({
@@ -287,7 +288,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           says: `not reached without a swipe; every touch-down above the keyboard's top (y ${top})${panels.length === 0 ? '' : ` and off its panel${panels.length === 1 ? '' : 's'} ${panels.map((r) => `${r.x},${r.y} ${r.width}x${r.height}`).join(', ')}`}`,
           call: scroll,
           judge: (o) => {
-            if (!o.reply.startsWith('ERROR') && swipes(o) === 0) return `reached with no swipe, under the keyboard: ${first(o)}`;
+            if (!isError(o.reply) && swipes(o) === 0) return `reached with no swipe, under the keyboard: ${first(o)}`;
             const under = touchDowns(o).filter(underKeyboard);
             return under.length > 0 ? `touched down under the keyboard at ${pointsText(under)}: ${first(o)}` : undefined;
           },
@@ -352,7 +353,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           verb: 'scroll_until',
           says: `not reached with no swipe (a tap at its centre fires ${other})`,
           call: scroll,
-          judge: (o) => (!o.reply.startsWith('ERROR') && swipes(o) === 0 ? `reached with no swipe where a tap fires ${other}: ${first(o)}` : undefined),
+          judge: (o) => (!isError(o.reply) && swipes(o) === 0 ? `reached with no swipe where a tap fires ${other}: ${first(o)}` : undefined),
         },
       ];
     }

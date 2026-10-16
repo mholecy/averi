@@ -136,7 +136,7 @@ describe('a coloured target, open', () => {
   it('no node, or none the probe agrees with: the reach around the probe point', () => {
     // a node whose centre lies outside the probe's reach (±50 x ±10.67 of (201,142)): the tree's word against the
     // device's, not held as the truth
-    for (const tree of [wda([]), wda([rect(51, 300, 300, 64)]), 'not json']) {
+    for (const tree of [wda([]), wda([rect(51, 300, 300, 64)])]) {
       const row = atNode(tree);
       expect(row.says).toBe('Tapped at its probe point (201,142)');
       check(row.judge, [
@@ -144,6 +144,8 @@ describe('a coloured target, open', () => {
         ['Tapped id:"lab.x"', ['idb ui tap 201 162'], /^Tapped off its probe point/],
       ]);
     }
+    // a tree the harness cannot read is its own error (truth.ts#rawNodes), never "no node"
+    expect(() => atNode('not json')).toThrow(/a wda payload that is no JSON/);
   });
   it('several frames: the tap at one of their centres the probe agrees with', () => {
     const row = atNode(wda([rect(51, 110, 300, 64), rect(51, 114, 300, 64), rect(51, 300, 300, 64)]));

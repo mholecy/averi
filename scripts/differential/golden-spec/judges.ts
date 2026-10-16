@@ -1,5 +1,5 @@
 import type { Call, Outcome } from '../differential.js';
-import { VISIBLE_STOP } from '../../truth/replies.js';
+import { allPassed, ASSERT_SUMMARY, ASSERTS_FAILED, claimsTap, isError, VISIBLE_STOP } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
 
@@ -37,7 +37,7 @@ export interface Expectation {
 }
 
 export const BUDGET_MS = 1_000;
-export const failed = (o: Outcome) => !o.reply.startsWith('All 1 asserts passed');
+export const failed = (o: Outcome) => !allPassed(o.reply);
 /**
  * The device's taps and swipe touch-downs as the fake device logged them (fake-device.ts): `idb ui tap x y`, `idb ui
  * swipe x1 y1 x2 y2 …` on iOS; `adb shell input tap x y`, `adb shell input swipe x1 y1 x2 y2 …` on Android.
@@ -50,12 +50,12 @@ export const strokes = (o: Outcome): { from: Point; to: Point }[] =>
     return m === null ? [] : [{ from: { x: Number(m[1]), y: Number(m[2]) }, to: { x: Number(m[3]), y: Number(m[4]) } }];
   });
 export const touchDowns = (o: Outcome) => strokes(o).map((s) => s.from);
-export const passed = (o: Outcome) => o.reply.startsWith('All 1 asserts passed');
+export const passed = (o: Outcome) => allPassed(o.reply);
 export const swipes = (o: Outcome) => touchDowns(o).length;
 /** The reply's first line — an assert's first verdict line, under its `N/N asserts …` summary. */
 export const first = (o: Outcome) => {
   const lines = o.reply.split('\n');
-  return (/^\d+\/\d+ asserts|^All \d+ asserts/.test(lines[0]) && lines.length > 1 ? lines[1] : lines[0]).slice(0, 200);
+  return (ASSERT_SUMMARY.test(lines[0]) && lines.length > 1 ? lines[1] : lines[0]).slice(0, 200);
 };
 /** The reply without the selectors it echoes: `id:"lab.form-keyboard.vs"` must not read as the word keyboard. */
 export const ownWords = (o: Outcome) => o.reply.replace(/\b[a-z]+:"(?:[^"\\]|\\.)*"/gi, '<selector>');
@@ -125,17 +125,17 @@ export const sent = (o: Outcome) => o.device.filter((c) => /^(idb ui|adb shell i
 export type ReplyKind = 'not found' | 'Tapped' | 'visible' | 'PASS' | 'FAIL' | 'refused' | 'other';
 export function replyKind(o: Outcome): ReplyKind {
   if (notInTree(o)) return 'not found';
-  if (o.reply.startsWith('Tapped')) return 'Tapped';
+  if (claimsTap(o.reply)) return 'Tapped';
   if (VISIBLE_STOP.test(o.reply)) return 'visible';
   if (passed(o)) return 'PASS';
-  if (/^\d+\/\d+ asserts FAILED/.test(o.reply)) return 'FAIL';
-  if (o.reply.startsWith('ERROR')) return 'refused';
+  if (ASSERTS_FAILED.test(o.reply)) return 'FAIL';
+  if (isError(o.reply)) return 'refused';
   return 'other';
 }
 /** A tap that must not land: not `Tapped`, and no tap sent. */
-export const notTapped = (o: Outcome) => (o.reply.startsWith('Tapped') ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
+export const notTapped = (o: Outcome) => (claimsTap(o.reply) ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 /** A plain stop that must reach the target where it is: not an ERROR, and no swipe. */
-export const reachedWithNoSwipe = (o: Outcome) => (o.reply.startsWith('ERROR') ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined);
+export const reachedWithNoSwipe = (o: Outcome) => (isError(o.reply) ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined);
 /** An assert that must pass. */
 export const passes = (o: Outcome) => (passed(o) ? undefined : `failed: ${first(o)}`);
 
@@ -178,7 +178,7 @@ export function strokesOff(o: Outcome, cell: Pick<CellTruth, 'screen' | 'safeAre
  * refusal is a mismatch too; else a refusal that sent nothing is as good (a cut target averi may refuse, ADR 0005).
  */
 export function landed(o: Outcome, where: Rect | null | undefined, fired: boolean, mustTap: boolean): string | undefined {
-  if (!o.reply.startsWith('Tapped')) return mustTap ? `not tapped: ${first(o)}` : notTapped(o);
+  if (!claimsTap(o.reply)) return mustTap ? `not tapped: ${first(o)}` : notTapped(o);
   if (!fired || where === null || where === undefined) return `Tapped where no probe fired it: ${first(o)}`;
   return tappedInside(o, where, 'what shows of it');
 }

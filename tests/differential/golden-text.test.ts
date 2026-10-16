@@ -155,14 +155,22 @@ describe('a covered string missing from the tree (TargetTruth.textListed)', () =
 describe('textListedIn: a node carrying the string, per payload', () => {
   it('uiautomator: text or content-desc, entities decoded, whitespace collapsed; not a substring', () => {
     const xml = '<hierarchy><node text="1&#160;234,56&#160;€" content-desc="" /><node text="" content-desc="Payee&apos;s" /></hierarchy>';
-    expect(textListedIn(xml, '1\u00a0234,56\u00a0€')).toBe(true);
-    expect(textListedIn(xml, "Payee's")).toBe(true);
-    expect(textListedIn(xml, '234,56')).toBe(false);
+    expect(textListedIn(xml, 'uiautomator', '1\u00a0234,56\u00a0€')).toBe(true);
+    expect(textListedIn(xml, 'uiautomator', "Payee's")).toBe(true);
+    expect(textListedIn(xml, 'uiautomator', '234,56')).toBe(false);
   });
   it('WDA / idb JSON: any string value', () => {
-    expect(textListedIn(JSON.stringify([{ AXLabel: 'Pokračovať na súhrn', AXValue: null }]), 'Pokračovať na súhrn')).toBe(true);
-    expect(textListedIn(JSON.stringify({ value: { label: 'x', children: [{ label: 'Šťastný' }] } }), 'Šťastný')).toBe(true);
-    expect(textListedIn(JSON.stringify([{ AXLabel: 'Continue' }]), 'Pokračovať')).toBe(false);
+    expect(textListedIn(JSON.stringify([{ AXLabel: 'Pokračovať na súhrn', AXValue: null }]), 'idb', 'Pokračovať na súhrn')).toBe(true);
+    expect(textListedIn(JSON.stringify({ value: { label: 'x', children: [{ label: 'Šťastný' }] } }), 'wda', 'Šťastný')).toBe(true);
+    expect(textListedIn(JSON.stringify([{ AXLabel: 'Continue' }]), 'idb', 'Pokračovať')).toBe(false);
+  });
+  it('a uiautomator node by its text or content-desc only, not another attribute', () => {
+    const xml = '<hierarchy><node text="" content-desc="" resource-id="Prihlásiť" bounds="[0,0][5,5]" /></hierarchy>';
+    expect(textListedIn(xml, 'uiautomator', 'Prihlásiť')).toBe(false);
+  });
+  it('a payload that is not what its source writes is an error, not an empty tree (truth.ts#rawNodes)', () => {
+    expect(() => textListedIn('not json', 'wda', 'x')).toThrow(/no JSON/);
+    expect(() => textListedIn('[{"AXLabel":"x"}]', 'uiautomator', 'x')).toThrow(/no XML dump/);
   });
 });
 

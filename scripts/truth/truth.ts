@@ -53,63 +53,17 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
 }
 
 /**
- * Whether a raw tree's payload (WDA's JSON, idb's JSON list, a uiautomator dump) lists a node identified as `id`: the
- * id between quotes, as each payload writes an identifier (`"lab.x.A"`, `resource-id="lab.x.A"`), so `lab.x.A.box`
- * is not `lab.x.A`.
+ * What a row asks a target by — as an assert's `element` names it: a text target (CatalogTarget.text) by its string, as
+ * a test names a label; any other by its identifier. The one rule the replayed golden (golden-spec.ts#expectations,
+ * base.ts#openRows) and the live one (live-visibility.ts) share; selectorOf spells it as a tool's selector.
  */
-export function listedIn(payload: string, id: string): boolean {
-  return payload.includes(`"${id}"`);
-}
-
-/**
- * The frames of the nodes a raw tree's payload lists as the target — identified as `id` (WDA's `rawIdentifier` or
- * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`), or, for a text target, labelled exactly `text` (WDA's
- * `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) — each frame once, in the tree's own units (WDA's
- * `rect`, idb's `frame`, uiautomator's `bounds`), in the payload's order. The harness's own reading, no averi code: the
- * open tap's judge holds averi to the centre of the node it finds (golden-spec/base.ts#atProbe). An unreadable payload
- * lists nothing.
- */
-export function nodeFramesIn(payload: string, source: SourceKind, by: { id: string } | { text: string }): Rect[] {
-  const frames: Rect[] = [];
-  const add = (r: Rect) => {
-    if (!frames.some((f) => f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height)) frames.push(r);
-  };
-  const is = (...values: unknown[]) => values.some((v) => v === ('id' in by ? by.id : by.text));
-  if (source === 'uiautomator') {
-    const unescape = (s: string) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    for (const [node] of payload.matchAll(/<node\b[^>]*>/g)) {
-      const attr = (name: string) => {
-        const m = new RegExp(`\\s${name}="([^"]*)"`).exec(node);
-        return m === null ? undefined : unescape(m[1]);
-      };
-      if (!('id' in by ? is(attr('resource-id')) : is(attr('text'), attr('content-desc')))) continue;
-      const b = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(attr('bounds') ?? '');
-      if (b !== null) add({ x: +b[1], y: +b[2], width: +b[3] - +b[1], height: +b[4] - +b[2] });
-    }
-    return frames;
-  }
-  let json: unknown;
-  try {
-    json = JSON.parse(payload);
-  } catch {
-    return frames;
-  }
-  const rectOf = (r: unknown): Rect | undefined => {
-    const o = r as Partial<Rect> | null | undefined;
-    return typeof o?.x === 'number' && typeof o.y === 'number' && typeof o.width === 'number' && typeof o.height === 'number' ? { x: o.x, y: o.y, width: o.width, height: o.height } : undefined;
-  };
-  const visit = (n: unknown) => {
-    if (n === null || typeof n !== 'object') return;
-    if (Array.isArray(n)) return n.forEach(visit);
-    const o = n as Record<string, unknown>;
-    const match = source === 'idb' ? ('id' in by ? is(o.AXUniqueId) : is(o.AXLabel)) : 'id' in by ? is(o.rawIdentifier, o.name) : is(o.label);
-    const r = rectOf(source === 'idb' ? o.frame : o.rect);
-    if (match && r !== undefined) add(r);
-    for (const [k, v] of Object.entries(o)) if (k === 'value' || k === 'children') visit(v);
-  };
-  visit(json);
-  return frames;
-}
+export type AssertElement = { id: string } | { text: string };
+export const elementOf = (t: Pick<TargetTruth, 'id' | 'text'>): AssertElement => (t.text !== undefined ? { text: t.text } : { id: t.id });
+/** elementOf as a tap's or a scroll_until's selector: `text:"…"` or `id:"…"`. */
+export const selectorOf = (t: Pick<TargetTruth, 'id' | 'text'>) => {
+  const e = elementOf(t);
+  return 'text' in e ? `text:"${e.text}"` : `id:"${e.id}"`;
+};
 
 /** XML's character references and the five named entities, decoded. */
 const decodeXml = (v: string) =>
@@ -120,24 +74,92 @@ const decodeXml = (v: string) =>
 const spaced = (v: string) => v.replace(/\s+/g, ' ').trim();
 
 /**
- * Whether a raw tree's payload lists a node carrying `text` as its own string: a uiautomator node's `text` or
- * `content-desc` (entities decoded), or any string value of WDA's or idb's JSON (a label, a value) — compared with
- * whitespace collapsed. A text target's `textListed` (schema.ts#TargetTruth): uiautomator dumps no node the user cannot
- * see, so a string wholly under the chrome may be missing while its box is listed by its uncovered strip.
+ * Every node of a raw tree's payload, as its own fields: a uiautomator dump's `<node>` elements, each attribute's value
+ * decoded (decodeXml: the named entities and the numeric character references uiautomator writes for non-ASCII); WDA's
+ * JSON (`value`, nested `children`) or idb's JSON list, each object of it. The harness's one reader of a raw tree
+ * (listedIn, nodeFramesIn, textListedIn), no averi code. A payload that is not what its source writes is an error, not an empty
+ * tree: a harness misreading its own capture would otherwise judge or record "not listed".
  */
-export function textListedIn(payload: string, text: string): boolean {
-  const want = spaced(text);
-  if (payload.trimStart().startsWith('<')) {
-    return [...payload.matchAll(/\s(?:text|content-desc)="([^"]*)"/g)].some((m) => spaced(decodeXml(m[1])) === want);
+function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[] {
+  if (source === 'uiautomator') {
+    if (!payload.trimStart().startsWith('<')) throw new Error(`a uiautomator payload that is no XML dump: ${JSON.stringify(payload.slice(0, 80))}`);
+    return [...payload.matchAll(/<node\b[^>]*>/g)].map(([node]) => Object.fromEntries([...node.matchAll(/\s([\w-]+)="([^"]*)"/g)].map((m) => [m[1], decodeXml(m[2])])));
   }
-  const strings: string[] = [];
-  const walk = (v: unknown): void => {
-    if (typeof v === 'string') strings.push(v);
-    else if (Array.isArray(v)) v.forEach(walk);
-    else if (v !== null && typeof v === 'object') Object.values(v).forEach(walk);
+  let json: unknown;
+  try {
+    json = JSON.parse(payload);
+  } catch (e) {
+    throw new Error(`a ${source} payload that is no JSON: ${(e as Error).message}`);
+  }
+  const nodes: Record<string, unknown>[] = [];
+  const visit = (n: unknown): void => {
+    if (n === null || typeof n !== 'object') return;
+    if (Array.isArray(n)) return n.forEach(visit);
+    nodes.push(n as Record<string, unknown>);
+    Object.values(n).forEach(visit);
   };
-  walk(JSON.parse(payload));
-  return strings.some((v) => spaced(v) === want);
+  visit(json);
+  return nodes;
+}
+
+/**
+ * Whether a raw node is the target `by` names, as each source writes it: identified as `id` (WDA's `rawIdentifier` or
+ * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`) exactly — `lab.x.A.box` is not `lab.x.A`; or, for a text
+ * target, labelled `text` (WDA's `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) compared as
+ * textListedIn compares a string: whitespace collapsed (spaced), so a string the app wraps onto lines is one node in
+ * both readings.
+ */
+function isTarget(o: Record<string, unknown>, source: SourceKind, by: AssertElement): boolean {
+  const values = 'id' in by ? (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]) : source === 'uiautomator' ? [o.text, o['content-desc']] : source === 'idb' ? [o.AXLabel] : [o.label];
+  return 'id' in by ? values.some((v) => v === by.id) : values.some((v) => typeof v === 'string' && spaced(v) === spaced(by.text));
+}
+
+/**
+ * Whether a raw tree's payload (WDA's JSON, idb's JSON list, a uiautomator dump) lists a node identified as `id`
+ * (isTarget: the source's identifier field, exactly) — TargetTruth.listed, recorded by the capture.
+ */
+export function listedIn(payload: string, source: SourceKind, id: string): boolean {
+  return rawNodes(payload, source).some((o) => isTarget(o, source, { id }));
+}
+
+/**
+ * The frames of the nodes a raw tree's payload lists as the target (isTarget: by its identifier, or a text target by its
+ * string) — each frame once, in the tree's own units (WDA's `rect`, idb's `frame`, uiautomator's `bounds`), in the
+ * payload's order. The harness's own reading (rawNodes), no averi code: the open tap's judge holds averi to the centre
+ * of the node it finds (golden-spec/base.ts#atProbe).
+ */
+export function nodeFramesIn(payload: string, source: SourceKind, by: AssertElement): Rect[] {
+  const frames: Rect[] = [];
+  const add = (r: Rect) => {
+    if (!frames.some((f) => f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height)) frames.push(r);
+  };
+  const rectOf = (r: unknown): Rect | undefined => {
+    const o = r as Partial<Rect> | null | undefined;
+    return typeof o?.x === 'number' && typeof o.y === 'number' && typeof o.width === 'number' && typeof o.height === 'number' ? { x: o.x, y: o.y, width: o.width, height: o.height } : undefined;
+  };
+  for (const o of rawNodes(payload, source)) {
+    if (!isTarget(o, source, by)) continue;
+    if (source === 'uiautomator') {
+      const b = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(typeof o.bounds === 'string' ? o.bounds : '');
+      if (b !== null) add({ x: +b[1], y: +b[2], width: +b[3] - +b[1], height: +b[4] - +b[2] });
+      continue;
+    }
+    const r = rectOf(source === 'idb' ? o.frame : o.rect);
+    if (r !== undefined) add(r);
+  }
+  return frames;
+}
+
+/**
+ * Whether a raw tree's payload lists a node carrying `text` as its own string: a uiautomator node's `text` or
+ * `content-desc`, or any string field of a WDA or idb node (a label, a value) — compared with whitespace collapsed
+ * (rawNodes reads the payload). A text target's `textListed` (schema.ts#TargetTruth): uiautomator dumps no node the
+ * user cannot see, so a string wholly under the chrome may be missing while its box is listed by its uncovered strip.
+ */
+export function textListedIn(payload: string, source: SourceKind, text: string): boolean {
+  const want = spaced(text);
+  const fields = (o: Record<string, unknown>) => (source === 'uiautomator' ? [o.text, o['content-desc']] : Object.values(o));
+  return rawNodes(payload, source).some((o) => fields(o).some((v) => typeof v === 'string' && spaced(v) === want));
 }
 
 /** The events a probe produced: what the app logged after the launch it was tapped on, without the time. */

@@ -1,7 +1,8 @@
 import type { Platform } from '../corpus.js';
 import type { Rect, TargetTruth } from '../../truth/schema.js';
 import type { Outcome } from '../differential.js';
-import { pointText, probePoint, touchesAt } from '../../truth/truth.js';
+import { claimsTap } from '../../truth/replies.js';
+import { pointText, probePoint, selectorOf, touchesAt } from '../../truth/truth.js';
 import { BUDGET_MS, classed, first, MOVED_TAP, ownWords, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
 
 /**
@@ -12,11 +13,13 @@ import { BUDGET_MS, classed, first, MOVED_TAP, ownWords, passes, pointsText, rea
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` at the centre of its node in the recorded tree, or where the tree lists none, at its probe point (atProbe) | passes on its own colour | visible after 0 swipes |
  *
- * `selector`: what the tap and scroll_until ask by — the target's identifier, or a text target's text
+ * The tap and scroll_until ask by truth.ts#selectorOf — the target's identifier, or a text target's text
  * (golden-spec/false-covers.ts#ownPartsRows). `nodes`: the frames of the nodes the replayed tree lists as the target,
- * by that selector (truth.ts#nodeFramesIn; golden-spec.ts#expectations reads them) — none given, none known.
+ * by that same element (truth.ts#elementOf, #nodeFramesIn; golden-spec.ts#expectations reads them) — none given, none
+ * known.
  */
-export function openRows(platform: Platform, t: TargetTruth, selector = `id:"${t.id}"`, nodes: readonly Rect[] = []): Expectation[] {
+export function openRows(platform: Platform, t: TargetTruth, nodes: readonly Rect[] = []): Expectation[] {
+  const selector = selectorOf(t);
   const element = { id: t.id };
   const centres = nodeCentres(nodes, t);
   return ([
@@ -24,7 +27,7 @@ export function openRows(platform: Platform, t: TargetTruth, selector = `id:"${t
       verb: 'tap',
       says: centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`,
       call: { tool: 'tap', args: { platform, selector } },
-      judge: (o) => (o.reply.startsWith('Tapped') ? atProbe(o, t, nodes) : `not tapped: ${first(o)}`),
+      judge: (o) => (claimsTap(o.reply) ? atProbe(o, t, nodes) : `not tapped: ${first(o)}`),
     },
     {
       verb: 'colour',

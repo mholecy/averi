@@ -1,7 +1,7 @@
 import type { Platform, SourceKind } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
-import { navigationBandTakes, parseGeometry } from '../../truth/truth.js';
+import { navigationBandTakes, parseGeometry, type AssertElement } from '../../truth/truth.js';
 import { BUDGET_MS, classed, first, passed, passes, said, type Expectation } from './judges.js';
 
 /**
@@ -51,18 +51,15 @@ export const ocrPasses = (o: Outcome): string | undefined => {
 /** An `ocr` reply measured what lies there (a PASS, or a FAIL on a reading) rather than failing closed. */
 export const measuredText = (o: Outcome) => passed(o) || (!UNCHECKED.test(o.reply) && READ.test(o.reply));
 
-/** What an assert names its element by: an identifier, or a text target's string (as a test names a label). */
-export type ElementSpec = { id: string } | { text: string };
-
 /** The ocr assert on `element`, asked for `text`. */
-const ocrCall = (platform: Platform, element: ElementSpec, text: string): Call => ({ tool: 'assert', args: { platform, asserts: [{ element, ocr: { text }, timeout: BUDGET_MS }] } });
+const ocrCall = (platform: Platform, element: AssertElement, text: string): Call => ({ tool: 'assert', args: { platform, asserts: [{ element, ocr: { text }, timeout: BUDGET_MS }] } });
 
 /**
  * An ocr row that must fail closed: something is drawn over `element` (`over`: a band, the chrome, the soft keyboard —
  * golden-spec/forms.ts's under-keyboard controls) — a PASS or a reading measured that, not the element. Asked for the
  * element's own string.
  */
-export function ocrFailsClosed(platform: Platform, element: ElementSpec, text: string, over: string): Expectation {
+export function ocrFailsClosed(platform: Platform, element: AssertElement, text: string, over: string): Expectation {
   return {
     verb: 'ocr',
     says: `fails closed (${over}): never a reading of what is drawn over it`,

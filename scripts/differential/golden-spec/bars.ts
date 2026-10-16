@@ -38,7 +38,7 @@ export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, nod
   const { kind, name } = parseGeometry(g);
   // iOS's home-indicator band: the tap is the app's, and consistency holds the target reached and drawn there
   // (truth.ts#navigationBandTakes) — else it is broken and asked nothing.
-  if (g === 'nav-band' && platform === 'ios') return openRows(platform, t, undefined, nodes);
+  if (g === 'nav-band' && platform === 'ios') return openRows(platform, t, nodes);
   if (g === 'status-band' || g === 'nav-band') {
     return [bandTap(platform, t), bandColour(platform, t, cell), notReachedStill(platform, t, cell, 'R-band')].map(classed);
   }

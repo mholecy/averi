@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { directionOf, isOverlap, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { VISIBLE_STOP } from '../../truth/replies.js';
+import { ASSERTS_FAILED, claimsTap, isError, VISIBLE_STOP } from '../../truth/replies.js';
 import { BUDGET_MS, DISMISSAL_COVERED, first, FLUSH_PROBED, landed, notInTree, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, scrollAdvice, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
@@ -43,8 +43,6 @@ const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id'>, direction: '
   tool: 'scroll_until',
   args: { platform, selector: `id:"${t.id}"`, direction, ...(fully && { fully: true }) },
 });
-
-export { directionOf } from '../../truth/truth.js';
 
 /**
  * The options of a row type whose truth may allow the target missing from the tree: `absent`, why it may (the caller's,
@@ -123,7 +121,7 @@ export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth):
     verb: 'colour',
     says: `R-band (the navigation band under ${cell.navigation} navigation, the app's): passes on its own colour ${t.color}, or fails closed`,
     call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: BUDGET_MS }] } },
-    judge: (o) => (passed(o) || /^\d+\/\d+ asserts FAILED/.test(o.reply) ? undefined : said(o, 'neither passed nor failed')),
+    judge: (o) => (passed(o) || ASSERTS_FAILED.test(o.reply) ? undefined : said(o, 'neither passed nor failed')),
   };
 }
 
@@ -163,7 +161,7 @@ export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTr
     verb: 'scroll_until',
     says: `${row}: not reached where it is (the stop fails; a replayed tree never moves)`,
     call: scrollCall(platform, t, directionOf(t, cell)),
-    judge: (o) => (o.reply.startsWith('ERROR') ? undefined : said(o, `reached where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing`)),
+    judge: (o) => (isError(o.reply) ? undefined : said(o, `reached where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing`)),
   };
 }
 
@@ -254,7 +252,7 @@ export function dismissRow(platform: Platform, control: { tag: string; id: strin
       if (keyboard === undefined) return undefined;
       const under = tapPoints(o).filter((p) => within(p, keyboard));
       if (under.length > 0) return said(o, `tapped under the keyboard at ${pointsText(under)}`);
-      return o.reply.startsWith('Tapped') ? said(o, 'Tapped while the keyboard still covers it') : undefined;
+      return claimsTap(o.reply) ? said(o, 'Tapped while the keyboard still covers it') : undefined;
     },
   };
 }

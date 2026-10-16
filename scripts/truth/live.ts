@@ -12,7 +12,8 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { judgeDismissal, visibilityCases, type Verdict as VisibilityVerdict } from './live-visibility.js';
+import { judgeDismissal, visibilityCases, type LiveVerdict } from './live-visibility.js';
+import { allPassed, claimsTap, isError } from './replies.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
 /**
@@ -117,8 +118,6 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-type Verdict = VisibilityVerdict;
-
 interface Case {
   id: string;
   group: 'forms' | 'visibility' | 'dismissal';
@@ -135,7 +134,7 @@ interface Case {
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
    * read right after call i, for a visibility case (its stop judged before the tap after it ran); else empty.
    */
-  judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[]): Verdict;
+  judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[]): LiveVerdict;
 }
 
 const id = (cell: string, tag: string) => `id:"lab.${cell}.${tag}"`;
@@ -145,20 +144,19 @@ const fill = (cell: string, tag: string, text: string, clear?: boolean): Call =>
 });
 const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
 const claims = (reply: string) => /^(Filled|Cleared|Tapped)/.test(reply) && !/NOT verified/.test(reply);
-const failedReply = (reply: string) => reply.startsWith('ERROR');
 const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
 
 /** The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). */
 const holds =
   (tag: string, want: string) =>
-  (s: LabState, replies: string[], _source?: Source, launched?: LabState): Verdict => {
+  (s: LabState, replies: string[], _source?: Source, launched?: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
     // LOUD splits by what averi left behind: the field as the launch left it, or changed (a part typed, a part cleared).
     const before = launched === undefined ? undefined : valueOf(launched, tag);
     const left = before === undefined ? '' : got === before ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
     const last = replies[replies.length - 1];
     if (got === want) {
-      return failedReply(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
+      return isError(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
     }
     return claims(last)
       ? { outcome: 'MISMATCH', why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
@@ -182,11 +180,11 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [{ tool: 'tap', args: { selector: id(K, 'vs') } }],
     judge: (s, [reply], source) =>
       source === 'uiautomator'
-        ? reply.startsWith('Tapped') !== (s.focus === 'vs')
+        ? claimsTap(reply) !== (s.focus === 'vs')
           ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}` }
-          : reply.startsWith('Tapped') ? { outcome: 'ok', why: short(reply) } : { outcome: 'LOUD', why: `not tapped, the focus on ${s.focus}: ${short(reply)}` }
+          : claimsTap(reply) ? { outcome: 'ok', why: short(reply) } : { outcome: 'LOUD', why: `not tapped, the focus on ${s.focus}: ${short(reply)}` }
       : s.focus !== 'postcode' ? { outcome: 'MISMATCH', why: `the focus moved to ${s.focus}: ${short(reply)}` }
-      : reply.startsWith('Tapped') ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus stayed on postcode` }
+      : claimsTap(reply) ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus stayed on postcode` }
       : { outcome: 'ok', why: short(reply) },
   },
   {
@@ -198,7 +196,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     says: 'a tap under the keyboard, keyboardDismiss on the title: wda hides it and taps; idb refuses (the list is inert)',
     calls: [{ tool: 'tap', args: { selector: id(K, 'vs') } }],
     judge: (s, [reply], source) => {
-      const tapped = reply.startsWith('Tapped');
+      const tapped = claimsTap(reply);
       if (tapped !== (s.focus === 'vs')) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}` };
       if (source === 'wda' && !tapped) return { outcome: 'LOUD', why: `not tapped, though a dismissal is configured: ${short(reply)}` };
       return { outcome: 'ok', why: short(reply) };
@@ -212,7 +210,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [{ tool: 'tap', args: { selector: id(K, 'submit') } }],
     judge: (s, [reply]) => {
       const fired = (s.submits ?? []).length > 0;
-      return fired === reply.startsWith('Tapped') ? { outcome: fired ? 'ok' : 'LOUD', why: short(reply) } : { outcome: 'MISMATCH', why: `averi says ${short(reply)} — submits: ${(s.submits ?? []).length}` };
+      return fired === claimsTap(reply) ? { outcome: fired ? 'ok' : 'LOUD', why: short(reply) } : { outcome: 'MISMATCH', why: `averi says ${short(reply)} — submits: ${(s.submits ?? []).length}` };
     },
   },
   {
@@ -237,7 +235,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [{ tool: 'tap', args: { selector: id(K, 'note') } }],
     judge: (s, [reply]) => {
       const submits = (s.submits ?? []).length;
-      const tapped = reply.startsWith('Tapped');
+      const tapped = claimsTap(reply);
       if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×, focus ${s.focus}); averi: ${short(reply)}` };
       if (s.focus === 'note') return tapped ? { outcome: 'ok', why: short(reply) } : { outcome: 'MISMATCH', why: `the focus is on note, but averi says ${short(reply)}` };
       return tapped ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}, no submit` } : { outcome: 'ok', why: `refused, nothing fired (focus ${s.focus}): ${short(reply)}` };
@@ -281,8 +279,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     ],
     judge: (s, [, gone, still]) => {
       if (s.fields?.name?.error !== null) return { outcome: 'LOUD', why: `the fill did not clear the app's error: ${JSON.stringify(s.fields?.name)}` };
-      if (gone.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `assert read the error the app no longer shows: ${short(gone)}` };
-      if (!still.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `the e-mail's error, still shown, failed: ${short(still)}` };
+      if (allPassed(gone)) return { outcome: 'MISMATCH', why: `assert read the error the app no longer shows: ${short(gone)}` };
+      if (!allPassed(still)) return { outcome: 'MISMATCH', why: `the e-mail's error, still shown, failed: ${short(still)}` };
       return { outcome: 'ok', why: 'name: error gone; email: error still read' };
     },
   },
@@ -298,8 +296,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     ],
     judge: (s, [, gone, still]) => {
       if (s.fields?.name?.error !== null) return { outcome: 'LOUD', why: `the fill did not clear the app's error: ${JSON.stringify(s.fields?.name)}` };
-      if (!gone.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `the name's message, gone from the app, is still read: ${short(gone)}` };
-      if (!still.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `the e-mail's message, still shown, failed: ${short(still)}` };
+      if (!allPassed(gone)) return { outcome: 'MISMATCH', why: `the name's message, gone from the app, is still read: ${short(gone)}` };
+      if (!allPassed(still)) return { outcome: 'MISMATCH', why: `the e-mail's message, still shown, failed: ${short(still)}` };
       return { outcome: 'ok', why: 'name: message gone; email: message still read' };
     },
   },
@@ -313,8 +311,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     ],
     judge: (s, [scroll, tap]) => {
       const chosen = valueOf(s, 'country') === 'São Tomé & Príncipe' && s.events.some((e) => e.kind === 'select' && e.tag === 'ST');
-      if (chosen) return failedReply(scroll) || failedReply(tap) ? { outcome: 'MISMATCH', why: `chosen, but averi failed: ${short(scroll)} / ${short(tap)}` } : { outcome: 'ok', why: short(scroll) };
-      return tap.startsWith('Tapped') ? { outcome: 'MISMATCH', why: `averi says ${short(tap)} — the app chose ${JSON.stringify(valueOf(s, 'country'))}` } : { outcome: 'LOUD', why: `${short(scroll)} / ${short(tap)}` };
+      if (chosen) return isError(scroll) || isError(tap) ? { outcome: 'MISMATCH', why: `chosen, but averi failed: ${short(scroll)} / ${short(tap)}` } : { outcome: 'ok', why: short(scroll) };
+      return claimsTap(tap) ? { outcome: 'MISMATCH', why: `averi says ${short(tap)} — the app chose ${JSON.stringify(valueOf(s, 'country'))}` } : { outcome: 'LOUD', why: `${short(scroll)} / ${short(tap)}` };
     },
   },
 ];
@@ -429,7 +427,7 @@ async function callTool(client: Client, call: Call, configPath: string): Promise
   }
 }
 
-type Result = { source: Source; c: Case; verdict: Verdict; replies: string[] };
+type Result = { source: Source; c: Case; verdict: LiveVerdict; replies: string[] };
 const results: Result[] = [];
 const record: RunRecord = { platform, side: values.side ?? 'this checkout', results: [] };
 const selected = CASES.filter((x) => groups.includes(x.group) && (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)));
@@ -439,7 +437,7 @@ const selected = CASES.filter((x) => groups.includes(x.group) && (only === undef
  * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
  * when scroll_until returned, and which a later read would let a fling finish behind the reply's back.
  */
-function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): Verdict {
+function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): LiveVerdict {
   const verdict = c.judge(state, replies, source, launched, after);
   if (verdict.outcome === 'ok' || late === undefined) return verdict;
   const again = c.judge(late, replies, source, launched, after);
@@ -451,7 +449,7 @@ if (rejudging !== undefined) {
   for (const r of rejudging.results) {
     const c = selected.find((x) => x.id === r.id);
     if (c === undefined) continue;
-    const verdict: Verdict = r.skip !== undefined || r.state === undefined ? { outcome: 'SKIP', why: r.skip ?? 'no state recorded' } : judged(c, r.source, r.replies, r.launched, r.after, r.state, r.late);
+    const verdict: LiveVerdict = r.skip !== undefined || r.state === undefined ? { outcome: 'SKIP', why: r.skip ?? 'no state recorded' } : judged(c, r.source, r.replies, r.launched, r.after, r.state, r.late);
     results.push({ source: r.source, c, verdict, replies: r.replies });
   }
 } else {
@@ -466,7 +464,7 @@ if (rejudging !== undefined) {
       for (const source of sources) {
         const launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
-          const verdict: Verdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
+          const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
           results.push({ source, c, verdict, replies: [] });
           record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined });
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
@@ -507,7 +505,7 @@ if (rejudging !== undefined) {
 const known = (r: Result) => knownLive(platform, r.source, r.c.id, r.verdict.cls);
 /** A KNOWN entry whose case failed by another rule: unknown, and said so. */
 const otherRule = (r: Result) => (r.verdict.outcome !== 'ok' && known(r) === undefined ? knownEntry(platform, r.source, r.c.id) : undefined);
-const count = (o: Verdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
+const count = (o: LiveVerdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
 const unknown = results.filter((r) => r.verdict.outcome === 'MISMATCH' && known(r) === undefined);
 const cleared = results.filter((r) => r.verdict.outcome === 'ok' && knownEntry(platform, r.source, r.c.id) !== undefined);
 const lines = [

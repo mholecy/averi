@@ -25,7 +25,7 @@ import { classed, type Expectation } from './judges.js';
  * centre of the node the tree lists with that text (`nodes`, base.ts#openRows).
  */
 export function ownPartsRows(platform: Platform, t: TargetTruth, nodes: readonly Rect[] = []): Expectation[] {
-  return openRows(platform, t, `text:"${t.text}"`, nodes).filter((e) => e.verb !== 'colour');
+  return openRows(platform, t, nodes).filter((e) => e.verb !== 'colour');
 }
 
 /**

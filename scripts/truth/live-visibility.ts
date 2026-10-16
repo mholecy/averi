@@ -1,7 +1,7 @@
 import type { Platform } from '../differential/corpus.js';
-import { screenUnchangedFor, swipesOf, VISIBLE_STOP } from './replies.js';
+import { claimsTap, screenUnchangedFor, swipesOf, VISIBLE_STOP } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
-import { bandsOf, directionOf, geometryOf, intersect, isOverlap, type GeometryContext } from './truth.js';
+import { bandsOf, directionOf, geometryOf, intersect, isOverlap, selectorOf, type GeometryContext } from './truth.js';
 
 /**
  * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5; run by live.ts): averi's
@@ -14,7 +14,7 @@ import { bandsOf, directionOf, geometryOf, intersect, isOverlap, type GeometryCo
  *
  * The cases come from the static truth (tests/fixtures/truth, one CellTruth per cell and platform): a tap on every
  * target, expected to fire where its probe fired (`reached`, or `reachedAtPiece`); a scroll_until toward every target
- * not `whole` (toward it: rows.ts#directionOf), with `fully: true` too where it is cut or overlapped; plus the turn-back
+ * not `whole` (toward it: truth.ts#directionOf), with `fully: true` too where it is cut or overlapped; plus the turn-back
  * cases (TURN_BACK), whose direction is the wrong one on purpose. Everything here is pure: live.ts runs the calls.
  *
  * Verdicts, as live.ts's: `ok` the app holds what the case asks and the reply agrees; `LOUD` it does not, and averi
@@ -62,7 +62,7 @@ export type VerdictClass =
   | 'presented-stroke'
   | 'dismissal';
 
-export interface Verdict {
+export interface LiveVerdict {
   outcome: Outcome;
   why: string;
   /** The rule a verdict not ok was reached by. */
@@ -90,8 +90,6 @@ const eventsText = (es: readonly ProbeEvent[]) => (es.length === 0 ? 'nothing' :
 const rectText = (r: Rect | undefined | null) => (r === undefined || r === null ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
 const round = (n: number) => Math.round(n * 10) / 10;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 260);
-/** The reply claims the tap: `Tapped …`, not an error. */
-export const claimsTap = (reply: string) => reply.startsWith('Tapped');
 /** The reply claims the stop: `Element … visible after N swipes` (fully or not). */
 export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
 
@@ -141,7 +139,7 @@ export function appText(state: LabState, platform: Platform, tag: string, view: 
  * expected); a `Tapped` that fired it alone is ok either way — the truth's probe at the centre is not the only tap
  * that reaches it.
  */
-export function judgeTap(tag: string, fires: boolean, reply: string, state: LabState, launched: LabState): Verdict {
+export function judgeTap(tag: string, fires: boolean, reply: string, state: LabState, launched: LabState): LiveVerdict {
   const fired = firedSince(state, launched);
   const own = fired.filter((e) => e.kind === 'tap' && e.tag === tag);
   const others = fired.filter((e) => !(e.kind === 'tap' && e.tag === tag));
@@ -162,7 +160,7 @@ export function judgeTap(tag: string, fires: boolean, reply: string, state: LabS
  * dismissal inert) the documented answer; under WDA honest when the dismissal was tapped (the editing ended — no field
  * focused) and the field then refused for where it lies once the keyboard is gone; else LOUD (not dismissed).
  */
-export function judgeDismissal(tag: string, reply: string, source: string, s: LabState, launched: LabState): Verdict {
+export function judgeDismissal(tag: string, reply: string, source: string, s: LabState, launched: LabState): LiveVerdict {
   const typed = Object.entries(s.fields ?? {}).filter(([k, f]) => f.value !== launched.fields?.[k]?.value);
   if (typed.length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', why: `typed into ${typed.map(([k, f]) => `${k} (${JSON.stringify(f.value)})`).join(', ')}: ${short(reply)}` };
   if ((s.submits ?? []).length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', why: `the form was submitted: ${short(reply)}` };
@@ -288,7 +286,7 @@ export function judgeScroll(
   final: LabState,
   launched: LabState,
   atStop: LabState = final,
-): Verdict {
+): LiveVerdict {
   // The stop on the state read when scroll_until returned (`atStop`), the tap on the state after it (`final`).
   const state = atStop;
   const app = appText(final, c.platform, c.tag, c.view, launched);
@@ -323,7 +321,7 @@ export function judgeScroll(
  * A scroll_until for a target beneath a presented layer (`declared: presented-over`): no stop where it lies covered, no
  * stroke on the screen beneath (it would move the host under the layer or drag the layer), the layer not dismissed.
  */
-export function judgePresentedScroll(c: { tag: string; view: string | undefined; platform: Platform }, [scroll]: readonly string[], state: LabState, launched: LabState): Verdict {
+export function judgePresentedScroll(c: { tag: string; view: string | undefined; platform: Platform }, [scroll]: readonly string[], state: LabState, launched: LabState): LiveVerdict {
   const app = appText(state, c.platform, c.tag, c.view, launched);
   const fired = firedSince(state, launched);
   const moved = strokesSince(state, launched).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
@@ -350,14 +348,12 @@ export interface VisibilityCase {
    * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (live.ts reads one
    * between the calls of a visibility case).
    */
-  judge(state: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]): Verdict;
+  judge(state: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]): LiveVerdict;
 }
 
 /** The target's static capture's tree of `source` did not list it (TargetTruth.listed): averi cannot know where it lies. */
 export const unlistedIn = (t: Pick<TargetTruth, 'listed'>, source: string) => t.listed?.[source as keyof NonNullable<TargetTruth['listed']>] === false;
 
-/** A text target is asked by its text, as the static rows ask it (golden-spec/false-covers.ts#ownPartsRows); else by id. */
-export const selector = (t: Pick<TargetTruth, 'id' | 'text'>) => (t.text !== undefined ? `text:"${t.text}"` : `id:"${t.id}"`);
 /** A cut or overlapped target: `fully: true` asks more of it than the plain stop (R-fully). */
 const CUT: readonly string[] = ['partly-centre-in', 'centre-out', 'sliver'];
 const fullyAsked = (g: Geometry | undefined) => g !== undefined && (CUT.includes(g) || isOverlap(g) || g === 'status-band' || g === 'nav-band');
@@ -389,7 +385,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
       id: `tap:${truth.cell}.${t.tag}`,
       cell: truth.cell,
       says: `tap ${t.tag} (${t.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
-      calls: [{ tool: 'tap', args: { selector: selector(t) } }],
+      calls: [{ tool: 'tap', args: { selector: selectorOf(t) } }],
       judge: (s, [reply], launched) => judgeTap(t.tag, fires, reply, s, launched),
     });
     if (t.declared === 'presented-over') {
@@ -398,7 +394,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
         id: `scroll:${truth.cell}.${t.tag}`,
         cell: truth.cell,
         says: `scroll_until ${t.tag} beneath the presented layer: refused, nothing stroked, nothing dismissed`,
-        calls: [{ tool: 'scroll_until', args: { selector: selector(t), direction: directionOf(t, truth) } }],
+        calls: [{ tool: 'scroll_until', args: { selector: selectorOf(t), direction: directionOf(t, truth) } }],
         judge: (s, replies, launched, _source, after) => judgePresentedScroll({ tag: t.tag, view: t.scrollView, platform }, replies, after[0] ?? s, launched),
       });
       continue;
@@ -428,8 +424,8 @@ function scrollCase(cell: string, t: TargetTruth, view: string, direction: 'up' 
     cell,
     says,
     calls: [
-      { tool: 'scroll_until', args: { selector: selector(t), direction, ...(fully && { fully: true }) } },
-      { tool: 'tap', args: { selector: selector(t) } },
+      { tool: 'scroll_until', args: { selector: selectorOf(t), direction, ...(fully && { fully: true }) } },
+      { tool: 'tap', args: { selector: selectorOf(t) } },
     ],
     judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: unlistedIn(t, source) }, replies, s, launched, after[0] ?? s),
   };
