@@ -222,6 +222,10 @@ Pixel_3a dumps (CellTruth.ime), starting each call with the keyboard shown.
 It also writes the screen after that `back` — `<cell>.after-back.xml` and `<cell>.after-back.state.json`
 (CellTruth.afterBack) — whose dump the fake device answers once a call sends `input keyevent 4`, so a tap the guard
 moves through `back` is replayed against the layout the app takes then.
+Under a floating IME (Gboard's Floating tile, set by hand: `form-keyboard-floating`, `ime: floating` in the catalog —
+the capture refuses it docked, and refuses every other form cell floating) the app hears of the 132-px strip only; the
+capture reads the panel from the shown touchable region (truth.ts#imePanels) and holds a control whose centre lies
+under it `under-keyboard` (FormTruth.keyboard.panels), its scroll_until's touch-downs above the panel's top.
 
 An Android capture writes the device's own `dumpsys window displays` with the IME down beside its truth
 (`<cell>.displays.txt`, CellTruth.displays — for a cell captured with the IME up, read after that `back`: the one

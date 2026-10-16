@@ -117,7 +117,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
     const brokenControls = (truth.form?.controls ?? []).flatMap((c) => {
-      const why = controlConsistency(c, outOfProcessKeyboard(recording.platform, truth.form?.keyboard?.frame));
+      const why = controlConsistency(c, outOfProcessKeyboard(recording.platform, truth.form?.keyboard?.frame, truth.form?.keyboard?.panels));
       return why === undefined ? [] : [`${c.tag}: ${why}`];
     });
     result.broken.push(...brokenControls);

@@ -475,6 +475,18 @@ describe('the Android form rows (phase 2b)', () => {
     check(pick(noPiece, 'tap', 'note').judge, [['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/]]);
   });
 
+  it("under a floating IME the keyboard's top is its panel's: a touch-down below the panel's top is under the keyboard", () => {
+    const ADB = (y: number) => `adb shell input swipe 540 ${y} 540 218 657`;
+    const floating = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, keyboard: { frame: rect(0, 2088, 1080, 132), field: 'postcode', panels: [rect(71, 1092, 937, 792)] } } }, 'uiautomator');
+    const scroll = pick(floating, 'scroll_until', 'vs');
+    expect(scroll.says).toMatch(/above the keyboard's top \(y 1092\)/);
+    check(scroll.judge, [
+      ['ERROR scroll_until … failed after 1 swipe', [ADB(874)], 'ok'],
+      ['ERROR scroll_until … failed after 1 swipe', [ADB(1500)], /^touched down under the keyboard at \(540,1500\)/],
+      ['Element id:"lab.f.vs" fully visible after 0 swipes', [], /^reached with no swipe, under the keyboard/],
+    ]);
+  });
+
   it('a piece after back that no probe reached admits no Tapped', () => {
     const unreached = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, afterBack: { ...c.afterBack!, piece: { ...c.afterBack!.piece!, reached: false } } } : c)) } }, 'uiautomator');
     check(pick(unreached, 'tap', 'note').judge, [

@@ -222,7 +222,9 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
       return rows;
     }
     case 'under-keyboard': {
-      const top = keyboard?.frame.y ?? Infinity;
+      // The keyboard's top: its band's, or a floating IME's panel's above it (FormTruth.keyboard.panels) — everything
+      // below the highest covers the screen for a stroke (the floating note's cut, src's highestCover).
+      const top = Math.min(keyboard?.frame.y ?? Infinity, ...(keyboard?.panels ?? []).map((p) => p.y));
       const rows: FormExpectation[] = [];
       if (platform !== 'android') {
         rows.push({

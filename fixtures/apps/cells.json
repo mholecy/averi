@@ -177,6 +177,31 @@
       }
     },
     {
+      "id": "form-keyboard-floating",
+      "family": "forms",
+      "platforms": ["android"],
+      "ime": "floating",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "Transfer details",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue", "pinned": true },
+        "focus": "postcode"
+      }
+    },
+    {
       "id": "form-prefilled",
       "family": "forms",
       "layer": "none",

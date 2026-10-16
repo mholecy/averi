@@ -31,6 +31,7 @@ describe('the cell catalog', () => {
       'forms/form-basic',
       'forms/form-errors',
       'forms/form-keyboard',
+      'forms/form-keyboard-floating',
       'forms/form-prefilled',
       'forms/form-picker',
       'forms/form-shared-id',

@@ -9,20 +9,29 @@
       "before": "7d9a783",
       "after": "cb77485",
       "verified": "golden",
-      "defect": "^Tapped|reached with no swipe, under the keyboard",
+      "defect": "^Tapped|reached with no swipe, under the keyboard|^passed on",
       "checks": [
-        "android-averi_lab-api33/form-keyboard.xml vs tap",
-        "android-averi_lab-api33/form-keyboard.xml ks tap",
-        "android-averi_lab-api33/form-keyboard.xml ss tap",
-        "android-averi_lab-api33/form-keyboard.xml vs scroll_until",
-        "android-averi_lab-api33/form-keyboard.xml ks scroll_until",
-        "android-averi_lab-api33/form-keyboard.xml ss scroll_until",
-        "android-averi_lab-api33/form-keyboard.xml note scroll_until"
+        "android-averi_lab-api33/form-keyboard-floating.xml postcode tap",
+        "android-averi_lab-api33/form-keyboard-floating.xml postcode colour",
+        "android-averi_lab-api33/form-keyboard-floating.xml postcode scroll_until",
+        "android-averi_lab-api33/form-keyboard-floating.xml phone tap",
+        "android-averi_lab-api33/form-keyboard-floating.xml phone colour",
+        "android-averi_lab-api33/form-keyboard-floating.xml phone scroll_until",
+        "android-averi_lab-api33/form-keyboard-floating.xml vs tap",
+        "android-averi_lab-api33/form-keyboard-floating.xml vs colour",
+        "android-averi_lab-api33/form-keyboard-floating.xml vs scroll_until",
+        "android-averi_lab-api33/form-keyboard-floating.xml ks tap",
+        "android-averi_lab-api33/form-keyboard-floating.xml ks colour",
+        "android-averi_lab-api33/form-keyboard-floating.xml ks scroll_until"
       ],
-      "expect": "DOES-NOT-FAIL",
-      "partial": "the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)",
-      "needs": "a floating-Gboard capture: form-keyboard on averi_lab with Gboard switched to floating (its ITYPE_IME inset only the 132-px collapse strip, the panel a second rect of `dumpsys window InputMethod`'s touchable region — the three readings CellTruth.ime serves, captured by AndroidLab.ime), a field under the panel and clear of the strip: its tap must not press a key, its scroll_until must not stop under the panel.",
-      "remark": "Docked, the fix leaves the band as it was by design (the touchable region equals the band, no panel): the tap rows (Tapped after one back, inside the field) and the scroll_until rows (touch-downs above y 1398) are green at 7d9a783 and at cb77485 alike, golden identical on the cell. The note's symptom (a guarded tap pressing Gboard's `d` key, a row behind the panel fully visible) needs the panel.",
+      "regressions": [
+        {
+          "rows": ["android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until"],
+          "broke": "cb77485",
+          "why": "the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)"
+        }
+      ],
+      "remark": "forms/form-keyboard-floating (round 4): form-keyboard on averi_lab with Gboard switched to Floating by hand (its grid → the Floating tile; no adb command or setting switches it; docked again after, the touchable region back to `(0,1398,1080,2220)`): `ITYPE_IME` only the 132-px strip `[0,2088][1080,2220]`, the panel the second rect of `touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))` — the note's three readings, served by the fake device (CellTruth.ime) — and postcode, phone, vs, ks with their centres under the panel, clear of the strip (truth.ts#imePanels, situationOf: under-keyboard; each probe at its centre pressed a key, each after one back focused it). At 7d9a783 each is `Tapped` with no back (the key pressed), its colour PASSES on the panel, and scroll_until calls it `fully visible after 0 swipes`; at cb77485 one back then a tap inside it, the colour fails closed, and scroll_until swipes touching down above the panel's top (1092). The docked leg (form-keyboard under a docked Gboard): green at 7d9a783 and at cb77485 alike, golden identical on the cell — docked, the region is the band, nothing beyond it (by design); 1.2 judges the docked half the fix was built on.",
       "pairs": [
         {
           "before": "98e49b7",
@@ -1009,6 +1018,15 @@
       "defect": "reached with no swipe where a tap fires",
       "checks": ["android-averi_lab-api33/form-keyboard.xml phone scroll_until"],
       "remark": "No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row."
+    },
+    {
+      "n": "FU1",
+      "note": "2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "never intersected the \\d+x\\d+ screen above the soft keyboard",
+      "checks": ["android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until"],
+      "remark": "No fix yet: red at HEAD and at cb77485, green at 7d9a783 (#1's regression elsewhere, recorded there). forms.known.ts owns the ratchet; this entry only links the note to its row."
     }
   ],
   "excluded": [

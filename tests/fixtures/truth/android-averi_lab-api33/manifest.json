@@ -71,6 +71,17 @@
       "truth": "form-keyboard.truth.json"
     },
     {
+      "file": "form-keyboard-floating.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-keyboard-floating.png",
+      "truth": "form-keyboard-floating.truth.json"
+    },
+    {
       "file": "form-prefilled.xml",
       "source": "uiautomator",
       "form": "raw",
