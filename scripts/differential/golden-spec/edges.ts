@@ -21,7 +21,14 @@ import { colourFails, directionRow, fullyRow, landRow, notReachedStill, refusedT
 export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation[] {
   switch (t.geometry) {
     case 'off-screen':
-      return [refusedTap(platform, t, 'R-off'), colourFails(platform, t, 'R-off: nothing of it is on the screen'), strokeRow(platform, t, cell, 'R-off'), directionRow(platform, t, cell)].map(classed);
+      return [
+        refusedTap(platform, t, 'R-off'),
+        colourFails(platform, t, 'R-off: nothing of it is on the screen'),
+        // uiautomator dumps only what is visible to the user: an Android off-screen row is in no tree (B4's
+        // tabbar-floating F), and R-stroke judges the strokes sent for it all the same.
+        strokeRow(platform, t, cell, 'R-off', platform === 'android' ? 'off the screen: uiautomator lists no row it does not show' : undefined),
+        directionRow(platform, t, cell),
+      ].map(classed);
     case 'outside-scroll-view':
       return [
         refusedTap(platform, t, 'R-outside-sv'),

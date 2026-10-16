@@ -71,9 +71,8 @@ describe('the rows each geometry asks', () => {
     ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'scroll_until fully: R-fully']],
     ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'scroll_until fully: R-fully']],
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
-    // iOS's home-indicator band is no band averi judges: a target the probe reached there asks the open rows (bars.ts);
-    // one not reached, nothing. Android's navigation band: R-band (below).
-    ['nav-band', { frame: rect(51, 820, 300, 64), reached: false }, []],
+    // iOS's home-indicator band is no band averi judges: the open rows (bars.ts; consistency holds the target reached and
+    // drawn there, else it is broken and asked nothing). Android's navigation band: R-band (below).
     ['nav-band', { frame: rect(51, 820, 300, 64), reached: true, drawn: 1 }, ['tap: Tapped', 'colour: passes on its own colour', 'scroll_until: reached with no swipe']],
     ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
     ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'scroll_until fully: R-fully']],
@@ -114,10 +113,13 @@ describe('R-stroke: every touch-down on the screen, clear of the bands and the c
   ])('%s', (_n, device, expected) => {
     expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
   });
-  it('judges the strokes even when the target is in no tree (uiautomator lists no off-screen Compose row): absent allowed', () => {
+  it('on Android judges the strokes even when the target is in no tree (uiautomator lists no off-screen row); on iOS that reply is vacuous', () => {
     const never = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes — element never appeared in the tree';
-    expect(verdict(rs, 'scroll_until', out(never, [IDB_STROKE, IDB_STROKE]))).toBeUndefined();
-    expect(verdict(rs, 'scroll_until', out(never, ['idb ui swipe 201 800 201 175 --duration 0.3']))).toMatch(/^touched down off the strokeable region at \(201,800\)/);
+    const off = target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null });
+    const android = expectations('android', off, CELL);
+    expect(verdict(android, 'scroll_until', out(never, [IDB_STROKE, IDB_STROKE]))).toBeUndefined();
+    expect(verdict(android, 'scroll_until', out(never, ['idb ui swipe 201 800 201 175 --duration 0.3']))).toMatch(/^touched down off the strokeable region at \(201,800\)/);
+    expect(verdict(rs, 'scroll_until', out(never, [IDB_STROKE, IDB_STROKE]))).toMatch(/^not in the tree: /);
   });
   it('the region itself: the screen less the bands and the chrome; with neither, the whole screen', () => {
     const ok = strokeable(CELL);

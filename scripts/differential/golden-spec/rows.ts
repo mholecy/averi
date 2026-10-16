@@ -17,7 +17,7 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, reachedWithNoSwipe
  * | R-off | off-screen | colour | fails: nothing of it is on the screen to measure | ADR 0010 (amendment: the off-screen case — nothing of what it reads on the screen, judged off the screen first), ADR 0002 (the thin sliver: judged off the screen, never measured) |
  * | R-outside-sv | outside-scroll-view | tap | refused naming scroll_until, nothing tapped | ADR 0005 |
  * | R-outside-sv | outside-scroll-view | colour | fails closed: it would measure the background | docs/bugs/2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md |
- * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it | swipes, every touch-down on the screen clear of the system bands and the chrome (the target may be absent from the tree) | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md |
+ * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it | swipes, every touch-down on the screen clear of the system bands and the chrome (the target may be absent from the tree, `absent`: an Android off-screen row) | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md |
  * | R-sliver | sliver | tap | refused naming scroll_until, nothing tapped | ADR 0013; docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md |
  * | R-sliver | sliver | scroll_until | not reached where it is — the stop fails, whatever it swiped (the plain stop does not stop on a sliver; a replayed tree never moves) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
@@ -79,19 +79,18 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string): Ex
 
 /**
  * R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable
- * (judges.ts#strokeable).
+ * (judges.ts#strokeable). `absent`, given by the caller where the tree may not list the target (an Android off-screen
+ * row: uiautomator dumps only what is visible to the user), lets a "never appeared in the tree" reply be judged by its
+ * strokes — the swipes sent looking for it are the evidence all the same.
  */
-export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, absent?: string): Expectation {
   const direction = directionOf(t, cell);
   return {
     verb: 'scroll_until',
     says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome`,
     call: scrollCall(platform, t, direction),
     judge: (o) => (swipes(o) === 0 ? said(o, 'no swipe') : strokesOff(o, cell)),
-    // The row judges the strokes, not the stop: a tree may not list a target off what shows (uiautomator dumps only
-    // what is visible to the user — a Compose row below the fold is in no dump), and the swipes it sends looking for
-    // it are the evidence all the same.
-    absent: 'off what shows: a tree may not list it, and the row judges the strokes sent for it',
+    ...(absent !== undefined && { absent }),
   };
 }
 
