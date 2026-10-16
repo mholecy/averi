@@ -18,9 +18,9 @@ export const bars: KnownFile = {
     ...keys(`${ANDROID}/fab.xml`, ['L', 'K'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: FAB_STROKES, note: '#24: strokes to clear the FAB host, then fails', as: FAB_HOST }),
     // LAB FINDING: Compose's bounds leave out what the pinned Continue covers, so P's dumped rect ends at the button.
     [`${ANDROID}/pinned-bar.xml P scroll_until`, { cls: 'fully visible where it is chrome-overlap:pinned, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: fully: true stops on a row 66 px under the pinned button (Compose\'s uncovered bounds)', as: LAB_FULLY }],
-    // The same rect: the colour sampled is the uncovered part, all P's — right about what shows; the row samples the
-    // app's frame, which the button overlaps (the note's "The colour row beside it").
-    [`${ANDROID}/pinned-bar.xml P colour`, { cls: 'passed on #E53935', kind: 'PASS', calls: [], note: 'Compose\'s uncovered bounds: the dumped rect is P\'s visible part, all its own colour' }],
+    // The same rect: the colour sampled is the uncovered part, all P's — the row samples the app's frame, which the
+    // button overlaps (the note's "The colour row beside it").
+    [`${ANDROID}/pinned-bar.xml P colour`, { cls: 'passed on #E53935', kind: 'PASS', calls: [], note: 'lab finding: the colour sampled on P\'s uncovered part only (Compose\'s uncovered bounds)', as: LAB_FULLY }],
     // uiautomator dumps only what is visible to the user: F, far below the fold in a Compose scroll view, is in no
     // dump. The tap waits 5 s "to appear" (no scroll_until advice: averi cannot know the row exists); the colour assert
     // is vacuous. R-stroke (the strokes sent looking for it) is judged and green.

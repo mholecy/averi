@@ -128,7 +128,7 @@ The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 - after bd06470:
   - ok android-averi_lab-api33/tabbar-floating.xml F scroll_until — ERROR scroll_until id:"lab.tabbar-floating.F" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tr
 
-Golden is identical at 188740b and bd06470.
+tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.
 
 ## 14: CALIBRATED
 
@@ -190,7 +190,7 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - ok android-averi_lab-api33/bands.xml S tap — ERROR id:"lab.bands.S" is under the status bar at (540,28), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 127,0 825x55) — it lies in no scroll view, so no scroll moves it out: it is p
   - ok android-averi_lab-api33/bands.xml S scroll_until — ERROR scroll_until id:"lab.bands.S" failed after 3 swipes — its centre stays under the status bar at (540,28), in the top 66 of the screen (tree units), where a tap goes to the status bar, and the content is exhausted: s
 
-Golden is identical at 0cb8b62 and 5e47ff4.
+bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.
 
 ## 22: CALIBRATED (partial: the overlay half, the status band and the pinned button (iOS))
 
@@ -240,7 +240,7 @@ Calibrated through the overlay half of the fix: before, the colour assert passed
 
 Needs: OCR judged on real pixels (phase 4): a text cut at the navigation bar.
 
-The merge message names D7's pixel part: the navigation band fails a pixel assert closed. Golden is identical at 94bae14 and e85bcdf.
+bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).
 
 ## 26: CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts)
 
@@ -254,6 +254,8 @@ The merge message names D7's pixel part: the navigation band fails a pixel asser
   - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — PASS  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — sampled #1E88E5 (dominant, 100% of region) vs expected #1E88E5 → dE00 0.00 ≤ 8; scale 3.000
   - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — PASS  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — sampled #43A047 (dominant, 100% of region) vs expected #43A047 → dE00 0.00 ≤ 8; scale 3.000
   - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — Element id:"lab.tabbar-hidden-push.C" fully visible after 0 swipes
+
+Needs: A cross-family row (base.ts): an open, uncovered whole target is tapped at its probe point — the moved tap of #26 (Tapped at (201,830), off C's centre) passes the open row today.
 
 The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24': the open row judges the class (Tapped), not where it landed.
 
@@ -401,12 +403,13 @@ No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed r
 
 ## B4-L1: OPEN-RED
 
-2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md — defect: `fully visible where it is`
+2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md — defect: `fully visible where it is|^passed on`
 
 - working tree:
   - RED android-averi_lab-api33/pinned-bar.xml P scroll_until — fully visible where it is chrome-overlap:pinned, after 0 swipe(s) that move nothing: Element id:"lab.pinned-bar.P" fully visible after 0 swipes
+  - RED android-averi_lab-api33/pinned-bar.xml P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 100% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 1.000
 
-No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its row.
+No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part).
 
 ## Not reproducible with the existing cells
 

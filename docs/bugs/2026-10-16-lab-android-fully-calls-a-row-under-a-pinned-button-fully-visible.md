@@ -52,15 +52,17 @@ sibling's top edge is the only trace.
 
 ## The colour row beside it
 
-The colour assert's PASS is filed with it, not as this bug: averi samples the dumped rect, which is P's uncovered part,
-all of it P's colour — the verdict is right about what the user sees there. The row (R-overlap's colour,
-golden-spec/rows.ts#overlapColour) expects it to fail closed because it samples the APP's frame inset 12 %, which the
-button overlaps; the tree's rect and the app's frame disagree (ADR 0020, decision 1: a finding about the tree).
+The colour assert's PASS has the same cause and is filed under this note too: averi samples the dumped rect, which is
+P's uncovered part, all of it P's colour. The row (R-overlap's colour, golden-spec/rows.ts#overlapColour) expects it to
+fail closed, as on iOS, because what the assert reads of the ELEMENT — its frame inset 12 % — is overlapped by the
+button (ADR 0001, ADR 0002); averi cannot see that, since the tree's rect and the app's frame disagree (ADR 0020,
+decision 1: a finding about the tree). The colour it reports is P's own, so the verdict misleads less than the `fully`
+stop does: an assert that should have failed closed passes on what shows.
 
 ## Notes
 
-- Kept in the bars family's KNOWN list (tests/differential/golden/bars.known.ts), the `fully` row `as: bug:` this
-  note, the colour row with no class; scripts/truth/calibration.json `B4-L1` (open) links the note to its row.
+- Kept in the bars family's KNOWN list (tests/differential/golden/bars.known.ts), the `fully` row and the colour row
+  `as: bug:` this note; scripts/truth/calibration.json `B4-L1` (open) links the note to both rows.
 - Related: docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md (a Compose row's bounds cut
   by a sticky header, fixed in d2b7744 for a header inside the row's scroll view); here the cutter is a sibling outside
   any scroll view.

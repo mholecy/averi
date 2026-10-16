@@ -174,7 +174,7 @@
       "fix": ["bd06470", "16ae6bb"],
       "before": "188740b",
       "verified": "golden",
-      "remark": "Golden is identical at 188740b and bd06470.",
+      "remark": "tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.",
       "after": "bd06470",
       "defect": "touched down off the strokeable region",
       "checks": ["android-averi_lab-api33/tabbar-floating.xml F scroll_until"]
@@ -307,7 +307,7 @@
       "fix": ["5e47ff4"],
       "before": "0cb8b62",
       "verified": "golden",
-      "remark": "Golden is identical at 0cb8b62 and 5e47ff4.",
+      "remark": "bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.",
       "after": "5e47ff4",
       "defect": "^Tapped|reached where it is",
       "checks": ["android-averi_lab-api33/bands.xml S tap", "android-averi_lab-api33/bands.xml S scroll_until"]
@@ -357,7 +357,7 @@
       "fix": ["e85bcdf"],
       "before": "94bae14",
       "verified": "golden",
-      "remark": "The merge message names D7's pixel part: the navigation band fails a pixel assert closed. Golden is identical at 94bae14 and e85bcdf.",
+      "remark": "bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).",
       "after": "e85bcdf",
       "defect": "^passed on",
       "checks": ["android-averi_lab-api33/bands.xml N colour"],
@@ -393,7 +393,8 @@
         "ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour",
         "ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until"
       ],
-      "partial": "the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts"
+      "partial": "the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts",
+      "needs": "A cross-family row (base.ts): an open, uncovered whole target is tapped at its probe point — the moved tap of #26 (Tapped at (201,830), off C's centre) passes the open row today."
     },
     {
       "n": "27",
@@ -613,9 +614,12 @@
       "note": "2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md",
       "status": "open",
       "verified": "golden",
-      "defect": "fully visible where it is",
-      "checks": ["android-averi_lab-api33/pinned-bar.xml P scroll_until"],
-      "remark": "No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its row."
+      "defect": "fully visible where it is|^passed on",
+      "checks": [
+        "android-averi_lab-api33/pinned-bar.xml P scroll_until",
+        "android-averi_lab-api33/pinned-bar.xml P colour"
+      ],
+      "remark": "No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part)."
     }
   ],
   "excluded": [
