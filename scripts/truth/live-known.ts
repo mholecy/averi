@@ -30,7 +30,8 @@ const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-re
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
-const FAB = 'residual:accepted (round 13: the FAB host layer is a cover; calibration.json #24)';
+/** calibration.json #24's status, verbatim: the decision is that note's. */
+const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
 
 /** A known case: its note, the rule it fails by (live-visibility.ts#VerdictClass), and whether it may pass by timing. */
 export interface KnownLive {
