@@ -421,6 +421,7 @@
       "after": "83e282a",
       "verified": "golden",
       "partial": "R-off only",
+      "needs": "R-outside-sv: a sheet-long-list target on the screen but outside its scroll view (a parked row whose cell lies below the table's clip yet above the screen's bottom — the table cut short of the sheet's foot); rows: R-outside-sv tap, colour, R-stroke.",
       "defect": "^Tapped|no swipe",
       "checks": [
         "ios-iphone17-ios27/sheet-long-list.wda.json F tap",
@@ -460,8 +461,9 @@
         "ios-iphone17-ios27/pinned-bar.idb.json P colour",
         "ios-iphone17-ios27/pinned-bar.wda.json P colour"
       ],
-      "remark": "Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks \"close it first\" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT.",
+      "remark": "Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks \"close it first\" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT. The status band and the pinned button (B4's bars cells, idb and WDA alike): bands S, centred in the status band under the status bar, passed on its own colour #E53935 at ad7ed11 (97 % of the region sampled) and fails closed at 596a379 naming the status bar drawn over the element; pinned-bar P, under the pinned Continue button, passed on #E53935 at ad7ed11 (66 % of the region) and fails closed at 596a379 naming button \"Continue\" drawn over the element — both green after.",
       "expect": "CALIBRATED-ON-DEFECT",
+      "needs": "the OCR half: phase 4 (the note covers the colour AND the OCR asserts; only the colour rows are golden's).",
       "regressions": [
         {
           "rows": ["android-averi_lab-api33/fab.xml L colour", "android-averi_lab-api33/fab.xml K colour"],
