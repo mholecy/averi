@@ -9,7 +9,8 @@ import { absenceError, type WaitEvidence } from './resolve.js';
 import { cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type PresentedTouchDown, type ScrollOutcome, type Shortfall, type TouchedOn } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { OPPOSITE, type Direction } from './swipe.js';
 
 /**

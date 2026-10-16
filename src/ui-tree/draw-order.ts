@@ -29,10 +29,10 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
  * `coversOf`, `presentedAt` and `presentedOver` read `exposure`'s):
  * - `drawnOver(container)` — `scroll_until`'s stroke box
- *   (interact/scroll-read.ts#TreeFacts, swipe.ts#strokeRoom): what is
+ *   (interact/scroll-read.ts#TreeFacts, interact/stroke-plan.ts#strokeRoom): what is
  *   drawn over the clipping container a stroke goes over?
  * - `drawnOverAt(container, point)` — the exhausted stop's sentence
- *   (scroll-rounds.ts#touchedOn): which of those a stroke's touch-down hit
+ *   (interact/stroke-plan.ts#touchedOn): which of those a stroke's touch-down hit
  *   (`drawnOver`'s column).
  * - `exposure(node, within)` — a TARGET's chrome: what is
  *   drawn over a node about to be tapped or scrolled to — a pinned CTA bar,
@@ -96,7 +96,7 @@ export interface DrawOrder {
    * found by its rect: the outermost node that scrolls (scroll-containers.ts#scrolls —
    * Android's clipping scrollers, and WDA's scroll views, which clip nothing in its tree)
    * with that rect outside the keyboard, since the round carries containers
-   * as rects (interact/scroll-rounds.ts#targetScrollers, geometry.ts#largestScroller). UNDEFINED when this
+   * as rects (interact/stroke-plan.ts#targetScrollers, geometry.ts#largestScroller). UNDEFINED when this
    * tree has no such container (a rect of another read — the list has moved
    * since), so the caller can tell "nothing over it" from "not asked of this
    * tree".
@@ -520,7 +520,7 @@ const NOT_DRAWN = {
    * does not say whether a node takes touches, so a transparent wrapper
    * reaching over a list counts too: its cost is a shorter stroke box —
    * never under half of it, or a third for one over the touch-down
-   * (interact/swipe.ts#overlayTop, TOUCH_DOWN_CUT_FLOOR) — never a stroke
+   * (interact/stroke-plan.ts#overlayTop, TOUCH_DOWN_CUT_FLOOR) — never a stroke
    * off the list.
    * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
    *
