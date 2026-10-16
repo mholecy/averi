@@ -76,9 +76,9 @@ struct OwnPartsScreen: View {
     }
 }
 
-/// One text target on its control: `L` a button whose label is the text; any other a text field's floating label with
-/// the empty field over it (the label 22 pt tall, the field 20, both centred: the label's rect a point past the
-/// field's at the top and the bottom, as on mp-native's SWIFT form).
+/// One text target on its control: `L` a button whose label is the text; any other a text field's label with the empty
+/// field over it (in WDA's tree the label 18 pt tall, the field 14, both centred: the label's rect 2 pt past the
+/// field's at the top and the bottom — on mp-native's SWIFT form the label reached 1 pt past its field).
 struct OwnPart: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell

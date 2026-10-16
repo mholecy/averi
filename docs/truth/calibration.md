@@ -43,7 +43,7 @@ open note on the working tree. See the script for the verdicts.
 | 35 | 2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done | calibrate | 173023f → 92f2a46 | CALIBRATED |
 | 36 | 2026-08-26-ios-ocr-crop-scale | needs-ocr | — | — |
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
-| FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
+| FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED (partial: the `error` assert half) |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
 
@@ -113,7 +113,7 @@ Regressions recorded:
 
 - ios-iphone17-ios27/sheet-medium.wda.json S tap, ios-iphone17-ios27/sheet-medium.wda.json S scroll_until: broke at 13d68a2, fixed at 81a7d62 — the sheet's frames-only background container read as a cover over its own button (#18)
 - android-averi_lab-api33/own-parts.xml L tap, android-averi_lab-api33/own-parts.xml L scroll_until: broke at 13d68a2, fixed at cccf6b8 — a Compose button's own text read as under the unlabelled button listed after it (#8)
-- ios-iphone17-ios27/own-parts.wda.json N tap, ios-iphone17-ios27/own-parts.wda.json N scroll_until, ios-iphone17-ios27/own-parts.idb.json N tap, ios-iphone17-ios27/own-parts.idb.json N scroll_until: broke at 13d68a2, fixed at 81a7d62 — a text field read as a cover over its own label, the label's rect a point past the field's (#18)
+- ios-iphone17-ios27/own-parts.wda.json N tap, ios-iphone17-ios27/own-parts.wda.json N scroll_until, ios-iphone17-ios27/own-parts.idb.json N tap, ios-iphone17-ios27/own-parts.idb.json N scroll_until: broke at 13d68a2, fixed at 81a7d62 — a text field read as a cover over its own label, the label's rect 2 pt past the field's at top and bottom (#18)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: green at 13d68a2, Tapped at b75b8b5 (fix/r5-cr) … dff7381, green again at 8c0fb41 (fix/r6-ios-top)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2
 
@@ -193,7 +193,7 @@ Regressions recorded:
 
 Needs: The text field's own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under an RN text field) needs a field whose tree lists one: neither SwiftUI's TextField nor a UIKit UITextField in the lab lists it (iOS 27.0, empty, unfocused).
 
-The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62.
+The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412]).
 
 ## 19: CALIBRATED
 
@@ -210,7 +210,7 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 lo
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 
 
-toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at #7's fixes (d928789, c3ebc62): the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has.
+toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has.
 
 ## 22: CALIBRATED (partial: the overlay half only)
 
@@ -323,7 +323,7 @@ The green tip of the fix branch, e10219e, is the merge's second parent.
 
 A text field error, not visibility; in the table because the form-errors cell reproduces it.
 
-## FE2: CALIBRATED
+## FE2: CALIBRATED (partial: the `error` assert half)
 
 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md — defect: `^passed: `
 
@@ -345,6 +345,8 @@ A text field error, not visibility; in the table because the form-errors cell re
   - ok ios-iphone17-ios27/form-shared-id.idb.json iban error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists — element found but error was: null, null, null
   - ok ios-iphone17-ios27/form-shared-id.idb.json bic error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists — element found but error was: null, null, null
   - ok ios-iphone17-ios27/form-shared-id.idb.json bank error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists — element found but error was: null, null, null
+
+Needs: The ui_snapshot half (the note: every field's `error` = the next field's title in ui_snapshot) needs a golden verb for ui_snapshot's error column — none yet.
 
 form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The last field has no title below it: no row. Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL).
 

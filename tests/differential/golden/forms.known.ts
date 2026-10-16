@@ -5,6 +5,9 @@ import { IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, NO
 // This KNOWN owns the ratchet for the lab finding's rows too (L2); scripts/truth/calibration.json owns only the link
 // from its note to the rows. A fix that strikes those rows off here turns L2 OPEN-NOT-REPRODUCED, and calibrate.ts
 // exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
+/** form-keyboard's note for its idb rows under the keyboard, shared by the toolbar cells (false-covers.known.ts). */
+export const IDB_UNDER_KEYBOARD = 'idb lists nothing under the keyboard';
+
 const LAB_IOS = 'bug:2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md';
 
 export const forms: KnownFile = {
@@ -18,8 +21,8 @@ export const forms: KnownFile = {
     // scroll_until swipes twice ABOVE the keyboard (pinned: a stroke moved under it fails here) and stops "never
     // appeared in the tree" — its touch-downs are right, but a replayed tree cannot show whether they would bring the
     // field out (vacuous).
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: 'idb lists nothing under the keyboard: the tap times out' }),
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE_ABOVE_KEYBOARD), note: 'idb lists nothing under the keyboard' }),
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the tap times out` }),
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE_ABOVE_KEYBOARD), note: IDB_UNDER_KEYBOARD }),
     // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under
     // idb the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers
     // Tapped and sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0

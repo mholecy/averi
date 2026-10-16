@@ -109,7 +109,7 @@
           ],
           "broke": "13d68a2",
           "fixed": "81a7d62",
-          "why": "a text field read as a cover over its own label, the label's rect a point past the field's (#18)"
+          "why": "a text field read as a cover over its own label, the label's rect 2 pt past the field's at top and bottom (#18)"
         },
         {
           "rows": [
@@ -293,7 +293,7 @@
           "why": "green at 16ae6bb: the cover judgement 13d68a2 introduced read the sheet's frames-only background (8,415 386x451) as drawn over its own button"
         }
       ],
-      "remark": "The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62."
+      "remark": "The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412])."
     },
     {
       "n": "19",
@@ -310,7 +310,7 @@
         "ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap",
         "ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap"
       ],
-      "remark": "toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at #7's fixes (d928789, c3ebc62): the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has."
+      "remark": "toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has."
     },
     {
       "n": "20",
@@ -538,6 +538,7 @@
       "before": "d407256",
       "after": "dfe63da",
       "verified": "golden",
+      "partial": "the `error` assert half",
       "defect": "^passed: ",
       "checks": [
         "ios-iphone17-ios27/form-shared-id.wda.json amount error",
@@ -549,6 +550,7 @@
         "ios-iphone17-ios27/form-shared-id.idb.json bic error",
         "ios-iphone17-ios27/form-shared-id.idb.json bank error"
       ],
+      "needs": "The ui_snapshot half (the note: every field's `error` = the next field's title in ui_snapshot) needs a golden verb for ui_snapshot's error column — none yet.",
       "remark": "form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The last field has no title below it: no row. Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL)."
     },
     {

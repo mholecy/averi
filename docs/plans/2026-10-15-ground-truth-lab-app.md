@@ -201,10 +201,11 @@ How to add a cell (B2–B5):
    measured an edge, band or chrome geometry, so a B2 or B4 cell needs no spec change for a geometry they already map. A
    family file maps what a geometry does not decide (presented.ts: the presented-over rows; forms.ts: the form rows); a
    new row type goes into rows.ts with the ADR or note deciding it, and a judge table test. A row keyed on the cell, not
-   on a target's geometry, is wired through the façade, `golden-spec.ts#expectations` — false-covers' R-dismiss
-   (rows.ts#dismissRow, under the cell's `config.ios.keyboardDismiss`). So a B5 author edits
-   `golden-spec/false-covers.ts` (its rows), `golden-spec.ts#expectations` (to ask them), rows.ts only for a new row
-   type, and steps 1–3 and 5's files.
+   on a target's geometry, is wired through the façade: false-covers' R-dismiss (rows.ts#dismissRow, under the form
+   cell's `config.ios.keyboardDismiss`) through `golden-spec.ts#formExpectations`, which takes the capture's source
+   (WDA only), its text targets through `golden-spec.ts#expectations`. So a B5 author edited
+   `golden-spec/false-covers.ts` (its rows), the façade (to ask them), rows.ts only for a new row type, and steps 1–3
+   and 5's files.
 5. **KNOWN** — `tests/differential/golden/<family>.known.ts`: the captures' COUNTS, and each mismatch the checkout has
    with its class, reply kind, calls, note and `as: bug:<note>` or `residual:<decision>`; then the note's rows in
    `scripts/truth/calibration.json` and a calibrate run.
@@ -213,8 +214,10 @@ How to add a cell (B2–B5):
 over its own label), `toolbar-dismiss` (SwiftUI's own full-screen `Toolbar` host from a principal title) and
 `toolbar-dismiss-bar` (plus an itemless bar-sized UIToolbar over the title), iOS form cells with
 `config.ios.keyboardDismiss`, R-dismiss asked under WDA only; `form-shared-id` in `forms` (FE2). #7 (first fix), #8,
-#18 (wider, still partial: no lab text field lists a scroll indicator), #19 and FE2 calibrated
-(docs/truth/calibration.md).
+#18 (wider, still partial: no lab text field lists a scroll indicator), #19 and FE2 (its assert half; `ui_snapshot`'s
+error column has no golden verb yet) calibrated (docs/truth/calibration.md). On Android `own-parts`' N is a green
+control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView
+[177,1351][443,1412]), so neither #8's shape nor #18's.
 
 **B4 (bars) — an open assumption to measure first.** What a raw tap in Android's navigation band does is not measured:
 under gesture navigation it reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's
