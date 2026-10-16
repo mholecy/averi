@@ -110,7 +110,9 @@ clips or its chrome — no capture before phase 3 does). A reply that says the t
 for element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within") is judged by its
 effect first — a tap refused without its remedy, a stroke beneath the presented layer is the row's own mismatch; only
 where the row would accept it is it no evidence either way, its mismatch said to be of that class first (`not in the
-tree: …`).
+tree: …`). Except where the capture's tree really did not list the target: an edge row's `Expectation.absent`, set from
+the truth's `TargetTruth.listed` for the replayed source (`golden-spec/edges.ts#notListed` — uiautomator dumps no node
+the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent for it).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
