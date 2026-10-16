@@ -299,7 +299,7 @@ the target moves the tap under a sixth, and passes unless the reply says it move
 it (`CatalogCell.platforms`) and, on Android, the navigation mode it is captured under (`CatalogCell.navigation`);
 capture-run skips it elsewhere (catalog.ts#captureRefusal), so `bands` (gesture) and `bands-three-button` sit in one run.
 Android: `scroll-bounded-flush` (rows whose identified container is not clickable — uiautomator cuts it flush with its
-scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, rows.ts#FLUSH_PROBED), `scroll-sticky-cut`
+scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, judges.ts#FLUSH_PROBED), `scroll-sticky-cut`
 (the header one accessibility element: Compose cuts the row AND its content at it — #9 STILL-RED-AFTER, lab finding VA1),
 `bands-three-button` (#23 still DOES-NOT-FAIL: the assert at 94bae14 does not pass on the bar). iOS:
 `sheet-long-list-short` (a row on the screen outside its table: #29's fix cures it, not #20's) and

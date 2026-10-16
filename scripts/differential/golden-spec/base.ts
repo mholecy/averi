@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { TargetTruth } from '../../truth/schema.js';
 import type { Outcome } from '../differential.js';
 import { pointText, probePoint, touchesAt } from '../../truth/truth.js';
-import { BUDGET_MS, classed, first, ownWords, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
+import { BUDGET_MS, classed, first, MOVED_TAP, ownWords, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
 
 /**
  * The base family's rows (fixtures/apps/cells/base.json): a coloured target open — reached by its probe and drawn as
@@ -69,16 +69,10 @@ export function probeDelivered(t: Pick<TargetTruth, 'frame' | 'probe'>): Point {
 export const OPEN_TAP_REACH = 1 / 6;
 
 /**
- * averi's reply for a tap it moved off a node's centre to an uncovered piece (src/interact/tap-judgement.ts, `Aim.moved`):
- * `Tapped <selector> at (x,y) — its centre (x,y) is under …; tapped the uncovered part WxH`. On a target the truth
- * measured uncovered (open, whole, reached, drawn as itself) nothing lies over its centre: the cover is averi's own.
- */
-const MOVED_TAP = / at \(-?[\d.]+,-?[\d.]+\) — its centre \(-?[\d.]+,-?[\d.]+\) is .*; tapped the uncovered part \d+x\d+/;
-
-/**
- * The open tap's judge on a `Tapped` reply: it does not say it moved the tap off a cover (MOVED_TAP), at least one tap
- * is sent, and every tap sent lies at the target's probe point (probeDelivered), within OPEN_TAP_REACH of its extent
- * on each axis.
+ * The open tap's judge on a `Tapped` reply: it does not say it moved the tap off a cover (judges.ts#MOVED_TAP — on a
+ * target the truth measured uncovered, open, whole, reached and drawn as itself, nothing lies over its centre: the
+ * cover is averi's own), at least one tap is sent, and every tap sent lies at the target's probe point
+ * (probeDelivered), within OPEN_TAP_REACH of its extent on each axis.
  */
 export function atProbe(o: Outcome, t: Pick<TargetTruth, 'frame' | 'probe'>): string | undefined {
   if (MOVED_TAP.test(ownWords(o))) return `Tapped moved off a cover over its centre, on a target measured uncovered: ${first(o)}`;

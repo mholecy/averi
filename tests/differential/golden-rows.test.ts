@@ -247,6 +247,8 @@ describe('R-land: a Tapped point inside what shows, where a probe fired', () => 
     ['centre out, its piece fired: Tapped inside', true, false, out(TAPPED, ['idb ui tap 201 685']), undefined],
     ['centre out, its piece never fired: Tapped', false, false, out(TAPPED, ['idb ui tap 201 685']), 'Tapped where no probe fired it: Tapped id:"lab.edges.A"'],
     ['centre out: refused, but a tap sent', false, false, out('ERROR: cut', ['idb ui tap 201 685']), 'refused, but sent idb ui tap 201 685'],
+    ['reached at its centre: Tapped with no tap sent', true, true, out(TAPPED), 'Tapped with no tap sent: Tapped id:"lab.edges.A"'],
+    ['centre out, its piece fired: Tapped with no tap sent', true, false, out(TAPPED), 'Tapped with no tap sent: Tapped id:"lab.edges.A"'],
   ])('%s', (_n, fired, mustTap, o, expected) => {
     expect(landed(o, visible, fired, mustTap)).toBe(expected);
   });
@@ -310,7 +312,7 @@ describe('R-dismiss and R-direction', () => {
   const r = dismissRow('ios', { tag: 'vs', id: 'lab.f.vs' }, { label: 'Transfer details', frame: rect(120, 60, 162, 22) });
   it('R-dismiss: the configured dismissal is tapped, inside its element', () => {
     expect(r.judge(out(TAPPED, ['idb ui tap 201 71', 'idb ui tap 201 700']))).toBeUndefined();
-    // What covered the dismissal is read from the guard's own clause (rows.ts#DISMISSAL_COVERED), as the replies at
+    // What covered the dismissal is read from the guard's own clause (judges.ts#DISMISSAL_COVERED), as the replies at
     // 5cff2ad (#7's toolbar) and 7542021 (#7's scroll view) say it — never from the advice, which names the
     // input-accessory toolbar whatever covered the dismissal.
     const refused = (cover: string) => `ERROR The soft keyboard covers id:"lab.f.vs": … and so was the input-accessory toolbar's Done … and none of the configured dismissals is usable on this screen (tap id:"lab.f.title": covered by ${cover}). Nothing was tapped`;

@@ -16,7 +16,14 @@ export function probePoint(frame: Rect): { x: number; y: number } {
   return { x: Math.round(frame.x + frame.width / 2), y: Math.round(frame.y + frame.height / 2) };
 }
 
-const inside = (p: { x: number; y: number }, r: Rect) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
+/**
+ * Whether a point lies in a rect, its left and top edges in, its right and bottom out — the one test the truth and the
+ * golden judges (golden-spec/judges.ts) share.
+ */
+export const within = (p: { x: number; y: number }, r: Rect) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
+
+/** Whether two points lie within TOUCH_SLACK of each other on each axis — a touch counts as the tap's (touchesAt). */
+export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.abs(p.x - q.x) <= TOUCH_SLACK && Math.abs(p.y - q.y) <= TOUCH_SLACK;
 
 /**
  * Where a control's frame lies, from the app's frames alone. A control laid in the picker sheet is `own.inSheet`; the
@@ -37,7 +44,7 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
   if (k !== undefined && frame.y >= k.y) return 'under-keyboard';
   if (k !== undefined && frame.y + frame.height > k.y) return 'covered';
   const bar = s.frames[`${form.submit.tag}.bar`];
-  if (form.submit.pinned === true && own.tag !== form.submit.tag && bar !== undefined && inside({ x: frame.x + frame.width / 2, y: cy }, bar)) return 'covered';
+  if (form.submit.pinned === true && own.tag !== form.submit.tag && bar !== undefined && within({ x: frame.x + frame.width / 2, y: cy }, bar)) return 'covered';
   return 'open';
 }
 
@@ -60,7 +67,7 @@ export function touchesAt(events: readonly ProbeEvent[], point: { x: number; y: 
   return events.filter((e) => {
     if (e.kind !== 'touch') return false;
     const [x, y] = e.tag.split(',').map(Number);
-    return Math.abs(x - point.x) <= TOUCH_SLACK && Math.abs(y - point.y) <= TOUCH_SLACK;
+    return nearPoint({ x, y }, point);
   });
 }
 
@@ -111,7 +118,7 @@ export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): P
 /**
  * Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (unprobedReason).
  */
-export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => inside(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
+export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => within(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
 /** A point as the truth's reasons and golden's mismatches spell it: `(x,y)`. */
 export const pointText = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
 
@@ -439,13 +446,13 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
   // ROUNDED centre lies below the band").
   const c = probePoint(frame);
   const bands = bandsOf(ctx.screen, ctx.safeArea);
-  if (bands.status !== undefined && inside(c, bands.status)) return 'status-band';
-  if (bands.nav !== undefined && inside(c, bands.nav)) return 'nav-band';
-  const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => inside(c, r));
+  if (bands.status !== undefined && within(c, bands.status)) return 'status-band';
+  if (bands.nav !== undefined && within(c, bands.nav)) return 'nav-band';
+  const chrome = Object.entries(ctx.chrome ?? {}).sort(([a], [b]) => a.localeCompare(b)).find(([, r]) => within(c, r));
   const underChrome = chrome === undefined ? undefined : (`under-chrome:${chrome[0]}` as const);
   if (area(visible) < area(frame)) {
     if (clipCuts(frame, visible, ctx.clip).some((cut) => cut.depth < minPiece(ctx.screen))) return 'sliver';
-    if (!inside(c, visible)) return 'centre-out';
+    if (!within(c, visible)) return 'centre-out';
     return underChrome ?? 'partly-centre-in';
   }
   return underChrome ?? regionOverlap(visible, ctx) ?? 'whole';
@@ -474,7 +481,7 @@ export function pieceProbePoint(frame: Rect, piece: Rect | null | undefined): { 
   if (piece === null || piece === undefined) return undefined;
   const a = probePoint(frame);
   const b = probePoint(piece);
-  return Math.abs(a.x - b.x) <= TOUCH_SLACK && Math.abs(a.y - b.y) <= TOUCH_SLACK ? undefined : b;
+  return nearPoint(a, b) ? undefined : b;
 }
 
 /**
@@ -495,7 +502,7 @@ export function controlConsistency(c: ControlTruth, outOfProcess: Rect | undefin
   const probed = c.frame !== undefined && c.situation !== 'off-screen' && c.situation !== 'not-rendered';
   if (probed) {
     const at = probePoint(c.frame!);
-    if (touchesAt(c.probe, at).length === 0 && !(outOfProcess !== undefined && inside(at, outOfProcess))) return NOT_DELIVERED;
+    if (touchesAt(c.probe, at).length === 0 && !(outOfProcess !== undefined && within(at, outOfProcess))) return NOT_DELIVERED;
   } else if (c.reached || c.probe.length > 0) {
     return `${c.situation}, never probed, but the truth holds a probe`;
   }

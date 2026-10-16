@@ -1,8 +1,8 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
-import { otherControlsFired, probePoint, TOUCH_SLACK } from '../../truth/truth.js';
-import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
+import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -105,10 +105,7 @@ export const notTappedOrInPiece =
   (piece: Rect) =>
   (o: Outcome): string | undefined => {
     if (!o.reply.startsWith('Tapped')) return notTapped(o);
-    const points = tapPoints(o);
-    if (points.length === 0) return said(o, 'Tapped with no tap sent');
-    const out = points.filter((p) => !within(p, piece));
-    return out.length > 0 ? said(o, `Tapped outside its piece at ${pointsText(out)}`) : undefined;
+    return tappedInside(o, piece, 'its piece');
   };
 
 /**
@@ -120,14 +117,11 @@ export const notTappedOrInPiece =
 export const tapAfterBackOnPiece =
   (centre: { x: number; y: number }, fires: string | undefined, piece: Rect | undefined) =>
   (o: Outcome): string | undefined => {
-    const points = tapPoints(o);
-    const atCentre = points.filter((p) => Math.abs(p.x - centre.x) <= TOUCH_SLACK && Math.abs(p.y - centre.y) <= TOUCH_SLACK);
+    const atCentre = tapPoints(o).filter((p) => nearPoint(p, centre));
     if (fires !== undefined && atCentre.length > 0) return said(o, `tapped at its centre ${pointsText(atCentre)}, which after back ${fires}`);
     if (!o.reply.startsWith('Tapped')) return notTapped(o);
     if (piece === undefined) return said(o, 'Tapped, where no tap after back reached it');
-    if (points.length === 0) return said(o, 'Tapped with no tap sent');
-    const out = points.filter((p) => !within(p, piece));
-    return out.length > 0 ? said(o, `Tapped outside its piece after back at ${pointsText(out)}`) : undefined;
+    return tappedInside(o, piece, 'its piece after back');
   };
 
 export function formRows(platform: Platform, truth: CellTruth): FormExpectation[] {

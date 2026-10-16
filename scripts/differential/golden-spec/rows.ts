@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { isOverlap, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { BUDGET_MS, first, landed, notInTree, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, DISMISSAL_COVERED, first, FLUSH_PROBED, landed, notInTree, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, scrollAdvice, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
@@ -198,8 +198,6 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): E
   };
 }
 
-/** The `fully` stop's own account of a flush edge it probed (scroll-rounds.ts's wording since 9c7885e): the side. */
-export const FLUSH_PROBED = /its (top|bottom|left|right) edge lies on its scroll container's .*a probe swipe toward it moved nothing/;
 const NOT_PROBED = 'no flush probe said';
 
 /**
@@ -216,12 +214,9 @@ export function flushProbe(o: Outcome, t: Pick<TargetTruth, 'visible' | 'scrollV
   if (sv === undefined || v === undefined) return `no scroll view or visible part in the truth to bear out its ${side} edge`;
   const edge = (r: Rect) => ({ top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width })[side];
   if (Math.abs(edge(v) - edge(sv)) > 1) return `its ${side} edge is not flush with its scroll view ${t.scrollView} in the truth (${edge(v)} vs ${edge(sv)})`;
-  const toward = o.device.some((c) => {
-    const m = /^(?:idb ui|adb shell input) swipe (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(c);
-    if (m === null) return false;
-    const [x1, y1, x2, y2] = m.slice(1, 5).map(Number);
-    const drag = { bottom: y2 < y1, top: y2 > y1, right: x2 < x1, left: x2 > x1 }[side];
-    return drag && within({ x: x1, y: y1 }, sv);
+  const toward = strokes(o).some(({ from, to }) => {
+    const drag = { bottom: to.y < from.y, top: to.y > from.y, right: to.x < from.x, left: to.x > from.x }[side];
+    return drag && within(from, sv);
   });
   return toward ? undefined : `no swipe from inside its scroll view ${t.scrollView} toward its ${side} edge`;
 }
@@ -269,16 +264,6 @@ export function dismissRow(platform: Platform, control: { tag: string; id: strin
     },
   };
 }
-
-/**
- * What a refused dismissal names as lying over it — `toolbar` (#7's first half: SwiftUI's screen-sized Toolbar host, #19's
- * bar), `scrollable` (#7's second half: a scroll view shorter than the screen, its frame over the title) — read from the
- * guard's own clause (`none of the configured dismissals is usable on this screen (tap …: covered by <role> …)`), not
- * from any "toolbar" in the reply: its advice names the input-accessory toolbar whatever covered the dismissal.
- */
-// Errs safe: a `)` inside an earlier part of the clause (a selector's text) ends the match before `covered by`, and
-// the row then names no cover — the mismatch stays red, only its wording loses the role.
-export const DISMISSAL_COVERED = /none of the configured dismissals is usable[^(]*\([^)]*covered by ([a-z]+)/;
 
 /**
  * R-direction: LIVE ONLY — whether each stroke brings the target closer is a dynamic; declared so the table is whole.
