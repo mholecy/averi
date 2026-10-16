@@ -11,6 +11,7 @@ import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
 import { hostExec, useRecognizer } from './fake-device.js';
+import { ocrSkip, probeRecognizer } from './ocr-probe.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -73,38 +74,21 @@ export const checkOf = (recording: string, target: string, verb: Verb, says: str
   return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
 };
 
-/**
- * A known text the probe reads to tell whether the host's recognizer works: the title of the iOS form-basic capture
- * ("New payment", read at confidence 1 on macOS Vision), a region of a committed screenshot in its pixels.
- */
-const OCR_PROBE = {
-  png: fileURLToPath(new URL('../../tests/fixtures/truth/ios-iphone17-ios27/form-basic.png', import.meta.url)),
-  region: { id: 'probe', x: 400, y: 215, w: 410, h: 90 },
-  reads: /New payment/,
-};
+/** The image the probe reads (any committed screenshot: only whether Vision runs at all is asked of it). */
+const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-iphone17-ios27/form-basic.png', import.meta.url));
 
 /**
- * Whether the `ocr` rows can be judged here, once per process: undefined when the host's recognizer read the probe's
- * known text (OCR_PROBE) — then the fake device runs the real one for every side from now on (useRecognizer('vision'))
- * — else why not: not macOS, no `swiftc`, a recognizer that did not compile, or one that runs but reads nothing (Vision
- * inside a sandbox answers `nilError`). Read with this checkout's recognizer (src/verify/ocr.ts#VisionOcr) on the host's
- * own processes (fake-device.ts#hostExec); each side then compiles and runs its own.
+ * Whether the `ocr` rows can be judged here, once per process: undefined to ask them — the fake device then runs the
+ * host's recognizer for every side (useRecognizer('vision')) — else why not. Decided by the harness's own probe
+ * (ocr-probe.ts#ocrSkip, never the src under test): skipped only when the host is not macOS, has no `swiftc`, or Vision
+ * answers `nilError` (a sandbox); any other failure asks the rows, so a side whose recognizer does not compile or reads
+ * wrong is red, not skipped. `GOLDEN_OCR=require` makes a skip an error: the ratchet then cannot pass without them.
  */
 let ocrProbe: Promise<string | undefined> | undefined;
 export function ocrAvailability(): Promise<string | undefined> {
-  ocrProbe ??= (async () => {
-    if (process.platform !== 'darwin') return `the macOS recognizer: this host is ${process.platform}`;
-    try {
-      const { VisionOcr } = await import('../../src/verify/ocr.js');
-      const engine = new VisionOcr((cmd, args, opts) => hostExec(cmd, args, opts?.stdin));
-      const [read] = await engine.recognize(await readFile(OCR_PROBE.png), [OCR_PROBE.region]);
-      const text = (read?.lines ?? []).map((l) => l.text).join(' ');
-      if (read?.error !== undefined) return `the recognizer could not read its probe: ${read.error}`;
-      return OCR_PROBE.reads.test(text) ? undefined : `the recognizer read ${JSON.stringify(text)} for its probe's "New payment"`;
-    } catch (e) {
-      return `the recognizer did not run: ${(e instanceof Error ? e.message : String(e)).split('\n')[0]}`;
-    }
-  })().then((why) => {
+  ocrProbe ??= probeRecognizer(hostExec, OCR_PROBE_PNG).then((o) => {
+    const why = ocrSkip(o);
+    if (why !== undefined && process.env.GOLDEN_OCR === 'require') throw new Error(`GOLDEN_OCR=require, but the ocr rows cannot be asked here: ${why}`);
     if (why === undefined) useRecognizer('vision');
     return why;
   });
@@ -112,7 +96,7 @@ export function ocrAvailability(): Promise<string | undefined> {
 }
 
 /** An `ocr` row not asked (ocrAvailability): no call made, no mismatch, the reason in its reply. */
-const skippedCheck = (recording: string, target: string, verb: Verb, says: string, why: string): GoldenCheck => ({
+export const skippedCheck = (recording: string, target: string, verb: Verb, says: string, why: string): GoldenCheck => ({
   recording,
   target,
   verb,

@@ -1,6 +1,8 @@
 import childProcess from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join, sep } from 'node:path';
 import { PNG } from 'pngjs';
 import type { Platform, Screen } from './corpus.js';
 import type { ImeCapture } from '../truth/schema.js';
@@ -124,8 +126,15 @@ let recognizer: Recognizer = 'none';
 export function useRecognizer(r: Recognizer): void {
   recognizer = r;
 }
-/** The OCR recognizer's commands: its compiler, and the binary averi caches under `averi-ocr-bin` (src/verify/ocr.ts). */
-const isRecognizer = (cmd: string) => cmd === 'swiftc' || cmd.includes('averi-ocr-bin');
+/**
+ * Where averi caches its compiled recognizer (src/verify/ocr.ts#VisionOcr: `<tmpdir>/averi-ocr-bin/recognizer-<key>`) —
+ * a path prefix, so no other command whose name merely mentions it is taken for the recognizer.
+ */
+const RECOGNIZER_DIR = join(tmpdir(), 'averi-ocr-bin') + sep;
+/** The averi OCR recognizer binary (RECOGNIZER_DIR). */
+export const isRecognizerBinary = (cmd: string) => cmd.startsWith(RECOGNIZER_DIR);
+/** The OCR recognizer's commands: its compiler, and the binary averi caches (isRecognizerBinary). */
+const isRecognizer = (cmd: string) => cmd === 'swiftc' || isRecognizerBinary(cmd);
 
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
@@ -251,7 +260,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     writeFileSync(out, '');
     return '';
   }
-  if (cmd.includes('averi-ocr-bin')) {
+  if (isRecognizerBinary(cmd)) {
     const regions = (JSON.parse(stdin ?? '{}') as { regions?: { id: string }[] }).regions ?? [];
     return JSON.stringify({ results: regions.map((r) => ({ id: r.id, lines: [] })) });
   }

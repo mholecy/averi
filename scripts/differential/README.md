@@ -159,17 +159,21 @@ capture's source for it (the keyboardDismiss list is inert under idb). A replaye
 keyboard going and the field then tapped (live golden, phase 5).
 
 OCR on the real pixels (phase 4): an `ocr` row is judged by the host's own recognizer reading the captured screenshot.
-golden.ts#ocrAvailability reads a known text once per process (the iOS form-basic title) with this checkout's
-recognizer on the host's processes (fake-device.ts#hostExec); when it reads it, the fake device passes `swiftc` and the
-recognizer binary averi caches under `averi-ocr-bin` through to the host (fake-device.ts#useRecognizer), so each side
-compiles and runs its own on the screenshot the fake serves. Where it cannot — not macOS, no `swiftc`, or Vision inside
-a sandbox, which answers `nilError` — the `ocr` rows are not asked: each is a check marked `skipped` (its reply says
-why, never a mismatch, the report counts them), golden.test.ts holds a skipped row's KNOWN entry where it is, and
-calibrate reads a skipped named row as NOT-ASKED. So run golden and calibrate outside the sandbox to judge them.
+golden.ts#ocrAvailability decides once per process with the harness's own minimal recognizer
+(scripts/differential/ocr-probe.ts, never the src under test): the `ocr` rows are skipped only when the host is not
+macOS, has no `swiftc`, or Vision answers `nilError` (inside a sandbox); any other failure asks them, so a side whose
+recognizer does not compile or reads wrong is red, not skipped. When asked, the fake device passes `swiftc` and the
+recognizer binary averi caches under `<tmpdir>/averi-ocr-bin/` through to the host (fake-device.ts#useRecognizer), so
+each side compiles and runs its own on the screenshot the fake serves. A skipped row is a check marked `skipped` (its
+reply says why, never a mismatch, the report counts them); golden.test.ts holds a skipped row's KNOWN entry where it
+is and shows `the ocr rows are asked` as a skipped test; calibrate reads a skipped named row as NOT-ASKED. Run golden
+and calibrate outside the sandbox to judge them; `GOLDEN_OCR=require` makes a skip an error (golden, golden.test.ts).
 `golden-spec/text.ts` holds the rows, asked of any text target (CatalogTarget.text) by its string: the tree's `text`
 and `ocr` pass on an open one (`ocr` exactly, or equal under the recognizer's fold, src/verify/ocr-fold.ts); under the
 status band, the chrome or Android's three-button bar `ocr` fails closed — a PASS or a reading measured what lies over
-it; across the gesture navigation band (the app's) a PASS or failing closed, never a FAIL on a reading. The text family
+it (its "not found" right only where the capture's tree of that source lists no node carrying the string:
+TargetTruth.textListed); across the gesture navigation band (the app's) a PASS or failing closed, never a FAIL on a
+reading. The text family
 (`text-sample`, `text-under-bar`, `text-nav-cut`) carries P5's sample strings; the under-keyboard form row gains its
 OCR half beside its colour row (golden-spec/forms.ts).
 

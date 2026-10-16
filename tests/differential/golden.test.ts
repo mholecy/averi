@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { installVirtualClock } from '../../scripts/differential/clock.js';
 import { loadCorpus, type Recording } from '../../scripts/differential/corpus.js';
 import { installFakeDevice } from '../../scripts/differential/fake-device.js';
-import { cellOf, goldenRecording, type GoldenCheck, type GoldenResult } from '../../scripts/differential/golden.js';
+import { cellOf, goldenRecording, ocrAvailability, type GoldenCheck, type GoldenResult } from '../../scripts/differential/golden.js';
 import { loadSide, type Side } from '../../scripts/differential/side.js';
 import { familyOf, loadCatalog } from '../../scripts/truth/catalog.js';
 import { FAMILIES } from '../../scripts/truth/schema.js';
@@ -41,6 +41,11 @@ const KNOWN: Record<string, Known> = Object.assign({}, ...FILES.map((f) => f.kno
 const COUNTS: Record<string, number> = Object.assign({}, ...FILES.map((f) => f.counts));
 
 const key = (c: GoldenCheck) => `${c.recording} ${c.target} ${c.verb}`;
+
+// Whether the `ocr` rows are asked on this host (golden.ts#ocrAvailability: the harness's own probe): undefined, or why
+// not — not macOS, no swiftc, Vision refusing with nilError (a sandbox). A skip shows as a skipped test below; with
+// GOLDEN_OCR=require it is an error instead (ocrAvailability throws), so a run that must judge them cannot pass without.
+const noOcr = await ocrAvailability();
 
 let side: Side;
 let corpus: Recording[];
@@ -98,6 +103,12 @@ describe('golden over the lab app truth', () => {
     const skipped = new Set(results.flatMap((r) => r.checks).filter((c) => c.skipped !== undefined).map(key));
     const fixed = Object.keys(KNOWN).filter((k) => !mismatches.has(k) && !skipped.has(k)).map((k) => `${k} — ${KNOWN[k].note}`);
     expect(fixed).toEqual([]);
+  });
+
+  it.skipIf(noOcr !== undefined)('the ocr rows are asked (the host\'s recognizer reads the screenshots)', () => {
+    const ocr = results.flatMap((r) => r.checks).filter((c) => c.verb === 'ocr');
+    expect(ocr.length).toBeGreaterThan(0);
+    expect(ocr.filter((c) => c.skipped !== undefined).map(key)).toEqual([]);
   });
 
   it('every mismatch is known', () => {

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, type Expectation } from '../../scripts/differential/golden-spec.js';
 import { verdictOf, type CalibrationEntry, type SideRun } from '../../scripts/truth/calibrate.js';
-import type { GoldenCheck } from '../../scripts/differential/golden.js';
+import { goldenReport, skippedCheck, type GoldenCheck } from '../../scripts/differential/golden.js';
+import { ocrSkip } from '../../scripts/differential/ocr-probe.js';
+import { isRecognizerBinary } from '../../scripts/differential/fake-device.js';
+import { textListedIn } from '../../scripts/truth/truth.js';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
 // Phase 4's text rows (scripts/differential/golden-spec/text.ts) and the OCR half of the under-keyboard form row
@@ -121,5 +126,81 @@ describe('calibrate: a skipped row (no recognizer on the host) is not asked', ()
   it('NOT-ASKED, never DOES-NOT-FAIL for a row that was never measured', () => {
     expect(verdictOf(e, side(check({ skipped: 'no Vision' })), side(check({ skipped: 'no Vision' })))).toBe('NOT-ASKED');
     expect(verdictOf(e, side(check({ mismatch: 'read what the band leaves of it as its text: x' })), side(check({})))).toBe('CALIBRATED');
+  });
+});
+
+describe('a covered string missing from the tree (TargetTruth.textListed)', () => {
+  const S = target({ tag: 'S', text: 'Zostatok', geometry: 'status-band', frame: rect(0, 11, 1080, 44), reached: false, probe: [] });
+  const truth = cell({ screen: { width: 1080, height: 2220 }, scale: 1, safeArea: { top: 66, left: 0, bottom: 66, right: 0 } });
+  const NOT_FOUND = out('1/1 asserts FAILED\nFAIL  element text:"Zostatok" renders text "Zostatok" — not found within 1 s');
+
+  it('listed by the capture: "not found" is no evidence (vacuous), as anywhere', () => {
+    const ocr = by(expectations('android', { ...S, textListed: { uiautomator: true } }, truth, 'uiautomator'), 'ocr');
+    expect(ocr.absent).toBeUndefined();
+    expect(ocr.judge(NOT_FOUND)).toMatch(/^not in the tree: /);
+  });
+  it('not listed by that source\'s capture: "not found" is right', () => {
+    const ocr = by(expectations('android', { ...S, textListed: { uiautomator: false } }, truth, 'uiautomator'), 'ocr');
+    expect(ocr.absent).toMatch(/lists no node carrying the string/);
+    expect(ocr.judge(NOT_FOUND)).toBeUndefined();
+    expect(ocr.judge(READ_FAIL('Continue'))).toMatch(/^measured the layer/);
+  });
+  it('no record (a capture before it): no excuse', () => {
+    expect(by(expectations('android', S, truth, 'uiautomator'), 'ocr').absent).toBeUndefined();
+  });
+});
+
+describe('textListedIn: a node carrying the string, per payload', () => {
+  it('uiautomator: text or content-desc, entities decoded, whitespace collapsed; not a substring', () => {
+    const xml = '<hierarchy><node text="1&#160;234,56&#160;€" content-desc="" /><node text="" content-desc="Payee&apos;s" /></hierarchy>';
+    expect(textListedIn(xml, '1\u00a0234,56\u00a0€')).toBe(true);
+    expect(textListedIn(xml, "Payee's")).toBe(true);
+    expect(textListedIn(xml, '234,56')).toBe(false);
+  });
+  it('WDA / idb JSON: any string value', () => {
+    expect(textListedIn(JSON.stringify([{ AXLabel: 'Pokračovať na súhrn', AXValue: null }]), 'Pokračovať na súhrn')).toBe(true);
+    expect(textListedIn(JSON.stringify({ value: { label: 'x', children: [{ label: 'Šťastný' }] } }), 'Šťastný')).toBe(true);
+    expect(textListedIn(JSON.stringify([{ AXLabel: 'Continue' }]), 'Pokračovať')).toBe(false);
+  });
+});
+
+describe('the ocr rows\' availability (ocr-probe.ts#ocrSkip): skipped only on the named host conditions', () => {
+  it.each([
+    ['not macOS', { platform: 'linux' as const }, /this host is linux/],
+    ['no swiftc', { platform: 'darwin' as const, compiler: { code: 'ENOENT', message: 'spawn swiftc ENOENT' } }, /no swiftc/],
+    ['Vision in a sandbox', { platform: 'darwin' as const, run: { stdout: 'ERROR Error Domain=… Code=… "nilError"' } }, /nilError/],
+  ])('%s → skipped', (_, o, why) => {
+    expect(ocrSkip(o)).toMatch(why);
+  });
+  it.each([
+    ['it reads', { platform: 'darwin' as const, run: { stdout: 'New payment\n' } }],
+    ['it reads nothing', { platform: 'darwin' as const, run: { stdout: '' } }],
+    ['the probe does not compile', { platform: 'darwin' as const, run: { error: 'swiftc: error: no such module Vision' } }],
+    ['swiftc exits non-zero', { platform: 'darwin' as const, compiler: { code: 1, message: 'exit 1' } }],
+  ])('%s → asked (a side whose recognizer fails is red, not skipped)', (_, o) => {
+    expect(ocrSkip(o)).toBeUndefined();
+  });
+});
+
+describe('a skipped row and the report', () => {
+  const c = skippedCheck('r/x.json', 'A', 'ocr', 'passes', 'Vision answers nilError');
+  it('no call, no mismatch, its reply and reason say so', () => {
+    expect(c).toMatchObject({ verb: 'ocr', kind: 'other', calls: [], skipped: 'Vision answers nilError' });
+    expect(c.mismatch).toBeUndefined();
+    expect(c.reply).toMatch(/^SKIPPED — no OCR on this host: Vision answers nilError/);
+  });
+  it('the report counts it and lists it as skipped, not ok', () => {
+    const report = goldenReport([{ recording: 'r/x.json', checks: [c], broken: [] }]);
+    expect(report).toMatch(/1 skipped \(no OCR on this host: Vision answers nilError\)/);
+    expect(report).toMatch(/- skipped A ocr: passes/);
+    expect(report).not.toMatch(/- ok A ocr/);
+  });
+});
+
+describe('the fake device takes only averi\'s cached recognizer for the real one', () => {
+  it('a path under <tmpdir>/averi-ocr-bin/, nothing that merely names it', () => {
+    expect(isRecognizerBinary(join(tmpdir(), 'averi-ocr-bin', 'recognizer-0123'))).toBe(true);
+    expect(isRecognizerBinary('/elsewhere/averi-ocr-bin/recognizer-0123')).toBe(false);
+    expect(isRecognizerBinary('averi-ocr-bin')).toBe(false);
   });
 });
