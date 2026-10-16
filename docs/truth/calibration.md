@@ -11,27 +11,27 @@ open note on the working tree. See the script for the verdicts.
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | needs-2b | 926b826 → 95f75f4 | — |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the iOS leg only) |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 14 rows (recorded) |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 19 rows (recorded) |
 | 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED (partial: the first fix (7542021): SwiftUI's own full-screen `Toolbar` host) |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | DOES-NOT-FAIL |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
-| 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | needs-cell:bars | 188740b → bd06470, 16ae6bb | — |
-| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | STILL-RED-AFTER (partial: not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's)) |
+| 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | calibrate | 188740b → bd06470 | CALIBRATED |
+| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | STILL-RED-AFTER (partial: not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's)), regressed elsewhere: 1 row (recorded) |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | STILL-RED-AFTER (partial: not the note's shape: the lab's S is cut 66 px past its container's edge instead of flush with it (the rows' red is LE1's)) |
-| 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | needs-cell:bars | d2b7744 → 81a7d62 | — |
+| 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | calibrate | d2b7744 → 81a7d62 | CALIBRATED |
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
 | 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic) |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node) |
 | 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only) |
-| 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | needs-cell:bars | 0cb8b62 → 5e47ff4 | — |
-| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half only), regressed elsewhere: 2 rows (recorded) |
-| 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | needs-ocr | 94bae14 → e85bcdf | — |
+| 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
+| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS)), regressed elsewhere: 6 rows (recorded) |
+| 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | CALIBRATED (partial: the navigation band's colour part (the static bands); OCR on real pixels is phase 4) |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
-| 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | needs-cell:bars | 7566443 → 83e282a | — |
+| 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | calibrate | 7566443 → 83e282a | CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts) |
 | 27 | 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
 | 28 | 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
 | 29 | 2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes | calibrate | ec2893a → b7eac90 | CALIBRATED |
@@ -52,6 +52,7 @@ open note on the working tree. See the script for the verdicts.
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | open | working tree | OPEN-RED |
+| B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
 
 ## 2: CALIBRATED (partial: stage A only)
 
@@ -123,6 +124,10 @@ The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc60
 
 Regressed elsewhere at 13d68a2 (green at 16ae6bb):
 
+  - RED android-averi_lab-api33/fab.xml L tap — not tapped: ERROR id:"lab.fab.L" is under container id:lab.fab.host (0,1758 1080x352) at its centre (204,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED android-averi_lab-api33/fab.xml L scroll_until — stopped: ERROR scroll_until id:"lab.fab.L" failed after 2 swipes — element is in the viewport but under container id:lab.fab.host (0,1758 1080x352) at its centre (204,1934), drawn over it — 0% of it shows — an
+  - RED android-averi_lab-api33/fab.xml K tap — not tapped: ERROR id:"lab.fab.K" is under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED android-averi_lab-api33/fab.xml K scroll_until — stopped: ERROR scroll_until id:"lab.fab.K" failed after 2 swipes — element is in the viewport but under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it — 0% of it shows — an
   - RED android-averi_lab-api33/own-parts.xml L tap — not tapped: ERROR text:"LOGIN" is under button (127,303 825x176) at its centre (540,392), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED android-averi_lab-api33/own-parts.xml L scroll_until — stopped: ERROR scroll_until text:"LOGIN" failed after 2 swipes — element is in the viewport but under button (127,303 825x176) at its centre (540,392), drawn over it — 0% of it shows — and the content is exhau
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
@@ -137,6 +142,7 @@ Regressed elsewhere at 13d68a2 (green at 16ae6bb):
   - RED ios-iphone17-ios27/own-parts.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it — 22% of i
   - RED ios-iphone17-ios27/sheet-medium.wda.json S tap — not tapped: ERROR id:"lab.sheet-medium.S" is under container (8,415 386x451) at its centre (201,484), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — stopped: ERROR scroll_until id:"lab.sheet-medium.S" failed after 2 swipes — element is in the viewport but under container (8,415 386x451) at its centre (201,484), drawn over it — 0% of it shows — and the cont
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — stopped: ERROR scroll_until id:"lab.tabbar-hidden-push.C" failed after 2 swipes — element is in the viewport but under button "Cards" (201,754 82x64) at its centre (201,810), drawn over it — 38% of it shows — 
 
 Regressions recorded:
 
@@ -147,6 +153,8 @@ Regressions recorded:
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2
 - ios-iphone17-ios27/blur-menu.idb.json W tap, ios-iphone17-ios27/blur-menu.idb.json W scroll_until, ios-iphone17-ios27/blur-menu.wda.json W tap, ios-iphone17-ios27/blur-menu.wda.json W scroll_until: broke at 13d68a2, not fixed — the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4
 - ios-iphone17-ios27/blur-menu-grouped.idb.json W tap, ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until: broke at 13d68a2, fixed at 8a55d2b — the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)
+- android-averi_lab-api33/fab.xml L tap, android-averi_lab-api33/fab.xml L scroll_until, android-averi_lab-api33/fab.xml K tap, android-averi_lab-api33/fab.xml K scroll_until: broke at 13d68a2, not fixed — pinned app chrome became a cover: the FAB host, a cover by the accepted round-13 reading (#24, residual), refuses the targets beside the FAB
+- ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until: broke at 13d68a2, fixed at 83e282a — pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop until ADR 0019's hidden subtree
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 
@@ -195,6 +203,17 @@ Needs: edges/scroll-sticky variant (Android) whose uiautomator node of the row i
 
 The lab's scroll-sticky R (its top 24 dp under the pinned header): uiautomator lists R whole (`[128,391][953,567]`) and the header after it, so `fully: true` refuses it on both sides ('under text "Sticky header" … drawn over it — 63% of it shows'). The note's shape — the row's rect cut at the header by the tree — is not what Compose's LazyColumn produced here.
 
+## 11: CALIBRATED
+
+2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md — defect: `touched down off the strokeable region`
+
+- before 188740b:
+  - RED android-averi_lab-api33/tabbar-floating.xml F scroll_until — touched down off the strokeable region at (540,1886) (540,1886): ERROR scroll_until id:"lab.tabbar-floating.F" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element
+- after bd06470:
+  - ok android-averi_lab-api33/tabbar-floating.xml F scroll_until — ERROR scroll_until id:"lab.tabbar-floating.F" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tr
+
+tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.
+
 ## 12: STILL-RED-AFTER (partial: not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's))
 
 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md — defect: `fully visible`
@@ -203,6 +222,14 @@ The lab's scroll-sticky R (its top 24 dp under the pinned header): uiautomator l
   - RED android-averi_lab-api33/scroll-bounded.xml P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.P" fully visible after 0 swipes
 - after 9c7885e:
   - RED android-averi_lab-api33/scroll-bounded.xml P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.P" fully visible after 0 swipes
+
+Regressed elsewhere at 9c7885e (green at d043e65):
+
+  - RED android-averi_lab-api33/tabbar-floating.xml F scroll_until — touched down off the strokeable region at (540,1886) (540,1886): ERROR scroll_until id:"lab.tabbar-floating.F" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element
+
+Regressions recorded:
+
+- android-averi_lab-api33/tabbar-floating.xml F scroll_until: broke at 9c7885e, fixed at bd06470 — the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470
 
 Needs: edges/scroll-bounded variant (Android) whose uiautomator bounds are cut FLUSH with the scroll container's edge (mp-native's SWIFT form: `{y:242, height:92}` on a container from 242) — the lab's verticalScroll in an edge-to-edge window does not cut P at all.
 
@@ -220,6 +247,19 @@ The lab's P is cut by its container's bottom (908) but uiautomator reports its w
 Needs: edges/scroll-bounded variant (Android) whose sliver's uiautomator bounds are cut FLUSH with the container's edge (mp-native's `details_toggle 66,1924 948x55` on a container ending at 1978) — the lab's S is cut 66 px past its container's bottom.
 
 The lab's S (22 px of it drawn above its container's bottom, 1541) reads `[128,1519][953,1607]`: past the container, not flush. Tapped at (541,1563) — below the container, where nothing of it is drawn — on both sides, the note's symptom; ADR 0013's refusal of a flush sliver does not reach it. Filed as lab finding LE1.
+
+## 14: CALIBRATED
+
+2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md — defect: `^Tapped`
+
+- before d2b7744:
+  - RED ios-iphone17-ios27/tabbar-floating.idb.json R tap — Tapped outside what shows of it at (201,747): Tapped id:"lab.tabbar-floating.R"
+  - RED ios-iphone17-ios27/tabbar-floating.wda.json R tap — Tapped outside what shows of it at (201,747): Tapped id:"lab.tabbar-floating.R"
+- after 81a7d62:
+  - ok ios-iphone17-ios27/tabbar-floating.idb.json R tap — ERROR id:"lab.tabbar-floating.R" is under button "cards" (201,755 82x64) at its centre (201,747), drawn over it; only a 354x21 part of it shows, under the 24x24 a tap may be moved to — scroll_until it first; nothing was 
+  - ok ios-iphone17-ios27/tabbar-floating.wda.json R tap — ERROR id:"lab.tabbar-floating.R" is under button "cards" (201,755 82x64) at its centre (201,747), drawn over it; only a 354x21 part of it shows, under the 24x24 a tap may be moved to — scroll_until it first; nothing was 
+
+81a7d62 does flip sheet-medium.wda S — that is #18's half of the merge, not this note's.
 
 ## 15: CALIBRATED
 
@@ -332,33 +372,88 @@ toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty ch
 
 presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Only R-off is asked: F lies off the screen, which takes precedence over outside its scroll view (truth.ts#geometryOf) — the note's own call, `fully: true`, is R-fully's and not asked of an off-screen target (partial); the plain stop asked by R-stroke shows the same 'fully visible after 0 swipes'. Before: tap Tapped at the parked point, scroll_until (R-stroke) 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). No idb evidence: idb lists the table's labels without their identifiers and no row below the fold (KNOWN).
 
-## 22: CALIBRATED-ON-DEFECT (partial: the overlay half only)
+## 21: CALIBRATED
 
-2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md — defect: `measured the layer over the target as the target`
+2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md — defect: `^Tapped|reached where it is`
+
+- before 0cb8b62:
+  - RED android-averi_lab-api33/bands.xml S tap — Tapped: Tapped id:"lab.bands.S"
+  - RED android-averi_lab-api33/bands.xml S scroll_until — reached where it is status-band, after 0 swipe(s) that move nothing: Element id:"lab.bands.S" fully visible after 0 swipes
+- after 5e47ff4:
+  - ok android-averi_lab-api33/bands.xml S tap — ERROR id:"lab.bands.S" is under the status bar at (540,28), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 127,0 825x55) — it lies in no scroll view, so no scroll moves it out: it is p
+  - ok android-averi_lab-api33/bands.xml S scroll_until — ERROR scroll_until id:"lab.bands.S" failed after 3 swipes — its centre stays under the status bar at (540,28), in the top 66 of the screen (tree units), where a tap goes to the status bar, and the content is exhausted: s
+
+bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.
+
+## 22: CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS))
+
+2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md — defect: `measured the layer over the target as the target|^passed on`
 
 - before ad7ed11:
   - RED ios-iphone17-ios27/sheet-medium.wda.json A colour — passed on #B72E2A: it measured the layer over the target as the target
   - RED ios-iphone17-ios27/sheet-medium.wda.json B colour — passed on #186DB7: it measured the layer over the target as the target
   - RED ios-iphone17-ios27/sheet-medium.wda.json C colour — passed on #8E24AA: it measured the layer over the target as the target
   - RED ios-iphone17-ios27/sheet-medium.wda.json D colour — passed on #FFB955: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/bands.idb.json S colour — passed on #E53935: PASS  element id:"lab.bands.S" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 97% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
+  - RED ios-iphone17-ios27/bands.wda.json S colour — passed on #E53935: PASS  element id:"lab.bands.S" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 97% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
+  - RED ios-iphone17-ios27/pinned-bar.idb.json P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 66% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
+  - RED ios-iphone17-ios27/pinned-bar.wda.json P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 66% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
 - after 596a379:
   - RED ios-iphone17-ios27/sheet-medium.wda.json A colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.A" fill within dE00 8 of #B72E2A — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,110 300x64) — the capture would show it, not
   - RED ios-iphone17-ios27/sheet-medium.wda.json B colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.B" fill within dE00 8 of #186DB7 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show it, not
   - RED ios-iphone17-ios27/sheet-medium.wda.json C colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.C" fill within dE00 8 of #8E24AA — button "Target S" (56,453 290x62) is drawn over the element (element 51,470 300x64) — the capture would show it, not the element; 
   - RED ios-iphone17-ios27/sheet-medium.wda.json D colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.D" fill within dE00 8 of #FFB955 — container (8,415 386x451) is drawn over the element (element 51,650 300x64) — the capture would show it, not the element; scroll_u
+  - ok ios-iphone17-ios27/bands.idb.json S colour — FAIL  element id:"lab.bands.S" fill within dE00 8 of #E53935 — the status bar is drawn over the element (element 51,21 300x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element
+  - ok ios-iphone17-ios27/bands.wda.json S colour — FAIL  element id:"lab.bands.S" fill within dE00 8 of #E53935 — the status bar is drawn over the element (element 51,21 300x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element
+  - ok ios-iphone17-ios27/pinned-bar.idb.json P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — button "Continue" (24,768 354x56, reaching 24,768 354x106) is drawn over the element (element 51,728 300x64) — the capture would show it, not the elemen
+  - ok ios-iphone17-ios27/pinned-bar.wda.json P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — button "Continue" (24,768 354x56) is drawn over the element (element 51,728 300x64) — the capture would show it, not the element; scroll_until the eleme
 
 Regressed elsewhere at 596a379 (green at ad7ed11):
 
+  - RED android-averi_lab-api33/fab.xml L colour — failed: FAIL  element id:"lab.fab.L" fill within dE00 8 of #E53935 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 44,1846 320x176) — the capture would show it, not the elemen
+  - RED android-averi_lab-api33/fab.xml K colour — failed: FAIL  element id:"lab.fab.K" fill within dE00 8 of #FB8C00 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 716,1846 320x176) — the capture would show it, not the eleme
   - RED ios-iphone17-ios27/blur-menu.idb.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
   - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — failed: FAIL  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — button "More" (283,754 82x64, reaching 283,741 82x77) is drawn over the element (element 51,698 300x64) — the capture would 
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — failed: FAIL  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — button "Cards" (201,754 82x64, reaching 201,741 82x77) is drawn over the element (element 51,778 300x64) — the capture would
 
 Regressions recorded:
 
+- android-averi_lab-api33/fab.xml L colour, android-averi_lab-api33/fab.xml K colour: broke at 596a379, not fixed — the pixel assert asks the covers the tap asks: the FAB host, a cover by the accepted round-13 reading (#24, residual), now fails it closed beside the FAB
+- ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour, ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour: broke at 596a379, fixed at 83e282a — the pixel assert asks the covers the tap asks: WDA's hidden host tab bar (#26) fails it closed until ADR 0019's hidden subtree
 - ios-iphone17-ios27/blur-menu.idb.json W colour, ios-iphone17-ios27/blur-menu.wda.json W colour: broke at 596a379, not fixed — the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4
 
-Needs: The note's own shapes — the status bar and a pinned button drawn over the element — need bars/bands and a pinned-bar colour row.
-
 Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks "close it first" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT.
+
+## 23: CALIBRATED (partial: the navigation band's colour part (the static bands); OCR on real pixels is phase 4)
+
+2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md — defect: `^passed on`
+
+- before 94bae14:
+  - RED android-averi_lab-api33/bands.xml N colour — passed on #8E24AA: PASS  element id:"lab.bands.N" fill within dE00 8 of #8E24AA — sampled #8E24AA (dominant, 50% of region) vs expected #8E24AA → dE00 0.00 ≤ 8; scale 1.000
+- after e85bcdf:
+  - ok android-averi_lab-api33/bands.xml N colour — FAIL  element id:"lab.bands.N" fill within dE00 8 of #8E24AA — the navigation bar is drawn over the element (element 127,2121 825x99, navigation bar 0,2154 1080x66) — the capture would show it, not the element; scroll_un
+
+Needs: OCR judged on real pixels (phase 4): a text cut at the navigation bar.
+
+bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).
+
+## 26: CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts)
+
+2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md — defect: `drawn over|under button`
+
+- before 7566443:
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — failed: FAIL  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — button "More" (283,754 82x64, reaching 283,741 82x77) is drawn over the element (element 51,698 300x64) — the capture would 
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — failed: FAIL  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — button "Cards" (201,754 82x64, reaching 201,741 82x77) is drawn over the element (element 51,778 300x64) — the capture would
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — stopped: ERROR scroll_until id:"lab.tabbar-hidden-push.C" failed after 3 swipes — element is in the viewport but under button "Cards" (201,754 82x64) at its centre (201,810), drawn over it — 38% of it shows — 
+- after 83e282a:
+  - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — PASS  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — sampled #1E88E5 (dominant, 100% of region) vs expected #1E88E5 → dE00 0.00 ≤ 8; scale 3.000
+  - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — PASS  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — sampled #43A047 (dominant, 100% of region) vs expected #43A047 → dE00 0.00 ≤ 8; scale 3.000
+  - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — Element id:"lab.tabbar-hidden-push.C" fully visible after 0 swipes
+
+Needs: A cross-family row (base.ts): an open, uncovered whole target is tapped at its probe point — the moved tap of #26 (Tapped at (201,830), off C's centre) passes the open row today.
+
+The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24': the open row judges the class (Tapped), not where it landed.
 
 ## 27: CALIBRATED
 
@@ -689,17 +784,22 @@ No fix yet: red at HEAD.
 
 No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view.
 
+## B4-L1: OPEN-RED
+
+2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md — defect: `fully visible where it is|^passed on`
+
+- working tree:
+  - RED android-averi_lab-api33/pinned-bar.xml P fully — fully visible where it is chrome-overlap:pinned, after 0 swipe(s) that move nothing: Element id:"lab.pinned-bar.P" fully visible after 0 swipes
+  - RED android-averi_lab-api33/pinned-bar.xml P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 100% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 1.000
+
+No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part).
+
 ## Not reproducible with the existing cells
 
 - 1 2026-10-05-android-floating-gboard-keyboard.md: needs-2b
 - 3 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md: needs-2b
 - 10 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md: needs-cell:edges — edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.
-- 11 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md: needs-cell:bars — bars/tabbar-floating (Android) with a target below the fold; rows: R-stroke (every touch-down in the strokeable region).
-- 14 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md: needs-cell:bars — bars/tabbar-floating (iOS): a row under the floating bar's surface above its buttons; rows: R-under-chrome.
-- 21 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md: needs-cell:bars — bars/bands (Android, edge-to-edge): a target under the status bar; rows: R-band; the swallowed probe accepted in consistency().
-- 23 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md: needs-ocr — bars/bands (Android navigation bar) and OCR judged on real pixels (phase 4).
-- 24 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md: residual:accepted (round 13: the FAB host layer is a cover) — bars/fab — to pin the accepted behaviour as KNOWN, not to turn it green.
+- 24 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md: residual:accepted (round 13: the FAB host layer is a cover)
 - 25 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped.md: residual:ADR 0007 (idb's QuickType bar)
-- 26 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md: needs-cell:bars — bars/tabbar-hidden-push: a pushed screen over a hidden host tab bar; rows: tap Tapped on the rows behind the phantom bar.
 - 31 2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md: residual:open (the blur overlay has no node in either tree)
 - 36 2026-08-26-ios-ocr-crop-scale.md: needs-ocr

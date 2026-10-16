@@ -23,9 +23,10 @@ import { consistency, controlConsistency, listedIn, measuredGeometry, outOfProce
  * — every cell before phase 3 — captures as before. On any cell, a target whose probe point (probePoint, its rounded
  * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
  * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
- * phase 3: truth.ts#consistency); so is an Android target whose centre lies in the navigation band
- * (truth.ts#unprobedBand: what a tap there does is unmeasured, and on three-button navigation it would leave the app).
- * One rule decides it, for the capture and consistency both: truth.ts#unprobedReason.
+ * phase 3: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the
+ * bar's (truth.ts#systemBarSwallows, #statusBarMaySwallow, #navigationBandTakes — the last by the navigation mode an
+ * Android capture records, LabDevice.navigation). One rule decides what is
+ * never tapped, for the capture and consistency both: truth.ts#unprobedReason.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown
  * and its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus
@@ -67,6 +68,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const manifest: RunManifest = { platform: lab.platform, app: 'AveriLab', device, note: opts.note, captures: [] };
   const broken: string[] = [];
   const skipped: string[] = [];
+  // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
+  const navigation = await lab.navigation?.();
   const captured = new Set<string>();
   for (const cell of cells) {
     const why = lab.unsupported(cell);
@@ -94,6 +97,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       ...(s.scrollViews !== undefined && { scrollViews: s.scrollViews }),
       ...(s.chrome !== undefined && { chrome: s.chrome }),
       ...(cell.config !== undefined && { config: cell.config }),
+      ...(navigation !== undefined && { navigation }),
     };
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
@@ -103,8 +107,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       if (box === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for text target ${t.tag}'s box (${t.tag}.box)`);
       const { drawn, seen } = measure(png, box, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
-      // The centre is never tapped where it lies off the screen, nor in Android's navigation band
-      // (truth.ts#unprobedReason, the rule consistency holds the target to).
+      // The centre is never tapped where it lies off the screen (truth.ts#unprobedReason, the rule consistency holds
+      // the target to).
       const unprobed = unprobedReason({ frame, ...geometry }, lab.platform, s.screen)?.says;
       const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
@@ -128,7 +132,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         ...(unprobed !== undefined && { unprobed }),
       };
       truth.targets.push(target);
-      const bad = consistency(target, lab.platform, s.screen);
+      const bad = consistency(target, lab.platform, s.screen, navigation);
       if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
       log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
     }

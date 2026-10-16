@@ -71,7 +71,9 @@ describe('the rows each geometry asks', () => {
     ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'fully: R-fully']],
     ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'fully: R-fully']],
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
-    ['nav-band', { frame: rect(51, 820, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the navigation band', 'scroll_until: R-band']],
+    // iOS's home-indicator band is no band averi judges: the open rows (bars.ts; consistency holds the target reached and
+    // drawn there, else it is broken and asked nothing). Android's navigation band: R-band (below).
+    ['nav-band', { frame: rect(51, 820, 300, 64), reached: true, drawn: 1 }, ['tap: Tapped', 'colour: passes on its own colour', 'scroll_until: reached with no swipe']],
     ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
     ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'fully: R-fully']],
     ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203) }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached']],
@@ -167,6 +169,14 @@ describe('R-stroke: every touch-down on the screen, clear of the bands and the c
   ])('%s', (_n, device, expected) => {
     expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
   });
+  it('judges the strokes even when the target is in no tree where its capture\'s tree did not list it (uiautomator lists no off-screen row); where it did, that reply is vacuous', () => {
+    const never = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes — element never appeared in the tree';
+    const off = target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, listed: { uiautomator: false } });
+    const android = expectations('android', off, CELL, 'uiautomator');
+    expect(verdict(android, 'scroll_until', out(never, [IDB_STROKE, IDB_STROKE]))).toBeUndefined();
+    expect(verdict(android, 'scroll_until', out(never, ['idb ui swipe 201 800 201 175 --duration 0.3']))).toMatch(/^touched down off the strokeable region at \(201,800\)/);
+    expect(verdict(rs, 'scroll_until', out(never, [IDB_STROKE, IDB_STROKE]))).toMatch(/^not in the tree: /);
+  });
   it('the region itself: the screen less the bands and the chrome; with neither, the whole screen', () => {
     const ok = strokeable(CELL);
     expect([ok({ x: 201, y: 61 }), ok({ x: 201, y: 62 }), ok({ x: 201, y: 789 }), ok({ x: 201, y: 790 }), ok({ x: 402, y: 400 })]).toEqual([false, true, true, false, false]);
@@ -223,11 +233,22 @@ describe('R-land: a Tapped point inside what shows, where a probe fired', () => 
 });
 
 describe('R-band: refused, never measured, never reached where it is', () => {
-  const rs = rows(target('nav-band', { frame: rect(51, 820, 300, 64), reached: false }));
+  const band = target('nav-band', { frame: rect(51, 820, 300, 64), reached: false });
+  const rs = expectations('android', band, CELL, 'uiautomator');
+  it('Android\'s navigation band asks R-band whatever the probe did (ADR 0009 N-a)', () => {
+    expect(says(expectations('android', { ...band, reached: true }, CELL, 'uiautomator')).map((x) => x.split(':')[1].trim())).toEqual(says(rs).map((x) => x.split(':')[1].trim()));
+    expect(says(rs).map((x) => x.split(':')[1].trim())).toEqual(['R-band', 'fails (R-band', 'R-band']);
+  });
   it('the tap refused with nothing sent, whatever its remedy', () => {
     expect(verdict(rs, 'tap', out('ERROR: under the navigation bar — scroll_until it first'))).toBeUndefined();
     expect(verdict(rs, 'tap', out('ERROR: pinned under the navigation bar'))).toBeUndefined();
     expect(verdict(rs, 'tap', out(TAPPED, ['adb shell input tap 201 852']))).toBe('Tapped: Tapped id:"lab.edges.A"');
+  });
+  it('where its probe fired the target (gesture navigation: the band is the app\'s), Tapped inside what shows of it, or refused with nothing sent', () => {
+    const fired = expectations('android', { ...band, reached: true }, CELL, 'uiautomator');
+    expect(verdict(fired, 'tap', out(TAPPED, ['adb shell input tap 201 852']))).toBeUndefined();
+    expect(verdict(fired, 'tap', out('ERROR: under the navigation bar — scroll_until it first'))).toBeUndefined();
+    expect(verdict(fired, 'tap', out(TAPPED, ['adb shell input tap 201 700']))).toMatch(/^Tapped outside what shows of it at \(201,700\)/);
   });
   it('the colour assert fails closed on the band (ADR 0001)', () => {
     expect(verdict(rs, 'colour', out(PASSED))).toMatch(/^passed on/);

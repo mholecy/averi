@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import type { CatalogCell, LabState } from './schema.js';
+import type { CatalogCell, LabState, NavigationMode } from './schema.js';
 
 /**
  * The lab app on one device, driven with the raw tools only (simctl, idb, WDA's own `/source`; adb) — what the truth
@@ -46,6 +46,10 @@ export interface LabDevice {
   trees(): Promise<RawTree[]>;
   /** Stop what the device holds for the lab (WDA, the app). */
   close(): Promise<void>;
+  /**
+   * Android: the navigation mode (CellTruth.navigation), undefined when the device does not say. Absent on iOS.
+   */
+  navigation?(): Promise<NavigationMode | undefined>;
 }
 
 /** Wait for a fresh launch's state: the cell named, ready (10 s at most), then 300 ms for the last write to land. */
@@ -276,6 +280,13 @@ export class AndroidLab implements LabDevice {
 
   async tap(x: number, y: number): Promise<void> {
     await this.adb('shell', 'input', 'tap', String(Math.round(x)), String(Math.round(y)));
+  }
+
+  /** `settings get secure navigation_mode`: 0 three buttons, 1 two buttons, 2 gestures; anything else undefined. */
+  async navigation(): Promise<NavigationMode | undefined> {
+    await this.guard();
+    const mode = (await this.adb('shell', 'settings', 'get', 'secure', 'navigation_mode')).stdout.trim();
+    return ({ '0': 'three-button', '1': 'two-button', '2': 'gesture' } as const)[mode as '0' | '1' | '2'];
   }
 
   async screenshot(): Promise<Buffer> {

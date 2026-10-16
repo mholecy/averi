@@ -5,7 +5,7 @@ import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
-import type { CatalogCell, CellTruth, Geometry, Insets, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
+import type { CatalogCell, CellTruth, Geometry, Insets, LabState, NavigationMode, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
   bandsOf,
   consistency,
@@ -18,8 +18,8 @@ import {
   pieceOf,
   pieceProbePoint,
   subtract,
+  navigationBandTakes,
   systemBarSwallows,
-  unprobedBand,
   unprobedReason,
   visibleOf,
   type GeometryContext,
@@ -188,11 +188,11 @@ describe('consistency with a measured geometry', () => {
     expect(why({ frame: rect(51, 850, 300, 64) }, 'ios', null)).toBeUndefined();
     // A centre ON the last row of the screen is probed (the screen is [0, height)).
     expect(why({ frame: rect(51, 810, 300, 127) }, 'ios', { width: 402, height: 875 })).toBeUndefined();
-    // Android's navigation band only: the status band is probed (systemBarSwallows judges it), iOS's bands too.
-    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'android')?.why).toBe('nav-band');
-    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'android')?.says).toMatch(/^its centre lies in the navigation band: .* unmeasured$/);
+    // A centre in a system band is probed on either platform: what a tap there does is measured (B4).
+    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'android')).toBeUndefined();
     expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'ios')).toBeUndefined();
     expect(why({ frame: rect(51, 20, 300, 24), geometry: 'status-band' }, 'android')).toBeUndefined();
+    expect(why({ frame: rect(51, 20, 300, 24), geometry: 'status-band' }, 'ios')).toBeUndefined();
   });
   it('whole or absent: the phase-1 rule — delivered, reached and drawn', () => {
     expect(consistency(T({}))).toBeUndefined();
@@ -233,14 +233,37 @@ describe('consistency with a measured geometry', () => {
     expect(consistency({ ...band, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
     expect(consistency({ ...band, reached: true, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
   });
-  it('the navigation band on Android is unmeasured (gesture or three buttons): never probed; on iOS probed as the status band', () => {
+  it('the navigation band (measured, B4): the app\'s on iOS and under gesture navigation, the bar\'s under three buttons', () => {
     const nav = T({ frame: rect(51, 820, 300, 64), geometry: 'nav-band', reached: false, probe: [] });
-    expect(consistency(nav, 'android')).toBeUndefined();
-    expect(consistency({ ...nav, probe: [ev('touch', '201,852')] }, 'android')).toBe('nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe');
+    const hit = { ...nav, reached: true, probe: [ev('touch', '201,852')] };
+    // Android, gesture navigation: the app's — its touch logged, the target reached and drawn.
+    expect(consistency(hit, 'android', undefined, 'gesture')).toBeUndefined();
+    expect(consistency(nav, 'android', undefined, 'gesture')).toMatch(/left no touch/);
+    expect(consistency({ ...hit, reached: false }, 'android', undefined, 'gesture')).toBe('nav-band, the tap the app\'s, but reached false');
+    // The gesture handle is drawn over the band: what of the target is drawn is not held there.
+    expect(consistency({ ...hit, drawn: 0.9 }, 'android', undefined, 'gesture')).toBeUndefined();
+    // Android, three buttons: the bar's — not reached.
+    expect(consistency(nav, 'android', undefined, 'three-button')).toBeUndefined();
+    expect(consistency({ ...nav, reached: true }, 'android', undefined, 'three-button')).toBe('nav-band under three-button navigation, whose bar takes the tap, but the probe reached it');
+    // Android with no mode recorded, or one never measured: the probe says nothing — broken.
+    expect(consistency(hit, 'android')).toBe('nav-band on Android under no recorded navigation (CellTruth.navigation): unmeasured, the probe says nothing');
+    expect(consistency(nav, 'android', undefined, 'two-button')).toMatch(/^nav-band on Android under two-button navigation/);
+    // iOS's home-indicator band: always the app's — a probe that left no touch is undelivered, not the bar's.
+    expect(consistency(hit, 'ios')).toBeUndefined();
     expect(consistency(nav, 'ios')).toMatch(/left no touch/);
-    // What is measured swallows; what is not is unprobed — the two never both claim a band.
+    expect(consistency({ ...hit, reached: false }, 'ios')).toBe('nav-band, the tap the app\'s, but reached false, drawn 100%');
+    // On iOS it is asked the open rows: drawn as itself too.
+    expect(consistency({ ...hit, drawn: 0.9 }, 'ios')).toBe('nav-band, the tap the app\'s, but reached true, drawn 90%');
+    // The rules never both claim a band (the status bands are systemBarSwallows', statusBarMaySwallow's).
     expect([systemBarSwallows('android', 'status-band'), systemBarSwallows('android', 'nav-band'), systemBarSwallows('ios', 'status-band')]).toEqual([true, false, false]);
-    expect([unprobedBand('android', 'nav-band'), unprobedBand('android', 'status-band'), unprobedBand('ios', 'nav-band')]).toEqual([true, false, false]);
+    expect([
+      navigationBandTakes('android', 'nav-band', 'gesture'),
+      navigationBandTakes('android', 'nav-band', 'three-button'),
+      navigationBandTakes('android', 'nav-band', undefined),
+      navigationBandTakes('ios', 'nav-band', undefined),
+      navigationBandTakes('android', 'status-band', 'gesture'),
+      navigationBandTakes('ios', 'whole', undefined),
+    ]).toEqual(['app', 'bar', 'unrecorded', 'app', undefined, undefined]);
   });
   it('cut with its centre showing must be reached; with its centre out, or outside its clip, must not; a sliver either', () => {
     expect(consistency(T({ geometry: 'partly-centre-in', drawn: 0.6 }))).toBeUndefined();
@@ -268,6 +291,11 @@ const GREEN = '#43A047';
 class GeometryLab implements LabDevice {
   readonly platform = 'android';
   taps: [number, number][] = [];
+  /** What `navigation()` answers (LabDevice.navigation): none unless a test sets it. */
+  mode: NavigationMode | undefined = undefined;
+  async navigation() {
+    return this.mode;
+  }
   private events: LabState['events'] = [];
   constructor(private readonly extra: Partial<LabState>) {}
   async describe() {
@@ -341,15 +369,25 @@ describe('capture with a measured geometry', () => {
     expect(t.targets[1].probe).toEqual([]);
   });
 
-  it('on Android never taps a centre in the navigation band (unmeasured), only its piece above the band', async () => {
+  it('on Android taps a centre in the navigation band, then its piece above the band, and records the navigation mode', async () => {
     const lab = new GeometryLab({ safeArea: { top: 4, left: 0, bottom: 21, right: 0 } });
+    lab.mode = 'gesture';
     const cell = { ...CELL, targets: CELL.targets.slice(0, 1), config: undefined };
     const { broken } = await capture(lab, [cell], { out, note: 't', catalog: [cell], log: () => undefined });
     expect(broken).toEqual([]);
-    expect(lab.taps).toEqual([[20, 15]]);
+    expect((await truthOf()).navigation).toBe('gesture');
+    expect(lab.taps).toEqual([
+      [20, 20],
+      [20, 15],
+    ]);
     const [a] = (await truthOf()).targets;
-    expect([a.geometry, a.reached, a.probe, a.piece, a.reachedAtPiece]).toEqual(['nav-band', false, [], rect(10, 10, 20, 9), true]);
-    expect(a.unprobed).toMatch(/^its centre lies in the navigation band: .* unmeasured$/);
+    expect([a.geometry, a.reached, a.probe, a.piece, a.reachedAtPiece]).toEqual(['nav-band', true, [ev('touch', '20,20')], rect(10, 10, 20, 9), true]);
+    expect(a.unprobed).toBeUndefined();
+    // No mode from the device: the nav-band probe says nothing, and the target is broken.
+    lab.mode = undefined;
+    expect((await capture(lab, [cell], { out, note: 't', catalog: [cell], log: () => undefined })).broken).toEqual([
+      'edges/A: nav-band on Android under no recorded navigation (CellTruth.navigation): unmeasured, the probe says nothing',
+    ]);
   });
 
   it('a state reporting none of it captures as before: no geometry, no second probe', async () => {

@@ -1,0 +1,54 @@
+{
+  "cell": "fab",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "frames": {
+    "W": {
+      "x": 127,
+      "y": 1208,
+      "width": 825,
+      "height": 176
+    },
+    "L": {
+      "x": 44,
+      "y": 1846,
+      "width": 320,
+      "height": 176
+    },
+    "K": {
+      "x": 716,
+      "y": 1846,
+      "width": 320,
+      "height": 176
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "list": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    }
+  },
+  "chrome": {
+    "fab": {
+      "x": 408,
+      "y": 1802,
+      "width": 264,
+      "height": 264
+    }
+  }
+}

@@ -153,6 +153,22 @@
           "broke": "13d68a2",
           "fixed": "8a55d2b",
           "why": "the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)"
+        },
+        {
+          "rows": [
+            "android-averi_lab-api33/fab.xml L tap",
+            "android-averi_lab-api33/fab.xml L scroll_until",
+            "android-averi_lab-api33/fab.xml K tap",
+            "android-averi_lab-api33/fab.xml K scroll_until"
+          ],
+          "broke": "13d68a2",
+          "why": "pinned app chrome became a cover: the FAB host, a cover by the accepted round-13 reading (#24, residual), refuses the targets beside the FAB"
+        },
+        {
+          "rows": ["ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "83e282a",
+          "why": "pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop until ADR 0019's hidden subtree"
         }
       ],
       "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."
@@ -220,12 +236,14 @@
     {
       "n": "11",
       "note": "2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md",
-      "status": "needs-cell:bars",
+      "status": "calibrate",
       "fix": ["bd06470", "16ae6bb"],
       "before": "188740b",
-      "verified": "merge-subject",
-      "needs": "bars/tabbar-floating (Android) with a target below the fold; rows: R-stroke (every touch-down in the strokeable region).",
-      "remark": "Golden is identical at 188740b and bd06470."
+      "verified": "golden",
+      "remark": "tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.",
+      "after": "bd06470",
+      "defect": "touched down off the strokeable region",
+      "checks": ["android-averi_lab-api33/tabbar-floating.xml F scroll_until"]
     },
     {
       "n": "12",
@@ -242,7 +260,15 @@
       ],
       "expect": "STILL-RED-AFTER",
       "needs": "edges/scroll-bounded variant (Android) whose uiautomator bounds are cut FLUSH with the scroll container's edge (mp-native's SWIFT form: `{y:242, height:92}` on a container from 242) — the lab's verticalScroll in an edge-to-edge window does not cut P at all.",
-      "remark": "The lab's P is cut by its container's bottom (908) but uiautomator reports its whole frame (`[128,798][953,974]`): a rect past the container, not flush with it — the shape 9c7885e's flush probe does not suspect. Red on both sides with the note's symptom (`fully visible after 0 swipes`); filed as lab finding LE1."
+      "remark": "The lab's P is cut by its container's bottom (908) but uiautomator reports its whole frame (`[128,798][953,974]`): a rect past the container, not flush with it — the shape 9c7885e's flush probe does not suspect. Red on both sides with the note's symptom (`fully visible after 0 swipes`); filed as lab finding LE1.",
+      "regressions": [
+        {
+          "rows": ["android-averi_lab-api33/tabbar-floating.xml F scroll_until"],
+          "broke": "9c7885e",
+          "fixed": "bd06470",
+          "why": "the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470"
+        }
+      ]
     },
     {
       "n": "13",
@@ -264,12 +290,17 @@
     {
       "n": "14",
       "note": "2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md",
-      "status": "needs-cell:bars",
+      "status": "calibrate",
       "fix": ["81a7d62"],
       "before": "d2b7744",
-      "verified": "merge-subject",
-      "needs": "bars/tabbar-floating (iOS): a row under the floating bar's surface above its buttons; rows: R-under-chrome.",
-      "remark": "81a7d62 does flip sheet-medium.wda S — that is #18's half of the merge, not this note's."
+      "verified": "golden",
+      "remark": "81a7d62 does flip sheet-medium.wda S — that is #18's half of the merge, not this note's.",
+      "after": "81a7d62",
+      "defect": "^Tapped",
+      "checks": [
+        "ios-iphone17-ios27/tabbar-floating.idb.json R tap",
+        "ios-iphone17-ios27/tabbar-floating.wda.json R tap"
+      ]
     },
     {
       "n": "15",
@@ -400,12 +431,14 @@
     {
       "n": "21",
       "note": "2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md",
-      "status": "needs-cell:bars",
+      "status": "calibrate",
       "fix": ["5e47ff4"],
       "before": "0cb8b62",
-      "verified": "merge-subject",
-      "needs": "bars/bands (Android, edge-to-edge): a target under the status bar; rows: R-band; the swallowed probe accepted in consistency().",
-      "remark": "Golden is identical at 0cb8b62 and 5e47ff4."
+      "verified": "golden",
+      "remark": "bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.",
+      "after": "5e47ff4",
+      "defect": "^Tapped|reached where it is",
+      "checks": ["android-averi_lab-api33/bands.xml S tap", "android-averi_lab-api33/bands.xml S scroll_until"]
     },
     {
       "n": "22",
@@ -415,18 +448,35 @@
       "before": "ad7ed11",
       "after": "596a379",
       "verified": "golden",
-      "partial": "the overlay half only",
-      "defect": "measured the layer over the target as the target",
+      "partial": "the overlay half, the status band and the pinned button (iOS)",
+      "defect": "measured the layer over the target as the target|^passed on",
       "checks": [
         "ios-iphone17-ios27/sheet-medium.wda.json A colour",
         "ios-iphone17-ios27/sheet-medium.wda.json B colour",
         "ios-iphone17-ios27/sheet-medium.wda.json C colour",
-        "ios-iphone17-ios27/sheet-medium.wda.json D colour"
+        "ios-iphone17-ios27/sheet-medium.wda.json D colour",
+        "ios-iphone17-ios27/bands.idb.json S colour",
+        "ios-iphone17-ios27/bands.wda.json S colour",
+        "ios-iphone17-ios27/pinned-bar.idb.json P colour",
+        "ios-iphone17-ios27/pinned-bar.wda.json P colour"
       ],
-      "needs": "The note's own shapes — the status bar and a pinned button drawn over the element — need bars/bands and a pinned-bar colour row.",
       "remark": "Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks \"close it first\" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT.",
       "expect": "CALIBRATED-ON-DEFECT",
       "regressions": [
+        {
+          "rows": ["android-averi_lab-api33/fab.xml L colour", "android-averi_lab-api33/fab.xml K colour"],
+          "broke": "596a379",
+          "why": "the pixel assert asks the covers the tap asks: the FAB host, a cover by the accepted round-13 reading (#24, residual), now fails it closed beside the FAB"
+        },
+        {
+          "rows": [
+            "ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour",
+            "ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour"
+          ],
+          "broke": "596a379",
+          "fixed": "83e282a",
+          "why": "the pixel assert asks the covers the tap asks: WDA's hidden host tab bar (#26) fails it closed until ADR 0019's hidden subtree"
+        },
         {
           "rows": [
             "ios-iphone17-ios27/blur-menu.idb.json W colour",
@@ -440,19 +490,23 @@
     {
       "n": "23",
       "note": "2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md",
-      "status": "needs-ocr",
+      "status": "calibrate",
       "fix": ["e85bcdf"],
       "before": "94bae14",
-      "verified": "merge-subject",
-      "needs": "bars/bands (Android navigation bar) and OCR judged on real pixels (phase 4).",
-      "remark": "The merge message names D7's pixel part: the navigation band fails a pixel assert closed. Golden is identical at 94bae14 and e85bcdf."
+      "verified": "golden",
+      "remark": "bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).",
+      "after": "e85bcdf",
+      "defect": "^passed on",
+      "checks": ["android-averi_lab-api33/bands.xml N colour"],
+      "partial": "the navigation band's colour part (the static bands); OCR on real pixels is phase 4",
+      "needs": "OCR judged on real pixels (phase 4): a text cut at the navigation bar."
     },
     {
       "n": "24",
       "note": "2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md",
       "status": "residual:accepted (round 13: the FAB host layer is a cover)",
       "verified": "unverified",
-      "needs": "bars/fab — to pin the accepted behaviour as KNOWN, not to turn it green."
+      "remark": "Pinned in tests/differential/golden/bars.known.ts as residual (fab.xml L, K: tap, colour, scroll_until), red by design."
     },
     {
       "n": "25",
@@ -464,12 +518,20 @@
     {
       "n": "26",
       "note": "2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md",
-      "status": "needs-cell:bars",
+      "status": "calibrate",
       "fix": ["83e282a"],
       "before": "7566443",
-      "verified": "merge-subject",
-      "needs": "bars/tabbar-hidden-push: a pushed screen over a hidden host tab bar; rows: tap Tapped on the rows behind the phantom bar.",
-      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows')."
+      "verified": "golden",
+      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24': the open row judges the class (Tapped), not where it landed.",
+      "after": "83e282a",
+      "defect": "drawn over|under button",
+      "checks": [
+        "ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour",
+        "ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour",
+        "ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until"
+      ],
+      "partial": "the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts",
+      "needs": "A cross-family row (base.ts): an open, uncovered whole target is tapped at its probe point — the moved tap of #26 (Tapped at (201,830), off C's centre) passes the open row today."
     },
     {
       "n": "27",
@@ -828,6 +890,18 @@
         "ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until"
       ],
       "remark": "No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view."
+    },
+    {
+      "n": "B4-L1",
+      "note": "2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "fully visible where it is|^passed on",
+      "checks": [
+        "android-averi_lab-api33/pinned-bar.xml P fully",
+        "android-averi_lab-api33/pinned-bar.xml P colour"
+      ],
+      "remark": "No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part)."
     }
   ],
   "excluded": [

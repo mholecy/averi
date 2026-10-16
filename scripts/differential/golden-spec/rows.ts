@@ -23,9 +23,9 @@ import { BUDGET_MS, first, landed, notInTree, notTapped, passed, passes, reached
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
  * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | never "visible" where it is, whatever it swiped: it is cut | ADR 0005 (the `fully` stop judges no sliver: a stop flush with a clipping container is the flush probe's to check, scroll-rounds.ts#PROBE_REACH), ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
- * | R-band | status-band, nav-band | tap | refused, nothing tapped — where its probe fired (iOS, below the bar's touch area): Tapped inside what shows of it, or refused with nothing sent | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
- * | R-band | status-band, nav-band | colour | fails: a system band over what it reads | ADR 0001 |
- * | R-band | status-band, nav-band | scroll_until | not reached where it is (the stop fails) | ADR 0009 (N-a: neither stop stops on a centre in the band) |
+ * | R-band | status-band, nav-band (iOS's home-indicator band asks the open rows: bars.ts) | tap | refused, nothing tapped — where its probe fired (iOS below the bar's touch area, Android's navigation band under gesture navigation): Tapped inside what shows of it, or refused with nothing sent | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
+ * | R-band | status-band, nav-band (iOS's home-indicator band asks the open rows: bars.ts) | colour | fails: a system band over what it reads | ADR 0001 |
+ * | R-band | status-band, nav-band (iOS's home-indicator band asks the open rows: bars.ts) | scroll_until | not reached where it is (the stop fails) | ADR 0009 (N-a: neither stop stops on a centre in the band) |
  * | R-under-chrome | under-chrome:<name> | tap | R-land on its piece | docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md; ADR 0005 |
  * | R-under-chrome | under-chrome:<name> | colour | fails: the chrome is a pixel cover over what it reads | ADR 0001, ADR 0003 |
  * | R-under-chrome | under-chrome:<name> | scroll_until | not reached where it is (the stop fails) | docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
@@ -70,9 +70,10 @@ export function refusedTap(platform: Platform, t: TargetTruth, row: string, abse
 /**
  * R-band: the tap refused, nothing sent (its remedy depends on whether a scroll lifts it out: not judged) — where the
  * probe at its centre did not fire it (the bar swallowed it: Android's status bar, the top of iOS's,
- * truth.ts#statusBarMaySwallow). Where it did (iOS, below the bar's own touch area), what fires there is the truth:
- * the tap is not expected refused — `Tapped` inside what shows of it, or refused with nothing sent (averi's own
- * model of iOS's status band, the top safe-area inset, may refuse it; it must not tap elsewhere).
+ * truth.ts#statusBarMaySwallow; Android's navigation bar under three buttons, truth.ts#navigationBandTakes). Where it
+ * did (iOS, below the bar's own touch area; Android's navigation band under gesture navigation), what fires there is
+ * the truth: the tap is not expected refused — `Tapped` inside what shows of it, or refused with nothing sent (averi's
+ * own model of the band may refuse it, ADR 0009 N-a on Android; it must not tap elsewhere).
  */
 export function bandTap(platform: Platform, t: TargetTruth): Expectation {
   if (t.reached) {
@@ -101,7 +102,10 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string, opt
  * R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable
  * (judges.ts#strokeable) — and, where the truth names the target's scroll view and the capture its clip, inside that
  * scroll view: a stroke that touches down beside it moves nothing it holds (WDA's own refusal names that scroll view).
- * Not where the target is `absent` from the tree: averi cannot know which scroll view holds a node it never saw.
+ * `absent`, given by the caller where the tree may not list the target (edges.ts#notListed: the capture's tree of that
+ * source did not — uiautomator dumps only what is visible to the user), lets a "never appeared in the tree" reply be
+ * judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is then not
+ * asked: averi cannot know which scroll view holds a node it never saw.
  */
 export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, absent?: string): Expectation {
   const direction = directionOf(t, cell);
