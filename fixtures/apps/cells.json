@@ -37,6 +37,76 @@
       ]
     },
     {
+      "id": "sheet-medium-edges",
+      "family": "presented",
+      "layer": "sheet-medium-scrolled",
+      "targets": [
+        { "tag": "H", "color": "#E53935", "slot": 0, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "G", "color": "#1E88E5", "slot": 1, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "E", "color": "#43A047", "slot": 2, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "F", "color": "#FB8C00", "slot": 3, "declared": "presented-over", "scrollView": "host" }
+      ]
+    },
+    {
+      "id": "sheet-background",
+      "family": "presented",
+      "layer": "sheet-large",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "sheet-long-list",
+      "family": "presented",
+      "layer": "sheet-list",
+      "targets": [
+        { "tag": "R", "color": "#1E88E5", "slot": 1, "in": "layer", "declared": "open", "scrollView": "list" },
+        { "tag": "F", "color": "#FB8C00", "slot": 20, "in": "layer", "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "dim-cover",
+      "family": "presented",
+      "layer": "dim-cover",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "blur-menu",
+      "family": "presented",
+      "layer": "blur-menu",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "K", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" },
+        { "tag": "W", "color": "#00897B", "slot": 1, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "blur-menu-grouped",
+      "family": "presented",
+      "layer": "blur-menu-grouped",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "K", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" },
+        { "tag": "W", "color": "#00897B", "slot": 1, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
       "id": "form-basic",
       "family": "forms",
       "layer": "none",

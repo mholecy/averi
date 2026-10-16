@@ -1,6 +1,6 @@
 {
   "family": "presented",
-  "note": "A layer presented over the targets: a sheet at the medium detent (with a target inside it), an alert (phase 1; #33, #35). Phase 3 adds its edges, a large sheet's bare background, a dim, a blur (calibration.json: #27, #28, #30, #31, #32, #34, #15, #20). App files: AveriLab/Presented.swift, Presented.kt.",
+  "note": "A layer presented over the targets: a sheet at the medium detent (with a target inside it), an alert (phase 1; #33, #35). Phase 3 (B3, iOS only — every note it calibrates is iOS's; the Android app builds none of their layers): the medium sheet over a scrolled host whose targets lie at the screen's edges (#30, #32, #34), a large sheet's bare background over the targets (#28), a large sheet holding a UIKit table longer than the screen (#20), an RN-style transparent cover's dim (#27), an in-screen menu over a blurred backdrop no tree lists, its rows listed in reading order or, grouped, before the screen beneath (#31, #15). App files: AveriLab/Presented.swift, Presented.kt.",
   "cells": [
     {
       "id": "sheet-medium",
@@ -21,6 +21,70 @@
         { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
         { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
         { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" }
+      ]
+    },
+    {
+      "id": "sheet-medium-edges",
+      "layer": "sheet-medium-scrolled",
+      "targets": [
+        { "tag": "H", "color": "#E53935", "slot": 0, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "G", "color": "#1E88E5", "slot": 1, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "E", "color": "#43A047", "slot": 2, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "F", "color": "#FB8C00", "slot": 3, "declared": "presented-over", "scrollView": "host" }
+      ]
+    },
+    {
+      "id": "sheet-background",
+      "layer": "sheet-large",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "sheet-long-list",
+      "layer": "sheet-list",
+      "targets": [
+        { "tag": "R", "color": "#1E88E5", "slot": 1, "in": "layer", "declared": "open", "scrollView": "list" },
+        { "tag": "F", "color": "#FB8C00", "slot": 20, "in": "layer", "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "dim-cover",
+      "layer": "dim-cover",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "blur-menu",
+      "layer": "blur-menu",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "K", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" },
+        { "tag": "W", "color": "#00897B", "slot": 1, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "blur-menu-grouped",
+      "layer": "blur-menu-grouped",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "K", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" },
+        { "tag": "W", "color": "#00897B", "slot": 1, "in": "layer", "declared": "open" }
       ]
     }
   ]

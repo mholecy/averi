@@ -156,6 +156,18 @@ struct LabState: Codable {
     var focus: String?
     var keyboard: KeyboardState?
     var submits: [Submit]?
+    // Phase 3's geometry (scripts/truth/truth.ts#geometryOf), written only by the cells that measure it; nil (absent
+    // from the file) on every other cell.
+    var safeArea: Insets?
+    var scrollViews: [String: Frame]?
+}
+
+/// The window's safe-area insets — the system bands (schema.ts#Insets), in points.
+struct Insets: Codable, Equatable {
+    let top: Double
+    let left: Double
+    let bottom: Double
+    let right: Double
 }
 
 @MainActor
@@ -192,6 +204,28 @@ final class Lab: ObservableObject {
         state.focus = nil
         state.keyboard = nil
         state.submits = cell?.form == nil ? nil : []
+        state.safeArea = nil
+        state.scrollViews = nil
+        write()
+    }
+
+    // --- the geometry (phase 3): what a target's frame is measured against ---
+
+    /// The key window's safe-area insets: iOS's status bar and home indicator.
+    func safeArea() {
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
+        guard let i = window?.safeAreaInsets else { return }
+        let insets = Insets(top: i.top, left: i.left, bottom: i.bottom, right: i.right)
+        guard state.safeArea != insets else { return }
+        state.safeArea = insets
+        write()
+    }
+
+    /// A scroll view's clip on the screen (screen coordinates): what of its content can show.
+    func scrollView(_ id: String, _ rect: CGRect) {
+        let f = Frame(rect)
+        guard state.scrollViews?[id] != f else { return }
+        state.scrollViews = (state.scrollViews ?? [:]).merging([id: f]) { $1 }
         write()
     }
 
