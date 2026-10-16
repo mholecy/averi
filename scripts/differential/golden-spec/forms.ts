@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { otherControlsFired } from '../../truth/truth.js';
-import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, touchDowns, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -62,8 +62,10 @@ export type FormExpectation = Expectation & { target: string };
  * | truth | verb | expected |
  * |---|---|---|
  * | a field shows an error the rules pair (verification.md, Field errors: same identifier below; own `_error` id close under) | `assert {element:{id}, error}` | passes |
+ * | Android: a field shows an error, by any identifier (Android sets no `error` on a field: verification.md, Field errors) | `assert {element:{text: message}}` | passes: the message is read as drawn |
  * | a field shows an error named neither way (`IbanError`) | `assert … error` | fails: not seen |
  * | a screen-level message far under the nearest field above it | `assert {element:{id: that field}, error: message}` | fails: pairs with none |
+ * | Android: the same message | `assert {element:{text: message}}` | passes |
  * | a field showing NO error, another field's title below it carrying the field's identifier (one component id shared by every field and its floating title: sharedTitleBelow) | `assert {element:{id, role: textfield}, error: that title}` | fails: a title is no error (verification.md, Field errors: a same-identifier text overlapping a same-identifier field is a title) |
  * | a field's title (the P5 text sample: ’ “ ” – — … NBSP & diacritics) | `assert {element:{id: titleId}, text: title}` | passes: the tree reads the text as drawn |
  * | a non-secure field the model holds a value in (prefilled) | `assert … text: value` | passes |
@@ -72,6 +74,8 @@ export type FormExpectation = Expectation & { target: string };
  * | a field sharing its identifier with another field | tap / scroll_until | not asked: `id:` names every field of the component, not this one |
  * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
  * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
+ * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.reachedAfterBack) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent at its centre (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") — not reached after `back`: live only (the layout after the IME went is not in the replayed tree) |
+ * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
  * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") |
@@ -85,7 +89,10 @@ export function formRows(platform: Platform, truth: CellTruth): FormExpectation[
   const out: FormExpectation[] = [];
   const assertCall = (spec: Record<string, unknown>): Call => ({ tool: 'assert', args: { platform, asserts: [{ ...spec, timeout: BUDGET_MS }] } });
   for (const f of form.fields) {
-    if (f.error !== null && f.errorFrame !== undefined) {
+    if (platform === 'android' && f.error !== null) {
+      // Android sets no `error` on a field (verification.md, Field errors): the message is asserted as text.
+      out.push({ target: f.tag, verb: 'error', says: `passes: the message read as text (${f.error.id})`, call: assertCall({ element: { text: f.error.text } }), judge: passes });
+    } else if (f.error !== null && f.errorFrame !== undefined) {
       const rule = pairingOf(form.fields, f, f.error.id, f.errorFrame);
       const pairs = PAIRS.has(rule);
       out.push({
@@ -126,7 +133,10 @@ export function formRows(platform: Platform, truth: CellTruth): FormExpectation[
       });
     }
   }
-  if (form.screenError !== null) {
+  if (form.screenError !== null && platform === 'android') {
+    const e = form.screenError;
+    out.push({ target: 'screenError', verb: 'error', says: `passes: the message read as text (${e.id})`, call: assertCall({ element: { text: e.text } }), judge: passes });
+  } else if (form.screenError !== null) {
     const e = form.screenError;
     const above = form.fields.filter((f) => overlapX(f.frame, e.frame) > 0 && bottom(f.frame) <= e.frame.y);
     const nearest = above.reduce<FieldTruth | undefined>((a, f) => (a === undefined || bottom(f.frame) > bottom(a.frame) ? f : a), undefined);
@@ -172,14 +182,45 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
     }
     case 'under-keyboard': {
       const top = keyboard?.frame.y ?? Infinity;
-      return [
-        {
+      const rows: FormExpectation[] = [];
+      if (platform !== 'android') {
+        rows.push({
           target,
           verb: 'tap',
           says: 'refused naming the keyboard, nothing tapped',
           call: tap,
           judge: (o) => notTapped(o) ?? (/\bsoft keyboard\b/i.test(ownWords(o)) ? undefined : said(o, 'refused without naming the keyboard')),
-        },
+        });
+      } else if (c.reachedAfterBack === true) {
+        const frame = c.frame!;
+        rows.push({
+          target,
+          verb: 'tap',
+          says: 'Tapped after one back hid the keyboard, one tap sent inside it',
+          call: tap,
+          judge: (o) => {
+            if (!o.reply.startsWith('Tapped')) return `not tapped: ${first(o)}`;
+            const back = o.device.findIndex((d) => d.startsWith('adb shell input keyevent 4'));
+            const tapAt = o.device.findIndex((d) => /^adb shell input tap /.test(d));
+            if (back < 0 || back > tapAt) return said(o, 'Tapped without a back before the tap');
+            const points = tapPoints(o);
+            if (points.length !== 1 || !within(points[0], frame)) return said(o, `Tapped at ${pointsText(points)}, not once inside its frame`);
+            return undefined;
+          },
+        });
+      }
+      if (c.seen !== undefined) {
+        const expected = c.seen;
+        rows.push({
+          target,
+          verb: 'colour',
+          says: `fails: the keyboard over it (asked for the colour the screen shows there, ${expected})`,
+          call: { tool: 'assert', args: { platform, asserts: [{ element: { id: c.id }, color: { expected }, timeout: BUDGET_MS }] } },
+          judge: (o) => (passed(o) ? `passed on ${expected}, the keyboard's: ${first(o)}` : undefined),
+        });
+      }
+      return [
+        ...rows,
         {
           target,
           verb: 'scroll_until',

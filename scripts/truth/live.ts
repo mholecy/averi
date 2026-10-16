@@ -8,9 +8,10 @@ import { IosAdapter } from '../../src/adapters/ios.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
-import { AdapterRegistry } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
-import { BUNDLE, IosLab, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
+import type { SourceKind } from '../differential/corpus.js';
+import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import type { LabState } from './schema.js';
 
 /**
@@ -22,6 +23,14 @@ import type { LabState } from './schema.js';
  *
  *   node --import tsx scripts/truth/live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda]
  *     [--cases b1,p4] [--shots <dir>]
+ *   node --import tsx scripts/truth/live.ts --serial <lab emulator> [--cases b1,p4] [--shots <dir>]
+ *
+ * Android (phase 2b, `--serial`): the same cases against the Compose app on the `averi_lab` AVD (Forms.kt; the guard
+ * refuses any other device), one tree source (uiautomator), the server's adapter the registry's own (defaultFactory),
+ * discovery listing that emulator alone — no adb call reaches another attached device. Its typing is one `input text`
+ * per character (src/adapters/android.ts#typeText). A case may judge per platform: Android hides the keyboard with
+ * `back` and taps (k1, k3), sets no `error` on a field (e1 asserts the message's text), and has no keyboardDismiss
+ * (k2 is iOS only).
  *
  * The server is built as tests/mcp/tools.test.ts builds one (createAveriServer over the SDK's in-memory transport and
  * a real Client), over a REAL AdapterRegistry whose factory constructs the iOS adapter itself: averi gives WDA port
@@ -43,20 +52,28 @@ import type { LabState } from './schema.js';
  */
 
 const { values } = parseArgs({
-  options: { udid: { type: 'string' }, 'wda-port': { type: 'string' }, sources: { type: 'string' }, cases: { type: 'string' }, shots: { type: 'string' } },
+  options: { udid: { type: 'string' }, serial: { type: 'string' }, 'wda-port': { type: 'string' }, sources: { type: 'string' }, cases: { type: 'string' }, shots: { type: 'string' } },
 });
-if (values.udid === undefined) throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--cases b1,p4]');
-const udid = values.udid;
+if ((values.udid === undefined) === (values.serial === undefined)) {
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--cases b1,p4] | --serial <lab emulator> [--cases b1,p4]');
+}
+const platform: 'ios' | 'android' = values.serial !== undefined ? 'android' : 'ios';
+const device = (values.udid ?? values.serial)!;
 const port = Number(values['wda-port'] ?? 8120);
-const sources = (values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[];
+/** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
+type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
+const sources: Source[] = platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
 const only = values.cases?.split(',');
 /** Where a case that is not ok leaves its screenshot (`--shots <dir>`), for the evidence. */
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
 // The WDA port too: 8100/8101 are refused (lab-device.ts#DEVICE_CHECK_WDA_PORTS).
-const lab = new IosLab(udid, { wdaPort: port });
-// The lab simulator or nothing (lab-device.ts#IosLab.guard): refused before any tool binds it.
-console.error(`lab: ${await lab.guard()}`);
+const ios = platform === 'ios' ? new IosLab(device, { wdaPort: port }) : undefined;
+const android = platform === 'android' ? new AndroidLab(device) : undefined;
+const lab = (ios ?? android)!;
+// The lab simulator or the lab AVD, or nothing (lab-device.ts#IosLab.guard, #AndroidLab.guard): refused before any
+// tool binds it.
+console.error(`lab: ${ios !== undefined ? await ios.guard() : (await android!.guard(), `${device}, AVD ${LAB_AVD}`)}`);
 
 // --- the cases ---
 
@@ -75,8 +92,10 @@ interface Case {
   dismiss?: unknown[];
   /** The case is about the soft keyboard: judged only when the launch shows it (else SKIP). */
   keyboard?: true;
+  /** The platforms it runs on (both when unset). */
+  platforms?: readonly ('ios' | 'android')[];
   calls: Call[];
-  judge(state: LabState, replies: string[], source: IosTreeSourceKind): Verdict;
+  judge(state: LabState, replies: string[], source: Source): Verdict;
 }
 
 const id = (cell: string, tag: string) => `id:"lab.${cell}.${tag}"`;
@@ -116,10 +135,14 @@ const CASES: Case[] = [
     id: 'k1',
     cell: K,
     keyboard: true,
-    says: 'a tap under the keyboard, no dismissal configured: refused, the focus stays',
+    says: 'a tap under the keyboard, no dismissal configured: refused, the focus stays (Android: hidden with back, then tapped — the focus on vs)',
     calls: [{ tool: 'tap', args: { selector: id(K, 'vs') } }],
-    judge: (s, [reply]) =>
-      s.focus !== 'postcode' ? { outcome: 'MISMATCH', why: `the focus moved to ${s.focus}: ${short(reply)}` }
+    judge: (s, [reply], source) =>
+      source === 'uiautomator'
+        ? reply.startsWith('Tapped') !== (s.focus === 'vs')
+          ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}` }
+          : reply.startsWith('Tapped') ? { outcome: 'ok', why: short(reply) } : { outcome: 'LOUD', why: `not tapped, the focus on ${s.focus}: ${short(reply)}` }
+      : s.focus !== 'postcode' ? { outcome: 'MISMATCH', why: `the focus moved to ${s.focus}: ${short(reply)}` }
       : reply.startsWith('Tapped') ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus stayed on postcode` }
       : { outcome: 'ok', why: short(reply) },
   },
@@ -127,6 +150,7 @@ const CASES: Case[] = [
     id: 'k2',
     cell: K,
     keyboard: true,
+    platforms: ['ios'],
     dismiss: [TITLE],
     says: 'a tap under the keyboard, keyboardDismiss on the title: wda hides it and taps; idb refuses (the list is inert)',
     calls: [{ tool: 'tap', args: { selector: id(K, 'vs') } }],
@@ -153,7 +177,7 @@ const CASES: Case[] = [
     cell: K,
     keyboard: true,
     dismiss: [TITLE],
-    says: 'a fill under the keyboard with a dismissal',
+    says: 'a fill under the keyboard with a dismissal (Android: none configured — back hides it)',
     calls: [fill(K, 'note', 'Thanks - ok')],
     judge: (s, replies, source) => {
       const v = holds('note', 'Thanks - ok')(s, replies);
@@ -190,6 +214,7 @@ const CASES: Case[] = [
   {
     id: 'e1',
     cell: 'form-errors',
+    platforms: ['ios'],
     says: 'fixing a field drops its error, and assert … error reads that from the live tree',
     calls: [
       fill('form-errors', 'name', 'Jan'),
@@ -201,6 +226,23 @@ const CASES: Case[] = [
       if (gone.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `assert read the error the app no longer shows: ${short(gone)}` };
       if (!still.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `the e-mail's error, still shown, failed: ${short(still)}` };
       return { outcome: 'ok', why: 'name: error gone; email: error still read' };
+    },
+  },
+  {
+    id: 'e1a',
+    cell: 'form-errors',
+    platforms: ['android'],
+    says: 'fixing a field drops its error, and its message (Android sets no error: asserted as text) goes from the tree',
+    calls: [
+      fill('form-errors', 'name', 'Jan'),
+      { tool: 'assert', args: { asserts: [{ element: { text: 'Enter the recipient’s name' }, absent: true, timeout: 2_000 }] } },
+      { tool: 'assert', args: { asserts: [{ element: { text: 'That’s not an e-mail – check the “@”' }, timeout: 2_000 }] } },
+    ],
+    judge: (s, [, gone, still]) => {
+      if (s.fields?.name?.error !== null) return { outcome: 'LOUD', why: `the fill did not clear the app's error: ${JSON.stringify(s.fields?.name)}` };
+      if (!gone.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `the name's message, gone from the app, is still read: ${short(gone)}` };
+      if (!still.startsWith('All 1 asserts passed')) return { outcome: 'MISMATCH', why: `the e-mail's message, still shown, failed: ${short(still)}` };
+      return { outcome: 'ok', why: 'name: message gone; email: message still read' };
     },
   },
   {
@@ -223,8 +265,13 @@ const CASES: Case[] = [
 
 async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
   const registry = new AdapterRegistry({
-    factory: (_platform, deviceId, opts) => new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? 'idb', deviceId, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
-    discovery: async (platform) => (platform === 'ios' ? (await listIosDevices()).filter((d) => d.id === udid) : []),
+    factory: (p, deviceId, opts) =>
+      p === 'android' ? defaultFactory(p, deviceId, opts) : new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? 'idb', deviceId, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
+    // The lab device alone. Android: listed without asking adb (its listing runs getprop on every attached device).
+    discovery: async (p) =>
+      p !== platform ? []
+      : p === 'ios' ? (await listIosDevices()).filter((d) => d.id === device)
+      : [{ id: device, platform: 'android', name: LAB_AVD, osVersion: 'lab', state: 'booted' }],
   });
   const server = createAveriServer({ registry, version: 'live-golden' });
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
@@ -243,16 +290,17 @@ async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
 
 const configDir = join(tmpdir(), `averi-live-${process.pid}`);
 await mkdir(configDir, { recursive: true });
-async function configFor(source: IosTreeSourceKind, dismiss: unknown[] | undefined): Promise<string> {
+async function configFor(source: Source, dismiss: unknown[] | undefined): Promise<string> {
   const path = join(configDir, `averi-${source}${dismiss === undefined ? '' : '-dismiss'}.yaml`);
+  const ios = source === 'uiautomator' ? {} : { ios: { bundleId: BUNDLE, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } };
   // JSON is YAML.
-  await writeFile(path, JSON.stringify({ app: { android: { package: 'dev.averi.lab' }, ios: { bundleId: BUNDLE, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } } }));
+  await writeFile(path, JSON.stringify({ app: { android: { package: BUNDLE }, ...ios } }));
   return path;
 }
 
 async function callTool(client: Client, call: Call, configPath: string): Promise<string> {
   try {
-    const r = await client.callTool({ name: call.tool, arguments: { platform: 'ios', ...call.args, configPath } }, undefined, { timeout: 300_000 });
+    const r = await client.callTool({ name: call.tool, arguments: { platform, ...call.args, configPath } }, undefined, { timeout: 300_000 });
     const text = (r.content as { type: string; text?: string }[]).map((c) => (c.type === 'text' ? c.text ?? '' : `[${c.type}]`)).join('\n');
     return `${r.isError === true ? 'ERROR ' : ''}${text}`;
   } catch (e) {
@@ -260,16 +308,18 @@ async function callTool(client: Client, call: Call, configPath: string): Promise
   }
 }
 
-console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
-const results: { source: IosTreeSourceKind; c: Case; verdict: Verdict; replies: string[] }[] = [];
+if (platform === 'ios') console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
+const results: { source: Source; c: Case; verdict: Verdict; replies: string[] }[] = [];
+/** The screen now, for the evidence of a case that is not ok. */
+const shoot = async (file: string) => writeFile(file, await lab.screenshot());
 const { client, close } = await connect();
 try {
   // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
-  for (const c of CASES.filter((x) => only === undefined || only.includes(x.id))) {
+  for (const c of CASES.filter((x) => (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)))) {
     for (const source of sources) {
       const launched = await lab.launch(c.cell);
       if (c.keyboard && launched.keyboard?.visible !== true) {
-        const verdict: Verdict = { outcome: 'SKIP', why: 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' };
+        const verdict: Verdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
         results.push({ source, c, verdict, replies: [] });
         console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
         continue;
@@ -285,7 +335,7 @@ try {
         await pause(3_000);
         const late = c.judge((await lab.state())!, replies, source);
         if (late.outcome !== verdict.outcome) verdict = { ...late, why: `${late.why} (only 3 s later; first read: ${verdict.why})` };
-        if (shots !== undefined && verdict.outcome !== 'ok') await lab.simctl('io', udid, 'screenshot', join(shots, `${source}-${c.id}-${Date.now()}.png`));
+        if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
       }
       results.push({ source, c, verdict, replies });
       console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
@@ -293,7 +343,7 @@ try {
   }
 } finally {
   await close();
-  await lab.simctl('terminate', udid, BUNDLE).catch(() => undefined);
+  await lab.close();
 }
 
 const count = (o: Verdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;

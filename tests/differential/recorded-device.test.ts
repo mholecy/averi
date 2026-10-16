@@ -142,4 +142,20 @@ describe('the fake device records what a tool would have sent', () => {
     expect((await android.keyboard!.state()).state).toBe('hidden');
     expect(deviceCalls().filter((c) => /keyevent/.test(c)).map((c) => /\b4\b/.test(c))).toEqual([true]);
   });
+
+  it('Android: a capture\'s own IME answers (CellTruth.ime) are served in place of the stock dumps, `hidden` once `back` hid it', async () => {
+    const stock = await fixture('dumpsys-window-displays-api33-keyboard-shown.txt');
+    const reading = (top: number, shown: boolean) => ({
+      displays: stock.replaceAll('frame=[0,1398][1080,2220]', `frame=[0,${top}][1080,2220]`).replaceAll('mIsImeShowing=true', `mIsImeShowing=${shown}`),
+      inputShown: `  mShowRequested=${shown} mShowExplicitlyRequested=false mShowForced=false mInputShown=${shown}\n`,
+      touchable: `  mShowRequested=${shown} mShowExplicitlyRequested=false mShowForced=false mInputShown=${shown}\n  touchable region=SkRegion((0,${top},1080,2220))\n`,
+    });
+    const ime = { shown: reading(1300, true), hidden: reading(1300, false) };
+    const android = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: PIXEL, frame: PIXEL, keyboard: 'shown', ime });
+    expect(await android.keyboard!.state()).toEqual({ state: 'shown', frame: { x: 0, y: 1300, width: 1080, height: 920 } });
+    expect((await android.keyboard!.touchable!()).region).toEqual([{ x: 0, y: 1300, width: 1080, height: 920 }]);
+    expect(await android.keyboard!.witness()).toBe('shown');
+    await android.pressKey('back');
+    expect(await android.keyboard!.witness()).toBe('hidden');
+  });
 });

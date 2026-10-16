@@ -8,14 +8,6 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, typ
  * both read it; tests/truth/truth.test.ts pins it.
  */
 
-/**
- * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it
- * (Forms.swift). iOS's, in points: Android's forms (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2b) need the
- * bar in pixels — deferred to phase 2b, where the app should report its bar's frame (e.g. `frames["submit.bar"]`) for
- * situationOf to read instead of this guess (round-2 review, MINOR-4).
- */
-export const PINNED_BAR_PADDING = 10;
-
 /** A probe's touch counts as the tap's when it lies this close to the tapped point (the tree's units). */
 export const TOUCH_SLACK = 2;
 
@@ -28,8 +20,12 @@ const inside = (p: { x: number; y: number }, r: Rect) => p.x >= r.x && p.x < r.x
 
 /**
  * Where a control's frame lies, from the app's frames alone. A control laid in the picker sheet is `own.inSheet`; the
- * pinned submit's bar (its frame and PINNED_BAR_PADDING, full width) covers what is laid under it; a control straddling
- * the keyboard's top, or with its centre under the bar, is `covered` — partly hidden.
+ * pinned submit's bar — its frame as the app reports it, `frames["<submit>.bar"]` (Forms.swift, Forms.kt: the bar the
+ * submit rides in, its padding and background included) — covers what is laid under it; a control straddling the
+ * keyboard's top, or with its centre under the bar, is `covered` — partly hidden. A pinned submit whose state reports
+ * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth); the iOS truths captured
+ * before phase 2b were measured with the bar guessed as the submit's frame and 10 pt above and below it, the bar
+ * Forms.swift now reports.
  */
 export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }): Situation {
   if (frame === undefined) return 'not-rendered';
@@ -40,10 +36,8 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
   const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
   if (k !== undefined && frame.y >= k.y) return 'under-keyboard';
   if (k !== undefined && frame.y + frame.height > k.y) return 'covered';
-  const submit = s.frames[form.submit.tag];
-  if (form.submit.pinned === true && own.tag !== form.submit.tag && submit !== undefined && cy >= submit.y - PINNED_BAR_PADDING && cy <= submit.y + submit.height + PINNED_BAR_PADDING) {
-    return 'covered';
-  }
+  const bar = s.frames[`${form.submit.tag}.bar`];
+  if (form.submit.pinned === true && own.tag !== form.submit.tag && bar !== undefined && inside({ x: frame.x + frame.width / 2, y: cy }, bar)) return 'covered';
   return 'open';
 }
 

@@ -329,6 +329,32 @@ export interface CellTruth {
    * tap in the navigation band (truth.ts#navigationBandTakes). Absent on iOS and on captures before B4.
    */
   navigation?: NavigationMode;
+  /**
+   * Android, a cell captured with the IME up (LabState.keyboard visible): the file beside the truth holding what the
+   * device answered to averi's own keyboard queries (ImeCapture) — the golden mode's fake device serves it in place of
+   * its stock dumps (scripts/differential/fake-device.ts#DeviceProfile.ime). Absent elsewhere.
+   */
+  ime?: string;
+}
+
+/**
+ * What an Android device answered to the three keyboard queries averi makes (src/adapters/android.ts: keyboardState's
+ * `dumpsys window displays`, keyboardWitness's INPUT_SHOWN_COMMAND, keyboardTouchable's TOUCHABLE_COMMAND), raw, with
+ * the IME up as captured (`shown`) and after one `input keyevent 4` hid it (`hidden`) — what a `back` the tools press
+ * leaves.
+ */
+export interface ImeCapture {
+  shown: ImeReadings;
+  hidden: ImeReadings;
+}
+
+export interface ImeReadings {
+  /** `dumpsys window displays`. */
+  displays: string;
+  /** `dumpsys input_method | grep -m1 -w mInputShown`. */
+  inputShown: string;
+  /** `dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true`. */
+  touchable: string;
 }
 
 /** Android's `navigation_mode`: 0 `three-button`, 1 `two-button`, 2 `gesture`. */
@@ -358,6 +384,16 @@ export interface ControlTruth {
    * not laid out).
    */
   probe: ProbeEvent[];
+  /**
+   * An `under-keyboard` control: the colour most of its frame shows in the screenshot — the keyboard's, what a colour
+   * assert on it would measure (golden-spec/forms.ts#controlRows). Absent elsewhere, and on captures before phase 2b.
+   */
+  seen?: string;
+  /**
+   * Android, an `under-keyboard` control: a raw tap at its centre after one `back` hid the IME (LabDevice.hideKeyboard)
+   * reached it — what averi's tap guard does there (hide, find again, tap). Absent elsewhere.
+   */
+  reachedAfterBack?: boolean;
 }
 
 /** A field as the app's model held it when the trees were read. */
