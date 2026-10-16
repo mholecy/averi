@@ -29,6 +29,25 @@ const UNCHECKED = /rendered text unchecked/;
 /** An ocr reply that read something (src/verify/text-parity.ts#evaluateOcrAssert: `read "…"`). */
 const READ = / read "/;
 
+/** What an `ocr` reply read (src/verify/text-parity.ts#evaluateOcrAssert: `read "…"`), or undefined when it read nothing. */
+export const readingOf = (o: Outcome): string | undefined => {
+  if (UNCHECKED.test(o.reply)) return undefined;
+  const m = / read ("(?:[^"\\]|\\.)*")/.exec(o.reply);
+  return m === null ? undefined : (JSON.parse(m[1]) as string);
+};
+
+/**
+ * The open string's `ocr` judge: a PASS is right. A FAIL on a reading is classed BY that reading — `read "…", not the
+ * string` — so a known one (lab notes OC1, OC2) is pinned to what the recognizer read: the reading turning empty (a
+ * recognizer that died: `failed`, failing closed) or into another wrong reading changes the class and fails the ratchet.
+ * Any other FAIL (failing closed, not found) is `failed`.
+ */
+export const ocrPasses = (o: Outcome): string | undefined => {
+  if (passed(o)) return undefined;
+  const read = readingOf(o);
+  return read === undefined ? `failed: ${first(o)}` : `read ${JSON.stringify(read)}, not the string: ${first(o)}`;
+};
+
 /** An `ocr` reply measured what lies there (a PASS, or a FAIL on a reading) rather than failing closed. */
 export const measuredText = (o: Outcome) => passed(o) || (!UNCHECKED.test(o.reply) && READ.test(o.reply));
 
@@ -80,7 +99,7 @@ export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | u
         verb: 'ocr',
         says: `passes: the screenshot shows ${JSON.stringify(text)} (read exactly, or equal under the recognizer's fold)`,
         call: ocrCall(platform, { text }, text),
-        judge: passes,
+        judge: ocrPasses,
       } satisfies Expectation,
     ].map(classed);
   }

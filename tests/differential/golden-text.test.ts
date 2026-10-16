@@ -3,7 +3,7 @@ import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, type Expectation } from '../../scripts/differential/golden-spec.js';
 import { verdictOf, type CalibrationEntry, type SideRun } from '../../scripts/truth/calibrate.js';
 import { goldenReport, skippedCheck, type GoldenCheck } from '../../scripts/differential/golden.js';
-import { ocrSkip } from '../../scripts/differential/ocr-probe.js';
+import { ocrDecision, ocrSkip } from '../../scripts/differential/ocr-probe.js';
 import { isRecognizerBinary } from '../../scripts/differential/fake-device.js';
 import { textListedIn } from '../../scripts/truth/truth.js';
 import { tmpdir } from 'node:os';
@@ -52,8 +52,10 @@ describe('an open text target (text-sample)', () => {
   it('ocr: a PASS (exact, or equal under the fold) is right; a FAIL on a reading, or failing closed, is the mismatch', () => {
     const ocr = by(rows, 'ocr');
     expect(ocr.judge(PASS('1 234,56 €'))).toBeUndefined();
-    expect(ocr.judge(READ_FAIL('1 234,56 C'))).toMatch(/^failed: FAIL/);
+    expect(ocr.judge(READ_FAIL('1 234,56 C'))).toMatch(/^read "1 234,56 C", not the string: FAIL/);
+    expect(ocr.judge(READ_FAIL('a "quoted" one'))).toMatch(/^read "a \\"quoted\\" one", not the string: /);
     expect(ocr.judge(NOTHING)).toMatch(/^failed: FAIL/);
+    expect(ocr.judge(CLOSED)).toMatch(/^failed: FAIL/);
     expect(ocr.judge(out('1/1 asserts FAILED\nFAIL  element text:"x" renders text "x" — not found within 1 s'))).toMatch(/^failed: /);
   });
   it('text: the tree reads it, else the mismatch', () => {
@@ -175,6 +177,8 @@ describe('the ocr rows\' availability (ocr-probe.ts#ocrSkip): skipped only on th
   it.each([
     ['it reads', { platform: 'darwin' as const, run: { stdout: 'New payment\n' } }],
     ['it reads nothing', { platform: 'darwin' as const, run: { stdout: '' } }],
+    ['a READING that says nilError (only the probe\'s own ERROR line skips)', { platform: 'darwin' as const, run: { stdout: 'nilError\nfound the word nilError here\n' } }],
+    ['nilError in a build error, not the probe\'s line', { platform: 'darwin' as const, run: { error: 'ERROR nilError' } }],
     ['the probe does not compile', { platform: 'darwin' as const, run: { error: 'swiftc: error: no such module Vision' } }],
     ['swiftc exits non-zero', { platform: 'darwin' as const, compiler: { code: 1, message: 'exit 1' } }],
   ])('%s → asked (a side whose recognizer fails is red, not skipped)', (_, o) => {
@@ -202,5 +206,17 @@ describe('the fake device takes only averi\'s cached recognizer for the real one
     expect(isRecognizerBinary(join(tmpdir(), 'averi-ocr-bin', 'recognizer-0123'))).toBe(true);
     expect(isRecognizerBinary('/elsewhere/averi-ocr-bin/recognizer-0123')).toBe(false);
     expect(isRecognizerBinary('averi-ocr-bin')).toBe(false);
+  });
+});
+
+describe('ocrDecision: what golden does with the probe\'s verdict', () => {
+  it('no reason: the rows are asked, whatever GOLDEN_OCR says', () => {
+    expect(ocrDecision(undefined, {})).toEqual({ ask: true });
+    expect(ocrDecision(undefined, { GOLDEN_OCR: 'require' })).toEqual({ ask: true });
+  });
+  it('a reason: skipped — or thrown under GOLDEN_OCR=require', () => {
+    expect(ocrDecision('Vision answers nilError', {})).toEqual({ ask: false, skip: 'Vision answers nilError' });
+    expect(ocrDecision('Vision answers nilError', { GOLDEN_OCR: 'other' })).toEqual({ ask: false, skip: 'Vision answers nilError' });
+    expect(() => ocrDecision('Vision answers nilError', { GOLDEN_OCR: 'require' })).toThrow(/^GOLDEN_OCR=require, but the ocr rows cannot be asked here: Vision answers nilError$/);
   });
 });

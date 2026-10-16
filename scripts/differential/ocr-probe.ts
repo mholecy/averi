@@ -50,8 +50,8 @@ export interface ProbeOutcome {
 export function ocrSkip(o: ProbeOutcome): string | undefined {
   if (o.platform !== 'darwin') return `the macOS recognizer: this host is ${o.platform}`;
   if (o.compiler !== undefined && o.compiler.code === 'ENOENT') return 'no swiftc on this host (ENOENT)';
-  const said = o.run === undefined ? '' : 'stdout' in o.run ? o.run.stdout : o.run.error;
-  if (/\bnilError\b/.test(said)) return 'Vision answers nilError (it does not run here: a sandbox)';
+  // Only the probe's own error line (PROBE_SWIFT: `ERROR <error>` on stdout): a string Vision READ can never skip.
+  if (o.run !== undefined && 'stdout' in o.run && /^ERROR .*\bnilError\b/m.test(o.run.stdout)) return 'Vision answers nilError (it does not run here: a sandbox)';
   return undefined;
 }
 
@@ -86,4 +86,14 @@ export async function probeRecognizer(exec: HostExec, png: string): Promise<Prob
   } catch (e) {
     return { platform, run: { error: e instanceof Error ? e.message : String(e) } };
   }
+}
+
+/**
+ * What golden does with the probe's verdict (golden.ts#ocrAvailability): `ask` the rows (no reason to skip), `skip`
+ * them with the reason — or, under `GOLDEN_OCR=require`, throw it: a run that must judge the rows cannot pass without.
+ */
+export function ocrDecision(why: string | undefined, env: Record<string, string | undefined>): { ask: true } | { ask: false; skip: string } {
+  if (why === undefined) return { ask: true };
+  if (env.GOLDEN_OCR === 'require') throw new Error(`GOLDEN_OCR=require, but the ocr rows cannot be asked here: ${why}`);
+  return { ask: false, skip: why };
 }

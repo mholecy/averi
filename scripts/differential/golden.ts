@@ -11,7 +11,7 @@ import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
 import { hostExec, useRecognizer } from './fake-device.js';
-import { ocrSkip, probeRecognizer } from './ocr-probe.js';
+import { ocrDecision, ocrSkip, probeRecognizer } from './ocr-probe.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -87,10 +87,9 @@ const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-ipho
 let ocrProbe: Promise<string | undefined> | undefined;
 export function ocrAvailability(): Promise<string | undefined> {
   ocrProbe ??= probeRecognizer(hostExec, OCR_PROBE_PNG).then((o) => {
-    const why = ocrSkip(o);
-    if (why !== undefined && process.env.GOLDEN_OCR === 'require') throw new Error(`GOLDEN_OCR=require, but the ocr rows cannot be asked here: ${why}`);
-    if (why === undefined) useRecognizer('vision');
-    return why;
+    const d = ocrDecision(ocrSkip(o), process.env);
+    if (d.ask) useRecognizer('vision');
+    return d.ask ? undefined : d.skip;
   });
   return ocrProbe;
 }
