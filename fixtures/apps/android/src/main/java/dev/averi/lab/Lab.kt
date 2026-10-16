@@ -70,6 +70,8 @@ object Catalog {
  */
 class Lab(context: Context, private val screen: Rect) {
     private val file = File(context.filesDir, "lab-state.json")
+    /** Pixels per dp — the state's `density`: what Android's 48-dp minimum touch target is in the state's units. */
+    private val density = context.resources.displayMetrics.density
     private var cell = ""
     private var ready = false
     private val frames = linkedMapOf<String, Rect>()
@@ -196,6 +198,7 @@ class Lab(context: Context, private val screen: Rect) {
             .put("ready", ready)
             .put("screen", rect(screen))
             .put("scale", 1)
+            .put("density", density.toDouble())
             .put("frames", JSONObject().apply { frames.forEach { (k, v) -> put(k, rect(v)) } })
             .put("events", JSONArray(events))
         safeArea?.let { json.put("safeArea", JSONObject().put("top", it.top).put("left", it.left).put("bottom", it.bottom).put("right", it.right)) }

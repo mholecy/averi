@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, controlPiece, listedIn, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, controlPiece, intersect, largestPiece, listedIn, touchTargetOf, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -138,11 +138,20 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     }
     // Android with the IME up: what averi's keyboard queries answer, for the golden mode's fake device to serve
     // (CellTruth.ime) — read after the trees and the screenshot, since it leaves the keyboard hidden.
+    let afterBack: LabState | undefined;
     if (s.keyboard?.visible === true && lab.ime !== undefined) {
       await writeFile(join(opts.out, `${cell.id}.ime.json`), JSON.stringify(await lab.ime(), null, 1) + '\n');
       truth.ime = `${cell.id}.ime.json`;
+      // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
+      // back — its trees and the app's state, beside the truth (CellTruth.afterBack).
+      const backTrees = await lab.trees();
+      afterBack = await lab.state();
+      if (afterBack === undefined) throw new Error(`cell ${cell.id}: no state after back`);
+      for (const t of backTrees) await writeFile(join(opts.out, `${cell.id}.after-back${t.suffix}`), t.payload);
+      await writeFile(join(opts.out, `${cell.id}.after-back.state.json`), JSON.stringify(afterBack, null, 2) + '\n');
+      truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
     }
-    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log);
+    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack);
     await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
     for (const t of trees) {
       manifest.captures.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
@@ -174,7 +183,7 @@ async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y:
 
 const described = (probe: readonly { kind: string; tag: string }[]) => (probe.length ? `, probe ${probe.map((e) => `${e.kind} ${e.tag}`).join('; ')}` : '');
 
-async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, png: PNG, broken: string[], log: (line: string) => void): Promise<FormTruth> {
+async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, png: PNG, broken: string[], log: (line: string) => void, afterBack?: LabState): Promise<FormTruth> {
   const frameOf = (tag: string): Rect => {
     const f = s.frames[tag];
     if (f === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${tag}`);
@@ -222,12 +231,25 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     // What the screen shows over a control laid under the keyboard: the colour a pixel assert there would measure.
     const seen = frame !== undefined && situation === 'under-keyboard' ? measure(png, frame, s.scale, '#000000').seen : undefined;
     // Android: what averi's tap guard does with a control under the IME — hide it (back), then tap — probed too.
-    let afterBack: { reached: boolean; probe: ControlTruth['probe'] } | undefined;
+    let backAt: { reached: boolean; probe: ControlTruth['probe'] } | undefined;
     if (frame !== undefined && situation === 'under-keyboard' && lab.hideKeyboard !== undefined) {
       const { events, after } = await probe(lab, cell.id, frame, () => lab.hideKeyboard!());
-      afterBack = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
+      backAt = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
     }
-    const reachedAfterBack = afterBack?.reached;
+    // Not reached at its centre after back: a probe, after back, at its piece of the layout then — its touch target
+    // (truth.ts#touchTargetOf) clear of the submit's frame there.
+    let back: { piece: Rect; reached: boolean } | undefined;
+    const backFrame = afterBack?.frames[w.frame];
+    if (backAt?.reached === false && backFrame !== undefined && afterBack !== undefined) {
+      const submit = w.tag !== form.submit.tag ? afterBack.frames[form.submit.tag] : undefined;
+      const screen = { x: 0, y: 0, width: afterBack.screen.width, height: afterBack.screen.height };
+      const target = intersect(touchTargetOf(backFrame, afterBack.density), screen);
+      const piece = target === null ? null : largestPiece(target, submit === undefined ? [] : [submit]);
+      if (piece !== null) {
+        const { events, after } = await probe(lab, cell.id, piece, () => lab.hideKeyboard!());
+        back = { piece, reached: readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached };
+      }
+    }
     // A covered control: a second probe at the centre of its piece clear of the keyboard and the pinned submit, when
     // that is not its frame's — where a tap moved off the cover would land.
     const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w) : null;
@@ -245,13 +267,14 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       situation,
       ...read,
       ...(seen !== undefined && { seen }),
-      ...(afterBack !== undefined && { reachedAfterBack: afterBack.reached, probeAfterBack: afterBack.probe }),
+      ...(backAt !== undefined && { reachedAfterBack: backAt.reached, probeAfterBack: backAt.probe }),
+      ...(back !== undefined && { pieceAfterBack: back.piece, reachedAtPieceAfterBack: back.reached }),
       ...(reachedAtPiece !== undefined && { piece: piece!, reachedAtPiece }),
     };
     controls.push(c);
     const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
-    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${afterBack === undefined ? '' : ` (after back ${afterBack.reached}${described(afterBack.probe)})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
+    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${backAt === undefined ? '' : ` (after back ${backAt.reached}${described(backAt.probe)})`}${back === undefined ? '' : ` (after back at its piece ${back.reached})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
   }
   // The principal title a keyboard dismissal taps (CatalogForm.titleId): probed — a tap on it must end the editing.
   let title: FormTruth['title'];

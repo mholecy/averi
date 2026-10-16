@@ -171,6 +171,11 @@ export interface LabState {
   screen: Rect;
   /** Screenshot pixels per unit: the device's scale on iOS (3), 1 on Android. */
   scale: number;
+  /**
+   * Android: pixels per dp (2.75 on averi_lab) — what the 48-dp minimum touch target a Compose control is given is in
+   * the state's units (truth.ts#touchTargetOf). Absent on iOS and on captures before phase 2b's review round 2.
+   */
+  density?: number;
   frames: Record<string, Rect>;
   /**
    * `tap` a target's action fired; `dismissed` a layer went away; `button` a layer's own button; on a form cell
@@ -335,6 +340,12 @@ export interface CellTruth {
    * its stock dumps (scripts/differential/fake-device.ts#DeviceProfile.ime). Absent elsewhere.
    */
   ime?: string;
+  /**
+   * Android, a cell captured with the IME up: the screen after one `back` hid it, as files beside the truth — the
+   * state (`state`) and each raw tree by source (`trees`) — the layout averi finds an element again in after its tap
+   * guard's `back`; golden's fake device serves the tree once `input keyevent 4` is sent (DeviceProfile.afterBackXml).
+   */
+  afterBack?: { state: string; trees: Partial<Record<SourceKind, string>> };
 }
 
 /**
@@ -399,6 +410,13 @@ export interface ControlTruth {
    * bottom lies over the control's centre). Present with `reachedAfterBack`.
    */
   probeAfterBack?: ProbeEvent[];
+  /**
+   * Not reached after back (`reachedAfterBack` false): the largest part of its touch target in the layout after back
+   * (truth.ts#touchTargetOf over CellTruth.afterBack's state) clear of the submit's frame there, and whether a raw tap
+   * at its centre, after one back, reached the control. Absent when there is no such part.
+   */
+  pieceAfterBack?: Rect;
+  reachedAtPieceAfterBack?: boolean;
   /**
    * A `covered` control: the largest part of its frame clear of the keyboard and the pinned submit (truth.ts#
    * controlPiece), and whether a second raw tap at its centre reached the control — probed when that centre is not

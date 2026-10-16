@@ -74,6 +74,12 @@ export interface DeviceProfile {
    * 'shown'`), `hidden` once a `back` hid it.
    */
   ime?: ImeCapture;
+  /**
+   * Android, a ground-truth capture with the IME up: the dump of the screen after one `back` hid it
+   * (CellTruth.afterBack) — answered for `uiautomator dump` once `input keyevent 4` has been sent in the call, as the
+   * layout the app takes then (the bar back at the bottom).
+   */
+  afterBackXml?: string;
 }
 
 /** A rect of the frame, in its pixels, painted one colour. */
@@ -85,6 +91,8 @@ export interface Paint {
 interface DeviceState {
   profile: DeviceProfile;
   keyboard: KeyboardState;
+  /** The dump answered now: the profile's, until a `back` swaps in its afterBackXml. */
+  dumpXml?: string;
   paint?: Paint;
   calls: string[];
 }
@@ -94,7 +102,7 @@ let current: DeviceState | undefined;
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
   if (profile.screenshot !== undefined) servedScreenshot(profile.frame, profile.screenshot);
-  current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [] };
+  current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [], ...(profile.dumpXml !== undefined && { dumpXml: profile.dumpXml }) };
 }
 
 /** Paint `paint.rect` of every frame until the next reset (one call). */
@@ -268,8 +276,8 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     const line = argv.join(' ');
     if (argv[0] === 'exec-out' && argv[1] === 'uiautomator') {
       device.calls.push('adb uiautomator dump');
-      if (profile.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
-      return `${profile.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
+      if (device.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
+      return `${device.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
     }
     if (argv[0] === 'exec-out' && argv[1] === 'screencap') {
       device.calls.push('adb screencap');
@@ -300,7 +308,10 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       return shell.includes('touchable region') ? inputShown(shown) + TOUCHABLE[keyboard] : inputShown(shown);
     }
     if (argv[1] === 'input') {
-      if (shell === 'input keyevent 4') device.keyboard = 'hidden';
+      if (shell === 'input keyevent 4') {
+        device.keyboard = 'hidden';
+        if (profile.afterBackXml !== undefined) device.dumpXml = profile.afterBackXml;
+      }
       return '';
     }
     device.calls.pop();

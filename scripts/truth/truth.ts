@@ -365,6 +365,21 @@ export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
   return largestPiece(visible, covers);
 }
 
+/** Android's minimum touch target: 48 dp (Compose's minimumInteractiveComponentSize). */
+export const MIN_TOUCH_DP = 48;
+/**
+ * The area a Compose control takes touches in: its frame grown about its centre to at least MIN_TOUCH_DP on each side
+ * (`density` pixels per dp) — measured on averi_lab: a 99-px field is dumped 132 px tall. The frame itself without a
+ * density.
+ */
+export function touchTargetOf(frame: Rect, density: number | undefined): Rect {
+  if (density === undefined) return frame;
+  const min = MIN_TOUCH_DP * density;
+  const w = Math.max(frame.width, min);
+  const h = Math.max(frame.height, min);
+  return { x: Math.round(frame.x - (w - frame.width) / 2), y: Math.round(frame.y - (h - frame.height) / 2), width: Math.round(w), height: Math.round(h) };
+}
+
 /** What of `visible` the `covers` leave, its largest rect — the piece a tap can land on; null when nothing. */
 export function largestPiece(visible: Rect, covers: readonly Rect[]): Rect | null {
   const pieces = covers.reduce<Rect[]>((ps, c) => ps.flatMap((p) => subtract(p, c)), [visible]);

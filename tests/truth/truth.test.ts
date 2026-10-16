@@ -16,6 +16,7 @@ import {
   readControlProbe,
   readTargetProbe,
   situationOf,
+  touchTargetOf,
   touchesAt,
 } from '../../scripts/truth/truth.js';
 
@@ -505,6 +506,9 @@ describe('capture of a form cell (Android)', () => {
     expect(lab.imeReads).toBe(1);
     const truth = JSON.parse(await readFile(join(out, 'form-k.truth.json'), 'utf8')) as CellTruth;
     expect(truth.ime).toBe('form-k.ime.json');
+    // The screen after ime()'s back, beside the truth: each tree and the state.
+    expect(truth.afterBack).toEqual({ state: 'form-k.after-back.state.json', trees: { wda: 'form-k.after-back.wda.json', idb: 'form-k.after-back.idb.json' } });
+    expect(JSON.parse(await readFile(join(out, 'form-k.after-back.state.json'), 'utf8')).cell).toBe('form-k');
     expect(JSON.parse(await readFile(join(out, 'form-k.ime.json'), 'utf8')).hidden.inputShown).toBe('mInputShown=false');
     const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
     expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', reachedAfterBack: true, probeAfterBack: [ev('touch', '201.0,621.0')] });
@@ -521,6 +525,14 @@ describe('capture of a form cell (Android)', () => {
     };
     await expect(runForm(lab, [FORM_KEYBOARD])).rejects.toThrow(/no frame for submit\.bar/);
   }, 15_000);
+});
+
+describe('touchTargetOf: a Compose control\'s 48-dp touch target', () => {
+  it('grows a frame shorter than 48 dp about its centre (averi_lab: a 99-px field dumped 132 px tall), keeps a larger one, and is the frame without a density', () => {
+    expect(touchTargetOf(rect(55, 2024, 970, 99), 2.75)).toEqual(rect(55, 2008, 970, 132));
+    expect(touchTargetOf(rect(55, 1238, 970, 160), 2.75)).toEqual(rect(55, 1238, 970, 160));
+    expect(touchTargetOf(rect(55, 2024, 970, 99), undefined)).toEqual(rect(55, 2024, 970, 99));
+  });
 });
 
 describe('listedIn: whether a raw tree lists a node identified as the target', () => {

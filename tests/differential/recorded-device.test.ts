@@ -158,4 +158,13 @@ describe('the fake device records what a tool would have sent', () => {
     await android.pressKey('back');
     expect(await android.keyboard!.witness()).toBe('hidden');
   });
+
+  it('Android: the dump after back (CellTruth.afterBack) is served once `input keyevent 4` is sent, not before', async () => {
+    const texts = async (a: { uiTree(): Promise<UiNode> }) => all(await a.uiTree()).map((n) => n.label).filter((t): t is string => t !== null);
+    const android = recordedAdapter(side, recording({ platform: 'android', source: 'uiautomator', form: 'raw', payload: COMPOSE.signIn }), { platform: 'android', screen: PIXEL, frame: PIXEL, keyboard: 'shown', afterBackXml: COMPOSE.login });
+    expect(await texts(android)).toContain('SIGN IN');
+    await android.pressKey('back');
+    expect(await texts(android)).toContain('LOGIN');
+    expect(await texts(android)).not.toContain('SIGN IN');
+  });
 });

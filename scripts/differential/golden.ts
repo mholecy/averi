@@ -82,6 +82,9 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   const result: GoldenResult = { recording: recording.id, checks: [], broken: [] };
   // Android captured with the IME up: the device's own keyboard answers, the keyboard shown at each call's start.
   const ime = truth.ime === undefined ? undefined : (JSON.parse(await readFile(join(dirname(recording.truth), truth.ime), 'utf8')) as ImeCapture);
+  // …and the screen after one back hid it, for the replayed tree's source (CellTruth.afterBack).
+  const backTree = truth.afterBack?.trees[recording.source];
+  const afterBackXml = backTree === undefined || recording.source !== 'uiautomator' ? undefined : await readFile(join(dirname(recording.truth), backTree), 'utf8');
   const profile = {
     platform: recording.platform,
     screen: recording.screen ?? truth.screen,
@@ -89,6 +92,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     screenshot,
     ...(recording.app !== undefined && { app: recording.app }),
     ...(ime !== undefined && { ime, keyboard: 'shown' as const }),
+    ...(afterBackXml !== undefined && { afterBackXml }),
   };
   const config = await configFor(recording, undefined, truth.config);
   const c = await connect(side, recording, profile);

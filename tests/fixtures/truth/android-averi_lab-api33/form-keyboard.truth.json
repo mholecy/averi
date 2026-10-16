@@ -10,6 +10,12 @@
   "targets": [],
   "navigation": "gesture",
   "ime": "form-keyboard.ime.json",
+  "afterBack": {
+    "state": "form-keyboard.after-back.state.json",
+    "trees": {
+      "uiautomator": "form-keyboard.after-back.xml"
+    }
+  },
   "form": {
     "fields": [
       {
@@ -449,7 +455,14 @@
             "kind": "submit",
             "tag": "invalid"
           }
-        ]
+        ],
+        "pieceAfterBack": {
+          "x": 55,
+          "y": 2126,
+          "width": 970,
+          "height": 14
+        },
+        "reachedAtPieceAfterBack": true
       },
       {
         "tag": "submit",
