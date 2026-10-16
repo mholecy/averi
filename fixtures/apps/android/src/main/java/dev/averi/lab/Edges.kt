@@ -6,14 +6,11 @@ package dev.averi.lab
 // outside its clip, overlapped by a sticky header) or of the screen (off it, resting in the status band) — Edges.swift's
 // layout tables, the same numbers in dp. Each target is a 300×64 dp box at a fixed place in a scroll container's
 // content, the container at a fixed place on the screen and scrolled to a fixed offset from its first frame. A target
-// reports its UNCLIPPED frame (its position in the window plus its size — Base.kt's boundsInWindow is clipped by the
-// container, and the truth must see where the frame runs on past the clip); the state reports what its geometry is
+// reports its UNCLIPPED frame (Lab.kt#screenFrame — Base.kt's boundsInWindow is clipped by the container, and the truth
+// must see where the frame runs on past the clip); the state reports what its geometry is
 // measured against (scripts/truth/truth.ts#geometryOf): the system bars' insets, each container's clip, the sticky
 // header as chrome.
 
-import android.graphics.Rect
-import android.view.View
-import android.view.WindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,9 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -52,7 +47,6 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 
 /** A scroll container of an edges cell (Edges.swift#EdgeScroller): `height` null runs to the screen's bottom. */
 private class EdgeScroller(val id: String, val top: Dp, val height: Dp?, val content: Dp, val offset: Dp, val rows: List<Pair<String, Dp>>)
@@ -77,15 +71,6 @@ private val STICKY_OFFSET = 24.dp
 private val ROW_WIDTH = 300.dp
 private val ROW_HEIGHT = 64.dp
 
-/** Where a layout lies on the screen, UNCLIPPED: its position in the window plus the window's place, and its size. */
-private fun screenRect(view: View, c: LayoutCoordinates): Rect {
-    val at = IntArray(2).also(view::getLocationOnScreen)
-    val p = c.positionInWindow()
-    val x = at[0] + p.x.roundToInt()
-    val y = at[1] + p.y.roundToInt()
-    return Rect(x, y, x + c.size.width, y + c.size.height)
-}
-
 /** One target, as Base.kt's TargetBox draws it, reporting its unclipped frame. */
 @Composable
 private fun EdgeBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modifier) {
@@ -97,13 +82,13 @@ private fun EdgeBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modifi
             .semantics { contentDescription = "Target ${t.tag}" }
             .background(Color(t.color))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { lab.event("tap", t.tag) }
-            .onGloballyPositioned { lab.frame(t.tag, screenRect(view, it)) },
+            .onGloballyPositioned { lab.frame(t.tag, screenFrame(view, it)) },
     )
 }
 
 @Composable
 internal fun EdgesScreen(cell: Cell, lab: Lab) {
-    val view = LocalView.current
+    systemBarsInsets(lab)
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }) {
         if (cell.id == "scroll-sticky") {
             StickyList(cell, lab)
@@ -122,10 +107,9 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
         }
     }
     LaunchedEffect(cell.id) {
-        delay(300)
-        view.rootWindowInsets?.getInsets(WindowInsets.Type.systemBars())?.let { lab.safeArea(Rect(it.left, it.top, it.right, it.bottom)) }
-        // The offsets applied and the frames reported before the capture reads the state.
-        delay(700)
+        // The insets reported (systemBarsInsets), the offsets applied and the frames reported before the capture reads
+        // the state.
+        delay(1000)
         lab.settled()
     }
 }
@@ -139,7 +123,7 @@ private fun EdgeScrollColumn(cell: Cell, s: EdgeScroller, lab: Lab, height: Dp) 
             .fillMaxWidth()
             .height(height)
             .background(Color(0xFFEEEEEE))
-            .onGloballyPositioned { lab.scrollView(s.id, screenRect(view, it)) }
+            .onGloballyPositioned { lab.scrollView(s.id, screenFrame(view, it)) }
             .verticalScroll(rememberScrollState(initial)),
     ) {
         Box(Modifier.fillMaxWidth().height(s.content)) {
@@ -161,7 +145,7 @@ private fun StickyList(cell: Cell, lab: Lab) {
             .fillMaxWidth()
             .height(STICKY_HEIGHT)
             .background(Color(0xFFEEEEEE))
-            .onGloballyPositioned { lab.scrollView("list", screenRect(view, it)) },
+            .onGloballyPositioned { lab.scrollView("list", screenFrame(view, it)) },
         state = rememberLazyListState(0, initial),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -172,7 +156,7 @@ private fun StickyList(cell: Cell, lab: Lab) {
                     .height(STICKY_HEADER)
                     .background(Color(0xFF455A64))
                     .testTag("lab.${cell.id}.header")
-                    .onGloballyPositioned { lab.chrome("stickyHeader", screenRect(view, it)) },
+                    .onGloballyPositioned { lab.chrome("stickyHeader", screenFrame(view, it)) },
                 contentAlignment = Alignment.Center,
             ) { Text("Sticky header", color = Color.White) }
         }

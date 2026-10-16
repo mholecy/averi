@@ -18,14 +18,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,9 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -52,7 +48,6 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 
 @Composable
 internal fun BarsScreen(cell: Cell, lab: Lab) {
@@ -70,21 +65,11 @@ private val CHROME = Color(0xFF263238)
 private val CHROME_ITEM = Color(0xFF546E7A)
 private val FAB = Color(0xFF00897B)
 
-/**
- * A layout's frame on the SCREEN, unclipped: its position in the window plus the window's place on the screen, and its
- * laid-out size — an off-screen row of a scroll view keeps its whole frame (boundsInWindow would clip it to nothing).
- */
-private fun screenFrame(c: LayoutCoordinates, at: IntArray): Rect {
-    val p = c.positionInWindow()
-    val x = at[0] + p.x.roundToInt()
-    val y = at[1] + p.y.roundToInt()
-    return Rect(x, y, x + c.size.width, y + c.size.height)
-}
-
+/** Reports a layout's unclipped frame on the screen (Lab.kt#screenFrame). */
 @Composable
 private fun reporting(report: (Rect) -> Unit): Modifier {
     val view = LocalView.current
-    return Modifier.onGloballyPositioned { c -> report(screenFrame(c, IntArray(2).also(view::getLocationOnScreen))) }
+    return Modifier.onGloballyPositioned { c -> report(screenFrame(view, c)) }
 }
 
 /**
@@ -105,16 +90,13 @@ private fun BarTarget(cell: Cell, tag: String, lab: Lab, width: Dp, height: Dp, 
     )
 }
 
-/** The system bars' insets in dp, reported to the state in pixels (LabState.safeArea). */
+/** The system bars' insets in dp, reported to the state in pixels (Lab.kt#systemBarsInsets, LabState.safeArea). */
 private data class Bars(val top: Dp, val bottom: Dp)
 
 @Composable
 private fun systemBars(lab: Lab): Bars {
-    val d = LocalDensity.current
-    val i = WindowInsets.systemBars
-    val r = Rect(i.getLeft(d, androidx.compose.ui.unit.LayoutDirection.Ltr), i.getTop(d), i.getRight(d, androidx.compose.ui.unit.LayoutDirection.Ltr), i.getBottom(d))
-    LaunchedEffect(r) { lab.safeArea(r) }
-    return with(d) { Bars(r.top.toDp(), r.bottom.toDp()) }
+    val r = systemBarsInsets(lab)
+    return with(LocalDensity.current) { Bars(r.top.toDp(), r.bottom.toDp()) }
 }
 
 /** Ready once the insets have been dispatched and the first layouts reported. */

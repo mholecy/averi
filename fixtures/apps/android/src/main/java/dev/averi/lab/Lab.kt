@@ -2,9 +2,19 @@ package dev.averi.lab
 
 import android.content.Context
 import android.graphics.Rect
+import android.view.View
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.LayoutDirection
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.roundToInt
 
 // The lab app's model: the cell catalog it bundles (fixtures/apps/cells.json, copied into the assets at build time)
 // and the state file it writes for the capture script (scripts/truth/schema.ts#LabState, the iOS app's shape) — the
@@ -144,4 +154,33 @@ class Lab(context: Context, private val screen: Rect) {
         tmp.writeText(json.toString(2) + "\n")
         tmp.renameTo(file)
     }
+}
+
+// --- phase 3's geometry, read once for every family that reports it (Edges.kt, Bars.kt) ---
+
+/**
+ * A layout's frame on the SCREEN, unclipped: its position in the window plus the window's place on the screen, and its
+ * laid-out size — a row cut by its scroll container, or off the screen, keeps its whole frame (boundsInWindow would
+ * clip it), so the truth sees where the frame runs on past the clip.
+ */
+fun screenFrame(view: View, c: LayoutCoordinates): Rect {
+    val at = IntArray(2).also(view::getLocationOnScreen)
+    val p = c.positionInWindow()
+    val x = at[0] + p.x.roundToInt()
+    val y = at[1] + p.y.roundToInt()
+    return Rect(x, y, x + c.size.width, y + c.size.height)
+}
+
+/**
+ * The system bars' insets in pixels (left, top, right, bottom as a Rect's fields), as Compose dispatches them to the
+ * edge-to-edge window (MainActivity's enableEdgeToEdge) — reported to the state's `safeArea` each time they change,
+ * and returned for a layout laid against the bars.
+ */
+@Composable
+fun systemBarsInsets(lab: Lab): Rect {
+    val d = LocalDensity.current
+    val i = WindowInsets.systemBars
+    val r = Rect(i.getLeft(d, LayoutDirection.Ltr), i.getTop(d), i.getRight(d, LayoutDirection.Ltr), i.getBottom(d))
+    LaunchedEffect(r) { lab.safeArea(r) }
+    return r
 }

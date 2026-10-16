@@ -26,11 +26,6 @@ private let chromeColour = Color(hex: "#263238")
 private let chromeItem = Color(hex: "#546E7A")
 private let fabColour = Color(hex: "#00897B")
 
-/// The key window's safe-area insets (the status band on top, the home indicator's at the bottom).
-@MainActor private func windowInsets() -> UIEdgeInsets {
-    UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.keyWindow?.safeAreaInsets ?? .zero
-}
-
 /// One target of a bars cell: TargetView (Base.swift) at the size its cell gives it, its frame reported in screen
 /// coordinates — unclipped, so a row far down a scroll view keeps its whole frame.
 struct BarTarget: View {
@@ -79,7 +74,7 @@ struct BarsHost: View {
         .ignoresSafeArea()
         .task {
             try? await Task.sleep(for: .milliseconds(300))
-            let i = windowInsets()
+            let i = windowInsets() ?? .zero
             insets = i
             lab.safeArea()
             try? await Task.sleep(for: .milliseconds(800))

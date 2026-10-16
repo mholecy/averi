@@ -183,6 +183,12 @@ struct Insets: Codable, Equatable {
     }
 }
 
+/// The key window's safe-area insets — the status band on top, the home indicator's at the bottom; nil while no window
+/// is key. The one reader: Lab.safeArea reports them, a cell laid out against the bands (Bars.swift) reads them.
+@MainActor func windowInsets() -> UIEdgeInsets? {
+    UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }?.safeAreaInsets
+}
+
 @MainActor
 final class Lab: ObservableObject {
     @Published var cell: Cell?
@@ -225,10 +231,9 @@ final class Lab: ObservableObject {
 
     // --- phase 3's geometry: what a target's measured geometry is measured against (truth.ts#geometryOf) ---
 
-    /// The key window's safe-area insets: iOS's status bar and home indicator.
+    /// The key window's safe-area insets (windowInsets): iOS's status bar and home indicator.
     func safeArea() {
-        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
-        guard let e = window?.safeAreaInsets else { return }
+        guard let e = windowInsets() else { return }
         let i = Insets(e)
         guard state.safeArea != i else { return }
         state.safeArea = i
