@@ -11,7 +11,7 @@ open note on the working tree. See the script for the verdicts.
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | needs-2b | 926b826 → 95f75f4 | — |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | needs-cell:edges | 2ae8b10 → 1221b0f | — |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the iOS leg only) |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 8 rows (recorded) |
 | 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | needs-cell:false-covers | d928789 → c3ebc62, 7542021 | — |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | needs-cell:false-covers | dd50327 → cccf6b8, c8c06a8 | — |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | needs-cell:edges | 10fb02b → d2b7744 | — |
@@ -20,32 +20,34 @@ open note on the working tree. See the script for the verdicts.
 | 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | needs-cell:edges | d043e65 → 9c7885e | — |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | needs-cell:edges | f4ff4be → 29a5c30 | — |
 | 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | needs-cell:bars | d2b7744 → 81a7d62 | — |
-| 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | needs-cell:presented | 20053ae → 8a55d2b | — |
+| 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
 | 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | needs-live | 8a55d2b → 21f1deb, b940052 | — |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half only) |
 | 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | needs-cell:false-covers | bd06470 → 470dafe, cd4d177 | — |
-| 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | needs-cell:presented | 7566443 → 83e282a | — |
+| 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | needs-cell:bars | 0cb8b62 → 5e47ff4 | — |
-| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED (partial: the overlay half only) |
+| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half only), regressed elsewhere: 2 rows (recorded) |
 | 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | needs-ocr | 94bae14 → e85bcdf | — |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
 | 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | needs-cell:bars | 7566443 → 83e282a | — |
-| 27 | 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done | needs-cell:presented | 53da035 → 15896c5 | — |
-| 28 | 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath | calibrate | 53da035 → 15896c5 | DOES-NOT-FAIL |
+| 27 | 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
+| 28 | 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
 | 29 | 2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes | needs-cell:edges | ec2893a → b7eac90 | — |
-| 30 | 2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes | needs-cell:presented | 4655113 → 753b560 | — |
+| 30 | 2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes | calibrate | 4655113 → 753b560 | CALIBRATED |
 | 31 | 2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done | residual:open (the blur overlay has no node in either tree) | — | — |
-| 32 | 2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold | needs-cell:presented | 83e282a → 0c439ad | — |
+| 32 | 2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold | calibrate | 83e282a → 0c439ad | CALIBRATED |
 | 33 | 2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet | calibrate | 23fb824 → ce33431 | CALIBRATED |
-| 34 | 2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar | needs-cell:presented | 4655113 → 753b560 | — |
+| 34 | 2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar | calibrate | 4655113 → 753b560 | CALIBRATED |
 | 35 | 2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done | calibrate | 173023f → 92f2a46 | CALIBRATED |
 | 36 | 2026-08-26-ios-ocr-crop-scale | needs-ocr | — | — |
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | DOES-NOT-FAIL |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
+| L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | open | working tree | OPEN-RED |
+| L4 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | open | working tree | OPEN-RED |
 
 ## 2: CALIBRATED (partial: stage A only)
 
@@ -100,6 +102,12 @@ The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc60
 
 Regressed elsewhere at 13d68a2 (green at 16ae6bb):
 
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu-grouped.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows 
+  - RED ios-iphone17-ios27/blur-menu.idb.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
+  - RED ios-iphone17-ios27/blur-menu.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
+  - RED ios-iphone17-ios27/blur-menu.wda.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
+  - RED ios-iphone17-ios27/blur-menu.wda.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
   - RED ios-iphone17-ios27/sheet-medium.wda.json S tap — not tapped: ERROR id:"lab.sheet-medium.S" is under container (8,415 386x451) at its centre (201,484), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — stopped: ERROR scroll_until id:"lab.sheet-medium.S" failed after 2 swipes — element is in the viewport but under container (8,415 386x451) at its centre (201,484), drawn over it — 0% of it shows — and the cont
 
@@ -108,8 +116,32 @@ Regressions recorded:
 - ios-iphone17-ios27/sheet-medium.wda.json S tap, ios-iphone17-ios27/sheet-medium.wda.json S scroll_until: broke at 13d68a2, fixed at 81a7d62 — the sheet's frames-only background container read as a cover over its own button (#18)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: green at 13d68a2, Tapped at b75b8b5 (fix/r5-cr) … dff7381, green again at 8c0fb41 (fix/r6-ios-top)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2
+- ios-iphone17-ios27/blur-menu.idb.json W tap, ios-iphone17-ios27/blur-menu.idb.json W scroll_until, ios-iphone17-ios27/blur-menu.wda.json W tap, ios-iphone17-ios27/blur-menu.wda.json W scroll_until: broke at 13d68a2, not fixed — the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4
+- ios-iphone17-ios27/blur-menu-grouped.idb.json W tap, ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until: broke at 13d68a2, fixed at 8a55d2b — the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
+
+## 15: CALIBRATED
+
+2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md — defect: `under button`
+
+- before 20053ae:
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu-grouped.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows 
+- after 8a55d2b:
+  - ok ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — Tapped id:"lab.blur-menu-grouped.W"
+  - ok ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — Element id:"lab.blur-menu-grouped.W" fully visible after 0 swipes
+
+Regressed elsewhere at 8a55d2b (green at 20053ae):
+
+  - RED ios-iphone17-ios27/form-keyboard.idb.json phone tap — Tapped: Tapped id:"lab.form-keyboard.phone"
+  - RED ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until — reached with no swipe where a tap fires submit invalid: Element id:"lab.form-keyboard.phone" fully visible after 0 swipes
+
+Regressions recorded:
+
+- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since — lab note L2 (#6 records it too)
+
+presented/blur-menu-grouped: the menu card and the screen beneath it each an accessibility container, the card's first, so idb lists its rows K, W before A–D, and A (top 110, above W's 448) is ADR 0015's reading break — mp-native's chooser shape. W's colour row is green on both sides (no evidence). The ungrouped blur-menu lists the targets in reading order (A, B, K, W, C, D): no break, W refused at every commit — lab note L4. The analysis' 'regression dd50327→2f98900 (8c0fb41?)' is the idb pinned-bar row (L2): Tapped from b75b8b5 to dff7381, refused at 8c0fb41 — verified by a first-parent bisect over golden. 8a55d2b itself re-breaks it (recorded in regressions, as in #6's).
 
 ## 16: CALIBRATED-ON-DEFECT
 
@@ -147,7 +179,20 @@ Needs: The text field's scroll indicator half needs a false-covers/own-parts cel
 
 The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note.
 
-## 22: CALIBRATED (partial: the overlay half only)
+## 20: CALIBRATED (partial: R-off only)
+
+2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md — defect: `^Tapped|no swipe`
+
+- before 7566443:
+  - RED ios-iphone17-ios27/sheet-long-list.wda.json F tap — Tapped: Tapped id:"lab.sheet-long-list.F"
+  - RED ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until — no swipe: Element id:"lab.sheet-long-list.F" fully visible after 0 swipes
+- after 83e282a:
+  - ok ios-iphone17-ios27/sheet-long-list.wda.json F tap — ERROR id:"lab.sheet-long-list.F" is off screen at (201,1374) on a 402x874 screen (rect 0,1342 402x64) — scroll_until it first; nothing was tapped
+  - ok ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-long-list.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 402x874 viewpor
+
+presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Only R-off is asked: F lies off the screen, which takes precedence over outside its scroll view (truth.ts#geometryOf) — the note's own call, `fully: true`, is R-fully's and not asked of an off-screen target (partial); the plain stop asked by R-stroke shows the same 'fully visible after 0 swipes'. Before: tap Tapped at the parked point, scroll_until (R-stroke) 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). No idb evidence: idb lists the table's labels without their identifiers and no row below the fold (KNOWN).
+
+## 22: CALIBRATED-ON-DEFECT (partial: the overlay half only)
 
 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md — defect: `measured the layer over the target as the target`
 
@@ -157,37 +202,101 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - RED ios-iphone17-ios27/sheet-medium.wda.json C colour — passed on #8E24AA: it measured the layer over the target as the target
   - RED ios-iphone17-ios27/sheet-medium.wda.json D colour — passed on #FFB955: it measured the layer over the target as the target
 - after 596a379:
-  - ok ios-iphone17-ios27/sheet-medium.wda.json A colour — FAIL  element id:"lab.sheet-medium.A" fill within dE00 8 of #B72E2A — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,110 300x64) — the capture would show it, not the element; scroll
-  - ok ios-iphone17-ios27/sheet-medium.wda.json B colour — FAIL  element id:"lab.sheet-medium.B" fill within dE00 8 of #186DB7 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show it, not the element; scroll
-  - ok ios-iphone17-ios27/sheet-medium.wda.json C colour — FAIL  element id:"lab.sheet-medium.C" fill within dE00 8 of #8E24AA — button "Target S" (56,453 290x62) is drawn over the element (element 51,470 300x64) — the capture would show it, not the element; scroll_until the ele
-  - ok ios-iphone17-ios27/sheet-medium.wda.json D colour — FAIL  element id:"lab.sheet-medium.D" fill within dE00 8 of #FFB955 — container (8,415 386x451) is drawn over the element (element 51,650 300x64) — the capture would show it, not the element; scroll_until the element wit
+  - RED ios-iphone17-ios27/sheet-medium.wda.json A colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.A" fill within dE00 8 of #B72E2A — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,110 300x64) — the capture would show it, not
+  - RED ios-iphone17-ios27/sheet-medium.wda.json B colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.B" fill within dE00 8 of #186DB7 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show it, not
+  - RED ios-iphone17-ios27/sheet-medium.wda.json C colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.C" fill within dE00 8 of #8E24AA — button "Target S" (56,453 290x62) is drawn over the element (element 51,470 300x64) — the capture would show it, not the element; 
+  - RED ios-iphone17-ios27/sheet-medium.wda.json D colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.D" fill within dE00 8 of #FFB955 — container (8,415 386x451) is drawn over the element (element 51,650 300x64) — the capture would show it, not the element; scroll_u
+
+Regressed elsewhere at 596a379 (green at ad7ed11):
+
+  - RED ios-iphone17-ios27/blur-menu.idb.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
+  - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
+
+Regressions recorded:
+
+- ios-iphone17-ios27/blur-menu.idb.json W colour, ios-iphone17-ios27/blur-menu.wda.json W colour: broke at 596a379, not fixed — the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4
 
 Needs: The note's own shapes — the status bar and a pinned button drawn over the element — need bars/bands and a pinned-bar colour row.
 
-Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element.
+Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks "close it first" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT.
 
-## 28: DOES-NOT-FAIL
+## 27: CALIBRATED
+
+2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md — defect: `^Tapped|measured the layer over the target as the target|fully visible`
+
+- before 53da035:
+  - RED ios-iphone17-ios27/dim-cover.wda.json A tap — Tapped: Tapped id:"lab.dim-cover.A"
+  - RED ios-iphone17-ios27/dim-cover.wda.json A colour — passed on #892220: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/dim-cover.wda.json A scroll_until — no "close it first": Element id:"lab.dim-cover.A" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/dim-cover.wda.json B tap — Tapped: Tapped id:"lab.dim-cover.B"
+  - RED ios-iphone17-ios27/dim-cover.wda.json B colour — passed on #125289: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/dim-cover.wda.json B scroll_until — no "close it first": Element id:"lab.dim-cover.B" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/dim-cover.wda.json C tap — Tapped: Tapped id:"lab.dim-cover.C"
+  - RED ios-iphone17-ios27/dim-cover.wda.json C colour — passed on #28602B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/dim-cover.wda.json C scroll_until — no "close it first": Element id:"lab.dim-cover.C" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/dim-cover.wda.json D tap — Tapped: Tapped id:"lab.dim-cover.D"
+  - RED ios-iphone17-ios27/dim-cover.wda.json D colour — passed on #975400: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/dim-cover.wda.json D scroll_until — no "close it first": Element id:"lab.dim-cover.D" fully visible after 0 swipes
+- after 41c394a (not the note's fix: 15896c5 fixed the note's Finportal tree, not this SwiftUI cover: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it):
+  - ok ios-iphone17-ios27/dim-cover.wda.json A tap — ERROR id:"lab.dim-cover.A" is under container (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from u
+  - ok ios-iphone17-ios27/dim-cover.wda.json A colour — FAIL  element id:"lab.dim-cover.A" fill within dE00 8 of #892220 — container (0,0 402x874) is drawn over the element (element 51,110 300x64) — the capture would show it, not the element; a screen is presented over the el
+  - ok ios-iphone17-ios27/dim-cover.wda.json A scroll_until — ERROR scroll_until id:"lab.dim-cover.A" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,142), drawn over it — 0% of it shows — a screen is presented over it (a m
+  - ok ios-iphone17-ios27/dim-cover.wda.json B tap — ERROR id:"lab.dim-cover.B" is under container (0,0 402x874) at its centre (201,322), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from u
+  - ok ios-iphone17-ios27/dim-cover.wda.json B colour — FAIL  element id:"lab.dim-cover.B" fill within dE00 8 of #125289 — container (0,0 402x874) is drawn over the element (element 51,290 300x64) — the capture would show it, not the element; a screen is presented over the el
+  - ok ios-iphone17-ios27/dim-cover.wda.json B scroll_until — ERROR scroll_until id:"lab.dim-cover.B" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,322), drawn over it — 0% of it shows — a screen is presented over it (a m
+  - ok ios-iphone17-ios27/dim-cover.wda.json C tap — ERROR id:"lab.dim-cover.C" is under container (0,0 402x874) at its centre (201,502), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from u
+  - ok ios-iphone17-ios27/dim-cover.wda.json C colour — FAIL  element id:"lab.dim-cover.C" fill within dE00 8 of #28602B — container (0,0 402x874) is drawn over the element (element 51,470 300x64) — the capture would show it, not the element; a screen is presented over the el
+  - ok ios-iphone17-ios27/dim-cover.wda.json C scroll_until — ERROR scroll_until id:"lab.dim-cover.C" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,502), drawn over it — 0% of it shows — a screen is presented over it (a m
+  - ok ios-iphone17-ios27/dim-cover.wda.json D tap — ERROR id:"lab.dim-cover.D" is under container (0,0 402x874) at its centre (201,682), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from u
+  - ok ios-iphone17-ios27/dim-cover.wda.json D colour — FAIL  element id:"lab.dim-cover.D" fill within dE00 8 of #975400 — container (0,0 402x874) is drawn over the element (element 51,650 300x64) — the capture would show it, not the element; a screen is presented over the el
+  - ok ios-iphone17-ios27/dim-cover.wda.json D scroll_until — ERROR scroll_until id:"lab.dim-cover.D" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,682), drawn over it — 0% of it shows — a screen is presented over it (a m
+
+presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root a screen-sized identified container dimming the screen and holding a card (an RN transparent Modal's shape). The note's own fix, 15896c5, is NOT verified on this cell (afterNotFix): the after side is 41c394a, the commit that cured the cell's shape. 15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped.
+
+## 28: CALIBRATED
 
 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md — defect: `^Tapped|fully visible`
 
 - before 53da035:
-  - RED ios-iphone17-ios27/form-picker.wda.json name tap — refused without "close it first": ERROR id:"lab.form-picker.name" is under button "Albania" (0,132 402x52) at its centre (201,177), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
-  - RED ios-iphone17-ios27/form-picker.wda.json name scroll_until — swiped 3× beneath the sheet: ERROR scroll_until id:"lab.form-picker.name" failed after 3 swipes — element is in the viewport but under button "Albania" (0,132 402x52) at its centre (201,177), drawn over it — 0% of it shows — and 
-  - RED ios-iphone17-ios27/form-picker.wda.json country tap — refused without "close it first": ERROR id:"lab.form-picker.country" is under button "Andorra" (0,236 402x52) at its centre (201,251), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
-  - RED ios-iphone17-ios27/form-picker.wda.json country scroll_until — swiped 3× beneath the sheet: ERROR scroll_until id:"lab.form-picker.country" failed after 3 swipes — element is in the viewport but under button "Andorra" (0,236 402x52) at its centre (201,251), drawn over it — 0% of it shows — a
-  - RED ios-iphone17-ios27/form-picker.wda.json submit tap — refused without "close it first": ERROR id:"lab.form-picker.submit" is under button "Austria" (0,288 402x52) at its centre (201,316), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
-  - RED ios-iphone17-ios27/form-picker.wda.json submit scroll_until — swiped 3× beneath the sheet: ERROR scroll_until id:"lab.form-picker.submit" failed after 3 swipes — element is in the viewport but under button "Austria" (0,288 402x52) at its centre (201,316), drawn over it — 0% of it shows — an
-- after 15896c5:
-  - ok ios-iphone17-ios27/form-picker.wda.json name tap — ERROR id:"lab.form-picker.name" is under button "Albania" (0,132 402x52) at its centre (201,177), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves 
-  - ok ios-iphone17-ios27/form-picker.wda.json name scroll_until — ERROR scroll_until id:"lab.form-picker.name" stopped before any swipe — element is in the viewport but under button "Albania" (0,132 402x52) at its centre (201,177), drawn over it — 0% of it shows — a screen is presented
-  - ok ios-iphone17-ios27/form-picker.wda.json country tap — ERROR id:"lab.form-picker.country" is under button "Andorra" (0,236 402x52) at its centre (201,251), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll mov
-  - ok ios-iphone17-ios27/form-picker.wda.json country scroll_until — ERROR scroll_until id:"lab.form-picker.country" stopped before any swipe — element is in the viewport but under button "Andorra" (0,236 402x52) at its centre (201,251), drawn over it — 0% of it shows — a screen is presen
-  - ok ios-iphone17-ios27/form-picker.wda.json submit tap — ERROR id:"lab.form-picker.submit" is under button "Austria" (0,288 402x52) at its centre (201,316), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
-  - ok ios-iphone17-ios27/form-picker.wda.json submit scroll_until — ERROR scroll_until id:"lab.form-picker.submit" stopped before any swipe — element is in the viewport but under button "Austria" (0,288 402x52) at its centre (201,316), drawn over it — 0% of it shows — a screen is present
+  - RED ios-iphone17-ios27/sheet-background.wda.json B tap — Tapped: Tapped id:"lab.sheet-background.B"
+  - RED ios-iphone17-ios27/sheet-background.wda.json B scroll_until — no "close it first": Element id:"lab.sheet-background.B" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/sheet-background.wda.json C tap — Tapped: Tapped id:"lab.sheet-background.C"
+  - RED ios-iphone17-ios27/sheet-background.wda.json C scroll_until — no "close it first": Element id:"lab.sheet-background.C" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/sheet-background.wda.json D tap — Tapped: Tapped id:"lab.sheet-background.D"
+  - RED ios-iphone17-ios27/sheet-background.wda.json D scroll_until — no "close it first": Element id:"lab.sheet-background.D" fully visible after 0 swipes
+- after 41c394a (not the note's fix: 15896c5 fixed the note's Contacts tree, not this SwiftUI sheet: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it):
+  - ok ios-iphone17-ios27/sheet-background.wda.json B tap — ERROR id:"lab.sheet-background.B" is under container (0,0 402x874) at its centre (201,322), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out
+  - ok ios-iphone17-ios27/sheet-background.wda.json B scroll_until — ERROR scroll_until id:"lab.sheet-background.B" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,322), drawn over it — 0% of it shows — a screen is presented over 
+  - ok ios-iphone17-ios27/sheet-background.wda.json C tap — ERROR id:"lab.sheet-background.C" is under container (0,0 402x874) at its centre (201,502), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out
+  - ok ios-iphone17-ios27/sheet-background.wda.json C scroll_until — ERROR scroll_until id:"lab.sheet-background.C" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,502), drawn over it — 0% of it shows — a screen is presented over 
+  - ok ios-iphone17-ios27/sheet-background.wda.json D tap — ERROR id:"lab.sheet-background.D" is under container (0,0 402x874) at its centre (201,682), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out
+  - ok ios-iphone17-ios27/sheet-background.wda.json D scroll_until — ERROR scroll_until id:"lab.sheet-background.D" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,682), drawn over it — 0% of it shows — a screen is presented over 
 
-Needs: presented/sheet-background: a page sheet whose bare background (no node of its own content) lies over a target of the screen beneath; rows: tap refused (not Tapped), scroll_until not 'fully visible' beneath the sheet. form-picker's picker sheet puts its rows over every target, so a row's refusal names the row, never the sheet's background.
+presented/sheet-background: a large sheet whose only content, S, lies at its top over A; B, C, D lie under its bare background. Before (53da035): Tapped, fully visible. The note's own fix, 15896c5, is NOT verified on this cell (afterNotFix): the after side is 41c394a, the commit that cured the cell's shape. Was DOES-NOT-FAIL on form-picker (whose picker rows lie over every target, so a refusal named a row; the first B0 run's CALIBRATED there was corrected by review round 1) — the cell this note needed.
 
-The country picker sheet over the form. The note's symptom is Tapped / fully visible beneath a sheet where only its background lies over the target. At 2ae8b10 these rows answered so; by 53da035 (before the fix) they are already refused, as under a picker row — red only on the remedy's wording ('scroll_until it first', not 'close it first') and on the swipe beneath the sheet, which are #33's defect, not this note's. So this cell does not fail for #28.
+## 30: CALIBRATED
+
+2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md — defect: `measured the layer over the target as the target`
+
+- before 4655113:
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E colour — passed on #327735: it measured the layer over the target as the target
+- after 753b560:
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json E colour — FAIL  element id:"lab.sheet-medium-edges.E" fill within dE00 8 of #327735 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,869 300x64) — the capture would show it, not the element; 
+
+presented/sheet-medium-edges: E shows 5 pt at the screen's bottom beneath the medium sheet's dim. Before: PASS on the dim's colour; after: fails closed, close it first. Red again from 41c394a (fix/r20-marks) — 'failed without "close it first"', not this note's PASS — lab note L3.
+
+## 32: CALIBRATED
+
+2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md — defect: `swiped \d+× beneath`
+
+- before 83e282a:
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.H" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+- after 0c439ad:
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.F" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (-402,-874 1206x2622) — a screen 
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.H" stopped before any swipe — element lies above the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (-402,-874 1206x2622) — a screen 
+
+presented/sheet-medium-edges: F wholly below, H wholly above the screen, beneath the medium sheet. Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3.
 
 ## 33: CALIBRATED
 
@@ -213,6 +322,23 @@ The country picker sheet over the form. The note's symptom is Tapped / fully vis
   - ok ios-iphone17-ios27/sheet-medium.wda.json D scroll_until — ERROR scroll_until id:"lab.sheet-medium.D" stopped before any swipe — element is in the viewport but under container (8,415 386x451) at its centre (201,682), drawn over it — 0% of it shows — a screen is presented over it
 
 The note's symptom is both halves: a tap beneath the sheet refused with scroll advice ('scroll_until it first'; D, under the sheet's wrapper: 'scroll_until this element out of the wrapper's band first') where the sheet is a presented screen to close, and scroll_until swiping beneath it. Every row is red before on that symptom and green after.
+
+## 34: CALIBRATED
+
+2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md — defect: `without "close it first"`
+
+- before 4655113:
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.H" is off screen at (201,-56) on a 402x874 screen (rect 51,-88 300x64) — scroll_until it first; nothing was tapped
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.G" is under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 51,-20 300x64) — it lies in a scroll view — 
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — scroll_until it first; nothing was tapped
+- after 753b560:
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json H tap — ERROR id:"lab.sheet-medium-edges.H" is off screen at (201,-56) on a 402x874 screen (rect 51,-88 300x64) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json G tap — ERROR id:"lab.sheet-medium-edges.G" is under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 51,-20 300x64) — a screen is presented over it (a modal or a she
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the element; a screen i
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that scre
+
+presented/sheet-medium-edges: H wholly above, F wholly below the screen, G wholly under the status bar, beneath the medium sheet; the colour row asks the remedy too (golden-spec/presented.ts). Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3.
 
 ## 35: CALIBRATED
 
@@ -308,6 +434,52 @@ Regressions recorded:
 
 No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed row.
 
+## L3: OPEN-RED
+
+2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md — defect: `without "close it first"|swiped \d+× beneath a presented layer`
+
+- working tree:
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.H" is off screen at (201,-56) on a 402x874 screen (rect 51,-88 300x64) — scroll_until it first; nothing was tapped
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.H" fill within dE00 8 of #E53935 — nothing of the element lies on the screen (element 51,-88 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until th
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.H" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.G" is under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 51,-20 300x64) — it lies in a scroll view — 
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.G" failed after 3 swipes — its centre stays under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.E" is off screen at (201,901) on a 402x874 screen — only 8% of it (rect 51,869 300x64) is on screen, and a tap goes to its centre — scroll_until it with fully: true fi
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.E" fill within dE00 8 of #327735 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,869 300x64) — the capture would show i
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.E" failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 8% of it is in the viewport, and the content is exhausted: swiping down no lo
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — scroll_until it first; nothing was tapped
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.F" fill within dE00 8 of #FB8C00 — nothing of the element lies on the screen (element 51,1009 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until t
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.M" is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.M" fill within dE00 8 of #721D88 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show i
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.M" failed after 3 swipes — element is in the viewport but under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it — 0
+
+No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there). M, whole on the screen under the dim, is the cell's positive control (its probe delivered) and is red the same way.
+
+## L4: OPEN-RED
+
+2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md — defect: `under button|button "Target C"|^Tapped|passed on #00897B|fully visible`
+
+- working tree:
+  - RED ios-iphone17-ios27/blur-menu.idb.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
+  - RED ios-iphone17-ios27/blur-menu.idb.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
+  - RED ios-iphone17-ios27/blur-menu.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 3 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
+  - RED ios-iphone17-ios27/blur-menu.wda.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
+  - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
+  - RED ios-iphone17-ios27/blur-menu.wda.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 3 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
+  - RED ios-iphone17-ios27/blur-menu.idb.json C tap — Tapped: Tapped id:"lab.blur-menu.C"
+  - RED ios-iphone17-ios27/blur-menu.idb.json C colour — passed on #00897B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/blur-menu.idb.json C scroll_until — no "close it first": Element id:"lab.blur-menu.C" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/blur-menu.wda.json C tap — Tapped: Tapped id:"lab.blur-menu.C"
+  - RED ios-iphone17-ios27/blur-menu.wda.json C colour — passed on #00897B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/blur-menu.wda.json C scroll_until — no "close it first": Element id:"lab.blur-menu.C" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json C tap — Tapped: Tapped id:"lab.blur-menu-grouped.C"
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json C colour — passed on #00897B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until — no "close it first": Element id:"lab.blur-menu-grouped.C" fully visible after 0 swipes
+
+No fix yet: red at HEAD, both ways. W (the menu row, listed just before C) refused under C: tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b — a false refusal. C (listed after W, which is drawn over its centre) Tapped / a PASS on W's colour / fully visible — the unsafe direction, also on blur-menu-grouped's idb list. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none.
+
 ## Not reproducible with the existing cells
 
 - 1 2026-10-05-android-floating-gboard-keyboard.md: needs-2b
@@ -321,19 +493,13 @@ No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed r
 - 12 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md: needs-cell:edges — edges/scroll-bounded (Android): a row cut flush at its scroll container's edge; rows: R-fully.
 - 13 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md: needs-cell:edges — edges/scroll-bounded (Android): a row showing a sliver at the container's edge; rows: R-sliver (tap refused).
 - 14 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md: needs-cell:bars — bars/tabbar-floating (iOS): a row under the floating bar's surface above its buttons; rows: R-under-chrome.
-- 15 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md: needs-cell:presented — presented/blur-menu or a chooser idb lists before the content behind it; the lab's idb presented cells list only the presented layer, so the order is never asked.
 - 17 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md: needs-live — edges/scroll-top-edge for the static half (a row resting in the status band); the turn-back itself is a dynamic (phase 5).
 - 19 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md: needs-cell:false-covers — false-covers/toolbar-dismiss with a config variant (an itemless WDA toolbar over the dismissal tap); rows: R-dismiss.
-- 20 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md: needs-cell:presented — presented/sheet-long-list: a sheet whose below-the-fold cells WDA lists (form-picker's ST is not in the tree, WDA or idb); rows: R-off, R-outside-sv.
 - 21 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md: needs-cell:bars — bars/bands (Android, edge-to-edge): a target under the status bar; rows: R-band; the swallowed probe accepted in consistency().
 - 23 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md: needs-ocr — bars/bands (Android navigation bar) and OCR judged on real pixels (phase 4).
 - 24 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md: residual:accepted (round 13: the FAB host layer is a cover) — bars/fab — to pin the accepted behaviour as KNOWN, not to turn it green.
 - 25 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped.md: residual:ADR 0007 (idb's QuickType bar)
 - 26 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md: needs-cell:bars — bars/tabbar-hidden-push: a pushed screen over a hidden host tab bar; rows: tap Tapped on the rows behind the phantom bar.
-- 27 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md: needs-cell:presented — presented/dim-cover: an RN-style transparent modal's screen-filling dimming leaf (unless the existing RN trees cover it).
 - 29 2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md: needs-cell:edges — edges/scroll-bounded: a row outside its scroll view's clip but on the screen; rows: R-outside-sv (colour fails closed).
-- 30 2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md: needs-cell:presented — presented/sheet-medium-edges: a target showing a sliver beside the sheet; rows: R-sliver, R-presented colour.
-- 31 2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md: residual:open (the blur overlay has no node in either tree) — presented/blur-menu — to pin it as KNOWN.
-- 32 2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md: needs-cell:presented — presented/sheet-medium-edges: a target below the fold beneath a sheet; rows: R-presented scroll_until (no stroke).
-- 34 2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md: needs-cell:presented — presented/sheet-medium-edges: a target beneath a sheet wholly off screen or wholly under the status bar; rows: R-presented tap and colour.
+- 31 2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md: residual:open (the blur overlay has no node in either tree)
 - 36 2026-08-26-ios-ocr-crop-scale.md: needs-ocr

@@ -60,7 +60,8 @@ describe('calibration.json', () => {
       ...[...(e.fix ?? []), e.before, e.after, ...(e.regressions ?? []).flatMap((r) => [r.broke, r.fixed])]
         .filter((s): s is string => s !== undefined && !SHA.test(s))
         .map((s) => `${e.n}: ${s} is no short SHA`),
-      ...(e.after !== undefined && !(e.fix ?? []).includes(e.after) ? [`${e.n}: after ${e.after} is none of its fix commits`] : []),
+      ...(e.after !== undefined && !(e.fix ?? []).includes(e.after) && e.afterNotFix === undefined ? [`${e.n}: after ${e.after} is none of its fix commits, and afterNotFix says not why`] : []),
+      ...(e.afterNotFix !== undefined && (e.after === undefined || (e.fix ?? []).includes(e.after)) ? [`${e.n}: afterNotFix, but after ${e.after} is a fix commit`] : []),
     ]);
     expect(bad).toEqual([]);
   });
@@ -234,6 +235,13 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
     const partial = results([entry({ partial: 'stage A only' })], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]]))[0];
     expect(verdictCell(partial)).toBe('CALIBRATED (partial: stage A only)');
     expect(calibrationReport([partial])).toContain('| x | x | calibrate | aaaaaaa → bbbbbbb | CALIBRATED (partial: stage A only) |');
+  });
+
+  it('an after side that is not the note\'s fix (afterNotFix) is said so in the table and the section', () => {
+    const cured = results([entry({ fix: ['ccccccc'], afterNotFix: 'ccccccc fixed the device tree only' })], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]]))[0];
+    const report = calibrationReport([cured]);
+    expect(report).toContain("| aaaaaaa → bbbbbbb (the note's fix ccccccc does not cure this cell) | CALIBRATED |");
+    expect(report).toContain("- after bbbbbbb (not the note's fix: ccccccc fixed the device tree only):");
   });
 });
 

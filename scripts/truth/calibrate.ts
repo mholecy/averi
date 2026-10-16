@@ -91,8 +91,14 @@ export interface CalibrationEntry {
   status: string;
   fix?: string[];
   before?: string;
-  /** The commit judged green: a fix commit (usually the first). */
+  /** The commit judged green: a fix commit (usually the first) — or, with `afterNotFix`, the commit that cured the cell. */
   after?: string;
+  /**
+   * Why `after` is none of the note's `fix` commits: the note's fix cured the device's tree but not the lab cell's
+   * shape, which a later commit cured (#27, #28: 15896c5 fixed the device trees; the lab's SwiftUI shapes are green from
+   * 41c394a). The report says so beside the sides, so the table never reads as if the note's fix were verified.
+   */
+  afterNotFix?: string;
   verified?: 'golden' | 'merge-subject' | 'unverified';
   /**
    * Golden rows, `<run>/<file> <target> <verb>` as the ratchet keys them (tests/differential/golden/<family>.known.ts).

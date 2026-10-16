@@ -61,8 +61,9 @@ enum CellRouter {
         case "edges": EdgesScreen(cell: cell)
         case "bars": BarsScreen(cell: cell)
         case "false-covers": FalseCoversScreen(cell: cell)
-        // The coloured-target host (Base.swift) with the cell's layer (Presented.swift).
-        case "base", "presented": CellScreen(cell: cell)
+        // The coloured-target host (Base.swift); a presented cell's host and layer (Presented.swift).
+        case "base": CellScreen(cell: cell)
+        case "presented": PresentedScreen(cell: cell)
         default: UnbuiltCell(cell: cell)
         }
     }

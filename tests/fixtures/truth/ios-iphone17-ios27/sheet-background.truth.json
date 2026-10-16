@@ -1,0 +1,121 @@
+{
+  "cell": "sheet-background",
+  "layer": "sheet-large",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.sheet-background.A",
+      "color": "#E53935",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 110
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,142.0"
+        },
+        {
+          "kind": "tap",
+          "tag": "S"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#8E24AA"
+    },
+    {
+      "tag": "B",
+      "id": "lab.sheet-background.B",
+      "color": "#1E88E5",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 290
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,322.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#FFFFFF"
+    },
+    {
+      "tag": "C",
+      "id": "lab.sheet-background.C",
+      "color": "#43A047",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 470
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,502.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#FFFFFF"
+    },
+    {
+      "tag": "D",
+      "id": "lab.sheet-background.D",
+      "color": "#FB8C00",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 650
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,682.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#FFFFFF"
+    },
+    {
+      "tag": "S",
+      "id": "lab.sheet-background.S",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 102
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,134.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#8E24AA"
+    }
+  ]
+}

@@ -14,7 +14,7 @@ import type { Expectation } from './golden-spec/judges.js';
  * | truth | tap | colour assert | scroll_until down |
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
- * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
+ * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover — naming `close it first`; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
  *
  * A row is added with the cells that need it — except phase 3's row types (golden-spec/rows.ts), which B1 (the plan's
  * phase 3) declared ahead of their cells so that the families can be built in parallel: a row type asks nothing until a

@@ -71,6 +71,138 @@
       "truth": "alert-dim.truth.json"
     },
     {
+      "file": "sheet-medium-edges.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-medium-edges.png",
+      "truth": "sheet-medium-edges.truth.json"
+    },
+    {
+      "file": "sheet-medium-edges.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-medium-edges.png",
+      "truth": "sheet-medium-edges.truth.json"
+    },
+    {
+      "file": "sheet-background.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-background.png",
+      "truth": "sheet-background.truth.json"
+    },
+    {
+      "file": "sheet-background.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-background.png",
+      "truth": "sheet-background.truth.json"
+    },
+    {
+      "file": "sheet-long-list.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-long-list.png",
+      "truth": "sheet-long-list.truth.json"
+    },
+    {
+      "file": "sheet-long-list.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-long-list.png",
+      "truth": "sheet-long-list.truth.json"
+    },
+    {
+      "file": "dim-cover.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "dim-cover.png",
+      "truth": "dim-cover.truth.json"
+    },
+    {
+      "file": "dim-cover.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "dim-cover.png",
+      "truth": "dim-cover.truth.json"
+    },
+    {
+      "file": "blur-menu.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu.png",
+      "truth": "blur-menu.truth.json"
+    },
+    {
+      "file": "blur-menu.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu.png",
+      "truth": "blur-menu.truth.json"
+    },
+    {
+      "file": "blur-menu-grouped.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu-grouped.png",
+      "truth": "blur-menu-grouped.truth.json"
+    },
+    {
+      "file": "blur-menu-grouped.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu-grouped.png",
+      "truth": "blur-menu-grouped.truth.json"
+    },
+    {
       "file": "form-basic.wda.json",
       "source": "wda",
       "form": "raw",
