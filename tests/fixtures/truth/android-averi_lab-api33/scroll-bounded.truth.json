@@ -41,7 +41,10 @@
         "width": 825,
         "height": 176
       },
-      "scrollView": "upper"
+      "scrollView": "upper",
+      "listed": {
+        "uiautomator": true
+      }
     },
     {
       "tag": "P",
@@ -77,6 +80,9 @@
         "height": 110
       },
       "scrollView": "upper",
+      "listed": {
+        "uiautomator": true
+      },
       "reachedAtPiece": true
     },
     {
@@ -113,6 +119,9 @@
         "height": 22
       },
       "scrollView": "lower",
+      "listed": {
+        "uiautomator": true
+      },
       "reachedAtPiece": true
     },
     {
@@ -138,7 +147,10 @@
       "geometry": "outside-scroll-view",
       "visible": null,
       "piece": null,
-      "scrollView": "lower"
+      "scrollView": "lower",
+      "listed": {
+        "uiautomator": false
+      }
     },
     {
       "tag": "F",
@@ -159,6 +171,9 @@
       "visible": null,
       "piece": null,
       "scrollView": "lower",
+      "listed": {
+        "uiautomator": false
+      },
       "unprobed": "its centre (541,3884) lies off the 1080x2220 screen"
     }
   ],

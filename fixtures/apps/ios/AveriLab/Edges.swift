@@ -36,12 +36,12 @@ enum EdgeLayout {
                 EdgeScroller(id: "lower", top: 380, height: 180, content: 1300, offset: 0, rows: [("S", 172), ("O", 240), ("F", 1000)]),
             ]
         case "scroll-top-edge":
-            // page, the whole screen, scrolled 358: A above the screen (-258 – -194: off-screen); T resting in the
-            // status band, its centre 54 in it (22–86: status-band, #17's static half). Not higher: a tap in the status
-            // bar itself (y 12, 30 measured on iOS 27) never reaches the app's window — it scrolls the page to its top
-            // instead — so a probe there would leave no touch; at 54 its touch is the app's. Edges.kt scrolls 400 dp
-            // (T -20–44 dp, its centre 12 dp inside Android's 24-dp status bar, whose probe is swallowed).
-            return [EdgeScroller(id: "page", top: 0, height: nil, content: 2400, offset: 358, rows: [("A", 100), ("T", 380)])]
+            // page, the whole screen, scrolled 382: A above the screen (-282 – -218: off-screen); T resting in the
+            // status band, cut by the screen's top (-2–62), its centre 30 under the status bar itself: status-band,
+            // #17's static half. A raw tap there never reaches the app's window (measured on iOS 27: y ≤ 50 logs no
+            // touch, ≥ 55 does — truth.ts#statusBarMaySwallow), so its probe is the bar's, as on Android. Edges.kt
+            // scrolls 400 dp (T -20–44 dp, its centre 12 dp inside Android's 24-dp status bar).
+            return [EdgeScroller(id: "page", top: 0, height: nil, content: 2400, offset: 382, rows: [("A", 100), ("T", 380)])]
         default:
             return []
         }

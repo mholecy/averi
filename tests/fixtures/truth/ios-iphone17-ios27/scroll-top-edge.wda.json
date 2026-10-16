@@ -85,11 +85,11 @@
               "children": [
                {
                 "customActions": null,
-                "nativeFrame": "{{0, -358}, {402, 2400}}",
+                "nativeFrame": "{{0, -382}, {402, 2400}}",
                 "label": null,
                 "rawIdentifier": null,
                 "traits": "",
-                "frame": "{{0, -358}, {402, 2400}}",
+                "frame": "{{0, -382}, {402, 2400}}",
                 "isVisible": "1",
                 "type": "Other",
                 "value": null,
@@ -97,11 +97,11 @@
                 "children": [
                  {
                   "customActions": null,
-                  "nativeFrame": "{{51, -258}, {300, 64}}",
+                  "nativeFrame": "{{51, -282}, {300, 64}}",
                   "label": "Target A",
                   "rawIdentifier": "lab.scroll-top-edge.A",
                   "traits": "Button",
-                  "frame": "{{51, -258}, {300, 64}}",
+                  "frame": "{{51, -282}, {300, 64}}",
                   "isVisible": "0",
                   "type": "Button",
                   "value": null,
@@ -111,7 +111,7 @@
                   "isFocused": "0",
                   "name": "lab.scroll-top-edge.A",
                   "rect": {
-                   "y": -258,
+                   "y": -282,
                    "x": 51,
                    "width": 300,
                    "height": 64
@@ -119,11 +119,11 @@
                  },
                  {
                   "customActions": null,
-                  "nativeFrame": "{{51, 22}, {300, 64}}",
+                  "nativeFrame": "{{51, -2}, {300, 64}}",
                   "label": "Target T",
                   "rawIdentifier": "lab.scroll-top-edge.T",
                   "traits": "Button",
-                  "frame": "{{51, 22}, {300, 64}}",
+                  "frame": "{{51, -2}, {300, 64}}",
                   "isVisible": "1",
                   "type": "Button",
                   "value": null,
@@ -133,7 +133,7 @@
                   "isFocused": "0",
                   "name": "lab.scroll-top-edge.T",
                   "rect": {
-                   "y": 22,
+                   "y": -2,
                    "x": 51,
                    "width": 300,
                    "height": 64
@@ -145,7 +145,7 @@
                 "isFocused": "0",
                 "name": null,
                 "rect": {
-                 "y": -358,
+                 "y": -382,
                  "x": 0,
                  "width": 402,
                  "height": 2400

@@ -63,7 +63,7 @@ private fun scrollersOf(cell: String): List<EdgeScroller> = when (cell) {
         EdgeScroller("upper", 110.dp, 220.dp, 700.dp, 0.dp, listOf("W" to 10.dp, "P" to 180.dp)),
         EdgeScroller("lower", 380.dp, 180.dp, 1300.dp, 0.dp, listOf("S" to 172.dp, "O" to 240.dp, "F" to 1000.dp)),
     )
-    // Scrolled 400 dp, not iOS's 358: T (-20–44 dp) rests with its centre 12 dp inside the 24-dp status bar.
+    // Scrolled 400 dp, not iOS's 382: T (-20–44 dp) rests with its centre 12 dp inside the 24-dp status bar.
     "scroll-top-edge" -> listOf(EdgeScroller("page", 0.dp, null, 2400.dp, 400.dp, listOf("A" to 100.dp, "T" to 380.dp)))
     else -> emptyList()
 }

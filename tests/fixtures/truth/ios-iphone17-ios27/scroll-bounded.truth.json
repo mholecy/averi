@@ -41,7 +41,11 @@
         "width": 300,
         "height": 64
       },
-      "scrollView": "upper"
+      "scrollView": "upper",
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
     },
     {
       "tag": "P",
@@ -77,6 +81,10 @@
         "height": 40
       },
       "scrollView": "upper",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
       "reachedAtPiece": true
     },
     {
@@ -113,6 +121,10 @@
         "height": 8
       },
       "scrollView": "lower",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
       "reachedAtPiece": true
     },
     {
@@ -138,7 +150,11 @@
       "geometry": "outside-scroll-view",
       "visible": null,
       "piece": null,
-      "scrollView": "lower"
+      "scrollView": "lower",
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
     },
     {
       "tag": "F",
@@ -159,6 +175,10 @@
       "visible": null,
       "piece": null,
       "scrollView": "lower",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
       "unprobed": "its centre (201,1412) lies off the 402x874 screen"
     }
   ],

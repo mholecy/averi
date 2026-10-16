@@ -27,6 +27,9 @@
       "visible": null,
       "piece": null,
       "scrollView": "page",
+      "listed": {
+        "uiautomator": false
+      },
       "unprobed": "its centre (541,-737) lies off the 1080x2220 screen"
     },
     {
@@ -42,7 +45,7 @@
       },
       "reached": false,
       "probe": [],
-      "drawn": 0.663,
+      "drawn": 0.674,
       "seen": "#3949AB",
       "geometry": "status-band",
       "visible": {
@@ -58,6 +61,9 @@
         "height": 55
       },
       "scrollView": "page",
+      "listed": {
+        "uiautomator": true
+      },
       "reachedAtPiece": true
     }
   ],

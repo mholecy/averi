@@ -42,6 +42,10 @@
         "height": 40
       },
       "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
       "reachedAtPiece": true
     }
   ],

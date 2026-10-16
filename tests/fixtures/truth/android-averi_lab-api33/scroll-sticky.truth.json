@@ -42,6 +42,9 @@
         "height": 110
       },
       "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      },
       "reachedAtPiece": true
     }
   ],
