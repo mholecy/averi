@@ -13,6 +13,16 @@ import type { TreeRead } from './read-tree.js';
  * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and
  * its throw over it and judges nothing).
  *
+ * THE ONE SCREEN TYPE a judgement takes: `Scene.standing` takes it for every
+ * purpose — the touches read its `box`, `boxes` and bands, the pixel purpose
+ * its `oriented` — and `scroll_until`'s frame is one (the device as built,
+ * one box and no band, until a round reads one); the standing's narrowing
+ * of it to boxes and bands is private. Distinct from it, for a reason:
+ * adapters/types.ts#DeviceScreen is the device's raw size as the adapter
+ * read it, before any tree orients it (and the width/height of a cover's
+ * `above`), and interact/swipe.ts#ScreenBox is a usable screen with the
+ * note a gesture reply carries.
+ *
  * Contract:
  * - `oriented` — the device's screen (`DeviceAdapter.viewport()`, memoized
  *   by the adapter, in the tree's units), anchored at the origin and turned
@@ -72,7 +82,8 @@ export interface UsableScreen {
 /**
  * The usable screen for `read` (the tree the caller already read) on
  * `adapter`'s device — `usableScreenOf` over the device's size and the
- * tree's. A device whose size cannot be read is no device; undefined when
+ * tree's — a verb hands in its read's look (ui-tree/look.ts#Look, a
+ * TreeRead). A device whose size cannot be read is no device; undefined when
  * there is no usable screen at all. FAILS OPEN: a tree that cannot be sized
  * (a throw out of `inferScreenSize`) is no usable screen either, so a
  * judgement behaves as with no box rather than failing the verb.

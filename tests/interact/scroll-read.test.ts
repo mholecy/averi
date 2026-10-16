@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
 import { judgeRead, strokeLine, type ReadJudgement, type RoundRead } from '../../src/interact/scroll-read.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
-import type { StandingScreen } from '../../src/ui-tree/standing.js';
+import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { node } from '../helpers/fake.js';
 import { BACK, coverOver, match, NO_BACK, treeOf, type Row } from '../helpers/rounds.js';
 
@@ -18,7 +18,9 @@ import { BACK, coverOver, match, NO_BACK, treeOf, type Row } from '../helpers/ro
 
 const box = (width: number, height: number): Rect => ({ x: 0, y: 0, width, height });
 const PHONE = box(1000, 2000);
-const AS_BUILT: StandingScreen = { box: PHONE, boxes: [PHONE] };
+/** A usable screen of `boxes` (the first the box) and `bands`, from the device. */
+const screenOf = (boxes: Rect[], bands: Pick<UsableScreen, 'statusBand' | 'navigationBand'> = {}): UsableScreen => ({ box: boxes[0], boxes, oriented: boxes[0], from: 'device', ...bands });
+const AS_BUILT = screenOf([PHONE]);
 
 /** A read of `row`'s tree on `screen`, its reading's facts: no node the keyboard's, the cover's remedy (else the in-tree model's). */
 const readOf = (row: Row & { ofKeyboard?: (n: UiNode) => boolean }, screen: Rect = PHONE): RoundRead => ({
@@ -113,7 +115,7 @@ describe('judgeRead — what one read means, row by row', () => {
     const PAD = { x: 0, y: 590, width: 402, height: 284 };
     const keys = ['Q', 'W', 'E'].map((k, i) => node({ role: 'button', label: k, rect: { x: 2 + 40 * i, y: 780, width: 38, height: 46 } }));
     const bandRow = (row: Rect): Row => ({ flatList: true, found: [match(row)], over: [...keys, node({ role: 'other', rect: { ...PAD } })] });
-    const IDB: StandingScreen = { box: box(402, 874), boxes: [box(402, 874)] };
+    const IDB = screenOf([box(402, 874)]);
     it('a row under it: no ask, the band applied as the cover, the row judged under it, the line unwitnessed', () => {
       const j = judgeRead(readOf(bandRow({ x: 20, y: 700, width: 362, height: 50 }), box(402, 874)), IDB, false);
       expect(said(judged(j))).toEqual({
@@ -135,19 +137,19 @@ describe('judgeRead — what one read means, row by row', () => {
     const IPHONE = box(402, 874);
     it('below the status band, on each box\'s own shape: the upright box cut, the turned one (landscape) not', () => {
       const turned = box(874, 402);
-      const j = judged(judgeRead(readOf({ found: [match({ x: 0, y: 300, width: 100, height: 50 })] }, IPHONE), { box: IPHONE, boxes: [IPHONE, turned], statusBand: 62 }, false));
+      const j = judged(judgeRead(readOf({ found: [match({ x: 0, y: 300, width: 100, height: 50 })] }, IPHONE), screenOf([IPHONE, turned], { statusBand: 62 }), false));
       expect(j.frames).toEqual([{ x: 0, y: 62, width: 402, height: 812 }, turned]);
       expect(j.uncutFrames).toEqual(j.frames);
     });
     it('above a corroborated cover, below the status band', () => {
       const band = { x: 0, y: 500, width: 402, height: 374 };
       const read = readOf({ found: [match({ x: 0, y: 480, width: 100, height: 50 })], cover: coverOver(band) }, IPHONE);
-      const j = judged(judgeRead(read, { box: IPHONE, boxes: [IPHONE], statusBand: 62 }, false, true));
+      const j = judged(judgeRead(read, screenOf([IPHONE], { statusBand: 62 }), false, true));
       expect(j.frames).toEqual([{ x: 0, y: 62, width: 402, height: 438 }]);
     });
     describe('a match across the navigation band\'s top (Android, 66-px bands on 1080x2220)', () => {
       const PIXEL = box(1080, 2220);
-      const SCREEN: StandingScreen = { box: PIXEL, boxes: [PIXEL], statusBand: 66, navigationBand: 2154 };
+      const SCREEN = screenOf([PIXEL], { statusBand: 66, navigationBand: 2154 });
       const read = readOf({ found: [match({ x: 0, y: 2100, width: 1080, height: 100 })], remedy: BACK }, PIXEL);
       const belowStatus = { x: 0, y: 66, width: 1080, height: 2154 };
       it('a `fully` stop the band\'s region refused: the frames cut above the navigation band too, the short-of frames not', () => {
@@ -175,14 +177,14 @@ describe('judgeRead — what one read means, row by row', () => {
     // A only inside the turned box (874 wide), B only inside the upright one (874 high).
     const a = match({ x: 500, y: 100, width: 100, height: 50 }, 'A');
     const b = match({ x: 10, y: 600, width: 100, height: 50 }, 'B');
-    const j = judged(judgeRead(readOf({ found: [a, b] }, IPHONE), { box: IPHONE, boxes: [IPHONE, box(874, 402)] }, false));
+    const j = judged(judgeRead(readOf({ found: [a, b] }, IPHONE), screenOf([IPHONE, box(874, 402)]), false));
     expect(j.best?.node.identifier).toBe('B');
     expect(j.best?.standing.kind).toBe('reachable');
   });
 });
 
 describe('strokeLine — the line a read\'s strokes stay above', () => {
-  const facts = (row: Row, screen: Rect) => judged(judgeRead(readOf(row, screen), { box: screen, boxes: [screen] }, false)).facts;
+  const facts = (row: Row, screen: Rect) => judged(judgeRead(readOf(row, screen), screenOf([screen]), false)).facts;
   it('no cover, no band: none', () => {
     expect(strokeLine(undefined, facts({ found: [] }, PHONE))).toBeUndefined();
   });

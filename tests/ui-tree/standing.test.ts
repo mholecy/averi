@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type StandingScreen, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -59,7 +59,9 @@ const idbAt = async (name: string, ...path: string[]): Promise<UiNode> =>
   parseIdbDescribeAll(JSON.stringify(path.reduce<any>((j, k) => j[k], JSON.parse(await fixture(name)))));
 
 /** A usable screen (ui-tree/usable-screen.ts#UsableScreen) of the device's size, `oriented` its box: what every purpose is handed — the pixel assert judges `oriented`, the touches `box`/`boxes`. */
-const usable = (screen: StandingScreen): UsableScreen => ({ ...screen, oriented: screen.box, from: 'device' });
+/** A screen's boxes and bands as a test writes them, before `usable` makes it the one screen type a standing takes. */
+type Bare = Omit<UsableScreen, 'oriented' | 'from'>;
+const usable = (screen: Bare): UsableScreen => ({ ...screen, oriented: screen.box, from: 'device' });
 const IPHONE = usable({ box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 });
 const PIXEL = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 });
 const PLAIN = { of: 'stop' } as const;
@@ -204,7 +206,7 @@ describe('Scene.standing for the tap — measured cases, fixture × purpose → 
       const r = node({ role: 'button', identifier: 'row', rect: { x: x - 10, y: y - 10, width: 20, height: 20 } });
       return { t: node({ role: 'container', rect: root, children: [r] }), r };
     };
-    const EITHER_WAY = { box: box(402, 874), boxes: [box(402, 874), box(874, 402)], statusBand: 62 };
+    const EITHER_WAY = usable({ box: box(402, 874), boxes: [box(402, 874), box(874, 402)], statusBand: 62 });
     it('the tap judges in ANY of the boxes — a point inside the turned box only is reachable; the stop judges the first box alone', () => {
       const { t, r } = at(600, 200);
       expect(said(sceneOf(t).standing(r, EITHER_WAY, TAP))).toEqual({ kind: 'reachable', at: { x: 600, y: 200 } });
@@ -268,7 +270,7 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
   });
   it('the status bar before the navigation bar when a centre lies in both (a screen shorter than its two bands)', () => {
     const both = tree(100, box(100, 200));
-    const tiny = { box: box(100, 200), boxes: [box(100, 200)], statusBand: 120, navigationBand: 80 };
+    const tiny = usable({ box: box(100, 200), boxes: [box(100, 200)], statusBand: 120, navigationBand: 80 });
     expect(said(sceneOf(both.t).standing(both.r, tiny, TAP))).toMatchObject({ kind: 'systemBar', bar: { edge: 'top', bottom: 120 } });
   });
   it('a reading that leaves nothing above it is no band (fails open): at or above the box\'s top, or above the status band\'s bottom — nothing refused, nothing cut', () => {
@@ -288,7 +290,7 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
   });
   it('portrait only: on a landscape box a band read upright is not judged', () => {
     const turned = tree(1050, box(2220, 1080));
-    const landscape = { box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 1014 };
+    const landscape = usable({ box: box(2220, 1080), boxes: [box(2220, 1080)], statusBand: 66, navigationBand: 1014 });
     expect(said(sceneOf(turned.t).standing(turned.r, landscape, TAP))).toMatchObject({ kind: 'reachable' });
   });
   it('a moved tap is never aimed into the band: the piece is chosen above it', () => {
@@ -444,7 +446,7 @@ describe('Scene.standing for the stop — its covers judged below the status ban
     const over = node({ role: 'image', identifier: 'over', rect: { x: 0, y: 30, width: 402, height: 50 } });
     const t = node({ role: 'container', rect: box(402, 874), children: [row, over] });
     const s = sceneOf(t).standing(row, IPHONE, FULLY);
-    expect([said(s), s.facts.shows]).toEqual([{ kind: 'covered', cover: 'over' }, sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY).facts.shows]);
+    expect([said(s), s.facts.shows]).toEqual([{ kind: 'covered', cover: 'over' }, sceneOf(t).standing(row, usable({ box: box(402, 874), boxes: [box(402, 874)] }), FULLY).facts.shows]);
     expect(s.facts.shows).toBeCloseTo(0.8);
   });
   it('under a keyboard line high enough that the frame above it is landscape-shaped (402x300), the band is still cut — judged on the box\'s shape', () => {
@@ -455,7 +457,7 @@ describe('Scene.standing for the stop — its covers judged below the status ban
   });
   it('with no band read, it covers as before', () => {
     const { t, row } = tree();
-    const s = sceneOf(t).standing(row, { box: box(402, 874), boxes: [box(402, 874)] }, FULLY);
+    const s = sceneOf(t).standing(row, usable({ box: box(402, 874), boxes: [box(402, 874)] }), FULLY);
     expect(said(s)).toEqual({ kind: 'covered', cover: 'in_band' });
     expect(s.facts.shows).toBeCloseTo(0.98);
   });
@@ -485,7 +487,7 @@ describe('parity — `scroll_until X` then `tap X`: a plain stop that is reachab
       const scene = sceneOf(tree);
       const turned: Rect = { x: 0, y: 0, width: box.height, height: box.width };
       for (const band of bands) for (const boxes of [[box], [box, turned]]) {
-        const screen = { box, boxes, ...band };
+        const screen = usable({ box, boxes, ...band });
         for (const n of everyNode(tree)) {
           if (n === tree) continue;
           judged++;
@@ -565,7 +567,7 @@ describe('Scene.standing for the tap — a keyboard line and a system band toget
 
 describe('Scene.standing for the tap — the on-screen point rule (the in-tree keyboard dismissal picker asks the same standing)', () => {
   /** The tap's standing of a 2x2 node centred on (x,y) in a root of `rect`. */
-  const tapAt = (x: number, y: number, screen: StandingScreen | undefined, rect = box(1080, 2220)): Standing['kind'] => {
+  const tapAt = (x: number, y: number, screen: UsableScreen | undefined, rect = box(1080, 2220)): Standing['kind'] => {
     const n = node({ role: 'text', rect: { x: x - 1, y: y - 1, width: 2, height: 2 } });
     return sceneOf(node({ role: 'container', rect, children: [n] })).standing(n, screen, TAP).kind;
   };
@@ -655,7 +657,7 @@ describe('Scene.standing for the stop — under a keyboard line (the WDA band\'s
   });
   it('a box that does not start at the origin: the frame runs from its top to the line, and a line at its top leaves nothing', () => {
     const t = tree(545);
-    const shifted = { box: { x: 0, y: 20, width: 402, height: 854 }, boxes: [{ x: 0, y: 20, width: 402, height: 854 }], statusBand: 62 };
+    const shifted = usable({ box: { x: 0, y: 20, width: 402, height: 854 }, boxes: [{ x: 0, y: 20, width: 402, height: 854 }], statusBand: 62 });
     expect(sceneOf(t).standing(t.children[0], shifted, { ...FULLY, keyboardTop: wda(589) }).facts.screen).toEqual({ x: 0, y: 20, width: 402, height: 569 });
     const nothing = sceneOf(t).standing(t.children[0], shifted, { ...PLAIN, keyboardTop: wda(20) });
     expect(said(nothing)).toEqual({ kind: 'underKeyboard', top: 20, witnessed: true });
@@ -672,7 +674,7 @@ describe('Scene.standing for the stop — a box that does not start at the origi
   it('a centre in the status band quotes the band\'s line, not its height inside the box', () => {
     const t = node({ role: 'container', rect: box(402, 874), children: [node({ role: 'button', identifier: 'row', rect: { x: 24, y: 10, width: 354, height: 52 } })] });
     const shifted = { x: 0, y: 20, width: 402, height: 854 };
-    expect(said(sceneOf(t).standing(t.children[0], { box: shifted, boxes: [shifted], statusBand: 62 }, PLAIN))).toEqual({ kind: 'systemBar', at: { x: 201, y: 36 }, bar: { edge: 'top', bottom: 62 } });
+    expect(said(sceneOf(t).standing(t.children[0], usable({ box: shifted, boxes: [shifted], statusBand: 62 }), PLAIN))).toEqual({ kind: 'systemBar', at: { x: 201, y: 36 }, bar: { edge: 'top', bottom: 62 } });
   });
 });
 
@@ -681,9 +683,9 @@ describe('Scene.standing for the stop — a box that does not start at the origi
 // case per refusal class and the sentences; the kind and the point are pinned here, where they are decided.
 
 /** A 402x874 iPhone screen with no status band read (the fakes the moved tap cases ran on). */
-const IPHONE_BARE = { box: box(402, 874), boxes: [box(402, 874)] };
+const IPHONE_BARE = usable({ box: box(402, 874), boxes: [box(402, 874)] });
 /** The Pixel_3a as built, no band read. */
-const PIXEL_BARE = { box: box(1080, 2220), boxes: [box(1080, 2220)] };
+const PIXEL_BARE = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)] });
 /** The tap as interact/tap-judgement.ts#judgeTap asks it: with the tree's own keyboard line (idb's band, ui-tree/keyboard-position.ts#KeyboardPosition.line) for `n`. */
 const tapOf = (t: UiNode, n: UiNode): TouchPurpose => {
   const line = keyboardPosition(sceneOf(t).order).line(n);
@@ -761,7 +763,7 @@ describe('Scene.standing for the tap — the screen\'s edges, the status band an
     // …and the band is cut before the largest piece is chosen: 120–160 below the bar, not the larger 30–90 reaching into it.
     ['a row 30–160 under a banner at 90–120: moved to the piece below the bar', () => swiftIdbWith(30, 130, node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 90, width: 402, height: 30 } })), 'swift_payment.form.priority_select', IPHONE, { kind: 'reachable', at: { x: 201, y: 140 }, moved: { piece: { x: 24, y: 120, width: 354, height: 40 }, cover: 'banner', aboveKeyboard: false } }],
     // A landscape box is not cut (an iPhone hides its status bar there): a centre at y 30 is tapped.
-    ['a landscape box with the band read: (400,30) reachable', () => on(box(874, 402), node({ identifier: 'n', rect: { x: 300, y: 10, width: 200, height: 40 } })), 'n', { box: box(874, 402), boxes: [box(874, 402)], statusBand: 62 }, { kind: 'reachable', at: { x: 400, y: 30 } }],
+    ['a landscape box with the band read: (400,30) reachable', () => on(box(874, 402), node({ identifier: 'n', rect: { x: 300, y: 10, width: 200, height: 40 } })), 'n', usable({ box: box(874, 402), boxes: [box(874, 402)], statusBand: 62 }), { kind: 'reachable', at: { x: 400, y: 30 } }],
   ] as const)('%s', async (_name, tree, id, screen, expected) => {
     const t = await tree();
     expect(said(sceneOf(t).standing(byId(t, id), screen, TAP))).toEqual(expected);
@@ -992,7 +994,7 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
     expectTypeOf(scene.standing(root, undefined, PLAIN)).toEqualTypeOf<Standing>();
     expectTypeOf(scene.standing(root, undefined, FULLY)).toEqualTypeOf<Standing>();
     expectTypeOf(scene.standing(root, undefined, { of: 'tap' })).toEqualTypeOf<TapStanding>();
-    // The pixel purpose takes the usable screen: a bare standing screen (no `oriented`) is refused.
+    // Every purpose takes the usable screen: a bare one of boxes (no `oriented`) is refused.
     // @ts-expect-error
     void (() => scene.standing(root, { box: root.rect, boxes: [root.rect] }, { of: 'pixel', reads: WHOLE, glyphs: true }));
     expectTypeOf<TapStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
@@ -1014,28 +1016,28 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
 describe('farEdgeFrames — the far edge\'s frames, cut beside the rule that sets band', () => {
   const UPRIGHT = box(1080, 2220);
   const TURNED = box(2220, 1080);
-  const ANDROID: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT], statusBand: 66, navigationBand: 2154 };
+  const ANDROID: UsableScreen = usable({ box: UPRIGHT, boxes: [UPRIGHT], statusBand: 66, navigationBand: 2154 });
   /** A full-width row on the 1080x2220 phone at `y`, `height` high, judged for `purpose` on `screen`. */
-  const rowAt = (y: number, height: number, purpose: TouchPurpose, screen: StandingScreen = ANDROID): Standing => {
+  const rowAt = (y: number, height: number, purpose: TouchPurpose, screen: UsableScreen = ANDROID): Standing => {
     const r = node({ role: 'button', identifier: 'row', rect: { x: 0, y, width: 1080, height } });
     return sceneOf(node({ role: 'container', rect: UPRIGHT, children: [r] })).standing(r, screen, purpose);
   };
   const BELOW_STATUS = { x: 0, y: 66, width: 1080, height: 2154 };
 
   it('no bands, no cover, no best: every box as it is', () => {
-    expect(farEdgeFrames({ box: UPRIGHT, boxes: [UPRIGHT, TURNED] }, undefined)).toEqual({ frames: [UPRIGHT, TURNED], uncutFrames: [UPRIGHT, TURNED] });
+    expect(farEdgeFrames(usable({ box: UPRIGHT, boxes: [UPRIGHT, TURNED] }), undefined)).toEqual({ frames: [UPRIGHT, TURNED], uncutFrames: [UPRIGHT, TURNED] });
   });
   it('each box below the status band on its own shape: the upright box cut, the turned one (landscape) not', () => {
-    const screen: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT, TURNED], statusBand: 66 };
+    const screen: UsableScreen = usable({ box: UPRIGHT, boxes: [UPRIGHT, TURNED], statusBand: 66 });
     expect(farEdgeFrames(screen, undefined)).toEqual({ frames: [BELOW_STATUS, TURNED], uncutFrames: [BELOW_STATUS, TURNED] });
   });
   it('above an applied cover: the first box\'s x, y and width, the cover\'s top y as the HEIGHT (not the top less the box\'s y), below the status band', () => {
     const lowered = { x: 0, y: 100, width: 402, height: 874 };
-    expect(farEdgeFrames({ box: lowered, boxes: [lowered] }, undefined, { width: 402, height: 500 }).frames).toEqual([{ x: 0, y: 100, width: 402, height: 500 }]);
+    expect(farEdgeFrames(usable({ box: lowered, boxes: [lowered] }), undefined, { width: 402, height: 500 }).frames).toEqual([{ x: 0, y: 100, width: 402, height: 500 }]);
     expect(farEdgeFrames(IPHONE, undefined, { width: 402, height: 500 }).frames).toEqual([{ x: 0, y: 62, width: 402, height: 438 }]);
   });
   it('a cover leaving nothing above it (no `above`): every box, uncut by the keyboard', () => {
-    const screen: StandingScreen = { box: UPRIGHT, boxes: [UPRIGHT, TURNED], statusBand: 66 };
+    const screen: UsableScreen = usable({ box: UPRIGHT, boxes: [UPRIGHT, TURNED], statusBand: 66 });
     expect(farEdgeFrames(screen, undefined, undefined).frames).toEqual([BELOW_STATUS, TURNED]);
   });
   it('a `fully` stop the navigation band\'s REGION refused (a row across its top, its centre clear): the frames cut above the band too, the short-of frames not', () => {
@@ -1056,11 +1058,11 @@ describe('farEdgeFrames — the far edge\'s frames, cut beside the rule that set
   it('two boxes: the navigation band cut on the FIRST box\'s shape — a landscape first box cuts neither, the upright second box included', () => {
     const wide = box(1000, 600);
     const tall = box(600, 1000);
-    const screen: StandingScreen = { box: wide, boxes: [wide, tall], navigationBand: 900 };
+    const screen: UsableScreen = usable({ box: wide, boxes: [wide, tall], navigationBand: 900 });
     const best = rowAt(2100, 100, FULLY);
     expect(farEdgeFrames(screen, best)).toEqual({ frames: [wide, tall], uncutFrames: [wide, tall] });
     // Cut on its own shape, the upright box would lose its bottom 100: the first box's shape decides, as the round always did.
-    expect(farEdgeFrames({ box: tall, boxes: [tall], navigationBand: 900 }, best).frames).toEqual([{ x: 0, y: 0, width: 600, height: 900 }]);
+    expect(farEdgeFrames(usable({ box: tall, boxes: [tall], navigationBand: 900 }), best).frames).toEqual([{ x: 0, y: 0, width: 600, height: 900 }]);
   });
 });
 

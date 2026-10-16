@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
-import { keyboardPosition } from '../../src/ui-tree/keyboard-position.js';
-import { sceneOf } from '../../src/ui-tree/standing.js';
+import { lookOn } from '../../src/ui-tree/look.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { play } from '../helpers/rounds.js';
 
@@ -23,12 +22,9 @@ describe('the label of a cell below the fold (Contacts New Contact, `add instant
   it('tap: refused as off screen — scroll_until it first — never sent to the parked point (143,73), the sheet\'s grabber strip', async () => {
     const tree = await contactsSheet();
     const adapter = { viewport: async () => IPHONE };
-    const look = { node: text(tree, 'add instant message'), tree, scene: sceneOf(tree) };
-    const reading = { ofKeyboard: () => false, cover: async () => undefined, corroborated: async () => false };
-    const outcome = await judgeTap(adapter, 'role:text label:"add instant message"', look, await usableScreen(adapter, { tree }), {
-      position: keyboardPosition(look.scene.order, reading),
-      remedy: { dismissal: 'none', advice: undefined },
-    })
+    // The look of the tree on an adapter with no oracle (ui-tree/look.ts#lookOn): the in-tree reading, no dismissal.
+    const look = lookOn({}, tree);
+    const outcome = await judgeTap(adapter, 'role:text label:"add instant message"', { node: text(tree, 'add instant message'), look }, await usableScreen(adapter, look))
       .then((j) => j.aim())
       .catch((e: unknown) => e as Error);
     expect(outcome instanceof Error ? `${outcome.constructor.name}: ${outcome.message}` : JSON.stringify(outcome)).toBe(

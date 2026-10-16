@@ -1,7 +1,7 @@
 import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
-import { readKeyboard, type Covering, type FrameVerdict, type KeyboardReading, type Uncovered } from '../ui-tree/keyboard-cover.js';
+import type { Covering, FrameVerdict, Uncovered } from '../ui-tree/keyboard-cover.js';
+import { lookOn, type Look } from '../ui-tree/look.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { sceneOf, type Scene } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -36,14 +36,14 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * poll see one keyboard by construction, and neither model calls the
  * oracle itself.
  *
- * A LOOK — the target resolved, its tree read — carries that tree's scene
- * (`SeenLook`, built by `withScene`: derived on first use, once). Every
+ * A LOOK — the target resolved, its tree read — carries that tree's
+ * ui-tree/look.ts#Look (`SeenLook`, built by `seenLook`): the scene, the
+ * keyboard reading and the keyboard position of that one read. Every
  * judgement of a look — the tap's and the dismissal picker's — reads the
- * look's scene and derives none of its own, so one look is at most one
- * draw-order walk. `scroll_until`'s read takes no look: it derives its own
- * scene, once per read (scroll-read.ts#factsOf); `grep sceneOf src/interact`
- * finds only `withScene` and that one. A convention the code keeps, not one
- * the types enforce: a SeenLook is a structural type.
+ * look's and builds none of its own, so one look is at most one draw-order
+ * walk and one reading; `scroll_until`'s read builds its own Look, once per
+ * read (scroll-read.ts#factsOf). `grep lookOn src/interact` finds only
+ * `seenLook` and the post-fill dismissal's one tree read.
  */
 
 /**
@@ -158,49 +158,37 @@ export interface DismissResult {
 }
 
 /**
- * A settled resolution as one LOOK: the node, the tree read that holds it,
- * and that tree's scene (ui-tree/standing.ts#Scene) — derived on first use,
- * once, and read by every judgement of the look: the tap's
+ * A settled resolution as one LOOK: the node, and the look of the tree read
+ * that holds it (ui-tree/look.ts#Look: its scene, its keyboard reading and
+ * position) — read by every judgement of the look: the tap's
  * (tap-judgement.ts#judgeTap, a TapLook as it stands) and the dismissal
- * picker's (keyboard-in-tree.ts#pickDismissal). Every tap and picker
- * judgement reads it and derives none of its own, so a look is at most one
- * draw-order walk; the scroll read, which takes no look, derives its own
- * once per read (scroll-read.ts#factsOf). Threaded, not cached by tree: a memo keyed by the tree
- * would rest on trees never being mutated after their scene is built, a
- * contract only the scroll read states.
+ * picker's (keyboard-in-tree.ts#pickDismissal). None derives a scene or a
+ * position of its own, so a look is at most one draw-order walk; the scroll
+ * read builds its own look once per read (scroll-read.ts#factsOf).
  */
-export interface SeenLook extends ResolvedSettled {
-  readonly scene: Scene;
+export interface SeenLook extends Resolved {
+  readonly look: Look;
 }
 
-/** `resolved` as a look (SeenLook): the same fields, and its tree's scene, derived on first use. */
-export function withScene<R extends { readonly tree: UiNode }>(resolved: R): R & { readonly scene: Scene } {
-  let scene: Scene | undefined;
-  return {
-    ...resolved,
-    get scene() {
-      return (scene ??= sceneOf(resolved.tree));
-    },
-  };
+/** `resolved` as a look (SeenLook): its node and note, and the look of its tree on `adapter` (ui-tree/look.ts#lookOn — building it derives and asks nothing). */
+export function seenLook(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, resolved: ResolvedSettled): SeenLook {
+  return { node: resolved.node, ...(resolved.note !== undefined && { note: resolved.note }), look: lookOn(adapter, resolved.tree) };
 }
 
 /**
  * A model's answer when the keyboard left the point: the node as resolved
- * again, the tree it was resolved in with its scene (the chrome check, the
- * last rule of a tap, judges it there — tap-judgement.ts#TapJudge.aim), and
- * the keyboard sentence.
+ * again, the look it was resolved in (the chrome check, the last rule of a
+ * tap, judges it there — tap-judgement.ts#TapJudge.aim), and the keyboard
+ * sentence.
  */
 export interface ClearedLook extends SeenLook {
   keyboardHidden?: string;
 }
 
-/** The guard's answer: the node and its tree — the same look, its scene the look's — with the keyboard sentence folded into the resolution note and kept alone beside it. */
+/** The guard's answer: the node and its look — the same look — with the keyboard sentence folded into the resolution note and kept alone beside it. */
 export const withNote = (resolved: SeenLook, keyboardHidden: string): ClearedLook => ({
   node: resolved.node,
-  tree: resolved.tree,
-  get scene() {
-    return resolved.scene;
-  },
+  look: resolved.look,
   note: resolved.note === undefined ? keyboardHidden : `${resolved.note}; ${keyboardHidden}`,
   keyboardHidden,
 });
@@ -224,12 +212,11 @@ export function failedLookMessage(e: unknown, refused: string, failed: (headline
   return [failed(headline), ...rest].join('\n');
 }
 
-/** What one look found: the target resolved again (with its tree's scene, SeenLook), where it is now, the keyboard read against that point, and the reading it came from (off the look's tree — the in-tree model's picker asks it again). */
-export interface Look {
+/** What one look found: the target resolved again (SeenLook: its look carries the reading off its tree, which the in-tree model's picker asks again), where it is now, and the keyboard read against that point. */
+export interface LookedAgain {
   resolved: SeenLook;
   point: Point;
   verdict: FrameVerdict;
-  reading: KeyboardReading;
 }
 
 /**
@@ -237,8 +224,8 @@ export interface Look {
  * SAME options — so it proves it holds still again, and so an
  * adjustResize activity's re-layout (or the iOS keyboard-avoiding layout's)
  * is followed to where the node is now — and the keyboard read against
- * that point by a reading off the tree that resolved it
- * (`readKeyboard(…).frameOver`: the in-tree model pays no device read; the
+ * that point by the look's reading, off the tree that resolved it
+ * (`Look.reading.frameOver`: the in-tree model pays no device read; the
  * window model asks its oracle once, twice with the keyboard up). The frame
  * decides, never the witness: on the window model this is the look after
  * `back`, and the key is already pressed. The reading is the first look's
@@ -254,16 +241,15 @@ export interface Look {
  * screen. No pause of its own: the caller sleeps KEYBOARD_HIDE_DELAY_MS
  * first (`confirmHidden` does for its looks).
  */
-export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: GuardOptions, failed: (e: unknown) => KeyboardGuardError): Promise<Look> {
+export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: GuardOptions, failed: (e: unknown) => KeyboardGuardError): Promise<LookedAgain> {
   let resolved: SeenLook;
   try {
-    resolved = withScene(await resolveSettled(adapter, target, opts));
+    resolved = seenLook(adapter, await resolveSettled(adapter, target, opts));
   } catch (e) {
     throw failed(e);
   }
   const point = tapPoint(resolved.node);
-  const keyboard = readKeyboard(adapter, resolved.tree);
-  return { resolved, point, verdict: await keyboard.frameOver(point, resolved.node), reading: keyboard };
+  return { resolved, point, verdict: await resolved.look.reading.frameOver(point, resolved.node) };
 }
 
 /** One confirming look after the side effect: the keyboard gone, with what the caller returns, or still up, with what its refusal needs to say. */
@@ -296,10 +282,10 @@ export interface CoveredLook {
   opts: GuardOptions;
   /** Where the target was on that look. */
   point: Point;
-  /** The screen the first look was judged on (ui-tree/usable-screen.ts#usableScreen), for a model that judges a point of its own — the in-tree model's dismissal (the tap's standing, ui-tree/standing.ts#Scene). */
+  /** The screen the first look was judged on (ui-tree/usable-screen.ts#usableScreen, of its look's tree), for a model that judges a point of its own — the in-tree model's dismissal (the tap's standing, ui-tree/standing.ts#Scene). */
   screen: UsableScreen | undefined;
   /**
-   * What the first look's reading said (`readKeyboard(…).over`): the frame
+   * What the first look's reading said (`Look.reading.over`): the frame
    * (or band, or panel) that covered it, and the input method's word over
    * it — `covered` (confirmed, or the witness could not be asked) or
    * `denied`, the veto. Read by the window model only; the in-tree model

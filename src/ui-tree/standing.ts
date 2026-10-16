@@ -276,9 +276,9 @@ export interface Scene {
   /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
   /** The tap's standing: a `Standing` never `clipped` (`TapStanding`). */
-  standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
+  standing(node: UiNode, screen: UsableScreen | undefined, purpose: TapPurpose): TapStanding;
   /** The stops' standing (and the tap's, asked as a `TouchPurpose`). */
-  standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
+  standing(node: UiNode, screen: UsableScreen | undefined, purpose: TouchPurpose): Standing;
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
   /**
    * THE region of the node a pixel measurement is asked of, on the screen the pixel purpose is judged on (`screen`,
@@ -348,8 +348,12 @@ export type PixelRegionOf = (rect: Rect, box: Rect) => Rect;
  */
 type PixelRead = Omit<PixelPurpose, 'reads'> & { readonly reads: Rect };
 
-/** The screen a standing is judged on: the usable screen's boxes and its system bands. */
-export type StandingScreen = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand' | 'navigationBand'>;
+/**
+ * What of the usable screen a standing's rules read: the boxes and the system bands — the touch purposes the screen's
+ * own, the pixel purpose its single `oriented` box (`singleBox`). Private: every verb hands the scene a UsableScreen
+ * (ui-tree/usable-screen.ts, the one screen type a judgement takes); this is only the narrowing the rules work in.
+ */
+type JudgedBoxes = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand' | 'navigationBand'>;
 
 /**
  * A system band a centre lies in, with the line its sentence quotes: the
@@ -624,9 +628,9 @@ export function sceneOf(tree: UiNode): Scene {
       return surface === undefined ? undefined : scene.order.presentation.press(surface);
     },
   };
-  /** The usable screen the pixel purpose judges on: `screen` when it has `oriented`, else the tree's own. */
-  function pixelScreen(screen: StandingScreen | UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
-    return screen !== undefined && 'oriented' in screen ? screen : treeScreen(tree);
+  /** The usable screen the pixel purpose judges on: `screen`, else the tree's own. */
+  function pixelScreen(screen: UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
+    return screen ?? treeScreen(tree);
   }
   /** `Scene.pixelRegion`, with the drawn frame it was cut by (undefined on a root of no area: nothing is cut there). */
   function pixelDrawn(node: UiNode, usable: UsableScreen & { readonly failsOpen?: boolean }): { readonly drawn: Drawn | undefined; readonly rect: Rect } {
@@ -634,13 +638,13 @@ export function sceneOf(tree: UiNode): Scene {
     return { drawn, rect: drawnPart(node.rect, drawn) ?? node.rect };
   }
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
-  function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TapPurpose): TapStanding;
-  function standing(node: UiNode, screen: StandingScreen | undefined, purpose: TouchPurpose): Standing;
+  function standing(node: UiNode, screen: UsableScreen | undefined, purpose: TapPurpose): TapStanding;
+  function standing(node: UiNode, screen: UsableScreen | undefined, purpose: TouchPurpose): Standing;
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
-  function standing(node: UiNode, screen: StandingScreen | UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
+  function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
     const judged: Judged = { scene, node, centre: tapPoint(node) };
     if (purpose.of === 'pixel') {
-      // The overloads hand the pixel purpose a usable screen (one with `oriented`): it picks its own box, `oriented` (`singleBox`).
+      // The pixel purpose picks its own box of the usable screen, `oriented` (`singleBox`).
       const usable = pixelScreen(screen);
       const single = singleBox(usable);
       // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
@@ -787,7 +791,7 @@ type RegionPlace =
  * screen") — or none when that fails open (a root of no area): every point
  * on the screen, the node judged in its own rect.
  */
-function touchScreen(screen: StandingScreen | undefined, tree: UiNode): StandingScreen | undefined {
+function touchScreen(screen: UsableScreen | undefined, tree: UiNode): UsableScreen | undefined {
   if (screen !== undefined) return screen;
   const own = treeScreen(tree);
   return own.failsOpen ? undefined : own;
@@ -869,7 +873,7 @@ function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
  * else on the screen.
  */
-function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: StandingScreen | undefined, failsOpen: boolean, drawn: Drawn | undefined): RegionPlace {
+function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: JudgedBoxes | undefined, failsOpen: boolean, drawn: Drawn | undefined): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
   if (on === undefined) return { off: 'wholly' };
   // Outside its scroll view next: on the box, but nothing of it drawn there — what lies there is not the element.
@@ -923,8 +927,8 @@ function systemBandOver(rect: Rect, box: Rect, bands: Bands): SystemBand | undef
   return undefined;
 }
 
-/** The screen's system bands, as `StandingScreen` carries them. */
-type Bands = Pick<StandingScreen, 'statusBand' | 'navigationBand'> | undefined;
+/** The screen's system bands, as `JudgedBoxes` carries them. */
+type Bands = Pick<JudgedBoxes, 'statusBand' | 'navigationBand'> | undefined;
 
 /**
  * THE system bands of `box`, derived once for every judgement: `clear`,
@@ -978,7 +982,7 @@ export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen
  * contract: the status band on each box's shape, the navigation band on the
  * first box's (`screen.box`).
  */
-export function farEdgeFrames(screen: StandingScreen, best: Standing | undefined, above?: DeviceScreen): { frames: Rect[]; uncutFrames: Rect[] } {
+export function farEdgeFrames(screen: UsableScreen, best: Standing | undefined, above?: DeviceScreen): { frames: Rect[]; uncutFrames: Rect[] } {
   const box = screen.box;
   const uncutFrames = above !== undefined ? [belowStatusBand({ x: box.x, y: box.y, width: above.width, height: above.height }, screen, box)] : screen.boxes.map((b) => belowStatusBand(b, screen));
   const regionAtBottom = best?.kind === 'systemBar' && best.band !== undefined && best.bar.edge === 'bottom';
@@ -986,7 +990,7 @@ export function farEdgeFrames(screen: StandingScreen, best: Standing | undefined
 }
 
 /** The tap's box: the box that holds the centre, else the first (`touchScreen`'s; the node's own rect when it fails open). */
-const chosenBox = (centre: Point, screen: StandingScreen): Rect => screen.boxes.find((b) => containsPoint(b, centre)) ?? screen.box;
+const chosenBox = (centre: Point, screen: JudgedBoxes): Rect => screen.boxes.find((b) => containsPoint(b, centre)) ?? screen.box;
 
 /**
  * THE ORDER (`Scene`'s contract), once for every verb, after what only the
@@ -1055,7 +1059,7 @@ function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = f
  * `offScreen` when none does — and undefined otherwise, the facts then
  * being the frame's for the purpose's own judgement.
  */
-function inStopFrame(judged: Judged, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: TouchJudgement } {
+function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: TouchJudgement } {
   const { scene, node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
     const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
@@ -1089,7 +1093,7 @@ function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: TouchJudgeme
 }
 
 /** The plain stop's standing (`Scene`'s contract): its centre placed, a sliver cut, a cover over its centre alone. */
-function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): TouchJudgement {
+function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: JudgedBoxes | undefined, line: KeyboardLine | undefined): TouchJudgement {
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
   return stopOrdered(facts, place, sliverCut(facts, facts.sliver), facts.centreCover, line);
@@ -1104,7 +1108,7 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Stand
  * a REGION past the slack (`systemBandOver`), the band's rect carried —
  * except for content no scroll lifts out of a band (`pinnedSurface`).
  */
-function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: StandingScreen | undefined, line: KeyboardLine | undefined): TouchJudgement {
+function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: JudgedBoxes | undefined, line: KeyboardLine | undefined): TouchJudgement {
   const { facts, outside } = inStopFrame(judged, box, bands, line);
   if (outside !== undefined) return outside;
   if (facts.clipped.length > 0) {
@@ -1157,7 +1161,7 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 }
 
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
-function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: StandingScreen | undefined, line: KeyboardLine | undefined): TapJudgement {
+function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: JudgedBoxes | undefined, line: KeyboardLine | undefined): TapJudgement {
   const { scene, node } = judged;
   // Less the system bands, and only what its scroll views draw (the drawn frame).
   const clear = systemBands(chosen, bands).clear;
@@ -1188,7 +1192,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
  * (draw-order.ts#paintsOver) — the one on top at its centre, else the last
  * drawn. `flat`: the tree lists no ancestry (draw-order.ts#listsAncestry).
  */
-function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: StandingScreen | undefined, purpose: PixelRead, flat: boolean): PixelJudgement {
+function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: JudgedBoxes | undefined, purpose: PixelRead, flat: boolean): PixelJudgement {
   const { scene, node } = judged;
   const below = belowStatusBand(box, bands);
   // Only the part of the box below the band that the measurement reads: what lies over the rest of the node is never sampled.
@@ -1272,7 +1276,7 @@ function pinnedSurface(node: UiNode, box: Rect, bands: Bands, clips: Pick<Clips,
  * other orientation of a turn suggested but not witnessed is never judged.
  * docs/adr/0012-pixel-assert-residuals-d4-d6.md
  */
-const singleBox = (usable: UsableScreen): StandingScreen => ({
+const singleBox = (usable: UsableScreen): JudgedBoxes => ({
   box: usable.oriented,
   boxes: [usable.oriented],
   statusBand: usable.statusBand,

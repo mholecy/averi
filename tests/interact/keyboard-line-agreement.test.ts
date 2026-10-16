@@ -5,6 +5,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { judgeRead } from '../../src/interact/scroll-read.js';
 import { readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
+import { lookOn } from '../../src/ui-tree/look.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { NO_BACK } from '../helpers/rounds.js';
 
@@ -39,17 +40,17 @@ async function pad(): Promise<{ tree: UiNode; key: UiNode; row: UiNode }> {
   return { tree, key: nodes.find((n) => n.role === 'button' && n.label === '5')!, row };
 }
 
-/** The line the pixel poll judged `element` under: what `line` returned to overElement. */
+/** The line the pixel poll judged `element` under: what `line` returned to overElement, over the round's look (ui-tree/look.ts#lookOn). */
 async function pixelLine(tree: UiNode, element: UiNode): Promise<KeyboardLine | undefined> {
   lines.length = 0;
-  await overElement({ viewport: async () => IPHONE }, tree, element);
+  await overElement({ viewport: async () => IPHONE }, lookOn({}, tree), element);
   expect(lines).toHaveLength(1);
   return lines[0];
 }
 
 /** The line scroll_until's read judged `element` under: the applied cover's, unless the read exempted it. */
 function scrollLine(tree: UiNode, element: UiNode): KeyboardLine | undefined {
-  const j = judgeRead({ tree, found: [element], ofKeyboard: readKeyboard({}, tree).ofKeyboard, remedy: NO_BACK }, { box: BOX, boxes: [BOX], statusBand: 62 }, false);
+  const j = judgeRead({ tree, found: [element], ofKeyboard: readKeyboard({}, tree).ofKeyboard, remedy: NO_BACK }, { box: BOX, boxes: [BOX], oriented: BOX, from: 'device', statusBand: 62 }, false);
   if ('ask' in j) throw new Error(`asked ${j.ask}`);
   return j.best?.under?.line;
 }

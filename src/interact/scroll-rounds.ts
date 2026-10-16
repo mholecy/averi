@@ -2,7 +2,7 @@ import type { ClippedSide, DeviceScreen, Rect, Stroke, UiNode } from '../adapter
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
-import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
+import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -541,8 +541,8 @@ export interface Rounds {
   readonly [opaque]: 'scroll-rounds';
 }
 
-/** The screen a round judges in: the usable screen's judging part (ui-tree/usable-screen.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
-type Frame = StandingScreen;
+/** The screen a round judges in: the usable screen (ui-tree/usable-screen.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
+type Frame = UsableScreen;
 
 /**
  * Everything the scroll remembers between rounds, one record with one
@@ -678,7 +678,9 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     done: false,
     owesDrawn: false,
     swipes: 0,
-    frame: { box, boxes: [box] },
+    // The device as built, as a usable screen of one box and no band — what the rounds judged in before a round read
+    // one (the bands come with the first usable screen a round reads; nothing reads `oriented` or `from` of a frame).
+    frame: { box, boxes: [box], oriented: box, from: 'device' },
     everFound: false,
     treesRead: 0,
     reads: { count: 0, totalMs: 0, lastMs: 0 },

@@ -1,7 +1,7 @@
 import { rectArea, type Rect, type UiNode } from '../adapters/types.js';
 import { frameText, outsideScrollViewText } from '../ui-tree/geometry.js';
-import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
-import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
+import { readKeyboard } from '../ui-tree/keyboard-cover.js';
+import { lookOn, type Look } from '../ui-tree/look.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton, cannotHide } from '../ui-tree/soft-keyboard.js';
 import { outsideItsScrollView, presentedRemedy, type TapStanding } from '../ui-tree/standing.js';
@@ -14,7 +14,6 @@ import {
   KeyboardGuardError,
   lookAgain,
   withNote,
-  withScene,
   type CoveredLook,
   type DismissOptions,
   type DismissResult,
@@ -23,7 +22,6 @@ import {
   type KeyboardDismissal,
   type KeyboardModel,
   type ClearedLook,
-  type SeenLook,
 } from './keyboard-model.js';
 import { describeTarget, findTarget, type Ambiguity, type RefusedOnPresentElement } from './resolve.js';
 import { tapStandings } from './tap-judgement.js';
@@ -210,12 +208,12 @@ interface DismissalPick {
  * would be the very tap this guard refuses), and a tap on it would land on
  * its centre, unmoved — THE TAP'S STANDING (ui-tree/standing.ts#Scene,
  * `{ of: 'tap' }`) over `screen` (the guard's first-look screen; the
- * dismissal's own read), over the look's scene
- * (keyboard-model.ts#SeenLook: derived on first use, the one every
- * judgement of the look reads; `dismiss()` makes its one read a look), its
+ * dismissal's own read), over the look's scene and keyboard position
+ * (ui-tree/look.ts#Look: derived on first use, the ones every judgement of
+ * the look reads; `dismiss()` makes its one read a look), its
  * keyboard line the tap's — the standing with the reading's line merged in
- * (tap-judgement.ts#tapStandings' `full`, the tap's own expression), the reading
- * asked once per call, by the first strategy that gets this far — under
+ * (tap-judgement.ts#tapStandings' `full`, the tap's own expression), the reading's
+ * line asked once per look, by the first strategy that gets this far — under
  * WDA a witnessed line, which refuses nothing the band check above has not:
  * - `reachable` at the centre, with no interactive node there it would
  *   press — usable;
@@ -250,20 +248,18 @@ interface DismissalPick {
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
  * An `accessory` is usable when `accessoryDismissButton` answers;
  * that answer is under an `ofKeyboard` root by construction, so no keyboard
- * check is repeated here. `keyboard` must be a reading OF `look.tree`: its band
+ * check is repeated here. The reading is the look's, OF `look.tree`: its band
  * and its `ofKeyboard` set are that tree's, and a node of another tree is
  * never the keyboard's by identity.
  */
 async function pickDismissal(
-  look: Pick<SeenLook, 'tree' | 'scene'>,
-  keyboard: KeyboardReading,
+  look: Look,
   dismissals: readonly KeyboardDismissal[],
   ambiguous: Ambiguity,
   screen: UsableScreen | undefined,
 ): Promise<DismissalPick> {
-  const { tree } = look;
+  const { tree, reading: keyboard } = look;
   const skipped: string[] = [];
-  let position: KeyboardPosition | undefined; // built over the look's scene by the first strategy that gets as far as asking the tap's standing, off `keyboard`: the reading's line asked once and only then
   for (const d of dismissals) {
     const name = describeDismissal(d);
     if (d.kind === 'accessory') {
@@ -298,8 +294,7 @@ async function pickDismissal(
       skipped.push(`${name}: under the keyboard`);
       continue;
     }
-    position ??= keyboardPosition(look.scene.order, keyboard);
-    const unusable = whyNotTapped(await tapStandings(look.scene, node, screen, position).full(), node);
+    const unusable = whyNotTapped(await tapStandings(look, node, screen).full(), node);
     if (unusable !== undefined) {
       skipped.push(`${name}: ${unusable}`);
       continue;
@@ -450,7 +445,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       }
       const { point } = second;
       const dismissals = opts.dismissals ?? [];
-      const { picked, skipped } = await pickDismissal(second.resolved, second.reading, dismissals, opts.ambiguous, screen);
+      const { picked, skipped } = await pickDismissal(second.resolved.look, dismissals, opts.ambiguous, screen);
       if (picked === undefined) {
         // Names MCP tools and "a flow" — the deliberate exception recorded at
         // the window model's "back did not close it" error. The platform's
@@ -541,10 +536,9 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * the guard's wrap): the tap was sent whatever the read says next.
      */
     async dismiss({ dismissals = [], ambiguous }: DismissOptions): Promise<DismissResult> {
-      const tree = await adapter.uiTree();
-      const keyboard = readKeyboard(adapter, tree);
-      if ((await keyboard.anywhere()) !== 'shown') return {};
-      const { picked, skipped } = await pickDismissal(withScene({ tree }), keyboard, dismissals, ambiguous, await usableScreen(adapter, { tree }));
+      const look = lookOn(adapter, await adapter.uiTree());
+      if ((await look.reading.anywhere()) !== 'shown') return {};
+      const { picked, skipped } = await pickDismissal(look, dismissals, ambiguous, await usableScreen(adapter, look));
       if (picked === undefined) {
         return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, skipped)} — the next tap under it will be refused` };
       }
