@@ -269,8 +269,9 @@ describe('the live KNOWN pins the rule a case fails by', () => {
     expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired')).toBeUndefined();
     expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim')).toBeUndefined();
   });
-  it('every entry names a note or residual and a rule', () => {
-    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.note} ${e.cls}`).toMatch(/^(android|ios) \w+ (tap|scroll|turn):\S+ (bug:|residual:|idb lists|calibration\.json).* \S+$/);
+  // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
+  it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {
+    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.cls}`).toMatch(/^(android|ios) \w+ (tap|scroll|turn):\S+ \S+$/);
   });
 });
 

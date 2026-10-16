@@ -1,12 +1,11 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records/*-vis.json, review round 1's runs on the lab
@@ -64,13 +63,5 @@ describe('live.ts: a known case not intermittent that comes out ok fails the run
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-  });
-});
-
-describe('live-known.ts: every note is a bug note or a residual', () => {
-  it('a `bug:` names a file of docs/bugs; anything else is a `residual:`', () => {
-    const notes = [...new Set(Object.values(LIVE_KNOWN).map((e) => e.note))];
-    const bad = notes.filter((n) => (n.startsWith('bug:') ? !existsSync(`${ROOT}docs/bugs/${n.slice(4)}`) : !n.startsWith('residual:')));
-    expect(bad).toEqual([]);
   });
 });
