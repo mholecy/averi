@@ -1,5 +1,5 @@
 import type { Platform } from '../corpus.js';
-import type { Call } from '../differential.js';
+import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { isOverlap, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
 import { BUDGET_MS, first, landed, notInTree, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -178,25 +178,53 @@ export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTr
  * replayed tree. One stop is the device's to answer, not the tree's: a rect FLUSH with its scroll container's edge,
  * where Android's uiautomator cuts a node's bounds, is checked by a probe swipe toward it (ADR 0005, scroll-rounds.ts
  * #PROBE_REACH; docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, its fix
- * 9c7885e) — on the device the probe moves a cut row and the stop goes on; in a replayed tree nothing moves, so "a probe
- * swipe toward it moved nothing" after the probe was sent (FLUSH_PROBED) is what averi owes the replay, accepted. A
- * flush stop with no probe sent, or any other "visible", is still red.
+ * 9c7885e) — on the device the probe moves a cut row and the stop goes on; in a replayed tree nothing moves. So a stop
+ * that says it probed a flush edge (FLUSH_PROBED) is accepted only where the TRUTH bears it out (flushProbe): what shows
+ * of the target ends on that side exactly at its own scroll view's edge, and a swipe was sent from inside that scroll
+ * view toward that edge. The replay checks only that the probe is sent toward the cut; whether it reveals the row and
+ * the stop goes on is live (phase 5). Any other "visible" is red.
  */
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   return {
     verb: 'fully',
-    says: `R-fully: fully: true is not "visible" where it is ${t.geometry} (a flush edge: probed, the probe's answer the device's)`,
+    says: `R-fully: fully: true is not "visible" where it is ${t.geometry} (a flush edge: probed toward it, the probe's answer the device's)`,
     call: scrollCall(platform, t, directionOf(t, cell), true),
     judge: (o) => {
       if (!/^Element .* visible after /.test(o.reply)) return undefined;
-      if (FLUSH_PROBED.test(o.reply) && swipes(o) > 0) return undefined;
-      return said(o, `fully visible where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing`);
+      const why = flushProbe(o, t, cell);
+      if (why === undefined) return undefined;
+      return said(o, `fully visible where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing${why === NOT_PROBED ? '' : ` (${why})`}`);
     },
   };
 }
 
-/** The `fully` stop's own account of a flush edge it probed (scroll-rounds.ts's wording since 9c7885e). */
-export const FLUSH_PROBED = /lies on its scroll container's .*a probe swipe toward it moved nothing/;
+/** The `fully` stop's own account of a flush edge it probed (scroll-rounds.ts's wording since 9c7885e): the side. */
+export const FLUSH_PROBED = /its (top|bottom|left|right) edge lies on its scroll container's .*a probe swipe toward it moved nothing/;
+const NOT_PROBED = 'no flush probe said';
+
+/**
+ * Why a stop's flush probe does not stand, judged by the truth — undefined when it does: the reply names a side
+ * (FLUSH_PROBED); what shows of the target (TargetTruth.visible) ends on that side at its scroll view's edge (within a
+ * pixel/point); and a swipe touched down inside that scroll view dragging toward that edge (a bottom edge: the finger
+ * moves up, as the content must to bring what lies below it into view).
+ */
+export function flushProbe(o: Outcome, t: Pick<TargetTruth, 'visible' | 'scrollView'>, cell: Pick<CellTruth, 'scrollViews'>): string | undefined {
+  const side = FLUSH_PROBED.exec(o.reply)?.[1] as 'top' | 'bottom' | 'left' | 'right' | undefined;
+  if (side === undefined) return NOT_PROBED;
+  const sv = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
+  const v = t.visible ?? undefined;
+  if (sv === undefined || v === undefined) return `no scroll view or visible part in the truth to bear out its ${side} edge`;
+  const edge = (r: Rect) => ({ top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width })[side];
+  if (Math.abs(edge(v) - edge(sv)) > 1) return `its ${side} edge is not flush with its scroll view ${t.scrollView} in the truth (${edge(v)} vs ${edge(sv)})`;
+  const toward = o.device.some((c) => {
+    const m = /^(?:idb ui|adb shell input) swipe (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(c);
+    if (m === null) return false;
+    const [x1, y1, x2, y2] = m.slice(1, 5).map(Number);
+    const drag = { bottom: y2 < y1, top: y2 > y1, right: x2 < x1, left: x2 > x1 }[side];
+    return drag && within({ x: x1, y: y1 }, sv);
+  });
+  return toward ? undefined : `no swipe from inside its scroll view ${t.scrollView} toward its ${side} edge`;
+}
 
 /**
  * R-land: the tap lands on what shows of the target. Reached at its centre (`partly-centre-in`, and a whole target
@@ -248,6 +276,8 @@ export function dismissRow(platform: Platform, control: { tag: string; id: strin
  * guard's own clause (`none of the configured dismissals is usable on this screen (tap …: covered by <role> …)`), not
  * from any "toolbar" in the reply: its advice names the input-accessory toolbar whatever covered the dismissal.
  */
+// Errs safe: a `)` inside an earlier part of the clause (a selector's text) ends the match before `covered by`, and
+// the row then names no cover — the mismatch stays red, only its wording loses the role.
 export const DISMISSAL_COVERED = /none of the configured dismissals is usable[^(]*\([^)]*covered by ([a-z]+)/;
 
 /**
