@@ -178,6 +178,8 @@ private fun TabbarFloating(cell: Cell, lab: Lab) {
         val w = maxWidth
         val header = 200.dp
         val pillTop = maxHeight - 44.dp - 87.dp
+        val list = rememberScrollState()
+        ReportScroll(lab, "list", { list.isScrollInProgress }, { list.value })
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(header), contentAlignment = Alignment.Center) { Text("Header") }
             Box(
@@ -186,7 +188,7 @@ private fun TabbarFloating(cell: Cell, lab: Lab) {
                     .weight(1f)
                     .then(reporting { lab.scrollView("list", it) })
                     .testTag("lab.${cell.id}.list")
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(list),
             ) {
                 Box(Modifier.fillMaxWidth().height(2400.dp)) {
                     BarTarget(cell, "T", lab, w - 48.dp, 52.dp, Modifier.offset(24.dp, 100.dp))
@@ -237,12 +239,14 @@ private fun Fab(cell: Cell, lab: Lab) {
         val h = maxHeight
         val hostTop = h - bars.bottom - 16.dp - 128.dp
         val beside = (w - 96.dp) / 2 - 32.dp
+        val list = rememberScrollState()
+        ReportScroll(lab, "list", { list.isScrollInProgress }, { list.value })
         Box(
             Modifier
                 .fillMaxSize()
                 .then(reporting { lab.scrollView("list", it) })
                 .testTag("lab.${cell.id}.list")
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(list),
         ) {
             Box(Modifier.fillMaxWidth().height(h + 400.dp)) {
                 BarTarget(cell, "W", lab, SLOT_W, SLOT_H, Modifier.offset((w - SLOT_W) / 2, hostTop - 200.dp))

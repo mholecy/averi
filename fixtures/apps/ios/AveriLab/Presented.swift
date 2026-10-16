@@ -134,6 +134,7 @@ struct ScrolledHost: View {
                     }
                 }
             }
+            .labScroll("host", lab)
             .scrollPosition($position)
             .contentMargins(0, for: .scrollContent)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.scrollView("host", $0) }
@@ -253,6 +254,24 @@ final class LongListController: UITableViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         report()
+    }
+
+    // The live golden's oracle (Lab.offset, Lab.scrolling): the table's offset, and each stroke from the drag's start
+    // until it rests (no fling: at the drag's end; a fling: once it has decelerated).
+    override func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        lab.offset("list", Double(scrollView.contentOffset.y + scrollView.adjustedContentInset.top))
+    }
+
+    override func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        lab.scrolling("list", true, Double(scrollView.contentOffset.y + scrollView.adjustedContentInset.top))
+    }
+
+    override func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { lab.scrolling("list", false, Double(scrollView.contentOffset.y + scrollView.adjustedContentInset.top)) }
+    }
+
+    override func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        lab.scrolling("list", false, Double(scrollView.contentOffset.y + scrollView.adjustedContentInset.top))
     }
 
     /// Each target's row and the table's clip, in screen points — rows below the fold included (rectForRow needs no

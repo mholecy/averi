@@ -48,8 +48,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/** A scroll container of an edges cell (Edges.swift#EdgeScroller): `height` null runs to the screen's bottom. */
-private class EdgeScroller(val id: String, val top: Dp, val height: Dp?, val content: Dp, val offset: Dp, val rows: List<Pair<String, Dp>>)
+/**
+ * A scroll container of an edges cell (Edges.swift#EdgeScroller): `height` null runs to the screen's bottom; `content`
+ * null is its height plus the offset — scrolled to its end.
+ */
+private class EdgeScroller(val id: String, val top: Dp, val height: Dp?, val content: Dp?, val offset: Dp, val rows: List<Pair<String, Dp>>)
 
 /** Edges.swift#EdgeLayout.scrollers, in dp (the Pixel 3a: 392×807 dp, 1080×2220 px). */
 private fun scrollersOf(cell: String): List<EdgeScroller> = when (cell) {
@@ -61,6 +64,9 @@ private fun scrollersOf(cell: String): List<EdgeScroller> = when (cell) {
     )
     // Scrolled 400 dp, not iOS's 382: T (-20–44 dp) rests with its centre 12 dp inside the 24-dp status bar.
     "scroll-top-edge" -> listOf(EdgeScroller("page", 0.dp, null, 2400.dp, 400.dp, listOf("A" to 100.dp, "T" to 380.dp)))
+    // scroll-top-edge's page, its content ending at the screen's bottom: nothing more to scroll toward the content's end
+    // (calibration.json #17's turn-back, live).
+    "scroll-top-edge-end" -> listOf(EdgeScroller("page", 0.dp, null, null, 400.dp, listOf("A" to 100.dp, "T" to 380.dp)))
     else -> emptyList()
 }
 
@@ -161,15 +167,17 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
 private fun EdgeScrollColumn(cell: Cell, s: EdgeScroller, lab: Lab, height: Dp) {
     val view = LocalView.current
     val initial = with(LocalDensity.current) { s.offset.roundToPx() }
+    val state = rememberScrollState(initial)
+    ReportScroll(lab, s.id, { state.isScrollInProgress }, { state.value })
     Box(
         Modifier
             .fillMaxWidth()
             .height(height)
             .background(Color(0xFFEEEEEE))
             .onGloballyPositioned { lab.scrollView(s.id, screenFrame(view, it)) }
-            .verticalScroll(rememberScrollState(initial)),
+            .verticalScroll(state),
     ) {
-        Box(Modifier.fillMaxWidth().height(s.content)) {
+        Box(Modifier.fillMaxWidth().height(s.content ?: (height + s.offset))) {
             for ((tag, y) in s.rows) {
                 val t = cell.targets.firstOrNull { it.tag == tag } ?: continue
                 RowBox(cell, t, lab, Modifier.align(Alignment.TopCenter).offset(y = y))
@@ -181,7 +189,16 @@ private fun EdgeScrollColumn(cell: Cell, s: EdgeScroller, lab: Lab, height: Dp) 
 @Composable
 private fun StickyList(cell: Cell, lab: Lab) {
     val view = LocalView.current
-    val initial = with(LocalDensity.current) { STICKY_OFFSET.roundToPx() }
+    val density = LocalDensity.current
+    val initial = with(density) { STICKY_OFFSET.roundToPx() }
+    val state = rememberLazyListState(0, initial)
+    // The list's offset in pixels down its content: the header item (index 0) then rows of ROW_HEIGHT.
+    val header = with(density) { STICKY_HEADER.roundToPx() }
+    val row = with(density) { ROW_HEIGHT.roundToPx() }
+    ReportScroll(lab, "list", { state.isScrollInProgress }) {
+        val i = state.firstVisibleItemIndex
+        (if (i == 0) 0 else header + (i - 1) * row) + state.firstVisibleItemScrollOffset
+    }
     LazyColumn(
         Modifier
             .padding(top = STICKY_TOP)
@@ -189,7 +206,7 @@ private fun StickyList(cell: Cell, lab: Lab) {
             .height(STICKY_HEIGHT)
             .background(Color(0xFFEEEEEE))
             .onGloballyPositioned { lab.scrollView("list", screenFrame(view, it)) },
-        state = rememberLazyListState(0, initial),
+        state = state,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         stickyHeader {
