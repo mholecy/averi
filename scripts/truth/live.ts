@@ -1,18 +1,20 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { IosAdapter } from '../../src/adapters/ios.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
-import { AdapterRegistry, defaultFactory } from '../../src/mcp/registry.js';
-import { createAveriServer } from '../../src/mcp/tools.js';
+import type { AdapterFactory, AdapterRegistry, DeviceDiscovery } from '../../src/mcp/registry.js';
+import type { createAveriServer as CreateAveriServer } from '../../src/mcp/tools.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
+import { takesDeps } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
-import type { LabState } from './schema.js';
+import { judgeDismissal, visibilityCases, type Verdict as VisibilityVerdict } from './live-visibility.js';
+import type { Catalog, CellTruth, LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -49,10 +51,30 @@ import type { LabState } from './schema.js';
  *    (idb ui text); IosLab.launch writes the simulator's keyboard preferences back before every launch, and the
  *    keyboard's cases run first besides.
  * Not a vitest test: it needs the simulator. Exit code 1 on a MISMATCH.
+ *
+ * Groups (`--groups`, all three by default): `forms` the cases above; `visibility` (phase 5) the coloured-target cells'
+ * taps and scroll_until — every case built from the cell's static truth (tests/fixtures/truth) by live-visibility.ts,
+ * the app's tap log, scroll offsets and strokes the oracle (`--cells` narrows them); `dismissal` (phase 5, iOS) a tap
+ * under the keyboard on the false-covers toolbar cells, under the cell's own `keyboardDismiss` (CellConfig): the
+ * control focused, nothing typed. A case not ok prints the app's state beneath it.
+ *
+ * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
+ * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
+ * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits.
  */
 
 const { values } = parseArgs({
-  options: { udid: { type: 'string' }, serial: { type: 'string' }, 'wda-port': { type: 'string' }, sources: { type: 'string' }, cases: { type: 'string' }, shots: { type: 'string' } },
+  options: {
+    udid: { type: 'string' },
+    serial: { type: 'string' },
+    'wda-port': { type: 'string' },
+    sources: { type: 'string' },
+    cases: { type: 'string' },
+    shots: { type: 'string' },
+    groups: { type: 'string' },
+    cells: { type: 'string' },
+    side: { type: 'string' },
+  },
 });
 if ((values.udid === undefined) === (values.serial === undefined)) {
   throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--cases b1,p4] | --serial <lab emulator> [--cases b1,p4]');
@@ -64,6 +86,8 @@ const port = Number(values['wda-port'] ?? 8120);
 type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
 const sources: Source[] = platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
 const only = values.cases?.split(',');
+const groups = (values.groups ?? 'forms,visibility,dismissal').split(',');
+const onlyCells = values.cells?.split(',');
 /** Where a case that is not ok leaves its screenshot (`--shots <dir>`), for the evidence. */
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
@@ -82,10 +106,11 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-type Verdict = { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; why: string };
+type Verdict = VisibilityVerdict;
 
 interface Case {
   id: string;
+  group?: 'forms' | 'visibility' | 'dismissal';
   cell: string;
   says: string;
   /** averi.yaml `app.ios.keyboardDismiss` for this case. */
@@ -280,19 +305,104 @@ const CASES: Case[] = [
   },
 ];
 
+// --- phase 5: the visibility cells, from their static truth ---
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+/** The truth run of this platform (tests/fixtures/truth/<run>, its manifest's `platform`). */
+async function truthsOf(p: Platform): Promise<CellTruth[]> {
+  const base = join(ROOT, 'tests/fixtures/truth');
+  for (const run of await readdir(base)) {
+    const manifest = JSON.parse(await readFile(join(base, run, 'manifest.json'), 'utf8')) as { platform: Platform; captures: { truth?: string }[] };
+    if (manifest.platform !== p) continue;
+    const files = [...new Set(manifest.captures.map((c) => c.truth).filter((t): t is string => t !== undefined))];
+    return Promise.all(files.map(async (f) => JSON.parse(await readFile(join(base, run, f), 'utf8')) as CellTruth));
+  }
+  return [];
+}
+
+if (groups.includes('visibility')) {
+  for (const truth of await truthsOf(platform)) {
+    if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;
+    for (const v of visibilityCases(truth, platform)) CASES.push({ ...v, group: 'visibility', judge: (s, replies, source, launched) => v.judge(s, replies, launched, source) });
+  }
+}
+
+/**
+ * The dismissal's dynamics (#7, #19; iOS): a tap on a field under the keyboard, the cell's own `keyboardDismiss` (the
+ * principal title, under SwiftUI's toolbar host or an itemless bar) — the app's focus must move to the field, nothing
+ * typed into any field, no submit. WDA taps the dismissal; under idb the list is inert, and a refusal with the focus
+ * left where it was is its documented answer.
+ */
+if (groups.includes('dismissal') && platform === 'ios') {
+  const catalog = JSON.parse(await readFile(join(ROOT, 'fixtures/apps/cells.json'), 'utf8')) as Catalog;
+  for (const cell of catalog.cells) {
+    const dismiss = cell.config?.ios?.keyboardDismiss as unknown[] | undefined;
+    if (cell.form === undefined || dismiss === undefined || (onlyCells !== undefined && !onlyCells.includes(cell.id))) continue;
+    if (cell.platforms !== undefined && !cell.platforms.includes('ios')) continue;
+    for (const tag of ['vs', 'ks', 'ss', 'note']) {
+      CASES.push({
+        id: `dismiss:${cell.id}.${tag}`,
+        group: 'dismissal',
+        cell: cell.id,
+        keyboard: true,
+        platforms: ['ios'],
+        dismiss,
+        says: `a tap on ${tag} under the keyboard, keyboardDismiss on the title: the keyboard dismissed, then ${tag} focused (or refused for where it lies once the keyboard is gone), nothing typed`,
+        calls: [{ tool: 'tap', args: { selector: id(cell.id, tag) } }],
+        judge: (s, [reply], source, launched) => judgeDismissal(tag, reply, source, s, launched),
+      });
+    }
+  }
+}
+
 // --- the server: a real registry, the lab simulator only, WDA on a port of its own ---
 
+/**
+ * The averi under test: this checkout's src, or `--side`'s (a checkout of another commit) — its tools, registry, iOS
+ * adapter and tree source, as scripts/differential/side.ts loads a side; an older registry that takes the factory alone
+ * is given one that answers an unbound call with the discovery (side.ts#takesDeps).
+ */
+interface Averi {
+  root: string;
+  createAveriServer: typeof CreateAveriServer;
+  registry(deps: { factory: AdapterFactory; discovery: DeviceDiscovery }): AdapterRegistry;
+  defaultFactory: AdapterFactory;
+  iosAdapter(udid: string, source: IosTreeSourceKind): DeviceAdapter;
+}
+
+async function loadAveri(root: string): Promise<Averi> {
+  const at = async (path: string) => (await import(pathToFileURL(resolve(root, path)).href)) as Record<string, unknown>;
+  const [tools, registry, ios, treeSource] = await Promise.all([at('src/mcp/tools.ts'), at('src/mcp/registry.ts'), at('src/adapters/ios.ts'), at('src/adapters/ios-tree-source.ts')]);
+  const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
+  const seam = await takesDeps(Registry);
+  const IosAdapter = ios.IosAdapter as new (opts: { udid: string; treeSource: unknown }) => DeviceAdapter;
+  const createIosTreeSource = treeSource.createIosTreeSource as (kind: IosTreeSourceKind, udid: string, deps: { port: number; derivedDataPath: string }) => unknown;
+  return {
+    root: resolve(root),
+    createAveriServer: tools.createAveriServer as typeof CreateAveriServer,
+    defaultFactory: registry.defaultFactory as AdapterFactory,
+    registry: (deps) => {
+      if (seam) return new Registry(deps);
+      const legacy = Registry as unknown as new (factory: AdapterFactory) => AdapterRegistry;
+      return new legacy((p, deviceId, opts) => (deviceId === undefined ? ({ listDevices: () => deps.discovery(p) } as unknown as DeviceAdapter) : deps.factory(p, deviceId, opts)));
+    },
+    iosAdapter: (udid, source) => new IosAdapter({ udid, treeSource: createIosTreeSource(source, udid, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
+  };
+}
+
+const averi = await loadAveri(values.side ?? ROOT);
+console.error(`averi: ${averi.root}`);
+
 async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
-  const registry = new AdapterRegistry({
-    factory: (p, deviceId, opts) =>
-      p === 'android' ? defaultFactory(p, deviceId, opts) : new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? 'idb', deviceId, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
+  const registry = averi.registry({
+    factory: (p, deviceId, opts) => (p === 'android' ? averi.defaultFactory(p, deviceId, opts) : averi.iosAdapter(deviceId, opts?.treeSource ?? 'idb')),
     // The lab device alone. Android: listed without asking adb (its listing runs getprop on every attached device).
     discovery: async (p) =>
       p !== platform ? []
       : p === 'ios' ? (await listIosDevices()).filter((d) => d.id === device)
       : [{ id: device, platform: 'android', name: LAB_AVD, osVersion: 'lab', state: 'booted' }],
   });
-  const server = createAveriServer({ registry, version: 'live-golden' });
+  const server = averi.createAveriServer({ registry, version: 'live-golden' });
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: 'live-golden', version: '0' });
@@ -334,7 +444,7 @@ const shoot = async (file: string) => writeFile(file, await lab.screenshot());
 const { client, close } = await connect();
 try {
   // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
-  for (const c of CASES.filter((x) => (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)))) {
+  for (const c of CASES.filter((x) => groups.includes(x.group ?? 'forms') && (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)))) {
     for (const source of sources) {
       const launched = await lab.launch(c.cell);
       if (c.keyboard && launched.keyboard?.visible !== true) {
@@ -366,12 +476,13 @@ try {
 }
 
 const count = (o: Verdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
-const lines = [`# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches, ${count('SKIP')} skipped`, ''];
+const lines = [`<!-- averi: ${values.side ?? 'this checkout'} -->`, `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches, ${count('SKIP')} skipped`, ''];
 for (const source of sources) {
   lines.push(`## ${source}`);
   for (const r of results.filter((x) => x.source === source)) {
     lines.push(`- ${r.verdict.outcome === 'ok' ? 'ok' : r.verdict.outcome} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}`);
-    if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ').slice(0, 400)}`);
+    if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ')}`);
+    if (r.verdict.outcome !== 'ok' && r.verdict.app !== undefined) lines.push(`    app: ${r.verdict.app}`);
   }
   lines.push('');
 }
