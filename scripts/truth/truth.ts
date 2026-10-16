@@ -139,7 +139,8 @@ const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive cont
  * what shows is reached, and so is one overlapped at its edge by a band or the chrome (its centre clear; what of it is
  * drawn is not held to DRAWN); one whose centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a
  * sliver, a centre under chrome and, on iOS, a centre in a band (the touch is the app's window's) may be either (what
- * fires there is the truth the rows read). Unmeasured, a declared-open target whose centre lies off the screen is
+ * fires there is the truth the rows read) — though iOS's status bar swallows a probe in the top of its band
+ * (statusBarMaySwallow: no touch, then not reached). Unmeasured, a declared-open target whose centre lies off the screen is
  * broken, as the phase-1 rule has it: never probed, it is never reached.
  */
 export function consistency(t: TargetTruth, platform?: Platform, screen?: { width: number; height: number }): string | undefined {
@@ -156,7 +157,10 @@ export function consistency(t: TargetTruth, platform?: Platform, screen?: { widt
       return probed ? 'nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe' : undefined;
   }
   if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
-  if (touchesAt(t.probe, probePoint(t.frame)).length === 0) return NOT_DELIVERED;
+  if (touchesAt(t.probe, probePoint(t.frame)).length === 0) {
+    if (statusBarMaySwallow(platform, g)) return t.reached ? `${g}, but the probe tap reached it with no touch logged` : undefined;
+    return NOT_DELIVERED;
+  }
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? undefined : `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
   if (g === 'partly-centre-in' && !t.reached) return 'declared open, cut with its centre showing, but the probe tap did not reach it';
@@ -173,6 +177,15 @@ export function consistency(t: TargetTruth, platform?: Platform, screen?: { widt
  * probe, so that scroll cannot reach the next one, and the touch it logs is the evidence the rows need.
  */
 export const systemBarSwallows = (platform: Platform | undefined, g: Geometry) => platform === 'android' && g === 'status-band';
+
+/**
+ * iOS's status bar swallows a tap in the top of its band and passes one below through: measured 2026-10-16 on the lab
+ * simulator (iPhone 17, iOS 27.0, top inset 62 pt) with raw `idb ui tap 201 y` on `open` — y 2, 12, 30, 40, 50 left no
+ * touch in the app, y 55, 58, 61 did (and on sheet-medium-edges, presented-over G's probe at (201,12) left none). So on
+ * iOS a status-band probe that left no touch is the bar's, not a broken cell — and must not have reached the target;
+ * one that left its touch is judged as any other.
+ */
+export const statusBarMaySwallow = (platform: Platform | undefined, g: Geometry) => platform === 'ios' && g === 'status-band';
 
 /**
  * Android's navigation band is NOT measured — an OPEN ASSUMPTION for B4 (bars) to measure: under gesture navigation a
