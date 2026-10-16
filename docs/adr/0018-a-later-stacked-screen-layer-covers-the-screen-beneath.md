@@ -247,8 +247,8 @@ predicate answers for it unchanged.
 
 Decision: before EVERY stroke, for a target the read holds and has not judged in the viewport — wholly off it, under
 the soft keyboard, clipped or cut to a sliver, its centre under a system bar, or short of the stop under a node of its
-own screen — `scroll_until` asks where the stroke would touch down (`swipe.ts#scrollStroke`'s `from`, the driver's
-own point for that stroke: its container's box, above the keyboard line) and whether a surface of a screen presented
+own screen — `scroll_until` asks where the stroke would touch down (`stroke-plan.ts#planStroke`'s points' `from`, the
+driver's own point for that stroke — since 2026-10-16 the very points it sends: its container's box, above the keyboard line) and whether a surface of a screen presented
 over the target's lies there (`draw-order.ts#DrawOrder.presentedAt`: the last node after the target holding the point
 that draws over it as a target — the `target` column, as `exposure` asks first — and is a presented surface over its
 screen, `presentedSurface`, every condition above and the labelled-dim amendment unchanged). If one does, the round

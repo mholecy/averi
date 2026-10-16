@@ -97,7 +97,7 @@ was reported done at (201,827), 3 pt below CONTINUE.
   where something the flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`),
   and otherwise tapped, stopped on and measured on what shows.
 - **Strokes over the screen's middle, not the target's scroll view** (iOS) — **closed 2026-10-16**: the scrollers now
-  feed the stroke's containers on a WDA tree (`interact/scroll-rounds.ts#targetScrollers`: the clipping chain, else
+  feed the stroke's containers on a WDA tree (`interact/stroke-plan.ts#targetScrollers`: the clipping chain, else
   `Clips.drawnIn`'s `scrollers`), and what WDA draws over such a scroll view cuts the stroke as on Android
   (`draw-order.ts#DrawOrder.drawnOver` finds its container among the nodes that scroll). Lab notes LE4 and LV3
   (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). Still so under idb, which

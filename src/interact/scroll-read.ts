@@ -91,11 +91,11 @@ export interface TreeFacts {
    * whose edges uiautomator has already cut the match's bounds; empty when
    * it has none (every node of an iOS tree) — for the `fully: true` stop's
    * flush check (PROBE_REACH) and the box the strokes are drawn in
-   * (swipe.ts#strokeRoom); what is drawn OVER a clipping container (the
+   * (interact/stroke-plan.ts#planStroke); what is drawn OVER a clipping container (the
    * floating tab bar) — `order.drawnOver`, what a stroke over it keeps
-   * clear of (swipe.ts#strokeRoom cuts the box above them), and
+   * clear of (stroke-plan.ts#strokeRoom cuts the box above them), and
    * `order.drawnOverAt`, the one a stroke that still touched down on it
-   * names (`touchedOn`), asked of the rects `clips.scrollersOf` and
+   * names (stroke-plan.ts#touchedOn), asked of the rects `clips.scrollersOf` and
    * `mainScroller` give, undefined when this tree has no container with
    * that rect (one remembered from an earlier read: the list has moved
    * since), never any on iOS, which has no clipping container; and idb's
@@ -328,7 +328,7 @@ function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { 
 const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined => (y <= 0 ? undefined : { width: viewport.width, height: y });
 
 /**
- * The top edge a stroke is kept above (swipe.ts#strokeRoom's `coverTop`):
+ * The top edge a stroke is kept above (stroke-plan.ts#strokeRoom's `coverTop`):
  * the keyboard line (ui-tree/keyboard-position.ts#KeyboardPosition.line) of the applied
  * cover's line and idb's band (`TreeFacts.scene`'s draw order) — the band
  * whether or not the round applied it (a moot band changes no judgement,
@@ -336,7 +336,7 @@ const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined =
  * number pad were stroked from y 699).
  * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
  * No guard on where the band lies in the gesture box: a top at or below
- * the box's bottom changes no stroke (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
+ * the box's bottom changes no stroke (stroke-plan.ts#strokeRoom and swipe.ts#swipeVectorAbove keep the whole box — pinned in
  * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
  * the band starts below the top bar's line, a fifth of the screen down.
  */

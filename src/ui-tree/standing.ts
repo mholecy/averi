@@ -297,7 +297,7 @@ export interface Scene {
    * (draw-order.ts#DrawOrder.markedAt: an alert's, an action sheet's or a popover's element, what of a `screen` layer
    * draws there; a screen presented by shape alone is not asked of no target). Undefined when none. The point is
    * kept: a surface judged by shape only where it lies is not one at every touch-down (a dismissed sheet parked off
-   * screen is no stop). One reader: `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
+   * screen is no stop). One reader: `scroll_until`'s stroke (interact/stroke-plan.ts#planStroke, its `presented`).
    */
   presentedAt(point: Point, target?: UiNode): PresentedPress | undefined;
 }

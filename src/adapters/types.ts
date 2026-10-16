@@ -193,7 +193,7 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
  * or a corner in common is none) — `rectsOverlap`'s question answered with
  * the shared rect itself, and its one arithmetic. Callers: the box a scroll
  * stroke is drawn in, the gesture box met with a clipping container
- * (interact/swipe.ts#strokeBox), and the fill's nearest-input pick
+ * (interact/stroke-plan.ts#strokeRoom), and the fill's nearest-input pick
  * (interact/fill.ts, its overlap area). Here beside `rectsOverlap`, below ui-tree/
  * geometry.ts, which re-exports it.
  */
