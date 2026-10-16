@@ -96,10 +96,12 @@ was reported done at (201,827), 3 pt below CONTINUE.
   `42,817` under idb) is judged on the screen alone, so the drawn frame cannot refuse it there: it is refused only
   where something the flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`),
   and otherwise tapped, stopped on and measured on what shows.
-- **Strokes over the screen's middle, not the target's scroll view** (iOS): the drawn frame names the target's scroll
-  views (`Clips.drawnIn`'s `scrollers`), but `scroll_until` still strokes in the screen box on a WDA tree (its stroke
-  containers are Android's clipping chain, `Clips.scrollersOf`). On the country sheet, a stroke `up` toward a row past
-  the list's 811 touches down above the sheet's list. Unchanged; the scrollers could feed the stroke's containers.
+- **Strokes over the screen's middle, not the target's scroll view** (iOS) — **closed 2026-10-16**: the scrollers now
+  feed the stroke's containers on a WDA tree (`interact/scroll-rounds.ts#targetScrollers`: the clipping chain, else
+  `Clips.drawnIn`'s `scrollers`), and what WDA draws over such a scroll view cuts the stroke as on Android
+  (`draw-order.ts#DrawOrder.drawnOver` finds its container among the nodes that scroll). Lab notes LE4 and LV3
+  (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). Still so under idb, which
+  lists no scroll view.
 - **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
   21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
   at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.

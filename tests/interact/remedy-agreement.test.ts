@@ -586,7 +586,7 @@ describe('a target beneath an alert — the tap, the pixel assert and scroll_unt
     field.rect = { x: 24, y: 1200, width: 354, height: 52 };
     expect(await tapSaid(tree, field)).toBe(`id:t is off screen at (201,1226) on a 402x874 screen (rect 24,1200 354x52) — ${CLOSE_IT}; nothing was tapped`);
     expect(failureOf(stopOf(tree, field), 'id:t').message).toBe(
-      `scroll_until id:t stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+      `scroll_until id:t stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,331) on ${ALERT} — ` +
         `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":1200,"width":354,"height":52} in a 402x874 viewport`,
     );
   });
