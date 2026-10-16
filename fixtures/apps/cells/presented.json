@@ -30,7 +30,8 @@
         { "tag": "H", "color": "#E53935", "slot": 0, "declared": "presented-over", "scrollView": "host" },
         { "tag": "G", "color": "#1E88E5", "slot": 1, "declared": "presented-over", "scrollView": "host" },
         { "tag": "E", "color": "#43A047", "slot": 2, "declared": "presented-over", "scrollView": "host" },
-        { "tag": "F", "color": "#FB8C00", "slot": 3, "declared": "presented-over", "scrollView": "host" }
+        { "tag": "F", "color": "#FB8C00", "slot": 3, "declared": "presented-over", "scrollView": "host" },
+        { "tag": "M", "color": "#8E24AA", "slot": 4, "declared": "presented-over", "scrollView": "host" }
       ]
     },
     {

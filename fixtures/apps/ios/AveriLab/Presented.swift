@@ -101,15 +101,16 @@ struct SheetContent: View {
 
 /// A scroll view over the whole screen, scrolled `offset` down on appear, its targets placed in the content so that,
 /// beneath the medium sheet: slot 0 lies wholly above the screen, slot 1 wholly under the status bar (its top above the
-/// screen), slot 2 shows 5 pt at the screen's bottom (under the sheet), slot 3 lies wholly below it.
+/// screen), slot 2 shows 5 pt at the screen's bottom (under the sheet), slot 3 lies wholly below it; slot 4 lies whole
+/// on the screen under the sheet's dim — the cell's positive control, the one target whose probe is delivered.
 struct ScrolledHost: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
     @State private var position = ScrollPosition(edge: .top)
 
     static let offset: CGFloat = 200
-    /// Each slot's top in the content; less `offset`, on the screen: -88, -20, 869, 1009.
-    static let tops: [CGFloat] = [112, 180, 1069, 1209]
+    /// Each slot's top in the content; less `offset`, on the screen: -88, -20, 869, 1009, 290.
+    static let tops: [CGFloat] = [112, 180, 1069, 1209, 490]
 
     var body: some View {
         GeometryReader { geo in

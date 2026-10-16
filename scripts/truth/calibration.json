@@ -651,9 +651,12 @@
         "ios-iphone17-ios27/sheet-medium-edges.wda.json E scroll_until",
         "ios-iphone17-ios27/sheet-medium-edges.wda.json F tap",
         "ios-iphone17-ios27/sheet-medium-edges.wda.json F colour",
-        "ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until"
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json M tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json M colour",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json M scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there)."
+      "remark": "No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there). M, whole on the screen under the dim, is the cell's positive control (its probe delivered) and is red the same way."
     },
     {
       "n": "L4",

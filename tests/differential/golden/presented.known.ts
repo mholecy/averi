@@ -56,7 +56,7 @@ export const presented: KnownFile = {
     // idb lists only the presented layer (as on sheet-medium): beneath the medium sheet over the scrolled host, the large
     // sheet's bare background and the transparent cover, the targets are not in the tree.
     ...['sheet-medium-edges', 'sheet-background', 'dim-cover'].flatMap((cell) => {
-      const tags = cell === 'sheet-medium-edges' ? ['H', 'G', 'E', 'F'] : ['A', 'B', 'C', 'D'];
+      const tags = cell === 'sheet-medium-edges' ? ['H', 'G', 'E', 'F', 'M'] : ['A', 'B', 'C', 'D'];
       return [
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
@@ -64,13 +64,15 @@ export const presented: KnownFile = {
       ];
     }),
     // LAB FINDING (calibration.json L3): beneath the medium sheet over a scrolled host, WDA's targets wholly above, wholly
-    // under the status bar, a 5-pt sliver and wholly below get scroll or status-bar advice and scroll_until swipes the
-    // sheet — green from 753b560 to 20b800a (#30, #32, #34 calibrate there), red from 41c394a (fix/r20-marks).
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
+    // under the status bar, a 5-pt sliver, wholly below — and M, whole on the screen under the dim — get scroll or
+    // status-bar advice and scroll_until swipes the sheet — green from 753b560 to 20b800a (#30, #32, #34 calibrate there),
+    // red from 41c394a (fix/r20-marks).
+    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F', 'M'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
+    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F', 'M'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'F'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: strokes on the sheet for a target off the screen beneath it', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['G'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, 'idb ui swipe 201 699 201 568 --duration 0.3'], note: 'lab finding: strokes on the sheet for a target under the status bar beneath it', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['E'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a sliver beneath it', as: LAB_EDGES }),
+    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['M'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a whole target under its dim', as: LAB_EDGES }),
     // sheet-long-list.idb.json — idb lists the UIKit table's labels without their accessibility identifiers (AXUniqueId
     // null), and none of the rows below the fold: neither target answers to its id. A tree source's limit.
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier' }),
@@ -111,8 +113,8 @@ export const presented: KnownFile = {
     [`${IOS}/alert-dim.wda.json`]: 12,
     [`${IOS}/sheet-medium.idb.json`]: 15,
     [`${IOS}/sheet-medium.wda.json`]: 15,
-    [`${IOS}/sheet-medium-edges.idb.json`]: 12,
-    [`${IOS}/sheet-medium-edges.wda.json`]: 12,
+    [`${IOS}/sheet-medium-edges.idb.json`]: 15,
+    [`${IOS}/sheet-medium-edges.wda.json`]: 15,
     [`${IOS}/sheet-background.idb.json`]: 15,
     [`${IOS}/sheet-background.wda.json`]: 15,
     [`${IOS}/sheet-long-list.idb.json`]: 6,

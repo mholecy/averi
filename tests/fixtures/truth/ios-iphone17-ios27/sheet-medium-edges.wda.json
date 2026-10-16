@@ -163,6 +163,28 @@
                  },
                  {
                   "customActions": null,
+                  "nativeFrame": "{{51, 290}, {300, 64}}",
+                  "label": "Target M",
+                  "rawIdentifier": "lab.sheet-medium-edges.M",
+                  "traits": "Button",
+                  "frame": "{{51, 290}, {300, 64}}",
+                  "isVisible": "0",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "lab.sheet-medium-edges.M",
+                  "rect": {
+                   "y": 290,
+                   "x": 51,
+                   "width": 300,
+                   "height": 64
+                  }
+                 },
+                 {
+                  "customActions": null,
                   "nativeFrame": "{{51, 869}, {300, 64}}",
                   "label": "Target E",
                   "rawIdentifier": "lab.sheet-medium-edges.E",

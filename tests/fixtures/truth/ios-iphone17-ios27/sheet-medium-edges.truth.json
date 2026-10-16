@@ -100,6 +100,45 @@
       "piece": null,
       "scrollView": "host",
       "unprobed": "its centre (201,1041) lies off the 402x874 screen"
+    },
+    {
+      "tag": "M",
+      "id": "lab.sheet-medium-edges.M",
+      "color": "#8E24AA",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 290
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,322.0"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "sheet"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#721D88",
+      "geometry": "whole",
+      "visible": {
+        "x": 51,
+        "y": 290,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 290,
+        "width": 300,
+        "height": 64
+      },
+      "scrollView": "host"
     }
   ],
   "safeArea": {

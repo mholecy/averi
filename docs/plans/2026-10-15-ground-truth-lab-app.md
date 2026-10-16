@@ -159,7 +159,8 @@ already refused, red only on #33's defect.
 
 **B3 — presented (2026-10-16, iOS only: every note it calibrates is iOS's; the Android app builds none of its layers).**
 Six cells (fixtures/apps/cells/presented.json): `sheet-medium-edges` (the medium sheet over a scrolled host; targets
-wholly above, wholly under the status bar, a 5-pt sliver, wholly below), `sheet-background` (a large sheet's bare
+wholly above, wholly under the status bar, a 5-pt sliver, wholly below, and one whole under the dim, the positive
+control), `sheet-background` (a large sheet's bare
 background over the targets — #28's cell; CALIBRATED, no longer DOES-NOT-FAIL), `sheet-long-list` (a UIKit table in a
 large sheet, WDA parking the label of a row below the fold at the sheet's origin, #20), `dim-cover` (an RN-style
 transparent cover, #27), `blur-menu` and `blur-menu-grouped` (a menu over a blurred backdrop no tree lists, #31's

@@ -25,15 +25,15 @@ open note on the working tree. See the script for the verdicts.
 | 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | needs-live | 8a55d2b → 21f1deb, b940052 | — |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half only) |
 | 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | needs-cell:false-covers | bd06470 → 470dafe, cd4d177 | — |
-| 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED |
+| 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | needs-cell:bars | 0cb8b62 → 5e47ff4 | — |
 | 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half only), regressed elsewhere: 2 rows (recorded) |
 | 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | needs-ocr | 94bae14 → e85bcdf | — |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
 | 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | needs-cell:bars | 7566443 → 83e282a | — |
-| 27 | 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done | calibrate | 53da035 → 41c394a | CALIBRATED |
-| 28 | 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath | calibrate | 53da035 → 41c394a | CALIBRATED |
+| 27 | 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
+| 28 | 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
 | 29 | 2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes | needs-cell:edges | ec2893a → b7eac90 | — |
 | 30 | 2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes | calibrate | 4655113 → 753b560 | CALIBRATED |
 | 31 | 2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done | residual:open (the blur overlay has no node in either tree) | — | — |
@@ -179,7 +179,7 @@ Needs: The text field's scroll indicator half needs a false-covers/own-parts cel
 
 The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note.
 
-## 20: CALIBRATED
+## 20: CALIBRATED (partial: R-off only)
 
 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md — defect: `^Tapped|no swipe`
 
@@ -190,7 +190,7 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - ok ios-iphone17-ios27/sheet-long-list.wda.json F tap — ERROR id:"lab.sheet-long-list.F" is off screen at (201,1374) on a 402x874 screen (rect 0,1342 402x64) — scroll_until it first; nothing was tapped
   - ok ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-long-list.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 402x874 viewpor
 
-presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Before: tap Tapped at the parked point, scroll_until 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). idb lists neither target by its id (KNOWN).
+presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Only R-off is asked: F lies off the screen, which takes precedence over outside its scroll view (truth.ts#geometryOf) — the note's own call, `fully: true`, is R-fully's and not asked of an off-screen target (partial); the plain stop asked by R-stroke shows the same 'fully visible after 0 swipes'. Before: tap Tapped at the parked point, scroll_until (R-stroke) 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). No idb evidence: idb lists the table's labels without their identifiers and no row below the fold (KNOWN).
 
 ## 22: CALIBRATED-ON-DEFECT (partial: the overlay half only)
 
@@ -237,7 +237,7 @@ Calibrated through the overlay half of the fix: before, the colour assert passed
   - RED ios-iphone17-ios27/dim-cover.wda.json D tap — Tapped: Tapped id:"lab.dim-cover.D"
   - RED ios-iphone17-ios27/dim-cover.wda.json D colour — passed on #975400: it measured the layer over the target as the target
   - RED ios-iphone17-ios27/dim-cover.wda.json D scroll_until — no "close it first": Element id:"lab.dim-cover.D" fully visible after 0 swipes
-- after 41c394a:
+- after 41c394a (not the note's fix: 15896c5 fixed the note's Finportal tree, not this SwiftUI cover: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it):
   - ok ios-iphone17-ios27/dim-cover.wda.json A tap — ERROR id:"lab.dim-cover.A" is under container (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from u
   - ok ios-iphone17-ios27/dim-cover.wda.json A colour — FAIL  element id:"lab.dim-cover.A" fill within dE00 8 of #892220 — container (0,0 402x874) is drawn over the element (element 51,110 300x64) — the capture would show it, not the element; a screen is presented over the el
   - ok ios-iphone17-ios27/dim-cover.wda.json A scroll_until — ERROR scroll_until id:"lab.dim-cover.A" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,142), drawn over it — 0% of it shows — a screen is presented over it (a m
@@ -251,7 +251,7 @@ Calibrated through the overlay half of the fix: before, the colour assert passed
   - ok ios-iphone17-ios27/dim-cover.wda.json D colour — FAIL  element id:"lab.dim-cover.D" fill within dE00 8 of #975400 — container (0,0 402x874) is drawn over the element (element 51,650 300x64) — the capture would show it, not the element; a screen is presented over the el
   - ok ios-iphone17-ios27/dim-cover.wda.json D scroll_until — ERROR scroll_until id:"lab.dim-cover.D" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,682), drawn over it — 0% of it shows — a screen is presented over it (a m
 
-presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root a screen-sized identified container dimming the screen and holding a card (an RN transparent Modal's shape). 15896c5 fixed the note's Finportal tree, not this one: still Tapped / PASS / fully visible at 15896c5 and every first-parent commit to 20b800a; green from 41c394a (fix/r20-marks: WDA marks the presented layer), so the lab shape calibrates there. 15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped.
+presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root a screen-sized identified container dimming the screen and holding a card (an RN transparent Modal's shape). The note's own fix, 15896c5, is NOT verified on this cell (afterNotFix): the after side is 41c394a, the commit that cured the cell's shape. 15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped.
 
 ## 28: CALIBRATED
 
@@ -264,7 +264,7 @@ presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root
   - RED ios-iphone17-ios27/sheet-background.wda.json C scroll_until — no "close it first": Element id:"lab.sheet-background.C" fully visible after 0 swipes
   - RED ios-iphone17-ios27/sheet-background.wda.json D tap — Tapped: Tapped id:"lab.sheet-background.D"
   - RED ios-iphone17-ios27/sheet-background.wda.json D scroll_until — no "close it first": Element id:"lab.sheet-background.D" fully visible after 0 swipes
-- after 41c394a:
+- after 41c394a (not the note's fix: 15896c5 fixed the note's Contacts tree, not this SwiftUI sheet: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it):
   - ok ios-iphone17-ios27/sheet-background.wda.json B tap — ERROR id:"lab.sheet-background.B" is under container (0,0 402x874) at its centre (201,322), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out
   - ok ios-iphone17-ios27/sheet-background.wda.json B scroll_until — ERROR scroll_until id:"lab.sheet-background.B" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,322), drawn over it — 0% of it shows — a screen is presented over 
   - ok ios-iphone17-ios27/sheet-background.wda.json C tap — ERROR id:"lab.sheet-background.C" is under container (0,0 402x874) at its centre (201,502), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out
@@ -272,7 +272,7 @@ presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root
   - ok ios-iphone17-ios27/sheet-background.wda.json D tap — ERROR id:"lab.sheet-background.D" is under container (0,0 402x874) at its centre (201,682), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out
   - ok ios-iphone17-ios27/sheet-background.wda.json D scroll_until — ERROR scroll_until id:"lab.sheet-background.D" stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,682), drawn over it — 0% of it shows — a screen is presented over 
 
-presented/sheet-background: a large sheet whose only content, S, lies at its top over A; B, C, D lie under its bare background. Before (53da035): Tapped, fully visible. 15896c5 fixed the note's Contacts tree, not this one: still red there and at every first-parent commit to 20b800a; green from 41c394a (fix/r20-marks), so the lab shape calibrates there. Was DOES-NOT-FAIL on form-picker (whose picker rows lie over every target, so a refusal named a row; the first B0 run's CALIBRATED there was corrected by review round 1) — the cell this note needed.
+presented/sheet-background: a large sheet whose only content, S, lies at its top over A; B, C, D lie under its bare background. Before (53da035): Tapped, fully visible. The note's own fix, 15896c5, is NOT verified on this cell (afterNotFix): the after side is 41c394a, the commit that cured the cell's shape. Was DOES-NOT-FAIL on form-picker (whose picker rows lie over every target, so a refusal named a row; the first B0 run's CALIBRATED there was corrected by review round 1) — the cell this note needed.
 
 ## 30: CALIBRATED
 
@@ -440,7 +440,7 @@ No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed r
 
 - working tree:
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.H" is off screen at (201,-56) on a 402x874 screen (rect 51,-88 300x64) — scroll_until it first; nothing was tapped
-  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.H" fill within dE00 8 of #000000 — nothing of the element lies on the screen (element 51,-88 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until th
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.H" fill within dE00 8 of #E53935 — nothing of the element lies on the screen (element 51,-88 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until th
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.H" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.G" is under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 51,-20 300x64) — it lies in a scroll view — 
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the
@@ -449,14 +449,17 @@ No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed r
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.E" fill within dE00 8 of #327735 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,869 300x64) — the capture would show i
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.E" failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 8% of it is in the viewport, and the content is exhausted: swiping down no lo
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — scroll_until it first; nothing was tapped
-  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.F" fill within dE00 8 of #000000 — nothing of the element lies on the screen (element 51,1009 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until t
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.F" fill within dE00 8 of #FB8C00 — nothing of the element lies on the screen (element 51,1009 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until t
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.M" is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.M" fill within dE00 8 of #721D88 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show i
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.M" failed after 3 swipes — element is in the viewport but under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it — 0
 
-No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there).
+No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there). M, whole on the screen under the dim, is the cell's positive control (its probe delivered) and is red the same way.
 
 ## L4: OPEN-RED
 
-2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md — defect: `under button|button "Target C"`
+2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md — defect: `under button|button "Target C"|^Tapped|passed on #00897B|fully visible`
 
 - working tree:
   - RED ios-iphone17-ios27/blur-menu.idb.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
@@ -465,8 +468,17 @@ No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 
   - RED ios-iphone17-ios27/blur-menu.wda.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
   - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
   - RED ios-iphone17-ios27/blur-menu.wda.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 3 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
+  - RED ios-iphone17-ios27/blur-menu.idb.json C tap — Tapped: Tapped id:"lab.blur-menu.C"
+  - RED ios-iphone17-ios27/blur-menu.idb.json C colour — passed on #00897B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/blur-menu.idb.json C scroll_until — no "close it first": Element id:"lab.blur-menu.C" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/blur-menu.wda.json C tap — Tapped: Tapped id:"lab.blur-menu.C"
+  - RED ios-iphone17-ios27/blur-menu.wda.json C colour — passed on #00897B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/blur-menu.wda.json C scroll_until — no "close it first": Element id:"lab.blur-menu.C" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json C tap — Tapped: Tapped id:"lab.blur-menu-grouped.C"
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json C colour — passed on #00897B: it measured the layer over the target as the target
+  - RED ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until — no "close it first": Element id:"lab.blur-menu-grouped.C" fully visible after 0 swipes
 
-No fix yet: red at HEAD. Tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none.
+No fix yet: red at HEAD, both ways. W (the menu row, listed just before C) refused under C: tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b — a false refusal. C (listed after W, which is drawn over its centre) Tapped / a PASS on W's colour / fully visible — the unsafe direction, also on blur-menu-grouped's idb list. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none.
 
 ## Not reproducible with the existing cells
 
