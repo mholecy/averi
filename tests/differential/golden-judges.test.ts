@@ -335,6 +335,7 @@ const ANDROID_FORM: CellTruth = {
   screen: { width: 1080, height: 2220 },
   scale: 1,
   targets: [],
+  afterBack: { state: 'form-keyboard.after-back.state.json', trees: { uiautomator: 'form-keyboard.after-back.xml' } },
   form: {
     fields: [field('name', 330, { frame: rect(55, 330, 970, 99), error: { id: 'IbanError', text: 'Enter the recipient’s name' }, errorFrame: rect(55, 440, 600, 40) })],
     controls: [
@@ -422,8 +423,13 @@ describe('the Android form rows (phase 2b)', () => {
   it('note\'s row says what the tap after back fired, and is replayed where the layout after back was captured (its piece then)', () => {
     expect(row('note tap').says).toMatch(/after one back a tap there fires submit invalid/);
     expect(row('note tap').live).toBeUndefined();
+    // Live only where no layout after back was captured — keyed on the truth's afterBack, not on the piece: a captured
+    // layout with no piece after back is replayed (no Tapped admitted).
+    const noLayout = formExpectations('android', { ...ANDROID_FORM, afterBack: undefined }, 'uiautomator');
+    expect(pick(noLayout, 'tap', 'note').live).toMatch(/live\.ts k5/);
     const noPiece = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, pieceAfterBack: undefined, reachedAtPieceAfterBack: undefined } : c)) } }, 'uiautomator');
-    expect(pick(noPiece, 'tap', 'note').live).toMatch(/live\.ts k5/);
+    expect(pick(noPiece, 'tap', 'note').live).toBeUndefined();
+    check(pick(noPiece, 'tap', 'note').judge, [['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/]]);
   });
 
   it('a piece after back that no probe reached admits no Tapped', () => {

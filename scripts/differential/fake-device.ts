@@ -77,7 +77,8 @@ export interface DeviceProfile {
   /**
    * Android, a ground-truth capture with the IME up: the dump of the screen after one `back` hid it
    * (CellTruth.afterBack) — answered for `uiautomator dump` once `input keyevent 4` has been sent in the call, as the
-   * layout the app takes then (the bar back at the bottom).
+   * layout the app takes then (the bar back at the bottom). Only the dump is swapped: the screenshot stays the IME-up
+   * one, so no colour row may rely on the screen after back.
    */
   afterBackXml?: string;
 }
