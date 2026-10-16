@@ -110,7 +110,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     });
     result.broken.push(...brokenControls);
     if (brokenControls.length === 0) {
-      for (const e of formExpectations(recording.platform, truth)) {
+      for (const e of formExpectations(recording.platform, truth, recording.source)) {
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome));
       }

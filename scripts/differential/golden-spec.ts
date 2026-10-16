@@ -1,8 +1,10 @@
-import type { Platform } from './corpus.js';
+import type { Platform, SourceKind } from './corpus.js';
 import { DRAWN, type CellTruth, type TargetTruth } from '../truth/schema.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
+import { dismissRows, ownPartsRows } from './golden-spec/false-covers.js';
+import { formExpectations as formRows, type FormExpectation } from './golden-spec/forms.js';
 import { presentedOverRows } from './golden-spec/presented.js';
 import type { Expectation } from './golden-spec/judges.js';
 
@@ -37,15 +39,16 @@ import type { Expectation } from './golden-spec/judges.js';
  * presented-over, else its MEASURED geometry (truth.ts#geometryOf) — never by its cell's family: edges.ts and bars.ts
  * are geometry groups, asked of a target of any family whose capture measured an edge, band or chrome geometry, and
  * base.ts's open rows of any target measured `whole` (or unmeasured). A row not keyed on a target's geometry is wired
- * here too: false-covers' R-dismiss (rows.ts#dismissRow, a cell's row under its `config.ios.keyboardDismiss`) goes
- * through expectations(), as the form rows go through formExpectations. So a B5 (false covers) author edits
- * golden-spec/false-covers.ts (its rows), this module's expectations() (to ask them of the cell), rows.ts only for a
- * new row type — and the family's catalog file, app views and tests/differential/golden/false-covers.known.ts, as every
- * batch does.
+ * here too: false-covers' text targets (golden-spec/false-covers.ts#ownPartsRows) through expectations(), and its
+ * R-dismiss (rows.ts#dismissRow, a form cell's row under its `config.ios.keyboardDismiss`) through formExpectations,
+ * in place of the form's own under-keyboard tap. So a B5 (false covers) author edits golden-spec/false-covers.ts (its
+ * rows), this module (to ask them), rows.ts only for a new row type — and the family's catalog file, app views and
+ * tests/differential/golden/false-covers.known.ts, as every batch does.
  */
 
 export * from './golden-spec/judges.js';
-export { formExpectations, pairingOf, type FormExpectation, type PairingRule } from './golden-spec/forms.js';
+export { pairingOf, type FormExpectation, type PairingRule } from './golden-spec/forms.js';
+export { dismissalOf, dismissRows, ownPartsRows } from './golden-spec/false-covers.js';
 export * from './golden-spec/rows.js';
 
 /**
@@ -56,6 +59,16 @@ export * from './golden-spec/rows.js';
  */
 export function expectations(platform: Platform, t: TargetTruth, cell?: CellTruth): Expectation[] {
   if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
-  if (t.geometry === undefined || t.geometry === 'whole') return t.reached && t.drawn >= DRAWN ? openRows(platform, t) : [];
+  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? ownPartsRows(platform, t) : openRows(platform, t);
   return cell === undefined ? [] : [...edgeRows(platform, t, cell), ...barRows(platform, t, cell)];
+}
+
+/**
+ * A form cell's rows (golden-spec/forms.ts#formExpectations) — and, on a cell whose config taps its title to hide the
+ * keyboard, R-dismiss (golden-spec/false-covers.ts#dismissRows) in place of each under-keyboard field's tap row, for
+ * the capture's tree `source` (the dismissal acts under WDA only).
+ */
+export function formExpectations(platform: Platform, truth: CellTruth, source?: SourceKind): FormExpectation[] {
+  const dismiss = dismissRows(platform, truth, source);
+  return [...formRows(platform, truth).filter((e) => !(e.verb === 'tap' && dismiss.replaces.has(e.target))), ...dismiss.rows];
 }
