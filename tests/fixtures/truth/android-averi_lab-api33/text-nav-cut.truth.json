@@ -1,0 +1,59 @@
+{
+  "cell": "text-nav-cut",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "T",
+      "id": "lab.text-nav-cut.T",
+      "text": "Zvuk a vibrácie",
+      "color": "#F3E5F5",
+      "declared": "open",
+      "frame": {
+        "x": 108,
+        "y": 2105,
+        "width": 864,
+        "height": 74
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,2142"
+        }
+      ],
+      "drawn": 0.935,
+      "seen": "#F3E5F5",
+      "geometry": "band-overlap:nav",
+      "visible": {
+        "x": 108,
+        "y": 2105,
+        "width": 864,
+        "height": 74
+      },
+      "piece": {
+        "x": 108,
+        "y": 2105,
+        "width": 864,
+        "height": 49
+      },
+      "listed": {
+        "uiautomator": true
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "navigation": "gesture",
+  "displays": "text-nav-cut.displays.txt"
+}

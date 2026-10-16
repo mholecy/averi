@@ -66,7 +66,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
   // the screenshot) after the rows its geometry asks.
-  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, cell)]);
+  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, cell, source)]);
   if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? text(ownPartsRows(platform, t)) : openRows(platform, t);
   return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell)]);
 }

@@ -1,0 +1,400 @@
+{
+  "cell": "text-sample",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.text-sample.A",
+      "text": "Prihlásiť sa",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 176,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,264"
+        }
+      ],
+      "drawn": 0.986,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 176,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 176,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "B",
+      "id": "lab.text-sample.B",
+      "text": "Ľubomír Šťastný",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 374,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,462"
+        }
+      ],
+      "drawn": 0.979,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 374,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 374,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "C",
+      "id": "lab.text-sample.C",
+      "text": "Mäkčeň, dĺžeň a vokáň",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 572,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,660"
+        }
+      ],
+      "drawn": 0.971,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 572,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 572,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "D",
+      "id": "lab.text-sample.D",
+      "text": "Jiří Dvořák: věřitel, půjčka",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 770,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,858"
+        }
+      ],
+      "drawn": 0.968,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 770,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 770,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "E",
+      "id": "lab.text-sample.E",
+      "text": "Payee’s name",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 968,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1056"
+        }
+      ],
+      "drawn": 0.983,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 968,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 968,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "F",
+      "id": "lab.text-sample.F",
+      "text": "Poznámka “pre mňa” a ‘OK’",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 1166,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1254"
+        }
+      ],
+      "drawn": 0.969,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 1166,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 1166,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "G",
+      "id": "lab.text-sample.G",
+      "text": "Splatnosť 1–15 — mesačne…",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 1364,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1452"
+        }
+      ],
+      "drawn": 0.97,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 1364,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 1364,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "H",
+      "id": "lab.text-sample.H",
+      "text": "1 234,56 €",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 1562,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1650"
+        }
+      ],
+      "drawn": 0.988,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 1562,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 1562,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "I",
+      "id": "lab.text-sample.I",
+      "text": "−12 345,00 EUR",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 1760,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1848"
+        }
+      ],
+      "drawn": 0.981,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 1760,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 1760,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "J",
+      "id": "lab.text-sample.J",
+      "text": "SK31 1200 0000 1987 4263 7541",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "x": 17,
+        "y": 1958,
+        "width": 1045,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,2046"
+        }
+      ],
+      "drawn": 0.96,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 17,
+        "y": 1958,
+        "width": 1045,
+        "height": 176
+      },
+      "piece": {
+        "x": 17,
+        "y": 1958,
+        "width": 1045,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "navigation": "gesture",
+  "displays": "text-sample.displays.txt"
+}

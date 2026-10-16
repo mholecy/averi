@@ -619,6 +619,50 @@
       },
       "screenshot": "toolbar-dismiss-short.png",
       "truth": "toolbar-dismiss-short.truth.json"
+    },
+    {
+      "file": "text-sample.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "text-sample.png",
+      "truth": "text-sample.truth.json"
+    },
+    {
+      "file": "text-sample.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "text-sample.png",
+      "truth": "text-sample.truth.json"
+    },
+    {
+      "file": "text-under-bar.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "text-under-bar.png",
+      "truth": "text-under-bar.truth.json"
+    },
+    {
+      "file": "text-under-bar.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "text-under-bar.png",
+      "truth": "text-under-bar.truth.json"
     }
   ]
 }

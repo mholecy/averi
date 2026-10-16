@@ -1,4 +1,4 @@
-import type { Platform } from '../corpus.js';
+import type { Platform, SourceKind } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { navigationBandTakes, parseGeometry } from '../../truth/truth.js';
@@ -52,9 +52,17 @@ export function ocrFailsClosed(platform: Platform, element: ElementSpec, text: s
   };
 }
 
-export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | undefined): Expectation[] {
+/**
+ * Why a covered text may be missing from the tree: uiautomator dumps no node the user cannot see, and a Compose string
+ * wholly under the chrome is dropped (text-under-bar's P: its box listed by the uncovered strip above the button, its
+ * string not at all) — a "not found" from the `ocr` row there is no reading, and right.
+ */
+const UNSEEN_STRING = 'uiautomator dumps no node the user cannot see: the string wholly under what is drawn over it is not listed';
+
+export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source?: SourceKind): Expectation[] {
   const text = t.text;
   if (text === undefined) return [];
+  const covered = (e: Expectation): Expectation => classed(source === 'uiautomator' ? { ...e, absent: UNSEEN_STRING } : e);
   const g = t.geometry ?? 'whole';
   if (g === 'whole') {
     if (!t.reached) return [];
@@ -74,12 +82,12 @@ export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | u
     ].map(classed);
   }
   const { kind, name } = parseGeometry(g);
-  if (g === 'status-band') return [classed(ocrFailsClosed(platform, { text }, text, 'the status band over it'))];
-  if (kind === 'under-chrome') return [classed(ocrFailsClosed(platform, { text }, text, `${name} over it`))];
+  if (g === 'status-band') return [covered(ocrFailsClosed(platform, { text }, text, 'the status band over it'))];
+  if (kind === 'under-chrome') return [covered(ocrFailsClosed(platform, { text }, text, `${name} over it`))];
   // In the navigation band, or overlapping it (its centre clear): who takes that band is the navigation mode's.
   if ((g === 'nav-band' || g === 'band-overlap:nav') && platform === 'android') {
     const takes = navigationBandTakes(platform, 'nav-band', cell?.navigation);
-    if (takes === 'bar') return [classed(ocrFailsClosed(platform, { text }, text, 'the navigation bar over it'))];
+    if (takes === 'bar') return [covered(ocrFailsClosed(platform, { text }, text, 'the navigation bar over it'))];
     if (takes === 'app') {
       return [
         classed({
