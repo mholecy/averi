@@ -362,6 +362,11 @@ export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
   if (visible === null) return null;
   const bands = bandsOf(ctx.screen, ctx.safeArea);
   const covers = [bands.status, bands.nav, ...Object.values(ctx.chrome ?? {})].filter((r): r is Rect => r !== undefined);
+  return largestPiece(visible, covers);
+}
+
+/** What of `visible` the `covers` leave, its largest rect — the piece a tap can land on; null when nothing. */
+export function largestPiece(visible: Rect, covers: readonly Rect[]): Rect | null {
   const pieces = covers.reduce<Rect[]>((ps, c) => ps.flatMap((p) => subtract(p, c)), [visible]);
   return pieces.reduce<Rect | null>((best, p) => (best === null || area(p) > area(best) ? p : best), null);
 }
@@ -376,8 +381,7 @@ export function controlPiece(frame: Rect, s: LabState, form: CatalogForm, own: {
   if (visible === null) return null;
   const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
   const submit = form.submit.pinned === true && own.tag !== form.submit.tag ? s.frames[form.submit.tag] : undefined;
-  const pieces = [k, submit].filter((r): r is Rect => r !== undefined).reduce<Rect[]>((ps, c) => ps.flatMap((p) => subtract(p, c)), [visible]);
-  return pieces.reduce<Rect | null>((best, p) => (best === null || area(p) > area(best) ? p : best), null);
+  return largestPiece(visible, [k, submit].filter((r): r is Rect => r !== undefined));
 }
 
 /**
