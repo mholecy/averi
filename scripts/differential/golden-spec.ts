@@ -68,7 +68,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell?: CellTrut
  * keyboard, R-dismiss (golden-spec/false-covers.ts#dismissRows) in place of each under-keyboard field's tap row, for
  * the capture's tree `source` (the dismissal acts under WDA only).
  */
-export function formExpectations(platform: Platform, truth: CellTruth, source?: SourceKind): FormExpectation[] {
+export function formExpectations(platform: Platform, truth: CellTruth, source: SourceKind): FormExpectation[] {
   const dismiss = dismissRows(platform, truth, source);
   return [...formRows(platform, truth).filter((e) => !(e.verb === 'tap' && dismiss.replaces.has(e.target))), ...dismiss.rows];
 }

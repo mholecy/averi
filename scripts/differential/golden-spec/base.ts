@@ -9,9 +9,11 @@ import { BUDGET_MS, classed, first, passes, reachedWithNoSwipe, type Expectation
  * | truth | tap | colour assert | scroll_until down |
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
+ *
+ * `selector`: what the tap and scroll_until ask by — the target's identifier, or a text target's text
+ * (golden-spec/false-covers.ts#ownPartsRows).
  */
-export function openRows(platform: Platform, t: TargetTruth): Expectation[] {
-  const selector = `id:"${t.id}"`;
+export function openRows(platform: Platform, t: TargetTruth, selector = `id:"${t.id}"`): Expectation[] {
   const element = { id: t.id };
   return ([
     {

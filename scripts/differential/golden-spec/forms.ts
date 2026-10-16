@@ -39,7 +39,9 @@ export function pairingOf(fields: readonly FieldTruth[], field: FieldTruth, id: 
  * The text a same-identifier rule would read as a pristine field's error: the nearest title BELOW the field, in its
  * column, that carries the field's own identifier — another field's title, where a design-system component gives every
  * field and its title one identifier (form-shared-id; docs/bugs/2026-10-14-ios-field-errors-pair-a-shared-component-id-
- * with-the-next-fields-title.md). undefined: none lies there.
+ * with-the-next-fields-title.md). undefined: none lies there. Its row cannot name the one field it is about — `id:`
+ * matches all of them (and their titles; `role: textfield` keeps the fields): it fails only when none of them reads the
+ * title as its error.
  */
 export function sharedTitleBelow(fields: readonly FieldTruth[], field: FieldTruth): FieldTruth | undefined {
   const below = fields.filter((g) => g !== field && g.titleId === field.id && g.titleFrame !== undefined && g.titleFrame.y >= bottom(field.frame) && overlapX(g.titleFrame, field.frame) > 0);

@@ -139,16 +139,23 @@ export function landRow(platform: Platform, t: TargetTruth): Expectation {
 /**
  * R-dismiss (B5 wires it, with a cell whose `config.ios.keyboardDismiss` names `dismissal`): a tap on `control`, under
  * the keyboard, sends the configured dismissal — a tap inside the dismissal element's frame — and is not refused for
- * a bar lying over that element.
+ * a bar lying over that element. With the `keyboard`'s frame (a replayed tree, where it never goes): nothing else is
+ * tapped — no tap inside the keyboard (it would press a key), and no `Tapped` reply (the control is still under it), as
+ * the form's own under-keyboard row it stands in for asks (golden-spec/forms.ts).
  */
-export function dismissRow(platform: Platform, control: { tag: string; id: string }, dismissal: { label: string; frame: Rect }): Expectation & { target: string } {
+export function dismissRow(platform: Platform, control: { tag: string; id: string }, dismissal: { label: string; frame: Rect }, keyboard?: Rect): Expectation & { target: string } {
   return {
     target: control.tag,
     verb: 'tap',
-    says: `R-dismiss: the keyboard dismissed by tapping ${dismissal.label}`,
+    says: `R-dismiss: the keyboard dismissed by tapping ${dismissal.label}${keyboard === undefined ? '' : ', nothing else tapped'}`,
     call: tapCall(platform, control),
-    judge: (o) =>
-      tapPoints(o).some((p) => within(p, dismissal.frame)) ? undefined : said(o, `no tap on the dismissal ${dismissal.label}${/toolbar/i.test(o.reply) ? ' (refused for a toolbar)' : ''}`),
+    judge: (o) => {
+      if (!tapPoints(o).some((p) => within(p, dismissal.frame))) return said(o, `no tap on the dismissal ${dismissal.label}${/toolbar/i.test(o.reply) ? ' (refused for a toolbar)' : ''}`);
+      if (keyboard === undefined) return undefined;
+      const under = tapPoints(o).filter((p) => within(p, keyboard));
+      if (under.length > 0) return said(o, `tapped under the keyboard at ${under.map((p) => `(${p.x},${p.y})`).join(' ')}`);
+      return o.reply.startsWith('Tapped') ? said(o, 'Tapped while the keyboard still covers it') : undefined;
+    },
   };
 }
 

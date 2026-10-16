@@ -32,7 +32,7 @@ describe('a text target on its own control (own-parts: #8, #18)', () => {
   const rows = expectations('android', t);
 
   it('asks a tap and a scroll_until by its text, never its colour', () => {
-    expect(rows.map((r) => `${r.verb} ${String(r.call.args.selector)}`)).toEqual(['tap text:"LOGIN"', 'scroll_until text:"LOGIN"']);
+    expect(rows.map((r) => `${r.verb} ${String(r.call.args.selector)} ${r.says}`)).toEqual(['tap text:"LOGIN" Tapped', 'scroll_until text:"LOGIN" reached with no swipe']);
   });
   it('tap: Tapped; refused as under its own button is the mismatch (#8)', () => {
     expect(by(rows, 'tap').judge(out('Tapped text:"LOGIN"', ['adb shell input tap 540 412']))).toBeUndefined();
@@ -96,13 +96,19 @@ describe('R-dismiss on a form whose config taps its title (toolbar-dismiss: #7, 
     expect(rows.map((r) => `${r.target} ${r.verb} ${r.says}`)).toEqual([
       'postcode tap Tapped',
       'vs scroll_until not reached without a swipe; every touch-down above the keyboard\'s top (y 573)',
-      'vs tap R-dismiss: the keyboard dismissed by tapping id:"lab.toolbar-dismiss.title"',
+      'vs tap R-dismiss: the keyboard dismissed by tapping id:"lab.toolbar-dismiss.title", nothing else tapped',
     ]);
     const tap = rows[2];
     expect(tap.judge(out('ERROR The soft keyboard covers id:"lab.toolbar-dismiss.vs" … none of the configured dismissals is usable on this screen (tap id:"lab.toolbar-dismiss.title": covered by toolbar "Toolbar"). Nothing was tapped'))).toMatch(
       /^no tap on the dismissal id:"lab.toolbar-dismiss.title" \(refused for a toolbar\)/,
     );
-    expect(tap.judge(out('ERROR The soft keyboard still covers …', ['idb ui tap 201 84']))).toBeUndefined();
+    expect(tap.judge(out('ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.vs", but it is still up … nothing else was tapped', ['idb ui tap 201 84']))).toBeUndefined();
+  });
+  it('R-dismiss: nothing else tapped — in a replayed tree the keyboard stays, so a tap under it presses a key and `Tapped` is false', () => {
+    const tap = formExpectations('ios', dismissCell(), 'wda')[2];
+    expect(tap.judge(out('Tapped id:"lab.toolbar-dismiss.vs"', ['idb ui tap 201 84', 'idb ui tap 201 621']))).toBe('tapped under the keyboard at (201,621): Tapped id:"lab.toolbar-dismiss.vs"');
+    expect(tap.judge(out('ERROR the keyboard is still up', ['idb ui tap 201 84', 'idb ui tap 201 621']))).toMatch(/^tapped under the keyboard at \(201,621\)/);
+    expect(tap.judge(out('Tapped id:"lab.toolbar-dismiss.vs"', ['idb ui tap 201 84']))).toBe('Tapped while the keyboard still covers it: Tapped id:"lab.toolbar-dismiss.vs"');
   });
   it('under idb (the list inert there) the form\'s own row stands', () => {
     expect(formExpectations('ios', dismissCell(), 'idb').map((r) => `${r.target} ${r.verb} ${r.says}`)).toContain('vs tap refused naming the keyboard, nothing tapped');
@@ -142,7 +148,7 @@ describe('a pristine form whose fields and titles share one identifier (form-sha
       submits: [],
     },
   };
-  const rows = formExpectations('ios', truth);
+  const rows = formExpectations('ios', truth, 'wda');
 
   it('each field with a same-identifier title below it: its error assert, asked with that title, must fail; no tap by the shared id', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual(['amount error', 'iban error', 'submit tap']);
@@ -153,8 +159,12 @@ describe('a pristine form whose fields and titles share one identifier (form-sha
     expect(rows[0].judge(out('All 1 asserts passed'))).toBe('passed: All 1 asserts passed');
     expect(rows[0].judge(out('0/1 asserts FAILED\nFAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "iban*" exists — element found but error was: null, null, null'))).toBeUndefined();
   });
+  it('a same-identifier title below the field but in another column (no horizontal overlap) asks no such row', () => {
+    const side = [shared('amount', 150), { ...shared('iban', 220), titleFrame: rect(390, 210, 10, 16) }];
+    expect(formExpectations('ios', { ...truth, form: { ...truth.form!, fields: side, controls: [] } }, 'wda')).toEqual([]);
+  });
   it('a field showing an error, or a title below it with another identifier, asks no such row', () => {
-    const named = formExpectations('ios', { ...truth, form: { ...truth.form!, fields: [field('a', 150, { titleFrame: rect(28, 140, 60, 16) }), field('b', 220, { titleFrame: rect(28, 210, 60, 16) })], controls: [] } });
+    const named = formExpectations('ios', { ...truth, form: { ...truth.form!, fields: [field('a', 150, { titleFrame: rect(28, 140, 60, 16) }), field('b', 220, { titleFrame: rect(28, 210, 60, 16) })], controls: [] } }, 'wda');
     expect(named).toEqual([]);
   });
 });

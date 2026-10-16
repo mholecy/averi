@@ -148,7 +148,7 @@ const form: CellTruth = {
 };
 
 describe('the form rows', () => {
-  const rows = formExpectations('ios', form);
+  const rows = formExpectations('ios', form, 'wda');
 
   it('every kind of row is asked', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual([
