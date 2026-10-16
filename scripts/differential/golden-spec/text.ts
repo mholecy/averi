@@ -53,16 +53,19 @@ export function ocrFailsClosed(platform: Platform, element: ElementSpec, text: s
 }
 
 /**
- * Why a covered text may be missing from the tree: uiautomator dumps no node the user cannot see, and a Compose string
- * wholly under the chrome is dropped (text-under-bar's P: its box listed by the uncovered strip above the button, its
- * string not at all) — a "not found" from the `ocr` row there is no reading, and right.
+ * Why a covered string may be missing from the replayed tree: its capture's tree of that source lists no node carrying
+ * it (TargetTruth.textListed, measured from the tree: uiautomator dumps no node the user cannot see — text-under-bar's
+ * P, its box listed by its uncovered strip above the button, its string not at all). Only then is a covered `ocr` row's
+ * "not found" right; where the tree lists the string (S in the status band) it is no evidence, as everywhere.
  */
-const UNSEEN_STRING = 'uiautomator dumps no node the user cannot see: the string wholly under what is drawn over it is not listed';
+export const unseenString = (t: Pick<TargetTruth, 'textListed'>, source: SourceKind | undefined): string | undefined =>
+  source !== undefined && t.textListed?.[source] === false ? `the ${source} capture lists no node carrying the string (TargetTruth.textListed): it is wholly under what is drawn over it` : undefined;
 
 export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source?: SourceKind): Expectation[] {
   const text = t.text;
   if (text === undefined) return [];
-  const covered = (e: Expectation): Expectation => classed(source === 'uiautomator' ? { ...e, absent: UNSEEN_STRING } : e);
+  const unseen = unseenString(t, source);
+  const covered = (e: Expectation): Expectation => classed(unseen === undefined ? e : { ...e, absent: unseen });
   const g = t.geometry ?? 'whole';
   if (g === 'whole') {
     if (!t.reached) return [];

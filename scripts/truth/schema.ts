@@ -290,6 +290,13 @@ export interface TargetTruth {
    */
   listed?: Partial<Record<SourceKind, boolean>>;
   /**
+   * A text target (`text`): whether each raw tree the capture read lists a node carrying its string
+   * (truth.ts#textListedIn) — uiautomator dumps no node the user cannot see, so a string wholly under the chrome may be
+   * missing though its box is listed. golden-spec/text.ts accepts a covered `ocr` row's "not found" only where it is
+   * false. Absent on captures before phase 4's review (backfilled from their committed trees).
+   */
+  textListed?: Partial<Record<SourceKind, boolean>>;
+  /**
    * A second probe, at the piece's centre (probePoint(piece)), when it is not the frame's: fired the target's action.
    * Absent when not probed — the piece's centre is the frame's, or there is no piece.
    */

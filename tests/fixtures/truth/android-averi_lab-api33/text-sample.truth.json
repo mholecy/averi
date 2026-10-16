@@ -44,6 +44,9 @@
       },
       "listed": {
         "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
       }
     },
     {
@@ -81,6 +84,9 @@
         "height": 176
       },
       "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
         "uiautomator": true
       }
     },
@@ -120,6 +126,9 @@
       },
       "listed": {
         "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
       }
     },
     {
@@ -157,6 +166,9 @@
         "height": 176
       },
       "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
         "uiautomator": true
       }
     },
@@ -196,6 +208,9 @@
       },
       "listed": {
         "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
       }
     },
     {
@@ -233,6 +248,9 @@
         "height": 176
       },
       "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
         "uiautomator": true
       }
     },
@@ -272,6 +290,9 @@
       },
       "listed": {
         "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
       }
     },
     {
@@ -309,6 +330,9 @@
         "height": 176
       },
       "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
         "uiautomator": true
       }
     },
@@ -348,6 +372,9 @@
       },
       "listed": {
         "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
       }
     },
     {
@@ -385,6 +412,9 @@
         "height": 176
       },
       "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
         "uiautomator": true
       }
     }

@@ -28,7 +28,11 @@
         }
       ],
       "drawn": 0.985,
-      "seen": "#3949AB"
+      "seen": "#3949AB",
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
     },
     {
       "tag": "N",
@@ -50,7 +54,11 @@
         }
       ],
       "drawn": 0.981,
-      "seen": "#B2EBF2"
+      "seen": "#B2EBF2",
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
     }
   ]
 }

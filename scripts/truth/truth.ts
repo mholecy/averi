@@ -57,6 +57,35 @@ export function listedIn(payload: string, id: string): boolean {
   return payload.includes(`"${id}"`);
 }
 
+/** XML's character references and the five named entities, decoded. */
+const decodeXml = (v: string) =>
+  v.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, e: string) =>
+    e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" } as Record<string, string>)[e.toLowerCase()],
+  );
+/** Whitespace as averi's text compare reads it (src/verify/text-parity.ts#normalizeText: every space one, trimmed). */
+const spaced = (v: string) => v.replace(/\s+/g, ' ').trim();
+
+/**
+ * Whether a raw tree's payload lists a node carrying `text` as its own string: a uiautomator node's `text` or
+ * `content-desc` (entities decoded), or any string value of WDA's or idb's JSON (a label, a value) — compared with
+ * whitespace collapsed. A text target's `textListed` (schema.ts#TargetTruth): uiautomator dumps no node the user cannot
+ * see, so a string wholly under the chrome may be missing while its box is listed by its uncovered strip.
+ */
+export function textListedIn(payload: string, text: string): boolean {
+  const want = spaced(text);
+  if (payload.trimStart().startsWith('<')) {
+    return [...payload.matchAll(/\s(?:text|content-desc)="([^"]*)"/g)].some((m) => spaced(decodeXml(m[1])) === want);
+  }
+  const strings: string[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') strings.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v !== null && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(JSON.parse(payload));
+  return strings.some((v) => spaced(v) === want);
+}
+
 /** The events a probe produced: what the app logged after the launch it was tapped on, without the time. */
 export function probeEvents(state: LabState | undefined, since: number): ProbeEvent[] {
   return (state?.events ?? []).slice(since).map(({ kind, tag }) => ({ kind, tag }));

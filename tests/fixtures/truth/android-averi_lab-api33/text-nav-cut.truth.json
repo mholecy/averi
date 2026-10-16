@@ -45,6 +45,9 @@
       "listed": {
         "uiautomator": true
       },
+      "textListed": {
+        "uiautomator": true
+      },
       "reachedAtPiece": true
     }
   ],

@@ -35,6 +35,10 @@
       "listed": {
         "wda": true,
         "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
       }
     },
     {
@@ -72,6 +76,10 @@
         "height": 64
       },
       "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
         "wda": true,
         "idb": true
       }
@@ -115,6 +123,10 @@
         "height": 8
       },
       "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
         "wda": true,
         "idb": true
       },

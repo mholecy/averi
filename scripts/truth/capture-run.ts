@@ -6,7 +6,7 @@ import type { LabDevice } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, controlPiece, listedIn, measuredGeometry, outOfProcessKeyboard, pieceAfterBack, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, controlPiece, listedIn, measuredGeometry, outOfProcessKeyboard, pieceAfterBack, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, textListedIn, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -129,6 +129,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
         // Whether each tree lists it — read by the edge rows (golden-spec/edges.ts#notListed), so recorded with a geometry.
         ...(geometry.geometry !== undefined && { listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, id)])) }),
+        // Whether each tree lists its string (golden-spec/text.ts: a covered string's "not found" is right only there).
+        ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, t.text!)])) }),
         ...(reachedAtPiece !== undefined && { reachedAtPiece }),
         ...(unprobed !== undefined && { unprobed }),
       };
