@@ -53,11 +53,21 @@ export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pic
 }
 
 /**
+ * The options of a row type whose truth may allow the target missing from the tree: `absent`, why it may (the caller's,
+ * edges.ts#notListed) — the row then accepts a reply that never found the target, judged by what it did. One shape for
+ * every row that takes it: refusedTap, strokeRow, and colourFails, which adds its `expected`.
+ */
+export interface RowOptions {
+  absent?: string;
+}
+
+/**
  * R-off, R-outside-sv, R-sliver: the tap refused, its remedy scroll_until, nothing sent. `absent` (why the truth allows
  * the target to be missing from the tree): a tap that waited for it and sent nothing is as good — no node, no remedy
  * to name.
  */
-export function refusedTap(platform: Platform, t: TargetTruth, row: string, absent?: string): Expectation {
+export function refusedTap(platform: Platform, t: TargetTruth, row: string, opts: RowOptions = {}): Expectation {
+  const { absent } = opts;
   return {
     verb: 'tap',
     says: `${row}: refused naming scroll_until, nothing tapped`,
@@ -87,7 +97,7 @@ export function bandTap(platform: Platform, t: TargetTruth): Expectation {
  * `expected`, the colour the screen shows there (TargetTruth.seen), so that a pass means it measured what lies there
  * instead of the target (R-outside-sv: the background beneath its scroll view, calibration.json #29).
  */
-export function colourFails(platform: Platform, t: TargetTruth, why: string, opts: { expected?: string; absent?: string } = {}): Expectation {
+export function colourFails(platform: Platform, t: TargetTruth, why: string, opts: RowOptions & { expected?: string } = {}): Expectation {
   const expected = opts.expected ?? t.color;
   return {
     verb: 'colour',
@@ -107,7 +117,8 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string, opt
  * judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is then not
  * asked: averi cannot know which scroll view holds a node it never saw.
  */
-export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, absent?: string): Expectation {
+export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, opts: RowOptions = {}): Expectation {
+  const { absent } = opts;
   const direction = directionOf(t, cell);
   const own = absent === undefined && t.scrollView !== undefined ? cell.scrollViews?.[t.scrollView] : undefined;
   return {

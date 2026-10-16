@@ -27,16 +27,16 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
   switch (t.geometry) {
     case 'off-screen':
       return [
-        refusedTap(platform, t, 'R-off', absent),
+        refusedTap(platform, t, 'R-off', { absent }),
         colourFails(platform, t, 'R-off: nothing of it is on the screen', { absent }),
-        strokeRow(platform, t, cell, 'R-off', absent),
+        strokeRow(platform, t, cell, 'R-off', { absent }),
         directionRow(platform, t, cell),
       ].map(classed);
     case 'outside-scroll-view':
       return [
-        refusedTap(platform, t, 'R-outside-sv', absent),
+        refusedTap(platform, t, 'R-outside-sv', { absent }),
         colourFails(platform, t, 'R-outside-sv: fails closed, never measuring the background', { expected: t.seen, absent }),
-        strokeRow(platform, t, cell, 'R-outside-sv', absent),
+        strokeRow(platform, t, cell, 'R-outside-sv', { absent }),
         directionRow(platform, t, cell),
       ].map(classed);
     case 'sliver':
