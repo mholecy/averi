@@ -99,6 +99,18 @@ struct Frame: Codable, Equatable {
     }
 }
 
+/// The window's safe-area insets — the system bands (scripts/truth/schema.ts#Insets), in points.
+struct Insets: Codable, Equatable {
+    let top: Double
+    let left: Double
+    let bottom: Double
+    let right: Double
+
+    init(_ i: UIEdgeInsets) {
+        top = i.top; left = i.left; bottom = i.bottom; right = i.right
+    }
+}
+
 struct LabEvent: Codable {
     /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button); on a form
     /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row);
@@ -156,6 +168,10 @@ struct LabState: Codable {
     var focus: String?
     var keyboard: KeyboardState?
     var submits: [Submit]?
+    // Phase 3's geometry (scripts/truth/schema.ts#LabState); nil (absent from the file) until a cell reports it.
+    var safeArea: Insets?
+    var scrollViews: [String: Frame]?
+    var chrome: [String: Frame]?
 }
 
 @MainActor
@@ -192,6 +208,9 @@ final class Lab: ObservableObject {
         state.focus = nil
         state.keyboard = nil
         state.submits = cell?.form == nil ? nil : []
+        state.safeArea = nil
+        state.scrollViews = nil
+        state.chrome = nil
         write()
     }
 
@@ -229,6 +248,32 @@ final class Lab: ObservableObject {
         let f = Frame(rect)
         guard state.frames[tag] != f else { return }
         state.frames[tag] = f
+        write()
+    }
+
+    // --- phase 3's geometry ---
+
+    /// The window's safe-area insets: LabState.safeArea.
+    func safeArea(_ i: UIEdgeInsets) {
+        let a = Insets(i)
+        guard state.safeArea != a else { return }
+        state.safeArea = a
+        write()
+    }
+
+    /// A scroll view's clip on the screen, by id (CatalogTarget.scrollView): LabState.scrollViews.
+    func scrollView(_ id: String, _ rect: CGRect) {
+        let f = Frame(rect)
+        guard state.scrollViews?[id] != f else { return }
+        state.scrollViews = (state.scrollViews ?? [:]).merging([id: f]) { $1 }
+        write()
+    }
+
+    /// A piece of the app's chrome drawn over content, by name: LabState.chrome.
+    func chrome(_ name: String, _ rect: CGRect) {
+        let f = Frame(rect)
+        guard state.chrome?[name] != f else { return }
+        state.chrome = (state.chrome ?? [:]).merging([name: f]) { $1 }
         write()
     }
 

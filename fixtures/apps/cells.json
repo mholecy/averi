@@ -178,6 +178,57 @@
           "probe": ["AL", "ST"]
         }
       }
+    },
+    {
+      "id": "bands",
+      "family": "bars",
+      "layer": "none",
+      "targets": [
+        { "tag": "S", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "O", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "W", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "Q", "color": "#FB8C00", "slot": 3, "declared": "open" },
+        { "tag": "N", "color": "#8E24AA", "slot": 4, "declared": "open" }
+      ]
+    },
+    {
+      "id": "pinned-bar",
+      "family": "bars",
+      "layer": "none",
+      "targets": [
+        { "tag": "W", "color": "#43A047", "slot": 0, "declared": "open" },
+        { "tag": "P", "color": "#E53935", "slot": 1, "declared": "open" }
+      ]
+    },
+    {
+      "id": "tabbar-floating",
+      "family": "bars",
+      "layer": "none",
+      "targets": [
+        { "tag": "T", "color": "#1E88E5", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "R", "color": "#E53935", "slot": 1, "declared": "open", "scrollView": "list" },
+        { "tag": "F", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "tabbar-hidden-push",
+      "family": "bars",
+      "layer": "tab-host",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "open" }
+      ]
+    },
+    {
+      "id": "fab",
+      "family": "bars",
+      "layer": "none",
+      "targets": [
+        { "tag": "W", "color": "#1E88E5", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "L", "color": "#E53935", "slot": 1, "declared": "open", "scrollView": "list" },
+        { "tag": "K", "color": "#FB8C00", "slot": 2, "declared": "open", "scrollView": "list" }
+      ]
     }
   ]
 }

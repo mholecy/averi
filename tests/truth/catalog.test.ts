@@ -26,6 +26,11 @@ describe('the cell catalog', () => {
       'forms/form-keyboard',
       'forms/form-prefilled',
       'forms/form-picker',
+      'bars/bands',
+      'bars/pinned-bar',
+      'bars/tabbar-floating',
+      'bars/tabbar-hidden-push',
+      'bars/fab',
     ]);
   });
 
