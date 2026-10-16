@@ -50,7 +50,7 @@ matters for `Tapped` is whether the action fired.
 
 | truth | tap | colour assert | scroll_until (down) |
 |---|---|---|---|
-| reached, drawn ≥ 95 % | `Tapped` | pass with its own colour | reached, 0 swipes |
+| reached, drawn ≥ 95 % | `Tapped` (phase 3 round 3: at its probe point, golden-spec/base.ts#atProbe) | pass with its own colour | reached, 0 swipes |
 | not reached, declared `presented-over` | refused, `close it first`, nothing tapped | fail (asked with the colour the screenshot shows there, so a pass means it measured the cover) | stopped before any swipe, `close it first` |
 
   New rows are added with the cells that need them (outside its scroll view → scroll advice; partly drawn with centre

@@ -62,6 +62,49 @@ describe('a coloured target, open', () => {
       ],
     ],
   ])('%s', (verb, cases) => check(pick(rows, verb).judge, cases));
+  // The probe at (201,142) fired it; the middle third of its 300x64 frame around that point is ±50 x ±10.67.
+  it.each<[string, TargetTruth, readonly Case[]]>([
+    [
+      'tap at its probe point',
+      target({}),
+      [
+        ['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'],
+        // own-parts' N: the tree's node narrower than the app's frame, its centre 9 pt off the probe
+        ['Tapped id:"lab.x"', ['idb ui tap 210 142'], 'ok'],
+        ['Tapped id:"lab.x"', ['idb ui tap 250 152'], 'ok'],
+        // #26: moved 20 pt off the probe, to "the uncovered part", where no probe fired
+        ['Tapped id:"lab.x" at (201,162) — its centre (201,142) is under button "Cards" …; tapped the uncovered part 300x24', ['idb ui tap 201 162'], /^Tapped off its probe point \(201,142\) at \(201,162\): .*under button/],
+        ['Tapped id:"lab.x"', ['idb ui tap 201 153'], /^Tapped off its probe point \(201,142\) at \(201,153\)/],
+        ['Tapped id:"lab.x"', ['idb ui tap 252 142'], /^Tapped off its probe point/],
+        ['Tapped id:"lab.x"', ['idb ui tap 201 142', 'idb ui tap 201 170'], /^Tapped off its probe point \(201,142\) at \(201,170\)/],
+        ['Tapped id:"lab.x"', [], /^Tapped, but no tap sent/],
+      ],
+    ],
+    [
+      'the touch the app logged, not the frame centre',
+      target({ probe: [{ kind: 'touch', tag: '201.0,160.0' }] }),
+      [
+        ['Tapped id:"lab.x"', ['idb ui tap 201 160'], 'ok'],
+        ['Tapped id:"lab.x"', ['idb ui tap 201 142'], /^Tapped off its probe point \(201,160\) at \(201,142\)/],
+      ],
+    ],
+    [
+      'no touch logged: the point the probe was sent at',
+      target({ probe: [] }),
+      [
+        ['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'],
+        ['Tapped id:"lab.x"', ['idb ui tap 201 160'], /^Tapped off its probe point \(201,142\)/],
+      ],
+    ],
+    [
+      'a small target: at least one unit (the tools\' rounding)',
+      target({ frame: rect(100, 100, 3, 3), probe: [{ kind: 'touch', tag: '102,102' }] }),
+      [
+        ['Tapped id:"lab.x"', ['adb shell input tap 101 101'], 'ok'],
+        ['Tapped id:"lab.x"', ['adb shell input tap 102 104'], /^Tapped off its probe point \(102,102\) at \(102,104\)/],
+      ],
+    ],
+  ])('%s', (_, t, cases) => check(pick(expectations('ios', t, undefined, 'wda'), 'tap').judge, cases));
 });
 
 describe('a coloured target beneath a presented layer', () => {
