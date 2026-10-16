@@ -179,6 +179,94 @@
       },
       "screenshot": "form-picker.png",
       "truth": "form-picker.truth.json"
+    },
+    {
+      "file": "form-shared-id.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-shared-id.png",
+      "truth": "form-shared-id.truth.json"
+    },
+    {
+      "file": "form-shared-id.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "form-shared-id.png",
+      "truth": "form-shared-id.truth.json"
+    },
+    {
+      "file": "own-parts.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "own-parts.png",
+      "truth": "own-parts.truth.json"
+    },
+    {
+      "file": "own-parts.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "own-parts.png",
+      "truth": "own-parts.truth.json"
+    },
+    {
+      "file": "toolbar-dismiss.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "toolbar-dismiss.png",
+      "truth": "toolbar-dismiss.truth.json"
+    },
+    {
+      "file": "toolbar-dismiss.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "toolbar-dismiss.png",
+      "truth": "toolbar-dismiss.truth.json"
+    },
+    {
+      "file": "toolbar-dismiss-bar.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "toolbar-dismiss-bar.png",
+      "truth": "toolbar-dismiss-bar.truth.json"
+    },
+    {
+      "file": "toolbar-dismiss-bar.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "toolbar-dismiss-bar.png",
+      "truth": "toolbar-dismiss-bar.truth.json"
     }
   ]
 }

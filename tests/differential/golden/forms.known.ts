@@ -38,5 +38,7 @@ export const forms: KnownFile = {
     [`${IOS}/form-picker.wda.json`]: 9,
     [`${IOS}/form-prefilled.idb.json`]: 11,
     [`${IOS}/form-prefilled.wda.json`]: 11,
+    [`${IOS}/form-shared-id.idb.json`]: 5,
+    [`${IOS}/form-shared-id.wda.json`]: 5,
   },
 };

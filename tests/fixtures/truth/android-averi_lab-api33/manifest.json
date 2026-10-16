@@ -36,6 +36,17 @@
       },
       "screenshot": "alert-dim.png",
       "truth": "alert-dim.truth.json"
+    },
+    {
+      "file": "own-parts.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "own-parts.png",
+      "truth": "own-parts.truth.json"
     }
   ]
 }
