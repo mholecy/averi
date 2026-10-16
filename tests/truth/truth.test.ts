@@ -10,6 +10,7 @@ import {
   consistency,
   controlConsistency,
   listedIn,
+  nodeFramesIn,
   otherControlsFired,
   outOfProcessKeyboard,
   pieceAfterBack,
@@ -48,6 +49,32 @@ const state = (over: Partial<LabState> = {}): LabState => ({
 });
 const UNPINNED: CatalogForm = { ...FORM, submit: { tag: 'submit', title: 'Continue' } };
 const field = { tag: 'phone', inSheet: false };
+
+describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own reading', () => {
+  const T = 'fixtures/truth/';
+  const read = (f: string) => readFile(new URL(`../${T}${f}`, import.meta.url), 'utf8');
+  it('reads each source of the committed open cell: WDA rect, idb frame, uiautomator bounds', async () => {
+    expect(nodeFramesIn(await read('ios-iphone17-ios27/open.wda.json'), 'wda', { id: 'lab.open.A' })).toEqual([rect(51, 110, 300, 64)]);
+    expect(nodeFramesIn(await read('ios-iphone17-ios27/open.idb.json'), 'idb', { id: 'lab.open.A' })).toEqual([rect(51, 110, 300, 64)]);
+    expect(nodeFramesIn(await read('android-averi_lab-api33/open.xml'), 'uiautomator', { id: 'lab.open.A' })).toEqual([rect(127, 303, 825, 176)]);
+    // an id that only starts the same is not it
+    expect(nodeFramesIn(await read('ios-iphone17-ios27/open.wda.json'), 'wda', { id: 'lab.open' })).toEqual([]);
+  });
+  it('a text target by its label (WDA, idb) or its text or content-desc (uiautomator), exactly', () => {
+    const wda = JSON.stringify({ value: { label: 'x', rect: rect(0, 0, 9, 9), children: [{ label: 'Email', rect: rect(69, 493, 94, 18) }, { label: 'Email address', rect: rect(1, 1, 1, 1) }] } });
+    expect(nodeFramesIn(wda, 'wda', { text: 'Email' })).toEqual([rect(69, 493, 94, 18)]);
+    const idb = JSON.stringify([{ AXLabel: 'Email', frame: rect(69, 493, 93.67, 18) }, { AXLabel: 'Other', frame: rect(0, 0, 1, 1) }]);
+    expect(nodeFramesIn(idb, 'idb', { text: 'Email' })).toEqual([rect(69, 493, 93.67, 18)]);
+    const xml = '<hierarchy><node text="LOGIN" bounds="[10,20][110,60]" /><node text="" content-desc="A &amp; B" bounds="[0,0][5,5]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { text: 'LOGIN' })).toEqual([rect(10, 20, 100, 40)]);
+    expect(nodeFramesIn(xml, 'uiautomator', { text: 'A & B' })).toEqual([rect(0, 0, 5, 5)]);
+  });
+  it('each frame once; an unreadable payload lists nothing', () => {
+    const xml = '<hierarchy><node resource-id="a" bounds="[0,0][5,5]"><node resource-id="a" bounds="[0,0][5,5]" /></node><node resource-id="a" bounds="[0,0][5,9]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { id: 'a' })).toEqual([rect(0, 0, 5, 5), rect(0, 0, 5, 9)]);
+    expect(nodeFramesIn('not json', 'wda', { id: 'a' })).toEqual([]);
+  });
+});
 
 describe('situationOf', () => {
   it.each([

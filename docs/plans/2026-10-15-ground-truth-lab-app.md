@@ -298,7 +298,12 @@ lands: every tap within OPEN_TAP_REACH (a sixth of the extent, chosen between th
 0.313 of #26's C) of the probe's logged touch, and no "tapped the uncovered part" reply on a target measured uncovered.
 #26 calibrated on its tap. Follow-up: hold every open tap to the centre of the target's node in the recorded tree
 (exact, up to the tools' rounding) — it closes the reach's blind spot (a cover averi imagines over under a third of
-the target moves the tap under a sixth, and passes unless the reply says it moved).
+the target moves the tap under a sixth, and passes unless the reply says it moved). Done in round 4
+(truth/r4-followups): the open tap is held to the centre of the target's node in the replayed tree, ±1
+(base.ts#NODE_CENTRE_SLACK; truth.ts#nodeFramesIn, the harness's own reading of WDA's `rect`, idb's `frame`,
+uiautomator's `bounds`), the reach kept as the fallback where the tree lists no single frame for it (66 of the 68 open
+taps have one node; idb's sheet-long-list and sheet-long-list-short R none). No row flips (879 checks, 257 mismatches,
+0 broken, each row's verdict as before); #26 still CALIBRATED; own-parts' N is now held to its text node's centre.
 
 **Round 3 — cell variants for partial notes (2026-10-16, truth/r3-variants).** A cell may name the platforms that build
 it (`CatalogCell.platforms`) and, on Android, the navigation mode it is captured under (`CatalogCell.navigation`);

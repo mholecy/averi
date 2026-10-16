@@ -102,6 +102,49 @@ describe('a coloured target, open', () => {
       ],
     ],
   ])('%s', (_, t, cases) => check(pick(expectations('ios', t, undefined, 'wda'), 'tap').judge, cases));
+
+  // Where the replayed tree lists the target's node (golden-spec.ts#expectations reads it with truth.ts#nodeFramesIn),
+  // the tap is held to that node's centre, ±1 (the tools' rounding) — not to the reach around the probe point.
+  const wda = (nodes: readonly Rect[]) => JSON.stringify({ value: { type: 'Window', rect: rect(0, 0, 402, 874), children: nodes.map((r) => ({ type: 'Button', rawIdentifier: 'lab.x', name: 'lab.x', rect: r })) } });
+  const atNode = (tree: string) => pick(expectations('ios', target({}), undefined, 'wda', tree), 'tap');
+  it('tap at the centre of its node in the recorded tree', () => {
+    const row = atNode(wda([rect(51, 110, 300, 64)]));
+    expect(row.says).toBe("Tapped at its node's centre (201,142) in the tree");
+    check(row.judge, [
+      ['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'],
+      ['Tapped id:"lab.x"', ['idb ui tap 202 143'], 'ok'],
+      // within the probe's reach (±50 x ±10.67), off the node's centre: the reach's blind spot, closed
+      ['Tapped id:"lab.x"', ['idb ui tap 201 145'], /^Tapped off its node's centre \(201,142\) at \(201,145\)/],
+      ['Tapped id:"lab.x"', ['idb ui tap 210 142'], /^Tapped off its node's centre/],
+      ['Tapped id:"lab.x"', ['idb ui tap 201 142', 'idb ui tap 201 144'], /^Tapped off its node's centre \(201,142\) at \(201,144\)/],
+      ['Tapped id:"lab.x"', [], /^Tapped, but no tap sent/],
+      ['Tapped id:"lab.x" at (201,142) — its centre (201,142) is under button "Cards" (201,140 82x64), drawn over it; tapped the uncovered part 300x24', ['idb ui tap 201 142'], /^Tapped moved off a cover/],
+    ]);
+    // own-parts' N: the node narrower than the app's frame — its centre, 9 pt off the probe, is where the tap belongs
+    check(atNode(wda([rect(69, 110, 282, 64)])).judge, [
+      ['Tapped id:"lab.x"', ['idb ui tap 210 142'], 'ok'],
+      ['Tapped id:"lab.x"', ['idb ui tap 201 142'], /^Tapped off its node's centre \(210,142\)/],
+    ]);
+    // a uiautomator centre on a half pixel: the tool's whole pixel either side is in
+    const xml = '<hierarchy><node resource-id="lab.x" bounds="[127,303][952,479]" /></hierarchy>';
+    check(pick(expectations('android', target({ frame: rect(127, 303, 825, 176), probe: [{ kind: 'touch', tag: '540,391' }] }), undefined, 'uiautomator', xml), 'tap').judge, [
+      ['Tapped id:"lab.x"', ['adb shell input tap 540 391'], 'ok'],
+      ['Tapped id:"lab.x"', ['adb shell input tap 539 391'], 'ok'],
+      ['Tapped id:"lab.x"', ['adb shell input tap 542 391'], /^Tapped off its node's centre \(539.5,391\)/],
+    ]);
+  });
+  it('no node, or several frames for it: the reach around the probe point', () => {
+    for (const tree of [wda([]), wda([rect(51, 110, 300, 64), rect(51, 110, 300, 40)]), 'not json']) {
+      const row = atNode(tree);
+      expect(row.says).toBe('Tapped at its probe point (201,142)');
+      check(row.judge, [
+        ['Tapped id:"lab.x"', ['idb ui tap 201 145'], 'ok'],
+        ['Tapped id:"lab.x"', ['idb ui tap 201 162'], /^Tapped off its probe point/],
+      ]);
+    }
+    // identical duplicates count once
+    expect(atNode(wda([rect(51, 110, 300, 64), rect(51, 110, 300, 64)])).says).toBe("Tapped at its node's centre (201,142) in the tree");
+  });
 });
 
 describe('a coloured target beneath a presented layer', () => {

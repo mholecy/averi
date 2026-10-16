@@ -611,7 +611,7 @@
           "why": "the same merge as #20's fix (7566443 → 83e282a), the same row, recorded there: sheet-long-list-short's F, below its table's clip over the footer, read at its real rect from 83e282a and measured on the footer (PASS on #CFD8DC) until #29's fix, b7eac90, fails it closed"
         }
       ],
-      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap at its probe point (golden-spec/base.ts#atProbe, phase 3 round 3).",
+      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap (golden-spec/base.ts#atProbe: at its probe point from phase 3 round 3, at its node's centre in the tree from round 4).",
       "after": "83e282a",
       "defect": "drawn over|under button",
       "checks": [

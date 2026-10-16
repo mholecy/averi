@@ -1,4 +1,4 @@
-import type { Platform } from '../differential/corpus.js';
+import type { Platform, SourceKind } from '../differential/corpus.js';
 import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
 /**
@@ -55,6 +55,56 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
  */
 export function listedIn(payload: string, id: string): boolean {
   return payload.includes(`"${id}"`);
+}
+
+/**
+ * The frames of the nodes a raw tree's payload lists as the target — identified as `id` (WDA's `rawIdentifier` or
+ * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`), or, for a text target, labelled exactly `text` (WDA's
+ * `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) — each frame once, in the tree's own units (WDA's
+ * `rect`, idb's `frame`, uiautomator's `bounds`), in the payload's order. The harness's own reading, no averi code: the
+ * open tap's judge holds averi to the centre of the node it finds (golden-spec/base.ts#atProbe). An unreadable payload
+ * lists nothing.
+ */
+export function nodeFramesIn(payload: string, source: SourceKind, by: { id: string } | { text: string }): Rect[] {
+  const frames: Rect[] = [];
+  const add = (r: Rect) => {
+    if (!frames.some((f) => f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height)) frames.push(r);
+  };
+  const is = (...values: unknown[]) => values.some((v) => v === ('id' in by ? by.id : by.text));
+  if (source === 'uiautomator') {
+    const unescape = (s: string) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    for (const [node] of payload.matchAll(/<node\b[^>]*>/g)) {
+      const attr = (name: string) => {
+        const m = new RegExp(`\\s${name}="([^"]*)"`).exec(node);
+        return m === null ? undefined : unescape(m[1]);
+      };
+      if (!('id' in by ? is(attr('resource-id')) : is(attr('text'), attr('content-desc')))) continue;
+      const b = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(attr('bounds') ?? '');
+      if (b !== null) add({ x: +b[1], y: +b[2], width: +b[3] - +b[1], height: +b[4] - +b[2] });
+    }
+    return frames;
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(payload);
+  } catch {
+    return frames;
+  }
+  const rectOf = (r: unknown): Rect | undefined => {
+    const o = r as Partial<Rect> | null | undefined;
+    return typeof o?.x === 'number' && typeof o.y === 'number' && typeof o.width === 'number' && typeof o.height === 'number' ? { x: o.x, y: o.y, width: o.width, height: o.height } : undefined;
+  };
+  const visit = (n: unknown) => {
+    if (n === null || typeof n !== 'object') return;
+    if (Array.isArray(n)) return n.forEach(visit);
+    const o = n as Record<string, unknown>;
+    const match = source === 'idb' ? ('id' in by ? is(o.AXUniqueId) : is(o.AXLabel)) : 'id' in by ? is(o.rawIdentifier, o.name) : is(o.label);
+    const r = rectOf(source === 'idb' ? o.frame : o.rect);
+    if (match && r !== undefined) add(r);
+    for (const [k, v] of Object.entries(o)) if (k === 'value' || k === 'children') visit(v);
+  };
+  visit(json);
+  return frames;
 }
 
 /** The events a probe produced: what the app logged after the launch it was tapped on, without the time. */

@@ -105,10 +105,12 @@ file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, 
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks
-where it lands: `Tapped`, every tap sent at the target's probe point — the touch its app logged for the probe that
-fired it — within the middle third of its extent (`base.ts#atProbe`, `OPEN_TAP_REACH`, a chosen value between the
-measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313; a clipped node's centre may
-lie further off and is not this row's), and not saying it moved the tap off a cover over the centre (`tapped the
+where it lands: `Tapped`, every tap sent at the centre of the target's node in the replayed tree, ±1 for the tools'
+rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the node by the selector the row asks —
+its identifier, or a text target's text — from the capture golden replays), or, where that tree lists no single frame
+for it (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its app
+logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
+the measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313), and not saying it moved the tap off a cover over the centre (`tapped the
 uncovered part`); a tap moved off is averi steering around a cover that is not there (calibration.json #26).
 A row type is asked only of a target whose truth carries a measured `geometry` other than
 `whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
