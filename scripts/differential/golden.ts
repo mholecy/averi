@@ -6,7 +6,8 @@ import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
 import type { Recording } from './corpus.js';
 import { configFor, connect, type Outcome } from './differential.js';
-import { expectations, formExpectations, replyKind, sent, type ReplyKind, type Verb } from './golden-spec.js';
+import { expectations, formExpectations, sent, type Verb } from './golden-spec.js';
+import { replyKind, type ReplyKind } from '../truth/replies.js';
 import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
@@ -37,7 +38,7 @@ export interface GoldenCheck {
   /** undefined: as the truth implies. */
   mismatch?: string;
   reply: string;
-  /** What kind of reply it is (golden-spec/judges.ts#replyKind): the ratchet pins it for a known mismatch. */
+  /** What kind of reply it is (scripts/truth/replies.ts#replyKind): the ratchet pins it for a known mismatch. */
   kind: ReplyKind;
   /**
    * The taps and swipes the device was sent (golden-spec/judges.ts#sent): the ratchet pins them for a known mismatch.
@@ -71,7 +72,7 @@ export function faultsOf(o: { reply: string; device: readonly string[] }): strin
 /** One golden row: the call's verdict, its reply, kind and device calls, and its faults (faultsOf) when it has any. */
 export const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: Outcome): GoldenCheck => {
   const faults = faultsOf(outcome);
-  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
+  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome.reply), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
 };
 
 /** The image the probe reads (any committed screenshot: only whether Vision runs at all is asked of it). */

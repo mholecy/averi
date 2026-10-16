@@ -71,8 +71,11 @@ describe('the rows each geometry asks', () => {
     ['partly-centre-in', { visible: rect(51, 670, 300, 50) }, ['tap: R-land: Tapped', 'fully: R-fully']],
     ['centre-out', { reached: false, visible: rect(51, 670, 300, 30) }, ['tap: R-land: refused, nothing tapped', 'fully: R-fully']],
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
-    // iOS's home-indicator band is no band averi judges: the open rows (bars.ts; consistency holds the target reached and
-    // drawn there, else it is broken and asked nothing). Android's navigation band: R-band (below).
+    // In a scroll view a band target is asked `fully` too (target-contract.ts#fullyAsked), as the live golden asks it.
+    ['status-band', { frame: rect(51, 10, 300, 64), reached: false, scrollView: 'list' }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band', 'fully: R-fully']],
+    // iOS's home-indicator band is no band averi judges: judged whole, the open rows (target-contract.ts
+    // #homeIndicatorBand; consistency holds the target reached and drawn there, else it is broken and asked nothing).
+    // Android's navigation band: R-band (below).
     ['nav-band', { frame: rect(51, 820, 300, 64), reached: true, drawn: 1 }, ['tap: Tapped', 'colour: passes on its own colour', 'scroll_until: reached with no swipe']],
     ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
     ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'fully: R-fully']],
@@ -117,7 +120,7 @@ describe('R-outside-sv colour: asked for the colour the screen shows there, so a
   });
 });
 
-describe('a target off the screen or outside its scroll view that its capture\'s tree did not list may be missing (notListed)', () => {
+describe('a target off the screen or outside its scroll view that its capture\'s tree did not list may be missing (target-contract.ts#unlistedBy)', () => {
   const NOT_FOUND = 'ERROR Timed out after 5000ms waiting for element id:"lab.edges.A" to appear';
   // On CELL's 402x874 screen, beside the scroll view `list` (380–560): accepted, as averi never saw which holds it.
   const ADB_STROKE = 'adb shell input swipe 201 699 201 175 300';
@@ -312,7 +315,7 @@ describe('R-dismiss and R-direction', () => {
   const r = dismissRow('ios', { tag: 'vs', id: 'lab.f.vs' }, { label: 'Transfer details', frame: rect(120, 60, 162, 22) });
   it('R-dismiss: the configured dismissal is tapped, inside its element', () => {
     expect(r.judge(out(TAPPED, ['idb ui tap 201 71', 'idb ui tap 201 700']))).toBeUndefined();
-    // What covered the dismissal is read from the guard's own clause (judges.ts#DISMISSAL_COVERED), as the replies at
+    // What covered the dismissal is read from the guard's own clause (replies.ts#dismissalCover), as the replies at
     // 5cff2ad (#7's toolbar) and 7542021 (#7's scroll view) say it — never from the advice, which names the
     // input-accessory toolbar whatever covered the dismissal.
     const refused = (cover: string) => `ERROR The soft keyboard covers id:"lab.f.vs": … and so was the input-accessory toolbar's Done … and none of the configured dismissals is usable on this screen (tap id:"lab.f.title": covered by ${cover}). Nothing was tapped`;

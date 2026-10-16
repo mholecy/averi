@@ -24,7 +24,7 @@ import { text } from './golden/text.known.js';
 // until it is struck off, and a new one fails it until it is fixed or listed with its note. A known mismatch is pinned
 // by what the reply DID: its class (what the judge's reason says first — golden-spec/judges.ts#classed: the judge's own
 // reason where it rejects the reply, `not in the tree` only where it would accept a reply that is no evidence), its
-// kind (golden-spec/judges.ts#replyKind: not found, Tapped, visible, PASS, FAIL, refused, other) and the taps and
+// kind (scripts/truth/replies.ts#replyKind: not found, Tapped, visible, PASS, FAIL, refused, other) and the taps and
 // swipes the device was sent. A known row that changes any of them — a stroke moved under the keyboard, a swipe fewer,
 // a timeout turned into a refusal with the wrong remedy, a stop turned into `fully visible` — fails here, though it
 // still mismatches.

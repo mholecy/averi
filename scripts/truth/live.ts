@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeDismissal, visibilityCases, type LiveVerdict } from './live-visibility.js';
-import { allPassed, claimsTap, isError } from './replies.js';
+import { allPassed, claimsDone, claimsTap, isError } from './replies.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
 /**
@@ -145,7 +145,6 @@ const fill = (cell: string, tag: string, text: string, clear?: boolean): Call =>
   args: { selector: id(cell, tag), text, ...(clear !== undefined && { clear }) },
 });
 const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
-const claims = (reply: string) => /^(Filled|Cleared|Tapped)/.test(reply) && !/NOT verified/.test(reply);
 const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
 
 /** The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). */
@@ -160,7 +159,7 @@ const holds =
     if (got === want) {
       return isError(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
     }
-    return claims(last)
+    return claimsDone(last)
       ? { outcome: 'MISMATCH', why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
       : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
   };

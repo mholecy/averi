@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Outcome } from '../../scripts/differential/differential.js';
-import { expectations, formExpectations, pairingOf, replyKind, taps, touchDowns, type Expectation } from '../../scripts/differential/golden-spec.js';
+import { expectations, formExpectations, pairingOf, taps, touchDowns, type Expectation } from '../../scripts/differential/golden-spec.js';
+import { replyKind } from '../../scripts/truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
 // The golden spec's judges (scripts/differential/golden-spec/*.ts, behind the façade golden-spec.ts), each on the
@@ -194,6 +195,6 @@ describe('replyKind: what kind of reply it is, pinned on every known mismatch (g
     ['ERROR scroll_until id:"lab.x" failed after 2 swipes — under button "Continue"', 'refused'],
     ['something else', 'other'],
   ] as const)('%s → %s', (reply, kind) => {
-    expect(replyKind(out(reply))).toBe(kind);
+    expect(replyKind(reply)).toBe(kind);
   });
 });

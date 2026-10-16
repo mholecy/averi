@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classStrokes, directionBreaks, distanceAt, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, stopHolds, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { classStrokes, directionBreaks, distanceAt, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { stopHolds } from '../../scripts/truth/target-contract.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
 import { knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 
@@ -190,6 +191,13 @@ describe('the visibility cases\' expectations from the static truth', () => {
     expect(band.judge(launched, ['ERROR under the navigation bar'], launched, 'uiautomator', []).outcome).toBe('ok');
     const [open] = visibilityCases(truth('bands', [target({ geometry: 'whole' })]), 'android');
     expect(open.judge(launched, ['ERROR covered'], launched, 'uiautomator', []).outcome).toBe('LOUD');
+  });
+  it('iOS\'s home-indicator band is no band (target-contract.ts#homeIndicatorBand): its target\'s tap must fire, a refusal LOUD, as the replayed open row asks', () => {
+    const [n] = visibilityCases(truth('bands', [target({ geometry: 'nav-band' })]), 'ios');
+    expect(n.asks).toEqual({ must: 'fire', inside: 'node' });
+    expect(n.judge(launched, ['ERROR under the home indicator'], launched, 'wda', [])).toMatchObject({ outcome: 'LOUD', cls: 'tap-refused', kind: 'refused' });
+    const fired = state({ events: [{ kind: 'tap', tag: 'N', at }] });
+    expect(n.judge(fired, ['Tapped id:"lab.c.N"'], launched, 'wda', [])).toMatchObject({ outcome: 'ok', kind: 'Tapped' });
   });
   it('a target its capture\'s tree of that source did not list: its strokes reported, not judged — listed, judged', () => {
     const t = target({ tag: 'T', id: 'lab.c.T', geometry: 'off-screen', scrollView: 'page', frame: { x: 51, y: -2, width: 300, height: 64 }, listed: { uiautomator: false, wda: true } });

@@ -12,7 +12,7 @@ const LAB_FULLY = 'bug:2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-b
 
 // tabbar-floating F on Android, far below the fold in a Compose scroll view, is in no uiautomator dump (only what is
 // visible to the user is): its capture records it unlisted (TargetTruth.listed), so its tap timing out, its colour
-// assert not finding it and R-stroke judged by the strokes sent for it are all green (edges.ts#notListed).
+// assert not finding it and R-stroke judged by the strokes sent for it are all green (target-contract.ts#unlistedBy).
 
 export const bars: KnownFile = {
   family: 'bars',

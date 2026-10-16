@@ -1,9 +1,10 @@
 import type { Platform } from '../corpus.js';
 import type { Rect, TargetTruth } from '../../truth/schema.js';
 import type { Outcome } from '../differential.js';
-import { claimsTap } from '../../truth/replies.js';
+import { claimsTap, movedTap } from '../../truth/replies.js';
 import { pointText, probePoint, selectorOf, touchesAt } from '../../truth/truth.js';
-import { BUDGET_MS, classed, first, MOVED_TAP, ownWords, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
+import { stopAsk, tapAsk } from '../../truth/target-contract.js';
+import { BUDGET_MS, classed, first, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
 
 /**
  * The base family's rows (fixtures/apps/cells/base.json): a coloured target open — reached by its probe and drawn as
@@ -24,6 +25,7 @@ export function openRows(platform: Platform, t: TargetTruth, nodes: readonly Rec
   const centres = nodeCentres(nodes, t);
   return ([
     {
+      asks: tapAsk(platform, t),
       verb: 'tap',
       says: centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`,
       call: { tool: 'tap', args: { platform, selector } },
@@ -36,6 +38,7 @@ export function openRows(platform: Platform, t: TargetTruth, nodes: readonly Rec
       judge: passes,
     },
     {
+      asks: stopAsk(platform, t, false),
       verb: 'scroll_until',
       says: 'reached with no swipe',
       call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
@@ -93,20 +96,20 @@ const withinReach = (p: Point, probe: Point, frame: Rect) =>
  * of the app's frame, is tapped 9 pt off its probe — 0.081 of its width, a right tap (at its node's centre); #26's C,
  * the tap moved 20 pt down to "the uncovered part" beneath a phantom tab bar button — 0.313 of its height, a wrong one.
  * Its blind spot: a cover averi imagines over less than a third of the target moves the tap less than a sixth of it,
- * and passes here — the moved-tap reply (MOVED_TAP) catches that one whenever averi says it moved. Where the tree lists
+ * and passes here — the moved-tap reply (replies.ts#movedTap) catches that one whenever averi says it moved. Where the tree lists
  * the target's node, the node-centre rule (NODE_CENTRE_SLACK) has no such spot.
  */
 export const OPEN_TAP_REACH = 1 / 6;
 
 /**
- * The open tap's judge on a `Tapped` reply: it does not say it moved the tap off a cover (judges.ts#MOVED_TAP — on a
+ * The open tap's judge on a `Tapped` reply: it does not say it moved the tap off a cover (replies.ts#movedTap — on a
  * target the truth measured uncovered, open, whole, reached and drawn as itself, nothing lies over its centre: the
  * cover is averi's own), at least one tap is sent, and every tap sent lies at the centre of one of the target's nodes
  * in the recorded tree (nodeCentres, within NODE_CENTRE_SLACK) — or, where the tree names none the probe agrees with,
  * at its probe point (probeDelivered), within OPEN_TAP_REACH of its extent on each axis.
  */
 export function atProbe(o: Outcome, t: Pick<TargetTruth, 'frame' | 'probe'>, nodes: readonly Rect[] = []): string | undefined {
-  if (MOVED_TAP.test(ownWords(o))) return `Tapped moved off a cover over its centre, on a target measured uncovered: ${first(o)}`;
+  if (movedTap(o.reply)) return `Tapped moved off a cover over its centre, on a target measured uncovered: ${first(o)}`;
   const points = tapPoints(o);
   if (points.length === 0) return `Tapped, but no tap sent: ${first(o)}`;
   const centres = nodeCentres(nodes, t);
