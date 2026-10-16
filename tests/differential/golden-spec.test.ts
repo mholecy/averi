@@ -92,6 +92,13 @@ describe('a target beneath a presented layer', () => {
     expect(colour.judge(out('1/1 asserts FAILED\nFAIL  element … — container (57,463 288x48) is drawn over the element … close it first'))).toBeUndefined();
   });
 
+  it('colour: a fail with the element in the tree names the presented remedy, not the status bar\'s or the screen edge\'s (ADR 0018)', () => {
+    const colour = row(rows, 'colour');
+    expect(
+      colour.judge(out('1/1 asserts FAILED\nFAIL  element … — the status bar is drawn over the element (element 24,-20 354x52, status bar 0,0 402x62) — scroll_until the element with `fully: true` first and re-run')),
+    ).toMatch(/^failed without "close it first": FAIL {2}element … — the status bar/);
+  });
+
   it('scroll_until: an Android stroke beneath the layer is a swipe', () => {
     const scroll = row(rows, 'scroll_until');
     expect(scroll.judge(out('ERROR scroll_until … stopped before any swipe … close it first'))).toBeUndefined();
