@@ -24,7 +24,10 @@ review): the presented layer is the tree source's fact — the WDA parser marks 
 and a marked layer covers what lies outside it through the whole screen; the Decision's conditions and the amendment
 "a labelled dim" are the fallback for a tree whose source did not judge presented layers; residuals 1, 2, 5 (iOS),
 6, 8 and 11 closed for WDA, 7 partly (a layer of only empty frames stands), 3, 4, 9 and 10 stand, 12–16 added (see
-"Amendment: the presented layer is the source's fact" below).
+"Amendment: the presented layer is the source's fact" below). Amended again 2026-10-16 (round 5 of phase 3, the lab
+finding L3): in the app's Window, a layer of only empty frames whose frames show on the screen, after the wholly
+invisible screen beneath, is the presented one when no content layer follows — residual 7 closed for WDA for that
+shape, standing for a bare frame and the rest (see "Amendment: a presented layer of only empty frames" below).
 
 ## Context
 
@@ -589,7 +592,7 @@ alert, and a non-modal sheet.
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
 | 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands |
-| 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **stands** for a layer of only empty frames: the flags rule skips a layer with no non-structural element, so it is not marked | stands |
+| 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
 | 10 a strip with no node at a list's bottom | stands (no presentation) | stands |
@@ -611,6 +614,57 @@ Residuals 12–17 below are this amendment's. Risks, none measured (the device p
 - **A lingering dismissed layer**: guarded by "visible content ON the screen" (a leftover parked at y 874 marks
   nothing; pinned on a synthetic tree); a leftover WDA kept visible on the screen over a beneath still `0` would be
   marked.
+
+## Amendment: a presented layer of only empty frames (2026-10-16)
+
+The lab's ground truth (phase 3, `presented/sheet-medium-edges`, fixtures/apps/ios/AveriLab/Presented.swift#ScrolledHost)
+found residual 7's standing part as a regression: a SwiftUI medium sheet with no content of its own, presented over a
+`ScrollView` scrolled 200 pt down. WDA lists the host's layer wholly `isVisible="0"` and the sheet's layer after it
+shown — `dismiss popup` (`-402,-874 1206x2622`) and the card (`8,415 386x451`) as nested `Other`s, every one `1`, no
+element of a non-structural role. The flags rule walked past that layer as one with no content, so nothing was marked;
+the root is `presentationsJudged`, so the shape rule, which had read the labelled dim as the sheet's surface (the
+amendment "a labelled dim"), was not asked either, and the five targets beneath — above the screen, under the status
+bar, a 5-pt sliver at the bottom, wholly off it below, whole under the dim — got scroll or status-bar advice and
+`scroll_until` stroked onto the sheet (15 golden rows red from the amendment "the presented layer is the source's fact",
+41c394a; green from 753b560 to 20b800a). Adding one visible `Button` to the sheet's card in a copy of the tree marks the
+layer and turns them back: the scrolled host is not the cause, the empty sheet is.
+
+**Decision: the hidden layer beneath is the fact; content only picks which later layer is presented.** In
+`wda-source.ts#presentedScreen`, in the APP's Window (the payload's first — measured: the first Window in every corpus
+payload, 89 of 89 shown, holding every mark), when a layer wholly `0` was walked past and NO content layer follows it in
+the Window, the first screen-sized layer after it that has no content and SHOWS — some element BELOW it, a child or
+deeper, never the layer itself, `isVisible="1"` and sharing area with the Window — is marked `screen`. A bare shown leaf
+presents nothing: Contacts' sheet with the keyboard up (corpus run16-ios/contacts-sheet-keyboard-wda.json) ends its
+Window with `Other 0,0 402x874`, shown, no children, after its marked sheet — read as the layer itself it would be
+marked wherever no content layer came first, a false "close it first" on every tap. Nor does a layer whose shown frames
+all lie off the Window. Everything else is as decided: a content layer after the beneath is still the one marked, even
+with an empty layer between them; a content layer neither hidden nor shown (a leftover parked off the screen) still
+marks nothing; an empty layer with no wholly `0` layer before it, or one nothing of which shows, marks nothing. The rule
+still reads a whole layer's flags and a visible later layer beside it — the corroboration Q3 asked for — never one
+node's flag; what changed is only that the later layer need not hold a button. Draw order is unchanged: a `screen`
+layer's own nodes stay covers judged by the rows, so the labelled `dismiss popup` is named over the whole target (`M`),
+and the anonymous layer where nothing of it draws.
+
+Not taken: asking the shape rule on a judged tree whose layers the source marked none of (the suspect first named:
+`presentationsJudged` switching the fallback off wholesale). It would ask the shape again of every judged tree on which
+the source marked nothing — Safari's capsule layer, the pass-through shapes of residual 1 — where the source's silence
+is the answer, and here the source already holds the fact: the beneath reads wholly `0`.
+
+New risk, beside "a lingering dismissed layer": an EMPTY layer WDA keeps shown on the screen after a dismissal, over a
+beneath still `0`, is now marked — a false refusal while the beneath reads hidden, as for a content leftover.
+
+Why the app's Window only: the keyboard's and the input host's Windows read wholly `0` while the keyboard is down, and
+are then not the keyboard's Windows the search skips (`keyboardMarks`' roots). Over corpus-r19's 58 raw WDA payloads,
+57 later Windows (on 44 payloads) read their first layer wholly `0`; 56 hold that layer alone, and the one with a layer
+after it (contacts-sheet-keyboard's input host) has a hidden layer of `Other`s only, no beneath. So none was marked by
+the rule even unlimited, but a shown empty layer appearing there during a keyboard transition would be marked a
+presented screen in a Window drawn over the app's whole screen. Limiting the rule to the first Window costs nothing on
+the corpus and the lab (every `screen` mark of the corpus is in the first Window), and leaves residual 3 — a
+presentation in a later Window — as it stood.
+
+**The harness** (corpus-r19, 648 trees, 309 raw, 385 712 calls, against debc9b2): 0 diffs — no recorded device tree
+lays a presented layer of only empty frames, so the rule changes nothing the corpus holds. Golden (the lab truth, 1131
+checks): the 15 WDA rows of `sheet-medium-edges` turn green, no other row changes (260 → 245 mismatches).
 
 ## Residuals accepted
 
@@ -683,6 +737,13 @@ Residuals 12–17 below are this amendment's. Risks, none measured (the device p
    covered through that layer's mark (the alert's bare dim, by the typed mark). Stands for a layer of ONLY empty frames
    (`container`/`other`, no non-structural element): `wda-source.ts#presentedScreen` skips a layer with no content, so
    it is not marked, and the screen beneath reads as before.
+   **Closed for WDA** (2026-10-16) for a shown layer with shown frames below it: in the app's Window, when no content
+   layer follows the wholly `0` beneath, the first screen-sized layer after it with no content whose children or
+   deeper frames show on the screen is marked `screen` (the amendment "a presented layer of only empty frames"; the
+   lab's medium sheet over a scrolled host, docs/bugs/2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md).
+   Stands for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an
+   empty sheet followed by a content leftover parked off the screen (that layer, neither hidden nor shown, ends the
+   walk with no mark), a layer in a later Window, and on a tree whose source did not judge, as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
    unidentified, unlabelled frame) — except in a layer holding an alert, which covers the whole screen by the adapter's
    mark whatever its dim is (see "Amendment: a layer holding an alert"). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath

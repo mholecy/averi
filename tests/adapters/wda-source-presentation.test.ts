@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
+import { drawOrder } from '../../src/ui-tree/draw-order.js';
 
 // What the WDA parser marks as a PRESENTED LAYER (`UiNode.presentation`, on the layer — a Window's direct child): the
 // source's own word that a layer is presented over the screen beneath. By the type of an element the layer holds
@@ -48,6 +49,18 @@ const pageSheet = () =>
     children: [
       el('Other', { rect: rect(0, 62, 402, 812), children: [el('NavigationBar', { label: 'New Contact', rect: rect(0, 62, 402, 56), children: [el('Button', { label: 'Cancel', rect: rect(16, 72, 70, 36) })] })] }),
       el('Table', { rect: rect(0, 118, 402, 756), children: [el('TextField', { label: 'First name', rect: rect(20, 300, 362, 44) })] }),
+    ],
+  });
+
+/**
+ * A sheet's layer with no content of its own (the lab's medium sheet): its `dismiss popup` and its card, nested empty
+ * `Other`s — every element shown, none of a non-structural role.
+ */
+const emptySheet = () =>
+  el('Other', {
+    children: [
+      el('Other', { label: 'dismiss popup', rawIdentifier: 'PopoverDismissRegion', rect: rect(-402, -874, 1206, 2622) }),
+      el('Other', { rect: rect(8, 415, 386, 451), children: [el('Other', { rect: rect(8, 415, 386, 451), children: [el('Other', { rect: rect(8, 415, 386, 451) })] })] }),
     ],
   });
 
@@ -122,6 +135,53 @@ describe('UiNode.presentation "screen" — a later screen-sized layer shown over
     const bare = el('Other', { isVisible: '0' });
     const strip = el('Other', { rect: rect(0, 0, 402, 120), children: [el('Button', { label: 'Banner', rect: rect(20, 60, 100, 44) })] });
     expect(marks(parseWdaSourceValue(app(win(bare, hiddenAll(screen('Contacts')), strip, pageSheet()))))).toEqual([['0,0 402x874', 'screen']]);
+  });
+
+  it('a sheet with NO content of its own (its dim and its card only empty frames, every one shown) over a hidden screen is marked "screen" — the hidden layer beneath is the fact, the sheet need not hold a button', () => {
+    // docs/bugs/2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md: the lab's
+    // medium sheet over a scrolled host, as WDA reports it — beneath, every node `0`; the sheet's layer a `dismiss
+    // popup` and the card's nested `Other`s, every one `1`, no element of a non-structural role.
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Host')), emptySheet()))))).toEqual([['0,0 402x874', 'screen']]);
+  });
+
+  it('draw order reads that mark: every target of the scrolled host beneath — above the screen, under the status bar, whole under the dim, a sliver at its bottom, below the screen — lies under a presented screen', () => {
+    const target = (id: string, y: number) => el('Button', { label: `Target ${id}`, rawIdentifier: `lab.${id}`, rect: rect(51, y, 300, 64) });
+    const host = el('Other', { children: [el('ScrollView', { children: [el('Other', { rect: rect(0, -200, 402, 1600), children: [target('H', -88), target('G', -20), target('M', 290), target('E', 869), target('F', 1009)] })] })] });
+    const tree = parseWdaSourceValue(app(win(hiddenAll(host), emptySheet())));
+    const order = drawOrder(tree);
+    const byId = (id: string) => [...everyNode(tree)].find((n) => n.identifier === `lab.${id}`)!;
+    for (const id of ['H', 'G', 'M', 'E', 'F']) expect(order.presentedOver(byId(id)), id).toBeDefined();
+    expect(order.exposure(byId('M'), SCREEN).presented.length).toBeGreaterThan(0);
+  });
+
+  it('…but only as the last word: a content-carrying layer after it is still the one marked, and one that is neither hidden nor shown still marks nothing', () => {
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Contacts')), emptySheet(), pageSheet())))).map(([, kind]) => kind)).toEqual(['screen']);
+    expect(parseWdaSourceValue(app(win(hiddenAll(screen('Contacts')), emptySheet(), pageSheet()))).children[0].children[2].presentation).toBe('screen');
+    const leftover = el('Other', { children: [el('Other', { rect: rect(8, 874, 386, 400), children: [el('Button', { label: 'Standard', rect: rect(31, 900, 340, 43) })] })] });
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Form')), emptySheet(), leftover))))).toEqual([]);
+  });
+
+  it('an empty layer is no presented screen without a hidden layer before it, nor when nothing of it shows', () => {
+    expect(marks(parseWdaSourceValue(app(win(screen('Form'), emptySheet()))))).toEqual([]);
+    expect(marks(parseWdaSourceValue(app(win(emptySheet(), hiddenAll(screen('Form'))))))).toEqual([]);
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Form')), hiddenAll(emptySheet())))))).toEqual([]);
+  });
+
+  it('what shows is asked of the layer\'s children: a bare shown leaf (Contacts\' sheet with the keyboard up ends its Window with one) is no presented screen, nor a layer whose only shown frame lies off the Window', () => {
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Form')), el('Other')))))).toEqual([]);
+    const parked = el('Other', { children: [el('Other', { isVisible: '0', rect: rect(-402, -874, 1206, 2622) }), el('Other', { rect: rect(8, 900, 386, 451), children: [el('Other', { rect: rect(8, 900, 386, 451) })] })] });
+    expect(marks(parseWdaSourceValue(app(win(hiddenAll(screen('Form')), parked))))).toEqual([]);
+  });
+
+  it('the FIRST empty layer that shows is the one marked, not a later one', () => {
+    const tree = parseWdaSourceValue(app(win(hiddenAll(screen('Form')), emptySheet(), emptySheet())));
+    expect(marks(tree)).toEqual([['0,0 402x874', 'screen']]);
+    expect(tree.children[0].children[1].presentation).toBe('screen');
+  });
+
+  it('only in the app\'s Window (the first): a later Window reading wholly `0` (the input host\'s, with the keyboard down) followed by a shown empty layer marks nothing', () => {
+    const inputHost = win(hiddenAll(el('Other', { children: [el('Other', { rect: rect(0, 566, 402, 308), children: [el('Button', { label: 'Paste', rect: rect(150, 600, 80, 40) })] })] })), emptySheet());
+    expect(marks(parseWdaSourceValue(app(win(screen('Form')), inputHost)))).toEqual([]);
   });
 
   it('only the FIRST shown layer after the hidden one: a later layer over the sheet (a toast host) is not marked', () => {

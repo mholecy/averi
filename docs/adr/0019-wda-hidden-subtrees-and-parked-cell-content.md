@@ -92,7 +92,9 @@ presentation hides the presenting screen from accessibility, and where idb and u
 tree, WDA lists it whole with every node `isVisible="0"`. The parser now reads that fact once, for the LAYER
 (`adapters/wda-source.ts#presentedScreen`): a Window's first screen-sized layer with visible content on the screen,
 laid after screen-sized content layers of the same Window every node of which reads `isVisible="0"`, is marked
-presented (`UiNode.presentation` `screen`); draw order covers the screen beneath through it (ADR 0018).
+presented (`UiNode.presentation` `screen`) — or, in the app's Window with no content layer after them, its first
+screen-sized layer with no content whose frames below it show on the screen (since 2026-10-16: ADR 0018's "Amendment:
+a presented layer of only empty frames"); draw order covers the screen beneath through it (ADR 0018).
 
 - **What it reads, and what it never reads.** A whole layer's flags AND a visible later layer beside it — the two
   together, corroboration, never one flag alone. Never one node's flag (residual 2: `isVisible` alone is no geometric
