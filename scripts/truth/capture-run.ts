@@ -109,7 +109,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       const geometry = measuredGeometry(frame, s, t.scrollView);
       // The centre is never tapped where it lies off the screen (truth.ts#unprobedReason, the rule consistency holds
       // the target to).
-      const unprobed = unprobedReason({ frame, ...geometry }, lab.platform, s.screen)?.says;
+      const unprobed = unprobedReason({ frame, ...geometry }, s.screen)?.says;
       const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
       const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;

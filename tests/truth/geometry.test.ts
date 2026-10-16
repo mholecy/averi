@@ -177,22 +177,20 @@ describe('consistency with a measured geometry', () => {
   it('unprobedReason: the one rule for which centres the capture never taps — consistency and the capture both read it', () => {
     const screen = { width: 402, height: 874 };
     // `null`: no screen given (a default parameter would take `undefined` for the screen).
-    const why = (over: Partial<TargetTruth>, platform: 'ios' | 'android' = 'ios', s: typeof screen | null = screen) => unprobedReason(T(over), platform, s ?? undefined);
+    const why = (over: Partial<TargetTruth>, s: typeof screen | null = screen) => unprobedReason(T(over), s ?? undefined);
     expect(why({})).toBeUndefined();
     expect(why({ geometry: 'whole' })).toBeUndefined();
     // An off-screen target, with or without the screen; a centre past the screen's edge, measured or not.
     expect(why({ frame: rect(51, 900, 300, 64), geometry: 'off-screen' })).toEqual({ why: 'off-screen', says: 'its centre (201,932) lies off the 402x874 screen' });
-    expect(why({ frame: rect(51, 900, 300, 64), geometry: 'off-screen' }, 'ios', null)?.why).toBe('off-screen');
+    expect(why({ frame: rect(51, 900, 300, 64), geometry: 'off-screen' }, null)?.why).toBe('off-screen');
     expect(why({ frame: rect(51, 850, 300, 64) })).toEqual({ why: 'centre-off-screen', says: 'its centre (201,882) lies off the 402x874 screen' });
     expect(why({ frame: rect(51, 850, 300, 64), geometry: 'centre-out' })?.why).toBe('centre-off-screen');
-    expect(why({ frame: rect(51, 850, 300, 64) }, 'ios', null)).toBeUndefined();
+    expect(why({ frame: rect(51, 850, 300, 64) }, null)).toBeUndefined();
     // A centre ON the last row of the screen is probed (the screen is [0, height)).
-    expect(why({ frame: rect(51, 810, 300, 127) }, 'ios', { width: 402, height: 875 })).toBeUndefined();
-    // A centre in a system band is probed on either platform: what a tap there does is measured (B4).
-    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'android')).toBeUndefined();
-    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' }, 'ios')).toBeUndefined();
-    expect(why({ frame: rect(51, 20, 300, 24), geometry: 'status-band' }, 'android')).toBeUndefined();
-    expect(why({ frame: rect(51, 20, 300, 24), geometry: 'status-band' }, 'ios')).toBeUndefined();
+    expect(why({ frame: rect(51, 810, 300, 127) }, { width: 402, height: 875 })).toBeUndefined();
+    // A centre in a system band is probed, on either platform: what a tap there does is measured (B4).
+    expect(why({ frame: rect(51, 840, 300, 24), geometry: 'nav-band' })).toBeUndefined();
+    expect(why({ frame: rect(51, 20, 300, 24), geometry: 'status-band' })).toBeUndefined();
   });
   it('whole or absent: the phase-1 rule — delivered, reached and drawn', () => {
     expect(consistency(T({}))).toBeUndefined();

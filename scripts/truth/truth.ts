@@ -129,7 +129,6 @@ const at = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
  */
 export function unprobedReason(
   t: Pick<TargetTruth, 'frame' | 'geometry'>,
-  platform: Platform | undefined,
   screen: { width: number; height: number } | undefined,
 ): { why: 'off-screen' | 'centre-off-screen'; says: string } | undefined {
   const offScreen = (why: 'off-screen' | 'centre-off-screen') => ({ why, says: `its centre ${at(probePoint(t.frame))} lies off the ${screen === undefined ? '' : `${screen.width}x${screen.height} `}screen` });
@@ -165,7 +164,7 @@ export function consistency(
 ): string | undefined {
   const g = t.geometry ?? 'whole';
   const probed = t.reached || t.probe.length > 0;
-  switch (unprobedReason(t, platform, screen)?.why) {
+  switch (unprobedReason(t, screen)?.why) {
     case 'off-screen':
       return probed || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
     case 'centre-off-screen':
