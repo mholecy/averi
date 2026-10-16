@@ -6,6 +6,7 @@ import { edgeRows } from './golden-spec/edges.js';
 import { dismissRows, ownPartsRows } from './golden-spec/false-covers.js';
 import { formRows, type FormExpectation } from './golden-spec/forms.js';
 import { presentedOverRows } from './golden-spec/presented.js';
+import { textRows } from './golden-spec/text.js';
 import type { Expectation } from './golden-spec/judges.js';
 
 /**
@@ -43,7 +44,9 @@ import type { Expectation } from './golden-spec/judges.js';
  * R-dismiss (rows.ts#dismissRow, a form cell's row under its `config.ios.keyboardDismiss`) through formExpectations,
  * in place of the form's own under-keyboard tap. So a B5 (false covers) author edits golden-spec/false-covers.ts (its
  * rows), this module (to ask them), rows.ts only for a new row type — and the family's catalog file, app views and
- * tests/differential/golden/false-covers.known.ts, as every batch does.
+ * tests/differential/golden/false-covers.known.ts, as every batch does. A text target (CatalogTarget.text) of any family
+ * adds golden-spec/text.ts's rows (phase 4: its string read back from the tree and, `ocr`, by the host's recognizer
+ * from the screenshot) to those its geometry asks.
  */
 
 export * from './golden-spec/judges.js';
@@ -61,8 +64,11 @@ export * from './golden-spec/rows.js';
  */
 export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind): Expectation[] {
   if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
-  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? ownPartsRows(platform, t) : openRows(platform, t);
-  return cell === undefined ? [] : [...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell)];
+  // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
+  // the screenshot) after the rows its geometry asks.
+  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, cell)]);
+  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? text(ownPartsRows(platform, t)) : openRows(platform, t);
+  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell)]);
 }
 
 /**

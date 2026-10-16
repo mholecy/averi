@@ -1,0 +1,40 @@
+{
+  "family": "text",
+  "note": "Text targets carrying P5's sample strings (docs/plans/2026-10-15-proposal-find-bugs-in-batches.md: Slovak and Czech diacritics, typographic quotes and apostrophes, en and em dashes, an ellipsis, amounts with NBSP and narrow-NBSP thousands separators and a minus sign, IBAN groups), each a box of its colour with the string drawn on it in black, the box the target (its frame and `<tag>.box` one) — phase 4: the tree's text and OCR on the real pixels (golden-spec/text.ts). text-sample: ten open strings down the screen. text-under-bar: S centred in the status band, W in the open, P under a pinned `Continue` button (chrome `pinned`) — calibration.json #22's OCR half. text-nav-cut (Android, gesture navigation): T's text drawn across the navigation band's top while its node ends flush at it (the node 49 px of the 74-px text, as Settings' row in the note) — #23. App files: AveriLab/Text.swift, Text.kt.",
+  "cells": [
+    {
+      "id": "text-sample",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#E3F2FD", "slot": 0, "declared": "open", "text": "Prihlásiť sa" },
+        { "tag": "B", "color": "#E3F2FD", "slot": 1, "declared": "open", "text": "Ľubomír Šťastný" },
+        { "tag": "C", "color": "#E3F2FD", "slot": 2, "declared": "open", "text": "Mäkčeň, dĺžeň a vokáň" },
+        { "tag": "D", "color": "#E3F2FD", "slot": 3, "declared": "open", "text": "Jiří Dvořák: věřitel, půjčka" },
+        { "tag": "E", "color": "#E3F2FD", "slot": 4, "declared": "open", "text": "Payee’s name" },
+        { "tag": "F", "color": "#E3F2FD", "slot": 5, "declared": "open", "text": "Poznámka “pre mňa” a ‘OK’" },
+        { "tag": "G", "color": "#E3F2FD", "slot": 6, "declared": "open", "text": "Splatnosť 1–15 — mesačne…" },
+        { "tag": "H", "color": "#E3F2FD", "slot": 7, "declared": "open", "text": "1 234,56 €" },
+        { "tag": "I", "color": "#E3F2FD", "slot": 8, "declared": "open", "text": "−12 345,00 EUR" },
+        { "tag": "J", "color": "#E3F2FD", "slot": 9, "declared": "open", "text": "SK31 1200 0000 1987 4263 7541" }
+      ]
+    },
+    {
+      "id": "text-under-bar",
+      "layer": "none",
+      "targets": [
+        { "tag": "S", "color": "#FFF3E0", "slot": 0, "declared": "open", "text": "Zostatok 1 234,56 €" },
+        { "tag": "W", "color": "#E8F5E9", "slot": 1, "declared": "open", "text": "Šťastný účet" },
+        { "tag": "P", "color": "#FCE4EC", "slot": 2, "declared": "open", "text": "Pokračovať na súhrn" }
+      ]
+    },
+    {
+      "id": "text-nav-cut",
+      "layer": "none",
+      "platforms": ["android"],
+      "navigation": "gesture",
+      "targets": [
+        { "tag": "T", "color": "#F3E5F5", "slot": 0, "declared": "open", "text": "Zvuk a vibrácie" }
+      ]
+    }
+  ]
+}

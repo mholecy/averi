@@ -46,9 +46,10 @@ export interface CatalogTarget {
  * cells of different families are written apart. `base` the open control; `presented` a layer presented over the
  * targets (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the
  * screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar
- * that is no cover. In this order in the generated catalog (scripts/truth/catalog.ts).
+ * that is no cover; `text` text targets carrying P5's sample strings, open and under the bands and chrome (phase 4: the
+ * tree's text and OCR on the real pixels). In this order in the generated catalog (scripts/truth/catalog.ts).
  */
-export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers'] as const;
+export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text'] as const;
 export type Family = (typeof FAMILIES)[number];
 
 export interface CatalogCell {

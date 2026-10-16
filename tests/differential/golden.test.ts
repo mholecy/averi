@@ -15,6 +15,7 @@ import { falseCovers } from './golden/false-covers.known.js';
 import { forms } from './golden/forms.known.js';
 import type { Known, KnownFile } from './golden/known.js';
 import { presented } from './golden/presented.known.js';
+import { text } from './golden/text.known.js';
 
 // The golden mode over the committed ground truth (tests/fixtures/truth, captured from the lab apps by
 // scripts/truth/capture.ts and capture-android.ts): each verb's answer against what the truth implies, no device. The
@@ -35,7 +36,7 @@ const BUGS = fileURLToPath(new URL('../../docs/bugs/', import.meta.url));
 /**
  * Every family's ratchet (tests/differential/golden/<family>.known.ts), one file per family of fixtures/apps/cells/.
  */
-const FILES: readonly KnownFile[] = [base, presented, forms, edges, bars, falseCovers];
+const FILES: readonly KnownFile[] = [base, presented, forms, edges, bars, falseCovers, text];
 const KNOWN: Record<string, Known> = Object.assign({}, ...FILES.map((f) => f.known));
 const COUNTS: Record<string, number> = Object.assign({}, ...FILES.map((f) => f.counts));
 
@@ -92,7 +93,10 @@ describe('golden over the lab app truth', () => {
 
   it('no known mismatch is fixed without being struck off KNOWN', () => {
     const mismatches = new Set(results.flatMap((r) => r.checks).filter((c) => c.mismatch !== undefined).map(key));
-    const fixed = Object.keys(KNOWN).filter((k) => !mismatches.has(k)).map((k) => `${k} — ${KNOWN[k].note}`);
+    // An `ocr` row skipped on a host with no working recognizer (golden.ts#ocrAvailability) was not asked: its KNOWN
+    // entry is held where it is.
+    const skipped = new Set(results.flatMap((r) => r.checks).filter((c) => c.skipped !== undefined).map(key));
+    const fixed = Object.keys(KNOWN).filter((k) => !mismatches.has(k) && !skipped.has(k)).map((k) => `${k} — ${KNOWN[k].note}`);
     expect(fixed).toEqual([]);
   });
 

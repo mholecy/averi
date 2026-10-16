@@ -49,6 +49,9 @@ describe('the cell catalog', () => {
       'false-covers/toolbar-dismiss',
       'false-covers/toolbar-dismiss-bar',
       'false-covers/toolbar-dismiss-short',
+      'text/text-sample',
+      'text/text-under-bar',
+      'text/text-nav-cut',
     ]);
   });
 

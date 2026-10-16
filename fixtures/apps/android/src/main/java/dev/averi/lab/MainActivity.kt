@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 // The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2): the iOS app's cells
 // (fixtures/apps/ios/AveriLab) in Compose. One cell per launch — the intent extra `cell` or averilab://cell/<id>; with
 // neither, the catalog as a list, for a person poking at the app. One file per cell family
-// (fixtures/apps/cells/<family>.json): Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt; CellRouter
+// (fixtures/apps/cells/<family>.json): Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt, Text.kt; CellRouter
 // below sends a cell to its family's screen.
 
 class MainActivity : ComponentActivity() {
@@ -123,6 +123,7 @@ private fun CellRouter(cell: Cell, lab: Lab) {
         "edges" -> EdgesScreen(cell, lab)
         "bars" -> BarsScreen(cell, lab)
         "false-covers" -> FalseCoversScreen(cell, lab)
+        "text" -> TextScreen(cell, lab)
         // The coloured-target host (Base.kt) with the cell's layer (Presented.kt).
         "base", "presented" -> CellScreen(cell, lab)
         else -> UnbuiltCell(cell)

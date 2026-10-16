@@ -31,7 +31,7 @@ import {
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, 'utf8')) as Calibration;
 const SHA = /^[0-9a-f]{7}$/;
-const VERBS = new Set(['tap', 'colour', 'scroll_until', 'fully', 'error', 'text']);
+const VERBS = new Set(['tap', 'colour', 'scroll_until', 'fully', 'error', 'text', 'ocr']);
 const captures = new Set(
   readdirSync(`${ROOT}${table.corpus}`).flatMap((run) => {
     const manifest = JSON.parse(readFileSync(`${ROOT}${table.corpus}/${run}/manifest.json`, 'utf8')) as { captures: { file: string; truth?: string }[] };
@@ -71,7 +71,7 @@ describe('calibration.json', () => {
       expect(STATUSES.test(s), s).toBe(true);
     for (const s of ['needs-cell:other', 'needs-cell:', 'residual:', 'needs-3', 'calibrated', 'open ', 'needs-2b:x', ''])
       expect(STATUSES.test(s), s).toBe(false);
-    expect(STATUSES.source).toBe('^(calibrate|open|residual:.+|needs-cell:(base|presented|forms|edges|bars|false-covers)|needs-2b|needs-live|needs-ocr)$');
+    expect(STATUSES.source).toBe('^(calibrate|open|residual:.+|needs-cell:(base|presented|forms|edges|bars|false-covers|text)|needs-2b|needs-live|needs-ocr)$');
     expect(VERDICTS).toEqual(['CALIBRATED', 'CALIBRATED-ON-DEFECT', 'DOES-NOT-FAIL', 'STILL-RED-AFTER', 'OPEN-RED', 'OPEN-NOT-REPRODUCED', 'NOT-ASKED', 'SIDE-DOES-NOT-LOAD']);
   });
 
