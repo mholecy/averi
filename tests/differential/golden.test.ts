@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { installVirtualClock } from '../../scripts/differential/clock.js';
@@ -8,14 +7,8 @@ import { cellOf, goldenRecording, ocrAvailability, type GoldenCheck, type Golden
 import { loadSide, type Side } from '../../scripts/differential/side.js';
 import { familyOf, loadCatalog } from '../../scripts/truth/catalog.js';
 import { FAMILIES } from '../../scripts/truth/schema.js';
-import { bars } from './golden/bars.known.js';
-import { base } from './golden/base.known.js';
-import { edges } from './golden/edges.known.js';
-import { falseCovers } from './golden/false-covers.known.js';
-import { forms } from './golden/forms.known.js';
-import type { Known, KnownFile } from './golden/known.js';
-import { presented } from './golden/presented.known.js';
-import { text } from './golden/text.known.js';
+import { COUNTS, KNOWN, KNOWN_FILES as FILES } from './golden/files.js';
+import type { KnownFile } from './golden/known.js';
 
 // The golden mode over the committed ground truth (tests/fixtures/truth, captured from the lab apps by
 // scripts/truth/capture.ts and capture-android.ts): each verb's answer against what the truth implies, no device. The
@@ -31,14 +24,6 @@ import { text } from './golden/text.known.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TRUTH = fileURLToPath(new URL('../fixtures/truth/', import.meta.url));
-const BUGS = fileURLToPath(new URL('../../docs/bugs/', import.meta.url));
-
-/**
- * Every family's ratchet (tests/differential/golden/<family>.known.ts), one file per family of fixtures/apps/cells/.
- */
-const FILES: readonly KnownFile[] = [base, presented, forms, edges, bars, falseCovers, text];
-const KNOWN: Record<string, Known> = Object.assign({}, ...FILES.map((f) => f.known));
-const COUNTS: Record<string, number> = Object.assign({}, ...FILES.map((f) => f.counts));
 
 const key = (c: GoldenCheck) => `${c.recording} ${c.target} ${c.verb}`;
 
@@ -75,16 +60,8 @@ describe('the ratchet\'s files', () => {
     expect([...twice((f) => f.known), ...twice((f) => f.counts)]).toEqual([]);
   });
 
-  it('a row filed as a bug names a note under docs/bugs; a residual names its decision', () => {
-    const bad = Object.entries(KNOWN).flatMap(([k, v]) => {
-      if (v.as === undefined) return [];
-      const [what, ...rest] = v.as.split(':');
-      const name = rest.join(':');
-      if (what === 'bug') return existsSync(`${BUGS}${name}`) ? [] : [`${k}: no docs/bugs/${name}`];
-      return name.trim() === '' ? [`${k}: a residual naming no decision`] : [];
-    });
-    expect(bad).toEqual([]);
-  });
+  // What a row is filed as (`as`: a bug note, a residual) is checked against docs/bugs and calibration.json with the
+  // live KNOWN's notes, in tests/truth/lab-notes.test.ts.
 });
 
 describe('golden over the lab app truth', () => {

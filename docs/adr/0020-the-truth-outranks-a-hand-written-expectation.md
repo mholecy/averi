@@ -55,6 +55,11 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    fails it too — it still mismatches, but differently (a timeout turned into a refusal with the wrong remedy keeps its
    class and its calls, but not its kind). The checks per capture are pinned, so a row that silently stops being asked
    fails.
+   The notes are held to docs/bugs and to the calibration table (scripts/truth/calibration.json), with no third file
+   between them (tests/truth/lab-notes.test.ts, round 5): a row filed as a bug (`as: bug:<file>`) names an existing
+   note, one filed as a residual names a decision recorded (a calibration.json residual, an ADR's numbered residual);
+   every note the calibration expects OPEN-RED has its rows here, each filed as it; and every note a row is filed as is
+   an open note of the calibration, but the live-only notes that test lists, each with its reason.
 
 ## Consequences
 
@@ -71,9 +76,11 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 
 - The golden mode replays a static tree: what changes the screen (typing, a dismissal, a stroke's effect) is the live
   golden's (scripts/truth/live.ts), which needs the lab device and is not a vitest test. Its KNOWN
-  (scripts/truth/live-known.ts) is keyed by case and verdict class only — no reply kind, no strokes, a device's timing
-  moves them — and an entry marked `intermittent` may come out ok without failing the run; a known case not
-  intermittent that comes out ok fails it, as §4 asks. What a run read is recorded (docs/truth/live-records/) and
+  (scripts/truth/live-known.ts) is keyed by case, with its verdict class and its reply's kind (round 5: the committed
+  records showed no known case whose kind moves — LV2's flush cases, the only ones with several records, read
+  `visible` in all six runs, ok or not) — but not its strokes, a device's timing moves how many are sent — and an entry
+  marked `intermittent` may come out ok without failing the run; a known case not intermittent that comes out ok fails
+  it, as §4 asks. Its notes are held as the static rows' are (§4). What a run read is recorded (docs/truth/live-records/) and
   judged again in vitest without a device (tests/truth/live-rejudge.test.ts, through `live.ts --rejudge`).
 - OCR is judged on the real pixels — the host's own recognizer on the captured screenshot (phase 4) — but only where
   the host has one: inside a sandbox (or off macOS) the `ocr` rows are skipped and counted, never red;

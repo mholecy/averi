@@ -14,6 +14,8 @@ const LE4 = 'bug:2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
+/** Review round 4's P4 (calibration.json NI1): idb lists a UIKit table's labels without their identifiers. */
+const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
 /** The short stroke down after two IDB_UP, the third of G's and blur-menu-grouped C's strokes. */
 const IDB_DOWN_SHORT = 'idb ui swipe 201 699 201 568 --duration 0.3';
@@ -77,19 +79,20 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['E'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a sliver beneath it', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['M'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a whole target under its dim', as: LAB_EDGES }),
     // sheet-long-list.idb.json — idb lists the UIKit table's labels without their accessibility identifiers (AXUniqueId
-    // null), and none of the rows below the fold: neither target answers to its id. A tree source's limit.
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier' }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier' }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier' }),
+    // null), and none of the rows below the fold: neither target answers to its id. R's rows are NI1's (filed as its
+    // note); F's, a tree source's limit no note files.
+    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
+    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
+    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['tap'], { cls: 'refused without scroll_until', kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists no row below the fold' }),
     // sheet-long-list-short (round 3): the same table cut short of the sheet's foot. Under idb R answers to no id, as
     // above (F, below the table's clip, is refused or fails as its rows ask: green). Under WDA F's stroke touches down
     // on the footer, beside the table holding it — lab finding LE4 (edges.known.ts), here on a UIKit table in a sheet.
-    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier' }),
-    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier' }),
-    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier' }),
+    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
+    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
+    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list-short.wda.json`, ['F'], ['scroll_until'], { cls: 'touched down outside its scroll view list at (201,699) (201,699)', kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: the stroke touches down on the footer, beside the table holding F', as: LE4 }),
     // RESIDUAL #31 (ADR 0018 residual 9): the blur menu's backdrop has no node in either tree — A, B, D beneath it read
     // as open. C's centre lies under the menu row W (its probe fires W): on the grouped variant's WDA tree C is refused
