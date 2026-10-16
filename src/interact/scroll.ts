@@ -5,7 +5,7 @@ import { sleep } from '../util/sleep.js';
 import { describeTarget, matchesToJudge, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
-import { dragMs, screenBox, scrollStroke, type Direction, type ScreenBox } from './swipe.js';
+import { dragMs, screenBox, type Direction, type ScreenBox } from './swipe.js';
 
 export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
 
@@ -186,7 +186,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   above it between two reads, in none — `Display` two rows below the fold
  *   was never reached. Each stroke is drawn over the target's scroll
  *   container (the screen's largest before the target is read in one;
- *   the round decides the box, swipe.ts#strokeRoom, above the keyboard
+ *   the round decides the box through its stroke plan, interact/stroke-plan.ts, above the keyboard
  *   and, for content below, above a node drawn over the
  *   container's lower part — a floating tab bar took the touch-down),
  *   its length the container's, and on an adapter
@@ -213,7 +213,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * #clipsOf, `Clips.scrollersOf`, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
  * one of them is answered with one short probe toward that edge, drawn over
  * a container with room for it above the keyboard (scroll-rounds.ts
- * #PROBE_REACH has the rule and its cost; swipe.ts#strokeRoom the box).
+ * #PROBE_REACH has the rule and its cost; interact/stroke-plan.ts the box).
  * Only the screen box comes from here — the round decides the stroke's.
  *
  * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
@@ -328,31 +328,25 @@ export async function scrollUntilVisible(
       throw scrollFailure(outcome, describe);
     }
     if (step.do === 'stroke') {
-      // The stroke's box is the round's (`step.box`, swipe.ts#strokeRoom over
-      // this round's screen box): the target's scroll container met with the
-      // screen box and kept above the keyboard and what is drawn over the
-      // container (`coverTop`, the higher of the two), or the screen box whole —
-      // decided once, there; here it only becomes points (scrollStroke, which
-      // judges nothing). No box: this round had no screen box to stroke in.
-      // `toward` names where the CONTENT lies — the finger moves the other
-      // way (content below → finger up). See swipeVector. Under a cover the
-      // stroke is `swipeVectorAbove` (the iOS device check): the
-      // uncovered box's stroke, its touch-down never inside the keyboard
-      // clearance nor higher than without a keyboard — the stroke over the
-      // box above it alone touched down in the app's top bar for a
-      // content-up scroll. The round says which cover (`coverTop`): this
-      // round's, or — on a round whose tree did not read — the last read
-      // round's. A 0×0 viewport does not throw above (pre-existing): the
-      // stroke then falls back to the tree's window while the stop still
-      // judges against 0×0.
+      // The stroke is the round's, made by its plan (`step.points`, interact/stroke-plan.ts#planStroke, or
+      // #planProbe for the flush check): over the target's scroll view met with this round's screen box and kept
+      // above the keyboard and what is drawn over that scroll view, or the screen box whole — decided once, there,
+      // with the points the plan asked the scene about at their touch-down; here they are only sent, as they are, and
+      // handed back as the next round's `drawn`. No points: this round had no screen box to stroke in. `toward`
+      // names where the CONTENT lies — the finger moves the other way (content below → finger up; swipe.ts#swipeVector).
+      // Under a cover the stroke is swipe.ts#swipeVectorAbove's (the iOS device check): the uncovered box's stroke,
+      // its touch-down never inside the keyboard clearance nor higher than without a keyboard — the stroke over the
+      // box above it alone touched down in the app's top bar for a content-up scroll. A 0×0 viewport does not throw
+      // above (pre-existing): the stroke then falls back to the tree's window while the stop still judges against
+      // 0×0.
       // Drawn at the adapter's drag speed when it has one (Android:
       // adapters/android.ts#dragSpeed has the measured fling and
       // the time it costs), so one stroke moves the content about its own
       // length and a row cannot cross the list between two reads; else at
       // the adapter's default duration (iOS).
-      const { box } = step;
-      if (box === undefined || screen === undefined) throw noBox;
-      drawn = scrollStroke({ ...step, box });
+      const { points } = step;
+      if (points === undefined || screen === undefined) throw noBox;
+      drawn = points;
       if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
       else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.usable.oriented));
     }

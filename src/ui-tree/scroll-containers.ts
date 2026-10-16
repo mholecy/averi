@@ -31,7 +31,7 @@ import type { UiNode } from '../adapters/types.js';
  *   (geometry.ts#Clips.drawnIn — a scroll view draws none of its content
  *   outside its frame, while the tree lists that content at its laid-out
  *   rect) — and so the scroll views a WDA target's strokes go over
- *   (interact/scroll-rounds.ts#targetScrollers). And the container a
+ *   (interact/stroke-plan.ts#targetScrollers). And the container a
  *   drawn-over question names (draw-order.ts#DrawOrder.drawnOver): a
  *   clipping scroller on Android, a scroll view on WDA.
  *
