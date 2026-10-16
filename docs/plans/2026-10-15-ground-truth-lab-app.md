@@ -333,6 +333,17 @@ trees do not cover them.
 averi's verbs run on the simulator against the lab app, the app's tap log and scroll offset as the oracle: covers
 what a static tree cannot (`scroll_until` dynamics, strokes, the keyboard).
 
+Round 4 (2026-10-16, truth/r4-live): both apps report each scroll view's offset and strokes (LabState.offsets,
+.strokes); `scripts/truth/live.ts --groups visibility,dismissal` builds its cases from the static truth
+(live-visibility.ts: a tap per target judged by the tap log, a scroll_until toward every target not whole — fully too
+where it is cut — judged by the target's live geometry and R-direction over the strokes, refusal cases beneath a
+presented layer, turn-back cases; the dismissal's dynamics on the toolbar cells), and `--side <checkout>` runs an
+older averi for a live calibration (calibration.json `live`: #12, #17, #7 per fix, #19). A new cell,
+edges/scroll-top-edge-end, gives #17's turn-back its shape. Results: docs/truth/live-android-2026-10-16-visibility.md
+(73 cases), docs/truth/live-ios-2026-10-16-visibility.md (222), docs/truth/live-calibration-2026-10-16.md; new lab
+notes LV1 (Android: a list moving through blank content read as exhausted), LV2 (Android: the flush probe leaves a deep
+cut cut), LV3 (iOS: the turn-back stroke touches down above the list) — live only, `excluded`; LE4 measured live.
+
 ### Alongside
 
 - P5 (text inventory) is independent and small — any time.

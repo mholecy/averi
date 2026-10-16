@@ -115,6 +115,30 @@ export interface CalibrationEntry {
   needs?: string;
   regressions?: Regression[];
   remark?: string;
+  /** The note's live calibration (phase 5): its live cases at a before and an after commit, on the lab device. */
+  live?: LiveCalibration[];
+}
+
+/**
+ * A live calibration (phase 5; scripts/truth/live.ts `--side`): the note's live cases run against the REAL lab app at
+ * the note's before and after commits, the app's tap log, offsets and strokes the oracle — what a replayed tree cannot
+ * show. Recorded by hand from the runs (a device is no vitest test): `verdict` as the golden verdicts read — CALIBRATED
+ * every case not ok before with the note's defect and ok after, DOES-NOT-FAIL a case ok before — and `summary` the
+ * committed live summary holding each side's replies and app state.
+ */
+export interface LiveCalibration {
+  platform: 'ios' | 'android';
+  /** The tree sources the cases ran under. */
+  sources: string[];
+  before: string;
+  after: string;
+  /** live.ts case ids (`scroll:scroll-bounded-flush.P.fully`, `turn:…`, `dismiss:…`). */
+  cases: string[];
+  verdict: Verdict;
+  /** What each side answered, briefly. */
+  remark: string;
+  /** The live summary (docs/truth/) holding the replies. */
+  summary: string;
 }
 
 export interface Calibration {

@@ -17,6 +17,7 @@ export function verdictCell(r: NoteResult): string {
   const e = r.entry;
   let v = r.verdict === expected(e) ? r.verdict : `**${r.verdict}** (expected ${expected(e)})`;
   if (e.partial !== undefined) v += ` (partial: ${e.partial})`;
+  for (const l of e.live ?? []) v += `; live ${l.platform}: ${l.verdict}`;
   const elsewhere = r.elsewhere ?? [];
   if (elsewhere.length > 0) {
     const loose = unrecorded(e, elsewhere).length;
@@ -75,6 +76,7 @@ export function calibrationReport(rs: readonly NoteResult[]): string {
       lines.push('', 'Regressions recorded:', '');
       for (const g of e.regressions) lines.push(`- ${g.rows.join(', ')}: broke at ${g.broke}${g.fixed === undefined ? ', not fixed' : `, fixed at ${g.fixed}`} — ${g.why}`);
     }
+    for (const l of e.live ?? []) lines.push('', `Live (phase 5, ${l.platform} ${l.sources.join(', ')}): **${l.verdict}**, ${l.before} → ${l.after}, ${l.cases.join(', ')} — ${l.remark} (${l.summary})`);
     if (e.needs !== undefined) lines.push('', `Needs: ${e.needs}`);
     if (e.remark !== undefined) lines.push('', e.remark);
     lines.push('');
