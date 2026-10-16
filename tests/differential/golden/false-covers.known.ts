@@ -10,21 +10,24 @@ export const falseCovers: KnownFile = {
   known: Object.fromEntries(
     // Under idb the cells' keyboardDismiss is inert (flow/config.ts#inertKeyboardDismissNote), so the form's own
     // under-keyboard rows stand — and idb lists nothing under the keyboard, as on form-keyboard (forms.known.ts): the
-    // tap times out, scroll_until swipes twice above the keyboard and stops "never appeared in the tree".
+    // tap times out, scroll_until swipes twice above the keyboard and stops "never appeared in the tree"; the colour
+    // assert (the keyboard's colour over it, ControlTruth.seen, in the truth since the phase-3 round-3 recapture) finds
+    // no node (vacuous).
     ['toolbar-dismiss', 'toolbar-dismiss-bar', 'toolbar-dismiss-short'].flatMap((cell) => [
       ...keys(`${IOS}/${cell}.idb.json`, UNDER_KEYBOARD, ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the tap times out` }),
       ...keys(`${IOS}/${cell}.idb.json`, UNDER_KEYBOARD, ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE_ABOVE_KEYBOARD), note: IDB_UNDER_KEYBOARD }),
+      ...keys(`${IOS}/${cell}.idb.json`, UNDER_KEYBOARD, ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the assert finds no node` }),
     ]),
   ),
   counts: {
     [`${ANDROID}/own-parts.xml`]: 4,
     [`${IOS}/own-parts.idb.json`]: 4,
     [`${IOS}/own-parts.wda.json`]: 4,
-    [`${IOS}/toolbar-dismiss.idb.json`]: 16,
-    [`${IOS}/toolbar-dismiss.wda.json`]: 16,
-    [`${IOS}/toolbar-dismiss-bar.idb.json`]: 16,
-    [`${IOS}/toolbar-dismiss-bar.wda.json`]: 16,
-    [`${IOS}/toolbar-dismiss-short.idb.json`]: 16,
-    [`${IOS}/toolbar-dismiss-short.wda.json`]: 16,
+    [`${IOS}/toolbar-dismiss.idb.json`]: 20,
+    [`${IOS}/toolbar-dismiss.wda.json`]: 20,
+    [`${IOS}/toolbar-dismiss-bar.idb.json`]: 20,
+    [`${IOS}/toolbar-dismiss-bar.wda.json`]: 20,
+    [`${IOS}/toolbar-dismiss-short.idb.json`]: 20,
+    [`${IOS}/toolbar-dismiss-short.wda.json`]: 20,
   },
 };

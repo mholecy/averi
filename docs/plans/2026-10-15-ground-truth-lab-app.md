@@ -138,8 +138,12 @@ The pinned submit's bar was measured from iOS's padding in points (the former tr
 both platforms, the constant dropped.
 Done 2026-10-16 (`truth/r3-forms-android`): the six form cells (form-shared-id too) on `averi_lab`, golden 707 → 776
 checks (69 Android form rows, 7 mismatches, KNOWN: lab note F2A1 and L1's class on form-picker), the IME's readings
-captured and served (CellTruth.ime), `submit.bar` reported by both apps (the committed iOS truths' 62 control
-situations recomputed with it: unchanged; the iOS app built with it, xcodebuild for a generic iOS Simulator), the live
+captured and served (CellTruth.ime), `submit.bar` reported by both apps (the iOS app built with it, xcodebuild for a
+generic iOS Simulator; the committed iOS form truths, captured before it, held no bar — the phase-3 round-3 review
+recaptured the nine iOS form cells, the forms family and toolbar-dismiss*, with the current app on the averi-lab
+iPhone 17: form-keyboard's state holds `submit.bar` 0,506.7 402x66.3, every control's situation, reach and probe as
+before, the controls under the keyboard gaining their `seen` and phone its probe at its piece, not reached; golden's
+rows all as before, plus 32 colour rows — 16 green under WDA, 16 idb `not in the tree`, KNOWN), the live
 golden on Android 18 ok / 2 LOUD of 20 (docs/truth/live-android-2026-10-16.md; lab note F2A2: non-ASCII typing; k5, a
 tap on a field the bar drops over once `back` hid the IME, no submit — replayed too, over the layout after back the
 capture keeps beside the truth: CellTruth.afterBack).

@@ -24,7 +24,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 76,
+          "x": 20,
+          "y": 136
+        }
       },
       {
         "tag": "country",
@@ -40,7 +46,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 101.66666666666666,
+          "x": 20,
+          "y": 210
+        }
       }
     ],
     "controls": [

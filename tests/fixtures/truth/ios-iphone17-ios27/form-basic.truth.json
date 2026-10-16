@@ -24,7 +24,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 194.66666666666666,
+          "x": 20,
+          "y": 136
+        }
       },
       {
         "tag": "email",
@@ -40,7 +46,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 138.66666666666666,
+          "x": 20,
+          "y": 210
+        }
       },
       {
         "tag": "iban",
@@ -56,7 +68,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 162.66666666666666,
+          "x": 20,
+          "y": 284
+        }
       },
       {
         "tag": "amount",
@@ -72,7 +90,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 197.66666666666666,
+          "x": 20,
+          "y": 358
+        }
       },
       {
         "tag": "pin",
@@ -88,7 +112,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 36,
+          "x": 20,
+          "y": 432
+        }
       }
     ],
     "controls": [

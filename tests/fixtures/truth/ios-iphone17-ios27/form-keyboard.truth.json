@@ -24,7 +24,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 129,
+          "x": 20,
+          "y": 136
+        }
       },
       {
         "tag": "message",
@@ -40,7 +46,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 174.33333333333331,
+          "x": 20,
+          "y": 210
+        }
       },
       {
         "tag": "street",
@@ -56,7 +68,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 113,
+          "x": 20,
+          "y": 284
+        }
       },
       {
         "tag": "city",
@@ -72,7 +90,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 73,
+          "x": 20,
+          "y": 358
+        }
       },
       {
         "tag": "postcode",
@@ -88,7 +112,13 @@
         },
         "error": null,
         "focused": true,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 64.66666666666666,
+          "x": 20,
+          "y": 432
+        }
       },
       {
         "tag": "phone",
@@ -104,7 +134,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 115,
+          "x": 20,
+          "y": 506
+        }
       },
       {
         "tag": "vs",
@@ -120,7 +156,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 108.33333333333331,
+          "x": 20,
+          "y": 580
+        }
       },
       {
         "tag": "ks",
@@ -136,7 +178,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 115.66666666666666,
+          "x": 20,
+          "y": 654
+        }
       },
       {
         "tag": "ss",
@@ -152,7 +200,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 108.33333333333331,
+          "x": 20,
+          "y": 728
+        }
       },
       {
         "tag": "note",
@@ -168,7 +222,13 @@
         },
         "error": null,
         "focused": false,
-        "value": ""
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 94.66666666666666,
+          "x": 20,
+          "y": 802
+        }
       }
     ],
     "controls": [
@@ -288,7 +348,16 @@
             "kind": "submit",
             "tag": "invalid"
           }
-        ]
+        ],
+        "atPiece": {
+          "piece": {
+            "x": 20,
+            "y": 563.0000000000001,
+            "width": 362,
+            "height": 0.9999999999998863
+          },
+          "reached": false
+        }
       },
       {
         "tag": "vs",
@@ -307,7 +376,8 @@
             "kind": "touch",
             "tag": "201.0,621.0"
           }
-        ]
+        ],
+        "seen": "#FFFFFF"
       },
       {
         "tag": "ks",
@@ -326,7 +396,8 @@
             "kind": "touch",
             "tag": "201.0,695.0"
           }
-        ]
+        ],
+        "seen": "#FFFFFF"
       },
       {
         "tag": "ss",
@@ -345,7 +416,8 @@
             "kind": "touch",
             "tag": "201.0,769.0"
           }
-        ]
+        ],
+        "seen": "#FFFFFF"
       },
       {
         "tag": "note",
@@ -364,7 +436,8 @@
             "kind": "touch",
             "tag": "201.0,843.0"
           }
-        ]
+        ],
+        "seen": "#E2E3E8"
       },
       {
         "tag": "submit",

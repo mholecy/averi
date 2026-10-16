@@ -24,7 +24,13 @@
         },
         "error": null,
         "focused": false,
-        "value": "Jan Šťastný"
+        "value": "Jan Šťastný",
+        "titleFrame": {
+          "height": 18,
+          "width": 194.66666666666666,
+          "x": 20,
+          "y": 136
+        }
       },
       {
         "tag": "email",
@@ -40,7 +46,13 @@
         },
         "error": null,
         "focused": false,
-        "value": "jan.stastny@example.com"
+        "value": "jan.stastny@example.com",
+        "titleFrame": {
+          "height": 18,
+          "width": 138.66666666666666,
+          "x": 20,
+          "y": 210
+        }
       },
       {
         "tag": "iban",
@@ -56,7 +68,13 @@
         },
         "error": null,
         "focused": false,
-        "value": "SK31 1200 0000 1987 4263 7541"
+        "value": "SK31 1200 0000 1987 4263 7541",
+        "titleFrame": {
+          "height": 18,
+          "width": 162.66666666666666,
+          "x": 20,
+          "y": 284
+        }
       },
       {
         "tag": "amount",
@@ -72,7 +90,13 @@
         },
         "error": null,
         "focused": false,
-        "value": "1 234,56"
+        "value": "1 234,56",
+        "titleFrame": {
+          "height": 18,
+          "width": 197.66666666666666,
+          "x": 20,
+          "y": 358
+        }
       },
       {
         "tag": "pin",
@@ -88,7 +112,13 @@
         },
         "error": null,
         "focused": false,
-        "value": "2580"
+        "value": "2580",
+        "titleFrame": {
+          "height": 18,
+          "width": 36,
+          "x": 20,
+          "y": 432
+        }
       }
     ],
     "controls": [

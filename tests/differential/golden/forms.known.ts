@@ -26,6 +26,9 @@ export const forms: KnownFile = {
     // field out (vacuous).
     ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the tap times out` }),
     ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE_ABOVE_KEYBOARD), note: IDB_UNDER_KEYBOARD }),
+    // …and the colour assert asked for the keyboard's colour over it (ControlTruth.seen, in the iOS truth since the
+    // phase-3 round-3 recapture) finds no node: vacuous, as the tap.
+    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the assert finds no node` }),
     // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under
     // idb the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers
     // Tapped and sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0
@@ -50,8 +53,8 @@ export const forms: KnownFile = {
     [`${IOS}/form-basic.wda.json`]: 11,
     [`${IOS}/form-errors.idb.json`]: 12,
     [`${IOS}/form-errors.wda.json`]: 12,
-    [`${IOS}/form-keyboard.idb.json`]: 17,
-    [`${IOS}/form-keyboard.wda.json`]: 17,
+    [`${IOS}/form-keyboard.idb.json`]: 21,
+    [`${IOS}/form-keyboard.wda.json`]: 21,
     [`${IOS}/form-picker.idb.json`]: 9,
     [`${IOS}/form-picker.wda.json`]: 9,
     [`${IOS}/form-prefilled.idb.json`]: 11,

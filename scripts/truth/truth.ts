@@ -30,9 +30,9 @@ export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number
  * pinned submit's bar — its frame as the app reports it, `frames["<submit>.bar"]` (Forms.swift, Forms.kt: the bar the
  * submit rides in, its padding and background included) — covers what is laid under it; a control straddling the
  * keyboard's top, or with its centre under the bar, is `covered` — partly hidden. A pinned submit whose state reports
- * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth); the iOS truths captured
- * before phase 2b were measured with the bar guessed as the submit's frame and 10 pt above and below it, the bar
- * Forms.swift now reports.
+ * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth). Every committed state of
+ * a pinned submit holds its bar: iOS's form-keyboard, first measured with it guessed as the submit's frame and 10 pt
+ * above and below it, was recaptured with the bar Forms.swift reports (phase 3, round-3 review: situations unchanged).
  */
 export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }): Situation {
   if (frame === undefined) return 'not-rendered';
