@@ -317,7 +317,11 @@ was recaptured with it, so it is replayed against its three-button bar, not the 
 unchanged); since the round-3 review it is the one source of that IME-down dump, an IME-up capture's ImeCapture
 holding only what is extra. Follow-up:
 calibrate takes one before/after pair per note, so #7's two fixes share 5cff2ad → c3ebc62 — several pairs per note
-would verify each fix alone.
+would verify each fix alone. Done in round 4 (truth/r4-followups): a note may name `pairs`, one before/after per further fix, each
+judged alone (`<n>.1`, `<n>.2` …) — #7 CALIBRATED on both (5cff2ad → 7542021 on toolbar-dismiss, d928789 → c3ebc62 on
+toolbar-dismiss-short, each its own `covered by` symptom), #1's 9131730 CALIBRATED on the docked IME's scroll_until rows
+(the cb77485 pair still DOES-NOT-FAIL: the panel), #19's first fix cd4d177 STILL-RED-AFTER (as the note says); #5's
+1bc603a, 565b747 (a stale IME reading: live) and #8's c8c06a8 (no icon-button cell) unpaired, in their `needs`.
 
 ### Phase 4 — the matrix, generated
 

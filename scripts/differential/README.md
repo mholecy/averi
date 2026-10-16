@@ -247,7 +247,11 @@ node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>�
 ```
 
 A note is CALIBRATED when every row it names is red before with the note's own symptom (`defect`, matched against the
-mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A side counts
+mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A note with
+several fixes names a before/after pair per further fix (`pairs`: each its own `before`, `after`, `checks`, `defect` and
+`expect`), each judged alone and reported as `<n>.1` (the note's own pair), `<n>.2` … — so #7's second fix needs its
+own symptom (`covered by scrollable`) red at its first parent, not only the first fix's; a note without `pairs` is its
+one pair, as before. A side counts
 only when it passes the canary: no check with a fault, the `open` cell replayed and green — a side miswired still prints
 JSON, every row an error a refusal row would accept. Every row of the corpus is compared at each fix: one green before
 and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the note's
