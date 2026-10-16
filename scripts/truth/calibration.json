@@ -4,11 +4,25 @@
     {
       "n": "1",
       "note": "2026-10-05-android-floating-gboard-keyboard.md",
-      "status": "needs-2b",
+      "status": "calibrate",
       "fix": ["cb77485", "9131730"],
       "before": "7d9a783",
-      "verified": "merge-subject",
-      "remark": "Android IME window: the fake device serves no dumpsys input_method/window insets, and no Android form-keyboard cell exists. Golden over the corpus is identical at 7d9a783 and cb77485."
+      "after": "cb77485",
+      "verified": "golden",
+      "defect": "^Tapped|reached with no swipe, under the keyboard",
+      "checks": [
+        "android-averi_lab-api33/form-keyboard.xml vs tap",
+        "android-averi_lab-api33/form-keyboard.xml ks tap",
+        "android-averi_lab-api33/form-keyboard.xml ss tap",
+        "android-averi_lab-api33/form-keyboard.xml vs scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml ks scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml ss scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml note scroll_until"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "partial": "the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)",
+      "needs": "a floating-Gboard capture: form-keyboard on averi_lab with Gboard switched to floating (its ITYPE_IME inset only the 132-px collapse strip, the panel a second rect of `dumpsys window InputMethod`'s touchable region — the three readings CellTruth.ime serves, captured by AndroidLab.ime), a field under the panel and clear of the strip: its tap must not press a key, its scroll_until must not stop under the panel.",
+      "remark": "Docked, the fix leaves the band as it was by design (the touchable region equals the band, no panel): the tap rows (Tapped after one back, inside the field) and the scroll_until rows (touch-downs above y 1398) are green at 7d9a783 and at cb77485 alike, golden identical on the cell. The note's symptom (a guarded tap pressing Gboard's `d` key, a row behind the panel fully visible) needs the panel."
     },
     {
       "n": "2",
@@ -31,11 +45,21 @@
     {
       "n": "3",
       "note": "2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md",
-      "status": "needs-2b",
+      "status": "calibrate",
       "fix": ["95f75f4"],
       "before": "926b826",
-      "verified": "merge-subject",
-      "remark": "The fix is the Android keyboard oracle's (colour/ocr on an element under the Android soft keyboard). Golden is identical at 926b826 and 95f75f4: no Android keyboard cell; the iOS form-keyboard cell has no colour rows."
+      "after": "95f75f4",
+      "verified": "golden",
+      "defect": "^passed on",
+      "checks": [
+        "android-averi_lab-api33/form-keyboard.xml vs colour",
+        "android-averi_lab-api33/form-keyboard.xml ks colour",
+        "android-averi_lab-api33/form-keyboard.xml ss colour",
+        "android-averi_lab-api33/form-keyboard.xml note colour"
+      ],
+      "partial": "the colour assert",
+      "needs": "the OCR half: phase 4 (ocr judged on real pixels; the note's `ocr CONTINUE` read the keyboard's ?123).",
+      "remark": "Each field under the docked IME asked for the colour the screenshot shows over it (ControlTruth.seen: the keyboard's #F0F0F3 / #FFFFFF): at 926b826 every one PASSes, measuring the keyboard (sampled #F8F8F9, 98 % of the region, for vs); at 95f75f4 each fails closed naming the soft keyboard over the element."
     },
     {
       "n": "4",
@@ -62,16 +86,18 @@
       "before": "98e49b7",
       "after": "9131730",
       "verified": "golden",
-      "partial": "the iOS leg only",
       "defect": "reached with no swipe, under the keyboard|touched down under the keyboard",
       "checks": [
         "ios-iphone17-ios27/form-keyboard.wda.json vs scroll_until",
         "ios-iphone17-ios27/form-keyboard.wda.json ks scroll_until",
         "ios-iphone17-ios27/form-keyboard.wda.json ss scroll_until",
-        "ios-iphone17-ios27/form-keyboard.wda.json note scroll_until"
+        "ios-iphone17-ios27/form-keyboard.wda.json note scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml vs scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml ks scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml ss scroll_until",
+        "android-averi_lab-api33/form-keyboard.xml note scroll_until"
       ],
-      "needs": "The note's Android leg needs phase 2b (an Android form-keyboard cell with the IME served).",
-      "remark": "The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus."
+      "remark": "The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus. The Android leg (phase 2b's form-keyboard, the IME's readings served): at 98e49b7 vs, ks, ss and note are \"fully visible after 0 swipes\" under the docked IME; at 9131730 each fails after 6 swipes (maxSwipes) touching down at y 1118, above the keyboard's top (1398), naming the keyboard (at HEAD: 2 swipes touching down at y 1034)."
     },
     {
       "n": "6",
@@ -905,6 +931,15 @@
         "android-averi_lab-api33/pinned-bar.xml P colour"
       ],
       "remark": "No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part)."
+    },
+    {
+      "n": "F2A1",
+      "note": "2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "reached with no swipe where a tap fires",
+      "checks": ["android-averi_lab-api33/form-keyboard.xml phone scroll_until"],
+      "remark": "No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row."
     }
   ],
   "excluded": [
@@ -1031,6 +1066,10 @@
     {
       "note": "2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md",
       "why": "lab finding about typing: live golden (phase 5)"
+    },
+    {
+      "note": "2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md",
+      "why": "lab finding about typing (F2A2): live golden (live.ts --serial, cases b1d, b7)"
     },
     {
       "note": "2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md",
