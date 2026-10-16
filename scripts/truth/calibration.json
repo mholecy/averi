@@ -52,7 +52,7 @@
         "ios-iphone17-ios27/scroll-top-edge.wda.json A tap",
         "ios-iphone17-ios27/scroll-top-edge.idb.json A tap"
       ],
-      "remark": "edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (golden-spec/edges.ts#notListed)."
+      "remark": "edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; golden-spec/edges.ts#notListed)."
     },
     {
       "n": "5",
@@ -182,6 +182,7 @@
       "before": "d043e65",
       "after": "9c7885e",
       "verified": "golden",
+      "partial": "not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's)",
       "defect": "fully visible",
       "checks": [
         "android-averi_lab-api33/scroll-bounded.xml P fully"
@@ -198,6 +199,7 @@
       "before": "f4ff4be",
       "after": "29a5c30",
       "verified": "golden",
+      "partial": "not the note's shape: the lab's S is cut 66 px past its container's edge instead of flush with it (the rows' red is LE1's)",
       "defect": "^Tapped",
       "checks": [
         "android-averi_lab-api33/scroll-bounded.xml S tap"
@@ -247,12 +249,20 @@
     {
       "n": "17",
       "note": "2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md",
-      "status": "needs-live",
+      "status": "calibrate",
       "fix": ["21f1deb", "b940052"],
       "before": "8a55d2b",
-      "verified": "merge-subject",
-      "needs": "The turn-back is a dynamic (phase 5's live golden). Its static half has a cell: edges/scroll-top-edge's T, resting in the status band (iOS 22–86 pt, its centre 54).",
-      "remark": "The static half does not fail: scroll-top-edge's T (its centre in the status band) is already 'not reached' at 8a55d2b — `its centre stays under iOS's status bar at (201,54) … and the content is exhausted` — and at 21f1deb (calibrate.ts --note 17 with T's rows, 2026-10-16: DOES-NOT-FAIL). What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431)."
+      "after": "21f1deb",
+      "verified": "golden",
+      "partial": "the static half only (a row resting in the status band); the turn-back is a dynamic",
+      "defect": "reached where it is",
+      "checks": [
+        "ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until",
+        "ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "needs": "The turn-back (phase 5's live golden): a stroke that leaves the row in the status band, or clipped, must turn back.",
+      "remark": "The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431)."
     },
     {
       "n": "18",
@@ -601,7 +611,7 @@
       "note": "2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md",
       "status": "open",
       "verified": "golden",
-      "defect": "fully visible|^Tapped|reached where it is|^passed on|no swipe",
+      "defect": "fully visible|^Tapped|reached where it is|^passed on|no swipe|touched down outside",
       "checks": [
         "ios-iphone17-ios27/scroll-bounded.idb.json P fully",
         "ios-iphone17-ios27/scroll-bounded.idb.json S tap",
@@ -609,7 +619,8 @@
         "ios-iphone17-ios27/scroll-bounded.idb.json S fully",
         "ios-iphone17-ios27/scroll-bounded.idb.json O tap",
         "ios-iphone17-ios27/scroll-bounded.idb.json O colour",
-        "ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until"
+        "ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until",
+        "ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until"
       ],
       "remark": "No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it."
     },
@@ -626,6 +637,18 @@
         "ios-iphone17-ios27/scroll-sticky.idb.json R fully"
       ],
       "remark": "No fix yet: red at HEAD."
+    },
+    {
+      "n": "LE4",
+      "note": "2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "touched down outside its scroll view",
+      "checks": [
+        "ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until",
+        "ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view."
     }
   ],
   "excluded": [

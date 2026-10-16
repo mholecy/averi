@@ -17,12 +17,12 @@ open note on the working tree. See the script for the verdicts.
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | DOES-NOT-FAIL |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | needs-cell:bars | 188740b → bd06470, 16ae6bb | — |
-| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | STILL-RED-AFTER |
-| 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | STILL-RED-AFTER |
+| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | STILL-RED-AFTER (partial: not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's)) |
+| 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | STILL-RED-AFTER (partial: not the note's shape: the lab's S is cut 66 px past its container's edge instead of flush with it (the rows' red is LE1's)) |
 | 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | needs-cell:bars | d2b7744 → 81a7d62 | — |
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | needs-cell:presented | 20053ae → 8a55d2b | — |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
-| 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | needs-live | 8a55d2b → 21f1deb, b940052 | — |
+| 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic) |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half only) |
 | 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | needs-cell:false-covers | bd06470 → 470dafe, cd4d177 | — |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | needs-cell:presented | 7566443 → 83e282a | — |
@@ -49,6 +49,7 @@ open note on the working tree. See the script for the verdicts.
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
+| LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | open | working tree | OPEN-RED |
 
 ## 2: CALIBRATED (partial: stage A only)
 
@@ -79,10 +80,10 @@ Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a conf
 - after 1221b0f:
   - ok ios-iphone17-ios27/scroll-bounded.wda.json F tap — ERROR id:"lab.scroll-bounded.F" is off screen at (201,1412) on a 402x874 screen (rect 51,1380 300x64) — scroll_until it first; nothing was tapped
   - ok ios-iphone17-ios27/scroll-bounded.idb.json F tap — ERROR id:"lab.scroll-bounded.F" is off screen at (201,1412) on a 402x874 screen (rect 51,1380 300x64) — scroll_until it first; nothing was tapped
-  - ok ios-iphone17-ios27/scroll-top-edge.wda.json A tap — ERROR id:"lab.scroll-top-edge.A" is off screen at (201,-226) on a 402x874 screen (rect 51,-258 300x64) — scroll_until it first; nothing was tapped
-  - ok ios-iphone17-ios27/scroll-top-edge.idb.json A tap — ERROR id:"lab.scroll-top-edge.A" is off screen at (201,-226) on a 402x874 screen (rect 51,-258 300x64) — scroll_until it first; nothing was tapped
+  - ok ios-iphone17-ios27/scroll-top-edge.wda.json A tap — ERROR id:"lab.scroll-top-edge.A" is off screen at (201,-250) on a 402x874 screen (rect 51,-282 300x64) — scroll_until it first; nothing was tapped
+  - ok ios-iphone17-ios27/scroll-top-edge.idb.json A tap — ERROR id:"lab.scroll-top-edge.A" is off screen at (201,-250) on a 402x874 screen (rect 51,-282 300x64) — scroll_until it first; nothing was tapped
 
-edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (golden-spec/edges.ts#notListed).
+edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; golden-spec/edges.ts#notListed).
 
 ## 5: CALIBRATED (partial: the iOS leg only)
 
@@ -144,7 +145,7 @@ Needs: edges/scroll-sticky variant (Android) whose uiautomator node of the row i
 
 The lab's scroll-sticky R (its top 24 dp under the pinned header): uiautomator lists R whole (`[128,391][953,567]`) and the header after it, so `fully: true` refuses it on both sides ('under text "Sticky header" … drawn over it — 63% of it shows'). The note's shape — the row's rect cut at the header by the tree — is not what Compose's LazyColumn produced here.
 
-## 12: STILL-RED-AFTER
+## 12: STILL-RED-AFTER (partial: not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's))
 
 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md — defect: `fully visible`
 
@@ -157,7 +158,7 @@ Needs: edges/scroll-bounded variant (Android) whose uiautomator bounds are cut F
 
 The lab's P is cut by its container's bottom (908) but uiautomator reports its whole frame (`[128,798][953,974]`): a rect past the container, not flush with it — the shape 9c7885e's flush probe does not suspect. Red on both sides with the note's symptom (`fully visible after 0 swipes`); filed as lab finding LE1.
 
-## 13: STILL-RED-AFTER
+## 13: STILL-RED-AFTER (partial: not the note's shape: the lab's S is cut 66 px past its container's edge instead of flush with it (the rows' red is LE1's))
 
 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md — defect: `^Tapped`
 
@@ -186,6 +187,21 @@ The lab's S (22 px of it drawn above its container's bottom, 1541) reads `[128,1
   - RED ios-iphone17-ios27/form-keyboard.idb.json note scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element nev
 
 idb lists nothing under the keyboard, so these rows stay red at every commit (KNOWN, tests/differential/golden/forms.known.ts): before the fix their mismatch is the judge's own "touched down under the keyboard at (201,699)" — the note's defect; after it, the vacuous "not in the tree" with both swipes above the keyboard.
+
+## 17: DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic)
+
+2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md — defect: `reached where it is`
+
+- before 8a55d2b:
+  - ok ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 2 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
+  - ok ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 2 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
+- after 21f1deb:
+  - ok ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 3 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
+  - ok ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 3 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
+
+Needs: The turn-back (phase 5's live golden): a stroke that leaves the row in the status band, or clipped, must turn back.
+
+The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431).
 
 ## 18: CALIBRATED (partial: the cell-background half only)
 
@@ -392,7 +408,7 @@ No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e)
 
 ## LE2: OPEN-RED
 
-2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md — defect: `fully visible|^Tapped|reached where it is|^passed on|no swipe`
+2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md — defect: `fully visible|^Tapped|reached where it is|^passed on|no swipe|touched down outside`
 
 - working tree:
   - RED ios-iphone17-ios27/scroll-bounded.idb.json P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.P" fully visible after 0 swipes
@@ -402,6 +418,7 @@ No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e)
   - RED ios-iphone17-ios27/scroll-bounded.idb.json O tap — Tapped: Tapped id:"lab.scroll-bounded.O"
   - RED ios-iphone17-ios27/scroll-bounded.idb.json O colour — passed on #FFFFFF: PASS  element id:"lab.scroll-bounded.O" fill within dE00 8 of #FFFFFF — sampled #FFFFFF (dominant, 100% of region) vs expected #FFFFFF → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until — no swipe: Element id:"lab.scroll-bounded.O" fully visible after 0 swipes
+  - RED ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until — touched down outside its scroll view lower at (201,699) (201,699): ERROR scroll_until id:"lab.scroll-bounded.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never inter
 
 No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it.
 
@@ -417,6 +434,16 @@ No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.draw
 
 No fix yet: red at HEAD.
 
+## LE4: OPEN-RED
+
+2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md — defect: `touched down outside its scroll view`
+
+- working tree:
+  - RED ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until — touched down outside its scroll view lower at (201,699) (201,699): ERROR scroll_until id:"lab.scroll-bounded.O" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never drawn
+  - RED ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until — touched down outside its scroll view lower at (201,699) (201,699): ERROR scroll_until id:"lab.scroll-bounded.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never inter
+
+No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view.
+
 ## Not reproducible with the existing cells
 
 - 1 2026-10-05-android-floating-gboard-keyboard.md: needs-2b
@@ -427,7 +454,6 @@ No fix yet: red at HEAD.
 - 11 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md: needs-cell:bars — bars/tabbar-floating (Android) with a target below the fold; rows: R-stroke (every touch-down in the strokeable region).
 - 14 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md: needs-cell:bars — bars/tabbar-floating (iOS): a row under the floating bar's surface above its buttons; rows: R-under-chrome.
 - 15 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md: needs-cell:presented — presented/blur-menu or a chooser idb lists before the content behind it; the lab's idb presented cells list only the presented layer, so the order is never asked.
-- 17 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md: needs-live — The turn-back is a dynamic (phase 5's live golden). Its static half has a cell: edges/scroll-top-edge's T, resting in the status band (iOS 22–86 pt, its centre 54).
 - 19 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md: needs-cell:false-covers — false-covers/toolbar-dismiss with a config variant (an itemless WDA toolbar over the dismissal tap); rows: R-dismiss.
 - 20 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md: needs-cell:presented — presented/sheet-long-list: a sheet whose below-the-fold cells WDA lists (form-picker's ST is not in the tree, WDA or idb); rows: R-off, R-outside-sv.
 - 21 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md: needs-cell:bars — bars/bands (Android, edge-to-edge): a target under the status bar; rows: R-band; the swallowed probe accepted in consistency().
