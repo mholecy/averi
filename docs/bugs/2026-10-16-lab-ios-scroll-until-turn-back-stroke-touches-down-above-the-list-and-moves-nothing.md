@@ -4,7 +4,8 @@ Lab note LV3. **Measured 2026-10-16** on the `averi-lab iPhone 17` simulator (iO
 `arch/round-20`'s `src/` (`debc9b2`), through the live golden (`scripts/truth/live.ts --udid … --groups visibility`,
 both tree sources), the lab app's `tabbar-floating` cell (fixtures/apps/ios/AveriLab/Bars.swift). The app's own scroll
 offset, stroke log and touch log (LabState.offsets, .strokes, the `touch` events — round 4) are the oracle. Summary:
-docs/truth/live-ios-2026-10-16-visibility.md (case `scroll:tabbar-floating.R`, wda and idb alike).
+docs/truth/live-ios-2026-10-16-visibility.md (case `scroll:tabbar-floating.R`, wda and idb alike; the figures below are
+that run's).
 
 ## Observed (measured)
 
@@ -12,18 +13,20 @@ docs/truth/live-ios-2026-10-16-visibility.md (case `scroll:tabbar-floating.R`, w
 content y 521 — lying under the floating tab bar (743–830), `under-chrome:tabBar`.
 
 ```
-scroll_until { selector: 'id:"lab.tabbar-floating.R"', direction: 'down' }          (wda; idb the same)
+scroll_until { selector: 'id:"lab.tabbar-floating.R"', direction: 'down' }                          (idb)
 → ERROR scroll_until id:"lab.tabbar-floating.R" failed after 5 swipes (the last 2, swiping up, did not move it: content
   exhausted, or the swipes were not taken) — element was in the viewport before the first swipe but did not stay (a
-  fling?) — in tree, off the 402x874 viewport at the last read (last rect {"x":24,"y":-485,…}). It was turned round 1
-  time: a swipe carried it past …
-app: list offset 1168–1206 (launched 0); strokes list 0→1168 (one); R 24,-447 354x52 (off-screen)
+  fling?) — in tree, off the 402x874 viewport at the last read (last rect {"x":24,"y":-391,"width":354,"height":52}). It
+  was turned round 1 time: a swipe carried it past the viewport (a fling), …, so the next was drawn the other way
+app: list offset 1111.7 (launched 0); strokes list 0→1111.7 (one); R 24,-390.7 354x52 (off-screen)
 touches (201,699) (201,175) (201,175) (201,175) (201,175)
+
+(wda: the same reply, last rect y -359; list 0→1079.7, R at -358.7; the same five touches)
 ```
 
-The first stroke (touch-down at y 699, inside the list) flings the list 1168 pt and carries R off the top — averi sees
-it and turns. Every turned stroke touches down at y 175: above the list's top (200), in the header, which scrolls
-nothing. Four strokes move nothing; the reply calls the content exhausted, with 1168 pt of it to scroll back.
+The first stroke (touch-down at y 699, inside the list) flings the list 1080–1112 pt and carries R off the top — averi
+sees it and turns. Every turned stroke touches down at y 175: above the list's top (200), in the header, which scrolls
+nothing. Four strokes move nothing; the reply calls the content exhausted, with all of that offset to scroll back.
 
 ## Cause (not changed here)
 

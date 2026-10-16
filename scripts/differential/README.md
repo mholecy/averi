@@ -174,7 +174,10 @@ coloured-target cell's static truth by `scripts/truth/live-visibility.ts` — ta
 scroll_until by the target's live geometry and by R-direction over the strokes the app logs (LabState.offsets,
 .strokes: both apps report them); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
 own keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
-calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts). Under iOS, idb's companion
+calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs of
+one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`); the exit code is 1
+only on an unknown MISMATCH. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
+1's), and `--rejudge <file>` judges it again with this checkout's judges, no device. Under iOS, idb's companion
 must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
 /tmp/idb/<udid>_companion.sock`).
 

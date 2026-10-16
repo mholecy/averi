@@ -28,7 +28,7 @@ export const LIVE_KNOWN: Readonly<Record<string, string>> = Object.fromEntries([
   // Android
   ...each('android uiautomator', ['scroll:scroll-bounded.P.fully', 'tap:scroll-bounded.S', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully'], LE1),
   ...each('android uiautomator', ['scroll:scroll-sticky-cut.R.fully'], VA1),
-  ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'turn:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1),
+  ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1),
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2),
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB),
   // iOS, idb: no scroll view listed

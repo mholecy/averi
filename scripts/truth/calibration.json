@@ -312,7 +312,7 @@
       "after": "9c7885e",
       "verified": "golden",
       "partial": "the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)",
-      "needs": "Done live, phase 5 (`live`): the probe reveals the cut rows, but moves the list 14–58 px a stroke, so a row cut deep (S, 154 px) is often left cut when the budget ends the stop, \"fully visible … it may be cut there\" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).",
+      "needs": "Done live, phase 5 (`live`): the probe reveals the cut rows in most runs, but moves the list 21–82 px a stroke, and a deep cut (S, 154 px) was left cut in one run of five at 9c7885e and one of three at debc9b2 when the budget ended the stop, \"fully visible … it may be cut there\" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).",
       "defect": "fully visible",
       "checks": [
         "android-averi_lab-api33/scroll-bounded-flush.xml P fully",
@@ -334,8 +334,9 @@
           "before": "d043e65",
           "after": "9c7885e",
           "cases": ["scroll:scroll-bounded-flush.P.fully", "scroll:scroll-bounded-flush.S.fully"],
-          "verdict": "CALIBRATED",
-          "remark": "Before (d043e65, two runs): both \"fully visible after 0 swipes\" with the app laying P out partly-centre-in and S a sliver (MISMATCH). After (9c7885e): the stop probes the flush edge and goes on — in the last run both revealed whole (P after 1 swipe, S after 3), ok; but the probe moves the list only 14–58 px a stroke, and S (cut by 154 px) ended at the budget \"fully visible after 2 swipes; but … it may be cut there\" with ~100 px still below the clip in two of three runs at 9c7885e and one of three at debc9b2 — LV2. P was hedged the same way once at 9c7885e.",
+          "verdict": "CALIBRATED-ON-DEFECT",
+          "intermittent": "4 committed runs at d043e65, every one red (\"fully visible after 0 swipes\", P partly-centre-in, S a sliver); 5 at 9c7885e: four reveal both rows whole (P after one probe of 79–82 px; S after three of 57–61 px), one leaves S 71 px below its clip (probes of 38 and 45 px; \"fully visible after 2 swipes; but … it may be cut there\") — LV2; at debc9b2 the same in 1 of 3 runs (S 75 px below, probes of 21 and 58 px).",
+          "remark": "Before: the stop calls a row cut flush at its container fully visible where it is (MISMATCH). After: it probes the flush edge and goes on — the note's defect gone in every run — but a deep cut (S, 154 px) is not always revealed before the budget ends the stop, which then still leads with \"fully visible\": red for another class in one run of five (LV2), so not every after-run is ok.",
           "summary": "docs/truth/live-calibration-2026-10-16.md"
         }
       ]

@@ -342,7 +342,11 @@ older averi for a live calibration (calibration.json `live`: #12, #17, #7 per fi
 edges/scroll-top-edge-end, gives #17's turn-back its shape. Results: docs/truth/live-android-2026-10-16-visibility.md
 (73 cases), docs/truth/live-ios-2026-10-16-visibility.md (222), docs/truth/live-calibration-2026-10-16.md; new lab
 notes LV1 (Android: a list moving through blank content read as exhausted), LV2 (Android: the flush probe leaves a deep
-cut cut), LV3 (iOS: the turn-back stroke touches down above the list) — live only, `excluded`; LE4 measured live.
+cut cut, intermittent), LV3 (iOS: the turn-back stroke touches down above the list) — live only, `excluded`; LE4
+measured live. Review round 1: the stop judged on the state read when scroll_until returned; a claim that the last
+swipes "did not change the screen" checked against the app's strokes whatever the tree listed; a live KNOWN
+(scripts/truth/live-known.ts, exit 1 only on an unknown MISMATCH); `--record` / `--rejudge` (docs/truth/live-records/);
+#12's live verdict CALIBRATED-ON-DEFECT, intermittent (one after-run of five leaves S cut).
 
 ### Alongside
 
