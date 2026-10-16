@@ -1,0 +1,52 @@
+{
+  "cell": "sheet-medium-edges",
+  "events": [],
+  "frames": {
+    "E": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 869
+    },
+    "F": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 1009
+    },
+    "G": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": -20
+    },
+    "H": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": -88
+    }
+  },
+  "ready": true,
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  },
+  "scrollViews": {
+    "host": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    }
+  }
+}
