@@ -268,7 +268,8 @@ The raw touch logs are docs/truth/band-probes-2026-10-16.md. The AVD was set bac
 what was measured: Android's status band swallows (systemBarSwallows, #21); the navigation band
 (truth.ts#navigationBandTakes) is the app's on iOS and under gesture navigation — the touch logged, the target reached
 (on iOS drawn too) — and the bar's under three buttons — not reached; with no mode recorded (or two buttons, not
-measured) a nav-band target is broken. No capture exists under three-button navigation yet (a follow-up). B1's iOS
+measured) a nav-band target is broken. No capture existed under three-button navigation then (a follow-up): round 3
+captured `bands-three-button` under it (truth/r3-variants, below). B1's iOS
 assumption did not hold: iOS's status bar swallows a tap in the top of its band — B3 measured it the same day on `open`
 (no touch at y 2–50, a touch from 55) and wrote the rule, truth.ts#statusBarMaySwallow, accepted above its line
 `IOS_STATUS_BAR_SWALLOWS_ABOVE`; B4's taps above agree and narrow the line (no touch up to 53, a touch from 54), so the
@@ -305,9 +306,12 @@ STILL-RED-AFTER, lab finding VA1), `bands-three-button` (#23 still DOES-NOT-FAIL
 the bar). iOS: `sheet-long-list-short` (a row on the screen outside its table: #29's fix cures it, not #20's) and
 `toolbar-dismiss-short` (a scroll view shorter than the screen over the title: #7's second fix, the pair 5cff2ad →
 c3ebc62). R-fully's flush acceptance is checked against the truth (the named edge flush with the target's scroll view,
-a swipe from inside it toward that edge); whether the probe reveals the row is live (phase 5). At the round-3 merge
-`bands-three-button` was recaptured with its own `dumpsys window displays` (CellTruth.displays, served by the fake
-device), so it is replayed against its three-button bar, not the gesture band (#23's verdict unchanged). Follow-up:
+a swipe from inside it toward that edge); whether the probe reveals the row is live (phase 5). A decision taken at the
+round-3 merge (501ec21), for fidelity: each Android capture keeps the device's own `dumpsys window displays`
+(CellTruth.displays), which golden's fake device serves in place of its stock gesture-mode dump — `bands-three-button`
+was recaptured with it, so it is replayed against its three-button bar, not the gesture band (#23's verdict
+unchanged); since the round-3 review it is the one source of that IME-down dump, an IME-up capture's ImeCapture
+holding only what is extra. Follow-up:
 calibrate takes one before/after pair per note, so #7's two fixes share 5cff2ad → c3ebc62 — several pairs per note
 would verify each fix alone.
 
