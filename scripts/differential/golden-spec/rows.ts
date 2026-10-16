@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { isOverlap, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { BUDGET_MS, first, landed, notTapped, passed, passes, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
+import { BUDGET_MS, first, landed, notInTree, notTapped, passed, passes, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, within, type Expectation } from './judges.js';
 
 /**
  * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
@@ -52,13 +52,18 @@ export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pic
   return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
 }
 
-/** R-off, R-outside-sv, R-sliver: the tap refused, its remedy scroll_until, nothing sent. */
-export function refusedTap(platform: Platform, t: TargetTruth, row: string): Expectation {
+/**
+ * R-off, R-outside-sv, R-sliver: the tap refused, its remedy scroll_until, nothing sent. `absent` (why the truth allows
+ * the target to be missing from the tree): a tap that waited for it and sent nothing is as good — no node, no remedy
+ * to name.
+ */
+export function refusedTap(platform: Platform, t: TargetTruth, row: string, absent?: string): Expectation {
   return {
     verb: 'tap',
     says: `${row}: refused naming scroll_until, nothing tapped`,
     call: tapCall(platform, t),
-    judge: (o) => notTapped(o) ?? (scrollAdvice(o) ? undefined : said(o, 'refused without scroll_until')),
+    judge: (o) => notTapped(o) ?? (scrollAdvice(o) || (absent !== undefined && notInTree(o)) ? undefined : said(o, 'refused without scroll_until')),
+    ...(absent !== undefined && { absent }),
   };
 }
 
@@ -67,13 +72,19 @@ export function bandTap(platform: Platform, t: TargetTruth): Expectation {
   return { verb: 'tap', says: `R-band: refused (${t.geometry}), nothing tapped`, call: tapCall(platform, t), judge: notTapped };
 }
 
-/** R-off, R-outside-sv, R-band, R-under-chrome: the colour assert fails, asked for the target's own colour. */
-export function colourFails(platform: Platform, t: TargetTruth, why: string): Expectation {
+/**
+ * R-off, R-outside-sv, R-band, R-under-chrome: the colour assert fails, asked for the target's own colour — or for
+ * `expected`, the colour the screen shows there (TargetTruth.seen), so that a pass means it measured what lies there
+ * instead of the target (R-outside-sv: the background beneath its scroll view, calibration.json #29).
+ */
+export function colourFails(platform: Platform, t: TargetTruth, why: string, opts: { expected?: string; absent?: string } = {}): Expectation {
+  const expected = opts.expected ?? t.color;
   return {
     verb: 'colour',
-    says: `fails (${why})`,
-    call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: BUDGET_MS }] } },
-    judge: (o) => (passed(o) ? `passed on ${t.color}: ${first(o)}` : undefined),
+    says: `fails (${why})${expected === t.color ? '' : `, asked for the colour the screen shows there (${expected})`}`,
+    call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected }, timeout: BUDGET_MS }] } },
+    judge: (o) => (passed(o) ? `passed on ${expected}: ${first(o)}` : undefined),
+    ...(opts.absent !== undefined && { absent: opts.absent }),
   };
 }
 
@@ -81,13 +92,14 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string): Ex
  * R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable
  * (judges.ts#strokeable).
  */
-export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, absent?: string): Expectation {
   const direction = directionOf(t, cell);
   return {
     verb: 'scroll_until',
     says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome`,
     call: scrollCall(platform, t, direction),
     judge: (o) => (swipes(o) === 0 ? said(o, 'no swipe') : strokesOff(o, cell)),
+    ...(absent !== undefined && { absent }),
   };
 }
 
@@ -111,7 +123,7 @@ export function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTr
  */
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   return {
-    verb: 'scroll_until',
+    verb: 'fully',
     says: `R-fully: fully: true is not "visible" where it is ${t.geometry}`,
     call: scrollCall(platform, t, directionOf(t, cell), true),
     judge: (o) => (/^Element .* visible after /.test(o.reply) ? said(o, `fully visible where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing`) : undefined),
