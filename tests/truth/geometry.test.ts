@@ -226,9 +226,11 @@ describe('consistency with a measured geometry', () => {
     expect(consistency(band, 'ios')).toBeUndefined();
     expect(consistency({ ...band, reached: true }, 'ios')).toMatch(/reached it with no touch logged/);
     expect(consistency({ ...band, geometry: 'whole' }, 'ios')).toMatch(/left no touch/);
-    // Only above the line measured (IOS_STATUS_BAR_SWALLOWS_ABOVE): a centre at y 58, still in the 62-pt band, was
-    // delivered when measured — no touch there is an undelivered probe.
+    // Only above the line measured (IOS_STATUS_BAR_SWALLOWS_ABOVE, 54): a centre at y 54 or 58, still in the 62-pt
+    // band, was delivered when measured — no touch there is an undelivered probe; one at y 50 or 53 was swallowed.
     expect(consistency({ ...band, frame: rect(51, 26, 300, 64) }, 'ios')).toMatch(/left no touch/);
+    expect(consistency({ ...band, frame: rect(51, 22, 300, 64) }, 'ios')).toMatch(/left no touch/);
+    expect(consistency({ ...band, frame: rect(51, 21, 300, 64) }, 'ios')).toBeUndefined();
     expect(consistency({ ...band, frame: rect(51, 18, 300, 64) }, 'ios')).toBeUndefined();
     expect(consistency({ ...band, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
     expect(consistency({ ...band, reached: true, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();

@@ -258,8 +258,8 @@ what was measured: Android's status band swallows (systemBarSwallows, #21); the 
 measured) a nav-band target is broken. No capture exists under three-button navigation yet (a follow-up). B1's iOS
 assumption did not hold: iOS's status bar swallows a tap in the top of its band — B3 measured it the same day on `open`
 (no touch at y 2–50, a touch from 55) and wrote the rule, truth.ts#statusBarMaySwallow, accepted above its line
-`IOS_STATUS_BAR_SWALLOWS_ABOVE` (51 pt; a probe below it with no touch is undelivered); B4's taps above agree and narrow
-the line (no touch up to 53, a touch from 54) — the constant is left at B3's 51, inside both measurements. averi refuses
+`IOS_STATUS_BAR_SWALLOWS_ABOVE`; B4's taps above agree and narrow the line (no touch up to 53, a touch from 54), so the
+constant is 54 pt, borne out by both measurements (a probe from y 54 on with no touch is undelivered). averi refuses
 a tap in a band (ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts).
 
 **B2 (edges) — built 2026-10-16.** Three cells in both apps (Edges.swift, Edges.kt; the apps' `Lab` gained the `chrome`

@@ -61,9 +61,10 @@ tap 201 61: [('touch', '201.0,61.0'), ('tap', 'O')]
 tap 201 857: [('touch', '201.0,857.0'), ('tap', 'N')]   tap 60 857: [('touch', '60.0,857.0'), ('tap', 'N')]
 ```
 
-The status bar's window takes every tap above y 54 of its 62-pt band; B3 measured the same on `open` (no touch at y
-2–50, a touch from 55) and set `truth.ts#IOS_STATUS_BAR_SWALLOWS_ABOVE` = 51, inside both measurements. The
-home-indicator band passes every tap to the app.
+The status bar's window takes every tap above y 54 of its 62-pt band (no touch up to 53, a touch from 54); B3 measured
+the same on `open` (no touch at y 2–50, a touch from 55). `truth.ts#IOS_STATUS_BAR_SWALLOWS_ABOVE` is 54 — a probe
+above y 54 that left no touch is the bar's, one from 54 on is undelivered — which both measurements bear out (B3's 51
+was not: B4 logged no touch at y 52 and 53). The home-indicator band passes every tap to the app.
 
 ## Follow-up
 

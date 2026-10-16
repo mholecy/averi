@@ -202,12 +202,14 @@ export const systemBarSwallows = (platform: Platform | undefined, g: Geometry) =
 
 /**
  * Where iOS's status bar stops swallowing a raw tap: a probe point above this y (points) may be the bar's. Measured
- * 2026-10-16 on the lab simulator ONLY (averi-lab iPhone 17, iOS 27.0, top inset 62 pt), raw `idb ui tap 201 y` on the
- * `open` cell: y 2, 12, 30, 40, 50 left no touch in the app, y 55, 58, 61, 62, 64 did; and sheet-medium-edges' G
- * (presented-over, its probe at (201,12)) left none. 51 lies strictly inside that measurement (no touch at 50, a touch
- * at 55); another device or OS may draw its bar taller or shorter — remeasure there.
+ * 2026-10-16 on the lab simulator ONLY (averi-lab iPhone 17, iOS 27.0, top inset 62 pt), twice, with raw `idb ui tap`:
+ * B3 on the `open` cell — y 2, 12, 30, 40, 50 left no touch in the app, y 55, 58, 61, 62, 64 did (and
+ * sheet-medium-edges' G, presented-over, its probe at (201,12), left none); B4 on the `bands` cell
+ * (docs/truth/band-probes-2026-10-16.md) — y 10, 31, 50, 52, 53 left no touch, y 54, 55, 58, 61 did. So the bar
+ * swallows every tap above 54 and none from 54 on, as both measurements have it; another device or OS may draw its bar
+ * taller or shorter — remeasure there.
  */
-export const IOS_STATUS_BAR_SWALLOWS_ABOVE = 51;
+export const IOS_STATUS_BAR_SWALLOWS_ABOVE = 54;
 
 /**
  * iOS's status bar swallows a tap in the top of its band and passes one below through (IOS_STATUS_BAR_SWALLOWS_ABOVE).
