@@ -26,6 +26,9 @@ describe('the cell catalog', () => {
       'forms/form-keyboard',
       'forms/form-prefilled',
       'forms/form-picker',
+      'edges/scroll-bounded',
+      'edges/scroll-sticky',
+      'edges/scroll-top-edge',
     ]);
   });
 
@@ -53,6 +56,7 @@ describe('the cell catalog', () => {
     expect(selectCells(c, { families: ['presented', 'base'], cells: ['open', 'form-picker', 'alert-dim'] }).map((x) => x.id)).toEqual(['open', 'alert-dim']);
     expect(() => selectCells(c, { families: ['edgez'] })).toThrow('no family edgez');
     expect(() => selectCells(c, { cells: ['nope'] })).toThrow('no cell nope');
-    expect(() => selectCells(c, { families: ['edges'] })).toThrow('no cell selected: families edges, cells any');
+    // A family with no cell yet (here: edges with its cells left out — every family gains cells in phase 3).
+    expect(() => selectCells({ ...c, cells: c.cells.filter((x) => x.family !== 'edges') }, { families: ['edges'] })).toThrow('no cell selected: families edges, cells any');
   });
 });
