@@ -11,11 +11,13 @@ package dev.averi.lab
 // - `text-under-bar`: S centred in the status band (the whole width, 16 dp), W in the open, P under a button pinned
 //   16 dp above the navigation band (chrome `pinned`, Bars.kt's PinnedBar) — P's top 8 dp above the button, its centre
 //   and its string under it (calibration.json #22's OCR half).
-// - `text-nav-cut` (gesture navigation): T's node 49 px tall, its foot flush with the navigation band's top, its text
-//   box 74 px drawn from the node's top on past it, unclipped, into the band — the node uiautomator dumps stops at the
-//   band where the text runs on, as Settings' row in docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-
-//   navigation-bar.md (`198,2105 428x49` of a 74-px row; calibration.json #23). The frame reported (`T`, `T.box`) is the
-//   text box's, all of it.
+// - `text-nav-cut` (gesture navigation): T's node laid 49 px tall, its foot flush with the navigation band's top, its
+//   text box 74 px from the node's top drawn on past it, unclipped, into the band — Settings' row shape in
+//   docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md (`198,2105 428x49` of a
+//   74-px row). What Compose dumps is NOT that shape: the node by its 48-dp minimum touch target, [108,2064][972,2196]
+//   (running on into the band), and its string as a node of its own by its full bounds, [366,2109][714,2175] — neither
+//   cut at the band (measured 2026-10-16), so the cut-glyph OCR half of the note is not reproduced (calibration.json
+//   #23's needs). The frame reported (`T`, `T.box`) is the text box's, all of it: 108,2105 864x74.
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

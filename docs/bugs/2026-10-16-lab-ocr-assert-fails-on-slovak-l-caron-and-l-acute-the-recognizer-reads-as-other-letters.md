@@ -35,10 +35,20 @@ Two Slovak letters are read as something the fold cannot reach:
 
 (`ä` read as `a` on iOS is folded — that part passes.) The assert reports a code-fix-style mismatch on text that is right.
 
+## The recognizer's languages (measured: not the cause)
+
+averi pins `recognitionLanguages = ["en-US"]` (src/verify/ocr.ts, the embedded recognizer). A throwaway recognizer of
+the same request (accurate, no language correction; not in src) read the same crops of the committed screenshots on
+macOS 27.0.1 with other languages: `sk-SK` is not among Vision's supported ones (`supportedRecognitionLanguages`: en-US …
+cs-CZ, pl-PL, …, no Slovak); `cs-CZ` and `["cs-CZ", "en-US"]` read exactly what `en-US` reads — `L'ubomír Stastný`,
+`Makčeň, dižeň a vokáň` (iOS), `L'ubomír Sťastný`, `Mäkčeň, dížeň a vokáň` (Android), and OC2's `1234,56 €`. So adding
+cs-CZ (the nearest supported language) is no fix on this host; the fold below is.
+
 ## Expected
 
 Either the fold also forgives `ľ`/`Ľ` read as `l'`/`L'` and `ĺ`/`Ĺ` read as `í`/`Í` (named in the reply as the other folds
-are), or the reply says that the recognizer is known not to tell these Slovak letters apart. A wrong letter elsewhere
+are) — or, on a host whose Vision supports Slovak or reads these letters under cs-CZ, the recognizer is given that
+language beside en-US (measured above: not on macOS 27.0.1) — or the reply says that the recognizer is known not to tell these Slovak letters apart. A wrong letter elsewhere
 (`ĺ` read as `l` where `í` is meant) must still fail.
 
 ## Reproduce

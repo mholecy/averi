@@ -22,6 +22,8 @@ The minus sign is folded (`−` vs `-`); the thousands separator is read as no s
 that Vision does not read as a word break. On Android (Roboto, the same strings) both PASS (`1 234,56 €` read with its
 space). The tree's `text` assert passes on both platforms (whitespace normalised: src/verify/text-parity.ts#normalizeText).
 
+Another recognition language does not change it (measured beside lab note OC1: `cs-CZ` reads `1234,56 €` too).
+
 ## Why it matters
 
 Amounts are the copy a banking app's tests assert most. An `ocr` assert copied from the tree fails on every
