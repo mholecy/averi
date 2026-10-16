@@ -1,9 +1,14 @@
+import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { KEYBOARD_ROLE, type KeyboardWitness, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, KEYBOARD_ROLE, type KeyboardWitness, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder, type DrawOrder } from '../../src/ui-tree/draw-order.js';
 import { readKeyboard, type KeyboardCover, type KeyboardReading } from '../../src/ui-tree/keyboard-cover.js';
 import { coverLine, keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
+import { strokeLine } from '../../src/interact/scroll-read.js';
+import { sceneOf } from '../../src/ui-tree/standing.js';
 import { GBOARD, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, screen, type FakeKeyboard } from '../helpers/fake.js';
 
@@ -258,5 +263,99 @@ describe('readingLine — asked of the reading at most once, and only when asked
   it('without a reading (or one with no cover to ask): none, nothing asked', async () => {
     expect(await keyboardPosition(NO_BAND).readingLine()).toBeUndefined();
     expect(await keyboardPosition(NO_BAND, { ofKeyboard: () => true }).readingLine()).toBeUndefined();
+  });
+});
+
+/**
+ * ONE KEYBOARD LINE for the pixel assert and `scroll_until`. The pixel poll (verify/pixel-poll.ts#overElement) and the
+ * scroll read's stroke line (interact/scroll-read.ts#strokeLine) build their position with NO reading, the scroll
+ * read's judgement (#judgeRead) with the read's `ofKeyboard` — so the two verbs could part on the band's line only if
+ * a position's `line` read the reading, or a tree carried both idb's band and WDA's marks (the one synthetic row of
+ * the `line` table above where the pixel poll's exemption, `line`'s subject, is narrower than the scroll read's,
+ * `owns`). Neither holds, and these pin both: `line` is the draw order's and the subject's alone, whatever the
+ * reading; a band comes only with idb's flat list (draw-order.ts#drawOrder) and marks only from WDA's source
+ * (adapters/wda-source.ts), so on each real keyboard tree the pixel poll's line for a node — `line(node)` — is the
+ * scroll read's: none for a node it `owns`, else `line()`, the stroke line's when no reading's cover applies. Swept
+ * 2026-10-16 over the 601 trees of corpus-r19 and the lab truth: 75 with a band, 57 with marks, none with both, no
+ * node of any where the two differ. The reading's own question — the pixel poll's `overlapping` rects against the
+ * scroll read's cover line — is not a position's and stays as ADR 0010 (pixel: any overlap) and the floating-Gboard
+ * note's stated cost (scroll_until: full-width cut) decide.
+ * These MODEL each verb's exemption on a position (the scroll read's as `owns(n) ? none : line()`); that the verbs
+ * take it there — overElement passing its element as `line`'s subject, judgeRead exempting through `owns` — is pinned
+ * through the verbs themselves in tests/interact/keyboard-line-agreement.test.ts.
+ * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
+ */
+describe('one line for the pixel assert and scroll_until — `line` reads no reading, and no tree has both a band and marks', () => {
+  const fixture = async (name: string): Promise<string> => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
+  const trees: [string, 'band' | 'marks', () => Promise<UiNode>][] = [
+    ['idb-swift-form-number-pad.json (idb\'s band)', 'band', async () => parseIdbDescribeAll(JSON.stringify(JSON.parse(await fixture('idb-swift-form-number-pad.json')).elements))],
+    ['wda-source-myport-login-keyboard.json (WDA\'s marks)', 'marks', async () => parseWdaSource(await fixture('wda-source-myport-login-keyboard.json'))],
+    ['wda-source-myport-2fa-keyboard-toolbar.json (WDA\'s marks, an accessory toolbar)', 'marks', async () => parseWdaSource(await fixture('wda-source-myport-2fa-keyboard-toolbar.json'))],
+  ];
+  const every = (n: UiNode): UiNode[] => [n, ...n.children.flatMap(every)];
+  it.each(trees)('%s: one source only, and every node\'s pixel line is the scroll read\'s as a position models it (owns ? none : line())', async (_name, source, read) => {
+    const tree = await read();
+    const order = sceneOf(tree).order;
+    // As the scroll read builds it: the reading's `ofKeyboard` (scroll.ts hands the round's reading's to the read).
+    const ofKeyboard = readKeyboard(new FakeAdapter({ s: tree }, 's'), tree).ofKeyboard;
+    const nodes = every(tree);
+    expect([order.keyboardBandTop !== undefined, nodes.some(ofKeyboard)]).toEqual([source === 'band', source === 'marks']);
+    const pixel = keyboardPosition(order);
+    const scroll = keyboardPosition(order, { ofKeyboard });
+    const stroke = strokeLine(undefined, { scene: sceneOf(tree) });
+    for (const n of nodes) {
+      expect(pixel.line(n)).toEqual(scroll.owns(n) ? undefined : scroll.line());
+      if (!scroll.owns(n)) expect(pixel.line(n)).toEqual(stroke);
+    }
+  });
+  it('`line` is the same with any reading or none — one that claims every node and offers a corroborated cover included', async () => {
+    const BAND_RECT = { x: 0, y: 1285, width: 1080, height: 935 };
+    const claimsAll = { ofKeyboard: () => true, cover: async () => ({ rects: [BAND_RECT], top: BAND_RECT, band: BAND_RECT, remedy: { dismissal: 'back' as const, advice: undefined } }), corroborated: async () => true };
+    for (const [, , read] of trees) {
+      const tree = await read();
+      const order = sceneOf(tree).order;
+      for (const reading of [undefined, { ofKeyboard: () => false }, claimsAll, readKeyboard(new FakeAdapter({ s: tree }, 's'), tree)]) {
+        for (const n of [undefined, ...every(tree)]) {
+          for (const given of [undefined, { y: 300, witnessed: true }]) expect(keyboardPosition(order, reading).line(n, given)).toEqual(keyboardPosition(order).line(n, given));
+        }
+      }
+    }
+  });
+});
+
+/**
+ * The structural guarantee the one line rests on, over every committed raw iOS capture: idb's parser marks the flat
+ * list (the only tree draw order reads a band off) and never a node `ofKeyboard`; WDA's parser marks keyboard nodes
+ * and never a node `flatList`. A parser that one day sets both would put a band and marks in one tree — the one case
+ * the pixel assert and scroll_until's read exempt the keyboard's own UI differently (the describe above).
+ */
+describe('no parser gives one tree both idb\'s flat list and WDA\'s keyboard marks — every committed raw capture', () => {
+  const FIXTURES = new URL('../fixtures/', import.meta.url);
+  const json = async (file: string): Promise<Record<string, unknown> | unknown[]> => JSON.parse(await readFile(new URL(file, FIXTURES), 'utf8'));
+  const flagged = (tree: UiNode, flag: 'ofKeyboard' | 'flatList'): boolean => [...everyNode(tree)].some((n) => n[flag] === true);
+  it('idb (describe-all): flat lists, none with an `ofKeyboard` node', async () => {
+    const payloads: [string, unknown][] = [];
+    for (const file of (await readdir(FIXTURES)).filter((f) => f.startsWith('idb-swift-form') || f.startsWith('idb-modal'))) {
+      const v = await json(file);
+      if (Array.isArray(v)) payloads.push([file, v]);
+      else if (Array.isArray(v.elements)) payloads.push([file, v.elements]);
+      else for (const [k, screen] of Object.entries((v.screens ?? v.positions) as Record<string, unknown>)) payloads.push([`${file} ${k}`, screen]);
+    }
+    expect(payloads.length).toBeGreaterThanOrEqual(6);
+    for (const [name, payload] of payloads) {
+      const tree = parseIdbDescribeAll(JSON.stringify(payload));
+      expect([name, tree.flatList === true, flagged(tree, 'ofKeyboard')]).toEqual([name, true, false]);
+    }
+  });
+  it('WDA (/source): no `flatList` node, keyboard marks on the keyboard captures', async () => {
+    const files = (await readdir(FIXTURES)).filter((f) => /^wda-(source|capture|synthetic)-.*\.json$/.test(f));
+    expect(files.length).toBeGreaterThanOrEqual(13);
+    const marked: string[] = [];
+    for (const file of files) {
+      const tree = parseWdaSource(await readFile(new URL(file, FIXTURES), 'utf8'));
+      expect([file, flagged(tree, 'flatList')]).toEqual([file, false]);
+      if (flagged(tree, 'ofKeyboard')) marked.push(file);
+    }
+    expect(marked).toEqual(expect.arrayContaining(['wda-source-myport-login-keyboard.json', 'wda-source-myport-2fa-keyboard-toolbar.json']));
   });
 });
