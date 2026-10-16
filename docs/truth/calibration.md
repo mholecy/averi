@@ -19,7 +19,7 @@ open note on the working tree. See the script for the verdicts.
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | CALIBRATED |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | calibrate | 188740b → bd06470 | CALIBRATED |
-| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)); live android: CALIBRATED-ON-DEFECT (intermittent), regressed elsewhere: 1 row (recorded) |
+| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is judged by the note's live calibration (recorded: `needs` says what it found)); live android: CALIBRATED-ON-DEFECT (intermittent), regressed elsewhere: 1 row (recorded) |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | CALIBRATED |
 | 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | calibrate | d2b7744 → 81a7d62 | CALIBRATED |
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
@@ -62,6 +62,7 @@ open note on the working tree. See the script for the verdicts.
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | open | working tree | OPEN-RED |
+| NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | open | working tree | OPEN-RED |
 
 ## 1.1: CALIBRATED
 
@@ -291,7 +292,7 @@ A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismi
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) o
 
-Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, 7542021 → c3ebc62, dismiss:toolbar-dismiss-short.vs, dismiss:toolbar-dismiss-short.ks, dismiss:toolbar-dismiss-short.ss, dismiss:toolbar-dismiss-short.note — The second fix, on toolbar-dismiss-short: before, refused with the keyboard up (the focus on postcode); after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal ("outside its scroll view … scroll_until it first") — ok. (docs/truth/live-calibration-2026-10-16.md)
+Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, d928789 → c3ebc62, dismiss:toolbar-dismiss-short.vs, dismiss:toolbar-dismiss-short.ks, dismiss:toolbar-dismiss-short.ss, dismiss:toolbar-dismiss-short.note — The second fix alone, on toolbar-dismiss-short, at the static pair 7.2's sides (d928789, c3ebc62's first parent → c3ebc62): before, refused with the keyboard up (the focus on postcode), the reply naming the note's defect (`tap id:"lab.toolbar-dismiss-short.title": covered by scrollable`) — as at 7542021, whose run this replaced (review round 4, P2: 7542021 → c3ebc62 spanned 11 first-parent commits); toolbar-dismiss's three ok at d928789, as at 7542021; after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal ("outside its scroll view … scroll_until it first") — ok. (docs/truth/live-calibration-2026-10-16.md)
 
 7.2, the second fix alone (d928789, c3ebc62's first parent → c3ebc62), on toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at d928789 `covered by scrollable` (as at 7542021; at 5cff2ad for the toolbar), the title tapped at c3ebc62.
 
@@ -332,7 +333,7 @@ edges/scroll-sticky-view (round 4): scroll-sticky-cut's list and merged header (
 
 tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.
 
-## 12: CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5))
+## 12: CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is judged by the note's live calibration (recorded: `needs` says what it found))
 
 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md — defect: `fully visible`
 
@@ -1044,6 +1045,20 @@ No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none)
   - RED ios-iphone17-ios27/text-sample.idb.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
 
 No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
+
+## NI1: OPEN-RED
+
+2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md — defect: `to appear$|not found within|never appeared in the tree`
+
+- working tree:
+  - RED ios-iphone17-ios27/sheet-long-list.idb.json R tap — not tapped: ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list.R" to appear
+  - RED ios-iphone17-ios27/sheet-long-list.idb.json R colour — failed: FAIL  element id:"lab.sheet-long-list.R" fill within dE00 8 of #1E88E5 — not found within 1 s
+  - RED ios-iphone17-ios27/sheet-long-list.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element neve
+  - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R tap — not tapped: ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list-short.R" to appear
+  - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R colour — failed: FAIL  element id:"lab.sheet-long-list-short.R" fill within dE00 8 of #1E88E5 — not found within 1 s
+  - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — elemen
+
+No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply says why (review round 4, P4). presented.known.ts owns the ratchet; this entry links the note to its rows. Live: scripts/truth/live-known.ts NO_ID (idb tap:sheet-long-list.R, tap:sheet-long-list-short.R, scroll:sheet-long-list-short.F).
 
 ## Not reproducible with the existing cells
 
