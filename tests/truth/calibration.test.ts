@@ -10,6 +10,7 @@ import {
   disposition,
   failing,
   isOpenCell,
+  notesOf,
   pairsOf,
   plan,
   regressedElsewhere,
@@ -302,6 +303,27 @@ describe('calibrate.ts — several fixes, one pair each (pairsOf)', () => {
     const report = calibrationReport(rs);
     expect(report).toContain('| 7.1 | x | calibrate | aaaaaaa → bbbbbbb | CALIBRATED (partial: first) |');
     expect(report).toContain('| 7.2 | x | calibrate | ccccccc → ddddddd | CALIBRATED, regressed elsewhere: 1 row (recorded) |');
+  });
+});
+
+describe('calibrate.ts — --note (notesOf)', () => {
+  it('the notes named, in the table\'s order; all without --note; an unknown name is an error naming it', () => {
+    const t = { notes: [entry({ n: '1' }), entry({ n: '7' }), entry({ n: 'FU1' })] };
+    expect(notesOf(t, undefined).map((e) => e.n)).toEqual(['1', '7', 'FU1']);
+    expect(notesOf(t, ['FU1', '1']).map((e) => e.n)).toEqual(['1', 'FU1']);
+    expect(() => notesOf(t, ['7', '999', 'x'])).toThrow('calibrate --note: 999, x is no note of the table');
+  });
+
+  it('the command line refuses an unknown note before any checkout', () => {
+    let err: { status: number | null; stderr: string } | undefined;
+    try {
+      execFileSync(process.execPath, ['--import', 'tsx', `${ROOT}scripts/truth/calibrate.ts`, '--note', '999'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      err = e as { status: number | null; stderr: string };
+    }
+    expect(err?.status).not.toBe(0);
+    expect(err?.stderr).toContain('calibrate --note: 999 is no note of the table');
+    expect(err?.stderr).not.toContain('ReferenceError');
   });
 });
 

@@ -301,8 +301,9 @@ lands: every tap within OPEN_TAP_REACH (a sixth of the extent, chosen between th
 the target moves the tap under a sixth, and passes unless the reply says it moved). Done in round 4
 (truth/r4-followups): the open tap is held to the centre of the target's node in the replayed tree, ±1
 (base.ts#NODE_CENTRE_SLACK; truth.ts#nodeFramesIn, the harness's own reading of WDA's `rect`, idb's `frame`,
-uiautomator's `bounds`), the reach kept as the fallback where the tree lists no single frame for it (66 of the 68 open
-taps have one node; idb's sheet-long-list and sheet-long-list-short R none). No row flips (879 checks, 257 mismatches,
+uiautomator's `bounds`), the reach kept as the fallback where the tree lists no node for it whose centre the probe's touch agrees with (within
+the reach; several such frames: one of their centres) (66 of the 68 open taps have one node; idb's sheet-long-list and
+sheet-long-list-short R none). No row flips (879 checks, 257 mismatches,
 0 broken, each row's verdict as before); #26 still CALIBRATED; own-parts' N is now held to its text node's centre.
 
 **Round 3 — cell variants for partial notes (2026-10-16, truth/r3-variants).** A cell may name the platforms that build
@@ -328,13 +329,13 @@ command or setting switches Gboard's mode — tried nothing else; docked again a
 inset, the panel `(71,1092,1008,1884)` the touchable region's second rect, four fields' centres under it
 (truth.ts#imePanels; situationOf holds them under-keyboard; readControlProbe no longer reads a focus left in place by a
 tap the panel took as a reach) — #1 CALIBRATED on them (7d9a783 → cb77485: Tapped with no back, a colour PASS on the
-panel, `fully visible after 0 swipes` before; back then a tap, failing closed, strokes above the panel after), its
+panel, `fully visible after 0 swipes` before; back then a tap, failing closed, strokes clear of the panel after), its
 regression elsewhere at cb77485 the pinned submit between panel and strip, lab finding FU1. Follow-up:
 calibrate takes one before/after pair per note, so #7's two fixes share 5cff2ad → c3ebc62 — several pairs per note
 would verify each fix alone. Done in round 4 (truth/r4-followups): a note may name `pairs`, one before/after per further fix, each
 judged alone (`<n>.1`, `<n>.2` …) — #7 CALIBRATED on both (5cff2ad → 7542021 on toolbar-dismiss, d928789 → c3ebc62 on
 toolbar-dismiss-short, each its own `covered by` symptom), #1's 9131730 CALIBRATED on the docked IME's scroll_until rows
-(the cb77485 pair still DOES-NOT-FAIL: the panel), #19's first fix cd4d177 STILL-RED-AFTER (as the note says); #5's
+(the cb77485 pair, #1.1, CALIBRATED on form-keyboard-floating: below), #19's first fix cd4d177 STILL-RED-AFTER (as the note says); #5's
 1bc603a, 565b747 (a stale IME reading: live) and #8's c8c06a8 (no icon-button cell) unpaired, in their `needs`.
 
 ### Phase 4 — the matrix, generated

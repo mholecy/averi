@@ -8,6 +8,7 @@ import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
   consistency,
+  controlPiece,
   controlConsistency,
   imePanels,
   listedIn,
@@ -128,6 +129,12 @@ describe('situationOf', () => {
     expect(situationOf(rect(55, 900, 970, 120), s, form, field, panel)).toBe('open');
     expect(situationOf(rect(55, 1462, 970, 120), s, form, field)).toBe('open');
     expect(situationOf(rect(55, 2100, 970, 100), s, form, field, panel)).toBe('under-keyboard');
+  });
+
+  it("controlPiece clears a floating IME's panel too: ss's piece below the panel (form-keyboard-floating)", () => {
+    const s = state({ screen: rect(0, 0, 1080, 2220), frames: {}, keyboard: { frame: rect(0, 2088, 1080, 132), visible: true, field: 'postcode' } });
+    expect(controlPiece(rect(55, 1842, 970, 99), s, UNPINNED, field, [rect(71, 1092, 937, 792)])).toEqual(rect(55, 1884, 970, 57));
+    expect(controlPiece(rect(55, 1842, 970, 99), s, UNPINNED, field)).toEqual(rect(55, 1842, 970, 99));
   });
 
   it('presented-over: under an open picker sheet, unless it is in the sheet', () => {
@@ -581,6 +588,32 @@ describe('capture of a form cell (Android)', () => {
     const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
     expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', afterBack: { reached: true, probe: [ev('touch', '201.0,621.0')] } });
     expect(truth.form!.controls.filter((c) => c.afterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);
+  }, 15_000);
+
+  // A floating IME (CatalogCell.ime): the panel read from the shown touchable region; the capture refuses a floating
+  // cell without one and any other form cell with one.
+  const floatingIme = (lab: FakeAndroidFormLab, band: string) => {
+    const ime = lab.ime.bind(lab);
+    lab.ime = async () => {
+      const r = await ime();
+      return { ...r, shown: { ...r.shown, touchable: `mInputShown=true\n    touchable region=SkRegion((20,300,380,500)${band})` } };
+    };
+  };
+  it('a form cell captured with the IME floating is refused unless the cell is marked so', async () => {
+    const lab = new FakeAndroidFormLab();
+    floatingIme(lab, '');
+    await expect(runForm(lab, [FORM_KEYBOARD])).rejects.toThrow(/the IME is floating \(a panel beyond its band: 20,300 360x200\) — dock it first/);
+  }, 15_000);
+  it('a cell marked ime: floating is refused docked (no panel beyond the band)', async () => {
+    await expect(runForm(new FakeAndroidFormLab(), [{ ...FORM_KEYBOARD, ime: 'floating' }])).rejects.toThrow(/captured with the IME floating only, but its touchable region holds no panel/);
+  }, 15_000);
+  it('a cell marked ime: floating, floating: the panel in its truth', async () => {
+    const lab = new FakeAndroidFormLab();
+    floatingIme(lab, '');
+    const { broken } = await runForm(lab, [{ ...FORM_KEYBOARD, ime: 'floating' }]);
+    const truth = JSON.parse(await readFile(join(out, 'form-k.truth.json'), 'utf8')) as CellTruth;
+    expect(truth.form!.keyboard!.panels).toEqual([rect(20, 300, 360, 200)]);
+    expect(broken.every((b) => !/no panel/.test(b))).toBe(true);
   }, 15_000);
 
   it('a pinned submit whose state reports no bar is refused: every control under it would read open', async () => {

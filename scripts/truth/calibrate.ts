@@ -289,6 +289,14 @@ export function disposition(rs: readonly NoteResult[], out?: string, partial = f
   return { path: out, stale: `${out}.failed`, code };
 }
 
+/** The notes `--note` names (all without it), in the table's order; a name that is no note of the table is an error. */
+export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string[] | undefined): CalibrationEntry[] {
+  const notes = table.notes.filter((e) => only === undefined || only.includes(e.n));
+  const unknown = (only ?? []).filter((n) => !table.notes.some((e) => e.n === n));
+  if (unknown.length > 0) throw new Error(`calibrate --note: ${unknown.join(', ')} is no note of the table`);
+  return notes;
+}
+
 // --- the command line ---
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -298,9 +306,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const repo = fileURLToPath(new URL('../..', import.meta.url));
   const table = JSON.parse(await readFile(join(repo, 'scripts/truth/calibration.json'), 'utf8')) as Calibration;
   const only = values.note?.split(',').map((s) => s.trim());
-  const notes = table.notes.filter((e) => only === undefined || only.includes(e.n));
-  if (only !== undefined && notes.length !== only.length) throw new Error(`calibrate --note: ${only.filter((n) => !entries.some((e) => e.n === n)).join(', ')} is no note of the table`);
-  const entries = notes.flatMap(pairsOf);
+  const entries = notesOf(table, only).flatMap(pairsOf);
   const { codeRoot } = await import('../differential/checkout.js');
   const worktrees = resolve(values.worktrees ?? join(tmpdir(), 'averi-calibration'));
   const run = promisify(execFile);

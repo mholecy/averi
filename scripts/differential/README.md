@@ -105,10 +105,11 @@ file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, 
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks
-where it lands: `Tapped`, every tap sent at the centre of the target's node in the replayed tree, ±1 for the tools'
-rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the node by the selector the row asks —
-its identifier, or a text target's text — from the capture golden replays), or, where that tree lists no single frame
-for it (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its app
+where it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
+rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
+its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies
+within the reach below of the probe's touch, the device's word over the tree's: base.ts#nodeCentres), or, where that
+tree lists none so (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its app
 logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
 the measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313), and not saying it moved the tap off a cover over the centre (`tapped the
 uncovered part`); a tap moved off is averi steering around a cover that is not there (calibration.json #26).
@@ -225,7 +226,8 @@ moves through `back` is replayed against the layout the app takes then.
 Under a floating IME (Gboard's Floating tile, set by hand: `form-keyboard-floating`, `ime: floating` in the catalog —
 the capture refuses it docked, and refuses every other form cell floating) the app hears of the 132-px strip only; the
 capture reads the panel from the shown touchable region (truth.ts#imePanels) and holds a control whose centre lies
-under it `under-keyboard` (FormTruth.keyboard.panels), its scroll_until's touch-downs above the panel's top.
+under it `under-keyboard` (FormTruth.keyboard.panels), its scroll_until's touch-downs off the panel and the band (a touch-down beside the panel or between it and the strip is
+the app's: lab finding FU1).
 
 An Android capture writes the device's own `dumpsys window displays` with the IME down beside its truth
 (`<cell>.displays.txt`, CellTruth.displays — for a cell captured with the IME up, read after that `back`: the one

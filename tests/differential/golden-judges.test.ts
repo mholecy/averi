@@ -133,8 +133,10 @@ describe('a coloured target, open', () => {
       ['Tapped id:"lab.x"', ['adb shell input tap 542 391'], /^Tapped off its node's centre \(539.5,391\)/],
     ]);
   });
-  it('no node, or several frames for it: the reach around the probe point', () => {
-    for (const tree of [wda([]), wda([rect(51, 110, 300, 64), rect(51, 110, 300, 40)]), 'not json']) {
+  it('no node, or none the probe agrees with: the reach around the probe point', () => {
+    // a node whose centre lies outside the probe's reach (±50 x ±10.67 of (201,142)): the tree's word against the
+    // device's, not held as the truth
+    for (const tree of [wda([]), wda([rect(51, 300, 300, 64)]), 'not json']) {
       const row = atNode(tree);
       expect(row.says).toBe('Tapped at its probe point (201,142)');
       check(row.judge, [
@@ -142,6 +144,16 @@ describe('a coloured target, open', () => {
         ['Tapped id:"lab.x"', ['idb ui tap 201 162'], /^Tapped off its probe point/],
       ]);
     }
+  });
+  it('several frames: the tap at one of their centres the probe agrees with', () => {
+    const row = atNode(wda([rect(51, 110, 300, 64), rect(51, 114, 300, 64), rect(51, 300, 300, 64)]));
+    expect(row.says).toBe("Tapped at its node's centre (201,142) or (201,146) in the tree");
+    check(row.judge, [
+      ['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'],
+      ['Tapped id:"lab.x"', ['idb ui tap 201 146'], 'ok'],
+      ['Tapped id:"lab.x"', ['idb ui tap 201 144'], /^Tapped off its node's centre \(201,142\) or \(201,146\) at \(201,144\)/],
+      ['Tapped id:"lab.x"', ['idb ui tap 201 332'], /^Tapped off its node's centre/],
+    ]);
     // identical duplicates count once
     expect(atNode(wda([rect(51, 110, 300, 64), rect(51, 110, 300, 64)])).says).toBe("Tapped at its node's centre (201,142) in the tree");
   });
@@ -475,14 +487,18 @@ describe('the Android form rows (phase 2b)', () => {
     check(pick(noPiece, 'tap', 'note').judge, [['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/]]);
   });
 
-  it("under a floating IME the keyboard's top is its panel's: a touch-down below the panel's top is under the keyboard", () => {
+  it("under a floating IME a touch-down on its panel or its strip is under the keyboard; beside the panel or between it and the strip, the app's", () => {
     const ADB = (y: number) => `adb shell input swipe 540 ${y} 540 218 657`;
     const floating = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, keyboard: { frame: rect(0, 2088, 1080, 132), field: 'postcode', panels: [rect(71, 1092, 937, 792)] } } }, 'uiautomator');
     const scroll = pick(floating, 'scroll_until', 'vs');
-    expect(scroll.says).toMatch(/above the keyboard's top \(y 1092\)/);
+    expect(scroll.says).toBe("not reached without a swipe; every touch-down above the keyboard's top (y 2088) and off its panel 71,1092 937x792");
+    const ADB_AT = (x: number, y: number) => `adb shell input swipe ${x} ${y} ${x} 218 657`;
     check(scroll.judge, [
       ['ERROR scroll_until … failed after 1 swipe', [ADB(874)], 'ok'],
       ['ERROR scroll_until … failed after 1 swipe', [ADB(1500)], /^touched down under the keyboard at \(540,1500\)/],
+      ['ERROR scroll_until … failed after 1 swipe', [ADB(2100)], /^touched down under the keyboard at \(540,2100\)/],
+      ['ERROR scroll_until … failed after 1 swipe', [ADB(1950)], 'ok'],
+      ['ERROR scroll_until … failed after 1 swipe', [ADB_AT(30, 1500)], 'ok'],
       ['Element id:"lab.f.vs" fully visible after 0 swipes', [], /^reached with no swipe, under the keyboard/],
     ]);
   });

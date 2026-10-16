@@ -18,11 +18,11 @@ import { BUDGET_MS, classed, first, MOVED_TAP, ownWords, passes, pointsText, rea
  */
 export function openRows(platform: Platform, t: TargetTruth, selector = `id:"${t.id}"`, nodes: readonly Rect[] = []): Expectation[] {
   const element = { id: t.id };
-  const node = nodeCentre(nodes);
+  const centres = nodeCentres(nodes, t);
   return ([
     {
       verb: 'tap',
-      says: node === undefined ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${pointText(node)} in the tree`,
+      says: centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`,
       call: { tool: 'tap', args: { platform, selector } },
       judge: (o) => (o.reply.startsWith('Tapped') ? atProbe(o, t, nodes) : `not tapped: ${first(o)}`),
     },
@@ -66,19 +66,24 @@ export function probeDelivered(t: Pick<TargetTruth, 'frame' | 'probe'>): Point {
 export const NODE_CENTRE_SLACK = 1;
 
 /**
- * The centre of the target's node, when the recorded tree lists exactly one frame for it (truth.ts#nodeFramesIn:
- * identical duplicates count once). None listed (idb lists no row of a long sheet's table past its first screen), or
- * several frames — which one averi resolves is its own choice, not the tree's — and there is none: the open tap falls
- * back to the reach around the probe point (OPEN_TAP_REACH).
+ * The centres of the target's nodes in the recorded tree (truth.ts#nodeFramesIn: each frame once) that the device
+ * agrees with: each within OPEN_TAP_REACH of the probe's delivered touch (probeDelivered) — the tree is what averi
+ * reads, the probe what the device measured, so a node the tree places elsewhere is not held as the truth. Several
+ * frames: the tap is held to one of their centres (which one averi resolves is its own choice). None listed (idb lists
+ * no row of a long sheet's table past its first screen), or none the probe agrees with: none — the open tap falls back
+ * to the reach around the probe point (OPEN_TAP_REACH).
  */
-export function nodeCentre(nodes: readonly Rect[]): Point | undefined {
-  if (nodes.length !== 1) return undefined;
-  const [n] = nodes;
-  return { x: n.x + n.width / 2, y: n.y + n.height / 2 };
+export function nodeCentres(nodes: readonly Rect[], t: Pick<TargetTruth, 'frame' | 'probe'>): Point[] {
+  const probe = probeDelivered(t);
+  return nodes.map((n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 })).filter((c) => withinReach(c, probe, t.frame));
 }
 
+/** Whether `p` lies within OPEN_TAP_REACH of `probe` on each axis, of `frame`'s extent (at least one unit). */
+const withinReach = (p: Point, probe: Point, frame: Rect) =>
+  Math.abs(p.x - probe.x) <= Math.max(1, frame.width * OPEN_TAP_REACH) && Math.abs(p.y - probe.y) <= Math.max(1, frame.height * OPEN_TAP_REACH);
+
 /**
- * The fallback where the tree names no single node for the target (nodeCentre): how far from the probe point an open
+ * The fallback where the tree names no node for the target the probe agrees with (nodeCentres): how far from the probe point an open
  * target's tap may land, as a fraction of the target's extent per axis: the
  * middle third of it around the probe point (at least one unit, the tools' rounding). A CHOSEN value between the two
  * measured: own-parts' N (iOS, both trees, a whole target its tree does not clip), whose text node starts 18 pt right
@@ -93,22 +98,20 @@ export const OPEN_TAP_REACH = 1 / 6;
 /**
  * The open tap's judge on a `Tapped` reply: it does not say it moved the tap off a cover (judges.ts#MOVED_TAP — on a
  * target the truth measured uncovered, open, whole, reached and drawn as itself, nothing lies over its centre: the
- * cover is averi's own), at least one tap is sent, and every tap sent lies at the centre of the target's node in the
- * recorded tree (nodeCentre, within NODE_CENTRE_SLACK) — or, where the tree names no single node for it, at its probe
- * point (probeDelivered), within OPEN_TAP_REACH of its extent on each axis.
+ * cover is averi's own), at least one tap is sent, and every tap sent lies at the centre of one of the target's nodes
+ * in the recorded tree (nodeCentres, within NODE_CENTRE_SLACK) — or, where the tree names none the probe agrees with,
+ * at its probe point (probeDelivered), within OPEN_TAP_REACH of its extent on each axis.
  */
 export function atProbe(o: Outcome, t: Pick<TargetTruth, 'frame' | 'probe'>, nodes: readonly Rect[] = []): string | undefined {
   if (MOVED_TAP.test(ownWords(o))) return `Tapped moved off a cover over its centre, on a target measured uncovered: ${first(o)}`;
   const points = tapPoints(o);
   if (points.length === 0) return `Tapped, but no tap sent: ${first(o)}`;
-  const node = nodeCentre(nodes);
-  if (node !== undefined) {
-    const off = points.filter((p) => Math.abs(p.x - node.x) > NODE_CENTRE_SLACK || Math.abs(p.y - node.y) > NODE_CENTRE_SLACK);
-    return off.length === 0 ? undefined : `Tapped off its node's centre ${pointText(node)} at ${pointsText(off)}: ${first(o)}`;
+  const centres = nodeCentres(nodes, t);
+  if (centres.length > 0) {
+    const off = points.filter((p) => !centres.some((c) => Math.abs(p.x - c.x) <= NODE_CENTRE_SLACK && Math.abs(p.y - c.y) <= NODE_CENTRE_SLACK));
+    return off.length === 0 ? undefined : `Tapped off its node's centre ${centres.map(pointText).join(' or ')} at ${pointsText(off)}: ${first(o)}`;
   }
   const probe = probeDelivered(t);
-  const dx = Math.max(1, t.frame.width * OPEN_TAP_REACH);
-  const dy = Math.max(1, t.frame.height * OPEN_TAP_REACH);
-  const off = points.filter((p) => Math.abs(p.x - probe.x) > dx || Math.abs(p.y - probe.y) > dy);
+  const off = points.filter((p) => !withinReach(p, probe, t.frame));
   return off.length === 0 ? undefined : `Tapped off its probe point ${pointText(probe)} at ${pointsText(off)}: ${first(o)}`;
 }
