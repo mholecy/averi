@@ -23,9 +23,9 @@ import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard
  * — every cell before phase 3 — captures as before. On any cell, a target whose probe point (probePoint, its rounded
  * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
  * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
- * phase 3: truth.ts#consistency); so is an Android target whose centre lies in the navigation band
- * (truth.ts#unprobedBand: what a tap there does is unmeasured, and on three-button navigation it would leave the app).
- * One rule decides it, for the capture and consistency both: truth.ts#unprobedReason.
+ * phase 3: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the
+ * bar's, its touch telling which (truth.ts#systemBarSwallows, #bandTouchTells). One rule decides what is
+ * never tapped, for the capture and consistency both: truth.ts#unprobedReason.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown
  * and its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus
@@ -100,8 +100,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
       const { drawn, seen } = measure(png, frame, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
-      // The centre is never tapped where it lies off the screen, nor in Android's navigation band
-      // (truth.ts#unprobedReason, the rule consistency holds the target to).
+      // The centre is never tapped where it lies off the screen (truth.ts#unprobedReason, the rule consistency holds
+      // the target to).
       const unprobed = unprobedReason({ frame, ...geometry }, lab.platform, s.screen)?.says;
       const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);

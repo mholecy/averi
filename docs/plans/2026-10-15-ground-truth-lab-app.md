@@ -209,12 +209,28 @@ How to add a cell (B2–B5):
    with its class, reply kind, calls, note and `as: bug:<note>` or `residual:<decision>`; then the note's rows in
    `scripts/truth/calibration.json` and a calibrate run.
 
-**B4 (bars) — an open assumption to measure first.** What a raw tap in Android's navigation band does is not measured:
-under gesture navigation it reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's
-context). Until B4 measures it in both modes, the capture never taps a centre there (`truth.ts#unprobedReason`, the
-target's `unprobed`), and consistency holds such a target to no probe; only the status bar's swallowed probe is
-measured (calibration.json #21, `systemBarSwallows`). An iOS status-band probe is taken: its touch is the app's, and
-the scroll-to-top it may also fire cannot reach the next probe (each relaunches the cell).
+**B4 (bars) — the band probes, measured (2026-10-16).** B1 left what a raw tap in Android's navigation band does
+unmeasured (gesture navigation or three buttons, ADR 0009's context) and never probed a centre there; it assumed iOS's
+status band passes every tap to the app. B4 measured both on the `bands` cell (S centred in the status band, N in the
+navigation band, O and Q 4 dp/pt into them) with the lab app's touch log as the witness — per tap: `am force-stop` and
+`am start … --es cell bands` (iOS: `simctl terminate`, `simctl launch … -cell bands`), the state file's event count,
+the raw tap, 1 s, the events since:
+
+| device, mode | the band | raw taps (x,y) | the app logged |
+|---|---|---|---|
+| averi_lab AVD, API 33, gesture (`settings get secure navigation_mode` 2; `dumpsys window displays`: `ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220]`) | navigation | (540,2187), (540,2215) on N; (100,2187) beside it | the touch each time, and `tap N` for the two on N |
+| the same, three buttons (`cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton`, mode 0, `[0,2088][1080,2220]`) | navigation | (540,2154), (100,2154), (270,2154) | nothing; the launcher took the focus (Home, Back) |
+| the same, either mode | status (`[0,0][1080,66]`) | (540,33) on S | nothing |
+| averi-lab iPhone 17 simulator, iOS 27.0 | status (0–62 pt) | (201,10), (201,31), (60,31), (340,31), (120,50), (201,52), (201,53) | nothing — the status bar's window takes them |
+| the same | status | (201,54), (60,54), (201,55), (201,58), (201,61) | the touch, and `tap O` beneath |
+| the same | home indicator (840–874 pt) | (201,857), (60,857) on N | the touch, and `tap N` |
+
+The AVD was set back to gesture navigation (`…navbar.gestural`; mode 2, the band at 2154 again) before its captures. So
+the capture probes a centre in any band (truth.ts#unprobedReason no longer names the navigation band), and
+consistency holds it to what the touch says: Android's status band swallows (systemBarSwallows, #21); in every other
+band (truth.ts#bandTouchTells) a logged touch means the target must be reached, none that it must not be. B1's iOS
+assumption did not hold: a centre in iOS's status band is swallowed above y 54. averi refuses a tap in a band either way
+(ADR 0009 N-a, ADR 0008): R-band.
 
 ### Phase 4 — the matrix, generated
 

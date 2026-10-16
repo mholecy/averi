@@ -105,24 +105,18 @@ const at = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
 /**
  * Why the capture never taps a target's centre — the one rule the capture (capture-run.ts: TargetTruth.unprobed) and
  * consistency both read: `off-screen` an off-screen target; `centre-off-screen` its probe point (probePoint) off the
- * `screen`, given — a raw tap there reaches no window of the app, so it would log no touch and say nothing; `nav-band`
- * a centre in Android's navigation band (unprobedBand: unmeasured whether a tap there reaches the app). `says` is the
- * truth's `unprobed`. undefined: the centre is probed.
+ * `screen`, given — a raw tap there reaches no window of the app, so it would log no touch and say nothing. `says` is
+ * the truth's `unprobed`. undefined: the centre is probed — a centre in a system band too (systemBarSwallows,
+ * bandTouchTells: what a tap there does is measured).
  */
 export function unprobedReason(
   t: Pick<TargetTruth, 'frame' | 'geometry'>,
   platform: Platform | undefined,
   screen: { width: number; height: number } | undefined,
-): { why: 'off-screen' | 'centre-off-screen' | 'nav-band'; says: string } | undefined {
+): { why: 'off-screen' | 'centre-off-screen'; says: string } | undefined {
   const offScreen = (why: 'off-screen' | 'centre-off-screen') => ({ why, says: `its centre ${at(probePoint(t.frame))} lies off the ${screen === undefined ? '' : `${screen.width}x${screen.height} `}screen` });
   if (t.geometry === 'off-screen') return offScreen('off-screen');
   if (screen !== undefined && !centreOnScreen(t.frame, screen)) return offScreen('centre-off-screen');
-  if (t.geometry !== undefined && unprobedBand(platform, t.geometry)) {
-    return {
-      why: 'nav-band',
-      says: 'its centre lies in the navigation band: whether a tap there reaches the app (gesture navigation) or presses Back, Home or Recents (three buttons) is unmeasured',
-    };
-  }
   return undefined;
 }
 
@@ -135,11 +129,11 @@ const NOT_DELIVERED = 'the probe tap left no touch in the app (the positive cont
  * centre of one cut by the screen's edge with its probe point past it (given the `screen`: centreOnScreen — a raw tap
  * there reaches no window of the app, so it would leave no touch and say nothing); on Android a probe in the status
  * band is swallowed by the status bar — no touch reaches the app, and it must not be reached (systemBarSwallows) — and
- * a centre in the navigation band is never probed (unprobedBand, unmeasured); an open target cut with its centre in
- * what shows is reached, and so is one overlapped at its edge by a band or the chrome (its centre clear; what of it is
+ * every other band probe (Android's navigation band, iOS's status and home-indicator bands) is the app's touch or the
+ * bar's, the touch telling which: logged, it must be reached; not, it must not be (bandTouchTells, measured); an open
+ * target cut with its centre in what shows is reached, and so is one overlapped at its edge by a band or the chrome (its centre clear; what of it is
  * drawn is not held to DRAWN); one whose centre lies outside what shows (`centre-out`, `outside-scroll-view`) is not; a
- * sliver, a centre under chrome and, on iOS, a centre in a band (the touch is the app's window's) may be either (what
- * fires there is the truth the rows read). Unmeasured, a declared-open target whose centre lies off the screen is
+ * sliver and a centre under chrome may be either (what fires there is the truth the rows read). Unmeasured, a declared-open target whose centre lies off the screen is
  * broken, as the phase-1 rule has it: never probed, it is never reached.
  */
 export function consistency(t: TargetTruth, platform?: Platform, screen?: { width: number; height: number }): string | undefined {
@@ -152,10 +146,12 @@ export function consistency(t: TargetTruth, platform?: Platform, screen?: { widt
       // Unmeasured (no geometry): the phase-1 rule — an open target must be reached, and one never probed is not.
       if (t.geometry === undefined && t.declared === 'open') return `declared open, but its centre ${at(probePoint(t.frame))} lies off the screen: never probed`;
       return probed ? `its centre ${at(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
-    case 'nav-band':
-      return probed ? 'nav-band on Android, never probed (unmeasured: unprobedBand), but the truth holds a probe' : undefined;
   }
   if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
+  if (bandTouchTells(platform, g)) {
+    if (touchesAt(t.probe, probePoint(t.frame)).length === 0) return t.reached ? `${g}, no touch in the app (the system bar took the tap), but the probe reached it` : undefined;
+    return t.reached ? undefined : `${g}, the touch the app's, but the probe tap did not reach it`;
+  }
   if (touchesAt(t.probe, probePoint(t.frame)).length === 0) return NOT_DELIVERED;
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? undefined : `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
@@ -167,20 +163,28 @@ export function consistency(t: TargetTruth, platform?: Platform, screen?: { widt
 
 /**
  * Android's status bar is the system's window: a raw tap in it never reaches the app (calibration.json #21, the status
- * bar — "the swallowed probe accepted"). Only the status bar: that is what #21 is about. iOS's status bar passes a tap
- * through to the app's window (its touch is logged), so it swallows nothing — though the tap may also scroll a scroll
- * view to its top (UIKit's scroll-to-top); the probe is still taken: the capture relaunches the cell before every
- * probe, so that scroll cannot reach the next one, and the touch it logs is the evidence the rows need.
+ * bar — "the swallowed probe accepted"; measured again by B4 on the averi_lab AVD, 2026-10-16: `adb shell input tap 540
+ * 33` on the `bands` cell logged no touch).
  */
 export const systemBarSwallows = (platform: Platform | undefined, g: Geometry) => platform === 'android' && g === 'status-band';
 
 /**
- * Android's navigation band is NOT measured — an OPEN ASSUMPTION for B4 (bars) to measure: under gesture navigation a
- * tap there reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's context), which
- * would leave the app, not probe it. So the capture never taps a centre in it (capture-run.ts: `unprobed`), and
- * consistency holds such a target to no probe — until B4 measures what a tap there does in each mode.
+ * A probe in any other system band is the app's touch or the bar's, and its touch tells which — MEASURED by B4 (bars),
+ * 2026-10-16, on the `bands` cell (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B4, has the commands):
+ *  - Android's navigation band (averi_lab AVD, API 33, 1080x2220): under gesture navigation (navigation_mode 2, the band
+ *    [0,2154][1080,2220]) `adb shell input tap` at (540,2187), (100,2187) and (540,2215) each logged its touch in the
+ *    app, and the two on N fired N; under three-button navigation (navigation_mode 0, [0,2088][1080,2220]) taps at
+ *    (540,2154), (100,2154) and (270,2154) logged no touch and left the app for the launcher (Home, Back) — the probe's
+ *    relaunch of the cell undoes it.
+ *  - iOS's status band (iPhone 17 simulator, iOS 27.0, the band 0–62 pt): `idb ui tap` at y 10, 31, 50 and 53 (x 60,
+ *    120, 201, 340) logged NO touch — the status bar's window takes it, the app never sees it — while y 54, 55, 58 and
+ *    61 logged the touch and fired O beneath. (B1 had assumed every iOS status-band tap was the app's.)
+ *  - iOS's home-indicator band (840–874 pt): taps at (201,857) and (60,857) logged the touch and fired N.
+ * So the capture probes a centre in a band like any other: with its touch logged the target must be reached, with none
+ * it must not be. The truth records no navigation mode — the committed Android captures are gesture navigation's. averi
+ * refuses the tap there either way (ADR 0009 N-a on Android, ADR 0008 on iOS's status band): R-band.
  */
-export const unprobedBand = (platform: Platform | undefined, g: Geometry) => platform === 'android' && g === 'nav-band';
+export const bandTouchTells = (platform: Platform | undefined, g: Geometry) => (g === 'status-band' || g === 'nav-band') && !systemBarSwallows(platform, g);
 
 // --- the measured geometry (phase 3) ---
 

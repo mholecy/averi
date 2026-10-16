@@ -249,7 +249,7 @@ export interface TargetTruth {
   /**
    * Why the probe at the frame's centre was not tapped (truth.ts#unprobedReason): the point (probePoint) lies off the
    * screen — an off-screen target, or one cut by the screen's edge with its centre past it: a raw tap there would reach
-   * no window of the app (and log no touch), so it would say nothing — or in Android's navigation band (unmeasured).
+   * no window of the app (and log no touch), so it would say nothing.
    * `reached` is false and `probe` empty.
    */
   unprobed?: string;
