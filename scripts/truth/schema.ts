@@ -353,6 +353,14 @@ export interface CellTruth {
    */
   ime?: string;
   /**
+   * Android, a cell captured with the IME down: the file beside the truth holding the device's own `dumpsys window
+   * displays` — the system bands averi reads (the navigation bar's top differs by navigation mode: [0,2154] under
+   * gestures, [0,2088] under three buttons on the lab AVD) — served by the golden mode's fake device in place of its
+   * stock gesture-mode dump (fake-device.ts#DeviceProfile.windowDisplays). A cell captured with the IME up has its
+   * dumps in `ime`. Absent on iOS and on captures before round 3.
+   */
+  displays?: string;
+  /**
    * Android, a cell captured with the IME up: the screen after one `back` hid it, as files beside the truth — the
    * state (`state`) and each raw tree by source (`trees`) — the layout averi finds an element again in after its tap
    * guard's `back`; golden's fake device serves the tree once `input keyevent 4` is sent (DeviceProfile.afterBackXml).

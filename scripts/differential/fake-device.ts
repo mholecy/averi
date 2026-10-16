@@ -39,7 +39,9 @@ import type { ImeCapture } from '../truth/schema.js';
  *    measurements), `screencap -p` the frame, every `input` accepted — and
  *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
  *    running (`pidof`), no log. A ground-truth capture with the IME up serves
- *    the device's own three keyboard answers instead (DeviceProfile.ime).
+ *    the device's own three keyboard answers instead (DeviceProfile.ime), one
+ *    with the IME down its own `dumpsys window displays` (DeviceProfile.
+ *    windowDisplays: its system bands, the navigation mode's own).
  *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
  *    caller asks — what a colour assert on that rect must sample; or, for
  *    a ground-truth capture (golden.ts), the screenshot the device showed.
@@ -81,6 +83,12 @@ export interface DeviceProfile {
    * one, so no colour row may rely on the screen after back.
    */
   afterBackXml?: string;
+  /**
+   * Android, a ground-truth capture with the IME down (scripts/truth/schema.ts#CellTruth.displays): the device's own
+   * `dumpsys window displays`, answered in place of the stock dump while the keyboard is hidden — its system bands
+   * (a three-button capture's navigation bar from 2088, not the stock gesture band from 2154).
+   */
+  windowDisplays?: string;
 }
 
 /** A rect of the frame, in its pixels, painted one colour. */
@@ -201,6 +209,7 @@ const captured = (profile: DeviceProfile, keyboard: KeyboardState) => profile.im
 function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
   const ime = captured(profile, keyboard);
   if (ime !== undefined) return ime.displays;
+  if (profile.windowDisplays !== undefined && keyboard === 'hidden') return profile.windowDisplays;
   if (profile.displays === 'api36') return API36;
   return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;
 }

@@ -52,3 +52,20 @@ describe('the fake device serving a captured screenshot', () => {
     );
   });
 });
+
+describe('the fake device serving a capture\'s own dumpsys window displays (CellTruth.displays)', () => {
+  const dump = (shell: string) => execFile('adb', ['-s', 'emulator-5554', 'shell', ...shell.split(' ')]).then((b) => b.toString('utf8'));
+  const OWN = '  InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2088][1080,2220] visible=true\n';
+
+  it('answers the capture\'s own dump while the keyboard is hidden, the stock gesture-mode dump without one', async () => {
+    useDevice({ platform: 'android', screen: { width: 1080, height: 2220 }, frame: { width: 1080, height: 2220 }, windowDisplays: OWN });
+    expect(await dump('dumpsys window displays')).toBe(OWN);
+    useDevice({ platform: 'android', screen: { width: 1080, height: 2220 }, frame: { width: 1080, height: 2220 } });
+    expect(await dump('dumpsys window displays')).toMatch(/ITYPE_NAVIGATION_BAR frame=\[0,2154\]\[1080,2220\]/);
+  });
+
+  it('not while a keyboard is shown: the dump the capture holds is the IME-down one', async () => {
+    useDevice({ platform: 'android', screen: { width: 1080, height: 2220 }, frame: { width: 1080, height: 2220 }, windowDisplays: OWN, keyboard: 'shown' });
+    expect(await dump('dumpsys window displays')).not.toBe(OWN);
+  });
+});

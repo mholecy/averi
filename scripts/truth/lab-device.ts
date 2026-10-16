@@ -56,6 +56,11 @@ export interface LabDevice {
    */
   ime?(): Promise<ImeCapture>;
   /**
+   * Android: `dumpsys window displays` now — the dump averi's Android adapter reads its system bands from (the status
+   * bar's height, the navigation bar's top: src/adapters/android.ts#systemBands) and its keyboard. Absent on iOS.
+   */
+  displays?(): Promise<string>;
+  /**
    * Android: hide the IME as averi's tap guard does (one `input keyevent 4`, src/mcp/tools.ts tap: "the keyboard is
    * hidden (back) and the element found again first") and give it time to go. Absent on iOS.
    */
@@ -317,6 +322,11 @@ export class AndroidLab implements LabDevice {
     const shown = await read();
     await this.hideKeyboard();
     return { shown, hidden: await read() };
+  }
+
+  async displays(): Promise<string> {
+    await this.guard();
+    return (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout;
   }
 
   async hideKeyboard(): Promise<void> {

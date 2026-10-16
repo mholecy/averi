@@ -220,12 +220,12 @@ It also writes the screen after that `back` — `<cell>.after-back.xml` and `<ce
 (CellTruth.afterBack) — whose dump the fake device answers once a call sends `input keyevent 4`, so a tap the guard
 moves through `back` is replayed against the layout the app takes then.
 
-A limit of the Android replay, today: the fake device answers `dumpsys window` with ONE gesture-navigation Pixel_3a
-profile (its navigation bar `[0,2154][1080,2220]`) for every capture — `bands-three-button`, captured under three
-buttons (the bar `[0,2088][1080,2220]`), is replayed against the gesture profile's band (review round 1 of
-truth/r3-variants measured its verdicts the same under a dump patched to the captured bar). The per-capture `dumpsys`
-serving arrives with phase 2b's IME work (`CellTruth.ime` / `DeviceProfile.ime`, truth/r3-forms-android): follow-up at
-that merge.
+An Android cell captured with the IME down has the device's own `dumpsys window displays` written beside its truth
+(`<cell>.displays.txt`, CellTruth.displays), which the fake device answers in place of its stock gesture-navigation
+Pixel_3a dump while the keyboard is hidden (DeviceProfile.windowDisplays) — the system bands averi reads come from the
+capture, so `bands-three-button` (captured under three buttons) is replayed against its own bar `[0,2088][1080,2220]`,
+not the gesture band `[0,2154][1080,2220]`. A capture without the file (every Android cell captured before it) is
+served the stock dump, which is the gesture-mode lab AVD's own.
 
 R-fully on a flush edge (rows.ts#fullyRow, #flushProbe): Android's uiautomator cuts a node flush with its scroll
 container's edge, and averi's `fully` stop probes such an edge with a swipe toward it (9c7885e). A replayed tree never

@@ -152,6 +152,12 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       await writeFile(join(opts.out, `${cell.id}.after-back.state.json`), JSON.stringify(afterBack, null, 2) + '\n');
       truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
     }
+    // Android with the IME down: the device's own system bands (CellTruth.displays) — the navigation bar's top depends
+    // on the navigation mode, which the fake device's stock dump (gesture navigation) does not follow.
+    if (s.keyboard?.visible !== true && lab.displays !== undefined) {
+      await writeFile(join(opts.out, `${cell.id}.displays.txt`), await lab.displays());
+      truth.displays = `${cell.id}.displays.txt`;
+    }
     if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack);
     await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
     for (const t of trees) {

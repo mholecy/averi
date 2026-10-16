@@ -85,6 +85,8 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   // …and the screen after one back hid it, for the replayed tree's source (CellTruth.afterBack).
   const backTree = truth.afterBack?.trees[recording.source];
   const afterBackXml = backTree === undefined || recording.source !== 'uiautomator' ? undefined : await readFile(join(dirname(recording.truth), backTree), 'utf8');
+  // Android captured with the IME down: the device's own system bands (CellTruth.displays: the navigation mode's own bar).
+  const windowDisplays = truth.displays === undefined || recording.platform !== 'android' ? undefined : await readFile(join(dirname(recording.truth), truth.displays), 'utf8');
   const profile = {
     platform: recording.platform,
     screen: recording.screen ?? truth.screen,
@@ -93,6 +95,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     ...(recording.app !== undefined && { app: recording.app }),
     ...(ime !== undefined && { ime, keyboard: 'shown' as const }),
     ...(afterBackXml !== undefined && { afterBackXml }),
+    ...(windowDisplays !== undefined && { windowDisplays }),
   };
   const config = await configFor(recording, undefined, truth.config);
   const c = await connect(side, recording, profile);
