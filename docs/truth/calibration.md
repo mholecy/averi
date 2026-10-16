@@ -13,20 +13,20 @@ open note on the working tree. See the script for the verdicts.
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
 | 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
-| 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED |
-| 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED |
+| 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED; live ios: CALIBRATED |
+| 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED; live ios: CALIBRATED-ON-DEFECT |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | CALIBRATED |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | calibrate | 188740b → bd06470 | CALIBRATED |
-| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)), regressed elsewhere: 1 row (recorded) |
+| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)); live android: CALIBRATED-ON-DEFECT (intermittent), regressed elsewhere: 1 row (recorded) |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | CALIBRATED |
 | 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | calibrate | d2b7744 → 81a7d62 | CALIBRATED |
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
-| 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic) |
+| 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is calibrated live (`live`)); live ios: CALIBRATED |
 | 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node) |
-| 19.1 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
+| 19.1 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED; live ios: CALIBRATED |
 | 19.2 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | c11d179 → cd4d177 | STILL-RED-AFTER |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only), regressed elsewhere: 1 row (recorded) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
@@ -269,6 +269,8 @@ The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 looks 300m
   - ok ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 looks 30
 
+Live (phase 5, ios wda): **CALIBRATED**, 5cff2ad → 7542021, dismiss:toolbar-dismiss.ks, dismiss:toolbar-dismiss.ss, dismiss:toolbar-dismiss.note — The first fix alone, on toolbar-dismiss: refused before (the keyboard up, the focus on postcode), the title tapped and each field focused after. vs (straddling the keyboard's top) times out "to hold still" at 5cff2ad, 7542021 and c3ebc62 alike and is tapped at debc9b2 — not this note's. toolbar-dismiss-short stays refused at 7542021, as golden measured. (docs/truth/live-calibration-2026-10-16.md)
+
 A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
 
 ## 7.2: CALIBRATED
@@ -285,6 +287,8 @@ A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismi
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 
   - ok ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-short.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-short.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) o
+
+Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, 7542021 → c3ebc62, dismiss:toolbar-dismiss-short.vs, dismiss:toolbar-dismiss-short.ks, dismiss:toolbar-dismiss-short.ss, dismiss:toolbar-dismiss-short.note — The second fix, on toolbar-dismiss-short: before, refused with the keyboard up (the focus on postcode); after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal ("outside its scroll view … scroll_until it first") — ok. (docs/truth/live-calibration-2026-10-16.md)
 
 7.2, the second fix alone (d928789, c3ebc62's first parent → c3ebc62), on toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at d928789 `covered by scrollable` (as at 7542021; at 5cff2ad for the toolbar), the title tapped at c3ebc62.
 
@@ -344,7 +348,9 @@ Regressions recorded:
 
 - android-averi_lab-api33/tabbar-floating.xml F scroll_until: broke at 9c7885e, fixed at bd06470 — the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470, bisected without a device (golden --only tabbar-floating over the first-parent commits 9c7885e..bd06470): red at 9c7885e and at 188740b, bd06470's first parent, green at bd06470 (the strokes touch down at (540,1598), above the bar)
 
-Needs: The live reveal (phase 5's live golden): on the device the probe swipe toward a cut row's flush edge moves it, and the `fully` stop goes on until the row is whole — a replayed tree never moves, so whether the probe tells a cut row from a whole one is uncalibrated.
+Live (phase 5, android uiautomator): **CALIBRATED-ON-DEFECT** (intermittent), d043e65 → 9c7885e, scroll:scroll-bounded-flush.P.fully, scroll:scroll-bounded-flush.S.fully — Before: the stop calls a row cut flush at its container fully visible where it is (MISMATCH). After: it probes the flush edge and goes on — the note's defect gone in every run — but a deep cut (S, 154 px) is not always revealed before the budget ends the stop, which then still leads with "fully visible": red for another class in one run of five (LV2), so not every after-run is ok. Intermittent: 4 committed runs at d043e65, every one red ("fully visible after 0 swipes", P partly-centre-in, S a sliver); 5 at 9c7885e: four reveal both rows whole (P after one probe of 79–82 px; S after three of 57–61 px), one leaves S 71 px below its clip (probes of 38 and 45 px; "fully visible after 2 swipes; but … it may be cut there") — LV2; at debc9b2 the same in 1 of 3 runs (S 75 px below, probes of 21 and 58 px). (docs/truth/live-calibration-2026-10-16.md)
+
+Needs: Done live, phase 5 (`live`): the probe reveals the cut rows in most runs, but moves the list 21–82 px a stroke, and a deep cut (S, 154 px) was left cut in one run of five at 9c7885e and one of three at debc9b2 when the budget ended the stop, "fully visible … it may be cut there" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).
 
 edges/scroll-bounded-flush (round 3, Android only): scroll-bounded's layout, each target an app row with an identified container that is not clickable — uiautomator cuts its bounds FLUSH with the container's edge (P `[128,798][953,908]` on `upper` ending at 908; a clickable node runs on 66 px past a clip, the lab's scroll-bounded P/S: LE1). Red at d043e65 (`fully visible after 0 swipes`); at 9c7885e the stop probes the flush edge — one swipe toward it — and, the replayed tree never moving, says `a probe swipe toward it moved nothing`: the probe's answer is the device's, so R-fully accepts a probed flush stop where the truth bears it out (rows.ts#flushProbe: P's bottom edge 908 is `upper`'s, the probe 540,788 → 540,697 drags up from inside it; S's 1541 is `lower`'s, 1443 → 1369) and both rows are green. scroll-bounded's own P (cut but read whole, past its container) stays red on both sides: LE1.
 
@@ -411,7 +417,7 @@ presented/blur-menu-grouped: the menu card and the screen beneath it each an acc
 
 idb lists nothing under the keyboard, so these rows stay red at every commit (KNOWN, tests/differential/golden/forms.known.ts): before the fix their mismatch is the judge's own "touched down under the keyboard at (201,699)" — the note's defect; after it, the vacuous "not in the tree" with both swipes above the keyboard.
 
-## 17: DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic)
+## 17: DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is calibrated live (`live`))
 
 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md — defect: `reached where it is`
 
@@ -422,7 +428,7 @@ idb lists nothing under the keyboard, so these rows stay red at every commit (KN
   - ok ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 3 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
   - ok ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until — ERROR scroll_until id:"lab.scroll-top-edge.T" failed after 3 swipes — its centre stays under iOS's status bar at (201,30), in the top 62 pt of the screen, where a tap goes to the status bar, and the content is exhausted:
 
-Needs: The turn-back (phase 5's live golden): a stroke that leaves the row in the status band, or clipped, must turn back.
+Live (phase 5, ios wda, idb): **CALIBRATED**, 8a55d2b → 21f1deb, turn:scroll-top-edge-end.T, turn:scroll-top-edge-end.T.fully — edges/scroll-top-edge-end (round 4: scroll-top-edge's page with its content ending at the screen's bottom, T in the status band). Before, on both sources: `direction: "down"` strokes that move nothing (page 382→382 ×3–5) and no turn back — "failed after N swipes — its centre stays under iOS's status bar … the content is exhausted" (plain), "CLIPPED at top … that is a layout defect" (fully): the note's own two replies, R-direction MISMATCH. After: one stroke up, "fully visible after 1 swipe", then Tapped (ok). On Android both commits answer "fully visible after 0 swipes" in the status band (no Android status-band rule then — a later note's), so the note is iOS's. (docs/truth/live-calibration-2026-10-16.md)
 
 The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431).
 
@@ -467,6 +473,8 @@ The sheet's background container is a frames-only wrapper over its button S — 
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 2 lo
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 lo
   - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 
+
+Live (phase 5, ios wda): **CALIBRATED**, bd06470 → 470dafe, dismiss:toolbar-dismiss-bar.vs, dismiss:toolbar-dismiss-bar.ks, dismiss:toolbar-dismiss-bar.ss, dismiss:toolbar-dismiss-bar.note — Before: every tap refused, the keyboard up, the focus left on postcode (LOUD). After: the title tapped, the keyboard dismissed and each field focused, nothing typed (ok). (docs/truth/live-calibration-2026-10-16.md)
 
 toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. The first fix, cd4d177 (children.length === 0), is judged alone as 19.2.
 

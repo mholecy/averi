@@ -156,6 +156,7 @@ struct TabbarFloating: View {
             }
             .frame(width: screen.width, height: 2400)
         }
+        .labScroll("list", lab)
         .frame(width: screen.width, height: screen.height - header - insets.bottom)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.scrollView("list", $0) }
         .position(x: x, y: header + (screen.height - header - insets.bottom) / 2)
@@ -210,6 +211,7 @@ struct FabCell: View {
             }
             .frame(width: screen.width, height: listHeight + 400)
         }
+        .labScroll("list", lab)
         .frame(width: screen.width, height: listHeight)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.scrollView("list", $0) }
         .position(x: x, y: insets.top + listHeight / 2)

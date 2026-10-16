@@ -1,18 +1,19 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { IosAdapter } from '../../src/adapters/ios.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
-import { AdapterRegistry, defaultFactory } from '../../src/mcp/registry.js';
-import { createAveriServer } from '../../src/mcp/tools.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
+import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
-import type { LabState } from './schema.js';
+import { knownEntry, knownLive } from './live-known.js';
+import { judgeDismissal, visibilityCases, type Verdict as VisibilityVerdict } from './live-visibility.js';
+import type { Catalog, CellTruth, LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -48,32 +49,66 @@ import type { LabState } from './schema.js';
  *  - SKIP: a keyboard case whose launch shows no soft keyboard — the simulator hides it once it has seen HID typing
  *    (idb ui text); IosLab.launch writes the simulator's keyboard preferences back before every launch, and the
  *    keyboard's cases run first besides.
- * Not a vitest test: it needs the simulator. Exit code 1 on a MISMATCH.
+ * Not a vitest test: it needs the simulator.
+ *
+ * Groups (`--groups`, `forms` by default — the earlier summaries' reproduce lines): `forms` the cases above; `visibility` (phase 5) the coloured-target cells'
+ * taps and scroll_until — every case built from the cell's static truth (tests/fixtures/truth) by live-visibility.ts,
+ * the app's tap log, scroll offsets and strokes the oracle (`--cells` narrows them); `dismissal` (phase 5, iOS) a tap
+ * under the keyboard on the false-covers toolbar cells, under the cell's own `keyboardDismiss` (CellConfig): the
+ * control focused, nothing typed. A case not ok prints its whole replies, and every scroll case (and any case not ok)
+ * the app's state beneath it. A case not ok that an existing note explains is KNOWN (live-known.ts) and marked so; the
+ * exit code is 1 only on a MISMATCH not known. `--record <file>` writes every read (the launch state, the state between
+ * the calls, after them) as JSON; `--rejudge <file>` judges such a record again with this checkout's judges, no device.
+ *
+ * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
+ * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
+ * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits.
  */
 
 const { values } = parseArgs({
-  options: { udid: { type: 'string' }, serial: { type: 'string' }, 'wda-port': { type: 'string' }, sources: { type: 'string' }, cases: { type: 'string' }, shots: { type: 'string' } },
+  options: {
+    udid: { type: 'string' },
+    serial: { type: 'string' },
+    'wda-port': { type: 'string' },
+    sources: { type: 'string' },
+    cases: { type: 'string' },
+    shots: { type: 'string' },
+    groups: { type: 'string' },
+    cells: { type: 'string' },
+    side: { type: 'string' },
+    record: { type: 'string' },
+    rejudge: { type: 'string' },
+  },
 });
-if ((values.udid === undefined) === (values.serial === undefined)) {
-  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--cases b1,p4] | --serial <lab emulator> [--cases b1,p4]');
+/** What a run read, case by case (`--record`): judged again without a device by `--rejudge`. */
+interface RunRecord {
+  platform: 'ios' | 'android';
+  side: string;
+  results: { source: Source; id: string; skip?: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState | undefined; late?: LabState }[];
 }
-const platform: 'ios' | 'android' = values.serial !== undefined ? 'android' : 'ios';
-const device = (values.udid ?? values.serial)!;
+const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await readFile(values.rejudge, 'utf8')) as RunRecord);
+if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
+}
+const platform: 'ios' | 'android' = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
+const device = (values.udid ?? values.serial ?? 'rejudged')!;
 const port = Number(values['wda-port'] ?? 8120);
 /** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
 type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
-const sources: Source[] = platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
+const sources: Source[] = rejudging !== undefined ? [...new Set(rejudging.results.map((r) => r.source))] : platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
 const only = values.cases?.split(',');
+// `forms` by default: the reproduce lines of the earlier summaries (docs/truth/live-android-2026-10-16.md) stay true.
+const groups = (values.groups ?? 'forms').split(',');
+const onlyCells = values.cells?.split(',');
 /** Where a case that is not ok leaves its screenshot (`--shots <dir>`), for the evidence. */
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
-// The WDA port too: 8100/8101 are refused (lab-device.ts#DEVICE_CHECK_WDA_PORTS).
-const ios = platform === 'ios' ? new IosLab(device, { wdaPort: port }) : undefined;
-const android = platform === 'android' ? new AndroidLab(device) : undefined;
-const lab = (ios ?? android)!;
+// The WDA port too: 8100/8101 are refused (lab-device.ts#DEVICE_CHECK_WDA_PORTS). No device at all when rejudging.
+const ios = rejudging === undefined && platform === 'ios' ? new IosLab(device, { wdaPort: port }) : undefined;
+const android = rejudging === undefined && platform === 'android' ? new AndroidLab(device) : undefined;
 // The lab simulator or the lab AVD, or nothing (lab-device.ts#IosLab.guard, #AndroidLab.guard): refused before any
 // tool binds it.
-console.error(`lab: ${ios !== undefined ? await ios.guard() : (await android!.guard(), `${device}, AVD ${LAB_AVD}`)}`);
+if (rejudging === undefined) console.error(`lab: ${ios !== undefined ? await ios.guard() : (await android!.guard(), `${device}, AVD ${LAB_AVD}`)}`);
 
 // --- the cases ---
 
@@ -82,10 +117,11 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-type Verdict = { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; why: string };
+type Verdict = VisibilityVerdict;
 
 interface Case {
   id: string;
+  group: 'forms' | 'visibility' | 'dismissal';
   cell: string;
   says: string;
   /** averi.yaml `app.ios.keyboardDismiss` for this case. */
@@ -95,8 +131,11 @@ interface Case {
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
   calls: Call[];
-  /** `launched`: the model as the launch left it, before any call — what a LOUD case's field held. */
-  judge(state: LabState, replies: string[], source: Source, launched: LabState): Verdict;
+  /**
+   * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
+   * read right after call i, for a visibility case (its stop judged before the tap after it ran); else empty.
+   */
+  judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[]): Verdict;
 }
 
 const id = (cell: string, tag: string) => `id:"lab.${cell}.${tag}"`;
@@ -131,7 +170,7 @@ const B = 'form-basic';
 const K = 'form-keyboard';
 const TITLE = { tap: { text: 'Transfer details' } };
 
-const CASES: Case[] = [
+const FORMS: Omit<Case, 'group'>[] = [
   // The keyboard's cases first: once the simulator has seen HID typing (idb ui text) it shows no soft keyboard
   // ("typing with a hardware keyboard keeps the software keyboard from showing", src/adapters/ios.ts) until
   // IosLab.launch writes its keyboard preferences back — first, so a failure of that write cannot skip them.
@@ -279,20 +318,83 @@ const CASES: Case[] = [
     },
   },
 ];
+const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
+
+// --- phase 5: the visibility cells, from their static truth ---
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+/** The truth run of this platform (tests/fixtures/truth/<run>, its manifest's `platform`). */
+async function truthsOf(p: Platform): Promise<CellTruth[]> {
+  const base = join(ROOT, 'tests/fixtures/truth');
+  for (const run of await readdir(base)) {
+    const manifest = JSON.parse(await readFile(join(base, run, 'manifest.json'), 'utf8')) as { platform: Platform; captures: { truth?: string }[] };
+    if (manifest.platform !== p) continue;
+    const files = [...new Set(manifest.captures.map((c) => c.truth).filter((t): t is string => t !== undefined))];
+    return Promise.all(files.map(async (f) => JSON.parse(await readFile(join(base, run, f), 'utf8')) as CellTruth));
+  }
+  return [];
+}
+
+if (groups.includes('visibility')) {
+  for (const truth of await truthsOf(platform)) {
+    if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;
+    for (const v of visibilityCases(truth, platform)) CASES.push({ ...v, group: 'visibility', judge: (s, replies, source, launched, after) => v.judge(s, replies, launched, source, after) });
+  }
+}
+
+/**
+ * The dismissal's dynamics (#7, #19; iOS): a tap on a field under the keyboard, the cell's own `keyboardDismiss` (the
+ * principal title, under SwiftUI's toolbar host or an itemless bar) — the app's focus must move to the field, nothing
+ * typed into any field, no submit. WDA taps the dismissal; under idb the list is inert, and a refusal with the focus
+ * left where it was is its documented answer.
+ */
+if (groups.includes('dismissal') && platform === 'ios') {
+  const catalog = JSON.parse(await readFile(join(ROOT, 'fixtures/apps/cells.json'), 'utf8')) as Catalog;
+  for (const cell of catalog.cells) {
+    const dismiss = cell.config?.ios?.keyboardDismiss as unknown[] | undefined;
+    if (cell.form === undefined || dismiss === undefined || (onlyCells !== undefined && !onlyCells.includes(cell.id))) continue;
+    if (cell.platforms !== undefined && !cell.platforms.includes('ios')) continue;
+    for (const tag of ['vs', 'ks', 'ss', 'note']) {
+      CASES.push({
+        id: `dismiss:${cell.id}.${tag}`,
+        group: 'dismissal',
+        cell: cell.id,
+        keyboard: true,
+        platforms: ['ios'],
+        dismiss,
+        says: `a tap on ${tag} under the keyboard, keyboardDismiss on the title: the keyboard dismissed, then ${tag} focused (or refused for where it lies once the keyboard is gone), nothing typed`,
+        calls: [{ tool: 'tap', args: { selector: id(cell.id, tag) } }],
+        judge: (s, [reply], source, launched) => judgeDismissal(tag, reply, source, s, launched),
+      });
+    }
+  }
+}
 
 // --- the server: a real registry, the lab simulator only, WDA on a port of its own ---
 
+/**
+ * The averi under test: this checkout's src, or `--side`'s (a checkout of another commit) — its tools, registry, iOS
+ * adapter and tree source, loaded by scripts/differential/side.ts#loadSide (the export guard, the old registry's shim).
+ */
+const averi = rejudging === undefined ? await loadSide(values.side ?? ROOT) : undefined;
+if (averi !== undefined) console.error(`averi: ${averi.root}`);
+function iosAdapter(udid: string, source: IosTreeSourceKind): DeviceAdapter {
+  const create = averi!.createIosTreeSource;
+  if (create === undefined) throw new Error(`side ${averi!.root}: no src/adapters/ios-tree-source.ts#createIosTreeSource — the live golden cannot build its tree source`);
+  const side = averi!;
+  return new side.IosAdapter({ udid, treeSource: create(source, udid, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) as ConstructorParameters<typeof side.IosAdapter>[0]['treeSource'] });
+}
+
 async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
-  const registry = new AdapterRegistry({
-    factory: (p, deviceId, opts) =>
-      p === 'android' ? defaultFactory(p, deviceId, opts) : new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? 'idb', deviceId, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
+  const registry = averi!.registry({
+    factory: (p, deviceId, opts) => (p === 'android' ? averi!.defaultFactory(p, deviceId, opts) : iosAdapter(deviceId, opts?.treeSource ?? 'idb')),
     // The lab device alone. Android: listed without asking adb (its listing runs getprop on every attached device).
     discovery: async (p) =>
       p !== platform ? []
       : p === 'ios' ? (await listIosDevices()).filter((d) => d.id === device)
       : [{ id: device, platform: 'android', name: LAB_AVD, osVersion: 'lab', state: 'booted' }],
   });
-  const server = createAveriServer({ registry, version: 'live-golden' });
+  const server = averi!.createAveriServer({ registry, version: 'live-golden' });
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: 'live-golden', version: '0' });
@@ -327,53 +429,109 @@ async function callTool(client: Client, call: Call, configPath: string): Promise
   }
 }
 
-if (platform === 'ios') console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
-const results: { source: Source; c: Case; verdict: Verdict; replies: string[] }[] = [];
-/** The screen now, for the evidence of a case that is not ok. */
-const shoot = async (file: string) => writeFile(file, await lab.screenshot());
-const { client, close } = await connect();
-try {
-  // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
-  for (const c of CASES.filter((x) => (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)))) {
-    for (const source of sources) {
-      const launched = await lab.launch(c.cell);
-      if (c.keyboard && launched.keyboard?.visible !== true) {
-        const verdict: Verdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
-        results.push({ source, c, verdict, replies: [] });
-        console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
-        continue;
-      }
-      const config = await configFor(source, c.dismiss);
-      const replies: string[] = [];
-      for (const call of c.calls) replies.push(await callTool(client, call, config));
-      await pause(800);
-      const state = (await lab.state())!;
-      let verdict = c.judge(state, replies, source, launched);
-      if (verdict.outcome !== 'ok') {
-        // A miss is read again 3 s later: a model that catches up was the app's lag, not a lost value.
-        await pause(3_000);
-        const late = c.judge((await lab.state())!, replies, source, launched);
-        if (late.outcome !== verdict.outcome) verdict = { ...late, why: `${late.why} (only 3 s later; first read: ${verdict.why})` };
-        if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
-      }
-      results.push({ source, c, verdict, replies });
-      console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
-    }
-  }
-} finally {
-  await close();
-  await lab.close();
+type Result = { source: Source; c: Case; verdict: Verdict; replies: string[] };
+const results: Result[] = [];
+const record: RunRecord = { platform, side: values.side ?? 'this checkout', results: [] };
+const selected = CASES.filter((x) => groups.includes(x.group) && (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)));
+
+/**
+ * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that
+ * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
+ * when scroll_until returned, and which a later read would let a fling finish behind the reply's back.
+ */
+function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): Verdict {
+  const verdict = c.judge(state, replies, source, launched, after);
+  if (verdict.outcome === 'ok' || late === undefined) return verdict;
+  const again = c.judge(late, replies, source, launched, after);
+  return again.outcome === verdict.outcome ? verdict : { ...again, why: `${again.why} (only 3 s later; first read: ${verdict.why})` };
 }
 
+if (rejudging !== undefined) {
+  // No device: each recorded case judged again by this checkout's judges.
+  for (const r of rejudging.results) {
+    const c = selected.find((x) => x.id === r.id);
+    if (c === undefined) continue;
+    const verdict: Verdict = r.skip !== undefined || r.state === undefined ? { outcome: 'SKIP', why: r.skip ?? 'no state recorded' } : judged(c, r.source, r.replies, r.launched, r.after, r.state, r.late);
+    results.push({ source: r.source, c, verdict, replies: r.replies });
+  }
+} else {
+  const lab = (ios ?? android)!;
+  if (platform === 'ios') console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
+  /** The screen now, for the evidence of a case that is not ok. */
+  const shoot = async (file: string) => writeFile(file, await lab.screenshot());
+  const { client, close } = await connect();
+  try {
+    // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
+    for (const c of selected) {
+      for (const source of sources) {
+        const launched = await lab.launch(c.cell);
+        if (c.keyboard && launched.keyboard?.visible !== true) {
+          const verdict: Verdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
+          results.push({ source, c, verdict, replies: [] });
+          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined });
+          console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
+          continue;
+        }
+        const config = await configFor(source, c.dismiss);
+        const replies: string[] = [];
+        const after: (LabState | undefined)[] = [];
+        for (const [i, call] of c.calls.entries()) {
+          replies.push(await callTool(client, call, config));
+          // A visibility case reads the app between its calls: its stop is judged as scroll_until left it.
+          if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
+        }
+        await pause(800);
+        const state = (await lab.state())!;
+        let late: LabState | undefined;
+        if (c.group !== 'visibility' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
+          await pause(3_000);
+          late = await lab.state();
+        }
+        const verdict = judged(c, source, replies, launched, after, state, late);
+        if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
+        results.push({ source, c, verdict, replies });
+        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }) });
+        console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
+      }
+    }
+  } finally {
+    await close();
+    await lab.close();
+    if (values.record !== undefined) await writeFile(values.record, JSON.stringify(record) + '\n');
+  }
+}
+
+// --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH ---
+
+/** The note a not-ok case is known by — only when it failed by the rule its KNOWN entry pins (live-known.ts). */
+const known = (r: Result) => knownLive(platform, r.source, r.c.id, r.verdict.cls);
+/** A KNOWN entry whose case failed by another rule: unknown, and said so. */
+const otherRule = (r: Result) => (r.verdict.outcome !== 'ok' && known(r) === undefined ? knownEntry(platform, r.source, r.c.id) : undefined);
 const count = (o: Verdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
-const lines = [`# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches, ${count('SKIP')} skipped`, ''];
+const unknown = results.filter((r) => r.verdict.outcome === 'MISMATCH' && known(r) === undefined);
+const cleared = results.filter((r) => r.verdict.outcome === 'ok' && knownEntry(platform, r.source, r.c.id) !== undefined);
+const lines = [
+  `<!-- averi: ${rejudging?.side ?? values.side ?? 'this checkout'}${rejudging !== undefined ? ` (rejudged from ${values.rejudge})` : ''} -->`,
+  `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,
+  '',
+];
 for (const source of sources) {
   lines.push(`## ${source}`);
   for (const r of results.filter((x) => x.source === source)) {
-    lines.push(`- ${r.verdict.outcome === 'ok' ? 'ok' : r.verdict.outcome} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}`);
-    if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ').slice(0, 400)}`);
+    const note = known(r);
+    const entry = knownEntry(platform, r.source, r.c.id);
+    const other = otherRule(r);
+    const mark =
+      r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known, ok this run: ${entry.note}]`)
+      : note !== undefined ? ` [known: ${note}]`
+      : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'}, where KNOWN pins ${other.cls} (${other.note})]`
+      : '';
+    lines.push(`- ${r.verdict.outcome}${r.verdict.cls === undefined ? '' : ` (${r.verdict.cls})`} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}${mark}`);
+    if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ')}`);
+    if (r.verdict.app !== undefined) lines.push(`    app: ${r.verdict.app}`);
   }
   lines.push('');
 }
+if (cleared.length > 0) lines.push(`Known but ok this run: ${cleared.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
 console.log(lines.join('\n'));
-if (count('MISMATCH') > 0) process.exitCode = 1;
+if (unknown.length > 0) process.exitCode = 1;

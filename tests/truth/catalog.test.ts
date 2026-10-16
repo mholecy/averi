@@ -41,6 +41,7 @@ describe('the cell catalog', () => {
       'edges/scroll-sticky-cut',
       'edges/scroll-sticky-view',
       'edges/scroll-top-edge',
+      'edges/scroll-top-edge-end',
       'bars/bands',
       'bars/bands-three-button',
       'bars/pinned-bar',

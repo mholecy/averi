@@ -62,3 +62,22 @@ to give its containers, and the main scroller is not `lower` — so the stroke f
 ## Rows (golden, KNOWN in tests/differential/golden/edges.known.ts)
 
 `ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until`, `F scroll_until`.
+
+## Measured live (phase 5, 2026-10-16)
+
+The inference above, measured: `scripts/truth/live.ts --udid <averi-lab iPhone 17> --groups visibility` (src
+`debc9b2`), the lab app logging every touch's start and each scroll view's strokes (LabState.strokes — round 4).
+Summary: docs/truth/live-ios-2026-10-16-visibility.md.
+
+```
+wda  scroll_until O (down)   touches (201,699) (201,699)   strokes none                   O stays outside lower
+wda  scroll_until F (down)   touches (201,699) (201,699)   strokes none                   lower offset 0
+wda  scroll_until S (down)   touches (201,699) (201,699) (201,175)   strokes upper 0→0    S stays a sliver
+wda  scroll_until P fully    touches (201,699)×2 (201,175) (201,699)×3   strokes upper 0→0  P stays cut (63 %)
+```
+
+Every stroke for a row of `lower` touches down at y 699, on the white background below it — nothing moves; the turned
+stroke (y 175) lands in `upper`, which bounces at its top. The replies blame the content ("content exhausted … nor does
+swiping up", "a layout defect"). The same root makes the turned stroke for `tabbar-floating`'s R touch down above its
+list, in the header (docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md,
+LV3). Under idb (no scroll view listed) the same touch-downs, F's and the turn-back case's included.

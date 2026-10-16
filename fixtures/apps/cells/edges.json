@@ -1,6 +1,6 @@
 {
   "family": "edges",
-  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it, resting in the status band) — phase 3 B2 (calibration.json: #4, #9, #10, #12, #13, #17, #29). Each target lies in a scroll view (`scrollView`, the clip LabState.scrollViews reports) at a fixed place in its content, scrolled to a fixed offset on appear, so its measured geometry (truth.ts#geometryOf) is what its comment in the app files says. `slot` is only the target's order. App files: AveriLab/Edges.swift, Edges.kt (the layout tables: the same numbers, points on iOS, dp on Android). Android-only variants (round 3, `platforms`): scroll-bounded-flush (scroll-bounded's W, P, S as rows whose identified container is not clickable, so uiautomator cuts its bounds flush with the scroll container's edge: #12, #13) scroll-sticky-cut (scroll-sticky with such a row under a header that is one accessibility element: #9) and scroll-sticky-view (round 4: scroll-sticky-cut with the row's content an Android View, AndroidView, whose bounds Compose does not cut at the header: #9's shape).",
+  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it, resting in the status band) — phase 3 B2 (calibration.json: #4, #9, #10, #12, #13, #17, #29). Each target lies in a scroll view (`scrollView`, the clip LabState.scrollViews reports) at a fixed place in its content, scrolled to a fixed offset on appear, so its measured geometry (truth.ts#geometryOf) is what its comment in the app files says. `slot` is only the target's order. App files: AveriLab/Edges.swift, Edges.kt (the layout tables: the same numbers, points on iOS, dp on Android). Android-only variants (round 3, `platforms`): scroll-bounded-flush (scroll-bounded's W, P, S as rows whose identified container is not clickable, so uiautomator cuts its bounds flush with the scroll container's edge: #12, #13) scroll-sticky-cut (scroll-sticky with such a row under a header that is one accessibility element: #9) and scroll-sticky-view (round 4: scroll-sticky-cut with the row's content an Android View, AndroidView, whose bounds Compose does not cut at the header: #9's shape). Round 4 (phase 5, both platforms): scroll-top-edge-end, scroll-top-edge's page with its content ending at the screen's bottom (scrolled to its end): T rests in the status band with nothing to scroll toward the content's end — #17's turn-back, judged live (scripts/truth/live.ts, live-visibility.ts#TURN_BACK).",
   "cells": [
     {
       "id": "scroll-bounded",
@@ -48,6 +48,14 @@
     },
     {
       "id": "scroll-top-edge",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#6D4C41", "slot": 0, "declared": "open", "scrollView": "page" },
+        { "tag": "T", "color": "#3949AB", "slot": 1, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "scroll-top-edge-end",
       "layer": "none",
       "targets": [
         { "tag": "A", "color": "#6D4C41", "slot": 0, "declared": "open", "scrollView": "page" },

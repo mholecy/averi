@@ -169,6 +169,19 @@ struct LabState: Codable {
     var safeArea: Insets?
     var scrollViews: [String: Frame]?
     var chrome: [String: Frame]?
+    // Phase 5's live oracle (scripts/truth/live.ts): each scroll view's content offset now, and each stroke it took —
+    // nil (absent from the file) on a cell with no scroll view that reports them.
+    var offsets: [String: Double]?
+    var strokes: [Stroke]?
+}
+
+/// One stroke a scroll view took (scripts/truth/schema.ts#Stroke): its content offset (points, 0 its content's top)
+/// when it left rest and when it came to rest again — a drag and the fling after it are one stroke.
+struct Stroke: Codable {
+    let view: String
+    let from: Double
+    let to: Double
+    let at: Double
 }
 
 /// The window's safe-area insets, in points — the system bands (scripts/truth/schema.ts#Insets).
@@ -226,6 +239,11 @@ final class Lab: ObservableObject {
         state.safeArea = nil
         state.scrollViews = nil
         state.chrome = nil
+        state.offsets = nil
+        state.strokes = nil
+        strokeFrom = [:]
+        rest = [:]
+        moving = [:]
         write()
     }
 
@@ -254,6 +272,38 @@ final class Lab: ObservableObject {
         let f = Frame(rect)
         guard state.chrome?[name] != f else { return }
         state.chrome = (state.chrome ?? [:]).merging([name: f]) { $1 }
+        write()
+    }
+
+    // --- phase 5's live oracle: where each scroll view is, and each stroke it took ---
+
+    /// The content offset each moving scroll view had when it left rest.
+    private var strokeFrom: [String: Double] = [:]
+    /// Where each scroll view last came to rest (or was put, not moving): a stroke's `from` — the offset may already
+    /// have moved when the phase leaves idle.
+    private var rest: [String: Double] = [:]
+
+    /// A scroll view's content offset now (points down its content, 0 its top), by its id.
+    func offset(_ id: String, _ y: Double) {
+        if strokeFrom[id] == nil && moving[id] != true { rest[id] = y }
+        guard state.offsets?[id] != y else { return }
+        state.offsets = (state.offsets ?? [:]).merging([id: y]) { $1 }
+        write()
+    }
+
+    private var moving: [String: Bool] = [:]
+
+    /// A scroll view left rest (`moving`) or came to rest at `y`: on rest, the stroke from where it last rested to here.
+    func scrolling(_ id: String, _ isMoving: Bool, _ y: Double) {
+        moving[id] = isMoving
+        if isMoving {
+            if strokeFrom[id] == nil { strokeFrom[id] = rest[id] ?? y }
+            return
+        }
+        rest[id] = y
+        offset(id, y)
+        guard let from = strokeFrom.removeValue(forKey: id) else { return }
+        state.strokes = (state.strokes ?? []) + [Stroke(view: id, from: from, to: y, at: Date().timeIntervalSince1970)]
         write()
     }
 
@@ -339,6 +389,18 @@ extension UIApplication {
             }
         }
         lab_sendEvent(event)
+    }
+}
+
+extension View {
+    /// Reports this SwiftUI scroll view's content offset and its strokes to the lab under `id` (Lab.offset,
+    /// Lab.scrolling): the live golden's oracle of which scroll view a stroke moved, and which way.
+    func labScroll(_ id: String, _ lab: Lab) -> some View {
+        self
+            .onScrollGeometryChange(for: Double.self) { Double($0.contentOffset.y + $0.contentInsets.top) } action: { _, y in lab.offset(id, y) }
+            .onScrollPhaseChange { _, phase, context in
+                lab.scrolling(id, phase != .idle, Double(context.geometry.contentOffset.y + context.geometry.contentInsets.top))
+            }
     }
 }
 

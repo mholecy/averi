@@ -1,8 +1,9 @@
 import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.js';
 
-// The edges family's ratchet (fixtures/apps/cells/edges.json): scroll-bounded, scroll-sticky, scroll-top-edge, and
-// round 3's Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round
-// 4's scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it) — its
+// The edges family's ratchet (fixtures/apps/cells/edges.json): scroll-bounded, scroll-sticky, scroll-top-edge (and
+// round 4's scroll-top-edge-end, its content ending at the screen's bottom: #17's turn-back, live), and round 3's
+// Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
+// scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it) — its
 // rows by geometry (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
 // scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE4); this KNOWN owns the
 // ratchet, as presented.known.ts does for L1.
@@ -58,11 +59,14 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-sticky-cut.xml`]: 4,
     [`${ANDROID}/scroll-sticky-view.xml`]: 4,
     [`${ANDROID}/scroll-top-edge.xml`]: 6,
+    [`${ANDROID}/scroll-top-edge-end.xml`]: 6,
     [`${IOS}/scroll-bounded.idb.json`]: 14,
     [`${IOS}/scroll-bounded.wda.json`]: 14,
     [`${IOS}/scroll-sticky.idb.json`]: 4,
     [`${IOS}/scroll-sticky.wda.json`]: 4,
     [`${IOS}/scroll-top-edge.idb.json`]: 6,
     [`${IOS}/scroll-top-edge.wda.json`]: 6,
+    [`${IOS}/scroll-top-edge-end.idb.json`]: 6,
+    [`${IOS}/scroll-top-edge-end.wda.json`]: 6,
   },
 };

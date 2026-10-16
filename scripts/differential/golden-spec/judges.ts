@@ -1,4 +1,5 @@
 import type { Call, Outcome } from '../differential.js';
+import { VISIBLE_STOP } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
 
@@ -124,7 +125,7 @@ export type ReplyKind = 'not found' | 'Tapped' | 'visible' | 'PASS' | 'FAIL' | '
 export function replyKind(o: Outcome): ReplyKind {
   if (notInTree(o)) return 'not found';
   if (o.reply.startsWith('Tapped')) return 'Tapped';
-  if (/^Element .* visible after /.test(o.reply)) return 'visible';
+  if (VISIBLE_STOP.test(o.reply)) return 'visible';
   if (passed(o)) return 'PASS';
   if (/^\d+\/\d+ asserts FAILED/.test(o.reply)) return 'FAIL';
   if (o.reply.startsWith('ERROR')) return 'refused';

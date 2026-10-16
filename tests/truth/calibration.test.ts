@@ -22,6 +22,7 @@ import {
   WORKING_TREE,
   type Calibration,
   type CalibrationEntry,
+  type LiveCalibration,
   type SideRun,
 } from '../../scripts/truth/calibrate.js';
 
@@ -282,6 +283,15 @@ describe('calibrate.ts — several fixes, one pair each (pairsOf)', () => {
     expect('pairs' in own).toBe(false);
     expect(second).toEqual({ n: '7.2', note: 'x.md', status: 'calibrate', fix: ['bbbbbbb', 'ddddddd'], regressions: note.regressions, before: 'ccccccc', after: 'ddddddd', checks: [K3], defect: 'scrollable', expect: 'STILL-RED-AFTER' });
     expect(plan(pairsOf(note))).toEqual(['aaaaaaa', 'bbbbbbb', 'ccccccc', 'ddddddd']);
+  });
+
+  it("a live calibration goes with the further pair whose after it shares, every other with the note's own pair", () => {
+    const live = (before: string, after: string): LiveCalibration => ({ platform: 'ios', sources: ['wda'], before, after, cases: ['dismiss:c'], verdict: 'CALIBRATED', remark: 'r', summary: 's' });
+    const [own, second] = pairsOf({ ...note, live: [live('aaaaaaa', 'bbbbbbb'), live('bbbbbbb', 'ddddddd'), live('aaaaaaa', 'eeeeeee')] });
+    expect(own.live).toEqual([live('aaaaaaa', 'bbbbbbb'), live('aaaaaaa', 'eeeeeee')]);
+    expect(second.live).toEqual([live('bbbbbbb', 'ddddddd')]);
+    expect('live' in pairsOf(note)[1]).toBe(false);
+    expect(pairsOf(entry({ live: [live('aaaaaaa', 'bbbbbbb')] }))[0].live).toEqual([live('aaaaaaa', 'bbbbbbb')]);
   });
 
   it("each pair judged alone: the second fix's own symptom required red at its before, a regression counted at the pair that broke it", () => {

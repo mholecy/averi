@@ -253,6 +253,33 @@
           ],
           "remark": "7.2, the second fix alone (d928789, c3ebc62's first parent → c3ebc62), on toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at d928789 `covered by scrollable` (as at 7542021; at 5cff2ad for the toolbar), the title tapped at c3ebc62."
         }
+      ],
+      "live": [
+        {
+          "platform": "ios",
+          "sources": ["wda"],
+          "before": "5cff2ad",
+          "after": "7542021",
+          "cases": ["dismiss:toolbar-dismiss.ks", "dismiss:toolbar-dismiss.ss", "dismiss:toolbar-dismiss.note"],
+          "verdict": "CALIBRATED",
+          "remark": "The first fix alone, on toolbar-dismiss: refused before (the keyboard up, the focus on postcode), the title tapped and each field focused after. vs (straddling the keyboard's top) times out \"to hold still\" at 5cff2ad, 7542021 and c3ebc62 alike and is tapped at debc9b2 — not this note's. toolbar-dismiss-short stays refused at 7542021, as golden measured.",
+          "summary": "docs/truth/live-calibration-2026-10-16.md"
+        },
+        {
+          "platform": "ios",
+          "sources": ["wda"],
+          "before": "7542021",
+          "after": "c3ebc62",
+          "cases": [
+            "dismiss:toolbar-dismiss-short.vs",
+            "dismiss:toolbar-dismiss-short.ks",
+            "dismiss:toolbar-dismiss-short.ss",
+            "dismiss:toolbar-dismiss-short.note"
+          ],
+          "verdict": "CALIBRATED-ON-DEFECT",
+          "remark": "The second fix, on toolbar-dismiss-short: before, refused with the keyboard up (the focus on postcode); after, the title is tapped and the keyboard goes (no field focused) — the note's defect cured — but each reply says `Tapped` while the app focused nothing: the fields lie below the 451-pt scroll view once the keyboard is gone, and the tap reached none of them (MISMATCH at c3ebc62). At debc9b2 the same dismissal, then an honest refusal (\"outside its scroll view … scroll_until it first\") — ok.",
+          "summary": "docs/truth/live-calibration-2026-10-16.md"
+        }
       ]
     },
     {
@@ -314,7 +341,7 @@
       "after": "9c7885e",
       "verified": "golden",
       "partial": "the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)",
-      "needs": "The live reveal (phase 5's live golden): on the device the probe swipe toward a cut row's flush edge moves it, and the `fully` stop goes on until the row is whole — a replayed tree never moves, so whether the probe tells a cut row from a whole one is uncalibrated.",
+      "needs": "Done live, phase 5 (`live`): the probe reveals the cut rows in most runs, but moves the list 21–82 px a stroke, and a deep cut (S, 154 px) was left cut in one run of five at 9c7885e and one of three at debc9b2 when the budget ended the stop, \"fully visible … it may be cut there\" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).",
       "defect": "fully visible",
       "checks": [
         "android-averi_lab-api33/scroll-bounded-flush.xml P fully",
@@ -327,6 +354,19 @@
           "broke": "9c7885e",
           "fixed": "bd06470",
           "why": "the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470, bisected without a device (golden --only tabbar-floating over the first-parent commits 9c7885e..bd06470): red at 9c7885e and at 188740b, bd06470's first parent, green at bd06470 (the strokes touch down at (540,1598), above the bar)"
+        }
+      ],
+      "live": [
+        {
+          "platform": "android",
+          "sources": ["uiautomator"],
+          "before": "d043e65",
+          "after": "9c7885e",
+          "cases": ["scroll:scroll-bounded-flush.P.fully", "scroll:scroll-bounded-flush.S.fully"],
+          "verdict": "CALIBRATED-ON-DEFECT",
+          "intermittent": "4 committed runs at d043e65, every one red (\"fully visible after 0 swipes\", P partly-centre-in, S a sliver); 5 at 9c7885e: four reveal both rows whole (P after one probe of 79–82 px; S after three of 57–61 px), one leaves S 71 px below its clip (probes of 38 and 45 px; \"fully visible after 2 swipes; but … it may be cut there\") — LV2; at debc9b2 the same in 1 of 3 runs (S 75 px below, probes of 21 and 58 px).",
+          "remark": "Before: the stop calls a row cut flush at its container fully visible where it is (MISMATCH). After: it probes the flush edge and goes on — the note's defect gone in every run — but a deep cut (S, 154 px) is not always revealed before the budget ends the stop, which then still leads with \"fully visible\": red for another class in one run of five (LV2), so not every after-run is ok.",
+          "summary": "docs/truth/live-calibration-2026-10-16.md"
         }
       ]
     },
@@ -410,15 +450,26 @@
       "before": "8a55d2b",
       "after": "21f1deb",
       "verified": "golden",
-      "partial": "the static half only (a row resting in the status band); the turn-back is a dynamic",
+      "partial": "the static half only (a row resting in the status band); the turn-back is calibrated live (`live`)",
       "defect": "reached where it is",
       "checks": [
         "ios-iphone17-ios27/scroll-top-edge.wda.json T scroll_until",
         "ios-iphone17-ios27/scroll-top-edge.idb.json T scroll_until"
       ],
       "expect": "DOES-NOT-FAIL",
-      "needs": "The turn-back (phase 5's live golden): a stroke that leaves the row in the status band, or clipped, must turn back.",
-      "remark": "The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431)."
+      "remark": "The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431).",
+      "live": [
+        {
+          "platform": "ios",
+          "sources": ["wda", "idb"],
+          "before": "8a55d2b",
+          "after": "21f1deb",
+          "cases": ["turn:scroll-top-edge-end.T", "turn:scroll-top-edge-end.T.fully"],
+          "verdict": "CALIBRATED",
+          "remark": "edges/scroll-top-edge-end (round 4: scroll-top-edge's page with its content ending at the screen's bottom, T in the status band). Before, on both sources: `direction: \"down\"` strokes that move nothing (page 382→382 ×3–5) and no turn back — \"failed after N swipes — its centre stays under iOS's status bar … the content is exhausted\" (plain), \"CLIPPED at top … that is a layout defect\" (fully): the note's own two replies, R-direction MISMATCH. After: one stroke up, \"fully visible after 1 swipe\", then Tapped (ok). On Android both commits answer \"fully visible after 0 swipes\" in the status band (no Android status-band rule then — a later note's), so the note is iOS's.",
+          "summary": "docs/truth/live-calibration-2026-10-16.md"
+        }
+      ]
     },
     {
       "n": "18",
@@ -481,6 +532,23 @@
           ],
           "expect": "STILL-RED-AFTER",
           "remark": "19.2: the first fix, cd4d177 (fix/r3-p2, `children.length === 0`), judged alone (c11d179 → cd4d177) on the same rows: the note says it did not hold on a toolbar with an empty child, which toolbar-dismiss-bar's bar has — red before and after it."
+        }
+      ],
+      "live": [
+        {
+          "platform": "ios",
+          "sources": ["wda"],
+          "before": "bd06470",
+          "after": "470dafe",
+          "cases": [
+            "dismiss:toolbar-dismiss-bar.vs",
+            "dismiss:toolbar-dismiss-bar.ks",
+            "dismiss:toolbar-dismiss-bar.ss",
+            "dismiss:toolbar-dismiss-bar.note"
+          ],
+          "verdict": "CALIBRATED",
+          "remark": "Before: every tap refused, the keyboard up, the focus left on postcode (LOUD). After: the title tapped, the keyboard dismissed and each field focused, nothing typed (ok).",
+          "summary": "docs/truth/live-calibration-2026-10-16.md"
         }
       ]
     },
@@ -1177,6 +1245,18 @@
     {
       "note": "2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md",
       "why": "text: OCR on real pixels, phase 4 (35321b4→92f2a46 per the analysis)"
+    },
+    {
+      "note": "2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md",
+      "why": "lab finding LV1: scroll dynamics, live only (live.ts --serial, case scroll:tabbar-floating.F)"
+    },
+    {
+      "note": "2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md",
+      "why": "lab finding LV2: the flush probe's reach, live only (live.ts --serial, case scroll:scroll-bounded-flush.S.fully); #12's `live` cites it"
+    },
+    {
+      "note": "2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md",
+      "why": "lab finding LV3: the turned stroke's touch-down, live only (live.ts --udid, case scroll:tabbar-floating.R)"
     }
   ]
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
@@ -80,6 +81,13 @@ class Lab(context: Context, private val screen: Rect) {
     private var safeArea: Rect? = null
     private val scrollViews = linkedMapOf<String, Rect>()
     private val chrome = linkedMapOf<String, Rect>()
+    // Phase 5's live oracle (scripts/truth/live.ts; schema.ts#LabState's offsets, strokes): absent from the file on a
+    // cell with no scroll container that reports them.
+    private val offsets = linkedMapOf<String, Int>()
+    private val strokes = JSONArray()
+    private val strokeFrom = mutableMapOf<String, Int>()
+    /** Where each container last came to rest: a stroke's `from` (its offset may move in the frame it starts). */
+    private val rest = mutableMapOf<String, Int>()
     // A form cell's oracle (Forms.kt; scripts/truth/schema.ts#LabState's fields, focus, keyboard, submits): null — absent
     // from the file — on every other cell.
     private var fields: LinkedHashMap<String, JSONObject>? = null
@@ -100,6 +108,10 @@ class Lab(context: Context, private val screen: Rect) {
         safeArea = null
         scrollViews.clear()
         chrome.clear()
+        offsets.clear()
+        while (strokes.length() > 0) strokes.remove(0)
+        strokeFrom.clear()
+        rest.clear()
         fields = if (found?.form != null) linkedMapOf() else null
         focus = null
         keyboard = null
@@ -134,6 +146,27 @@ class Lab(context: Context, private val screen: Rect) {
     fun chrome(name: String, r: Rect) {
         if (chrome[name] == r) return
         chrome[name] = Rect(r)
+        write()
+    }
+
+    // --- phase 5's live oracle: where each scroll container is, and each stroke it took ---
+
+    /**
+     * A scroll container's state, read in one snapshot: its content offset (pixels down its content, 0 its top) and
+     * whether it is scrolling. A stroke runs from where it last rested to where it comes to rest — a drag and the fling
+     * after it are one stroke.
+     */
+    fun scroll(id: String, moving: Boolean, px: Int) {
+        if (moving) {
+            strokeFrom.putIfAbsent(id, rest[id] ?: px)
+        } else {
+            rest[id] = px
+            strokeFrom.remove(id)?.let { from ->
+                strokes.put(JSONObject().put("view", id).put("from", from).put("to", px).put("at", System.currentTimeMillis() / 1000.0))
+            }
+        }
+        if (offsets[id] == px && moving) return
+        offsets[id] = px
         write()
     }
 
@@ -204,6 +237,8 @@ class Lab(context: Context, private val screen: Rect) {
         safeArea?.let { json.put("safeArea", JSONObject().put("top", it.top).put("left", it.left).put("bottom", it.bottom).put("right", it.right)) }
         if (scrollViews.isNotEmpty()) json.put("scrollViews", JSONObject().apply { scrollViews.forEach { (k, v) -> put(k, rect(v)) } })
         if (chrome.isNotEmpty()) json.put("chrome", JSONObject().apply { chrome.forEach { (k, v) -> put(k, rect(v)) } })
+        if (offsets.isNotEmpty()) json.put("offsets", JSONObject().apply { offsets.forEach { (k, v) -> put(k, v) } })
+        if (strokes.length() > 0) json.put("strokes", JSONArray(strokes.toString()))
         fields?.let { all ->
             json.put("fields", JSONObject().apply { all.forEach { (k, v) -> put(k, v) } })
             json.put("focus", focus ?: JSONObject.NULL)
@@ -243,4 +278,14 @@ fun systemBarsInsets(lab: Lab): Rect {
     val r = Rect(i.getLeft(d, LayoutDirection.Ltr), i.getTop(d), i.getRight(d, LayoutDirection.Ltr), i.getBottom(d))
     LaunchedEffect(r) { lab.safeArea(r) }
     return r
+}
+
+/**
+ * Reports a scroll container's content offset and its strokes to the lab under `id` (Lab.scroll): the
+ * live golden's oracle of which container a stroke moved, and which way. `offset` and `moving` are read as snapshot
+ * state (ScrollState.value / isScrollInProgress, a LazyListState's).
+ */
+@Composable
+fun ReportScroll(lab: Lab, id: String, moving: () -> Boolean, offset: () -> Int) {
+    LaunchedEffect(lab, id) { snapshotFlow { moving() to offset() }.collect { (m, o) -> lab.scroll(id, m, o) } }
 }

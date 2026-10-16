@@ -122,6 +122,8 @@ export interface CalibrationEntry {
    * `before`/`after`/`checks`/`defect` are its first pair; a note without `pairs` has that one (pairsOf).
    */
   pairs?: CalibrationPair[];
+  /** The note's live calibration (phase 5): its live cases at a before and an after commit, on the lab device. */
+  live?: LiveCalibration[];
 }
 
 /** One more before/after pair of a note (CalibrationEntry.pairs): the fields of the note's own pair, for one fix. */
@@ -135,6 +137,33 @@ export interface CalibrationPair {
   expect?: Verdict;
   partial?: string;
   remark?: string;
+}
+
+/**
+ * A live calibration (phase 5; scripts/truth/live.ts `--side`): the note's live cases run against the REAL lab app at
+ * the note's before and after commits, the app's tap log, offsets and strokes the oracle — what a replayed tree cannot
+ * show. Recorded by hand from the runs (a device is no vitest test): `verdict` as the golden verdicts read — CALIBRATED
+ * every case not ok before with the note's defect and ok after, DOES-NOT-FAIL a case ok before — and `summary` the
+ * committed live summary holding each side's replies and app state.
+ */
+export interface LiveCalibration {
+  platform: 'ios' | 'android';
+  /** The tree sources the cases ran under. */
+  sources: string[];
+  before: string;
+  after: string;
+  /** live.ts case ids (`scroll:scroll-bounded-flush.P.fully`, `turn:…`, `dismiss:…`). */
+  cases: string[];
+  verdict: Verdict;
+  /**
+   * The cases' outcome is not the same in every run of a side (a device's timing): how many runs each side had and how
+   * they went — the verdict is then the one every run bears out, never the best run's.
+   */
+  intermittent?: string;
+  /** What each side answered, briefly. */
+  remark: string;
+  /** The live summary (docs/truth/) holding the replies. */
+  summary: string;
 }
 
 export interface Calibration {
@@ -178,22 +207,31 @@ export function sideRunOf(json: GoldenJson): SideRun {
  * A note as the pairs it is judged on: the note itself (its own pair; `pairs` dropped) and, for each further pair, the
  * note with that pair's sides, rows, symptom and expectation, numbered `<n>.<i>` from 2 (the note's own pair `<n>.1`
  * then). A pair keeps the note's `regressions` (each names the commit it broke at, so it counts only at the pair whose
- * after that is) and not its `needs`, `partial` or `remark`, which are the first pair's.
+ * after that is) and not its `needs`, `partial` or `remark`, which are the first pair's. A `live` calibration goes
+ * with the further pair whose after it shares (#7's second fix live, 7542021 → c3ebc62, beside 7.2's d928789 →
+ * c3ebc62), every other with the note's own pair.
  */
 export function pairsOf(e: CalibrationEntry): CalibrationEntry[] {
-  const { pairs, ...own } = e;
-  if (pairs === undefined || pairs.length === 0) return [own];
+  const { pairs, live, ...own } = e;
+  if (pairs === undefined || pairs.length === 0) return [live === undefined ? own : { ...own, live }];
+  const liveOf = (i: number) => (live ?? []).filter((l) => pairs.findIndex((p) => p.after === l.after) === i);
+  const withLive = (entry: CalibrationEntry, ls: LiveCalibration[]): CalibrationEntry => (ls.length === 0 ? entry : { ...entry, live: ls });
   return [
-    { ...own, n: `${e.n}.1` },
-    ...pairs.map((p, i): CalibrationEntry => ({
-      n: `${e.n}.${i + 2}`,
-      note: e.note,
-      status: e.status,
-      ...(e.fix !== undefined && { fix: e.fix }),
-      ...(e.verified !== undefined && { verified: e.verified }),
-      ...(e.regressions !== undefined && { regressions: e.regressions }),
-      ...p,
-    })),
+    withLive({ ...own, n: `${e.n}.1` }, liveOf(-1)),
+    ...pairs.map((p, i): CalibrationEntry =>
+      withLive(
+        {
+          n: `${e.n}.${i + 2}`,
+          note: e.note,
+          status: e.status,
+          ...(e.fix !== undefined && { fix: e.fix }),
+          ...(e.verified !== undefined && { verified: e.verified }),
+          ...(e.regressions !== undefined && { regressions: e.regressions }),
+          ...p,
+        },
+        liveOf(i),
+      ),
+    ),
   ];
 }
 

@@ -104,15 +104,16 @@ or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — cla
 file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars, false-covers), the judges
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
-asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks
-where it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
+asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
+it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
 rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
 its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies
 within the reach below of the probe's touch, the device's word over the tree's: base.ts#nodeCentres), or, where that
-tree lists none so (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its app
-logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
-the measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313), and not saying it moved the tap off a cover over the centre (`tapped the
-uncovered part`); a tap moved off is averi steering around a cover that is not there (calibration.json #26).
+tree lists none so (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its
+app logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
+the measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313), and not saying it moved
+the tap off a cover over the centre (`tapped the uncovered part`); a tap moved off is averi steering around a cover that
+is not there (calibration.json #26).
 A row type is asked only of a target whose truth carries a measured `geometry` other than
 `whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
 clips or its chrome — no capture before phase 3 does). A reply that says the target is not in the tree (a tap "waiting
@@ -169,7 +170,20 @@ keyboard preferences):
 ```sh
 node --import tsx scripts/truth/live.ts --udid <lab udid> [--wda-port 8120] [--sources idb,wda] [--cases k1,b1]
 node --import tsx scripts/truth/live.ts --serial <averi_lab serial> [--cases k1,b1]     # Android (phase 2b), adb outside the sandbox
+node --import tsx scripts/truth/live.ts --udid <lab udid> --groups visibility,dismissal [--cells scroll-bounded] [--side <checkout>]
 ```
+
+Phase 5 (`--groups`, all of forms, visibility and dismissal by default): the visibility cases are built from each
+coloured-target cell's static truth by `scripts/truth/live-visibility.ts` — taps judged by the app's tap log,
+scroll_until by the target's live geometry and by R-direction over the strokes the app logs (LabState.offsets,
+.strokes: both apps report them); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
+own keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
+calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs of
+one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`); the exit code is 1
+only on an unknown MISMATCH. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
+1's), and `--rejudge <file>` judges it again with this checkout's judges, no device. Under iOS, idb's companion
+must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
+/tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
 false-covers — scripts/truth/schema.ts#FAMILIES); both apps bundle `fixtures/apps/cells.json`, which
@@ -225,9 +239,9 @@ It also writes the screen after that `back` — `<cell>.after-back.xml` and `<ce
 moves through `back` is replayed against the layout the app takes then.
 Under a floating IME (Gboard's Floating tile, set by hand: `form-keyboard-floating`, `ime: floating` in the catalog —
 the capture refuses it docked, and refuses every other form cell floating) the app hears of the 132-px strip only; the
-capture reads the panel from the shown touchable region (truth.ts#imePanels) and holds a control whose centre lies
-under it `under-keyboard` (FormTruth.keyboard.panels), its scroll_until's touch-downs off the panel and the band (a touch-down beside the panel or between it and the strip is
-the app's: lab finding FU1).
+capture reads the panel from the shown touchable region (truth.ts#imePanels) and holds a control whose centre lies under
+it `under-keyboard` (FormTruth.keyboard.panels), its scroll_until's touch-downs off the panel and the band (a touch-down
+beside the panel or between it and the strip is the app's: lab finding FU1).
 
 An Android capture writes the device's own `dumpsys window displays` with the IME down beside its truth
 (`<cell>.displays.txt`, CellTruth.displays — for a cell captured with the IME up, read after that `back`: the one

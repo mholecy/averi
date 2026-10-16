@@ -224,6 +224,24 @@ export interface LabState {
    * drawn over content.
    */
   chrome?: Record<string, Rect>;
+  // Phase 5's live oracle (scripts/truth/live.ts, live-visibility.ts) — optional: written by the scroll views of the
+  // coloured-target cells from the round-4 apps on; no capture reads them.
+  /** Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top. */
+  offsets?: Record<string, number>;
+  /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */
+  strokes?: Stroke[];
+}
+
+/**
+ * One stroke a scroll view took (LabState.strokes): its content offset when it left rest (`from`) and when it came to
+ * rest again (`to`) — a drag and the fling after it are one stroke; `at` when it came to rest (seconds since the epoch).
+ * A stroke that moved it and brought it back (a bounce at the content's end) has `from` = `to`.
+ */
+export interface Stroke {
+  view: string;
+  from: number;
+  to: number;
+  at: number;
 }
 
 /** One field as the app's model holds it — not as any tree reports it. */

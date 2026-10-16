@@ -10,12 +10,13 @@ import UIKit
 // same numbers in dp.
 
 /// A scroll view of an edges cell: its top on the screen and its height (nil: to the screen's bottom), its content's
-/// height, the offset it is scrolled to on appear, and the top of each target in its content.
+/// height (nil: its height plus the offset — scrolled to its end on appear), the offset it is scrolled to on appear, and
+/// the top of each target in its content.
 struct EdgeScroller {
     let id: String
     let top: CGFloat
     let height: CGFloat?
-    let content: CGFloat
+    let content: CGFloat?
     let offset: CGFloat
     let rows: [(tag: String, y: CGFloat)]
 }
@@ -42,6 +43,11 @@ enum EdgeLayout {
             // touch, ≥ 55 does — truth.ts#statusBarMaySwallow), so its probe is the bar's, as on Android. Edges.kt
             // scrolls 400 dp (T -20–44 dp, its centre 12 dp inside Android's 24-dp status bar).
             return [EdgeScroller(id: "page", top: 0, height: nil, content: 2400, offset: 382, rows: [("A", 100), ("T", 380)])]
+        case "scroll-top-edge-end":
+            // scroll-top-edge's page, its content ending at the screen's bottom (scrolled to its end): T rests in the
+            // status band with nothing more to scroll toward the content's end — a stroke that way moves nothing, so
+            // only a turn back reveals T (calibration.json #17's turn-back, live: scripts/truth/live.ts).
+            return [EdgeScroller(id: "page", top: 0, height: nil, content: nil, offset: 382, rows: [("A", 100), ("T", 380)])]
         default:
             return []
         }
@@ -90,17 +96,19 @@ struct EdgeScrollView: View {
 
     var body: some View {
         let height = scroller.height ?? screen.height - scroller.top
+        let content = scroller.content ?? height + scroller.offset
         ScrollView {
             ZStack(alignment: .topLeading) {
-                Color.clear.frame(width: screen.width, height: scroller.content)
+                Color.clear.frame(width: screen.width, height: content)
                 ForEach(scroller.rows, id: \.tag) { row in
                     if let t = cell.targets.first(where: { $0.tag == row.tag }) {
                         TargetView(cell: cell, target: t).position(x: screen.width / 2, y: row.y + Slot.size.height / 2)
                     }
                 }
             }
-            .frame(width: screen.width, height: scroller.content)
+            .frame(width: screen.width, height: content)
         }
+        .labScroll(scroller.id, lab)
         .scrollPosition($position)
         .scrollIndicators(.hidden)
         .contentMargins(0, for: .scrollContent)
@@ -137,6 +145,7 @@ struct StickyList: View {
                 }
             }
         }
+        .labScroll("list", lab)
         .scrollPosition($position)
         .scrollIndicators(.hidden)
         .contentMargins(0, for: .scrollContent)
