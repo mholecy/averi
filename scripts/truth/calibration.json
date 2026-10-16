@@ -165,10 +165,10 @@
           "why": "pinned app chrome became a cover: the FAB host, a cover by the accepted round-13 reading (#24, residual), refuses the targets beside the FAB"
         },
         {
-          "rows": ["ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until"],
+          "rows": ["ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until", "ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap"],
           "broke": "13d68a2",
           "fixed": "83e282a",
-          "why": "pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop until ADR 0019's hidden subtree"
+          "why": "pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop, and moves C's tap 20 pt off its probe point to 'the uncovered part' (red on the open row's tap at its probe point since phase 3 round 3), until ADR 0019's hidden subtree"
         }
       ],
       "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."
@@ -525,16 +525,15 @@
       "fix": ["83e282a"],
       "before": "7566443",
       "verified": "golden",
-      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24': the open row judges the class (Tapped), not where it landed.",
+      "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap at its probe point (golden-spec/base.ts#atProbe, phase 3 round 3).",
       "after": "83e282a",
       "defect": "drawn over|under button",
       "checks": [
         "ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour",
         "ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour",
-        "ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until"
-      ],
-      "partial": "the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts",
-      "needs": "A cross-family row (base.ts): an open, uncovered whole target is tapped at its probe point — the moved tap of #26 (Tapped at (201,830), off C's centre) passes the open row today."
+        "ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until",
+        "ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap"
+      ]
     },
     {
       "n": "27",

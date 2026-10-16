@@ -11,7 +11,7 @@ open note on the working tree. See the script for the verdicts.
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | needs-2b | 926b826 → 95f75f4 | — |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the iOS leg only) |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 19 rows (recorded) |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
 | 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED (partial: the first fix (7542021): SwiftUI's own full-screen `Toolbar` host) |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | DOES-NOT-FAIL |
@@ -31,7 +31,7 @@ open note on the working tree. See the script for the verdicts.
 | 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | DOES-NOT-FAIL (partial: the navigation band's colour part (the static bands), on a gesture-navigation capture whose band is the app's; OCR on real pixels is phase 4) |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
-| 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | calibrate | 7566443 → 83e282a | CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts) |
+| 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | calibrate | 7566443 → 83e282a | CALIBRATED |
 | 27 | 2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
 | 28 | 2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath | calibrate | 53da035 → 41c394a (the note's fix 15896c5 does not cure this cell) | CALIBRATED |
 | 29 | 2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes | calibrate | ec2893a → b7eac90 | CALIBRATED |
@@ -142,6 +142,7 @@ Regressed elsewhere at 13d68a2 (green at 16ae6bb):
   - RED ios-iphone17-ios27/own-parts.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it — 22% of i
   - RED ios-iphone17-ios27/sheet-medium.wda.json S tap — not tapped: ERROR id:"lab.sheet-medium.S" is under container (8,415 386x451) at its centre (201,484), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — stopped: ERROR scroll_until id:"lab.sheet-medium.S" failed after 2 swipes — element is in the viewport but under container (8,415 386x451) at its centre (201,484), drawn over it — 0% of it shows — and the cont
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap — Tapped off its probe point (201,810) at (201,830): Tapped id:"lab.tabbar-hidden-push.C" at (201,830) — its centre (201,810) is under button "Cards" (201,754 82x64), drawn over it; tapped the uncovered part 300x24
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — stopped: ERROR scroll_until id:"lab.tabbar-hidden-push.C" failed after 2 swipes — element is in the viewport but under button "Cards" (201,754 82x64) at its centre (201,810), drawn over it — 38% of it shows — 
 
 Regressions recorded:
@@ -154,7 +155,7 @@ Regressions recorded:
 - ios-iphone17-ios27/blur-menu.idb.json W tap, ios-iphone17-ios27/blur-menu.idb.json W scroll_until, ios-iphone17-ios27/blur-menu.wda.json W tap, ios-iphone17-ios27/blur-menu.wda.json W scroll_until: broke at 13d68a2, not fixed — the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4
 - ios-iphone17-ios27/blur-menu-grouped.idb.json W tap, ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until: broke at 13d68a2, fixed at 8a55d2b — the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)
 - android-averi_lab-api33/fab.xml L tap, android-averi_lab-api33/fab.xml L scroll_until, android-averi_lab-api33/fab.xml K tap, android-averi_lab-api33/fab.xml K scroll_until: broke at 13d68a2, not fixed — pinned app chrome became a cover: the FAB host, a cover by the accepted round-13 reading (#24, residual), refuses the targets beside the FAB
-- ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until: broke at 13d68a2, fixed at 83e282a — pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop until ADR 0019's hidden subtree
+- ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until, ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap: broke at 13d68a2, fixed at 83e282a — pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop, and moves C's tap 20 pt off its probe point to 'the uncovered part' (red on the open row's tap at its probe point since phase 3 round 3), until ADR 0019's hidden subtree
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 
@@ -442,7 +443,7 @@ Needs: a three-button bands capture (the averi_lab AVD under three buttons, docs
 
 bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). Both are right under gesture navigation, the only mode captured: the band is the app's there (truth.ts#navigationBandTakes) and N is reached, 90 % drawn and seen in its own colour #8E24AA beneath the handle, so its colour row accepts a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020: the measured truth outranks a hand-written expectation) — the row is green on both sides, DOES-NOT-FAIL. The note's defect is a FAIL owed where the bar is drawn over the target, the row a three-button capture asks (FAIL expected). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).
 
-## 26: CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts)
+## 26: CALIBRATED
 
 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md — defect: `drawn over|under button`
 
@@ -450,14 +451,14 @@ bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 t
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — failed: FAIL  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — button "More" (283,754 82x64, reaching 283,741 82x77) is drawn over the element (element 51,698 300x64) — the capture would 
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — failed: FAIL  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — button "Cards" (201,754 82x64, reaching 201,741 82x77) is drawn over the element (element 51,778 300x64) — the capture would
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — stopped: ERROR scroll_until id:"lab.tabbar-hidden-push.C" failed after 3 swipes — element is in the viewport but under button "Cards" (201,754 82x64) at its centre (201,810), drawn over it — 38% of it shows — 
+  - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap — Tapped off its probe point (201,810) at (201,830): Tapped id:"lab.tabbar-hidden-push.C" at (201,830) — its centre (201,810) is under button "Cards" (201,754 82x64), drawn over it; tapped the uncovered part 300x24
 - after 83e282a:
   - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — PASS  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — sampled #1E88E5 (dominant, 100% of region) vs expected #1E88E5 → dE00 0.00 ≤ 8; scale 3.000
   - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — PASS  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — sampled #43A047 (dominant, 100% of region) vs expected #43A047 → dE00 0.00 ≤ 8; scale 3.000
   - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — Element id:"lab.tabbar-hidden-push.C" fully visible after 0 swipes
+  - ok ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap — Tapped id:"lab.tabbar-hidden-push.C"
 
-Needs: A cross-family row (base.ts): an open, uncovered whole target is tapped at its probe point — the moved tap of #26 (Tapped at (201,830), off C's centre) passes the open row today.
-
-The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24': the open row judges the class (Tapped), not where it landed.
+The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button "Cards" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap at its probe point (golden-spec/base.ts#atProbe, phase 3 round 3).
 
 ## 27: CALIBRATED
 
