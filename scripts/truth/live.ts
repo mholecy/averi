@@ -10,8 +10,8 @@ import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import { AdapterRegistry, defaultFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
-import type { SourceKind } from '../differential/corpus.js';
-import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
+import type { Platform, SourceKind } from '../differential/corpus.js';
+import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import type { LabState } from './schema.js';
 
 /**
@@ -93,7 +93,7 @@ interface Case {
   /** The case is about the soft keyboard: judged only when the launch shows it (else SKIP). */
   keyboard?: true;
   /** The platforms it runs on (both when unset). */
-  platforms?: readonly ('ios' | 'android')[];
+  platforms?: readonly Platform[];
   calls: Call[];
   /** `launched`: the model as the launch left it, before any call — what a LOUD case's field held. */
   judge(state: LabState, replies: string[], source: Source, launched: LabState): Verdict;
@@ -313,7 +313,7 @@ async function configFor(source: Source, dismiss: unknown[] | undefined): Promis
   const path = join(configDir, `averi-${source}${dismiss === undefined ? '' : '-dismiss'}.yaml`);
   const ios = source === 'uiautomator' ? {} : { ios: { bundleId: BUNDLE, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } };
   // JSON is YAML.
-  await writeFile(path, JSON.stringify({ app: { android: { package: BUNDLE }, ...ios } }));
+  await writeFile(path, JSON.stringify({ app: { android: { package: LAB_PACKAGE }, ...ios } }));
   return path;
 }
 

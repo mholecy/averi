@@ -18,7 +18,10 @@ const run = promisify(execFile);
 /** How a lab runs a command — injectable, so the device guards are tested without a device. */
 export type Exec = (file: string, args: string[]) => Promise<{ stdout: string }>;
 const exec: Exec = (file, args) => run(file, args, { maxBuffer: 64 << 20 });
+/** The lab app's iOS bundle identifier. */
 export const BUNDLE = 'dev.averi.lab';
+/** The lab app's Android package: the iOS bundle's name, aliased so each platform's code says which one it means. */
+export const LAB_PACKAGE = BUNDLE;
 export const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One raw tree of the screen as it is now: a capture of the run, its file `<cell><suffix>`. */
@@ -287,7 +290,7 @@ export class AndroidLab implements LabDevice {
 
   async state(): Promise<LabState | undefined> {
     try {
-      return JSON.parse((await this.adb('exec-out', 'run-as', BUNDLE, 'cat', 'files/lab-state.json')).stdout) as LabState;
+      return JSON.parse((await this.adb('exec-out', 'run-as', LAB_PACKAGE, 'cat', 'files/lab-state.json')).stdout) as LabState;
     } catch {
       return undefined;
     }
@@ -296,9 +299,9 @@ export class AndroidLab implements LabDevice {
   /** A fresh process: `am force-stop`, the last state file removed (see IosLab.launch), `am start … --es cell <id>`. */
   async launch(cell: string): Promise<LabState> {
     await this.guard();
-    await this.adb('shell', 'am', 'force-stop', BUNDLE);
-    await this.adb('shell', 'run-as', BUNDLE, 'rm', '-f', 'files/lab-state.json');
-    await this.adb('shell', 'am', 'start', '-W', '-n', `${BUNDLE}/.MainActivity`, '--es', 'cell', cell);
+    await this.adb('shell', 'am', 'force-stop', LAB_PACKAGE);
+    await this.adb('shell', 'run-as', LAB_PACKAGE, 'rm', '-f', 'files/lab-state.json');
+    await this.adb('shell', 'am', 'start', '-W', '-n', `${LAB_PACKAGE}/.MainActivity`, '--es', 'cell', cell);
     return settled(this, cell);
   }
 
@@ -346,6 +349,6 @@ export class AndroidLab implements LabDevice {
   /** Nothing unless guard() resolved: a refused (or never checked) device is left as it was. */
   async close(): Promise<void> {
     if (!this.cleared) return;
-    await this.adb('shell', 'am', 'force-stop', BUNDLE);
+    await this.adb('shell', 'am', 'force-stop', LAB_PACKAGE);
   }
 }
