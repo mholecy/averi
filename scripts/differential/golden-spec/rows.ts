@@ -71,8 +71,8 @@ export function refusedTap(platform: Platform, t: TargetTruth, row: string, abse
  * R-band: the tap refused, nothing sent (its remedy depends on whether a scroll lifts it out: not judged) — where the
  * probe at its centre did not fire it (the bar swallowed it: Android's status bar, the top of iOS's,
  * truth.ts#statusBarMaySwallow). Where it did (iOS, below the bar's own touch area), what fires there is the truth:
- * the tap is not expected refused — `Tapped` inside what shows of it, or refused with nothing sent (ADR 0009's band
- * rule may refuse it; it must not tap elsewhere).
+ * the tap is not expected refused — `Tapped` inside what shows of it, or refused with nothing sent (averi's own
+ * model of iOS's status band, the top safe-area inset, may refuse it; it must not tap elsewhere).
  */
 export function bandTap(platform: Platform, t: TargetTruth): Expectation {
   if (t.reached) {
