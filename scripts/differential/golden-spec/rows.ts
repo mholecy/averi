@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { isOverlap, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { BUDGET_MS, first, landed, notInTree, notTapped, passed, passes, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, first, landed, notInTree, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, scrollAdvice, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
@@ -128,7 +128,7 @@ export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, r
     judge: (o) => {
       if (swipes(o) === 0) return said(o, 'no swipe');
       const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
-      return strokesOff(o, cell) ?? (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${beside.map((p) => `(${p.x},${p.y})`).join(' ')}: ${first(o)}`);
+      return strokesOff(o, cell) ?? (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`);
     },
     ...(absent !== undefined && { absent }),
   };
@@ -196,7 +196,7 @@ export function dismissRow(platform: Platform, control: { tag: string; id: strin
       if (!tapPoints(o).some((p) => within(p, dismissal.frame))) return said(o, `no tap on the dismissal ${dismissal.label}${/toolbar/i.test(o.reply) ? ' (refused for a toolbar)' : ''}`);
       if (keyboard === undefined) return undefined;
       const under = tapPoints(o).filter((p) => within(p, keyboard));
-      if (under.length > 0) return said(o, `tapped under the keyboard at ${under.map((p) => `(${p.x},${p.y})`).join(' ')}`);
+      if (under.length > 0) return said(o, `tapped under the keyboard at ${pointsText(under)}`);
       return o.reply.startsWith('Tapped') ? said(o, 'Tapped while the keyboard still covers it') : undefined;
     },
   };

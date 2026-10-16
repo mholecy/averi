@@ -118,7 +118,8 @@ export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): P
  * Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (unprobedReason).
  */
 export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => inside(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
-const at = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
+/** A point as the truth's reasons and golden's mismatches spell it: `(x,y)`. */
+export const pointText = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
 
 /**
  * Why the capture never taps a target's centre — the one rule the capture (capture-run.ts: TargetTruth.unprobed) and
@@ -131,7 +132,7 @@ export function unprobedReason(
   t: Pick<TargetTruth, 'frame' | 'geometry'>,
   screen: { width: number; height: number } | undefined,
 ): { why: 'off-screen' | 'centre-off-screen'; says: string } | undefined {
-  const offScreen = (why: 'off-screen' | 'centre-off-screen') => ({ why, says: `its centre ${at(probePoint(t.frame))} lies off the ${screen === undefined ? '' : `${screen.width}x${screen.height} `}screen` });
+  const offScreen = (why: 'off-screen' | 'centre-off-screen') => ({ why, says: `its centre ${pointText(probePoint(t.frame))} lies off the ${screen === undefined ? '' : `${screen.width}x${screen.height} `}screen` });
   if (t.geometry === 'off-screen') return offScreen('off-screen');
   if (screen !== undefined && !centreOnScreen(t.frame, screen)) return offScreen('centre-off-screen');
   return undefined;
@@ -169,8 +170,8 @@ export function consistency(
       return probed || t.reachedAtPiece !== undefined ? 'off-screen, never probed, but the truth holds a probe' : undefined;
     case 'centre-off-screen':
       // Unmeasured (no geometry): the phase-1 rule — an open target must be reached, and one never probed is not.
-      if (t.geometry === undefined && t.declared === 'open') return `declared open, but its centre ${at(probePoint(t.frame))} lies off the screen: never probed`;
-      return probed ? `its centre ${at(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
+      if (t.geometry === undefined && t.declared === 'open') return `declared open, but its centre ${pointText(probePoint(t.frame))} lies off the screen: never probed`;
+      return probed ? `its centre ${pointText(probePoint(t.frame))} off the screen, never probed, but the truth holds a probe` : undefined;
   }
   if (systemBarSwallows(platform, g)) return t.reached ? `${g}, but the probe tap reached it through the system bar` : undefined;
   const takes = navigationBandTakes(platform, g, navigation);

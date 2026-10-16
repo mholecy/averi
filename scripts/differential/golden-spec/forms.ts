@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { otherControlsFired } from '../../truth/truth.js';
-import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, reachedWithNoSwipe, said, swipes, touchDowns, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, touchDowns, type Expectation } from './judges.js';
 
 /** The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formExpectations. */
 
@@ -185,7 +185,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           judge: (o) => {
             if (!o.reply.startsWith('ERROR') && swipes(o) === 0) return `reached with no swipe, under the keyboard: ${first(o)}`;
             const under = touchDowns(o).filter((p) => p.y >= top);
-            return under.length > 0 ? `touched down under the keyboard at ${under.map((p) => `(${p.x},${p.y})`).join(' ')}: ${first(o)}` : undefined;
+            return under.length > 0 ? `touched down under the keyboard at ${pointsText(under)}: ${first(o)}` : undefined;
           },
         },
       ];
@@ -222,7 +222,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
             const downs = touchDowns(o);
             if (downs.length === 0) return `no swipe: ${first(o)}`;
             const off = sheet === undefined ? [] : downs.filter((p) => p.y < sheet.y || p.y > sheet.y + sheet.height);
-            return off.length > 0 ? `touched down off the sheet at ${off.map((p) => `(${p.x},${p.y})`).join(' ')}: ${first(o)}` : undefined;
+            return off.length > 0 ? `touched down off the sheet at ${pointsText(off)}: ${first(o)}` : undefined;
           },
         },
       ];

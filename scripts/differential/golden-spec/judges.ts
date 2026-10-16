@@ -1,6 +1,6 @@
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
-import { bandsOf } from '../../truth/truth.js';
+import { bandsOf, pointText } from '../../truth/truth.js';
 
 /**
  * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an
@@ -110,7 +110,8 @@ export const tapPoints = (o: Outcome): Point[] =>
     const m = /tap (-?[\d.]+) (-?[\d.]+)/.exec(c);
     return m === null ? [] : [{ x: Number(m[1]), y: Number(m[2]) }];
   });
-const at = (ps: readonly Point[]) => ps.map((p) => `(${p.x},${p.y})`).join(' ');
+/** Points as a mismatch lists them: `(x,y) (x,y)` (truth.ts#pointText each). */
+export const pointsText = (ps: readonly Point[]) => ps.map(pointText).join(' ');
 
 /**
  * Where a stroke may touch down on a cell: on the screen, clear of the system bands (CellTruth.safeArea) and of every
@@ -128,7 +129,7 @@ export function strokeable(cell: Pick<CellTruth, 'screen' | 'safeArea' | 'chrome
 export function strokesOff(o: Outcome, cell: Pick<CellTruth, 'screen' | 'safeArea' | 'chrome'>): string | undefined {
   const ok = strokeable(cell);
   const off = touchDowns(o).filter((p) => !ok(p));
-  return off.length === 0 ? undefined : `touched down off the strokeable region at ${at(off)}: ${first(o)}`;
+  return off.length === 0 ? undefined : `touched down off the strokeable region at ${pointsText(off)}: ${first(o)}`;
 }
 
 /**
@@ -140,7 +141,7 @@ export function landed(o: Outcome, where: Rect | null | undefined, fired: boolea
   if (!o.reply.startsWith('Tapped')) return mustTap ? `not tapped: ${first(o)}` : notTapped(o);
   if (!fired || where === null || where === undefined) return `Tapped where no probe fired it: ${first(o)}`;
   const out = tapPoints(o).filter((p) => !within(p, where));
-  return out.length > 0 ? `Tapped outside what shows of it at ${at(out)}: ${first(o)}` : undefined;
+  return out.length > 0 ? `Tapped outside what shows of it at ${pointsText(out)}: ${first(o)}` : undefined;
 }
 
 /** The reply names scroll_until as the remedy (the off-screen, outside-its-scroll-view and sliver refusals do). */
