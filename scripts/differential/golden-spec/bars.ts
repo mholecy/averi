@@ -3,7 +3,7 @@ import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
 import { openRows } from './base.js';
-import { bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
+import { bandColour, bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
 
 /**
  * The band and chrome geometries' rows — a geometry group, named for the bars family (fixtures/apps/cells/bars.json,
@@ -14,7 +14,7 @@ import { bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour
  *
  * | geometry | rows |
  * |---|---|
- * | status-band, nav-band (Android) | R-band tap, R-band colour, R-band scroll_until |
+ * | status-band, nav-band (Android) | R-band tap, R-band colour (in the navigation band under gesture navigation: a PASS on its own colour or a FAIL, rows.ts#bandColour), R-band scroll_until |
  * | nav-band on iOS: the home indicator's band | the open rows (base.ts) — consistency holds it reached and drawn |
  * | under-chrome:<name> | R-under-chrome tap (R-land on its piece), colour, scroll_until |
  * | band-overlap:<band>, chrome-overlap:<name> | R-overlap: tap (R-land at its centre), colour (fails closed only where what it samples is overlapped), scroll_until reached with no swipe, R-fully (a band's: in a scroll view only) |
@@ -39,7 +39,7 @@ export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth): Ex
   // (truth.ts#navigationBandTakes) — else it is broken and asked nothing.
   if (g === 'nav-band' && platform === 'ios') return openRows(platform, t);
   if (g === 'status-band' || g === 'nav-band') {
-    return [bandTap(platform, t), colourFails(platform, t, `R-band: the ${g === 'status-band' ? 'status' : 'navigation'} band over it`), notReachedStill(platform, t, cell, 'R-band')].map(classed);
+    return [bandTap(platform, t), bandColour(platform, t, cell), notReachedStill(platform, t, cell, 'R-band')].map(classed);
   }
   if (kind === 'under-chrome') {
     const chrome = name;

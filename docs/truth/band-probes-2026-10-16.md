@@ -70,5 +70,7 @@ was not: B4 logged no touch at y 52 and 53). The home-indicator band passes ever
 
 - No capture exists under three-button navigation: the committed Android run is gesture navigation's. A run under three
   buttons (the AVD switched as above, then restored) would hold N `nav-band`, not reached, `navigation:
-  "three-button"` — consistent by navigationBandTakes, and its rows unchanged (R-band). Two-button navigation was not
-  measured: a capture under it records `two-button`, and a nav-band target there is broken until it is.
+  "three-button"` — consistent by navigationBandTakes, its rows R-band with the colour row expecting a FAIL
+  (rows.ts#bandColour; under gesture navigation it accepts N's PASS on its own colour too), the capture
+  calibration.json #23 needs to calibrate on that row. Two-button navigation was not measured: a capture under it
+  records `two-button`, and a nav-band target there is broken until it is.

@@ -253,6 +253,20 @@ describe('R-band: refused, never measured, never reached where it is', () => {
   it('the colour assert fails closed on the band (ADR 0001)', () => {
     expect(verdict(rs, 'colour', out(PASSED))).toMatch(/^passed on/);
   });
+  it('the navigation band\'s colour by the mode recorded: under three buttons (the bar\'s) it fails closed; under gesture navigation (the app\'s: bands N seen in its own colour) a PASS on its own colour or a FAIL (ADR 0020)', () => {
+    const three = expectations('android', band, { ...CELL, navigation: 'three-button' }, 'uiautomator');
+    expect(verdict(three, 'colour', out(PASSED))).toMatch(/^passed on #43A047/);
+    expect(verdict(three, 'colour', out(FAILED))).toBeUndefined();
+    const gesture = expectations('android', { ...band, reached: true }, { ...CELL, navigation: 'gesture' }, 'uiautomator');
+    expect(gesture.find((r) => r.verb === 'colour')!.says).toBe('R-band (the navigation band under gesture navigation, the app\'s): passes on its own colour #43A047, or fails closed');
+    expect(verdict(gesture, 'colour', out(PASSED))).toBeUndefined();
+    expect(verdict(gesture, 'colour', out(FAILED))).toBeUndefined();
+    expect(verdict(gesture, 'colour', out('ERROR: stuck'))).toBe('neither passed nor failed: ERROR: stuck');
+    expect(verdict(gesture, 'colour', out('1/1 asserts FAILED\n✗ element id:"lab.edges.A" not found within 1000ms'))).toMatch(/^not in the tree: /);
+    // The status band is the bar's in either mode: it fails closed.
+    const status = expectations('android', target('status-band', { frame: rect(51, 10, 300, 64), reached: false }), { ...CELL, navigation: 'gesture' }, 'uiautomator');
+    expect(verdict(status, 'colour', out(PASSED))).toMatch(/^passed on/);
+  });
   it('a band target whose probe fired (iOS, below the bar\'s touch area) is not expected refused: Tapped inside it, or nothing sent', () => {
     const fired = rows(target('status-band', { frame: rect(51, 22, 300, 64), visible: rect(51, 22, 300, 64), reached: true }));
     expect(verdict(fired, 'tap', out(TAPPED, ['idb ui tap 201 54']))).toBeUndefined();

@@ -494,12 +494,13 @@
       "fix": ["e85bcdf"],
       "before": "94bae14",
       "verified": "golden",
-      "remark": "bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).",
+      "remark": "bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). Both are right under gesture navigation, the only mode captured: the band is the app's there (truth.ts#navigationBandTakes) and N is reached, 90 % drawn and seen in its own colour #8E24AA beneath the handle, so its colour row accepts a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020: the measured truth outranks a hand-written expectation) — the row is green on both sides, DOES-NOT-FAIL. The note's defect is a FAIL owed where the bar is drawn over the target, the row a three-button capture asks (FAIL expected). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).",
       "after": "e85bcdf",
       "defect": "^passed on",
       "checks": ["android-averi_lab-api33/bands.xml N colour"],
-      "partial": "the navigation band's colour part (the static bands); OCR on real pixels is phase 4",
-      "needs": "OCR judged on real pixels (phase 4): a text cut at the navigation bar."
+      "expect": "DOES-NOT-FAIL",
+      "partial": "the navigation band's colour part (the static bands), on a gesture-navigation capture whose band is the app's; OCR on real pixels is phase 4",
+      "needs": "a three-button bands capture (the averi_lab AVD under three buttons, docs/truth/band-probes-2026-10-16.md: N not reached, its colour row expecting a FAIL), and OCR judged on real pixels (phase 4): a text cut at the navigation bar."
     },
     {
       "n": "24",

@@ -266,7 +266,11 @@ assumption did not hold: iOS's status bar swallows a tap in the top of its band 
 (no touch at y 2–50, a touch from 55) and wrote the rule, truth.ts#statusBarMaySwallow, accepted above its line
 `IOS_STATUS_BAR_SWALLOWS_ABOVE`; B4's taps above agree and narrow the line (no touch up to 53, a touch from 54), so the
 constant is 54 pt, borne out by both measurements (a probe from y 54 on with no touch is undelivered). averi refuses
-a tap in a band (ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts).
+a tap in a band (ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts). R-band's colour
+row follows the mode recorded (rows.ts#bandColour): under gesture navigation, where bands' N is reached, 90 % drawn and
+seen in its own colour beneath the handle, a PASS on its own colour or a fail-closed FAIL (ADR 0020: the measured truth
+outranks a hand-written expectation); under three buttons a FAIL — the row calibration.json #23 needs a three-button
+capture for.
 
 **B5 — false covers (2026-10-16), merged into truth/phase-3 (d4281cc).** `own-parts` (both platforms: a button's own
 text, a text field over its own label), `toolbar-dismiss` (SwiftUI's own full-screen `Toolbar` host from a principal
