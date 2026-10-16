@@ -320,7 +320,9 @@ round-3 merge (501ec21), for fidelity: each Android capture keeps the device's o
 (CellTruth.displays), which golden's fake device serves in place of its stock gesture-mode dump — `bands-three-button`
 was recaptured with it, so it is replayed against its three-button bar, not the gesture band (#23's verdict
 unchanged); since the round-3 review it is the one source of that IME-down dump, an IME-up capture's ImeCapture
-holding only what is extra. Follow-up:
+holding only what is extra. Round 4 (truth/r4-followups) adds `scroll-sticky-view` (Android): scroll-sticky-cut with
+R's content an Android View (AndroidView) — the container cut at the header, the View listed whole, #9's own shape:
+#9 CALIBRATED on it (10fb02b → d2b7744); VA1 stays the all-Compose row's. Follow-up:
 calibrate takes one before/after pair per note, so #7's two fixes share 5cff2ad → c3ebc62 — several pairs per note
 would verify each fix alone. Done in round 4 (truth/r4-followups): a note may name `pairs`, one before/after per further fix, each
 judged alone (`<n>.1`, `<n>.2` …) — #7 CALIBRATED on both (5cff2ad → 7542021 on toolbar-dismiss, d928789 → c3ebc62 on

@@ -319,6 +319,15 @@
       ]
     },
     {
+      "id": "scroll-sticky-view",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "R", "color": "#00897B", "slot": 0, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
       "id": "scroll-top-edge",
       "family": "edges",
       "layer": "none",

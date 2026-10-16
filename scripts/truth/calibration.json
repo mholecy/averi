@@ -271,13 +271,8 @@
       "after": "d2b7744",
       "verified": "golden",
       "defect": "fully visible",
-      "checks": [
-        "android-averi_lab-api33/scroll-sticky-cut.xml R fully"
-      ],
-      "expect": "STILL-RED-AFTER",
-      "needs": "A row whose container is cut at the sticky header while its content keeps its whole rect (mp-native's Account Detail: `row_0 66,480 948x84`, its children `66,403 948x143`) — the shape d2b7744 reads. Tried on the lab (round 3, bounded): scroll-sticky (a plain header container: uiautomator lists R whole, `[128,391][953,567]`, and averi refuses it under the header on both sides — DOES-NOT-FAIL); scroll-sticky-cut (the header one accessibility element, `semantics(mergeDescendants = true)`; R a non-clickable testTag container around a clickable box): Compose takes the header out of the container AND its content (`[128,457][953,567]` both), so the rect is cut at the header but no descendant reaches past it — red before and after. Which Compose setup leaves the children whole was not found.",
-      "remark": "scroll-sticky-cut's R (frame 128,391 825x176, its top 66 px under the header 0,303 1080x154): the dump cuts R and its content at the header's bottom, 457. Red with the note's symptom (`fully visible after 0 swipes`) at 10fb02b and at d2b7744 — filed as lab finding VA1. The earlier variant, scroll-sticky (R listed whole, the header after it), is refused on both sides ('under text \"Sticky header\" … drawn over it — 63% of it shows'): DOES-NOT-FAIL, kept as the contrast.",
-      "partial": "not the note's shape: Compose cuts the row's content at the header too, so d2b7744's descendants' extent finds nothing past the cut (lab finding VA1)"
+      "checks": ["android-averi_lab-api33/scroll-sticky-view.xml R fully"],
+      "remark": "edges/scroll-sticky-view (round 4): scroll-sticky-cut's list and merged header (`semantics(mergeDescendants = true)`), the row R a testTag container whose content is an Android View (AndroidView: a clickable android.view.View labelled `Target R`) — uiautomator cuts the container at the header's bottom, `[128,457][953,567]`, and lists the View whole, `[128,391][953,567]` (the View system's bounds, which Compose's accessibility does not cut at the header): the note's shape (mp-native's `row_0 66,480 948x84`, its children `66,403 948x143`). R's frame 128,391 825x176, its top 66 px under the header 0,303 1080x154. At 10fb02b `fully: true` calls it `fully visible after 0 swipes`; at d2b7744 the descendants' extent past the cut refuses it. The earlier variants stay as the contrast: scroll-sticky (R listed whole, the header after it: refused on both sides, DOES-NOT-FAIL) and scroll-sticky-cut (the content a Compose node, cut with the container: red before and after — lab finding VA1)."
     },
     {
       "n": "10",
