@@ -1,3 +1,5 @@
+import type { SourceKind } from '../differential/corpus.js';
+
 /**
  * The lab apps' contract with the harness (docs/plans/2026-10-15-ground-truth-lab-app.md): the cell catalog both apps
  * bundle (fixtures/apps/cells.json), the state file an app writes while a cell is on screen, and the truth file the
@@ -268,7 +270,7 @@ export interface TargetTruth {
    * idb: true}`, `{uiautomator: false}` — uiautomator dumps no node not visible to the user. Recorded with a measured
    * geometry only (absent before B2's review too): a target without it is held to be listed.
    */
-  listed?: Partial<Record<'wda' | 'idb' | 'uiautomator', boolean>>;
+  listed?: Partial<Record<SourceKind, boolean>>;
   /**
    * A second probe, at the piece's centre (probePoint(piece)), when it is not the frame's: fired the target's action.
    * Absent when not probed — the piece's centre is the frame's, or there is no piece.
