@@ -141,7 +141,11 @@ sent and their notes — a ratchet both ways (one fixed fails until struck off; 
 whose class, reply kind or device calls change fails until re-noted). The ratchet is kept per cell family,
 `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's cells only, aggregated by
 golden.test.ts, which refuses a row filed under another family's file); a row may say what it is beside its class — `as:
-bug:<docs/bugs file>` or `residual:<decision>`.
+bug:<docs/bugs file>` or `residual:<decision>`. `tests/truth/lab-notes.test.ts` ties the notes of both ratchets (this
+one's `as`, the live KNOWN's `note`) and calibration.json to docs/bugs: every `bug:` an existing note, every `residual:`
+a calibration.json residual's status or an ADR's numbered residual, every note calibration.json expects OPEN-RED with
+its rows in KNOWN filed as it, and every note a KNOWN row is filed as an open note of calibration.json (but the
+live-only ones it lists, each excluded from the calibration with its reason).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no
 coloured targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it
@@ -198,8 +202,9 @@ earlier summaries stay true): the visibility cases are built from each coloured-
 .strokes: both apps report them); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
 own keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
 calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs of
-one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case
-and verdict class — a weaker contract than ADR 0020 §4's, its header says why); the exit code is 1 on an unknown
+one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
+with its verdict class and the kind of reply it rests on — a weaker contract than ADR 0020 §4's, no strokes and an
+`intermittent` case allowed ok, its header says why and what the committed records measured); the exit code is 1 on an unknown
 MISMATCH and, in a run of this checkout (not `--side`), on a known case not marked `intermittent` that comes out ok —
 fixed, to be struck off. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
 1's), and `--rejudge <file>` judges it again with this checkout's judges, no device

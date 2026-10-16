@@ -503,9 +503,12 @@ if (rejudging !== undefined) {
 // --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on
 // a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off) ---
 
-/** The note a not-ok case is known by — only when it failed by the rule its KNOWN entry pins (live-known.ts). */
-const known = (r: Result) => knownLive(platform, r.source, r.c.id, r.verdict.cls);
-/** A KNOWN entry whose case failed by another rule: unknown, and said so. */
+/**
+ * The note a not-ok case is known by — only when it failed by the rule, on the kind of reply, its KNOWN entry pins
+ * (live-known.ts).
+ */
+const known = (r: Result) => knownLive(platform, r.source, r.c.id, r.verdict.cls, r.verdict.kind);
+/** A KNOWN entry whose case failed by another rule, or on another kind of reply: unknown, and said so. */
 const otherRule = (r: Result) => (r.verdict.outcome !== 'ok' && known(r) === undefined ? knownEntry(platform, r.source, r.c.id) : undefined);
 const count = (o: LiveVerdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
 const unknown = results.filter((r) => r.verdict.outcome === 'MISMATCH' && known(r) === undefined);
@@ -528,7 +531,7 @@ for (const source of sources) {
     const mark =
       r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known${entry.intermittent === true ? ' (intermittent)' : ''}, ok this run: ${entry.note}]`)
       : note !== undefined ? ` [known: ${note}]`
-      : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'}, where KNOWN pins ${other.cls} (${other.note})]`
+      : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'} on ${r.verdict.kind ?? '?'}, where KNOWN pins ${other.cls} on ${other.kind} (${other.note})]`
       : '';
     lines.push(`- ${r.verdict.outcome}${r.verdict.cls === undefined ? '' : ` (${r.verdict.cls})`} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}${mark}`);
     if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ')}`);

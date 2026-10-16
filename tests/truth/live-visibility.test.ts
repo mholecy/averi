@@ -262,12 +262,18 @@ describe('the tap after a stop is judged on the state after the tap', () => {
   });
 });
 
-describe('the live KNOWN pins the rule a case fails by', () => {
-  it('a known case failing by its entry\'s rule is known; by another rule it is not', () => {
-    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim')).toMatch(/LV1|blank-content/);
-    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'stop-claim')).toBeUndefined();
-    expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired')).toBeUndefined();
-    expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim')).toBeUndefined();
+describe('the live KNOWN pins the rule a case fails by and the kind of reply it rests on', () => {
+  it('a known case failing by its entry\'s rule on its entry\'s kind is known; by another rule, or another kind, it is not', () => {
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'not found')).toMatch(/LV1|blank-content/);
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'stop-claim', 'not found')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'refused')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', undefined)).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired', 'refused')).toBeUndefined();
+    expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim', 'visible')).toBeUndefined();
+  });
+  it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
+    const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
+    expect(bad).toEqual([]);
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
   it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {
