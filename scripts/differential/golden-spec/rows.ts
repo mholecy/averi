@@ -1,7 +1,8 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { isOverlap, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
+import { directionOf, isOverlap, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
+import { VISIBLE_STOP } from '../../truth/replies.js';
 import { BUDGET_MS, DISMISSAL_COVERED, first, FLUSH_PROBED, landed, notInTree, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, scrollAdvice, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
@@ -43,14 +44,7 @@ const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id'>, direction: '
   args: { platform, selector: `id:"${t.id}"`, direction, ...(fully && { fully: true }) },
 });
 
-/**
- * Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the
- * screen), else `up`.
- */
-export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pick<CellTruth, 'screen'>): 'up' | 'down' {
-  const shown = t.visible ?? { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
-  return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
-}
+export { directionOf } from '../../truth/truth.js';
 
 /**
  * The options of a row type whose truth may allow the target missing from the tree: `absent`, why it may (the caller's,
@@ -190,7 +184,7 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): E
     says: `R-fully: fully: true is not "visible" where it is ${t.geometry} (a flush edge: probed toward it, the probe's answer the device's)`,
     call: scrollCall(platform, t, directionOf(t, cell), true),
     judge: (o) => {
-      if (!/^Element .* visible after /.test(o.reply)) return undefined;
+      if (!VISIBLE_STOP.test(o.reply)) return undefined;
       const why = flushProbe(o, t, cell);
       if (why === undefined) return undefined;
       return said(o, `fully visible where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing${why === NOT_PROBED ? '' : ` (${why})`}`);

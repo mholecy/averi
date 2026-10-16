@@ -37,6 +37,11 @@ export interface Side {
    * told by the constructor's own behaviour (`takesDeps`), not by what else the module exports.
    */
   registry(deps: { factory: AdapterFactory; discovery: DeviceDiscovery }): AdapterRegistry;
+  /**
+   * The side's iOS tree-source seam (src/adapters/ios-tree-source.ts#createIosTreeSource), when it has one — what the
+   * live golden (scripts/truth/live.ts `--side`) builds a real WDA or idb source with; the replay does not use it.
+   */
+  createIosTreeSource?: (kind: 'idb' | 'wda', udid: string, deps: { port?: number; derivedDataPath?: string }) => unknown;
 }
 
 export async function loadSide(root: string): Promise<Side> {
@@ -52,6 +57,8 @@ export async function loadSide(root: string): Promise<Side> {
     at('src/adapters/ios.ts', ['IosAdapter']),
     at('src/adapters/wda-source.ts', ['parseWdaSourceValue']),
   ]);
+  // Optional: a side without the seam loads all the same (the replay never needs it).
+  const treeSource = (await import(pathToFileURL(resolve(root, 'src/adapters/ios-tree-source.ts')).href).catch(() => ({}))) as Record<string, unknown>;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
   return {
@@ -60,6 +67,7 @@ export async function loadSide(root: string): Promise<Side> {
     defaultFactory: registry.defaultFactory as Side['defaultFactory'],
     IosAdapter: ios.IosAdapter as Side['IosAdapter'],
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
+    ...(typeof treeSource.createIosTreeSource === 'function' && { createIosTreeSource: treeSource.createIosTreeSource as NonNullable<Side['createIosTreeSource']> }),
     registry: (deps) => {
       if (discoverySeam) return new Registry(deps);
       const legacy = Registry as unknown as new (factory: AdapterFactory) => AdapterRegistry;

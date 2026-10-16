@@ -135,6 +135,11 @@ export interface LiveCalibration {
   /** live.ts case ids (`scroll:scroll-bounded-flush.P.fully`, `turn:…`, `dismiss:…`). */
   cases: string[];
   verdict: Verdict;
+  /**
+   * The cases' outcome is not the same in every run of a side (a device's timing): how many runs each side had and how
+   * they went — the verdict is then the one every run bears out, never the best run's.
+   */
+  intermittent?: string;
   /** What each side answered, briefly. */
   remark: string;
   /** The live summary (docs/truth/) holding the replies. */

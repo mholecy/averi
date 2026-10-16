@@ -1,7 +1,7 @@
 import type { Platform } from '../differential/corpus.js';
-import { directionOf } from '../differential/golden-spec/rows.js';
+import { screenUnchangedFor, swipesOf, VISIBLE_STOP } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
-import { bandsOf, geometryOf, intersect, isOverlap, type GeometryContext } from './truth.js';
+import { bandsOf, directionOf, geometryOf, intersect, isOverlap, type GeometryContext } from './truth.js';
 
 /**
  * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5; run by live.ts): averi's
@@ -19,15 +19,27 @@ import { bandsOf, geometryOf, intersect, isOverlap, type GeometryContext } from 
  *
  * Verdicts, as live.ts's: `ok` the app holds what the case asks and the reply agrees; `LOUD` it does not, and averi
  * said so (an error); `MISMATCH` averi claimed what did not happen (`Tapped` with nothing fired or something else
- * fired, "visible" with the target not where the stop needs it), failed what did happen, or the strokes broke the
- * row (another scroll view stroked, a stroke that did not bring the target closer not turned back).
+ * fired, "visible" with the target not where the stop needs it, "the last N swipes did not change the screen" with the
+ * app logging one of them moving a scroll view), failed what did happen, or the strokes broke the row (another scroll
+ * view stroked, a stroke that did not bring the target closer not turned back).
+ *
+ * The oracle's caveats, stated:
+ *  - a stroke is what the app saw from leaving rest to coming to rest: on iOS a second swipe that catches a list still
+ *    decelerating (decelerating → interacting, never idle between) merges with the first into one stroke, so a turn
+ *    sent mid-fling reads as part of the stroke before it;
+ *  - Compose's sticky LazyColumn (scroll-sticky, scroll-sticky-cut) reports an offset derived from its first visible
+ *    item's index (Edges.kt: the header item, then rows of a fixed height), exact only while every item is that height;
+ *  - sheet-long-list's UITableView reports no offset before its first scroll: the launch offset falls back to 0 — its
+ *    real rest at launch (classStrokes' `o0`);
+ *  - the stop is judged on the state read right after scroll_until returns (live.ts reads it between the calls), the
+ *    tap on the state after the tap.
  */
 
 export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
 export interface Verdict {
   outcome: Outcome;
   why: string;
-  /** The app's state behind a verdict that is not ok: what live.ts's summary prints under the case. */
+  /** The app's state behind the verdict (every scroll case's, any other case's not ok): live.ts prints it under the case. */
   app?: string;
 }
 
@@ -53,7 +65,7 @@ export const short = (reply: string) => reply.split('\n')[0].slice(0, 260);
 /** The reply claims the tap: `Tapped …`, not an error. */
 export const claimsTap = (reply: string) => reply.startsWith('Tapped');
 /** The reply claims the stop: `Element … visible after N swipes` (fully or not). */
-export const claimsVisible = (reply: string) => /^Element .* visible after /.test(reply);
+export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
 
 /**
  * What the target's geometry is judged against in the live state: the screen, the bands (iOS's home-indicator band is
@@ -192,11 +204,19 @@ export function classStrokes(state: LabState, launched: LabState, platform: Plat
     });
 }
 
-/** The number of swipes a scroll_until reply names (`after N swipes`, `failed after N swipes`), undefined when none. */
-export const swipesOf = (reply: string) => {
-  const m = /after (\d+) swipes?/.exec(reply);
-  return m === null ? undefined : Number(m[1]);
-};
+/**
+ * A failure that says its last N swipes did not change the screen, while the app logged a stroke among them that moved a
+ * scroll view (any view: the claim is about the screen) — undefined when the claim stands or is not made. Judged only
+ * when the app logged at least as many strokes as the reply counts swipes, so the last N strokes are the last N swipes
+ * (a swipe that moves nothing at all may log no stroke).
+ */
+export function unchangedClaimBroken(reply: string, strokes: readonly Stroke[]): string | undefined {
+  const n = screenUnchangedFor(reply);
+  const swipes = swipesOf(reply);
+  if (n === undefined || swipes === undefined || strokes.length < swipes) return undefined;
+  const moved = strokes.slice(-n).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
+  return moved.length === 0 ? undefined : `averi says the last ${n} swipes did not change the screen — the app logged ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} in them`;
+}
 
 /**
  * What the strokes did against R-direction (golden-spec/rows.ts: each stroke brings the target closer, and a stroke that
@@ -237,10 +257,13 @@ export function directionBreaks(strokes: readonly Stroke[], classed: readonly Cl
 export function judgeScroll(
   c: { tag: string; view: string; fully: boolean; platform: Platform; unlisted?: boolean },
   [scroll, tap]: readonly string[],
-  state: LabState,
+  final: LabState,
   launched: LabState,
+  atStop: LabState = final,
 ): Verdict {
-  const app = appText(state, c.platform, c.tag, c.view, launched);
+  // The stop on the state read when scroll_until returned (`atStop`), the tap on the state after it (`final`).
+  const state = atStop;
+  const app = appText(final, c.platform, c.tag, c.view, launched);
   const g = liveGeometry(state, c.platform, c.tag, c.view);
   const holds = g !== undefined && stopHolds(g, c.fully);
   const classed = classStrokes(state, launched, c.platform, c.tag, c.view) ?? [];
@@ -249,9 +272,12 @@ export function judgeScroll(
   const end = f0 === undefined || region === undefined ? 0 : distanceAt(state.offsets?.[c.view] ?? launched.offsets?.[c.view] ?? 0, f0, launched.offsets?.[c.view] ?? 0, region);
   const breaks = directionBreaks(strokesSince(state, launched), classed, c.view, swipesOf(scroll), end);
   const stop = c.fully ? 'fully visible' : 'visible';
-  const tapped = tap === undefined ? undefined : judgeTap(c.tag, holds, tap, state, launched);
+  const tapped = tap === undefined ? undefined : judgeTap(c.tag, holds, tap, final, launched);
+  const unchanged = unchangedClaimBroken(scroll, strokesSince(state, launched));
   if (claimsVisible(scroll) && !holds) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
+  // Whatever the tree listed: a claim about the screen the app's own strokes contradict.
+  if (unchanged !== undefined) return { outcome: 'MISMATCH', why: `${unchanged}: ${short(scroll)}`, app };
   // A target the tree does not list (uiautomator dumps no node not visible to the user): averi cannot tell where it
   // lies, nor which scroll view holds it — what R-stroke exempts too (golden-spec/rows.ts#strokeRow); its strokes are
   // reported, not judged.
@@ -260,9 +286,9 @@ export function judgeScroll(
     const unjudged = breaks.length > 0 ? ` (not in the tree: its strokes unjudged — ${breaks.join('; ')})` : '';
     return holds ? { outcome: 'MISMATCH', why: `averi failed (${short(scroll)}) — the app shows it ${g} (${stop} as the stop needs)`, app } : { outcome: 'LOUD', why: `not reached (${g ?? 'no frame'}), and averi said so${unjudged}: ${short(scroll)}`, app };
   }
-  if (tap === undefined || tapped === undefined) return { outcome: 'ok', why: short(scroll) };
+  if (tap === undefined || tapped === undefined) return { outcome: 'ok', why: short(scroll), app };
   if (tapped.outcome !== 'ok') return { ...tapped, why: `stopped (${short(scroll)}), then the tap: ${tapped.why}`, app };
-  return { outcome: 'ok', why: `${short(scroll)}; then ${short(tap)}` };
+  return { outcome: 'ok', why: `${short(scroll)}; then ${short(tap)}`, app };
 }
 
 /**
@@ -276,7 +302,7 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   if (claimsVisible(scroll)) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
   if (fired.length > 0) return { outcome: 'MISMATCH', why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
   if (moved.length > 0) return { outcome: 'MISMATCH', why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
-  return { outcome: 'ok', why: `refused, nothing moved or fired: ${short(scroll)}` };
+  return { outcome: 'ok', why: `refused, nothing moved or fired: ${short(scroll)}`, app };
 }
 
 // --- the cases ---
@@ -291,12 +317,19 @@ export interface VisibilityCase {
   cell: string;
   says: string;
   calls: VisibilityCall[];
-  /** `source`: the tree source the case ran under — a target its static capture's tree of that source did not list (TargetTruth.listed) is not held to R-direction. */
-  judge(state: LabState, replies: string[], launched: LabState, source: string): Verdict;
+  /**
+   * `source`: the tree source the case ran under — a target its static capture's tree of that source did not list
+   * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (live.ts reads one
+   * between the calls of a visibility case).
+   */
+  judge(state: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]): Verdict;
 }
 
+/** The target's static capture's tree of `source` did not list it (TargetTruth.listed): averi cannot know where it lies. */
+export const unlistedIn = (t: Pick<TargetTruth, 'listed'>, source: string) => t.listed?.[source as keyof NonNullable<TargetTruth['listed']>] === false;
+
 /** A text target is asked by its text, as the static rows ask it (golden-spec/false-covers.ts#ownPartsRows); else by id. */
-const selector = (t: Pick<TargetTruth, 'id' | 'text'>) => (t.text !== undefined ? `text:"${t.text}"` : `id:"${t.id}"`);
+export const selector = (t: Pick<TargetTruth, 'id' | 'text'>) => (t.text !== undefined ? `text:"${t.text}"` : `id:"${t.id}"`);
 /** A cut or overlapped target: `fully: true` asks more of it than the plain stop (R-fully). */
 const CUT: readonly string[] = ['partly-centre-in', 'centre-out', 'sliver'];
 const fullyAsked = (g: Geometry | undefined) => g !== undefined && (CUT.includes(g) || isOverlap(g) || g === 'status-band' || g === 'nav-band');
@@ -338,7 +371,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
         cell: truth.cell,
         says: `scroll_until ${t.tag} beneath the presented layer: refused, nothing stroked, nothing dismissed`,
         calls: [{ tool: 'scroll_until', args: { selector: selector(t), direction: directionOf(t, truth) } }],
-        judge: (s, replies, launched) => judgePresentedScroll({ tag: t.tag, view: t.scrollView, platform }, replies, s, launched),
+        judge: (s, replies, launched, _source, after) => judgePresentedScroll({ tag: t.tag, view: t.scrollView, platform }, replies, after[0] ?? s, launched),
       });
       continue;
     }
@@ -366,6 +399,6 @@ function scrollCase(cell: string, t: TargetTruth, view: string, direction: 'up' 
       { tool: 'scroll_until', args: { selector: selector(t), direction, ...(fully && { fully: true }) } },
       { tool: 'tap', args: { selector: selector(t) } },
     ],
-    judge: (s, replies, launched, source) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: t.listed?.[source as keyof NonNullable<TargetTruth['listed']>] === false }, replies, s, launched),
+    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: unlistedIn(t, source) }, replies, s, launched, after[0] ?? s),
   };
 }

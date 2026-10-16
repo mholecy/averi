@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classStrokes, directionBreaks, distanceAt, judgeDismissal, judgePresentedScroll, judgeScroll, judgeTap, showRegion, stopHolds, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { classStrokes, directionBreaks, distanceAt, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, stopHolds, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
 
 // The live golden's visibility judges (scripts/truth/live-visibility.ts): pure over the lab app's state — its tap log,
@@ -177,5 +177,68 @@ describe('judgeDismissal (#7, #19)', () => {
     expect(judgeDismissal('vs', after, 'wda', form(null), launched).outcome).toBe('ok');
     expect(judgeDismissal('vs', after, 'wda', launched, launched).outcome).toBe('LOUD');
     expect(judgeDismissal('vs', 'ERROR The soft keyboard covers id:"x"', 'wda', launched, launched).outcome).toBe('LOUD');
+  });
+});
+
+describe('the visibility cases\' expectations from the static truth', () => {
+  const target = (over: Partial<TargetTruth>): TargetTruth => ({ tag: 'N', id: 'lab.c.N', color: '#000000', declared: 'open', frame: { x: 0, y: 2121, width: 825, height: 99 }, reached: true, probe: [], drawn: 1, seen: '#000000', ...over });
+  const truth = (cell: string, targets: TargetTruth[]): CellTruth => ({ cell, layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets });
+  const launched = state({ events: [] });
+  it('a target in a system band its probe reached: a refusal is ok (R-band), not LOUD; one reached in the open: LOUD', () => {
+    const [band] = visibilityCases(truth('bands', [target({ geometry: 'nav-band' })]), 'android');
+    expect(band.judge(launched, ['ERROR under the navigation bar'], launched, 'uiautomator', []).outcome).toBe('ok');
+    const [open] = visibilityCases(truth('bands', [target({ geometry: 'whole' })]), 'android');
+    expect(open.judge(launched, ['ERROR covered'], launched, 'uiautomator', []).outcome).toBe('LOUD');
+  });
+  it('a target its capture\'s tree of that source did not list: its strokes reported, not judged — listed, judged', () => {
+    const t = target({ tag: 'T', id: 'lab.c.T', geometry: 'off-screen', scrollView: 'page', frame: { x: 51, y: -2, width: 300, height: 64 }, listed: { uiautomator: false, wda: true } });
+    const scroll = visibilityCases(truth('c', [t]), 'ios').find((c) => c.id === 'scroll:c.T')!;
+    const beside = state({ strokes: [stroke(0, 400, 'upper'), stroke(400, 800, 'upper')] });
+    const reply = ['ERROR scroll_until failed after 2 swipes — element never appeared in the tree', 'ERROR'];
+    expect(scroll.judge(beside, reply, launched, 'uiautomator', [beside]).outcome).toBe('LOUD');
+    expect(scroll.judge(beside, reply, launched, 'wda', [beside]).outcome).toBe('MISMATCH');
+  });
+  it('a text target is asked by its text, another by its id', () => {
+    const [byText] = visibilityCases(truth('own-parts', [target({ text: 'LOGIN', geometry: 'whole' })]), 'ios');
+    expect(byText.calls[0].args.selector).toBe('text:"LOGIN"');
+    const [byId] = visibilityCases(truth('own-parts', [target({ geometry: 'whole' })]), 'ios');
+    expect(byId.calls[0].args.selector).toBe('id:"lab.c.N"');
+  });
+});
+
+describe('unchangedClaimBroken: "the last N swipes did not change the screen" against the app\'s strokes', () => {
+  const reply = (n: number, swipes: number) => `ERROR scroll_until id:"x" failed after ${swipes} swipes (the last ${n}, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree`;
+  it('a stroke among the last N moved a scroll view — any one: the claim is about the screen', () => {
+    expect(unchangedClaimBroken(reply(2, 4), [stroke(0, 400, 'upper'), stroke(400, 800, 'upper'), stroke(800, 1100, 'upper'), stroke(1100, 1320, 'upper')])).toMatch(/the last 2 swipes did not change the screen — the app logged upper 800→1100, upper 1100→1320/);
+  });
+  it('the last N moved nothing: the claim stands; fewer strokes than swipes: not judged; "did not move it": not this claim', () => {
+    expect(unchangedClaimBroken(reply(2, 4), [stroke(0, 400), stroke(400, 900), stroke(900, 900), stroke(900, 900)])).toBeUndefined();
+    expect(unchangedClaimBroken(reply(2, 4), [stroke(0, 400), stroke(400, 900)])).toBeUndefined();
+    expect(unchangedClaimBroken('ERROR failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted)', [stroke(0, 400), stroke(400, 900)])).toBeUndefined();
+  });
+  it('in judgeScroll: a MISMATCH even for a target the tree did not list', () => {
+    const moved = state({ strokes: [stroke(0, 400, 'upper'), stroke(400, 800, 'upper')] });
+    expect(judgeScroll({ tag: 'T', view: 'page', fully: false, platform: 'android', unlisted: true }, [reply(2, 2), 'ERROR'], moved, state()).outcome).toBe('MISMATCH');
+  });
+});
+
+describe('judgeScroll judges the stop where scroll_until left it', () => {
+  it('a target visible only after the tap ran (a fling finishing): the stop read at return is what counts', () => {
+    const c = { tag: 'T', view: 'page', fully: false, platform: 'ios' as const };
+    const atStop = state({ frames: { T: { x: 51, y: -2, width: 300, height: 64 } }, offsets: { page: 382 } });
+    const later = state({ frames: { T: { x: 51, y: 300, width: 300, height: 64 } }, offsets: { page: 80 }, strokes: [stroke(382, 80)], events: [{ kind: 'tap', tag: 'T', at }] });
+    expect(judgeScroll(c, ['Element id:"x" visible after 1 swipe', 'Tapped'], later, state(), atStop).outcome).toBe('MISMATCH');
+    expect(judgeScroll(c, ['Element id:"x" visible after 1 swipe', 'Tapped'], later, state(), later).outcome).toBe('ok');
+  });
+  it('the cases hand the state read between the calls to the stop (scroll) and to the refusal beneath a layer', () => {
+    const t: TargetTruth = { tag: 'T', id: 'lab.c.T', color: '#000000', declared: 'open', frame: { x: 51, y: -2, width: 300, height: 64 }, reached: false, probe: [], drawn: 0, seen: '#000000', geometry: 'status-band', scrollView: 'page', visible: { x: 51, y: 0, width: 300, height: 62 } };
+    const cell: CellTruth = { cell: 'c', layer: 'none', device: 'd', screen: { width: 402, height: 874 }, scale: 3, targets: [t] };
+    const scroll = visibilityCases(cell, 'ios').find((x) => x.id === 'scroll:c.T')!;
+    const atStop = state({ frames: { T: { x: 51, y: -2, width: 300, height: 64 } } });
+    const later = state({ frames: { T: { x: 51, y: 300, width: 300, height: 64 } }, offsets: { page: 80 }, strokes: [stroke(382, 80)], events: [{ kind: 'tap', tag: 'T', at }] });
+    expect(scroll.judge(later, ['Element id:"x" visible after 1 swipe', 'Tapped'], state(), 'wda', [atStop]).outcome).toBe('MISMATCH');
+    const beneath = visibilityCases({ ...cell, targets: [{ ...t, declared: 'presented-over' }] }, 'ios').find((x) => x.id === 'scroll:c.T')!;
+    const moved = state({ strokes: [stroke(200, 0, 'page')] });
+    expect(beneath.judge(state(), ['ERROR close it first'], state(), 'wda', [moved]).outcome).toBe('MISMATCH');
   });
 });

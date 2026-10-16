@@ -1,5 +1,5 @@
 import type { Platform } from '../differential/corpus.js';
-import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
+import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth, type CellTruth } from './schema.js';
 
 /**
  * The truth's arithmetic, free of any device (docs/plans/2026-10-15-ground-truth-lab-app.md): where a form control
@@ -527,4 +527,13 @@ export function controlConsistency(c: ControlTruth, outOfProcess: Rect | undefin
   if (c.situation === 'open' && !c.reached) return 'open, but the probe tap did not reach it';
   if (c.situation !== 'open' && c.reached) return `${c.situation}, but the probe tap reached it`;
   return undefined;
+}
+
+/**
+ * Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the
+ * screen), else `up`.
+ */
+export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pick<CellTruth, 'screen'>): 'up' | 'down' {
+  const shown = t.visible ?? { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
+  return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
 }
