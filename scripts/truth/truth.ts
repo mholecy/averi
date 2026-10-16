@@ -8,14 +8,6 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, typ
  * both read it; tests/truth/truth.test.ts pins it.
  */
 
-/**
- * The pinned submit's bar: the submit's frame and the bottom safe-area inset's padding above and below it
- * (Forms.swift). iOS's, in points: Android's forms (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2b) need the
- * bar in pixels — deferred to phase 2b, where the app should report its bar's frame (e.g. `frames["submit.bar"]`) for
- * situationOf to read instead of this guess (round-2 review, MINOR-4).
- */
-export const PINNED_BAR_PADDING = 10;
-
 /** A probe's touch counts as the tap's when it lies this close to the tapped point (the tree's units). */
 export const TOUCH_SLACK = 2;
 
@@ -28,8 +20,12 @@ const inside = (p: { x: number; y: number }, r: Rect) => p.x >= r.x && p.x < r.x
 
 /**
  * Where a control's frame lies, from the app's frames alone. A control laid in the picker sheet is `own.inSheet`; the
- * pinned submit's bar (its frame and PINNED_BAR_PADDING, full width) covers what is laid under it; a control straddling
- * the keyboard's top, or with its centre under the bar, is `covered` — partly hidden.
+ * pinned submit's bar — its frame as the app reports it, `frames["<submit>.bar"]` (Forms.swift, Forms.kt: the bar the
+ * submit rides in, its padding and background included) — covers what is laid under it; a control straddling the
+ * keyboard's top, or with its centre under the bar, is `covered` — partly hidden. A pinned submit whose state reports
+ * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth); the iOS truths captured
+ * before phase 2b were measured with the bar guessed as the submit's frame and 10 pt above and below it, the bar
+ * Forms.swift now reports.
  */
 export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }): Situation {
   if (frame === undefined) return 'not-rendered';
@@ -40,10 +36,8 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
   const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
   if (k !== undefined && frame.y >= k.y) return 'under-keyboard';
   if (k !== undefined && frame.y + frame.height > k.y) return 'covered';
-  const submit = s.frames[form.submit.tag];
-  if (form.submit.pinned === true && own.tag !== form.submit.tag && submit !== undefined && cy >= submit.y - PINNED_BAR_PADDING && cy <= submit.y + submit.height + PINNED_BAR_PADDING) {
-    return 'covered';
-  }
+  const bar = s.frames[`${form.submit.tag}.bar`];
+  if (form.submit.pinned === true && own.tag !== form.submit.tag && bar !== undefined && inside({ x: frame.x + frame.width / 2, y: cy }, bar)) return 'covered';
   return 'open';
 }
 
@@ -368,8 +362,41 @@ export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
   if (visible === null) return null;
   const bands = bandsOf(ctx.screen, ctx.safeArea);
   const covers = [bands.status, bands.nav, ...Object.values(ctx.chrome ?? {})].filter((r): r is Rect => r !== undefined);
+  return largestPiece(visible, covers);
+}
+
+/** Android's minimum touch target: 48 dp (Compose's minimumInteractiveComponentSize). */
+export const MIN_TOUCH_DP = 48;
+/**
+ * The area a Compose control takes touches in: its frame grown about its centre to at least MIN_TOUCH_DP on each side
+ * (`density` pixels per dp) — measured on averi_lab: a 99-px field is dumped 132 px tall. The frame itself without a
+ * density.
+ */
+export function touchTargetOf(frame: Rect, density: number | undefined): Rect {
+  if (density === undefined) return frame;
+  const min = MIN_TOUCH_DP * density;
+  const w = Math.max(frame.width, min);
+  const h = Math.max(frame.height, min);
+  return { x: Math.round(frame.x - (w - frame.width) / 2), y: Math.round(frame.y - (h - frame.height) / 2), width: Math.round(w), height: Math.round(h) };
+}
+
+/** What of `visible` the `covers` leave, its largest rect — the piece a tap can land on; null when nothing. */
+export function largestPiece(visible: Rect, covers: readonly Rect[]): Rect | null {
   const pieces = covers.reduce<Rect[]>((ps, c) => ps.flatMap((p) => subtract(p, c)), [visible]);
   return pieces.reduce<Rect | null>((best, p) => (best === null || area(p) > area(best) ? p : best), null);
+}
+
+/**
+ * A `covered` form control's piece: the largest part of its frame on the screen clear of the keyboard and of the
+ * pinned submit's own frame (not its bar's: the bar's padding draws over the control but may let a tap through — it
+ * is the probe at the piece that says, ControlTruth.reachedAtPiece). null when nothing of it is clear.
+ */
+export function controlPiece(frame: Rect, s: LabState, form: CatalogForm, own: { tag: string }): Rect | null {
+  const visible = intersect(frame, { x: 0, y: 0, width: s.screen.width, height: s.screen.height });
+  if (visible === null) return null;
+  const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
+  const submit = form.submit.pinned === true && own.tag !== form.submit.tag ? s.frames[form.submit.tag] : undefined;
+  return largestPiece(visible, [k, submit].filter((r): r is Rect => r !== undefined));
 }
 
 /**

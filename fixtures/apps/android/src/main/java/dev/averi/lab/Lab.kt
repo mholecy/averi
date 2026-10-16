@@ -27,9 +27,13 @@ val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert")
 /** `text`: a text target (B5's own-parts) — this text drawn on its coloured control, the control's box `<tag>.box`. */
 data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null)
 
-/** `family`: base, presented, forms, edges, bars, false-covers — MainActivity's CellRouter routes by it. */
-data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null) {
-    val supported get() = layer in SUPPORTED_LAYERS
+/**
+ * `family`: base, presented, forms, edges, bars, false-covers — MainActivity's CellRouter routes by it. `form`: a form
+ * cell's catalog entry as it stands (Forms.kt reads it) — a form builds its own picker sheet, so its `sheet-large` is
+ * supported where a coloured-target cell's is not.
+ */
+data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null, val form: JSONObject? = null) {
+    val supported get() = layer in SUPPORTED_LAYERS || (form != null && layer == "sheet-large")
 }
 
 /**
@@ -55,7 +59,7 @@ object Catalog {
                     text = t.optString("text").ifEmpty { null },
                 )
             }
-            Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null })
+            Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null }, c.optJSONObject("form"))
         }
     }
 }
@@ -66,6 +70,8 @@ object Catalog {
  */
 class Lab(context: Context, private val screen: Rect) {
     private val file = File(context.filesDir, "lab-state.json")
+    /** Pixels per dp — the state's `density`: what Android's 48-dp minimum touch target is in the state's units. */
+    private val density = context.resources.displayMetrics.density
     private var cell = ""
     private var ready = false
     private val frames = linkedMapOf<String, Rect>()
@@ -74,6 +80,12 @@ class Lab(context: Context, private val screen: Rect) {
     private var safeArea: Rect? = null
     private val scrollViews = linkedMapOf<String, Rect>()
     private val chrome = linkedMapOf<String, Rect>()
+    // A form cell's oracle (Forms.kt; scripts/truth/schema.ts#LabState's fields, focus, keyboard, submits): null — absent
+    // from the file — on every other cell.
+    private var fields: LinkedHashMap<String, JSONObject>? = null
+    private var focus: String? = null
+    private var keyboard: JSONObject? = null
+    private var submits: JSONArray? = null
 
     /** A fresh state for `id` (`unknown:<id>` / `unsupported:<id>` when this app cannot show it). */
     fun show(id: String, found: Cell?) {
@@ -88,6 +100,10 @@ class Lab(context: Context, private val screen: Rect) {
         safeArea = null
         scrollViews.clear()
         chrome.clear()
+        fields = if (found?.form != null) linkedMapOf() else null
+        focus = null
+        keyboard = null
+        submits = if (found?.form != null) JSONArray() else null
         write()
     }
 
@@ -121,6 +137,43 @@ class Lab(context: Context, private val screen: Rect) {
         write()
     }
 
+    // --- the form oracle (Forms.kt): what the MODEL holds, never what a tree reports ---
+
+    /** One field as the model holds it: its value, whether it has the focus, the error it shows (text and id) or none. */
+    fun field(tag: String, value: String, focused: Boolean, error: Pair<String, String>?) {
+        val f = JSONObject().put("value", value).put("focused", focused)
+            .put("error", error?.let { JSONObject().put("text", it.first).put("id", it.second) } ?: JSONObject.NULL)
+        val all = fields ?: return
+        if (all[tag]?.toString() == f.toString()) return
+        all[tag] = f
+        write()
+    }
+
+    /** The field holding the focus (null: none) — a `focus` event, `tag` empty for none. */
+    fun focused(tag: String?) {
+        if (focus == tag) return
+        focus = tag
+        event("focus", tag ?: "")
+    }
+
+    /**
+     * The IME's frame on the screen in pixels, from Compose's WindowInsets.ime (its bottom inset: the keyboard spans the
+     * screen's width from `screen.bottom - inset` down), `visible` while the inset is not 0, and the field focused when
+     * it changed — the one it serves.
+     */
+    fun keyboard(frame: Rect, visible: Boolean) {
+        val k = JSONObject().put("frame", rect(frame)).put("visible", visible).put("field", focus ?: JSONObject.NULL)
+        if (keyboard?.toString() == k.toString()) return
+        keyboard = k
+        write()
+    }
+
+    fun submit(valid: Boolean, values: Map<String, String>) {
+        val now = System.currentTimeMillis() / 1000.0
+        submits?.put(JSONObject().put("at", now).put("valid", valid).put("values", JSONObject(values)))
+        event("submit", if (valid) "valid" else "invalid")
+    }
+
     fun settled() {
         ready = true
         write()
@@ -145,11 +198,18 @@ class Lab(context: Context, private val screen: Rect) {
             .put("ready", ready)
             .put("screen", rect(screen))
             .put("scale", 1)
+            .put("density", density.toDouble())
             .put("frames", JSONObject().apply { frames.forEach { (k, v) -> put(k, rect(v)) } })
             .put("events", JSONArray(events))
         safeArea?.let { json.put("safeArea", JSONObject().put("top", it.top).put("left", it.left).put("bottom", it.bottom).put("right", it.right)) }
         if (scrollViews.isNotEmpty()) json.put("scrollViews", JSONObject().apply { scrollViews.forEach { (k, v) -> put(k, rect(v)) } })
         if (chrome.isNotEmpty()) json.put("chrome", JSONObject().apply { chrome.forEach { (k, v) -> put(k, rect(v)) } })
+        fields?.let { all ->
+            json.put("fields", JSONObject().apply { all.forEach { (k, v) -> put(k, v) } })
+            json.put("focus", focus ?: JSONObject.NULL)
+            json.put("keyboard", keyboard ?: JSONObject.NULL)
+            json.put("submits", submits)
+        }
         val tmp = File(file.parentFile, "lab-state.json.tmp")
         tmp.writeText(json.toString(2) + "\n")
         tmp.renameTo(file)

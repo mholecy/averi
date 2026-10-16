@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
@@ -8,7 +8,7 @@ import type { Recording } from './corpus.js';
 import { configFor, connect, type Outcome } from './differential.js';
 import { expectations, formExpectations, replyKind, sent, type ReplyKind, type Verb } from './golden-spec.js';
 import type { Side } from './side.js';
-import { pct, type CellTruth } from '../truth/schema.js';
+import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
 
 /**
@@ -80,12 +80,19 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   const screenshot = await readFile(recording.screenshot);
   const png = PNG.sync.read(screenshot);
   const result: GoldenResult = { recording: recording.id, checks: [], broken: [] };
+  // Android captured with the IME up: the device's own keyboard answers, the keyboard shown at each call's start.
+  const ime = truth.ime === undefined ? undefined : (JSON.parse(await readFile(join(dirname(recording.truth), truth.ime), 'utf8')) as ImeCapture);
+  // …and the screen after one back hid it, for the replayed tree's source (CellTruth.afterBack).
+  const backTree = truth.afterBack?.trees[recording.source];
+  const afterBackXml = backTree === undefined || recording.source !== 'uiautomator' ? undefined : await readFile(join(dirname(recording.truth), backTree), 'utf8');
   const profile = {
     platform: recording.platform,
     screen: recording.screen ?? truth.screen,
     frame: { width: png.width, height: png.height },
     screenshot,
     ...(recording.app !== undefined && { app: recording.app }),
+    ...(ime !== undefined && { ime, keyboard: 'shown' as const }),
+    ...(afterBackXml !== undefined && { afterBackXml }),
   };
   const config = await configFor(recording, undefined, truth.config);
   const c = await connect(side, recording, profile);
@@ -110,7 +117,8 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     });
     result.broken.push(...brokenControls);
     if (brokenControls.length === 0) {
-      for (const e of formExpectations(recording.platform, truth, recording.source)) {
+      // A live-only form row (Expectation.live) is the live golden's, never asked here — as a target's.
+      for (const e of formExpectations(recording.platform, truth, recording.source).filter((x) => x.live === undefined)) {
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome));
       }

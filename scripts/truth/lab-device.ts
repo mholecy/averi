@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import type { CatalogCell, LabState, NavigationMode } from './schema.js';
+import type { CatalogCell, ImeCapture, ImeReadings, LabState, NavigationMode } from './schema.js';
 
 /**
  * The lab app on one device, driven with the raw tools only (simctl, idb, WDA's own `/source`; adb) — what the truth
@@ -50,6 +50,16 @@ export interface LabDevice {
    * Android: the navigation mode (CellTruth.navigation), undefined when the device does not say. Absent on iOS.
    */
   navigation?(): Promise<NavigationMode | undefined>;
+  /**
+   * Android, with the IME up: what averi's keyboard queries answer now, then after one `back` hid it
+   * (schema.ts#ImeCapture). Leaves the keyboard hidden. Absent on iOS (its keyboard is in the tree).
+   */
+  ime?(): Promise<ImeCapture>;
+  /**
+   * Android: hide the IME as averi's tap guard does (one `input keyevent 4`, src/mcp/tools.ts tap: "the keyboard is
+   * hidden (back) and the element found again first") and give it time to go. Absent on iOS.
+   */
+  hideKeyboard?(): Promise<void>;
 }
 
 /** Wait for a fresh launch's state: the cell named, ready (10 s at most), then 300 ms for the last write to land. */
@@ -221,6 +231,13 @@ export class IosLab implements LabDevice {
  */
 const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert']);
 
+/**
+ * averi's keyboard queries (src/adapters/android.ts: INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND), word for word — copied,
+ * not imported, so the capture asks what averi asks without loading the code it judges.
+ */
+export const IME_INPUT_SHOWN = 'dumpsys input_method | grep -m1 -w mInputShown';
+export const IME_TOUCHABLE = `${IME_INPUT_SHOWN}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
+
 export class AndroidLab implements LabDevice {
   readonly platform = 'android';
 
@@ -256,8 +273,9 @@ export class AndroidLab implements LabDevice {
   }
 
   unsupported(cell: CatalogCell): string | undefined {
+    // A form cell builds its own picker sheet (Forms.kt): its `sheet-large` is the form's, not a presented layer's.
+    if (cell.form !== undefined && cell.layer === 'sheet-large') return undefined;
     if (!ANDROID_LAYERS.has(cell.layer)) return `layer ${cell.layer} is not one the Android app builds`;
-    if (cell.form !== undefined) return 'a form cell — the Android app builds them from phase 2b on';
     return undefined;
   }
 
@@ -287,6 +305,23 @@ export class AndroidLab implements LabDevice {
     await this.guard();
     const mode = (await this.adb('shell', 'settings', 'get', 'secure', 'navigation_mode')).stdout.trim();
     return ({ '0': 'three-button', '1': 'two-button', '2': 'gesture' } as const)[mode as '0' | '1' | '2'];
+  }
+
+  async ime(): Promise<ImeCapture> {
+    await this.guard();
+    const read = async (): Promise<ImeReadings> => ({
+      displays: (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout,
+      inputShown: (await this.adb('shell', IME_INPUT_SHOWN).catch(() => ({ stdout: '' }))).stdout,
+      touchable: (await this.adb('shell', IME_TOUCHABLE)).stdout,
+    });
+    const shown = await read();
+    await this.hideKeyboard();
+    return { shown, hidden: await read() };
+  }
+
+  async hideKeyboard(): Promise<void> {
+    await this.adb('shell', 'input', 'keyevent', '4');
+    await pause(1_500);
   }
 
   async screenshot(): Promise<Buffer> {

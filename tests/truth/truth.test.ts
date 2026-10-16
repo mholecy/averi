@@ -16,6 +16,7 @@ import {
   readControlProbe,
   readTargetProbe,
   situationOf,
+  touchTargetOf,
   touchesAt,
 } from '../../scripts/truth/truth.js';
 
@@ -25,7 +26,10 @@ import {
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
 const SCREEN = rect(0, 0, 402, 874);
 
-/** form-keyboard as captured on the iPhone 17: the keyboard's top at 573, the submit pinned at 516.7..563 above it. */
+/**
+ * form-keyboard as captured on the iPhone 17: the keyboard's top at 573, the submit pinned at 516.7..563 above it, in
+ * its bar (the app reports `submit.bar`: the safe-area inset's 10-pt padding above and below, the screen's width).
+ */
 const FORM: CatalogForm = {
   title: 'Transfer details',
   fields: [{ tag: 'phone', kind: 'text', title: 'Phone' }],
@@ -36,7 +40,7 @@ const state = (over: Partial<LabState> = {}): LabState => ({
   ready: true,
   screen: SCREEN,
   scale: 3,
-  frames: { submit: rect(20, 516.7, 362, 46.3) },
+  frames: { submit: rect(20, 516.7, 362, 46.3), 'submit.bar': rect(0, 506.7, 402, 66.3) },
   events: [],
   keyboard: { frame: rect(0, 573, 402, 301), visible: true, field: 'postcode' },
   ...over,
@@ -51,8 +55,10 @@ describe('situationOf', () => {
     ['under-keyboard from the keyboard top exactly', rect(20, 573, 362, 34), state(), 'under-keyboard'],
     ['covered: straddling the keyboard top', rect(20, 560, 362, 34), state(), 'covered'],
     ['covered: centre in the pinned bar band (the phone field under Continue)', rect(20, 530, 362, 34), state(), 'covered'],
-    ['covered: centre just inside the 10 pt inset padding above the submit', rect(20, 489.8, 362, 34), state(), 'covered'],
-    ['open: centre just past the padding', rect(20, 488.6, 362, 34), state(), 'open'],
+    ['covered: centre just inside the bar\'s 10 pt padding above the submit', rect(20, 489.8, 362, 34), state(), 'covered'],
+    ['open: centre just above the bar', rect(20, 488.6, 362, 34), state(), 'open'],
+    ['open: centre beside a bar narrower than the screen (Android reports its own)', rect(0, 530, 60, 34), state({ frames: { submit: rect(20, 516.7, 362, 46.3), 'submit.bar': rect(100, 506.7, 302, 66.3) } }), 'open'],
+    ['open: a pinned submit whose state reports no bar covers nothing', rect(20, 530, 362, 34), state({ frames: { submit: rect(20, 516.7, 362, 46.3) } }), 'open'],
     ['open: the same field when the submit is not pinned', rect(20, 530, 362, 34), state(), 'open', UNPINNED],
     ['off-screen: centre below the screen', rect(20, 900, 362, 34), state(), 'off-screen'],
     ['off-screen: centre above the screen', rect(20, -60, 362, 34), state(), 'off-screen'],
@@ -319,7 +325,7 @@ function formState(cell: string): Omit<LabState, 'events'> {
       ready: true,
       screen: SCREEN,
       scale: 3,
-      frames: { name: rect(20, 160, 362, 34), 'name.error': rect(20, 200, 150, 16), phone: rect(20, 530, 362, 34), vs: rect(20, 604, 362, 34), submit: rect(20, 516.7, 362, 46.3), screenError: rect(20, 300, 362, 20) },
+      frames: { name: rect(20, 160, 362, 34), 'name.error': rect(20, 200, 150, 16), phone: rect(20, 530, 362, 34), vs: rect(20, 604, 362, 34), submit: rect(20, 516.7, 362, 46.3), 'submit.bar': rect(0, 506.7, 402, 66.3), screenError: rect(20, 300, 362, 20) },
       fields: { name: { value: 'Ann', focused: true, error: { text: 'Required', id: 'lab.form-k.name_error' } }, phone: empty, vs: empty },
       focus: 'name',
       keyboard: { frame: rect(0, 573, 402, 301), visible: true, field: 'name' },
@@ -352,11 +358,11 @@ const FORM_TAPS: Record<string, (s: { focus: string | null }) => ProbeEvent[]> =
 };
 
 class FakeIosFormLab implements LabDevice {
-  readonly platform = 'ios';
+  readonly platform: 'ios' | 'android' = 'ios';
   taps: string[] = [];
-  private cell = '';
-  private focus: string | null = null;
-  private events: LabState['events'] = [];
+  protected cell = '';
+  protected focus: string | null = null;
+  protected events: LabState['events'] = [];
   constructor(private readonly touches = true) {}
   async describe() {
     return 'averi-lab iPhone 17 simulator, iOS 27.0';
@@ -402,7 +408,7 @@ describe('capture of a form cell (iOS)', () => {
     const lab = new FakeIosFormLab();
     const { broken, manifest } = await runForm(lab, [FORM_KEYBOARD]);
     expect(broken).toEqual([]);
-    expect(lab.taps).toEqual(['form-k 201,177', 'form-k 201,547', 'form-k 201,621', 'form-k 201,540']);
+    expect(lab.taps).toEqual(['form-k 201,177', 'form-k 201,547', 'form-k 201,564', 'form-k 201,621', 'form-k 201,540']);
     const truth = await truthOf('form-k');
     expect(truth.targets).toEqual([]);
     expect(truth.form!.fields).toEqual([
@@ -412,8 +418,8 @@ describe('capture of a form cell (iOS)', () => {
     ]);
     expect(truth.form!.controls).toEqual([
       { tag: 'name', id: 'lab.form-k.name', kind: 'field', frame: rect(20, 160, 362, 34), situation: 'open', reached: true, probe: [ev('touch', '201.0,177.0')] },
-      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')] },
-      { tag: 'vs', id: 'lab.form-k.vs', kind: 'field', frame: rect(20, 604, 362, 34), situation: 'under-keyboard', reached: false, probe: [ev('touch', '201.0,621.0')] },
+      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')], piece: { x: 20, y: 563, width: 362, height: 1 }, reachedAtPiece: false },
+      { tag: 'vs', id: 'lab.form-k.vs', kind: 'field', frame: rect(20, 604, 362, 34), situation: 'under-keyboard', reached: false, probe: [ev('touch', '201.0,621.0')], seen: '#000000' },
       { tag: 'submit', id: 'lab.form-k.submit', kind: 'button', frame: rect(20, 516.7, 362, 46.3), situation: 'open', reached: true, probe: [ev('touch', '201.0,540.0')] },
     ]);
     expect(truth.form!.keyboard).toEqual({ frame: rect(0, 573, 402, 301), field: 'name' });
@@ -451,6 +457,82 @@ describe('capture of a form cell (iOS)', () => {
       expect.stringMatching(/^form-k\/submit: the probe tap left no touch/),
     ]);
   }, 15_000);
+});
+
+/**
+ * The keyboard cell on Android: the IME out of the app's process (a key's touch is never logged), its readings captured
+ * (ime), and a tap after `back` (hideKeyboard) reaching the field under it, as the app's layout keeps its place.
+ */
+class FakeAndroidFormLab extends FakeIosFormLab {
+  override readonly platform = 'android';
+  hidden = false;
+  imeReads = 0;
+  override async launch(cell: string): Promise<LabState> {
+    this.hidden = false;
+    return super.launch(cell);
+  }
+  override async tap(x: number, y: number) {
+    if (this.hidden && `${x},${y}` === '201,621') {
+      this.taps.push(`form-k ${x},${y} after back`);
+      await super.tap(x, y);
+      this.focus = 'vs';
+      this.events.push({ kind: 'focus', tag: 'vs', at: 0 });
+      return;
+    }
+    if (!this.hidden && `${x},${y}` === '201,621') {
+      this.taps.push(`form-k ${x},${y}`); // on the IME: no touch logged in the app
+      return;
+    }
+    await super.tap(x, y);
+  }
+  async ime() {
+    this.imeReads++;
+    this.hidden = true;
+    const r = (shown: boolean) => ({ displays: `displays ${shown}`, inputShown: `mInputShown=${shown}`, touchable: `touchable ${shown}` });
+    return { shown: r(true), hidden: r(false) };
+  }
+  async hideKeyboard() {
+    this.hidden = true;
+  }
+}
+
+describe('capture of a form cell (Android)', () => {
+  const runForm = (lab: LabDevice, cells: CatalogCell[]) => capture(lab, cells, { out, note: 'test', catalog: [FORM_KEYBOARD], log: () => undefined });
+
+  it('the IME\'s readings beside the truth; under it: no touch needed, the colour shown over it, the tap after back', async () => {
+    const lab = new FakeAndroidFormLab();
+    const { broken } = await runForm(lab, [FORM_KEYBOARD]);
+    expect(broken).toEqual([]);
+    expect(lab.imeReads).toBe(1);
+    const truth = JSON.parse(await readFile(join(out, 'form-k.truth.json'), 'utf8')) as CellTruth;
+    expect(truth.ime).toBe('form-k.ime.json');
+    // The screen after ime()'s back, beside the truth: each tree and the state.
+    expect(truth.afterBack).toEqual({ state: 'form-k.after-back.state.json', trees: { wda: 'form-k.after-back.wda.json', idb: 'form-k.after-back.idb.json' } });
+    expect(JSON.parse(await readFile(join(out, 'form-k.after-back.state.json'), 'utf8')).cell).toBe('form-k');
+    expect(JSON.parse(await readFile(join(out, 'form-k.ime.json'), 'utf8')).hidden.inputShown).toBe('mInputShown=false');
+    const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
+    expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', reachedAfterBack: true, probeAfterBack: [ev('touch', '201.0,621.0')] });
+    expect(truth.form!.controls.filter((c) => c.reachedAfterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);
+  }, 15_000);
+
+  it('a pinned submit whose state reports no bar is refused: every control under it would read open', async () => {
+    const lab = new FakeAndroidFormLab();
+    const state = lab.state.bind(lab);
+    lab.state = async () => {
+      const s = await state();
+      if (s !== undefined) delete s.frames['submit.bar'];
+      return s;
+    };
+    await expect(runForm(lab, [FORM_KEYBOARD])).rejects.toThrow(/no frame for submit\.bar/);
+  }, 15_000);
+});
+
+describe('touchTargetOf: a Compose control\'s 48-dp touch target', () => {
+  it('grows a frame shorter than 48 dp about its centre (averi_lab: a 99-px field dumped 132 px tall), keeps a larger one, and is the frame without a density', () => {
+    expect(touchTargetOf(rect(55, 2024, 970, 99), 2.75)).toEqual(rect(55, 2008, 970, 132));
+    expect(touchTargetOf(rect(55, 1238, 970, 160), 2.75)).toEqual(rect(55, 1238, 970, 160));
+    expect(touchTargetOf(rect(55, 2024, 970, 99), undefined)).toEqual(rect(55, 2024, 970, 99));
+  });
 });
 
 describe('listedIn: whether a raw tree lists a node identified as the target', () => {

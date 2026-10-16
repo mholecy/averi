@@ -6,11 +6,11 @@ open note on the working tree. See the script for the verdicts.
 
 | # | note | status | before → after | verdict |
 |---|---|---|---|---|
-| 1 | 2026-10-05-android-floating-gboard-keyboard | needs-2b | 7d9a783 → cb77485, 9131730 | — |
+| 1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)) |
 | 2 | 2026-10-05-ios-tap-lands-on-soft-keyboard | calibrate | 73eea5f → 6f41787 | CALIBRATED (partial: stage A only) |
-| 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | needs-2b | 926b826 → 95f75f4 | — |
+| 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED (partial: the colour assert) |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
-| 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the iOS leg only) |
+| 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
 | 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
 | 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED (partial: the first fix (7542021): SwiftUI's own full-screen `Toolbar` host) |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
@@ -53,6 +53,32 @@ open note on the working tree. See the script for the verdicts.
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | open | working tree | OPEN-RED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
+| F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | open | working tree | OPEN-RED |
+
+## 1: DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime))
+
+2026-10-05-android-floating-gboard-keyboard.md — defect: `^Tapped|reached with no swipe, under the keyboard`
+
+- before 7d9a783:
+  - ok android-averi_lab-api33/form-keyboard.xml vs tap — Tapped id:"lab.form-keyboard.vs" (the soft keyboard covered id:"lab.form-keyboard.vs"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard.xml ks tap — Tapped id:"lab.form-keyboard.ks" (the soft keyboard covered id:"lab.form-keyboard.ks"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard.xml ss tap — Tapped id:"lab.form-keyboard.ss" (the soft keyboard covered id:"lab.form-keyboard.ss"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
+  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
+  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
+  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 scre
+- after cb77485:
+  - ok android-averi_lab-api33/form-keyboard.xml vs tap — Tapped id:"lab.form-keyboard.vs" (the soft keyboard covered id:"lab.form-keyboard.vs"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard.xml ks tap — Tapped id:"lab.form-keyboard.ks" (the soft keyboard covered id:"lab.form-keyboard.ks"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard.xml ss tap — Tapped id:"lab.form-keyboard.ss" (the soft keyboard covered id:"lab.form-keyboard.ss"; hidden before tapping)
+  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
+  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
+  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen
+  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 scre
+
+Needs: a floating-Gboard capture: form-keyboard on averi_lab with Gboard switched to floating (its ITYPE_IME inset only the 132-px collapse strip, the panel a second rect of `dumpsys window InputMethod`'s touchable region — the three readings CellTruth.ime serves, captured by AndroidLab.ime), a field under the panel and clear of the strip: its tap must not press a key, its scroll_until must not stop under the panel.
+
+Docked, the fix leaves the band as it was by design (the touchable region equals the band, no panel): the tap rows (Tapped after one back, inside the field) and the scroll_until rows (touch-downs above y 1398) are green at 7d9a783 and at cb77485 alike, golden identical on the cell. The note's symptom (a guarded tap pressing Gboard's `d` key, a row behind the panel fully visible) needs the panel.
 
 ## 2: CALIBRATED (partial: stage A only)
 
@@ -71,6 +97,25 @@ open note on the working tree. See the script for the verdicts.
 
 Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a config variant. The same fields' scroll_until rows stay red here: they are #5's (iOS leg, 9131730).
 
+## 3: CALIBRATED (partial: the colour assert)
+
+2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md — defect: `^passed on`
+
+- before 926b826:
+  - RED android-averi_lab-api33/form-keyboard.xml vs colour — passed on #F0F0F3, the keyboard's: PASS  element id:"lab.form-keyboard.vs" fill within dE00 8 of #F0F0F3 — sampled #F8F8F9 (dominant, 98% of region) vs expected #F0F0F3 → dE00 1.93 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard.xml ks colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard.ks" fill within dE00 8 of #FFFFFF — sampled #FAFAFB (dominant, 95% of region) vs expected #FFFFFF → dE00 1.12 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard.xml ss colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard.ss" fill within dE00 8 of #FFFFFF — sampled #FBFBFC (dominant, 95% of region) vs expected #FFFFFF → dE00 0.95 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard.xml note colour — passed on #F0F0F3, the keyboard's: PASS  element id:"lab.form-keyboard.note" fill within dE00 8 of #F0F0F3 — sampled #F6F6F7 (dominant, 87% of region) vs expected #F0F0F3 → dE00 1.60 ≤ 8; scale 1.000
+- after 95f75f4:
+  - ok android-averi_lab-api33/form-keyboard.xml vs colour — FAIL  element id:"lab.form-keyboard.vs" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,1462 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
+  - ok android-averi_lab-api33/form-keyboard.xml ks colour — FAIL  element id:"lab.form-keyboard.ks" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
+  - ok android-averi_lab-api33/form-keyboard.xml ss colour — FAIL  element id:"lab.form-keyboard.ss" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1826 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
+  - ok android-averi_lab-api33/form-keyboard.xml note colour — FAIL  element id:"lab.form-keyboard.note" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,2008 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, o
+
+Needs: the OCR half: phase 4 (ocr judged on real pixels; the note's `ocr CONTINUE` read the keyboard's ?123).
+
+Each field under the docked IME asked for the colour the screenshot shows over it (ControlTruth.seen: the keyboard's #F0F0F3 / #FFFFFF): at 926b826 every one PASSes, measuring the keyboard (sampled #F8F8F9, 98 % of the region, for vs); at 95f75f4 each fails closed naming the soft keyboard over the element.
+
 ## 4: CALIBRATED
 
 2026-10-08-ios-tap-off-screen-reported-done.md — defect: `^Tapped`
@@ -88,7 +133,7 @@ Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a conf
 
 edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; golden-spec/edges.ts#notListed).
 
-## 5: CALIBRATED (partial: the iOS leg only)
+## 5: CALIBRATED
 
 2026-10-08-scroll-until-ignores-android-soft-keyboard.md — defect: `reached with no swipe, under the keyboard|touched down under the keyboard`
 
@@ -97,15 +142,21 @@ edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (ab
   - RED ios-iphone17-ios27/form-keyboard.wda.json ks scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ks" fully visible after 0 swipes
   - RED ios-iphone17-ios27/form-keyboard.wda.json ss scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ss" fully visible after 0 swipes
   - RED ios-iphone17-ios27/form-keyboard.wda.json note scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.note" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml vs scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.vs" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml ks scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ks" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml ss scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.ss" fully visible after 0 swipes
+  - RED android-averi_lab-api33/form-keyboard.xml note scroll_until — reached with no swipe, under the keyboard: Element id:"lab.form-keyboard.note" fully visible after 0 swipes
 - after 9131730:
   - ok ios-iphone17-ios27/form-keyboard.wda.json vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 402x874 viewport (last rect {"x":20,"y":604,"width":362,"height":34}). The soft keyboard was up o
   - ok ios-iphone17-ios27/form-keyboard.wda.json ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 402x874 viewport (last rect {"x":20,"y":678,"width":362,"height":34}). The soft keyboard was up o
   - ok ios-iphone17-ios27/form-keyboard.wda.json ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 402x874 viewport (last rect {"x":20,"y":752,"width":362,"height":34}). The soft keyboard was up o
   - ok ios-iphone17-ios27/form-keyboard.wda.json note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 402x874 viewport (last rect {"x":20,"y":826,"width":362,"height":34}). The soft keyboard was up
+  - ok android-averi_lab-api33/form-keyboard.xml vs scroll_until — ERROR scroll_until id:"lab.form-keyboard.vs" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1462,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml ks scroll_until — ERROR scroll_until id:"lab.form-keyboard.ks" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1644,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml ss scroll_until — ERROR scroll_until id:"lab.form-keyboard.ss" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":1826,"width":970,"height":132}). The soft keyboard was 
+  - ok android-averi_lab-api33/form-keyboard.xml note scroll_until — ERROR scroll_until id:"lab.form-keyboard.note" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":55,"y":2008,"width":970,"height":132}). The soft keyboard wa
 
-Needs: The note's Android leg needs phase 2b (an Android form-keyboard cell with the IME served).
-
-The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus.
+The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc603a and 565b747 change nothing in the lab corpus. The Android leg (phase 2b's form-keyboard, the IME's readings served): at 98e49b7 vs, ks, ss and note are "fully visible after 0 swipes" under the docked IME; at 9131730 each fails after 6 swipes (maxSwipes) touching down at y 1118, above the keyboard's top (1398), naming the keyboard (at HEAD: 2 swipes touching down at y 1034).
 
 ## 6: CALIBRATED
 
@@ -799,10 +850,17 @@ No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke be
 
 No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part).
 
+## F2A1: OPEN-RED
+
+2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md — defect: `reached with no swipe where a tap fires`
+
+- working tree:
+  - RED android-averi_lab-api33/form-keyboard.xml phone scroll_until — reached with no swipe where a tap fires submit invalid: Element id:"lab.form-keyboard.phone" visible after 0 swipes — CLIPPED at bottom, 67% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. A rect assert or screenshot on this elem
+
+No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row.
+
 ## Not reproducible with the existing cells
 
-- 1 2026-10-05-android-floating-gboard-keyboard.md: needs-2b
-- 3 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md: needs-2b
 - 10 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md: needs-cell:edges — edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.
 - 24 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md: residual:accepted (round 13: the FAB host layer is a cover)
 - 25 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped.md: residual:ADR 0007 (idb's QuickType bar)

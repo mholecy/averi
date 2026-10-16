@@ -1,6 +1,6 @@
 {
   "family": "forms",
-  "note": "The form cells (phase 1b): fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android: phase 2b).",
+  "note": "The form cells (phase 1b): fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android, phase 2b: the IME drawn over the form, which keeps its height; only the pinned submit bar rides above it). A pinned submit reports its bar as `<submit>.bar` (truth.ts#situationOf).",
   "cells": [
     {
       "id": "form-basic",

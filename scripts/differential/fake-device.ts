@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { PNG } from 'pngjs';
 import type { Platform, Screen } from './corpus.js';
+import type { ImeCapture } from '../truth/schema.js';
 
 /**
  * The fake device of the differential harness: the PROCESS boundary, faked
@@ -37,7 +38,8 @@ import type { Platform, Screen } from './corpus.js';
  *    region (docked or floating Gboard, tests/helpers/android-dumps.ts's
  *    measurements), `screencap -p` the frame, every `input` accepted — and
  *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
- *    running (`pidof`), no log.
+ *    running (`pidof`), no log. A ground-truth capture with the IME up serves
+ *    the device's own three keyboard answers instead (DeviceProfile.ime).
  *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
  *    caller asks — what a colour assert on that rect must sample; or, for
  *    a ground-truth capture (golden.ts), the screenshot the device showed.
@@ -66,6 +68,18 @@ export interface DeviceProfile {
   app?: string;
   /** The captured screenshot (PNG): answered as it is, in place of the grey frame — `frame` must be its size. */
   screenshot?: Buffer;
+  /**
+   * Android, a ground-truth capture with the IME up (scripts/truth/schema.ts#ImeCapture): the device's own answers to
+   * the three keyboard queries, served in place of the stock dumps — `shown` while the keyboard is (set `keyboard:
+   * 'shown'`), `hidden` once a `back` hid it.
+   */
+  ime?: ImeCapture;
+  /**
+   * Android, a ground-truth capture with the IME up: the dump of the screen after one `back` hid it
+   * (CellTruth.afterBack) — answered for `uiautomator dump` once `input keyevent 4` has been sent in the call, as the
+   * layout the app takes then (the bar back at the bottom).
+   */
+  afterBackXml?: string;
 }
 
 /** A rect of the frame, in its pixels, painted one colour. */
@@ -77,6 +91,8 @@ export interface Paint {
 interface DeviceState {
   profile: DeviceProfile;
   keyboard: KeyboardState;
+  /** The dump answered now: the profile's, until a `back` swaps in its afterBackXml. */
+  dumpXml?: string;
   paint?: Paint;
   calls: string[];
 }
@@ -86,7 +102,7 @@ let current: DeviceState | undefined;
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
   if (profile.screenshot !== undefined) servedScreenshot(profile.frame, profile.screenshot);
-  current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [] };
+  current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [], ...(profile.dumpXml !== undefined && { dumpXml: profile.dumpXml }) };
 }
 
 /** Paint `paint.rect` of every frame until the next reset (one call). */
@@ -178,7 +194,12 @@ const TOUCHABLE: Record<KeyboardState, string> = {
   floating: '  touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))\n',
 };
 
+/** The captured IME readings for the keyboard's state now (DeviceProfile.ime), when the profile has them. */
+const captured = (profile: DeviceProfile, keyboard: KeyboardState) => profile.ime?.[keyboard === 'hidden' ? 'hidden' : 'shown'];
+
 function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
+  const ime = captured(profile, keyboard);
+  if (ime !== undefined) return ime.displays;
   if (profile.displays === 'api36') return API36;
   return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;
 }
@@ -255,8 +276,8 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     const line = argv.join(' ');
     if (argv[0] === 'exec-out' && argv[1] === 'uiautomator') {
       device.calls.push('adb uiautomator dump');
-      if (profile.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
-      return `${profile.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
+      if (device.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
+      return `${device.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
     }
     if (argv[0] === 'exec-out' && argv[1] === 'screencap') {
       device.calls.push('adb screencap');
@@ -281,11 +302,16 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     }
     if (shell === 'dumpsys window displays') return displays(profile, keyboard);
     if (shell.startsWith('dumpsys input_method')) {
+      const ime = captured(profile, keyboard);
+      if (ime !== undefined) return shell.includes('touchable region') ? ime.touchable : ime.inputShown;
       const shown = keyboard !== 'hidden';
       return shell.includes('touchable region') ? inputShown(shown) + TOUCHABLE[keyboard] : inputShown(shown);
     }
     if (argv[1] === 'input') {
-      if (shell === 'input keyevent 4') device.keyboard = 'hidden';
+      if (shell === 'input keyevent 4') {
+        device.keyboard = 'hidden';
+        if (profile.afterBackXml !== undefined) device.dumpXml = profile.afterBackXml;
+      }
       return '';
     }
     device.calls.pop();

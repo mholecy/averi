@@ -40,7 +40,9 @@ struct FormScreen: View {
             }
             .safeAreaInset(edge: .bottom) {
                 if form.submit.pinned == true {
+                    // Its bar reported as `submit.bar`: what scripts/truth/truth.ts#situationOf reads as its cover.
                     submitButton.padding(.horizontal, 20).padding(.vertical, 10).background(.bar)
+                        .reportFrame("\(form.submit.tag).bar", to: lab)
                 }
             }
             .navigationTitle(form.title)

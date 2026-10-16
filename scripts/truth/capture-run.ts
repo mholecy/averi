@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, listedIn, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, controlPiece, intersect, largestPiece, listedIn, touchTargetOf, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -136,7 +136,22 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
       log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
     }
-    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, broken, log);
+    // Android with the IME up: what averi's keyboard queries answer, for the golden mode's fake device to serve
+    // (CellTruth.ime) — read after the trees and the screenshot, since it leaves the keyboard hidden.
+    let afterBack: LabState | undefined;
+    if (s.keyboard?.visible === true && lab.ime !== undefined) {
+      await writeFile(join(opts.out, `${cell.id}.ime.json`), JSON.stringify(await lab.ime(), null, 1) + '\n');
+      truth.ime = `${cell.id}.ime.json`;
+      // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
+      // back — its trees and the app's state, beside the truth (CellTruth.afterBack).
+      const backTrees = await lab.trees();
+      afterBack = await lab.state();
+      if (afterBack === undefined) throw new Error(`cell ${cell.id}: no state after back`);
+      for (const t of backTrees) await writeFile(join(opts.out, `${cell.id}.after-back${t.suffix}`), t.payload);
+      await writeFile(join(opts.out, `${cell.id}.after-back.state.json`), JSON.stringify(afterBack, null, 2) + '\n');
+      truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
+    }
+    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack);
     await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
     for (const t of trees) {
       manifest.captures.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
@@ -151,11 +166,14 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
 }
 
 /**
- * Relaunch the cell, tap the frame's centre (or the point given), give the app 1 s to log — the events the tap
- * produced, the launch's own left out.
+ * Relaunch the cell, run `first` when given (LabDevice.hideKeyboard), tap the frame's centre (or the point given), give
+ * the app 1 s to log — the events the tap produced, the launch's and `first`'s own left out.
  */
-async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y: number }): Promise<{ events: ReturnType<typeof probeEvents>; after: LabState | undefined }> {
-  const before = (await lab.launch(cell)).events.length;
+async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y: number }, first?: () => Promise<void>): Promise<{ events: ReturnType<typeof probeEvents>; after: LabState | undefined }> {
+  const launched = await lab.launch(cell);
+  // Something done before the tap (LabDevice.hideKeyboard): the events it made are left out, as the launch's are.
+  if (first !== undefined) await first();
+  const before = first === undefined ? launched.events.length : (await lab.state())!.events.length;
   const at = 'width' in where ? probePoint(where) : where;
   await lab.tap(at.x, at.y);
   await new Promise((r) => setTimeout(r, 1_000));
@@ -165,7 +183,7 @@ async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y:
 
 const described = (probe: readonly { kind: string; tag: string }[]) => (probe.length ? `, probe ${probe.map((e) => `${e.kind} ${e.tag}`).join('; ')}` : '');
 
-async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, broken: string[], log: (line: string) => void): Promise<FormTruth> {
+async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, png: PNG, broken: string[], log: (line: string) => void, afterBack?: LabState): Promise<FormTruth> {
   const frameOf = (tag: string): Rect => {
     const f = s.frames[tag];
     if (f === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${tag}`);
@@ -197,6 +215,9 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       frame: `row.${code}`,
     })),
   ];
+  // The pinned submit's bar is what situationOf reads as its cover: a state without it would measure every control
+  // under it open.
+  if (form.submit.pinned === true) frameOf(`${form.submit.tag}.bar`);
   const keyboard = s.keyboard?.visible === true ? s.keyboard : undefined;
   const controls: ControlTruth[] = [];
   for (const w of wanted) {
@@ -207,11 +228,53 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       const { events, after } = await probe(lab, cell.id, frame);
       read = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
     }
-    const c: ControlTruth = { tag: w.tag, id: w.id, kind: w.kind, ...(frame !== undefined && { frame }), situation, ...read };
+    // What the screen shows over a control laid under the keyboard: the colour a pixel assert there would measure.
+    const seen = frame !== undefined && situation === 'under-keyboard' ? measure(png, frame, s.scale, '#000000').seen : undefined;
+    // Android: what averi's tap guard does with a control under the IME — hide it (back), then tap — probed too.
+    let backAt: { reached: boolean; probe: ControlTruth['probe'] } | undefined;
+    if (frame !== undefined && situation === 'under-keyboard' && lab.hideKeyboard !== undefined) {
+      const { events, after } = await probe(lab, cell.id, frame, () => lab.hideKeyboard!());
+      backAt = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
+    }
+    // Not reached at its centre after back: a probe, after back, at its piece of the layout then — its touch target
+    // (truth.ts#touchTargetOf) clear of the submit's frame there.
+    let back: { piece: Rect; reached: boolean } | undefined;
+    const backFrame = afterBack?.frames[w.frame];
+    if (backAt?.reached === false && backFrame !== undefined && afterBack !== undefined) {
+      const submit = w.tag !== form.submit.tag ? afterBack.frames[form.submit.tag] : undefined;
+      const screen = { x: 0, y: 0, width: afterBack.screen.width, height: afterBack.screen.height };
+      const target = intersect(touchTargetOf(backFrame, afterBack.density), screen);
+      const piece = target === null ? null : largestPiece(target, submit === undefined ? [] : [submit]);
+      if (piece !== null) {
+        const { events, after } = await probe(lab, cell.id, piece, () => lab.hideKeyboard!());
+        back = { piece, reached: readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached };
+      }
+    }
+    // A covered control: a second probe at the centre of its piece clear of the keyboard and the pinned submit, when
+    // that is not its frame's — where a tap moved off the cover would land.
+    const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w) : null;
+    const second = frame === undefined ? undefined : pieceProbePoint(frame, piece);
+    let reachedAtPiece: boolean | undefined;
+    if (second !== undefined) {
+      const { events, after } = await probe(lab, cell.id, second);
+      reachedAtPiece = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached;
+    }
+    const c: ControlTruth = {
+      tag: w.tag,
+      id: w.id,
+      kind: w.kind,
+      ...(frame !== undefined && { frame }),
+      situation,
+      ...read,
+      ...(seen !== undefined && { seen }),
+      ...(backAt !== undefined && { reachedAfterBack: backAt.reached, probeAfterBack: backAt.probe }),
+      ...(back !== undefined && { pieceAfterBack: back.piece, reachedAtPieceAfterBack: back.reached }),
+      ...(reachedAtPiece !== undefined && { piece: piece!, reachedAtPiece }),
+    };
     controls.push(c);
     const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
-    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${described(c.probe)}`);
+    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${backAt === undefined ? '' : ` (after back ${backAt.reached}${described(backAt.probe)})`}${back === undefined ? '' : ` (after back at its piece ${back.reached})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
   }
   // The principal title a keyboard dismissal taps (CatalogForm.titleId): probed — a tap on it must end the editing.
   let title: FormTruth['title'];

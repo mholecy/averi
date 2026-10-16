@@ -38,6 +38,72 @@
       "truth": "alert-dim.truth.json"
     },
     {
+      "file": "form-basic.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-basic.png",
+      "truth": "form-basic.truth.json"
+    },
+    {
+      "file": "form-errors.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-errors.png",
+      "truth": "form-errors.truth.json"
+    },
+    {
+      "file": "form-keyboard.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-keyboard.png",
+      "truth": "form-keyboard.truth.json"
+    },
+    {
+      "file": "form-prefilled.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-prefilled.png",
+      "truth": "form-prefilled.truth.json"
+    },
+    {
+      "file": "form-picker.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-picker.png",
+      "truth": "form-picker.truth.json"
+    },
+    {
+      "file": "form-shared-id.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-shared-id.png",
+      "truth": "form-shared-id.truth.json"
+    },
+    {
       "file": "scroll-bounded.xml",
       "source": "uiautomator",
       "form": "raw",

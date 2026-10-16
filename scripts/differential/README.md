@@ -165,6 +165,7 @@ keyboard preferences):
 
 ```sh
 node --import tsx scripts/truth/live.ts --udid <lab udid> [--wda-port 8120] [--sources idb,wda] [--cases k1,b1]
+node --import tsx scripts/truth/live.ts --serial <averi_lab serial> [--cases k1,b1]     # Android (phase 2b), adb outside the sandbox
 ```
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
@@ -208,8 +209,13 @@ adb -s <serial> install -r fixtures/apps/android/build/outputs/apk/debug/AveriLa
 node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests/fixtures/truth/android-<avd>-api<N> [--family presented]
 ```
 
-The Android app builds the coloured-target cells; a form cell or another layer is skipped and said so (phase 2b brings
-the forms, through the same `capture`).
+The Android app builds the coloured-target cells and, since phase 2b, the form cells (Forms.kt: the IME drawn over the
+form, only the pinned submit's bar riding on it); another layer is skipped and said so. A cell captured with the IME up
+also writes `<cell>.ime.json` — what averi's three keyboard queries answered, shown and after one `back`
+(schema.ts#ImeCapture) — which golden's fake device serves in place of its stock Pixel_3a dumps (CellTruth.ime).
+It also writes the screen after that `back` — `<cell>.after-back.xml` and `<cell>.after-back.state.json`
+(CellTruth.afterBack) — whose dump the fake device answers once a call sends `input keyevent 4`, so a tap the guard
+moves through `back` is replayed against the layout the app takes then.
 
 ### Calibration on the bug notes (phase 3)
 

@@ -1,8 +1,8 @@
 import type { Platform } from '../corpus.js';
-import type { Call } from '../differential.js';
+import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
-import { otherControlsFired } from '../../truth/truth.js';
-import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, touchDowns, type Expectation } from './judges.js';
+import { otherControlsFired, probePoint, TOUCH_SLACK } from '../../truth/truth.js';
+import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -62,8 +62,10 @@ export type FormExpectation = Expectation & { target: string };
  * | truth | verb | expected |
  * |---|---|---|
  * | a field shows an error the rules pair (verification.md, Field errors: same identifier below; own `_error` id close under) | `assert {element:{id}, error}` | passes |
+ * | Android: a field shows an error, by any identifier (Android sets no `error` on a field: verification.md, Field errors) | `assert {element:{text: message}}` | passes: the message is read as drawn |
  * | a field shows an error named neither way (`IbanError`) | `assert … error` | fails: not seen |
  * | a screen-level message far under the nearest field above it | `assert {element:{id: that field}, error: message}` | fails: pairs with none |
+ * | Android: the same message | `assert {element:{text: message}}` | passes |
  * | a field showing NO error, another field's title below it carrying the field's identifier (one component id shared by every field and its floating title: sharedTitleBelow) | `assert {element:{id, role: textfield}, error: that title}` | fails: a title is no error (verification.md, Field errors: a same-identifier text overlapping a same-identifier field is a title) |
  * | a field's title (the P5 text sample: ’ “ ” – — … NBSP & diacritics) | `assert {element:{id: titleId}, text: title}` | passes: the tree reads the text as drawn |
  * | a non-secure field the model holds a value in (prefilled) | `assert … text: value` | passes |
@@ -72,20 +74,72 @@ export type FormExpectation = Expectation & { target: string };
  * | a field sharing its identifier with another field | tap / scroll_until | not asked: `id:` names every field of the component, not this one |
  * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
  * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
+ * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.reachedAfterBack) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") |
+ * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: probeAfterBack says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (pieceAfterBack, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
+ * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
- * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") |
+ * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.reachedAtPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
  * | the same | scroll_until down | never "reached" without a swipe |
  * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent |
  * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
  */
+/**
+ * Android's under-keyboard tap (ControlTruth.reachedAfterBack): `Tapped`, a `back` (`input keyevent 4`) sent before the
+ * tap, and exactly one tap, inside the control's frame.
+ */
+export const tappedAfterBack =
+  (frame: Rect) =>
+  (o: Outcome): string | undefined => {
+    if (!o.reply.startsWith('Tapped')) return `not tapped: ${first(o)}`;
+    const back = o.device.findIndex((d) => d.startsWith('adb shell input keyevent 4'));
+    const tapAt = o.device.findIndex((d) => /^adb shell input tap /.test(d));
+    if (back < 0 || back > tapAt) return said(o, 'Tapped without a back before the tap');
+    const points = tapPoints(o);
+    if (points.length !== 1 || !within(points[0], frame)) return said(o, `Tapped at ${pointsText(points)}, not once inside its frame`);
+    return undefined;
+  };
+
+/** A covered control's tap where its piece was reached (ControlTruth.reachedAtPiece): refused with nothing sent, or `Tapped` with every tap inside the piece. */
+export const notTappedOrInPiece =
+  (piece: Rect) =>
+  (o: Outcome): string | undefined => {
+    if (!o.reply.startsWith('Tapped')) return notTapped(o);
+    const points = tapPoints(o);
+    if (points.length === 0) return said(o, 'Tapped with no tap sent');
+    const out = points.filter((p) => !within(p, piece));
+    return out.length > 0 ? said(o, `Tapped outside its piece at ${pointsText(out)}`) : undefined;
+  };
+
+/**
+ * Android's under-keyboard tap where a tap at its centre after back did NOT reach it (ControlTruth.reachedAfterBack
+ * false): no tap within TOUCH_SLACK of that centre where it fired another control (`fires`, the probe's words); a
+ * refusal sends nothing; `Tapped` only with every tap inside `piece` — its piece after back, given only where a probe
+ * there reached it (none: no Tapped is right).
+ */
+export const tapAfterBackOnPiece =
+  (centre: { x: number; y: number }, fires: string | undefined, piece: Rect | undefined) =>
+  (o: Outcome): string | undefined => {
+    const points = tapPoints(o);
+    const atCentre = points.filter((p) => Math.abs(p.x - centre.x) <= TOUCH_SLACK && Math.abs(p.y - centre.y) <= TOUCH_SLACK);
+    if (fires !== undefined && atCentre.length > 0) return said(o, `tapped at its centre ${pointsText(atCentre)}, which after back ${fires}`);
+    if (!o.reply.startsWith('Tapped')) return notTapped(o);
+    if (piece === undefined) return said(o, 'Tapped, where no tap after back reached it');
+    if (points.length === 0) return said(o, 'Tapped with no tap sent');
+    const out = points.filter((p) => !within(p, piece));
+    return out.length > 0 ? said(o, `Tapped outside its piece after back at ${pointsText(out)}`) : undefined;
+  };
+
 export function formRows(platform: Platform, truth: CellTruth): FormExpectation[] {
   const form = truth.form;
   if (form === undefined) return [];
   const out: FormExpectation[] = [];
   const assertCall = (spec: Record<string, unknown>): Call => ({ tool: 'assert', args: { platform, asserts: [{ ...spec, timeout: BUDGET_MS }] } });
   for (const f of form.fields) {
-    if (f.error !== null && f.errorFrame !== undefined) {
+    if (platform === 'android' && f.error !== null) {
+      // Android sets no `error` on a field (verification.md, Field errors): the message is asserted as text.
+      out.push({ target: f.tag, verb: 'error', says: `passes: the message read as text (${f.error.id})`, call: assertCall({ element: { text: f.error.text } }), judge: passes });
+    } else if (f.error !== null && f.errorFrame !== undefined) {
       const rule = pairingOf(form.fields, f, f.error.id, f.errorFrame);
       const pairs = PAIRS.has(rule);
       out.push({
@@ -126,7 +180,10 @@ export function formRows(platform: Platform, truth: CellTruth): FormExpectation[
       });
     }
   }
-  if (form.screenError !== null) {
+  if (form.screenError !== null && platform === 'android') {
+    const e = form.screenError;
+    out.push({ target: 'screenError', verb: 'error', says: `passes: the message read as text (${e.id})`, call: assertCall({ element: { text: e.text } }), judge: passes });
+  } else if (form.screenError !== null) {
     const e = form.screenError;
     const above = form.fields.filter((f) => overlapX(f.frame, e.frame) > 0 && bottom(f.frame) <= e.frame.y);
     const nearest = above.reduce<FieldTruth | undefined>((a, f) => (a === undefined || bottom(f.frame) > bottom(a.frame) ? f : a), undefined);
@@ -172,14 +229,54 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
     }
     case 'under-keyboard': {
       const top = keyboard?.frame.y ?? Infinity;
-      return [
-        {
+      const rows: FormExpectation[] = [];
+      if (platform !== 'android') {
+        rows.push({
           target,
           verb: 'tap',
           says: 'refused naming the keyboard, nothing tapped',
           call: tap,
           judge: (o) => notTapped(o) ?? (/\bsoft keyboard\b/i.test(ownWords(o)) ? undefined : said(o, 'refused without naming the keyboard')),
-        },
+        });
+      } else if (c.reachedAfterBack === true) {
+        const frame = c.frame!;
+        rows.push({
+          target,
+          verb: 'tap',
+          says: 'Tapped after one back hid the keyboard, one tap sent inside it',
+          call: tap,
+          judge: tappedAfterBack(frame),
+        });
+      } else if (c.reachedAfterBack === false) {
+        // After `back` the layout changes (the bar drops back to the screen's bottom): a raw tap at its centre then did
+        // not reach it — what it fired is the probe's (ControlTruth.probeAfterBack). averi finds the element again in
+        // the layout after back: with that layout captured (CellTruth.afterBack, served by the fake device once `back`
+        // is sent) the row is replayed — never a tap where the centre's probe fired another control, and Tapped only
+        // inside its piece there where a probe reached it (pieceAfterBack); without it, the live golden's (live.ts k5).
+        const fired = otherControlsFired(c.probeAfterBack ?? [], c.tag);
+        const what = fired.length > 0 ? `fires ${fired.map((e) => `${e.kind} ${e.tag}`).join(', ')}` : 'does not reach it';
+        const piece = c.pieceAfterBack;
+        rows.push({
+          target,
+          verb: 'tap',
+          says: `never a tap at its centre (after one back a tap there ${what}); Tapped only inside its piece after back${piece === undefined ? '' : ` ${pointsText([{ x: piece.x, y: piece.y }])} ${piece.width}x${piece.height}`}, where a probe reached it`,
+          call: tap,
+          judge: tapAfterBackOnPiece(probePoint(c.frame!), fired.length > 0 ? what : undefined, c.reachedAtPieceAfterBack === true ? piece : undefined),
+          ...(piece === undefined && { live: 'no layout after back captured: averi finds the element again in the new tree, which a replayed tree (the IME-up layout) does not hold; live.ts k5 judges it on the model' }),
+        });
+      }
+      if (c.seen !== undefined) {
+        const expected = c.seen;
+        rows.push({
+          target,
+          verb: 'colour',
+          says: `fails: the keyboard over it (asked for the colour the screen shows there, ${expected})`,
+          call: { tool: 'assert', args: { platform, asserts: [{ element: { id: c.id }, color: { expected }, timeout: BUDGET_MS }] } },
+          judge: (o) => (passed(o) ? `passed on ${expected}, the keyboard's: ${first(o)}` : undefined),
+        });
+      }
+      return [
+        ...rows,
         {
           target,
           verb: 'scroll_until',
@@ -237,7 +334,15 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
       if (fired.length === 0) return [];
       const other = fired.map((e) => `${e.kind} ${e.tag}`).join(', ');
       return [
-        { target, verb: 'tap', says: `not tapped, nothing sent (a tap at its centre fires ${other})`, call: tap, judge: notTapped },
+        c.reachedAtPiece === true && c.piece !== undefined
+          ? {
+              target,
+              verb: 'tap',
+              says: `not tapped, or Tapped inside its piece ${pointsText([{ x: c.piece.x, y: c.piece.y }])} ${c.piece.width}x${c.piece.height} (a tap at its centre fires ${other}; one at its piece reached it)`,
+              call: tap,
+              judge: notTappedOrInPiece(c.piece),
+            }
+          : { target, verb: 'tap', says: `not tapped, nothing sent (a tap at its centre fires ${other})`, call: tap, judge: notTapped },
         {
           target,
           verb: 'scroll_until',

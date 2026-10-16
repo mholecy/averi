@@ -63,3 +63,8 @@ tree at all, so the rule needs "the tree is a presented window" rather than "thi
   unchanged — the same `Timed out … to appear`, `not found within 1 s` and two `input swipe 540 1776 540 444 1334`
   strokes for A–D on both cells. Round 20 reads the presented layer from the source's own facts; uiautomator's dump
   of the active window lists no layer beneath to judge.
+- Also on the phase-2b form cell `form-picker` (2026-10-16, `android-averi_lab-api33/form-picker.xml`): the country
+  picker, a ModalBottomSheet fully expanded over the form, is the only window uiautomator dumps; `tap` on the form's
+  `name`, `country` and `submit` times out "waiting for element … to appear" (no "close it first"), and `scroll_until`
+  strokes the sheet twice (`input swipe 540 1768 540 608 1162`). Their probes landed on the sheet's rows (a tap at the
+  name field's centre chose `Åland Islands`). KNOWN in tests/differential/golden/forms.known.ts, `as: bug:` this note.
