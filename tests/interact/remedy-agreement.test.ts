@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { keyboardPosition, type KeyboardLine, type KeyboardPosition } from '../../src/ui-tree/keyboard-position.js';
 import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
-import type { MarkedLayer } from '../../src/ui-tree/draw-order.js';
+import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';

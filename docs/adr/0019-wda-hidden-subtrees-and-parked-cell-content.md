@@ -106,8 +106,9 @@ a presented layer of only empty frames"); draw order covers the screen beneath t
 - **Decision 1's guard.** "Except a node that is the surface of a screen presented over the target's
   (`presentedSurface`)" now holds only on a tree whose source did not judge presented layers (no
   `UiNode.presentationsJudged` on its root — for `hidden`, which only a flagged payload sets, a snapshot printed before
-  the marks): there the surface is the shape fallback's (`presented-by-shape.ts#PresentedByShape.presentedSurface`). On
-  a judged tree no hidden node is excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover,
+  the marks): there the surface is the shape fallback's (`presentedSurface`; since 2026-10-16 in
+  `presentation.ts#byShape`, named `inferred` by `presentation.ts#PresentedOver`). On a judged tree no hidden node is
+  excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover,
   must still cover the list beneath — holds by the mark instead: a marked layer covers the screen beneath through its
   own cover, which no row excuses, whatever its hidden nodes. Reading the marks in the guard (a hidden node of a marked
   layer covering as before) was measured and not taken: 36 replies on the three expanded country-sheet trees, wording

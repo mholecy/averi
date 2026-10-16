@@ -4,7 +4,7 @@ import type { AdapterOpts, AdapterRegistry } from './registry.js';
 import { BARE_TREE_CONTENTS } from '../ui-tree/bare-tree.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { presentedRemedy, presentedStop } from '../ui-tree/standing.js';
-import type { MarkedLayer } from '../ui-tree/draw-order.js';
+import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';

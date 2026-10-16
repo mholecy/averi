@@ -452,7 +452,11 @@ export interface UiNode {
    * whose `ownControl` row takes a control PADDED evenly in such a wrapper
    * and centred on the label for the label's own (`paddedOn`) only where
    * the shape was measured. A mark of the source, like `flatList`: ui-tree
-   * knows no platform. Absent on WDA and idb trees — no wrapper of that
+   * knows no platform. Read with a SECOND meaning, "this tree is
+   * uiautomator's", by ui-tree/presentation.ts#presentationOf, which picks
+   * the uiautomator adapter (`byUiautomator`) for such a tree — the one mark
+   * that tells it today; L1's fix should bring a dedicated root mark of its
+   * own (the dump lists only the active window). Absent on WDA and idb trees — no wrapper of that
    * shape was seen there, and an unlabelled button laid with an even margin
    * over a centred text (a card's overlay) stays its cover.
    */
@@ -483,7 +487,7 @@ export interface UiNode {
    * Its readers, all of them:
    * - ui-tree/draw-order.ts's `hidden` row, in the `target` column only: such a node is no cover of a target unless, on
    *   a tree whose source did not judge presented layers (`presentationsJudged`), it is the surface of a screen
-   *   presented over the target's by shape (ui-tree/presented-by-shape.ts#PresentedByShape.presentedSurface); on a
+   *   presented over the target's by shape (ui-tree/presentation.ts#PresentedOver.surface, `inferred`); on a
    *   judged tree a marked layer covers through its own cover instead. Through that column it reaches every caller of
    *   `exposure`, `paintsOver` and `coversOf`: the tap's aim (interact/tap-judgement.ts), `scroll_until`'s standing and
    *   the pixel assert's covers (ui-tree/standing.ts), the in-tree dismissal picker (interact/keyboard-in-tree.ts,
@@ -519,11 +523,12 @@ export interface UiNode {
    * region, an alert's buttons are reached).
    *
    * Its readers, all of them:
-   * - ui-tree/draw-order.ts#markOf, the one reading of it in code (with `presentationElement`): a typed layer's
-   *   element, when its rect has area on the screen (never judged by `hidden`), is that layer's ONE cover through the
-   *   whole screen; a `screen` layer reaches the whole screen and its own nodes stay covers, each a presented surface
-   *   (`markedLayers`: `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); draw order hands the mark on
-   *   as `MarkedLayer` (its kind and label, `DrawOrder.presentedPress`) — to the standing's remedy
+   * - ui-tree/presentation.ts#markOf, the one reading of it in code (with `presentationElement`; the presentation
+   *   module's marks adapter, `byMarks`): a typed layer's element, when its rect has area on the screen (never judged
+   *   by `hidden`), is that layer's ONE cover through the whole screen; a `screen` layer reaches the whole screen and
+   *   its own nodes stay covers, each a presented surface (presentation.ts#PresentedOver, which draw order reads for
+   *   `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer`
+   *   (its kind and label, presentation.ts#Presentation.press) — to the standing's remedy
    *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
@@ -533,18 +538,18 @@ export interface UiNode {
   /**
    * Set on the ELEMENT that names a layer marked by type (`presentation` `alert`, `actionSheet` or `popover`): the
    * `Alert`, the `Sheet` or the `Popover` itself — its label is the layer's in the remedy, its rect where the layer
-   * is named; the layer's one cover. Read only with `presentation`, by ui-tree/draw-order.ts#markOf; printed by
+   * is named; the layer's one cover. Read only with `presentation`, by ui-tree/presentation.ts#markOf; printed by
    * `ui_snapshot`.
    */
   presentationElement?: true;
   /**
    * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
    * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
-   * (`presentation`), so draw order never asks its shape fallback of it (ui-tree/presented-by-shape.ts). Absent on a
-   * tree whose source says nothing of presentation (idb, Android, a flagless WDA payload, a normalized
-   * snapshot without it): there draw order still infers a presented screen from shape, through that fallback. Read by
-   * ui-tree/draw-order.ts#drawOrder, which builds the fallback only without it (so on a judged tree the `hidden` row's
-   * shape guard holds of no node); printed by `ui_snapshot`.
+   * (`presentation`), so the presentation module never asks a fallback of it (ui-tree/presentation.ts#byShape,
+   * #byUiautomator). Absent on a tree whose source says nothing of presentation (idb, Android, a flagless WDA payload,
+   * a normalized snapshot without it): there a presented screen is still inferred from shape, through that fallback.
+   * Read by ui-tree/presentation.ts#presentationOf, which builds the fallback only without it (so on a judged tree draw
+   * order's `hidden` row's shape guard holds of no node); printed by `ui_snapshot`.
    */
   presentationsJudged?: true;
 }

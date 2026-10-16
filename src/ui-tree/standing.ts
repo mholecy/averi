@@ -5,9 +5,8 @@ import {
   listsUnclippedFrames,
   type DrawOrder,
   type Exposure,
-  type MarkedLayer,
-  type PresentedPress,
 } from './draw-order.js';
+import type { MarkedLayer, PresentedPress } from './presentation.js';
 import {
   aboveNavigationBand,
   belowStatusBand,
@@ -291,11 +290,12 @@ export interface Scene {
   pixelRegion(node: UiNode, screen: UsableScreen | undefined): Rect;
   /**
    * THE presented question a stroke asks at its touch-down (`point`), as a sentence quotes the answer
-   * (draw-order.ts#PresentedPress): on behalf of `target`, the surface of a screen presented over the target's own
+   * (presentation.ts#PresentedPress): on behalf of `target`, the surface of a screen presented over the target's own
    * that holds the point (draw-order.ts#DrawOrder.presentedAt) — or, with NO target (one not in the tree), the cover
    * of a layer the tree marks as presented the point lands on, off that layer's own scroll views
-   * (draw-order.ts#DrawOrder.markedAt: an alert's, an action sheet's or a popover's element, what of a `screen` layer
-   * draws there; a screen presented by shape alone is not asked of no target). Undefined when none. The point is
+   * (draw-order.ts#DrawOrder.markedAt, over presentation.ts#Presentation.topmostAt: an alert's, an action sheet's or
+   * a popover's element, what of a `screen` layer draws there; a screen presented by shape alone is not asked of no
+   * target), quoted by the presentation (presentation.ts#Presentation.press). Undefined when none. The point is
    * kept: a surface judged by shape only where it lies is not one at every touch-down (a dismissed sheet parked off
    * screen is no stop). One reader: `scroll_until`'s stroke (interact/scroll-rounds.ts#presentedTouchDown).
    */
@@ -460,7 +460,7 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
  *    dim), else the last presented surface among its covers, else the last drawn over it. `layer`: the presented
- *    layer the tree source marks when that surface is its element (draw-order.ts#DrawOrder.presentedPress), which
+ *    layer the tree source marks when that surface is its element (presentation.ts#Presentation.press), which
  *    `presentedRemedy` names.
  * 2. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
@@ -621,7 +621,7 @@ export function sceneOf(tree: UiNode): Scene {
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
     presentedAt(point, target) {
       const surface = target === undefined ? scene.order.markedAt(point) : scene.order.presentedAt(target, point);
-      return surface === undefined ? undefined : scene.order.presentedPress(surface);
+      return surface === undefined ? undefined : scene.order.presentation.press(surface);
     },
   };
   /** The usable screen the pixel purpose judges on: `screen` when it has `oriented`, else the tree's own. */
@@ -683,7 +683,7 @@ function remedied(
   // nothing in the frame (below the fold, inside the status band) has no covers there.
   const surface = judgement.facts.presented?.at(-1) ?? scene.order.presentedOver(node);
   if (surface !== undefined) {
-    const { layer } = scene.order.presentedPress(surface);
+    const { layer } = scene.order.presentation.press(surface);
     return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface, ...(layer !== undefined && { layer }) } };
   }
   if ('touch' in judging) {

@@ -28,6 +28,9 @@ and a marked layer covers what lies outside it through the whole screen; the Dec
 finding L3): in the app's Window, a layer of only empty frames whose frames show on the screen, after the wholly
 invisible screen beneath, is the presented one when no content layer follows — residual 7 closed for WDA for that
 shape, standing for a bare frame and the rest (see "Amendment: a presented layer of only empty frames" below).
+Amended again 2026-10-16 (round 5 of phase 3, architecture step A2): where the rules live — the one reader of the
+marks and the shape fallback are adapters of one presentation module, `ui-tree/presentation.ts`; no decision changes
+(see "Amendment: one presentation module" below; the code pointers of the earlier sections name the new places).
 
 ## Context
 
@@ -56,11 +59,12 @@ layer's own surface.
 ## Decision
 
 (Since 2026-10-15 this Decision, its three conditions and the amendment "a labelled dim" are the FALLBACK, asked only
-of a tree whose source did not judge presented layers: `ui-tree/presented-by-shape.ts`. On a judged tree the
+of a tree whose source did not judge presented layers: since 2026-10-16 the presentation module's shape adapter,
+`ui-tree/presentation.ts#byShape` (until then `ui-tree/presented-by-shape.ts`). On a judged tree the
 presented layers are the ones the source marks — "Amendment: the presented layer is the source's fact".)
 
 A node on a screen PRESENTED over the target's covers the target — through its own surface — when it is a surface that
-draws its whole rect (`presented-by-shape.ts#givesWay`, the owner's option (a) on the review of the slice):
+draws its whole rect (`givesWay`, in `presentation.ts#byShape`; the owner's option (a) on the review of the slice):
 
 - in `structural`: a structural LEAF (no children) that FILLS THE SCREEN — the RN Modal's dimming root `forgot_overlay`;
   a smaller leaf stays excused (every unmapped Android leaf is an `other`, every RN View leaf under WDA too: an icon's
@@ -410,7 +414,8 @@ Decision (Q1 (D)): a layer that holds a WDA `Alert` is a PRESENTED LAYER that co
 regardless of node frames — bare dim leaf or not, a same-frame `Toolbar` of the form included. The fact is the
 ADAPTER'S, not a shape's: `adapters/wda-source.ts#PRESENTATIONS` marks the `Alert` element (`UiNode.presentation:
 "alert"`; its role stays `container`) — the one place a source says a layer is presented, built so that a later
-decision may mark other presentations there, alerts only now. Draw order reads the mark (`draw-order.ts#markedLayers`):
+decision may mark other presentations there, alerts only now. Draw order reads the mark (since 2026-10-16 through the
+presentation module's marks adapter, `presentation.ts#byMarks`):
 the marked element covers every node drawn before it — not its ancestors, nor its own subtree — with its reach the
 whole screen, drawn whatever the rows say; it is the layer's ONE cover (what else its layer holds — the dim, the empty
 frame, the alert's texts and backdrop leaves — is drawn on it and no cover of its own), and that screen's surface
@@ -512,7 +517,8 @@ What the flags rule reads (Q3): a whole LAYER's flags AND a visible later layer 
 flag alone; never one node's flag (ADR 0019's residual 2: `isVisible` alone is no geometric truth) and never the
 target's own. No shape corroboration is asked. `ui_snapshot` prints all three fields, as it prints `hidden`.
 
-**Draw order reads the marks** (`draw-order.ts#markOf`, the one reader; `markedLayers`): a marked layer covers what
+**Draw order reads the marks** (the one reader, then `draw-order.ts`'s `markOf`; since 2026-10-16
+`presentation.ts#markOf`, in the marks adapter `byMarks`, which draw order asks): a marked layer covers what
 lies OUTSIDE it and is drawn before it — never a layer holding the target, nor one inside it, nor the keyboard's own
 nodes — through the whole screen, whatever the frames around it, for every question but `drawnOver`. So a layer's own
 nodes are never beneath it: `tap id:"PopoverDismissRegion"`, the popover's own dim and the way to close it, stays
@@ -536,8 +542,9 @@ false refusals on the five popover trees). How each kind covers:
 
 **The shape rule is the fallback (Q1).** The Decision's three conditions and the amendment "a labelled dim" —
 `presentedOver`, `givesWay`, `presentedSurface`, the frame rows' `overPresented` / `surfaceCandidate`, and the `hidden`
-row's guard (ADR 0019) — live in ONE module, `ui-tree/presented-by-shape.ts`, which `draw-order.ts#drawOrder` builds
-only for a tree whose root is not `presentationsJudged`: Android's uiautomator tree, idb's flat list (where it never
+row's guard (ADR 0019) — live in ONE module (then `ui-tree/presented-by-shape.ts`; since 2026-10-16 the shape adapter
+of the presentation module, `presentation.ts#byShape`), which is built only for a tree whose root is not
+`presentationsJudged`: Android's uiautomator tree, idb's flat list (where it never
 holds), a WDA payload with no flags, and every snapshot printed before the marks — the normalized trees in the tests'
 fixtures and in the corpus. A judged tree never reaches it: there the marked layers are the presented ones, and a later
 screen-sized layer the source did not mark presents nothing. What both read of a node's place (`Placed`, `holderOf`,
@@ -665,6 +672,53 @@ presentation in a later Window — as it stood.
 **The harness** (corpus-r19, 648 trees, 309 raw, 385 712 calls, against debc9b2): 0 diffs — no recorded device tree
 lays a presented layer of only empty frames, so the rule changes nothing the corpus holds. Golden (the lab truth, 1131
 checks): the 15 WDA rows of `sheet-medium-edges` turn green, no other row changes (260 → 245 mismatches).
+
+## Amendment: one presentation module (2026-10-16)
+
+The architecture review of 2026-10-16 (candidate A2, round 5 of phase 3) found "what is presented over what" answered
+in pieces: draw order read the marks (`markOf`, `markedOnScreen`, `markedLayers`, `laterFor`, `presentedPress`, the
+no-target `markedAt`), built the shape fallback with its own frame rows handed in as a callback (`FRAME_EXCUSES`, so
+the fallback's `givesWay` could name a surface from the rows that excuse it), and asked the fallback's
+`presentedSurface` from three places (`Exposure.presented`, `lastPresentedSurface`, the `hidden` row) — while Android,
+whose uiautomator dump lists only the presented window (the lab note L1, 2026-10-15, on truth/phase-3), had no place a
+fix could land but beside the WDA shapes.
+
+**Decision: only where the rules live changes.** `ui-tree/presentation.ts` is the one module; its interface is the
+test surface (tests/ui-tree/presentation.test.ts):
+
+- `presentationOf(tree, walk)` — built by draw order over its own walk (`placed.ts#walkOf`, moved there from
+  `drawOrder`), once per tree;
+- `over(node)` — what is presented over a target (`PresentedOver`): which later node a typed layer leaves undrawn
+  (`drawn`), which is a marked layer's cover reaching the whole screen (`wholeScreen`), which is the surface of a screen
+  presented over it and on what evidence (`surface`: `fact` for a node of a marked `screen` layer, `inferred` for the
+  shape's — the `hidden` row lets only an inference outvote WDA's hidden flag, as ADR 0019 decided), and which frame
+  excuse gives way (`givesWay`);
+- `topmostAt(point)` — the marked layer a stroke for no target lands on (`markedAt`'s fact; draw order still names
+  what of a `screen` layer draws there, by its no-target column);
+- `press(surface)` — the `MarkedLayer` and reach a sentence quotes (was `DrawOrder.presentedPress`; `DrawOrder`
+  now hands the module on as `presentation`, and `standing.ts#Scene.presentedAt` keeps its signature);
+- `fallback` — which adapter infers what the source did not judge.
+
+Behind it, three adapters, composed per tree: BY MARKS (`byMarks`, holding `markOf` — **the one reader of
+`UiNode.presentation` / `presentationElement` is now `presentation.ts#markOf`**; read on every tree), BY SHAPE
+(`byShape`, the former `presented-by-shape.ts` whole: `presentedOver`, `givesWay`, `presentedSurface`,
+`OVER_PRESENTED`), asked only of an unjudged tree that is not Android's, and BY UIAUTOMATOR (`byUiautomator`), asked of
+Android's tree (the uiautomator root's `paddedTouchTargets` mark). The frame excuses moved to `placed.ts#FRAME_EXCUSES`
+beside the other frame predicates, so the shape adapter asks them directly and draw order hands it no callback. The
+WDA parser's marking (`wda-source.ts#presentedLayers`, `presentedScreen`) stays in the parser: it reads WDA's raw
+elements and flags, which ui-tree never sees; the module reads what it marks.
+
+The uiautomator adapter knows no fact of its own yet and answers as the shape adapter — what Android got before: a
+pure move. Its doc says how L1 lands there: read the dump's window facts (a window smaller than the screen — a dialog;
+a screen-wide clickable scrim before the content — a sheet) into a layer, answer `topmostAt` and `press` with it, and
+`scroll_until` for a target not in the tree stops "close it first" through the same `Scene.presentedAt` the WDA marks
+already use. That fix is a later step with its own golden rows.
+
+Everything decided above stands: the source's marks first, the shape only as the fallback, the target's own
+visibility never evidence alone; every residual reads as before. **The harness:** golden row by row identical to
+`468dc1b`, the differential over corpus-r19 against `468dc1b` 0 diffs. The code pointers of the earlier sections were
+moved to the new places (`presented-by-shape.ts` → `presentation.ts#byShape`, draw order's `markOf` / `markedLayers`
+→ `presentation.ts#markOf` / `byMarks`); their text is otherwise unchanged.
 
 ## Residuals accepted
 

@@ -1,7 +1,7 @@
 import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import type { MarkedLayer, PresentedPress } from '../ui-tree/draw-order.js';
+import type { MarkedLayer, PresentedPress } from '../ui-tree/presentation.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
 import { outsideItsScrollView, type StandingScreen, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -233,7 +233,7 @@ export type ScrollOutcome = (
 /**
  * Where a stroke would touch down (`touchDown`, the driver's own point) on the surface of a presented screen, with
  * that surface as a sentence quotes it — its reach and the marked layer it is the element of
- * (ui-tree/draw-order.ts#PresentedPress): the `presented` stop's `next`, a bound's `presented`.
+ * (ui-tree/presentation.ts#PresentedPress): the `presented` stop's `next`, a bound's `presented`.
  */
 export interface PresentedTouchDown extends PresentedPress {
   readonly touchDown: Point;

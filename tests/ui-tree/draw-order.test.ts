@@ -1613,7 +1613,7 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
     expect(order.exposure(cell, IPHONE_BOX)).toMatchObject({ covers: [], presented: [] });
     const surface = order.presentedAt(cell, TOUCH_DOWN)!;
     expect(surface).toMatchObject({ label: 'Are you sure you want to discard this new contact?', rect: rect(10, 78, 240, 169) });
-    expect(order.presentedPress(surface)).toMatchObject({ reach: IPHONE_BOX, layer: { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' } });
+    expect(order.presentation.press(surface)).toMatchObject({ reach: IPHONE_BOX, layer: { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' } });
   });
 
   it('measured, the SWIFT form under the Fees half sheet: `payee_city_input` at y 937 — the last surface at the point is named, the sheet\'s form `scrollable 31,456 340x355` over the dim `-402,-874 1206x2622`; above the sheet only the dim', () => {
