@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
+import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
 import { consistency, controlConsistency, controlPiece, intersect, largestPiece, listedIn, touchTargetOf, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
@@ -72,7 +73,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const navigation = await lab.navigation?.();
   const captured = new Set<string>();
   for (const cell of cells) {
-    const why = lab.unsupported(cell);
+    const why = captureRefusal(cell, lab.platform, navigation) ?? lab.unsupported(cell);
     if (why !== undefined) {
       skipped.push(`${cell.id}: ${why}`);
       log(`${cell.id}: skipped — ${why}`);

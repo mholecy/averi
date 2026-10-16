@@ -205,18 +205,21 @@
       "status": "calibrate",
       "fix": ["7542021", "c3ebc62"],
       "before": "5cff2ad",
-      "after": "7542021",
+      "after": "c3ebc62",
       "verified": "golden",
-      "partial": "the first fix (7542021): SwiftUI's own full-screen `Toolbar` host",
-      "defect": "^no tap on the dismissal .*\\(refused for a toolbar\\)",
+      "partial": "one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up",
+      "defect": "^no tap on the dismissal .*\\(refused for a (toolbar|scrollable)\\)",
       "checks": [
         "ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap",
         "ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap",
         "ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap",
-        "ios-iphone17-ios27/toolbar-dismiss.wda.json note tap"
+        "ios-iphone17-ios27/toolbar-dismiss.wda.json note tap",
+        "ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap",
+        "ios-iphone17-ios27/toolbar-dismiss-short.wda.json ks tap",
+        "ios-iphone17-ios27/toolbar-dismiss-short.wda.json ss tap",
+        "ios-iphone17-ios27/toolbar-dismiss-short.wda.json note tap"
       ],
-      "needs": "The second fix's half (c3ebc62: the form's scroll view, 58 % of the screen, its frame under the top bar, covering the title) needs a toolbar-dismiss variant whose scroll view is shorter than the screen — SwiftUI lays the lab form's at 0,0 402x874, a screen-sized host already excused at 7542021, so golden is green on toolbar-dismiss at d928789.",
-      "remark": "The principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's shape. Red at 5cff2ad: refused, `covered by toolbar \"Toolbar\"`, nothing tapped; at 7542021 the title is tapped. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb)."
+      "remark": "Both fixes on one pair, 5cff2ad → c3ebc62. toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar \"Toolbar\"`, nothing tapped; the title tapped from 7542021 on. toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at 5cff2ad for the toolbar, and at 7542021 and at d928789, c3ebc62's first parent, `covered by scrollable` (measured with golden --side over both, not part of this pair); the title tapped at c3ebc62. The defect reads the guard's own `covered by <role>` clause (rows.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb)."
     },
     {
       "n": "8",
@@ -243,11 +246,12 @@
       "verified": "golden",
       "defect": "fully visible",
       "checks": [
-        "android-averi_lab-api33/scroll-sticky.xml R fully"
+        "android-averi_lab-api33/scroll-sticky-cut.xml R fully"
       ],
-      "expect": "DOES-NOT-FAIL",
-      "needs": "edges/scroll-sticky variant (Android) whose uiautomator node of the row is CUT at the sticky header's bottom (mp-native's Account Detail: the row's testTag container `66,480 948x84` while its own children carry `66,403 948x143`) — the lab's LazyColumn stickyHeader reports the row whole, so averi sees the header over it.",
-      "remark": "The lab's scroll-sticky R (its top 24 dp under the pinned header): uiautomator lists R whole (`[128,391][953,567]`) and the header after it, so `fully: true` refuses it on both sides ('under text \"Sticky header\" … drawn over it — 63% of it shows'). The note's shape — the row's rect cut at the header by the tree — is not what Compose's LazyColumn produced here."
+      "expect": "STILL-RED-AFTER",
+      "needs": "A row whose container is cut at the sticky header while its content keeps its whole rect (mp-native's Account Detail: `row_0 66,480 948x84`, its children `66,403 948x143`) — the shape d2b7744 reads. Tried on the lab (round 3, bounded): scroll-sticky (a plain header container: uiautomator lists R whole, `[128,391][953,567]`, and averi refuses it under the header on both sides — DOES-NOT-FAIL); scroll-sticky-cut (the header one accessibility element, `semantics(mergeDescendants = true)`; R a non-clickable testTag container around a clickable box): Compose takes the header out of the container AND its content (`[128,457][953,567]` both), so the rect is cut at the header but no descendant reaches past it — red before and after. Which Compose setup leaves the children whole was not found.",
+      "remark": "scroll-sticky-cut's R (frame 128,391 825x176, its top 66 px under the header 0,303 1080x154): the dump cuts R and its content at the header's bottom, 457. Red with the note's symptom (`fully visible after 0 swipes`) at 10fb02b and at d2b7744 — filed as lab finding VA1. The earlier variant, scroll-sticky (R listed whole, the header after it), is refused on both sides ('under text \"Sticky header\" … drawn over it — 63% of it shows'): DOES-NOT-FAIL, kept as the contrast.",
+      "partial": "not the note's shape: Compose cuts the row's content at the header too, so d2b7744's descendants' extent finds nothing past the cut (lab finding VA1)"
     },
     {
       "n": "10",
@@ -279,14 +283,13 @@
       "before": "d043e65",
       "after": "9c7885e",
       "verified": "golden",
-      "partial": "not the note's shape: the lab's P runs past its container's edge instead of being cut flush with it (the rows' red is LE1's)",
+      "partial": "the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)",
       "defect": "fully visible",
       "checks": [
-        "android-averi_lab-api33/scroll-bounded.xml P fully"
+        "android-averi_lab-api33/scroll-bounded-flush.xml P fully",
+        "android-averi_lab-api33/scroll-bounded-flush.xml S fully"
       ],
-      "expect": "STILL-RED-AFTER",
-      "needs": "edges/scroll-bounded variant (Android) whose uiautomator bounds are cut FLUSH with the scroll container's edge (mp-native's SWIFT form: `{y:242, height:92}` on a container from 242) — the lab's verticalScroll in an edge-to-edge window does not cut P at all.",
-      "remark": "The lab's P is cut by its container's bottom (908) but uiautomator reports its whole frame (`[128,798][953,974]`): a rect past the container, not flush with it — the shape 9c7885e's flush probe does not suspect. Red on both sides with the note's symptom (`fully visible after 0 swipes`); filed as lab finding LE1.",
+      "remark": "edges/scroll-bounded-flush (round 3, Android only): scroll-bounded's layout, each target an app row with an identified container that is not clickable — uiautomator cuts its bounds FLUSH with the container's edge (P `[128,798][953,908]` on `upper` ending at 908; a clickable node runs on 66 px past a clip, the lab's scroll-bounded P/S: LE1). Red at d043e65 (`fully visible after 0 swipes`); at 9c7885e the stop probes the flush edge — one swipe toward it — and, the replayed tree never moving, says `a probe swipe toward it moved nothing`: the probe's answer is the device's, so R-fully accepts a probed flush stop where the truth bears it out (rows.ts#flushProbe: P's bottom edge 908 is `upper`'s, the probe 540,788 → 540,697 drags up from inside it; S's 1541 is `lower`'s, 1443 → 1369) and both rows are green. scroll-bounded's own P (cut but read whole, past its container) stays red on both sides: LE1.",
       "regressions": [
         {
           "rows": ["android-averi_lab-api33/tabbar-floating.xml F scroll_until"],
@@ -304,14 +307,11 @@
       "before": "f4ff4be",
       "after": "29a5c30",
       "verified": "golden",
-      "partial": "not the note's shape: the lab's S is cut 66 px past its container's edge instead of flush with it (the rows' red is LE1's)",
       "defect": "^Tapped",
       "checks": [
-        "android-averi_lab-api33/scroll-bounded.xml S tap"
+        "android-averi_lab-api33/scroll-bounded-flush.xml S tap"
       ],
-      "expect": "STILL-RED-AFTER",
-      "needs": "edges/scroll-bounded variant (Android) whose sliver's uiautomator bounds are cut FLUSH with the container's edge (mp-native's `details_toggle 66,1924 948x55` on a container ending at 1978) — the lab's S is cut 66 px past its container's bottom.",
-      "remark": "The lab's S (22 px of it drawn above its container's bottom, 1541) reads `[128,1519][953,1607]`: past the container, not flush. Tapped at (541,1563) — below the container, where nothing of it is drawn — on both sides, the note's symptom; ADR 0013's refusal of a flush sliver does not reach it. Filed as lab finding LE1."
+      "remark": "edges/scroll-bounded-flush's S (round 3): a 22-px sliver above `lower`'s bottom (1541), its node cut flush there, `[128,1519][953,1541]` — mp-native's `details_toggle 66,1924 948x55` on a container ending at 1978. Tapped at f4ff4be (the note's symptom); refused at 29a5c30, ADR 0013's flush sliver. scroll-bounded's own S (cut 66 px past its container) is Tapped on both sides: LE1."
     },
     {
       "n": "14",
@@ -447,11 +447,19 @@
       "after": "83e282a",
       "verified": "golden",
       "partial": "R-off only",
-      "needs": "R-outside-sv: a sheet-long-list target on the screen but outside its scroll view (a parked row whose cell lies below the table's clip yet above the screen's bottom — the table cut short of the sheet's foot); rows: R-outside-sv tap, colour, R-stroke.",
+      "needs": "None static: the R-outside-sv variant exists (presented/sheet-long-list-short, round 3: the table 62–446 in the large sheet, a footer under it; F, row 8, 574–638 on the screen below the table's clip, WDA parks its label at 0,62 402x64) and is not this note's: its tap and plain stop red at 7566443 AND at 83e282a (Tapped at the parked point; `fully visible after 0 swipes`), its colour asked for the footer's #CFD8DC red from 83e282a (see regressions), all cured at b7eac90 — #29's fix (tap refused, colour failed closed; ec2893a red): its colour row is calibrated under #29, its stroke row is LE4's. The note's `fully: true` on a parked row stays R-fully's, not asked of an off-screen target.",
       "defect": "^Tapped|no swipe",
       "checks": [
         "ios-iphone17-ios27/sheet-long-list.wda.json F tap",
         "ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until"
+      ],
+      "regressions": [
+        {
+          "rows": ["ios-iphone17-ios27/sheet-long-list-short.wda.json F colour"],
+          "broke": "83e282a",
+          "fixed": "b7eac90",
+          "why": "sheet-long-list-short's F, below the table's clip and on the screen over its footer: at 7566443 the colour assert measured the label WDA parks at the sheet's origin (0,62, a white row: FAIL, sampled #FFFFFF — wrong place, the row asking the footer's colour reads it as a fail); 83e282a reads F's real rect and measures the footer it lies over (PASS on #CFD8DC, #29's defect); b7eac90 (#29's fix) fails it closed outside its scroll view (ec2893a still red)"
+        }
       ],
       "remark": "presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Only R-off is asked: F lies off the screen, which takes precedence over outside its scroll view (truth.ts#geometryOf) — the note's own call, `fully: true`, is R-fully's and not asked of an off-screen target (partial); the plain stop asked by R-stroke shows the same 'fully visible after 0 swipes'. Before: tap Tapped at the parked point, scroll_until (R-stroke) 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). No idb evidence: idb lists the table's labels without their identifiers and no row below the fold (KNOWN)."
     },
@@ -522,13 +530,15 @@
       "fix": ["e85bcdf"],
       "before": "94bae14",
       "verified": "golden",
-      "remark": "bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). Both are right under gesture navigation, the only mode captured: the band is the app's there (truth.ts#navigationBandTakes) and N is reached, 90 % drawn and seen in its own colour #8E24AA beneath the handle, so its colour row accepts a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020: the measured truth outranks a hand-written expectation) — the row is green on both sides, DOES-NOT-FAIL. The note's defect is a FAIL owed where the bar is drawn over the target, the row a three-button capture asks (FAIL expected). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).",
+      "remark": "Replayed against the fake device's one gesture-navigation `dumpsys window` (the Pixel_3a profile's navigation bar [0,2154][1080,2220]), not the captured three-button bar [0,2088][1080,2220] — review round 1 measured the verdict unchanged under a dump patched to it; per-capture dumpsys serving is a follow-up at truth/r3-forms-android's merge (CellTruth.ime / DeviceProfile.ime). bands-three-button: bands' screen on the averi_lab AVD under three-button navigation (`navigation_mode` 0, the bar `[0,2088][1080,2220]`; restored to gesture, mode 2, after the capture), in the same run as bands' gesture capture (CatalogCell.navigation, catalog.ts#captureRefusal). Its N row is green on both sides — DOES-NOT-FAIL: the pre-fix assert does not pass on the bar, see needs. Under gesture navigation (bands.xml) N is reached, 90 % drawn and seen in its own colour beneath the handle, its row accepting a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020): green on both sides too.",
       "after": "e85bcdf",
       "defect": "^passed on",
-      "checks": ["android-averi_lab-api33/bands.xml N colour"],
+      "checks": [
+        "android-averi_lab-api33/bands-three-button.xml N colour"
+      ],
       "expect": "DOES-NOT-FAIL",
-      "partial": "the navigation band's colour part (the static bands), on a gesture-navigation capture whose band is the app's; OCR on real pixels is phase 4",
-      "needs": "a three-button bands capture (the averi_lab AVD under three buttons, docs/truth/band-probes-2026-10-16.md: N not reached, its colour row expecting a FAIL), and OCR judged on real pixels (phase 4): a text cut at the navigation bar."
+      "partial": "the navigation band's colour part (the static bands), on a three-button capture; OCR on real pixels is phase 4",
+      "needs": "OCR judged on real pixels (phase 4): a text cut at the navigation bar. The three-button capture (bars/bands-three-button, round 3) does not make the colour row fail: N (2132–2176, under the bar 2088–2220) is not reached and 0 % drawn; its tree node runs `[127,2088][952,2220]`, so the assert samples the bar's white and its tint (#F4EAF7, `seen`) mixed — asked for the colour the screen shows there (rows.ts#bandColour under three buttons), it fails at 94bae14 (57 % white, dE00 8.87) as at e85bcdf. A target whose node lies wholly on one colour of the bar would be needed for a pass at 94bae14."
     },
     {
       "n": "24",
@@ -551,6 +561,14 @@
       "fix": ["83e282a"],
       "before": "7566443",
       "verified": "golden",
+      "regressions": [
+        {
+          "rows": ["ios-iphone17-ios27/sheet-long-list-short.wda.json F colour"],
+          "broke": "83e282a",
+          "fixed": "b7eac90",
+          "why": "the same merge as #20's fix (7566443 → 83e282a), the same row, recorded there: sheet-long-list-short's F, below its table's clip over the footer, read at its real rect from 83e282a and measured on the footer (PASS on #CFD8DC) until #29's fix, b7eac90, fails it closed"
+        }
+      ],
       "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap at its probe point (golden-spec/base.ts#atProbe, phase 3 round 3).",
       "after": "83e282a",
       "defect": "drawn over|under button",
@@ -615,11 +633,13 @@
       "before": "ec2893a",
       "after": "b7eac90",
       "verified": "golden",
-      "defect": "^passed on",
+      "defect": "^passed on|^Tapped",
       "checks": [
-        "ios-iphone17-ios27/scroll-bounded.wda.json O colour"
+        "ios-iphone17-ios27/scroll-bounded.wda.json O colour",
+        "ios-iphone17-ios27/sheet-long-list-short.wda.json F colour",
+        "ios-iphone17-ios27/sheet-long-list-short.wda.json F tap"
       ],
-      "remark": "edges/scroll-bounded's O, wholly below its scroll view `lower` (0,380 402x180) and on the screen, asked for the colour the screen shows there (the white background): WDA's assert passed on it at ec2893a and fails closed at b7eac90. Under idb the same row still passes at HEAD — idb lists no scroll view: lab finding LE2."
+      "remark": "edges/scroll-bounded's O, wholly below its scroll view `lower` (0,380 402x180) and on the screen, asked for the colour the screen shows there (the white background): WDA's assert passed on it at ec2893a and fails closed at b7eac90. Under idb the same row still passes at HEAD — idb lists no scroll view: lab finding LE2. Round 3: sheet-long-list-short's F (a UIKit table's row 8 in a large sheet, below the table's clip and over its footer, WDA's label parked at the sheet's origin) — the colour asked for the footer's #CFD8DC passes at ec2893a and fails closed at b7eac90, as O's does (also red at 7566443 and 83e282a: #20's fix does not reach it); its tap, Tapped at ec2893a (and at 7566443, 83e282a), is refused at b7eac90 — the defect gains `^Tapped` for it."
     },
     {
       "n": "30",
@@ -915,9 +935,22 @@
       "defect": "touched down outside its scroll view",
       "checks": [
         "ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until",
-        "ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until"
+        "ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until",
+        "ios-iphone17-ios27/sheet-long-list-short.wda.json F scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view."
+      "remark": "No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view. Also sheet-long-list-short's F (round 3): the stroke touches down at (201,699), on the footer beside the sheet's table."
+    },
+    {
+      "n": "VA1",
+      "note": "2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^passed on|fully visible",
+      "checks": [
+        "android-averi_lab-api33/scroll-sticky-cut.xml R colour",
+        "android-averi_lab-api33/scroll-sticky-cut.xml R fully"
+      ],
+      "remark": "No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744)."
     },
     {
       "n": "B4-L1",

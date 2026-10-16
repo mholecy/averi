@@ -4,7 +4,8 @@ import UIKit
 // The presented family (fixtures/apps/cells/presented.json): a layer presented over the coloured-target host
 // (Base.swift) — a sheet at the medium detent with its own target, an alert (phase 1); phase 3's cells: the medium sheet
 // over a scrolled host whose targets lie at its edges (sheet-medium-edges), a large sheet whose bare background lies
-// over the targets (sheet-background), a large sheet holding a UIKit table longer than the screen (sheet-long-list), a
+// over the targets (sheet-background), a large sheet holding a UIKit table longer than the screen (sheet-long-list; cut
+// short of the sheet's foot, a footer under it: sheet-long-list-short), a
 // transparent full-screen cover dimming the screen (dim-cover, an RN transparent Modal's shape) and an in-screen menu
 // over a blurred, dimmed backdrop that no tree lists (blur-menu).
 
@@ -25,9 +26,10 @@ struct PresentedScreen: View {
 /// The layers presented as a sheet, and at which detent.
 private let sheetDetents: [String: PresentationDetent] = [
     "sheet-medium": .medium, "sheet-medium-scrolled": .medium, "sheet-large": .large, "sheet-list": .large,
+    "sheet-list-short": .large,
 ]
 /// The layers whose cells report what a geometry is measured against (the safe area, their scroll views' clips).
-private let measuredLayers: Set<String> = ["sheet-medium-scrolled", "sheet-list"]
+private let measuredLayers: Set<String> = ["sheet-medium-scrolled", "sheet-list", "sheet-list-short"]
 
 /// The cell's layer, raised after the screen beneath has appeared, and the state marked ready once it has settled — a
 /// cell with layer `none` (base's `open`) raises nothing and is ready after 300 ms.
@@ -82,6 +84,14 @@ struct SheetContent: View {
     var body: some View {
         if cell.layer == "sheet-list" {
             LongList(cell: cell, lab: lab).ignoresSafeArea(edges: .bottom)
+        } else if cell.layer == "sheet-list-short" {
+            // sheet-long-list-short: the table cut short of the sheet's foot, a plain footer under it — a row below the
+            // table's clip lies on the screen, over the footer (calibration.json #20's R-outside-sv).
+            VStack(spacing: 0) {
+                LongList(cell: cell, lab: lab).frame(height: LongListController.shortHeight)
+                Color(hex: LongListController.footer).accessibilityHidden(true)
+            }
+            .ignoresSafeArea(edges: .bottom)
         } else {
             // sheet-medium: its target S at the top; sheet-background (`sheet-large`): S at the top, the rest of the
             // sheet its bare background — no node of its own over the targets beneath; sheet-medium-edges: no target.
@@ -178,6 +188,10 @@ struct LongList: UIViewControllerRepresentable {
 final class LongListController: UITableViewController {
     static let rows = 40
     static let rowHeight: CGFloat = 64
+    /// sheet-long-list-short's table: six rows tall (rows 0–5 laid out, row 6 on cut at the clip), its footer's colour
+    /// none of a target's.
+    static let shortHeight: CGFloat = 384
+    static let footer = "#CFD8DC"
     private let cell: Cell
     private let lab: Lab
     private let targets: [Int: Target]

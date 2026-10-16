@@ -2,7 +2,8 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { FAMILIES, type Catalog, type CatalogCell, type Family } from './schema.js';
+import type { Platform } from '../differential/corpus.js';
+import { FAMILIES, type Catalog, type CatalogCell, type Family, type NavigationMode } from './schema.js';
 
 /**
  * The cell catalog, one file per family (fixtures/apps/cells/<family>.json, schema.ts#FAMILIES), and the one catalog
@@ -112,6 +113,19 @@ export function selectCells(catalog: Catalog, opts: { families?: readonly string
   );
   if (picked.length === 0) throw new Error(`no cell selected: families ${opts.families?.join(', ') ?? 'any'}, cells ${opts.cells?.join(', ') ?? 'any'}`);
   return picked;
+}
+
+/**
+ * Why a capture on this platform, under this navigation mode (Android's; undefined on iOS), does not capture the cell —
+ * a cell built for other platforms (CatalogCell.platforms), or, on Android, one captured under another navigation mode
+ * (CatalogCell.navigation; iOS has none, so it does not apply there) — or undefined when it does. Said, never captured
+ * wrong: a three-button cell captured under gestures, or bands' gesture capture replaced by a three-button one, would
+ * record a truth its id denies.
+ */
+export function captureRefusal(cell: Pick<CatalogCell, 'platforms' | 'navigation'>, platform: Platform, navigation: NavigationMode | undefined): string | undefined {
+  if (cell.platforms !== undefined && !cell.platforms.includes(platform)) return `built for ${cell.platforms.join(', ')} only`;
+  if (cell.navigation === undefined || platform !== 'android') return undefined;
+  return navigation === cell.navigation ? undefined : `captured under ${cell.navigation} navigation only, the device is in ${navigation ?? 'an unknown'} mode`;
 }
 
 /** The family of each cell of the catalog — how a capture's KNOWN rows are grouped (tests/differential/golden/). */

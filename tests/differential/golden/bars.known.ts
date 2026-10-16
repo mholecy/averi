@@ -28,6 +28,7 @@ export const bars: KnownFile = {
   ]),
   counts: {
     [`${ANDROID}/bands.xml`]: 15,
+    [`${ANDROID}/bands-three-button.xml`]: 15,
     [`${ANDROID}/pinned-bar.xml`]: 7,
     [`${ANDROID}/tabbar-floating.xml`]: 9,
     [`${ANDROID}/fab.xml`]: 9,

@@ -195,14 +195,40 @@ describe('R-sliver, R-band, R-under-chrome: scroll_until does not call it reache
   });
 });
 
+// scroll-bounded-flush's P as captured: cut flush by `upper`'s bottom (908); averi's real probe at 9c7885e drags up from
+// inside `upper` (788 → 697), toward the bottom edge.
+const UP_PROBE = 'adb shell input swipe 540 788 540 697 300';
+const FLUSH = 'Element id:"lab.edges.A" fully visible after 1 swipe; its bottom edge lies on its scroll container\'s (0,303 1080x605), and a probe swipe toward it moved nothing — nothing of it is cut there';
+
+describe('R-fully on a flush edge: the stop\'s probe is the device\'s to answer, but the truth must bear out the edge and the swipe', () => {
+  const flushCell: CellTruth = { ...CELL, screen: { width: 1080, height: 2220 }, scrollViews: { upper: rect(0, 303, 1080, 605) } };
+  const flush = (visible: Rect) => expectations('android', target('partly-centre-in', { frame: rect(128, 798, 825, 176), visible, scrollView: 'upper' }), flushCell, 'uiautomator');
+  const P = flush(rect(128, 798, 825, 110));
+  it('probed from inside its scroll view toward the flush edge (#12 at 9c7885e): accepted', () => {
+    expect(verdict(P, 'fully', out(FLUSH, [UP_PROBE]))).toBeUndefined();
+  });
+  it('no swipe sent, a swipe dragging away from the edge, or one touching down outside its scroll view: red', () => {
+    expect(verdict(P, 'fully', out(FLUSH))).toMatch(/^fully visible where it is partly-centre-in, after 0 swipe\(s\) that move nothing \(no swipe from inside its scroll view upper toward its bottom edge\)/);
+    expect(verdict(P, 'fully', out(FLUSH, ['adb shell input swipe 540 697 540 788 300']))).toMatch(/\(no swipe from inside its scroll view upper toward its bottom edge\)/);
+    expect(verdict(P, 'fully', out(FLUSH, ['adb shell input swipe 540 1200 540 1100 300']))).toMatch(/\(no swipe from inside its scroll view upper toward its bottom edge\)/);
+  });
+  it('an edge the truth does not show flush with its scroll view (the lab\'s scroll-bounded P runs past it): red', () => {
+    expect(verdict(flush(rect(128, 798, 825, 90)), 'fully', out(FLUSH, [UP_PROBE]))).toMatch(/\(its bottom edge is not flush with its scroll view upper in the truth \(888 vs 908\)\)/);
+    expect(verdict(P, 'fully', out(FLUSH.replace('its bottom edge', 'its top edge'), ['adb shell input swipe 540 400 540 500 300']))).toMatch(/its top edge is not flush/);
+  });
+});
+
 describe('R-fully: fully: true never calls a cut target "visible" where it is, whatever it swiped', () => {
   const rs = rows(target('partly-centre-in', { visible: rect(51, 670, 300, 50) }));
   it.each([
     ['fully visible after 0 swipes (the notes #9, #12)', out(VISIBLE), 'fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 0 swipes'],
     ['"visible after 1 swipe": a replayed tree never moves, so it stopped where it is', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), 'fully visible where it is partly-centre-in, after 1 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 1 swipe'],
     ['stuck', out('ERROR: stuck'), undefined],
+    // A stop claiming a flush probe, on a truth with no scroll view to bear it out: red.
+    ['a flush probe claimed where the truth names no scroll view', out(FLUSH, [UP_PROBE]), /^fully visible where it is partly-centre-in, after 1 swipe\(s\) that move nothing \(no scroll view or visible part/],
   ])('%s', (_n, o, expected) => {
-    expect(verdict(rs, 'fully', o)).toBe(expected);
+    if (expected instanceof RegExp) expect(verdict(rs, 'fully', o)).toMatch(expected);
+    else expect(verdict(rs, 'fully', o)).toBe(expected);
   });
   it('asks toward the cut: down when its centre is below what shows, up when above', () => {
     const call = (t: TargetTruth) => rows(t).find((r) => r.verb === 'fully')!.call.args as { direction: string; fully: boolean };
@@ -257,6 +283,10 @@ describe('R-band: refused, never measured, never reached where it is', () => {
     const three = expectations('android', band, { ...CELL, navigation: 'three-button' }, 'uiautomator');
     expect(verdict(three, 'colour', out(PASSED))).toMatch(/^passed on #43A047/);
     expect(verdict(three, 'colour', out(FAILED))).toBeUndefined();
+    // Asked for the colour the screen shows there — the bar's — so that a pass means it measured the bar (#23).
+    const bar = expectations('android', { ...band, seen: '#F4EAF7' }, { ...CELL, navigation: 'three-button' }, 'uiautomator').find((r) => r.verb === 'colour')!;
+    expect(bar.call.args).toMatchObject({ asserts: [{ color: { expected: '#F4EAF7' } }] });
+    expect(bar.says).toBe('fails (R-band: the navigation bar over it), asked for the colour the screen shows there (#F4EAF7)');
     const gesture = expectations('android', { ...band, reached: true }, { ...CELL, navigation: 'gesture' }, 'uiautomator');
     expect(gesture.find((r) => r.verb === 'colour')!.says).toBe('R-band (the navigation band under gesture navigation, the app\'s): passes on its own colour #43A047, or fails closed');
     expect(verdict(gesture, 'colour', out(PASSED))).toBeUndefined();
@@ -280,7 +310,13 @@ describe('R-dismiss and R-direction', () => {
   const r = dismissRow('ios', { tag: 'vs', id: 'lab.f.vs' }, { label: 'Transfer details', frame: rect(120, 60, 162, 22) });
   it('R-dismiss: the configured dismissal is tapped, inside its element', () => {
     expect(r.judge(out(TAPPED, ['idb ui tap 201 71', 'idb ui tap 201 700']))).toBeUndefined();
-    expect(r.judge(out('ERROR: no keyboard dismissal: covered by Toolbar'))).toBe('no tap on the dismissal Transfer details (refused for a toolbar): ERROR: no keyboard dismissal: covered by Toolbar');
+    // What covered the dismissal is read from the guard's own clause (rows.ts#DISMISSAL_COVERED), as the replies at
+    // 5cff2ad (#7's toolbar) and 7542021 (#7's scroll view) say it — never from the advice, which names the
+    // input-accessory toolbar whatever covered the dismissal.
+    const refused = (cover: string) => `ERROR The soft keyboard covers id:"lab.f.vs": … and so was the input-accessory toolbar's Done … and none of the configured dismissals is usable on this screen (tap id:"lab.f.title": covered by ${cover}). Nothing was tapped`;
+    expect(r.judge(out(refused('toolbar "Toolbar"')))).toMatch(/^no tap on the dismissal Transfer details \(refused for a toolbar\): ERROR The soft keyboard/);
+    expect(r.judge(out(refused('scrollable')))).toMatch(/^no tap on the dismissal Transfer details \(refused for a scrollable\): ERROR The soft keyboard/);
+    expect(r.judge(out('ERROR … the input-accessory toolbar\'s Done … nothing was tapped'))).toBe("no tap on the dismissal Transfer details: ERROR … the input-accessory toolbar's Done … nothing was tapped");
     expect(r.judge(out(TAPPED, ['idb ui tap 201 700']))).toBe('no tap on the dismissal Transfer details: Tapped id:"lab.edges.A"');
   });
   it('R-direction is live only: declared — asked of a target off what shows, never by the golden mode (golden-wiring.test.ts)', () => {

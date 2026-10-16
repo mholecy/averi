@@ -11,15 +11,20 @@ import UIKit
 // - `toolbar-dismiss` (layer `toolbar-screen`) and `toolbar-dismiss-bar` (`toolbar-bar`): a form (Forms.swift's
 //   FormScreen, its principal title the cell's `keyboardDismiss` taps). The principal item makes SwiftUI lay its own
 //   full-screen `Toolbar` host (one empty child) after the content in WDA's tree — #7's shape, on both cells;
-//   `toolbar-bar` adds an itemless UIKit toolbar over the navigation bar (#19). Neither draws anything or takes a
-//   touch: a tap on the title still ends the editing (FormTruth.title).
+//   `toolbar-bar` adds an itemless UIKit toolbar over the navigation bar (#19); `toolbar-dismiss-short` (layer
+//   `toolbar-screen-short`) is toolbar-dismiss with the form's scroll view 451 pt tall below the bar (FormScreen's
+//   scrollHeight): no host by size — WDA lists it 0,0 402x567, its frame running up under the bar over the title, its
+//   rows below it, its foot 6 pt above the keyboard's top so no field lies clipped above the keyboard (touching it,
+//   SwiftUI runs the scroll view on under the keyboard to the screen's foot: measured 0,0 402x874) — #7's second fix,
+//   c3ebc62; mp-native's 0,0 402x512. No toolbar draws anything or takes a touch: a tap on the title still ends the
+//   editing (FormTruth.title).
 
 struct FalseCoversScreen: View {
     let cell: Cell
 
     var body: some View {
         if let form = cell.form {
-            FormScreen(cell: cell, form: form).overlay(alignment: .top) { if cell.layer == "toolbar-bar" { ShadowToolbar() } }
+            FormScreen(cell: cell, form: form, scrollHeight: cell.layer == "toolbar-screen-short" ? 451 : nil).overlay(alignment: .top) { if cell.layer == "toolbar-bar" { ShadowToolbar() } }
         } else {
             OwnPartsScreen(cell: cell)
         }

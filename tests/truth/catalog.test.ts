@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { buildCatalog, CATALOG_FILE, formatJson, generatedCatalog, loadCatalog, readFamilies, selectCells, type FamilyFile } from '../../scripts/truth/catalog.js';
+import { buildCatalog, captureRefusal, CATALOG_FILE, formatJson, generatedCatalog, loadCatalog, readFamilies, selectCells, type FamilyFile } from '../../scripts/truth/catalog.js';
 import { FAMILIES } from '../../scripts/truth/schema.js';
 
 // The catalog both lab apps bundle (fixtures/apps/cells.json) is generated from one file per family
@@ -24,6 +24,7 @@ describe('the cell catalog', () => {
       'presented/sheet-medium-edges',
       'presented/sheet-background',
       'presented/sheet-long-list',
+      'presented/sheet-long-list-short',
       'presented/dim-cover',
       'presented/blur-menu',
       'presented/blur-menu-grouped',
@@ -35,8 +36,11 @@ describe('the cell catalog', () => {
       'forms/form-shared-id',
       'edges/scroll-bounded',
       'edges/scroll-sticky',
+      'edges/scroll-bounded-flush',
+      'edges/scroll-sticky-cut',
       'edges/scroll-top-edge',
       'bars/bands',
+      'bars/bands-three-button',
       'bars/pinned-bar',
       'bars/tabbar-floating',
       'bars/tabbar-hidden-push',
@@ -44,6 +48,7 @@ describe('the cell catalog', () => {
       'false-covers/own-parts',
       'false-covers/toolbar-dismiss',
       'false-covers/toolbar-dismiss-bar',
+      'false-covers/toolbar-dismiss-short',
     ]);
   });
 
@@ -66,12 +71,24 @@ describe('the cell catalog', () => {
   it('selects by family, by cell, by both; a name that matches nothing is an error', async () => {
     const c = await loadCatalog();
     expect(selectCells(c, {}).length).toBe(c.cells.length);
-    expect(selectCells(c, { families: ['presented'] }).map((x) => x.id)).toEqual(['sheet-medium', 'alert-dim', 'sheet-medium-edges', 'sheet-background', 'sheet-long-list', 'dim-cover', 'blur-menu', 'blur-menu-grouped']);
+    expect(selectCells(c, { families: ['presented'] }).map((x) => x.id)).toEqual(['sheet-medium', 'alert-dim', 'sheet-medium-edges', 'sheet-background', 'sheet-long-list', 'sheet-long-list-short', 'dim-cover', 'blur-menu', 'blur-menu-grouped']);
     expect(selectCells(c, { cells: ['open', 'form-picker'] }).map((x) => x.id)).toEqual(['open', 'form-picker']);
     expect(selectCells(c, { families: ['presented', 'base'], cells: ['open', 'form-picker', 'alert-dim'] }).map((x) => x.id)).toEqual(['open', 'alert-dim']);
     expect(() => selectCells(c, { families: ['edgez'] })).toThrow('no family edgez');
     expect(() => selectCells(c, { cells: ['nope'] })).toThrow('no cell nope');
     // A family with no cell yet (here: edges with its cells left out — every family gains cells in phase 3).
     expect(() => selectCells({ ...c, cells: c.cells.filter((x) => x.family !== 'edges') }, { families: ['edges'] })).toThrow('no cell selected: families edges, cells any');
+  });
+});
+
+describe('captureRefusal: a cell captured only where it is built, and on Android under its navigation mode', () => {
+  it('platforms, and the navigation mode on Android only', () => {
+    expect(captureRefusal({}, 'ios', undefined)).toBeUndefined();
+    expect(captureRefusal({ platforms: ['android'] }, 'ios', undefined)).toBe('built for android only');
+    expect(captureRefusal({ platforms: ['android'] }, 'android', 'gesture')).toBeUndefined();
+    expect(captureRefusal({ navigation: 'gesture' }, 'ios', undefined)).toBeUndefined();
+    expect(captureRefusal({ navigation: 'gesture' }, 'android', 'gesture')).toBeUndefined();
+    expect(captureRefusal({ navigation: 'gesture' }, 'android', 'three-button')).toBe('captured under gesture navigation only, the device is in three-button mode');
+    expect(captureRefusal({ navigation: 'three-button' }, 'android', undefined)).toBe('captured under three-button navigation only, the device is in an unknown mode');
   });
 });

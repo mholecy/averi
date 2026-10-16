@@ -14,6 +14,9 @@ struct FormScreen: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
     let form: FormSpec
+    /// A scroll view shorter than the screen, pinned to the top (false-covers' toolbar-dismiss-short: calibration.json
+    /// #7's second fix, mp-native's form scroll view 512 pt of 874); nil, the scroll view fills the screen.
+    var scrollHeight: CGFloat? = nil
     @State private var values: [String: String] = [:]
     /// A submit has run: an invalid field shows its error from now on (and loses it once fixed).
     @State private var dirty = false
@@ -38,6 +41,7 @@ struct FormScreen: View {
                 }
                 .padding(20)
             }
+            .modifier(ShortScroll(height: scrollHeight))
             .safeAreaInset(edge: .bottom) {
                 if form.submit.pinned == true {
                     // Its bar reported as `submit.bar`: what scripts/truth/truth.ts#situationOf reads as its cover.
@@ -244,5 +248,18 @@ extension View {
     /// The view's frame in screen coordinates (`.global`: the window fills the screen, a sheet is in the same window).
     func reportFrame(_ tag: String, to lab: Lab) -> some View {
         onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.frame(tag, $0) }
+    }
+}
+
+/// FormScreen's scroll view `height` tall at the top of the screen, when given.
+private struct ShortScroll: ViewModifier {
+    let height: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let height {
+            content.frame(height: height).frame(maxHeight: .infinity, alignment: .top)
+        } else {
+            content
+        }
     }
 }

@@ -1,4 +1,4 @@
-import type { SourceKind } from '../differential/corpus.js';
+import type { Platform, SourceKind } from '../differential/corpus.js';
 
 /**
  * The lab apps' contract with the harness (docs/plans/2026-10-15-ground-truth-lab-app.md): the cell catalog both apps
@@ -68,6 +68,18 @@ export interface CatalogCell {
    * (CellTruth.config), so a capture is replayed as it was captured.
    */
   config?: CellConfig;
+  /**
+   * The platforms whose app builds it, when not both: a variant of a cell for one platform's tree (calibration.json
+   * #9, #12, #13: Android's uiautomator bounds). capture-run.ts skips it elsewhere (catalog.ts#captureRefusal).
+   */
+  platforms?: Platform[];
+  /**
+   * Android: the navigation mode it is captured under — only on a device in that mode (LabDevice.navigation); iOS has
+   * none, so it does not apply there. A cell without it is captured under any mode, which its truth records
+   * (CellTruth.navigation). `bands` (gesture) and `bands-three-button` (Android only) are one screen under each mode, so
+   * both captures sit in one run and neither replaces the other (calibration.json #23).
+   */
+  navigation?: NavigationMode;
 }
 
 /** averi.yaml settings per platform, merged over the golden mode's own (`bundleId`, `treeSource`, `package`). */

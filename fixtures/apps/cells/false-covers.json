@@ -1,6 +1,6 @@
 {
   "family": "false-covers",
-  "note": "What is no cover: a target's own parts (a button's text, a text field's floating label and its scroll bar: own-parts), a toolbar over the keyboard dismissal the cell's config taps (toolbar-dismiss: a screen-sized one, layer toolbar-screen; toolbar-dismiss-bar: an itemless bar-sized one, layer toolbar-bar) — phase 3 B5 (calibration.json: #7, #8, #18, #19). App files: AveriLab/FalseCovers.swift, FalseCovers.kt (own-parts only: the toolbar cells are form cells, phase 2b on Android).",
+  "note": "What is no cover: a target's own parts (a button's text, a text field's floating label and its scroll bar: own-parts), a toolbar over the keyboard dismissal the cell's config taps (toolbar-dismiss: a screen-sized one, layer toolbar-screen; toolbar-dismiss-bar: an itemless bar-sized one, layer toolbar-bar; toolbar-dismiss-short: the screen-sized one over a form whose scroll view is shorter than the screen, its frame over the title, layer toolbar-screen-short — #7's second fix) — phase 3 B5 (calibration.json: #7, #8, #18, #19). App files: AveriLab/FalseCovers.swift, FalseCovers.kt (own-parts only: the toolbar cells are form cells, phase 2b on Android).",
   "cells": [
     {
       "id": "own-parts",
@@ -57,6 +57,31 @@
         "focus": "postcode"
       },
       "config": { "ios": { "keyboardDismiss": [{ "tap": { "id": "lab.toolbar-dismiss-bar.title" } }] } }
+    },
+    {
+      "id": "toolbar-dismiss-short",
+      "layer": "toolbar-screen-short",
+      "platforms": ["ios"],
+      "targets": [],
+      "form": {
+        "title": "SWIFT payment",
+        "titleId": "lab.toolbar-dismiss-short.title",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue to summary" },
+        "focus": "postcode"
+      },
+      "config": { "ios": { "keyboardDismiss": [{ "tap": { "id": "lab.toolbar-dismiss-short.title" } }] } }
     }
   ]
 }

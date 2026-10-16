@@ -52,7 +52,8 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun BarsScreen(cell: Cell, lab: Lab) {
     when (cell.id) {
-        "bands" -> Bands(cell, lab)
+        // bands-three-button: the same screen, captured under three-button navigation (CatalogCell.navigation).
+        "bands", "bands-three-button" -> Bands(cell, lab)
         "pinned-bar" -> PinnedBar(cell, lab)
         "tabbar-floating" -> TabbarFloating(cell, lab)
         "fab" -> Fab(cell, lab)

@@ -126,6 +126,28 @@
       "truth": "scroll-sticky.truth.json"
     },
     {
+      "file": "scroll-bounded-flush.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-bounded-flush.png",
+      "truth": "scroll-bounded-flush.truth.json"
+    },
+    {
+      "file": "scroll-sticky-cut.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky-cut.png",
+      "truth": "scroll-sticky-cut.truth.json"
+    },
+    {
       "file": "scroll-top-edge.xml",
       "source": "uiautomator",
       "form": "raw",
@@ -146,6 +168,17 @@
       },
       "screenshot": "bands.png",
       "truth": "bands.truth.json"
+    },
+    {
+      "file": "bands-three-button.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "bands-three-button.png",
+      "truth": "bands-three-button.truth.json"
     },
     {
       "file": "pinned-bar.xml",
