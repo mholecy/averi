@@ -48,7 +48,7 @@ const pick = <E extends Expectation>(rows: readonly E[], verb: string, tag?: str
 };
 
 describe('a coloured target, open', () => {
-  const rows = expectations('ios', target({}));
+  const rows = expectations('ios', target({}), undefined, 'wda');
   it.each<[string, readonly Case[]]>([
     ['tap', [['Tapped id:"lab.x"', ['idb ui tap 201 142'], 'ok'], ['ERROR id:"lab.x" is under …; nothing was tapped', [], /^not tapped/], [TIMED_OUT, [], /^not tapped: ERROR Timed out/]]],
     ['colour', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
@@ -65,7 +65,7 @@ describe('a coloured target, open', () => {
 });
 
 describe('a coloured target beneath a presented layer', () => {
-  const rows = expectations('ios', target({ declared: 'presented-over', reached: false, drawn: 0, seen: '#B72E2A' }));
+  const rows = expectations('ios', target({ declared: 'presented-over', reached: false, drawn: 0, seen: '#B72E2A' }), undefined, 'wda');
   it.each<[string, readonly Case[]]>([
     [
       'tap',
@@ -148,7 +148,7 @@ const form: CellTruth = {
 };
 
 describe('the form rows', () => {
-  const rows = formExpectations('ios', form);
+  const rows = formExpectations('ios', form, 'wda');
 
   it('every kind of row is asked', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual([

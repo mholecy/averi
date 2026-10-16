@@ -1,0 +1,56 @@
+{
+  "cell": "own-parts",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "L",
+      "id": "lab.own-parts.L",
+      "text": "LOGIN",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "x": 472,
+        "y": 364,
+        "width": 135,
+        "height": 55
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,392"
+        }
+      ],
+      "drawn": 0.984,
+      "seen": "#3949AB"
+    },
+    {
+      "tag": "N",
+      "id": "lab.own-parts.N",
+      "text": "Payee’s name",
+      "color": "#B2EBF2",
+      "declared": "open",
+      "frame": {
+        "x": 177,
+        "y": 1351,
+        "width": 266,
+        "height": 61
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "310,1382"
+        }
+      ],
+      "drawn": 0.981,
+      "seen": "#B2EBF2"
+    }
+  ]
+}

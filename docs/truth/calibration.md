@@ -11,9 +11,9 @@ open note on the working tree. See the script for the verdicts.
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | needs-2b | 926b826 → 95f75f4 | — |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the iOS leg only) |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 8 rows (recorded) |
-| 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | needs-cell:false-covers | d928789 → c3ebc62, 7542021 | — |
-| 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | needs-cell:false-covers | dd50327 → cccf6b8, c8c06a8 | — |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 14 rows (recorded) |
+| 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED (partial: the first fix (7542021): SwiftUI's own full-screen `Toolbar` host) |
+| 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | DOES-NOT-FAIL |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | needs-cell:bars | 188740b → bd06470, 16ae6bb | — |
@@ -23,8 +23,8 @@ open note on the working tree. See the script for the verdicts.
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
 | 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is a dynamic) |
-| 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half only) |
-| 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | needs-cell:false-covers | bd06470 → 470dafe, cd4d177 | — |
+| 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node) |
+| 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | needs-cell:bars | 0cb8b62 → 5e47ff4 | — |
 | 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half only), regressed elsewhere: 2 rows (recorded) |
@@ -43,7 +43,7 @@ open note on the working tree. See the script for the verdicts.
 | 35 | 2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done | calibrate | 173023f → 92f2a46 | CALIBRATED |
 | 36 | 2026-08-26-ios-ocr-crop-scale | needs-ocr | — | — |
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
-| FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | DOES-NOT-FAIL |
+| FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED (partial: the `error` assert half) |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | open | working tree | OPEN-RED |
@@ -123,24 +123,64 @@ The iOS leg of the fix (the WDA band bounds the judgement and the stroke). 1bc60
 
 Regressed elsewhere at 13d68a2 (green at 16ae6bb):
 
+  - RED android-averi_lab-api33/own-parts.xml L tap — not tapped: ERROR text:"LOGIN" is under button (127,303 825x176) at its centre (540,392), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED android-averi_lab-api33/own-parts.xml L scroll_until — stopped: ERROR scroll_until text:"LOGIN" failed after 2 swipes — element is in the viewport but under button (127,303 825x176) at its centre (540,392), drawn over it — 0% of it shows — and the content is exhau
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu-grouped.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows 
   - RED ios-iphone17-ios27/blur-menu.idb.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
   - RED ios-iphone17-ios27/blur-menu.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
   - RED ios-iphone17-ios27/blur-menu.wda.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
   - RED ios-iphone17-ios27/blur-menu.wda.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows — and th
+  - RED ios-iphone17-ios27/own-parts.idb.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scro
+  - RED ios-iphone17-ios27/own-parts.idb.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it — 22% of i
+  - RED ios-iphone17-ios27/own-parts.wda.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scro
+  - RED ios-iphone17-ios27/own-parts.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it — 22% of i
   - RED ios-iphone17-ios27/sheet-medium.wda.json S tap — not tapped: ERROR id:"lab.sheet-medium.S" is under container (8,415 386x451) at its centre (201,484), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — stopped: ERROR scroll_until id:"lab.sheet-medium.S" failed after 2 swipes — element is in the viewport but under container (8,415 386x451) at its centre (201,484), drawn over it — 0% of it shows — and the cont
 
 Regressions recorded:
 
 - ios-iphone17-ios27/sheet-medium.wda.json S tap, ios-iphone17-ios27/sheet-medium.wda.json S scroll_until: broke at 13d68a2, fixed at 81a7d62 — the sheet's frames-only background container read as a cover over its own button (#18)
+- android-averi_lab-api33/own-parts.xml L tap, android-averi_lab-api33/own-parts.xml L scroll_until: broke at 13d68a2, fixed at cccf6b8 — a Compose button's own text read as under the unlabelled button listed after it (#8)
+- ios-iphone17-ios27/own-parts.wda.json N tap, ios-iphone17-ios27/own-parts.wda.json N scroll_until, ios-iphone17-ios27/own-parts.idb.json N tap, ios-iphone17-ios27/own-parts.idb.json N scroll_until: broke at 13d68a2, fixed at 81a7d62 — a text field read as a cover over its own label, the label's rect 2 pt past the field's at top and bottom (#18)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: green at 13d68a2, Tapped at b75b8b5 (fix/r5-cr) … dff7381, green again at 8c0fb41 (fix/r6-ios-top)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2
 - ios-iphone17-ios27/blur-menu.idb.json W tap, ios-iphone17-ios27/blur-menu.idb.json W scroll_until, ios-iphone17-ios27/blur-menu.wda.json W tap, ios-iphone17-ios27/blur-menu.wda.json W scroll_until: broke at 13d68a2, not fixed — the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4
 - ios-iphone17-ios27/blur-menu-grouped.idb.json W tap, ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until: broke at 13d68a2, fixed at 8a55d2b — the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
+
+## 7: CALIBRATED (partial: the first fix (7542021): SwiftUI's own full-screen `Toolbar` host)
+
+2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
+
+- before 5cff2ad:
+  - RED ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter cannot h
+  - RED ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter cannot h
+  - RED ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter cannot h
+  - RED ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapter cannot
+- after 7542021:
+  - ok ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.vs", but it is still up: the band [0,573][402,874] still contains the tap point (201,621) on 2 looks 300m
+  - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 2 looks 300m
+  - ok ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 looks 300m
+  - ok ios-iphone17-ios27/toolbar-dismiss.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 looks 30
+
+Needs: The second fix's half (c3ebc62: the form's scroll view, 58 % of the screen, its frame under the top bar, covering the title) needs a toolbar-dismiss variant whose scroll view is shorter than the screen — SwiftUI lays the lab form's at 0,0 402x874, a screen-sized host already excused at 7542021, so golden is green on toolbar-dismiss at d928789.
+
+The principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's shape. Red at 5cff2ad: refused, `covered by toolbar "Toolbar"`, nothing tapped; at 7542021 the title is tapped. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
+
+## 8: CALIBRATED
+
+2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md — defect: `^(not tapped|stopped): .*\bunder button \(`
+
+- before dd50327:
+  - RED android-averi_lab-api33/own-parts.xml L tap — not tapped: ERROR text:"LOGIN" is under button (127,303 825x176) at its centre (540,392), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED android-averi_lab-api33/own-parts.xml L scroll_until — stopped: ERROR scroll_until text:"LOGIN" failed after 2 swipes — element is in the viewport but under button (127,303 825x176) at its centre (540,392), drawn over it — 0% of it shows — and the content is exhau
+- after cccf6b8:
+  - ok android-averi_lab-api33/own-parts.xml L tap — Tapped text:"LOGIN"
+  - ok android-averi_lab-api33/own-parts.xml L scroll_until — Element text:"LOGIN" fully visible after 0 swipes
+
+own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes "a layout defect"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.
 
 ## 9: DOES-NOT-FAIL
 
@@ -235,24 +275,49 @@ Needs: The turn-back (phase 5's live golden): a stroke that leaves the row in th
 
 The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431).
 
-## 18: CALIBRATED (partial: the cell-background half only)
+## 18: CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node)
 
-2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md — defect: `^(not tapped|stopped): .*\bunder container \(`
+2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md — defect: `^(not tapped|stopped): .*\bunder (container|textfield)\b`
 
 - before d2b7744:
   - RED ios-iphone17-ios27/sheet-medium.wda.json S tap — not tapped: ERROR id:"lab.sheet-medium.S" is under container (8,415 386x451) at its centre (201,484), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — stopped: ERROR scroll_until id:"lab.sheet-medium.S" failed after 3 swipes — element is in the viewport but under container (8,415 386x451) at its centre (201,484), drawn over it — 0% of it shows — and the cont
+  - RED ios-iphone17-ios27/own-parts.wda.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scro
+  - RED ios-iphone17-ios27/own-parts.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 3 swipes — element is in the viewport but under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it — 22% of i
+  - RED ios-iphone17-ios27/own-parts.idb.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scro
+  - RED ios-iphone17-ios27/own-parts.idb.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 3 swipes — element is in the viewport but under textfield id:lab.own-parts.N.field (69,495 264x14) at its centre (116,502), drawn over it — 22% of i
 - after 81a7d62:
   - ok ios-iphone17-ios27/sheet-medium.wda.json S tap — Tapped id:"lab.sheet-medium.S"
   - ok ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — Element id:"lab.sheet-medium.S" fully visible after 0 swipes
+  - ok ios-iphone17-ios27/own-parts.wda.json N tap — Tapped text:"Payee’s name"
+  - ok ios-iphone17-ios27/own-parts.wda.json N scroll_until — Element text:"Payee’s name" fully visible after 0 swipes
+  - ok ios-iphone17-ios27/own-parts.idb.json N tap — Tapped text:"Payee’s name"
+  - ok ios-iphone17-ios27/own-parts.idb.json N scroll_until — Element text:"Payee’s name" fully visible after 0 swipes
 
 Regressions recorded:
 
 - ios-iphone17-ios27/sheet-medium.wda.json S tap, ios-iphone17-ios27/sheet-medium.wda.json S scroll_until: broke at 13d68a2, fixed at 81a7d62 — green at 16ae6bb: the cover judgement 13d68a2 introduced read the sheet's frames-only background (8,415 386x451) as drawn over its own button
 
-Needs: The text field's scroll indicator half needs a false-covers/own-parts cell.
+Needs: The text field's own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under an RN text field) needs a field whose tree lists one: neither SwiftUI's TextField nor a UIKit UITextField in the lab lists it (iOS 27.0, empty, unfocused).
 
-The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note.
+The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412]).
+
+## 19: CALIBRATED
+
+2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md — defect: `^no tap on the dismissal .*\(refused for a toolbar\)`
+
+- before bd06470:
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.vs": the band it draws over [0,573][402,874] contains the tap point (201,621) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ks": the band it draws over [0,573][402,874] contains the tap point (201,695) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.ss": the band it draws over [0,573][402,874] contains the tap point (201,769) on two looks 300ms apart; this adapter 
+  - RED ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — no tap on the dismissal id:"lab.toolbar-dismiss-bar.title" (refused for a toolbar): ERROR The soft keyboard covers id:"lab.toolbar-dismiss-bar.note": the band it draws over [0,573][402,874] contains the tap point (201,843) on two looks 300ms apart; this adapte
+- after 470dafe:
+  - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.vs", but it is still up: the band [0,573][402,874] still contains the tap point (201,621) on 2 lo
+  - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ks", but it is still up: the band [0,573][402,874] still contains the tap point (201,695) on 2 lo
+  - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.ss", but it is still up: the band [0,573][402,874] still contains the tap point (201,769) on 2 lo
+  - ok ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap — ERROR Tapped id:"lab.toolbar-dismiss-bar.title" at (201,84) to hide the soft keyboard covering id:"lab.toolbar-dismiss-bar.note", but it is still up: the band [0,573][402,874] still contains the tap point (201,843) on 2 
+
+toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has.
 
 ## 20: CALIBRATED (partial: R-off only)
 
@@ -470,24 +535,32 @@ The green tip of the fix branch, e10219e, is the merge's second parent.
 
 A text field error, not visibility; in the table because the form-errors cell reproduces it.
 
-## FE2: DOES-NOT-FAIL
+## FE2: CALIBRATED (partial: the `error` assert half)
 
 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md — defect: `^passed: `
 
 - before d407256:
-  - ok ios-iphone17-ios27/form-errors.wda.json name error — PASS  element id:"lab.form-errors.name" with error "Enter the recipient’s name" exists
-  - ok ios-iphone17-ios27/form-errors.wda.json amount error — PASS  element id:"lab.form-errors.amount" with error "Amount must be 0,01 – 10 000 €" exists
-  - ok ios-iphone17-ios27/form-errors.idb.json name error — PASS  element id:"lab.form-errors.name" with error "Enter the recipient’s name" exists
-  - ok ios-iphone17-ios27/form-errors.idb.json amount error — PASS  element id:"lab.form-errors.amount" with error "Amount must be 0,01 – 10 000 €" exists
+  - RED ios-iphone17-ios27/form-shared-id.wda.json amount error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "IBAN*" exists
+  - RED ios-iphone17-ios27/form-shared-id.wda.json iban error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists
+  - RED ios-iphone17-ios27/form-shared-id.wda.json bic error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists
+  - RED ios-iphone17-ios27/form-shared-id.wda.json bank error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists
+  - RED ios-iphone17-ios27/form-shared-id.idb.json amount error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "IBAN*" exists
+  - RED ios-iphone17-ios27/form-shared-id.idb.json iban error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists
+  - RED ios-iphone17-ios27/form-shared-id.idb.json bic error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists
+  - RED ios-iphone17-ios27/form-shared-id.idb.json bank error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists
 - after dfe63da:
-  - ok ios-iphone17-ios27/form-errors.wda.json name error — PASS  element id:"lab.form-errors.name" with error "Enter the recipient’s name" exists
-  - ok ios-iphone17-ios27/form-errors.wda.json amount error — PASS  element id:"lab.form-errors.amount" with error "Amount must be 0,01 – 10 000 €" exists
-  - ok ios-iphone17-ios27/form-errors.idb.json name error — PASS  element id:"lab.form-errors.name" with error "Enter the recipient’s name" exists
-  - ok ios-iphone17-ios27/form-errors.idb.json amount error — PASS  element id:"lab.form-errors.amount" with error "Amount must be 0,01 – 10 000 €" exists
+  - ok ios-iphone17-ios27/form-shared-id.wda.json amount error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "IBAN*" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.wda.json iban error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.wda.json bic error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.wda.json bank error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.idb.json amount error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "IBAN*" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.idb.json iban error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.idb.json bic error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.idb.json bank error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists — element found but error was: null, null, null
 
-Needs: forms: a cell whose fields and their titles all share ONE identifier (a design-system component id), pristine (no error shown); rows: each field's `error` assert fails / ui_snapshot shows no error. form-errors gives every title its own id (`<field>.title`), so the same-identifier rule never meets another field's title.
+Needs: The ui_snapshot half (the note: every field's `error` = the next field's title in ui_snapshot) needs a golden verb for ui_snapshot's error column — none yet.
 
-The same-identifier rows (name, amount) are the nearest the cell asks; they pass on both sides.
+form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The last field has no title below it: no row. Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL).
 
 ## L1: OPEN-RED
 
@@ -620,12 +693,9 @@ No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke be
 
 - 1 2026-10-05-android-floating-gboard-keyboard.md: needs-2b
 - 3 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md: needs-2b
-- 7 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md: needs-cell:false-covers — false-covers/toolbar-dismiss with a config variant (CatalogCell.config → configFor: app.ios.keyboardDismiss) — a screen-sized SwiftUI toolbar host and a scroll view after the title; rows: R-dismiss.
-- 8 2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md: needs-cell:false-covers — false-covers/own-parts on Android: a Compose button's text as the target (CatalogTarget.text); rows: tap Tapped on the label.
 - 10 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md: needs-cell:edges — edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.
 - 11 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md: needs-cell:bars — bars/tabbar-floating (Android) with a target below the fold; rows: R-stroke (every touch-down in the strokeable region).
 - 14 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md: needs-cell:bars — bars/tabbar-floating (iOS): a row under the floating bar's surface above its buttons; rows: R-under-chrome.
-- 19 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md: needs-cell:false-covers — false-covers/toolbar-dismiss with a config variant (an itemless WDA toolbar over the dismissal tap); rows: R-dismiss.
 - 21 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md: needs-cell:bars — bars/bands (Android, edge-to-edge): a target under the status bar; rows: R-band; the swallowed probe accepted in consistency().
 - 23 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md: needs-ocr — bars/bands (Android navigation bar) and OCR judged on real pixels (phase 4).
 - 24 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md: residual:accepted (round 13: the FAB host layer is a cover) — bars/fab — to pin the accepted behaviour as KNOWN, not to turn it green.

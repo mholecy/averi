@@ -28,9 +28,10 @@ export interface CatalogTarget {
   in?: 'layer';
   declared: Declared;
   /**
-   * A text target (calibration.json #8, a Compose button's own text): the target is this text drawn on its coloured
-   * rectangle, identified as lab.<cell>.<tag>, its rectangle lab.<cell>.<tag>.box — the selector a row asks by is the
-   * text's. Phase 3 (B5) builds the first; no app draws one yet.
+   * A text target (calibration.json #8, a Compose button's own text; #18, a text field's own floating label): the
+   * target is this text drawn on its coloured control (the button, the field's box), identified as lab.<cell>.<tag>,
+   * the control's box lab.<cell>.<tag>.box (its frame reported as `<tag>.box`, the one `drawn` is measured over) — the
+   * rows ask by the text (`text:"…"`), as a test names a label (golden-spec/false-covers.ts#ownPartsRows).
    */
   text?: string;
   /** The scroll view the target lies in: an id of LabState.scrollViews, whose clip the measured geometry cuts it by. */
@@ -88,6 +89,11 @@ export interface CatalogField {
   /** The text above the field. Identified as `titleId`, else `lab.<cell>.<tag>.title`. */
   title: string;
   titleId?: string;
+  /**
+   * The field's own identifier, else `lab.<cell>.<tag>` — a design-system component's id shared by every field and its
+   * title (calibration.json FE2: `TextFieldWithComponentStyle`).
+   */
+  fieldId?: string;
   placeholder?: string;
   /** What a dev flavour puts in the field before the user does. */
   prefill?: string;
@@ -100,6 +106,17 @@ export interface CatalogField {
 export interface CatalogForm {
   /** The navigation title — a neutral element a keyboard dismissal can tap. */
   title: string;
+  /**
+   * The title drawn as the navigation bar's principal item with this identifier, its frame reported as `title`; a tap
+   * on it ends the editing (the keyboard goes) — what a cell's `config.ios.keyboardDismiss` taps (calibration.json #7,
+   * #19). Probed: FormTruth.title.
+   */
+  titleId?: string;
+  /**
+   * Each title floats inside its field's component, overlapping the field's top (mp-native's SWIFT form; FE2) — not
+   * stacked above it.
+   */
+  floatingTitles?: boolean;
   fields: CatalogField[];
   /** `pinned`: laid in the bottom safe-area inset, so it rides above the keyboard. */
   submit: { tag: string; title: string; pinned?: boolean };
@@ -216,6 +233,11 @@ export interface TargetTruth {
   tag: string;
   /** The selector the target answers to in every tree source: its accessibility identifier. */
   id: string;
+  /**
+   * A text target's text (CatalogTarget.text): its rows ask by it; `drawn` and `seen` are measured over its control's
+   * box (`<tag>.box`), the text drawn on it.
+   */
+  text?: string;
   color: string;
   declared: Declared;
   /** The app's frame, in the tree's units (points on iOS, pixels on Android). */
@@ -338,6 +360,8 @@ export interface FieldTruth extends FieldState {
   frame: Rect;
   /** The shown error's frame (`error` non-null). */
   errorFrame?: Rect;
+  /** The title's frame (`<tag>.title`), when the app reported one. */
+  titleFrame?: Rect;
 }
 
 export interface FormTruth {
@@ -350,6 +374,11 @@ export interface FormTruth {
   submits: { valid: boolean }[];
   /** The picker sheet's frame, when it is presented. */
   sheet?: Rect;
+  /**
+   * The principal title (CatalogForm.titleId), its frame and its probe: `reached` when a raw tap at its centre ended
+   * the editing (a `focus` event with no field) — the keyboard dismissal a cell's config taps works on the screen.
+   */
+  title?: { id: string; frame: Rect; reached: boolean; probe: ProbeEvent[] };
 }
 
 /** A target counts as drawn as itself from this fraction on (a frame's edge pixels may be antialiased). */

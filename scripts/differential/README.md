@@ -101,7 +101,7 @@ control that the tap reached the app at all — and how much of the target the s
 fake device serves that screenshot instead of the grey frame (and refuses a profile whose frame is not its size);
 `golden-spec.ts` says what each verb must answer for each kind of truth (tapped or refused and the remedy, colour pass
 or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — classes, not wording. It is a façade over one
-file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars; false-covers to come), the judges
+file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars, false-covers), the judges
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). A row type is asked only of a target whose truth carries a measured `geometry` other than
@@ -142,7 +142,13 @@ read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a 
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the
 keyboard tapped and reached with no swipe, `scroll_until` touching down above the keyboard, a field under the pinned
 submit whose probe tap submitted the form neither tapped nor "reached" without a swipe, and a lazy picker row swiped for
-on the sheet.
+on the sheet. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error`
+assert, asked with the same-identifier title below it, fails; no tap is asked by an identifier fields share.
+`golden-spec/false-covers.ts` asks a text target (`own-parts`) by its text — Tapped, reached with no swipe — and, under
+WDA, R-dismiss of a form whose config taps its principal title (`toolbar-dismiss`, `toolbar-dismiss-bar`: a toolbar
+over the title in the tree) in place of the form's under-keyboard tap row; the façade's `formExpectations` takes the
+capture's source for it (the keyboardDismiss list is inert under idb). A replayed tree shows the dismissal sent, not the
+keyboard going and the field then tapped (live golden, phase 5).
 
 What a replayed tree cannot judge — a fill, a clear, typing into the focused field, a dismissal — the live golden runs
 on the lab simulator through averi's MCP tools, the app's model as the oracle (not a vitest test; it needs the

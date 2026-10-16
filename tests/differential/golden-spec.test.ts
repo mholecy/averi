@@ -73,7 +73,7 @@ const target = (over: Partial<TargetTruth>): TargetTruth => ({
 });
 
 describe('a target beneath a presented layer', () => {
-  const rows = expectations('android', target({}));
+  const rows = expectations('android', target({}), undefined, 'uiautomator');
 
   it('tap: refused with "close it first" and nothing sent; a refusal that still sent a tap is a mismatch', () => {
     const tap = row(rows, 'tap');
@@ -93,7 +93,7 @@ describe('a target beneath a presented layer', () => {
   });
 
   it('colour: a target measured wholly off the screen is asked for its own colour (nothing there shows another)', () => {
-    const off = row(expectations('ios', target({ geometry: 'off-screen', seen: '#000000', frame: rect(51, 1009, 300, 64) })), 'colour');
+    const off = row(expectations('ios', target({ geometry: 'off-screen', seen: '#000000', frame: rect(51, 1009, 300, 64) }), undefined, 'wda'), 'colour');
     expect(off.call.args).toMatchObject({ asserts: [{ color: { expected: '#E53935' } }] });
     expect(off.says).toMatch(/^fails \(nothing of it is on the screen\), asked for its own colour/);
     expect(row(rows, 'colour').call.args).toMatchObject({ asserts: [{ color: { expected: '#B72E2A' } }] });
@@ -136,7 +136,7 @@ const formTruth = (controls: ControlTruth[]): CellTruth => ({
 });
 
 describe('a field under the keyboard', () => {
-  const rows = formExpectations('ios', formTruth([control({})]));
+  const rows = formExpectations('ios', formTruth([control({})]), 'wda');
 
   it('tap: refused naming the soft keyboard — the word in the echoed selector (form-keyboard) does not count', () => {
     const tap = row(rows, 'tap');
@@ -151,7 +151,7 @@ describe('a field under the keyboard', () => {
 
 describe('a field partly hidden whose probe fired another control (the phone field under the pinned submit)', () => {
   const phone = control({ tag: 'phone', id: 'lab.form-keyboard.phone', frame: rect(20, 530, 362, 34), situation: 'covered', probe: [{ kind: 'touch', tag: '201.0,547.0' }, { kind: 'submit', tag: 'invalid' }] });
-  const rows = formExpectations('ios', formTruth([phone]));
+  const rows = formExpectations('ios', formTruth([phone]), 'wda');
 
   it('has a tap and a scroll_until row', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual(['phone tap', 'phone scroll_until']);
@@ -173,7 +173,7 @@ describe('a field partly hidden whose probe fired another control (the phone fie
   });
 
   it('a covered control whose probe fired nothing else has no row', () => {
-    expect(formExpectations('ios', formTruth([{ ...phone, probe: [{ kind: 'touch', tag: '201.0,547.0' }, { kind: 'focus', tag: '' }] }]))).toEqual([]);
+    expect(formExpectations('ios', formTruth([{ ...phone, probe: [{ kind: 'touch', tag: '201.0,547.0' }, { kind: 'focus', tag: '' }] }]), 'wda')).toEqual([]);
   });
 });
 

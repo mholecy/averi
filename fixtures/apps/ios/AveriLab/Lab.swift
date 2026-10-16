@@ -35,6 +35,10 @@ struct Message: Codable, Equatable {
 
 struct FormSpec: Decodable {
     let title: String
+    /// The title drawn as the navigation bar's principal item with this identifier; a tap on it ends the editing.
+    let titleId: String?
+    /// Each title floats inside its field's component, overlapping the field's top (FE2), not stacked above it.
+    let floatingTitles: Bool?
     let fields: [FieldSpec]
     let submit: SubmitSpec
     let screenError: Message?
@@ -49,6 +53,8 @@ struct FieldSpec: Decodable, Identifiable {
     let kind: String
     let title: String
     let titleId: String?
+    /// The field's own identifier, else lab.<cell>.<tag> — a component id shared by every field and its title (FE2).
+    let fieldId: String?
     let placeholder: String?
     let prefill: String?
     let error: Message?
@@ -84,6 +90,8 @@ struct Target: Decodable {
     /// "layer": the target lies on the cell's layer (inside the sheet), not on the screen beneath it.
     let `in`: String?
     let declared: String
+    /// A text target (B5's own-parts): this text drawn on its coloured control, the control's box `<tag>.box`.
+    let text: String?
 
     var onLayer: Bool { self.in == "layer" }
 }

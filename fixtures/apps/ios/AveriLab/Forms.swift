@@ -45,6 +45,19 @@ struct FormScreen: View {
             }
             .navigationTitle(form.title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if let id = form.titleId {
+                    // The title as an app draws its own (mp-native's SWIFT form): a principal item with an identifier,
+                    // a tap on it ending the editing — the neutral element a keyboard dismissal taps.
+                    ToolbarItem(placement: .principal) {
+                        Text(form.title)
+                            .font(.headline)
+                            .accessibilityIdentifier(id)
+                            .reportFrame("title", to: lab)
+                            .onTapGesture { focus = nil }
+                    }
+                }
+            }
         }
         .sheet(isPresented: $picker, onDismiss: { lab.event("dismissed", "sheet") }) {
             if let p = form.picker { PickerSheet(cell: cell, picker: p, value: binding(p.field), shown: $picker).environmentObject(lab) }
@@ -70,7 +83,7 @@ struct FormScreen: View {
         }
     }
 
-    private func fieldID(_ f: FieldSpec) -> String { "lab.\(cell.id).\(f.tag)" }
+    private func fieldID(_ f: FieldSpec) -> String { f.fieldId ?? "lab.\(cell.id).\(f.tag)" }
 
     private func binding(_ tag: String) -> Binding<String> {
         Binding(get: { values[tag, default: ""] }, set: { values[tag] = $0 })
@@ -78,13 +91,31 @@ struct FormScreen: View {
 
     @ViewBuilder private func fieldRow(_ f: FieldSpec) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(f.title)
-                .font(.subheadline)
-                .accessibilityIdentifier(f.titleId ?? "\(fieldID(f)).title")
-                .reportFrame("\(f.tag).title", to: lab)
-            input(f)
-                .accessibilityIdentifier(fieldID(f))
-                .reportFrame(f.tag, to: lab)
+            if form.floatingTitles == true {
+                // A design-system component (FE2): the title floats in the component's top, the input under it, the
+                // two overlapping by a few points — the title reaches into the field's frame.
+                ZStack(alignment: .topLeading) {
+                    input(f)
+                        .accessibilityIdentifier(fieldID(f))
+                        .reportFrame(f.tag, to: lab)
+                        .padding(.top, 10)
+                    Text(f.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier(f.titleId ?? "\(fieldID(f)).title")
+                        .reportFrame("\(f.tag).title", to: lab)
+                }
+            } else {
+                Text(f.title)
+                    .font(.subheadline)
+                    .accessibilityIdentifier(f.titleId ?? "\(fieldID(f)).title")
+                    .reportFrame("\(f.tag).title", to: lab)
+                input(f)
+                    .accessibilityIdentifier(fieldID(f))
+                    .reportFrame(f.tag, to: lab)
+            }
             if let e = shownError(f) {
                 Text(e.text)
                     .font(.footnote)

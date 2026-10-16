@@ -32,9 +32,13 @@ describe('the cell catalog', () => {
       'forms/form-keyboard',
       'forms/form-prefilled',
       'forms/form-picker',
+      'forms/form-shared-id',
       'edges/scroll-bounded',
       'edges/scroll-sticky',
       'edges/scroll-top-edge',
+      'false-covers/own-parts',
+      'false-covers/toolbar-dismiss',
+      'false-covers/toolbar-dismiss-bar',
     ]);
   });
 

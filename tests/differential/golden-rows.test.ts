@@ -33,7 +33,7 @@ const target = (geometry: Geometry | undefined, over: Partial<TargetTruth> = {})
   ...(geometry !== undefined && { geometry }),
   ...over,
 });
-const rows = (t: TargetTruth) => expectations('ios', t, CELL);
+const rows = (t: TargetTruth) => expectations('ios', t, CELL, 'wda');
 const verdict = (rs: readonly Expectation[], verb: string, o: Outcome) => {
   const r = rs.find((x) => x.verb === verb);
   if (r === undefined) throw new Error(`no ${verb} row`);
@@ -55,7 +55,7 @@ describe('the rows ask nothing of a capture with no measured geometry', () => {
     expect(rows(target(undefined, { drawn: 0.5 }))).toEqual([]);
   });
   it('a geometry row needs the capture its bands and chrome are read from', () => {
-    expect(expectations('ios', target('off-screen'))).toEqual([]);
+    expect(expectations('ios', target('off-screen'), undefined, 'wda')).toEqual([]);
   });
   it('a presented-over target keeps the presented rows whatever its geometry (ADR 0018 first)', () => {
     const t = target('sliver', { declared: 'presented-over', reached: false });
@@ -280,7 +280,7 @@ describe('a cell\'s averi.yaml variant (CellTruth.config)', () => {
 describe('R-overlap: a whole target, its centre clear, its edge under a band or the chrome past the slack', () => {
   // 51,600 300x200: the colour sampler reads its 12 %-inset rect, 87,624 228x152 — down to y 776.
   const overlapped = (tabTop: number) =>
-    expectations('ios', target('chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }), { ...CELL, safeArea: undefined, chrome: { tabBar: rect(0, tabTop, 402, 874 - tabTop) } });
+    expectations('ios', target('chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }), { ...CELL, safeArea: undefined, chrome: { tabBar: rect(0, tabTop, 402, 874 - tabTop) } }, 'wda');
   it('the colour fails closed when what it samples is overlapped past the slack (ADR 0001, 0002); else passes on its own colour', () => {
     const colour = (tabTop: number) => overlapped(tabTop).find((r) => r.verb === 'colour')!;
     expect(colour(774).says).toMatch(/^R-overlap: passes/);

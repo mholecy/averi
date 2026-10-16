@@ -100,6 +100,26 @@
         },
         {
           "rows": [
+            "android-averi_lab-api33/own-parts.xml L tap",
+            "android-averi_lab-api33/own-parts.xml L scroll_until"
+          ],
+          "broke": "13d68a2",
+          "fixed": "cccf6b8",
+          "why": "a Compose button's own text read as under the unlabelled button listed after it (#8)"
+        },
+        {
+          "rows": [
+            "ios-iphone17-ios27/own-parts.wda.json N tap",
+            "ios-iphone17-ios27/own-parts.wda.json N scroll_until",
+            "ios-iphone17-ios27/own-parts.idb.json N tap",
+            "ios-iphone17-ios27/own-parts.idb.json N scroll_until"
+          ],
+          "broke": "13d68a2",
+          "fixed": "81a7d62",
+          "why": "a text field read as a cover over its own label, the label's rect 2 pt past the field's at top and bottom (#18)"
+        },
+        {
+          "rows": [
             "ios-iphone17-ios27/form-keyboard.idb.json phone tap",
             "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
           ],
@@ -140,22 +160,36 @@
     {
       "n": "7",
       "note": "2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md",
-      "status": "needs-cell:false-covers",
-      "fix": ["c3ebc62", "7542021"],
-      "before": "d928789",
-      "verified": "merge-subject",
-      "needs": "false-covers/toolbar-dismiss with a config variant (CatalogCell.config → configFor: app.ios.keyboardDismiss) — a screen-sized SwiftUI toolbar host and a scroll view after the title; rows: R-dismiss.",
-      "remark": "First try 7542021 (before 5cff2ad). Golden is identical across both pairs."
+      "status": "calibrate",
+      "fix": ["7542021", "c3ebc62"],
+      "before": "5cff2ad",
+      "after": "7542021",
+      "verified": "golden",
+      "partial": "the first fix (7542021): SwiftUI's own full-screen `Toolbar` host",
+      "defect": "^no tap on the dismissal .*\\(refused for a toolbar\\)",
+      "checks": [
+        "ios-iphone17-ios27/toolbar-dismiss.wda.json vs tap",
+        "ios-iphone17-ios27/toolbar-dismiss.wda.json ks tap",
+        "ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap",
+        "ios-iphone17-ios27/toolbar-dismiss.wda.json note tap"
+      ],
+      "needs": "The second fix's half (c3ebc62: the form's scroll view, 58 % of the screen, its frame under the top bar, covering the title) needs a toolbar-dismiss variant whose scroll view is shorter than the screen — SwiftUI lays the lab form's at 0,0 402x874, a screen-sized host already excused at 7542021, so golden is green on toolbar-dismiss at d928789.",
+      "remark": "The principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's shape. Red at 5cff2ad: refused, `covered by toolbar \"Toolbar\"`, nothing tapped; at 7542021 the title is tapped. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb)."
     },
     {
       "n": "8",
       "note": "2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md",
-      "status": "needs-cell:false-covers",
+      "status": "calibrate",
       "fix": ["cccf6b8", "c8c06a8"],
       "before": "dd50327",
-      "verified": "unverified",
-      "needs": "false-covers/own-parts on Android: a Compose button's text as the target (CatalogTarget.text); rows: tap Tapped on the label.",
-      "remark": "The analysis calls it a regression of 13d68a2, green at 86eb42d — not checked: no cell has text targets. Golden is identical at dd50327/cccf6b8 and 2f98900/c8c06a8."
+      "after": "cccf6b8",
+      "verified": "golden",
+      "defect": "^(not tapped|stopped): .*\\bunder button \\(",
+      "checks": [
+        "android-averi_lab-api33/own-parts.xml L tap",
+        "android-averi_lab-api33/own-parts.xml L scroll_until"
+      ],
+      "remark": "own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes \"a layout defect\"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout."
     },
     {
       "n": "9",
@@ -306,13 +340,17 @@
       "before": "d2b7744",
       "after": "81a7d62",
       "verified": "golden",
-      "partial": "the cell-background half only",
-      "defect": "^(not tapped|stopped): .*\\bunder container \\(",
+      "partial": "the cell-background half and the text field over its own label; not the field's scroll-indicator node",
+      "defect": "^(not tapped|stopped): .*\\bunder (container|textfield)\\b",
       "checks": [
         "ios-iphone17-ios27/sheet-medium.wda.json S tap",
-        "ios-iphone17-ios27/sheet-medium.wda.json S scroll_until"
+        "ios-iphone17-ios27/sheet-medium.wda.json S scroll_until",
+        "ios-iphone17-ios27/own-parts.wda.json N tap",
+        "ios-iphone17-ios27/own-parts.wda.json N scroll_until",
+        "ios-iphone17-ios27/own-parts.idb.json N tap",
+        "ios-iphone17-ios27/own-parts.idb.json N scroll_until"
       ],
-      "needs": "The text field's scroll indicator half needs a false-covers/own-parts cell.",
+      "needs": "The text field's own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under an RN text field) needs a field whose tree lists one: neither SwiftUI's TextField nor a UIKit UITextField in the lab lists it (iOS 27.0, empty, unfocused).",
       "regressions": [
         {
           "rows": [
@@ -324,17 +362,24 @@
           "why": "green at 16ae6bb: the cover judgement 13d68a2 introduced read the sheet's frames-only background (8,415 386x451) as drawn over its own button"
         }
       ],
-      "remark": "The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note."
+      "remark": "The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412])."
     },
     {
       "n": "19",
       "note": "2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md",
-      "status": "needs-cell:false-covers",
+      "status": "calibrate",
       "fix": ["470dafe", "cd4d177"],
       "before": "bd06470",
-      "verified": "merge-subject",
-      "needs": "false-covers/toolbar-dismiss with a config variant (an itemless WDA toolbar over the dismissal tap); rows: R-dismiss.",
-      "remark": "First fix cd4d177 (before c11d179). Golden is identical at bd06470 and 470dafe."
+      "after": "470dafe",
+      "verified": "golden",
+      "defect": "^no tap on the dismissal .*\\(refused for a toolbar\\)",
+      "checks": [
+        "ios-iphone17-ios27/toolbar-dismiss-bar.wda.json vs tap",
+        "ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ks tap",
+        "ios-iphone17-ios27/toolbar-dismiss-bar.wda.json ss tap",
+        "ios-iphone17-ios27/toolbar-dismiss-bar.wda.json note tap"
+      ],
+      "remark": "toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. First fix cd4d177 (children.length === 0) not run: the note says it did not hold on a toolbar with an empty child, which this one has."
     },
     {
       "n": "20",
@@ -611,17 +656,21 @@
       "fix": ["dfe63da"],
       "before": "d407256",
       "after": "dfe63da",
-      "verified": "merge-subject",
+      "verified": "golden",
+      "partial": "the `error` assert half",
       "defect": "^passed: ",
       "checks": [
-        "ios-iphone17-ios27/form-errors.wda.json name error",
-        "ios-iphone17-ios27/form-errors.wda.json amount error",
-        "ios-iphone17-ios27/form-errors.idb.json name error",
-        "ios-iphone17-ios27/form-errors.idb.json amount error"
+        "ios-iphone17-ios27/form-shared-id.wda.json amount error",
+        "ios-iphone17-ios27/form-shared-id.wda.json iban error",
+        "ios-iphone17-ios27/form-shared-id.wda.json bic error",
+        "ios-iphone17-ios27/form-shared-id.wda.json bank error",
+        "ios-iphone17-ios27/form-shared-id.idb.json amount error",
+        "ios-iphone17-ios27/form-shared-id.idb.json iban error",
+        "ios-iphone17-ios27/form-shared-id.idb.json bic error",
+        "ios-iphone17-ios27/form-shared-id.idb.json bank error"
       ],
-      "expect": "DOES-NOT-FAIL",
-      "needs": "forms: a cell whose fields and their titles all share ONE identifier (a design-system component id), pristine (no error shown); rows: each field's `error` assert fails / ui_snapshot shows no error. form-errors gives every title its own id (`<field>.title`), so the same-identifier rule never meets another field's title.",
-      "remark": "The same-identifier rows (name, amount) are the nearest the cell asks; they pass on both sides."
+      "needs": "The ui_snapshot half (the note: every field's `error` = the next field's title in ui_snapshot) needs a golden verb for ui_snapshot's error column — none yet.",
+      "remark": "form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The last field has no title below it: no row. Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL)."
     },
     {
       "n": "L1",

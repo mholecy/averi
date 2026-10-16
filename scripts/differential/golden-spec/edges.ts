@@ -22,7 +22,7 @@ import { colourFails, directionRow, fullyRow, landRow, notReachedStill, refusedT
  * source did not list it (notListed); R-stroke asks every touch-down inside the target's own scroll view where the truth
  * names one (rows.ts#strokeRow).
  */
-export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, source?: SourceKind): Expectation[] {
+export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, source: SourceKind): Expectation[] {
   const absent = notListed(t, source);
   switch (t.geometry) {
     case 'off-screen':
@@ -57,6 +57,6 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
  * does not find it and a scroll_until that swipes for it are then all averi can answer. A target the tree lists, or a
  * capture that did not record it, is held to be in the tree.
  */
-export function notListed(t: Pick<TargetTruth, 'listed'>, source: SourceKind | undefined): string | undefined {
-  return source !== undefined && t.listed?.[source] === false ? `the capture's ${source} tree does not list it` : undefined;
+export function notListed(t: Pick<TargetTruth, 'listed'>, source: SourceKind): string | undefined {
+  return t.listed?.[source] === false ? `the capture's ${source} tree does not list it` : undefined;
 }

@@ -214,13 +214,23 @@ How to add a cell (B2–B5):
    measured an edge, band or chrome geometry, so a B2 or B4 cell needs no spec change for a geometry they already map. A
    family file maps what a geometry does not decide (presented.ts: the presented-over rows; forms.ts: the form rows); a
    new row type goes into rows.ts with the ADR or note deciding it, and a judge table test. A row keyed on the cell, not
-   on a target's geometry, is wired through the façade, `golden-spec.ts#expectations` — false-covers' R-dismiss
-   (rows.ts#dismissRow, under the cell's `config.ios.keyboardDismiss`). So a B5 author edits
-   `golden-spec/false-covers.ts` (its rows), `golden-spec.ts#expectations` (to ask them), rows.ts only for a new row
-   type, and steps 1–3 and 5's files.
+   on a target's geometry, is wired through the façade: false-covers' R-dismiss (rows.ts#dismissRow, under the form
+   cell's `config.ios.keyboardDismiss`) through `golden-spec.ts#formExpectations` (WDA only), its text targets through
+   `golden-spec.ts#expectations`; both take the capture's source, required. So a B5 author edited
+   `golden-spec/false-covers.ts` (its rows), the façade (to ask them), rows.ts only for a new row type, and steps 1–3
+   and 5's files.
 5. **KNOWN** — `tests/differential/golden/<family>.known.ts`: the captures' COUNTS, and each mismatch the checkout has
    with its class, reply kind, calls, note and `as: bug:<note>` or `residual:<decision>`; then the note's rows in
    `scripts/truth/calibration.json` and a calibrate run.
+
+**B5 (false covers) — done on truth/b5-false-covers.** `own-parts` (both platforms: a button's own text, a text field
+over its own label), `toolbar-dismiss` (SwiftUI's own full-screen `Toolbar` host from a principal title) and
+`toolbar-dismiss-bar` (plus an itemless bar-sized UIToolbar over the title), iOS form cells with
+`config.ios.keyboardDismiss`, R-dismiss asked under WDA only; `form-shared-id` in `forms` (FE2). #7 (first fix), #8,
+#18 (wider, still partial: no lab text field lists a scroll indicator), #19 and FE2 (its assert half; `ui_snapshot`'s
+error column has no golden verb yet) calibrated (docs/truth/calibration.md). On Android `own-parts`' N is a green
+control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView
+[177,1351][443,1412]), so neither #8's shape nor #18's.
 
 **B4 (bars) — an open assumption to measure first.** What a raw tap in Android's navigation band does is not measured:
 under gesture navigation it reaches the app; under three-button navigation it presses Back, Home or Recents (ADR 0009's
@@ -232,19 +242,19 @@ cell); in the top of the band — a probe point above y 51 of 62 pt (`truth.ts#I
 by B3 on the lab's iPhone 17, iOS 27.0, `open` cell: no touch at y ≤ 50, a touch at y ≥ 55) — the bar swallows it: no
 touch, and not reached (`truth.ts#statusBarMaySwallow`); a probe below that line with no touch is undelivered.
 
-**B2 (edges) — built 2026-10-16.** Three cells in both apps (Edges.swift, Edges.kt; the apps' `Lab` gained the
-`safeArea`, `scrollViews` and `chrome` writers): `scroll-bounded` (two bounded scroll views — a whole row, a row cut
-with its centre showing, a sliver, a row below its scroll view but on the screen, a row laid out below the screen),
-`scroll-sticky` (a lazy list whose pinned section header overlaps its first row, the header reported as chrome) and
-`scroll-top-edge` (a row resting in the status band — on iOS under the bar's own touch area, its probe swallowed as
-above — and a row above the screen). Calibrated: #4 and #29; #9 and #17's static half DOES-NOT-FAIL; #12 and #13
-STILL-RED-AFTER, partial (the lab's Compose does not cut uiautomator's bounds flush with the container, the shape their
-fixes judge); #10 not reproduced (no inverted bounds); lab findings LE1–LE4. What changed in the shared rows: `fully:
-true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops keys two rows; the R-outside-sv colour
-asks for the colour the screen shows there (a pass measured the background); an edge row accepts a target missing from
-the tree only where its capture's tree of that source did not list it (TargetTruth.listed, edges.ts#notListed); R-stroke
-holds every touch-down inside the target's own scroll view where the truth names it; R-band's tap is not expected
-refused where the probe fired the target.
+**B2 (edges) — built 2026-10-16.** Three cells in both apps (Edges.swift, Edges.kt; the apps' `Lab` gained the `chrome`
+writer, and Android's the `safeArea` and `scrollViews` ones — iOS's are B3's, one of each): `scroll-bounded` (two
+bounded scroll views — a whole row, a row cut with its centre showing, a sliver, a row below its scroll view but on the
+screen, a row laid out below the screen), `scroll-sticky` (a lazy list whose pinned section header overlaps its first
+row, the header reported as chrome) and `scroll-top-edge` (a row resting in the status band — on iOS under the bar's own
+touch area, its probe swallowed as above — and a row above the screen). Calibrated: #4 and #29; #9 and #17's static half
+DOES-NOT-FAIL; #12 and #13 STILL-RED-AFTER, partial (the lab's Compose does not cut uiautomator's bounds flush with the
+container, the shape their fixes judge); #10 not reproduced (no inverted bounds); lab findings LE1–LE4. What changed in
+the shared rows: `fully: true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops keys two
+rows; the R-outside-sv colour asks for the colour the screen shows there (a pass measured the background); an edge row
+accepts a target missing from the tree only where its capture's tree of that source did not list it (TargetTruth.listed,
+edges.ts#notListed); R-stroke holds every touch-down inside the target's own scroll view where the truth names it;
+R-band's tap is not expected refused where the probe fired the target.
 
 ### Phase 4 — the matrix, generated
 

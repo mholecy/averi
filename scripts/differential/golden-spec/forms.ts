@@ -35,6 +35,19 @@ export function pairingOf(fields: readonly FieldTruth[], field: FieldTruth, id: 
   return frame.y - bottom(field.frame) <= Math.max(MAX_GAP, field.frame.height) ? 'own error identifier close under the field' : 'too far under the field: pairs with none';
 }
 
+/**
+ * The text a same-identifier rule would read as a pristine field's error: the nearest title BELOW the field, in its
+ * column, that carries the field's own identifier — another field's title, where a design-system component gives every
+ * field and its title one identifier (form-shared-id; docs/bugs/2026-10-14-ios-field-errors-pair-a-shared-component-id-
+ * with-the-next-fields-title.md). undefined: none lies there. Its row cannot name the one field it is about — `id:`
+ * matches all of them (and their titles; `role: textfield` keeps the fields): it fails only when none of them reads the
+ * title as its error.
+ */
+export function sharedTitleBelow(fields: readonly FieldTruth[], field: FieldTruth): FieldTruth | undefined {
+  const below = fields.filter((g) => g !== field && g.titleId === field.id && g.titleFrame !== undefined && g.titleFrame.y >= bottom(field.frame) && overlapX(g.titleFrame, field.frame) > 0);
+  return below.reduce<FieldTruth | undefined>((a, g) => (a === undefined || g.titleFrame!.y < a.titleFrame!.y ? g : a), undefined);
+}
+
 const PAIRS: ReadonlySet<PairingRule> = new Set(['same identifier below the field', 'own error identifier close under the field']);
 
 /** One row of a form cell: `target` names what it is about (a field's tag, `<tag>.title`, `screenError`). */
@@ -48,10 +61,12 @@ export type FormExpectation = Expectation & { target: string };
  * | a field shows an error the rules pair (verification.md, Field errors: same identifier below; own `_error` id close under) | `assert {element:{id}, error}` | passes |
  * | a field shows an error named neither way (`IbanError`) | `assert … error` | fails: not seen |
  * | a screen-level message far under the nearest field above it | `assert {element:{id: that field}, error: message}` | fails: pairs with none |
+ * | a field showing NO error, another field's title below it carrying the field's identifier (one component id shared by every field and its floating title: sharedTitleBelow) | `assert {element:{id, role: textfield}, error: that title}` | fails: a title is no error (verification.md, Field errors: a same-identifier text overlapping a same-identifier field is a title) |
  * | a field's title (the P5 text sample: ’ “ ” – — … NBSP & diacritics) | `assert {element:{id: titleId}, text: title}` | passes: the tree reads the text as drawn |
  * | a non-secure field the model holds a value in (prefilled) | `assert … text: value` | passes |
  * | a secure field the model holds a value in | `assert … text: value` | fails: a masked field never reads back as its value |
  * | a control open (centre on screen, clear of keyboard and pinned bar; a probe tap reached it) | tap | `Tapped` |
+ * | a field sharing its identifier with another field | tap / scroll_until | not asked: `id:` names every field of the component, not this one |
  * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
  * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
@@ -76,6 +91,16 @@ export function formExpectations(platform: Platform, truth: CellTruth): FormExpe
         says: `${pairs ? 'passes' : 'fails'} (${rule}: ${f.error.id})`,
         call: assertCall({ element: { id: f.id }, error: f.error.text }),
         judge: (o) => (pairs === passed(o) ? undefined : `${passed(o) ? 'passed' : 'failed'}: ${first(o)}`),
+      });
+    }
+    const shared = f.error === null ? sharedTitleBelow(form.fields, f) : undefined;
+    if (shared !== undefined) {
+      out.push({
+        target: f.tag,
+        verb: 'error',
+        says: `fails: no error shown (${shared.tag}'s title below it shares its identifier: a title, no error)`,
+        call: assertCall({ element: { id: f.id, role: 'textfield' }, error: shared.title }),
+        judge: (o) => (failed(o) ? undefined : `passed: ${first(o)}`),
       });
     }
     if (truth.cell === 'form-basic') {
@@ -114,7 +139,8 @@ export function formExpectations(platform: Platform, truth: CellTruth): FormExpe
       });
     }
   }
-  for (const c of form.controls) out.push(...controlRows(platform, c, truth));
+  const sharedId = (c: ControlTruth) => form.fields.filter((f) => f.id === c.id).length > 1;
+  for (const c of form.controls) if (!sharedId(c)) out.push(...controlRows(platform, c, truth));
   return out.map(classed);
 }
 

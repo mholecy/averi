@@ -69,6 +69,17 @@
       },
       "screenshot": "scroll-top-edge.png",
       "truth": "scroll-top-edge.truth.json"
+    },
+    {
+      "file": "own-parts.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "own-parts.png",
+      "truth": "own-parts.truth.json"
     }
   ]
 }
