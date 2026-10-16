@@ -299,7 +299,7 @@ const ANDROID_FORM: CellTruth = {
     fields: [field('name', 330, { frame: rect(55, 330, 970, 99), error: { id: 'IbanError', text: 'Enter the recipient’s name' }, errorFrame: rect(55, 440, 600, 40) })],
     controls: [
       control('vs', { frame: rect(55, 1478, 970, 99), situation: 'under-keyboard', reached: false, probe: [], seen: '#FFFFFF', reachedAfterBack: true, probeAfterBack: [{ kind: 'touch', tag: '540,1528' }, { kind: 'focus', tag: 'vs' }] }),
-      control('note', { frame: rect(55, 2024, 970, 99), situation: 'under-keyboard', reached: false, probe: [], reachedAfterBack: false, probeAfterBack: [{ kind: 'touch', tag: '540,2074' }, { kind: 'submit', tag: 'invalid' }] }),
+      control('note', { frame: rect(55, 2024, 970, 99), situation: 'under-keyboard', reached: false, probe: [], reachedAfterBack: false, probeAfterBack: [{ kind: 'touch', tag: '540,2074' }, { kind: 'submit', tag: 'invalid' }], pieceAfterBack: rect(55, 2126, 970, 14), reachedAtPieceAfterBack: true }),
       control('phone', { frame: rect(55, 1296, 970, 99), situation: 'covered', reached: false, probe: [{ kind: 'touch', tag: '540,1346' }, { kind: 'submit', tag: 'invalid' }], piece: rect(55, 1370, 970, 25), reachedAtPiece: true }),
     ],
     keyboard: { frame: rect(0, 1398, 1080, 822), field: 'postcode' },
@@ -352,12 +352,17 @@ describe('the Android form rows (phase 2b)', () => {
     ],
     ['the colour under the keyboard fails: a pass measured the keyboard', 'vs colour', [[FAIL, [], 'ok'], [PASS, [], /^passed on #FFFFFF, the keyboard's/]]],
     [
-      'under the keyboard, NOT reached after back (the bar dropped over it; live only): not tapped, nothing sent',
+      'under the keyboard, NOT reached at its centre after back (the bar dropped over it): never there; Tapped only inside its piece after back',
       'note tap',
       [
         ['ERROR … nothing was tapped', [], 'ok'],
-        ['Tapped id:"lab.f.note"', [BACK, KEY(2074)], /^Tapped/],
-        ['ERROR …', [BACK, KEY(2074)], /^refused, but sent/],
+        ['Tapped id:"lab.f.note" (the soft keyboard covered …; hidden before tapping)', [BACK, KEY(2133)], 'ok'],
+        ['Tapped id:"lab.f.note"', [BACK, KEY(2074)], /^tapped at its centre \(540,2074\), which after back fires submit invalid/],
+        ['ERROR …', [BACK, KEY(2074)], /^tapped at its centre/],
+        ['Tapped id:"lab.f.note"', [BACK, KEY(2100)], /^Tapped outside its piece after back at \(540,2100\)/],
+        ['Tapped id:"lab.f.note"', [BACK, KEY(2133), KEY(2100)], /^Tapped outside its piece after back at \(540,2100\)/],
+        ['Tapped id:"lab.f.note"', [BACK], /^Tapped with no tap sent/],
+        ['ERROR …', [BACK, KEY(2133)], /^refused, but sent/],
       ],
     ],
     [
@@ -374,9 +379,18 @@ describe('the Android form rows (phase 2b)', () => {
     ],
   ])('%s', (_name, key, cases) => check(row(key).judge, cases));
 
-  it('note\'s row says what the tap after back fired, and is the live golden\'s (the layout after back is not in a replayed tree)', () => {
-    expect(row('note tap').says).toMatch(/after one back a tap at its centre fires submit invalid/);
-    expect(row('note tap').live).toMatch(/live\.ts k5/);
-    expect(row('vs tap').live).toBeUndefined();
+  it('note\'s row says what the tap after back fired, and is replayed where the layout after back was captured (its piece then)', () => {
+    expect(row('note tap').says).toMatch(/after one back a tap there fires submit invalid/);
+    expect(row('note tap').live).toBeUndefined();
+    const noPiece = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, pieceAfterBack: undefined, reachedAtPieceAfterBack: undefined } : c)) } }, 'uiautomator');
+    expect(pick(noPiece, 'tap', 'note').live).toMatch(/live\.ts k5/);
+  });
+
+  it('a piece after back that no probe reached admits no Tapped', () => {
+    const unreached = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, reachedAtPieceAfterBack: false } : c)) } }, 'uiautomator');
+    check(pick(unreached, 'tap', 'note').judge, [
+      ['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/],
+      ['ERROR … nothing was tapped', [], 'ok'],
+    ]);
   });
 });

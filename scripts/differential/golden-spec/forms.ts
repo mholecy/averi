@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
-import { otherControlsFired } from '../../truth/truth.js';
+import { otherControlsFired, probePoint, TOUCH_SLACK } from '../../truth/truth.js';
 import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
@@ -75,7 +75,7 @@ export type FormExpectation = Expectation & { target: string };
  * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
  * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
  * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.reachedAfterBack) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") |
- * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: probeAfterBack says what fired) | tap | LIVE ONLY (Expectation.live): averi finds it again in the layout after `back`, which the replayed tree (the IME-up layout) does not hold; live.ts k5 judges it — no submit, and `Tapped` only with the focus on it |
+ * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: probeAfterBack says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (pieceAfterBack, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
  * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
@@ -109,6 +109,25 @@ export const notTappedOrInPiece =
     if (points.length === 0) return said(o, 'Tapped with no tap sent');
     const out = points.filter((p) => !within(p, piece));
     return out.length > 0 ? said(o, `Tapped outside its piece at ${pointsText(out)}`) : undefined;
+  };
+
+/**
+ * Android's under-keyboard tap where a tap at its centre after back did NOT reach it (ControlTruth.reachedAfterBack
+ * false): no tap within TOUCH_SLACK of that centre where it fired another control (`fires`, the probe's words); a
+ * refusal sends nothing; `Tapped` only with every tap inside `piece` — its piece after back, given only where a probe
+ * there reached it (none: no Tapped is right).
+ */
+export const tapAfterBackOnPiece =
+  (centre: { x: number; y: number }, fires: string | undefined, piece: Rect | undefined) =>
+  (o: Outcome): string | undefined => {
+    const points = tapPoints(o);
+    const atCentre = points.filter((p) => Math.abs(p.x - centre.x) <= TOUCH_SLACK && Math.abs(p.y - centre.y) <= TOUCH_SLACK);
+    if (fires !== undefined && atCentre.length > 0) return said(o, `tapped at its centre ${pointsText(atCentre)}, which after back ${fires}`);
+    if (!o.reply.startsWith('Tapped')) return notTapped(o);
+    if (piece === undefined) return said(o, 'Tapped, where no tap after back reached it');
+    if (points.length === 0) return said(o, 'Tapped with no tap sent');
+    const out = points.filter((p) => !within(p, piece));
+    return out.length > 0 ? said(o, `Tapped outside its piece after back at ${pointsText(out)}`) : undefined;
   };
 
 export function formRows(platform: Platform, truth: CellTruth): FormExpectation[] {
@@ -229,19 +248,21 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           judge: tappedAfterBack(frame),
         });
       } else if (c.reachedAfterBack === false) {
-        // After `back` the layout changes (the bar drops to the screen's bottom): a raw tap at its centre then did not
-        // reach it — what it fired instead is the probe's (ControlTruth.probeAfterBack). averi finds the element again
-        // after `back`, in the tree of the NEW layout, which a replayed tree (the IME-up layout) cannot show: the row is
-        // the live golden's (live.ts k5, judged on the model's focus and submits), never a replay's.
+        // After `back` the layout changes (the bar drops back to the screen's bottom): a raw tap at its centre then did
+        // not reach it — what it fired is the probe's (ControlTruth.probeAfterBack). averi finds the element again in
+        // the layout after back: with that layout captured (CellTruth.afterBack, served by the fake device once `back`
+        // is sent) the row is replayed — never a tap where the centre's probe fired another control, and Tapped only
+        // inside its piece there where a probe reached it (pieceAfterBack); without it, the live golden's (live.ts k5).
         const fired = otherControlsFired(c.probeAfterBack ?? [], c.tag);
         const what = fired.length > 0 ? `fires ${fired.map((e) => `${e.kind} ${e.tag}`).join(', ')}` : 'does not reach it';
+        const piece = c.pieceAfterBack;
         rows.push({
           target,
           verb: 'tap',
-          says: `never a submit: Tapped only where it reaches it (after one back a tap at its centre ${what})`,
+          says: `never a tap at its centre (after one back a tap there ${what}); Tapped only inside its piece after back${piece === undefined ? '' : ` ${pointsText([{ x: piece.x, y: piece.y }])} ${piece.width}x${piece.height}`}, where a probe reached it`,
           call: tap,
-          judge: notTapped,
-          live: `after back the layout changes (the bar drops over it) and averi finds the element again in the new tree; live.ts k5 judges it on the model (2026-10-16: Tapped on note's 14-px strip below Continue, [55,2126][1025,2140] in the new dump, focus note, no submit)`,
+          judge: tapAfterBackOnPiece(probePoint(c.frame!), fired.length > 0 ? what : undefined, c.reachedAtPieceAfterBack === true ? piece : undefined),
+          ...(piece === undefined && { live: 'no layout after back captured: averi finds the element again in the new tree, which a replayed tree (the IME-up layout) does not hold; live.ts k5 judges it on the model' }),
         });
       }
       if (c.seen !== undefined) {

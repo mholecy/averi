@@ -42,7 +42,7 @@ export const forms: KnownFile = {
   counts: {
     [`${ANDROID}/form-basic.xml`]: 11,
     [`${ANDROID}/form-errors.xml`]: 12,
-    [`${ANDROID}/form-keyboard.xml`]: 20,
+    [`${ANDROID}/form-keyboard.xml`]: 21,
     [`${ANDROID}/form-picker.xml`]: 9,
     [`${ANDROID}/form-prefilled.xml`]: 11,
     [`${ANDROID}/form-shared-id.xml`]: 5,
