@@ -8,7 +8,7 @@ open note on the working tree. See the script for the verdicts.
 |---|---|---|---|---|
 | 1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime)) |
 | 2 | 2026-10-05-ios-tap-lands-on-soft-keyboard | calibrate | 73eea5f → 6f41787 | CALIBRATED (partial: stage A only) |
-| 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED (partial: the colour assert) |
+| 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
 | 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
@@ -27,8 +27,8 @@ open note on the working tree. See the script for the verdicts.
 | 19 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only), regressed elsewhere: 1 row (recorded) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
-| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS)), regressed elsewhere: 6 rows (recorded) |
-| 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | DOES-NOT-FAIL (partial: the navigation band's colour part (the static bands), on a three-button capture; OCR on real pixels is phase 4) |
+| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts), regressed elsewhere: 6 rows (recorded) |
+| 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | CALIBRATED (partial: the band's pixel half: a text across the gesture navigation band (text-nav-cut's T), its colour assert) |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
 | 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | calibrate | 7566443 → 83e282a | CALIBRATED, regressed elsewhere: 1 row (recorded) |
@@ -44,6 +44,7 @@ open note on the working tree. See the script for the verdicts.
 | 36 | 2026-08-26-ios-ocr-crop-scale | needs-ocr | — | — |
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED (partial: the `error` assert half) |
+| TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | open | working tree | OPEN-RED |
@@ -55,6 +56,8 @@ open note on the working tree. See the script for the verdicts.
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | open | working tree | OPEN-RED |
+| OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
+| OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | open | working tree | OPEN-RED |
 
 ## 1: DOES-NOT-FAIL (partial: the docked leg: the Android form-keyboard cell under a docked Gboard, its IME readings served (CellTruth.ime))
 
@@ -98,24 +101,24 @@ Docked, the fix leaves the band as it was by design (the touchable region equals
 
 Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a config variant. The same fields' scroll_until rows stay red here: they are #5's (iOS leg, 9131730).
 
-## 3: CALIBRATED (partial: the colour assert)
+## 3: CALIBRATED
 
-2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md — defect: `^passed on`
+2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md — defect: `^passed on|^measured the layer over the target as the target`
 
 - before 926b826:
   - RED android-averi_lab-api33/form-keyboard.xml vs colour — passed on #F0F0F3, the keyboard's: PASS  element id:"lab.form-keyboard.vs" fill within dE00 8 of #F0F0F3 — sampled #F8F8F9 (dominant, 98% of region) vs expected #F0F0F3 → dE00 1.93 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/form-keyboard.xml ks colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard.ks" fill within dE00 8 of #FFFFFF — sampled #FAFAFB (dominant, 95% of region) vs expected #FFFFFF → dE00 1.12 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/form-keyboard.xml ss colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard.ss" fill within dE00 8 of #FFFFFF — sampled #FBFBFC (dominant, 95% of region) vs expected #FFFFFF → dE00 0.95 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/form-keyboard.xml note colour — passed on #F0F0F3, the keyboard's: PASS  element id:"lab.form-keyboard.note" fill within dE00 8 of #F0F0F3 — sampled #F6F6F7 (dominant, 87% of region) vs expected #F0F0F3 → dE00 1.60 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/form-keyboard.xml ks ocr — measured the layer over the target as the target: FAIL  element id:"lab.form-keyboard.ks" renders text "Constant symbol" — read "d f a S"; vs expected "Constant symbol" ≠
 - after 95f75f4:
   - ok android-averi_lab-api33/form-keyboard.xml vs colour — FAIL  element id:"lab.form-keyboard.vs" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,1462 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
   - ok android-averi_lab-api33/form-keyboard.xml ks colour — FAIL  element id:"lab.form-keyboard.ks" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
   - ok android-averi_lab-api33/form-keyboard.xml ss colour — FAIL  element id:"lab.form-keyboard.ss" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1826 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
   - ok android-averi_lab-api33/form-keyboard.xml note colour — FAIL  element id:"lab.form-keyboard.note" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,2008 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, o
+  - ok android-averi_lab-api33/form-keyboard.xml ks ocr — FAIL  element id:"lab.form-keyboard.ks" renders text "Constant symbol" — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or
 
-Needs: the OCR half: phase 4 (ocr judged on real pixels; the note's `ocr CONTINUE` read the keyboard's ?123).
-
-Each field under the docked IME asked for the colour the screenshot shows over it (ControlTruth.seen: the keyboard's #F0F0F3 / #FFFFFF): at 926b826 every one PASSes, measuring the keyboard (sampled #F8F8F9, 98 % of the region, for vs); at 95f75f4 each fails closed naming the soft keyboard over the element.
+Each field under the docked IME asked for the colour the screenshot shows over it (ControlTruth.seen: the keyboard's #F0F0F3 / #FFFFFF): at 926b826 every one PASSes, measuring the keyboard (sampled #F8F8F9, 98 % of the region, for vs); at 95f75f4 each fails closed naming the soft keyboard over the element. The OCR half (phase 4, golden-spec/text.ts#ocrFailsClosed, judged on the real pixels by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability): each field asked `ocr` for its own copy (its title); at 926b826 ks reads the keyboard's keys (`read "d f a S"`) as the field's text — the note's `read "123"` — and at 95f75f4 fails closed naming the soft keyboard. vs, ss and note are not named: at 926b826 the recognizer reads nothing in their rects (`read no text …; failing closed`), the right class by chance, so their rows are green on both sides.
 
 ## 4: CALIBRATED
 
@@ -456,7 +459,7 @@ presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists 
 
 bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.
 
-## 22: CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS))
+## 22: CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts)
 
 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md — defect: `measured the layer over the target as the target|^passed on`
 
@@ -469,6 +472,10 @@ bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b6
   - RED ios-iphone17-ios27/bands.wda.json S colour — passed on #E53935: PASS  element id:"lab.bands.S" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 97% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/pinned-bar.idb.json P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 66% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/pinned-bar.wda.json P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 66% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
+  - RED ios-iphone17-ios27/text-under-bar.wda.json S ocr — measured the layer over the target as the target: FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — read "17:02 Zostatok 1 234,56 €"; vs expected "Zostatok 1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-under-bar.idb.json S ocr — measured the layer over the target as the target: FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — read "17:02 Zostatok 1 234,56 €"; vs expected "Zostatok 1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-under-bar.wda.json P ocr — measured the layer over the target as the target: FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — read "Continue"; vs expected "Pokračovať na súhrn" ≠
+  - RED ios-iphone17-ios27/text-under-bar.idb.json P ocr — measured the layer over the target as the target: FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — read "Continue"; vs expected "Pokračovať na súhrn" ≠
 - after 596a379:
   - RED ios-iphone17-ios27/sheet-medium.wda.json A colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.A" fill within dE00 8 of #B72E2A — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,110 300x64) — the capture would show it, not
   - RED ios-iphone17-ios27/sheet-medium.wda.json B colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.B" fill within dE00 8 of #186DB7 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show it, not
@@ -478,6 +485,10 @@ bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b6
   - ok ios-iphone17-ios27/bands.wda.json S colour — FAIL  element id:"lab.bands.S" fill within dE00 8 of #E53935 — the status bar is drawn over the element (element 51,21 300x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element
   - ok ios-iphone17-ios27/pinned-bar.idb.json P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — button "Continue" (24,768 354x56, reaching 24,768 354x106) is drawn over the element (element 51,728 300x64) — the capture would show it, not the elemen
   - ok ios-iphone17-ios27/pinned-bar.wda.json P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — button "Continue" (24,768 354x56) is drawn over the element (element 51,728 300x64) — the capture would show it, not the element; scroll_until the eleme
+  - ok ios-iphone17-ios27/text-under-bar.wda.json S ocr — FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — the status bar is drawn over the element (element 0,21 402x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_unt
+  - ok ios-iphone17-ios27/text-under-bar.idb.json S ocr — FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — the status bar is drawn over the element (element 0,21 402x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_unt
+  - ok ios-iphone17-ios27/text-under-bar.wda.json P ocr — FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — button "Continue" (24,768 354x56) is drawn over the element (element 51,760 300x64) — the capture would show it, not the element; scroll_until
+  - ok ios-iphone17-ios27/text-under-bar.idb.json P ocr — FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — button "Continue" (24,768 354x56, reaching 24,768 354x106) is drawn over the element (element 51,760 300x64) — the capture would show it, not 
 
 Regressed elsewhere at 596a379 (green at ad7ed11):
 
@@ -494,22 +505,20 @@ Regressions recorded:
 - ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour, ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour: broke at 596a379, fixed at 83e282a — the pixel assert asks the covers the tap asks: WDA's hidden host tab bar (#26) fails it closed until ADR 0019's hidden subtree
 - ios-iphone17-ios27/blur-menu.idb.json W colour, ios-iphone17-ios27/blur-menu.wda.json W colour: broke at 596a379, not fixed — the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4
 
-Needs: the OCR half: phase 4 (the note covers the colour AND the OCR asserts; only the colour rows are golden's).
+Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks "close it first" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT. The status band and the pinned button (B4's bars cells, idb and WDA alike): bands S, centred in the status band under the status bar, passed on its own colour #E53935 at ad7ed11 (97 % of the region sampled) and fails closed at 596a379 naming the status bar drawn over the element; pinned-bar P, under the pinned Continue button, passed on #E53935 at ad7ed11 (66 % of the region) and fails closed at 596a379 naming button "Continue" drawn over the element — both green after. The OCR half (phase 4, text-under-bar, golden-spec/text.ts#ocrFailsClosed, judged on the real pixels by the host's recognizer — NOT-ASKED where it has none): S, a string centred in the status band, asked `ocr` for itself, reads the status bar's clock with it at ad7ed11 (`read "17:02 Zostatok 1 …"`, the note's `read "Contacts"`), and P, a string under the pinned Continue, reads `"Continue"` — both fail closed at 596a379 naming the status bar and the button, under WDA and idb.
 
-Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks "close it first" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT. The status band and the pinned button (B4's bars cells, idb and WDA alike): bands S, centred in the status band under the status bar, passed on its own colour #E53935 at ad7ed11 (97 % of the region sampled) and fails closed at 596a379 naming the status bar drawn over the element; pinned-bar P, under the pinned Continue button, passed on #E53935 at ad7ed11 (66 % of the region) and fails closed at 596a379 naming button "Continue" drawn over the element — both green after.
+## 23: CALIBRATED (partial: the band's pixel half: a text across the gesture navigation band (text-nav-cut's T), its colour assert)
 
-## 23: DOES-NOT-FAIL (partial: the navigation band's colour part (the static bands), on a three-button capture; OCR on real pixels is phase 4)
-
-2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md — defect: `^passed on`
+2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md — defect: `^passed on|^read what the band leaves of it as its text`
 
 - before 94bae14:
-  - ok android-averi_lab-api33/bands-three-button.xml N colour — FAIL  element id:"lab.bands-three-button.N" fill within dE00 8 of #F4EAF7 — sampled #FFFFFF (dominant, 57% of region) vs expected #F4EAF7 → dE00 8.87 > 8; scale 1.000
+  - RED android-averi_lab-api33/text-nav-cut.xml T colour — passed on #F3E5F5: PASS  element id:"lab.text-nav-cut.T" fill within dE00 8 of #F3E5F5 — sampled #F3E5F5 (dominant, 66% of region) vs expected #F3E5F5 → dE00 0.00 ≤ 8; scale 1.000
 - after e85bcdf:
-  - ok android-averi_lab-api33/bands-three-button.xml N colour — FAIL  element id:"lab.bands-three-button.N" fill within dE00 8 of #F4EAF7 — the navigation bar is drawn over the element (element 127,2088 825x132, navigation bar 0,2088 1080x132) — the capture would show it, not the ele
+  - ok android-averi_lab-api33/text-nav-cut.xml T colour — FAIL  element id:"lab.text-nav-cut.T" fill within dE00 8 of #F3E5F5 — the navigation bar is drawn over the element (element 108,2064 864x132, navigation bar 0,2154 1080x66) — the capture would show it, not the element; s
 
-Needs: OCR judged on real pixels (phase 4): a text cut at the navigation bar. The three-button capture (bars/bands-three-button, round 3) does not make the colour row fail: N (2132–2176, under the bar 2088–2220) is not reached and 0 % drawn; its tree node runs `[127,2088][952,2220]`, so the assert samples the bar's white and its tint (#F4EAF7, `seen`) mixed — asked for the colour the screen shows there (rows.ts#bandColour under three buttons), it fails at 94bae14 (57 % white, dE00 8.87) as at e85bcdf. A target whose node lies wholly on one colour of the bar would be needed for a pass at 94bae14.
+Needs: The OCR half — the note's cut glyphs read as the element's text (`read "Colnd & vibration"`) — needs a node the tree CUTS at the band's top while its text is drawn on below it, as Settings' RecyclerView row (`198,2105 428x49` of a 74-px row). Compose dumps neither: text-nav-cut's T node is listed by its 48-dp touch target ([108,2064][972,2196]) and its string by its own full bounds ([366,2109][714,2175]), both running on into the band, so at 94bae14 the crop holds the whole string and reads it right (PASS, which the row accepts). A View-based list (an AndroidView RecyclerView ending at 2154, clipToPadding false), or a Compose clip that cuts the semantics bounds, would be needed; and a three-button capture of a target lying wholly on one colour of the bar for N's colour half.
 
-Replayed against the capture's own `dumpsys window displays` (CellTruth.displays, served by the fake device as DeviceProfile.windowDisplays: the three-button bar [0,2088][1080,2220], recaptured 2026-10-16 at the round-3 merge), so averi's navigation band there is the bar's; the verdict is the one review round 1 measured under a dump patched to it. bands-three-button: bands' screen on the averi_lab AVD under three-button navigation (`navigation_mode` 0, the bar `[0,2088][1080,2220]`; restored to gesture, mode 2, after the capture), in the same run as bands' gesture capture (CatalogCell.navigation, catalog.ts#captureRefusal). Its N row is green on both sides — DOES-NOT-FAIL: the pre-fix assert does not pass on the bar, see needs. Under gesture navigation (bands.xml) N is reached, 90 % drawn and seen in its own colour beneath the handle, its row accepting a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020): green on both sides too.
+Replayed against the capture's own `dumpsys window displays` (CellTruth.displays, served by the fake device as DeviceProfile.windowDisplays: the three-button bar [0,2088][1080,2220], recaptured 2026-10-16 at the round-3 merge), so averi's navigation band there is the bar's; the verdict is the one review round 1 measured under a dump patched to it. bands-three-button: bands' screen on the averi_lab AVD under three-button navigation (`navigation_mode` 0, the bar `[0,2088][1080,2220]`; restored to gesture, mode 2, after the capture), in the same run as bands' gesture capture (CatalogCell.navigation, catalog.ts#captureRefusal). Its N row is green on both sides — DOES-NOT-FAIL: the pre-fix assert does not pass on the bar (N's tree node runs [127,2088][952,2220], so the assert samples the bar's white and its tint mixed: it fails at 94bae14, 57 % white, dE00 8.87, as at e85bcdf). Under gesture navigation (bands.xml) N is reached, 90 % drawn and seen in its own colour beneath the handle, its row accepting a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020): green on both sides too. Phase 4 (round 4) calibrates on text-nav-cut (gesture navigation): T, a 74-px string box drawn across the band's top (2105–2179, the band from 2154), its own 49-px node ending flush at the band. Its colour row (R-overlap, rows.ts#overlapColour: what it samples is overlapped by the band) PASSes at 94bae14, sampling across the band (66 % of the region its colour), and fails closed at e85bcdf naming the navigation bar: CALIBRATED on the note's band, a check of its own since N's DOES-NOT-FAIL would hold the whole entry. Its `ocr` row (golden-spec/text.ts, the host's recognizer) is green on both sides: PASS reading the whole string at 94bae14, failing closed at e85bcdf — see needs.
 
 ## 26: CALIBRATED
 
@@ -742,6 +751,33 @@ Needs: The ui_snapshot half (the note: every field's `error` = the next field's 
 
 form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The last field has no title below it: no row. Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL).
 
+## TX1: CALIBRATED
+
+2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md — defect: `≠`
+
+- before 92f2a46:
+  - RED ios-iphone17-ios27/own-parts.wda.json N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/own-parts.idb.json N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED android-averi_lab-api33/own-parts.xml N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json E ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json E ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED android-averi_lab-api33/text-sample.xml E ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json A ocr — failed: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json A ocr — failed: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
+  - RED android-averi_lab-api33/text-sample.xml A ocr — failed: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" ≠
+- after 35321b4:
+  - ok ios-iphone17-ios27/own-parts.wda.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/own-parts.idb.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok android-averi_lab-api33/own-parts.xml N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/text-sample.wda.json E ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/text-sample.idb.json E ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok android-averi_lab-api33/text-sample.xml E ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/text-sample.wda.json A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" = (differs only in á vs a, ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacriti
+  - ok ios-iphone17-ios27/text-sample.idb.json A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" = (differs only in á vs a, ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacriti
+  - ok android-averi_lab-api33/text-sample.xml A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" = (differs only in ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+
+A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.ts, by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability). own-parts' N draws Payee’s name (U+2019); asked `ocr` for that string the recognizer reads Payee's name: at 92f2a46 the assert fails on the reading (≠), at 35321b4 it passes, naming the fold (’ vs '). text-sample's E draws the same string (16 pt, both platforms), and its A the note's Slovak `Prihlásiť sa`, which the same fix folds (a combining mark off): read `Prihlásit sa`, red at 92f2a46 and green at 35321b4 alike. Its neighbours that the fold does not reach are lab notes OC1 (Ľ read L', ĺ read í) and OC2 (iOS: an NBSP thousands separator read as nothing), KNOWN in text.known.ts.
+
 ## L1: OPEN-RED
 
 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md — defect: `swiped \d+× beneath a presented layer`
@@ -898,6 +934,32 @@ No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links t
   - RED android-averi_lab-api33/form-keyboard.xml phone scroll_until — reached with no swipe where a tap fires submit invalid: Element id:"lab.form-keyboard.phone" visible after 0 swipes — CLIPPED at bottom, 67% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. A rect assert or screenshot on this elem
 
 No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row.
+
+## OC1: OPEN-RED
+
+2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md — defect: `≠`
+
+- working tree:
+  - RED ios-iphone17-ios27/text-sample.wda.json B ocr — failed: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json C ocr — failed: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json B ocr — failed: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json C ocr — failed: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED android-averi_lab-api33/text-sample.xml B ocr — failed: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED android-averi_lab-api33/text-sample.xml C ocr — failed: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+
+No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
+
+## OC2: OPEN-RED
+
+2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md — defect: `≠`
+
+- working tree:
+  - RED ios-iphone17-ios27/text-sample.wda.json H ocr — failed: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json I ocr — failed: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json H ocr — failed: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json I ocr — failed: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
+
+No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
 
 ## Not reproducible with the existing cells
 
