@@ -14,6 +14,8 @@ const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
+/** The short stroke down after two IDB_UP, the third of G's and blur-menu-grouped C's strokes. */
+const IDB_DOWN_SHORT = 'idb ui swipe 201 699 201 568 --duration 0.3';
 /**
  * The slot targets' probe points (Base.swift#Slot) and the colour the screenshot shows over each under the blur menu:
  * A, B, D their own blurred and dimmed; C (#00897B) the menu row W's own colour — W is drawn over C's centre.
@@ -70,7 +72,7 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F', 'M'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F', 'M'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'F'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: strokes on the sheet for a target off the screen beneath it', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['G'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, 'idb ui swipe 201 699 201 568 --duration 0.3'], note: 'lab finding: strokes on the sheet for a target under the status bar beneath it', as: LAB_EDGES }),
+    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['G'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: 'lab finding: strokes on the sheet for a target under the status bar beneath it', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['E'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a sliver beneath it', as: LAB_EDGES }),
     ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['M'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a whole target under its dim', as: LAB_EDGES }),
     // sheet-long-list.idb.json — idb lists the UIKit table's labels without their accessibility identifiers (AXUniqueId
@@ -90,7 +92,7 @@ export const presented: KnownFile = {
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.wda.json`, ['A', 'B', 'D']),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused under the menu row W drawn over its centre; the backdrop has no node', as: BLUR }),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the menu row W; the backdrop has no node', as: BLUR }),
-    ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, 'idb ui swipe 201 699 201 568 --duration 0.3'], note: 'strokes for C under the menu row W; the backdrop has no node', as: BLUR }),
+    ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: 'strokes for C under the menu row W; the backdrop has no node', as: BLUR }),
     // LAB FINDING (calibration.json L4): the menu row W, listed in reading order just before C, which it is drawn over,
     // reads as covered by C under idb and WDA (no reading break, ADR 0015) — a false refusal; and C, listed after W,
     // reads as drawn over W: Tapped at its centre, which fires W, a colour PASS on W's colour, fully visible — the unsafe
