@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { judgedGeometry, stopAsk, tapAsk, type TapAsk } from '../../truth/target-contract.js';
+import { judgedContext, type StopAsk, type TapAsk } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
@@ -32,7 +32,7 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
  * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | never "visible" where it is, whatever it swiped: it is cut — but a rect flush with its scroll container's edge, probed with a swipe toward it, may stop when the replayed probe moves nothing (the probe's answer is the device's: replies.ts#flushProbedSide) | ADR 0005 (the `fully` stop judges no sliver: a stop flush with a clipping container is the flush probe's to check, scroll-rounds.ts#PROBE_REACH), ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
- * | R-band | status-band, nav-band (iOS's home-indicator band is no band: target-contract.ts#homeIndicatorBand) | tap | refused, nothing tapped — where its probe fired (iOS below the bar's touch area, Android's navigation band under gesture navigation): Tapped inside what shows of it, or refused with nothing sent | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
+ * | R-band | status-band, nav-band (iOS's home-indicator band is no band: target-contract.ts#judgedContext) | tap | refused, nothing tapped — where its probe fired (iOS below the bar's touch area, Android's navigation band under gesture navigation): Tapped inside what shows of it, or refused with nothing sent | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
  * | R-band | status-band, nav-band | colour | fails: a system band over what it reads (Android's navigation bar under three buttons: asked for the colour the screen shows there, the bar's, so a pass means it measured the bar — #23) — but in Android's navigation band under gesture navigation, where the band is the app's (truth.ts#navigationBandTakes, measured: bands N reached, seen in its own colour beneath the gesture handle), passes on its own colour or fails closed | ADR 0001; ADR 0020 (the measured truth outranks a hand-written expectation) |
  * | R-band | status-band, nav-band | scroll_until | not reached where it is (the stop fails) | ADR 0009 (N-a: neither stop stops on a centre in the band) |
  * | R-band | status-band, nav-band, in a scroll view | scroll_until `fully: true` | R-fully: not "visible" where it is (target-contract.ts#fullyAsked) | ADR 0009 (N-a, `fully`) |
@@ -63,26 +63,35 @@ export interface RowOptions {
 }
 
 /**
- * The tap row that judges the target's tap clause (target-contract.ts#tapAsk): `refuse` naming scroll_until — R-off,
- * R-outside-sv, R-sliver (refusedTap, `row` its name); in a system band — R-band (bandTap); else R-land (landRow). The
- * open target's tap (`fire` at its node) is base.ts#openRows', a presented one's (`refuse`, close it first)
- * presented.ts' — their families ask them whole. `absent` (unlistedBy) as refusedTap takes it.
+ * The tap row that judges `ask`, the target's tap clause (target-contract.ts#contractOf), routed by the clause:
+ * `refuse` naming scroll_until — R-off, R-outside-sv, R-sliver (refusedTap); `land-or-refuse` inside what shows — R-band,
+ * a band whose probe fired (bandTap); `fire` inside what shows or `land-or-refuse` inside its piece — R-land (landRow);
+ * `refuse` with no remedy — the row's name says which wording judges it (`R-band`: bandTap, else landRow): the same
+ * clause, two mismatch texts the KNOWN files pin. The open target's tap (`fire` at its node) is base.ts#openRows', a
+ * presented one's (`refuse`, close it first) presented.ts'. `absent` (unlistedBy) as refusedTap takes it.
  */
-export function tapRow(platform: Platform, t: TargetTruth, row: string, opts: RowOptions = {}): Expectation {
-  const ask = tapAsk(platform, t);
+export function tapRow(platform: Platform, t: TargetTruth, ask: TapAsk | undefined, row: string, opts: RowOptions = {}): Expectation {
   if (ask === undefined) throw new Error(`${t.id}: the target contract asks no tap of it (${t.geometry ?? t.declared}) — its rows are not asked`);
-  if (ask.must === 'refuse' && ask.remedy === 'scroll_until') return refusedTap(platform, t, row, ask, opts);
-  const g = judgedGeometry(platform, t.geometry);
-  return g === 'status-band' || g === 'nav-band' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+  switch (ask.must) {
+    case 'refuse':
+      if (ask.remedy === 'scroll_until') return refusedTap(platform, t, row, ask, opts);
+      if (ask.remedy === 'close it first') throw new Error(`${t.id}: a presented target's tap is presented.ts's`);
+      return row === 'R-band' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+    case 'land-or-refuse':
+      return ask.inside === 'visible' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+    case 'fire':
+      if (ask.inside === 'node') throw new Error(`${t.id}: an open target's tap is base.ts#openRows'`);
+      return landRow(platform, t, ask);
+  }
 }
 
 /**
- * The plain stop's row on a target where its capture lays it out (target-contract.ts#stopAsk): reached with no swipe
- * where the stop holds there (R-overlap: its centre clear — reachedAtOnce), else not reached where it is (R-sliver,
- * R-band, R-under-chrome — notReachedStill). `row` names it.
+ * The plain stop's row that judges `ask`, the stop clause where the capture lays the target out
+ * (target-contract.ts#contractOf): reached with no swipe where the stop holds there (R-overlap: its centre clear —
+ * reachedAtOnce), else not reached where it is (R-sliver, R-band, R-under-chrome — notReachedStill). `row` names it.
  */
-export function stopRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
-  return stopAsk(platform, t, false).holds ? reachedAtOnce(platform, t, cell, row) : notReachedStill(platform, t, cell, row);
+export function stopRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk): Expectation {
+  return ask.holds ? reachedAtOnce(platform, t, cell, row, ask) : notReachedStill(platform, t, cell, row, ask);
 }
 
 /**
@@ -142,8 +151,8 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string, opt
  * about what shows (ADR 0020: the measured truth outranks a hand-written expectation) and a FAIL is averi failing
  * closed on the band it models (ADR 0009 N-a): either is accepted, nothing else. With no mode recorded consistency
  * holds the target broken, and no row is asked. Who takes the band is truth.ts#navigationBandTakes' alone (the bar only
- * on Android); iOS's home-indicator band never comes here — the contract judges a target there `whole`
- * (target-contract.ts#homeIndicatorBand).
+ * on Android); iOS's home-indicator band never comes here — the contract judges a target there by what else lies
+ * around it (target-contract.ts#judgedContext).
  */
 export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
   const g = t.geometry === 'status-band' ? 'status' : 'navigation';
@@ -170,13 +179,13 @@ export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth):
  * judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is then not
  * asked: averi cannot know which scroll view holds a node it never saw.
  */
-export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, opts: RowOptions = {}): Expectation {
+export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk, opts: RowOptions = {}): Expectation {
   const { absent } = opts;
   const direction = directionOf(t, cell);
   const own = absent === undefined && t.scrollView !== undefined ? cell.scrollViews?.[t.scrollView] : undefined;
   return {
     verb: 'scroll_until',
-    asks: stopAsk(platform, t, false),
+    asks: ask,
     says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`,
     call: scrollCall(platform, t, direction),
     judge: (o) => {
@@ -193,9 +202,9 @@ export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, r
  * moves it, so a stop after N swipes stopped where it is just the same: the stop must fail (an ERROR), whatever it
  * swiped.
  */
-function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk): Expectation {
   return {
-    asks: stopAsk(platform, t, false),
+    asks: ask,
     verb: 'scroll_until',
     says: `${row}: not reached where it is (the stop fails; a replayed tree never moves)`,
     call: scrollCall(platform, t, directionOf(t, cell)),
@@ -214,9 +223,9 @@ function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, ro
  * view toward that edge. The replay checks only that the probe is sent toward the cut; whether it reveals the row and
  * the stop goes on is live (phase 5). Any other "visible" is red.
  */
-export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
+export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth, ask: StopAsk): Expectation {
   return {
-    asks: stopAsk(platform, t, true),
+    asks: ask,
     verb: 'fully',
     says: `R-fully: fully: true is not "visible" where it is ${t.geometry} (a flush edge: probed toward it, the probe's answer the device's)`,
     call: scrollCall(platform, t, directionOf(t, cell), true),
@@ -312,9 +321,9 @@ export function directionRow(platform: Platform, t: TargetTruth, cell: CellTruth
 }
 
 /** R-overlap: the plain stop is centre-based (ADR 0009 N-a), and the centre is clear — reached with no swipe. */
-function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTruth, row: string): Expectation {
+function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk): Expectation {
   return {
-    asks: stopAsk(platform, t, false),
+    asks: ask,
     verb: 'scroll_until',
     says: `${row}: reached with no swipe (its centre clear)`,
     call: scrollCall(platform, t, directionOf(t, cell)),
@@ -328,7 +337,8 @@ function reachedAtOnce(platform: Platform, t: TargetTruth, cell: CellTruth, row:
  * alone, and the assert passes on its own colour.
  */
 export function overlapColour(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
-  const over = t.visible === null || t.visible === undefined ? undefined : regionOverlap(sampleOf(t.visible), { screen: { x: 0, y: 0, ...cell.screen }, ...(cell.safeArea !== undefined && { safeArea: cell.safeArea }), ...(cell.chrome !== undefined && { chrome: cell.chrome }) });
+  // The bands and chrome as the contract judges them (target-contract.ts#judgedContext: iOS's home-indicator band none).
+  const over = t.visible === null || t.visible === undefined ? undefined : regionOverlap(sampleOf(t.visible), judgedContext(platform, cell, undefined));
   if (over !== undefined) return colourFails(platform, t, `R-overlap: ${parseGeometry(over).name} over what it samples`);
   return {
     verb: 'colour',

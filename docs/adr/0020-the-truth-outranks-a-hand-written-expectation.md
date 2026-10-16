@@ -27,10 +27,15 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    (scripts/truth/target-contract.ts). The replayed golden and the live golden are both its consumers, never its
    authors: the replayed rows (scripts/differential/golden-spec/*.ts — per cell family and phase 3's row types, behind
    the façade golden-spec.ts, each row citing the rule or ADR that decides it) turn a clause into a call and a judge over
-   a replayed reply, the live cases (scripts/truth/live-visibility.ts) into calls on the lab app judged by its own log;
-   each stamps the clause it judges, and a parity test holds the two equal for every committed truth target both ask
-   (tests/truth/target-contract.test.ts). Their oracles differ, not their contract: the replay knows the capture's probe
-   and the tree, the live golden the app's tap log. averi's replies are read by one module too
+   a replayed reply, the live cases (scripts/truth/live-visibility.ts) into calls on the lab app judged by its own log,
+   its geometry read in the same judged context. Each records the clause that chose it. For every committed truth target
+   both ask, tests/truth/target-contract.test.ts holds the recorded clauses equal and feeds both judges the same
+   synthetic answers — a refusal that sent and fired nothing, a `Tapped` that fired the target alone where the clause
+   lands it, a stop with no swipe where the capture lays the target out — requiring them to agree as the clause says.
+   Their oracles differ, not their contract: the replay knows the capture's probe and the tree, the live golden the
+   app's tap log (so a `Tapped` that fired the target alone is true live even where the replay requires a refusal).
+   How a target is addressed (its text or its identifier) is not yet the contract's: the replay's edge, band and chrome
+   rows ask a text target by its identifier, the live cases by its text — a residual the contract's header records. averi's replies are read by one module too
    (scripts/truth/replies.ts: a reply's kind, its claims, its numbers, an ocr reading), for both. A reply saying the target is
    not in the tree is judged by its effect first: where the row rejects it (a tap refused without its remedy, a stroke
    beneath the presented layer), the mismatch is the row's own reason; where the row would accept it, it is no evidence

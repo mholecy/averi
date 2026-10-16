@@ -3,7 +3,7 @@ import type { Rect, TargetTruth } from '../../truth/schema.js';
 import type { Outcome } from '../differential.js';
 import { claimsTap, movedTap } from '../../truth/replies.js';
 import { pointText, probePoint, selectorOf, touchesAt } from '../../truth/truth.js';
-import { stopAsk, tapAsk } from '../../truth/target-contract.js';
+import type { TargetContract } from '../../truth/target-contract.js';
 import { BUDGET_MS, classed, first, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
 
 /**
@@ -17,15 +17,16 @@ import { BUDGET_MS, classed, first, passes, pointsText, reachedWithNoSwipe, tapP
  * The tap and scroll_until ask by truth.ts#selectorOf — the target's identifier, or a text target's text
  * (golden-spec/false-covers.ts#ownPartsRows). `nodes`: the frames of the nodes the replayed tree lists as the target,
  * by that same element (truth.ts#elementOf, #nodeFramesIn; golden-spec.ts#expectations reads them) — none given, none
- * known.
+ * known. `c`, the target's contract (target-contract.ts#contractOf), whose clauses chose these rows — the tap `fire` at
+ * its node, the plain stop holding where it lies — each row records the clause it judges (Expectation.asks).
  */
-export function openRows(platform: Platform, t: TargetTruth, nodes: readonly Rect[] = []): Expectation[] {
+export function openRows(platform: Platform, t: TargetTruth, c: Pick<TargetContract, 'tap' | 'stop'>, nodes: readonly Rect[] = []): Expectation[] {
   const selector = selectorOf(t);
   const element = { id: t.id };
   const centres = nodeCentres(nodes, t);
   return ([
     {
-      asks: tapAsk(platform, t),
+      asks: c.tap,
       verb: 'tap',
       says: centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`,
       call: { tool: 'tap', args: { platform, selector } },
@@ -38,7 +39,7 @@ export function openRows(platform: Platform, t: TargetTruth, nodes: readonly Rec
       judge: passes,
     },
     {
-      asks: stopAsk(platform, t, false),
+      asks: c.stop,
       verb: 'scroll_until',
       says: 'reached with no swipe',
       call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },

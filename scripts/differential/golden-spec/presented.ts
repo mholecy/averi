@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { TargetTruth } from '../../truth/schema.js';
 import { closeFirst, notInTree } from '../../truth/replies.js';
-import { tapAsk } from '../../truth/target-contract.js';
+import type { TapAsk } from '../../truth/target-contract.js';
 import { BUDGET_MS, classed, notTapped, passed, said, swipes, type Expectation } from './judges.js';
 
 /**
@@ -18,7 +18,7 @@ import { BUDGET_MS, classed, notTapped, passed, said, swipes, type Expectation }
  * for an open target (golden-spec.ts#expectations): the remedy is to close the layer, and scroll advice cannot be
  * followed (scroll_until refuses beneath it).
  */
-export function presentedOverRows(platform: Platform, t: TargetTruth): Expectation[] {
+export function presentedOverRows(platform: Platform, t: TargetTruth, ask: TapAsk): Expectation[] {
   const selector = `id:"${t.id}"`;
   const element = { id: t.id };
   // A target measured wholly off the screen shows nothing there to ask for (its `seen` is no pixel's): it is asked for
@@ -27,7 +27,7 @@ export function presentedOverRows(platform: Platform, t: TargetTruth): Expectati
   const asked = offScreen ? t.color : t.seen;
   return ([
     {
-      asks: tapAsk(platform, t),
+      asks: ask,
       verb: 'tap',
       says: 'refused: close it first, nothing tapped',
       call: { tool: 'tap', args: { platform, selector } },

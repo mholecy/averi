@@ -1,7 +1,7 @@
 import type { Platform } from '../differential/corpus.js';
 import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
-import { fullyAsked, judgedGeometry, judgedSafeArea, stopAsk, stopHolds, tapAsk, unlistedBy, type StopAsk, type TapAsk } from './target-contract.js';
+import { contractOf, judgedContext, stopHolds, unlistedBy, type StopAsk, type TapAsk } from './target-contract.js';
 import { bandsOf, directionOf, geometryOf, intersect, selectorOf, type GeometryContext } from './truth.js';
 
 /**
@@ -99,19 +99,11 @@ const round = (n: number) => Math.round(n * 10) / 10;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 260);
 
 /**
- * What the target's geometry is judged against in the live state: the screen, the bands the contract judges
- * (target-contract.ts#judgedSafeArea: iOS's home-indicator band is none, so only its status band), the target's scroll
- * view's clip, the chrome.
+ * What the target's geometry is judged against in the live state: the contract's judged context
+ * (target-contract.ts#judgedContext — the one the replay judges a capture in: iOS's home-indicator band is no band), on
+ * the app's screen, bands, the target's scroll view's clip and the chrome as it reports them now.
  */
-export function liveContext(state: LabState, platform: Platform, view: string | undefined): GeometryContext {
-  const clip = view === undefined ? undefined : state.scrollViews?.[view];
-  return {
-    screen: { x: 0, y: 0, width: state.screen.width, height: state.screen.height },
-    ...(state.safeArea !== undefined && { safeArea: judgedSafeArea(platform, state.safeArea) }),
-    ...(clip !== undefined && { clip }),
-    ...(state.chrome !== undefined && { chrome: state.chrome }),
-  };
-}
+export const liveContext = (state: LabState, platform: Platform, view: string | undefined): GeometryContext => judgedContext(platform, state, view);
 
 /** The target's live geometry, from its frame as the app lays it out now; undefined when the app reported no frame. */
 export function liveGeometry(state: LabState, platform: Platform, tag: string, view: string | undefined): Geometry | undefined {
@@ -387,13 +379,14 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     // band: the app's, measured) — must fire it. Else — `land-or-refuse` (a system band whose probe fired, a piece) or
     // `refuse` — a refusal is as good, but never a `Tapped` that fired nothing, or something else. A target the
     // contract asks nothing of (its truth contradicts itself: consistency's to report) gets no case.
-    const ask = tapAsk(platform, t);
+    const contract = contractOf(platform, t, truth);
+    const ask = contract.tap;
     if (ask === undefined) continue;
     const fires = ask.must === 'fire';
     cases.push({
       id: `tap:${truth.cell}.${t.tag}`,
       cell: truth.cell,
-      says: `tap ${t.tag} (${t.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
+      says: `tap ${t.tag} (${contract.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
       calls: [{ tool: 'tap', args: { selector: selectorOf(t) } }],
       asks: ask,
       judge: (s, [reply], launched) => judgeTap(t.tag, fires, reply, s, launched),
@@ -409,12 +402,12 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
       });
       continue;
     }
-    const g = judgedGeometry(platform, t.geometry);
+    const g = contract.geometry;
     if (t.scrollView === undefined || g === undefined || g === 'whole') continue;
     const view = t.scrollView;
-    for (const fully of fullyAsked(platform, t) ? [false, true] : [false]) {
+    for (const stop of [contract.stop, ...(contract.fully === undefined ? [] : [contract.fully])]) {
       const direction = directionOf(t, truth);
-      cases.push({ ...scrollCase(truth.cell, t, view, direction, fully, platform, `scroll_until ${t.tag} (${t.geometry}) ${direction}${fully ? ', fully' : ''}: stops on it as the app lays it out, every stroke on ${view} bringing it closer, then the tap fires it`), asks: stopAsk(platform, t, fully) });
+      cases.push({ ...scrollCase(truth.cell, t, view, direction, stop.fully, platform, `scroll_until ${t.tag} (${g}) ${direction}${stop.fully ? ', fully' : ''}: stops on it as the app lays it out, every stroke on ${view} bringing it closer, then the tap fires it`), asks: stop });
     }
   }
   for (const b of TURN_BACK.filter((x) => x.cell === truth.cell)) {
@@ -422,7 +415,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     if (t?.scrollView === undefined) continue;
     // A target its capture's tree of a source does not list: averi cannot see where it lies, so there is nothing to turn
     // back toward — the case is said so, and its strokes are not held to R-direction under that source.
-    const unlisted = Object.entries(t.listed ?? {}).filter(([, l]) => l === false).map(([src]) => src);
+    const unlisted = Object.keys(t.listed ?? {}).filter((src) => unlistedBy(t, src) !== undefined);
     const says = unlisted.length === 0 ? `turn back: ${b.says}` : `the wrong direction: ${b.says} — under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
     cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
   }

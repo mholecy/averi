@@ -192,8 +192,9 @@ describe('the visibility cases\' expectations from the static truth', () => {
     const [open] = visibilityCases(truth('bands', [target({ geometry: 'whole' })]), 'android');
     expect(open.judge(launched, ['ERROR covered'], launched, 'uiautomator', []).outcome).toBe('LOUD');
   });
-  it('iOS\'s home-indicator band is no band (target-contract.ts#homeIndicatorBand): its target\'s tap must fire, a refusal LOUD, as the replayed open row asks', () => {
-    const [n] = visibilityCases(truth('bands', [target({ geometry: 'nav-band' })]), 'ios');
+  it('iOS\'s home-indicator band is no band (target-contract.ts#judgedContext): its target\'s tap must fire, a refusal LOUD, as the replayed open row asks', () => {
+    const iosBands: CellTruth = { ...truth('bands', [target({ geometry: 'nav-band', frame: { x: 51, y: 847, width: 300, height: 20 } })]), screen: { width: 402, height: 874 }, safeArea: { top: 62, left: 0, bottom: 34, right: 0 } };
+    const [n] = visibilityCases(iosBands, 'ios');
     expect(n.asks).toEqual({ must: 'fire', inside: 'node' });
     expect(n.judge(launched, ['ERROR under the home indicator'], launched, 'wda', [])).toMatchObject({ outcome: 'LOUD', cls: 'tap-refused', kind: 'refused' });
     const fired = state({ events: [{ kind: 'tap', tag: 'N', at }] });

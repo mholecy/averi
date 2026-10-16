@@ -54,7 +54,8 @@ export interface GoldenCheck {
 }
 
 /**
- * A reply that is a JavaScript error or the harness's own, not a tool's answer: thrown through the MCP client
+ * A reply that is a JavaScript error or the harness's own, not a tool's answer — the harness's errors, so read here, not
+ * by scripts/truth/replies.ts (which reads averi's replies): thrown through the MCP client
  * (`THROW`), a TypeError/ReferenceError of a side loaded wrong ("this.factory is not a function"), or the fake device's
  * refusal (`differential: …`).
  */

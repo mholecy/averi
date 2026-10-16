@@ -1,9 +1,9 @@
 import type { Platform, SourceKind } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
-import type { CellTruth, TargetTruth } from '../../truth/schema.js';
+import type { CellTruth, Geometry, TargetTruth } from '../../truth/schema.js';
 import { navigationBandTakes, parseGeometry, type AssertElement } from '../../truth/truth.js';
 import { failedClosedUnchecked, readingOf, readSomething } from '../../truth/replies.js';
-import { judgedGeometry } from '../../truth/target-contract.js';
+import { stringUnlistedBy } from '../../truth/target-contract.js';
 import { BUDGET_MS, classed, first, passed, passes, said, type Expectation } from './judges.js';
 
 /**
@@ -18,7 +18,7 @@ import { BUDGET_MS, classed, first, passed, passes, said, type Expectation } fro
  * | a text target open and whole (reached, drawn as its box) | `assert {element:{text}, text}` | passes: the tree carries the app's string exactly — the selector finds it by it, the text assert reads it | tools.ts assert `text` (exact, whitespace collapsed); docs/bugs/2026-10-15-android-numeric-character-references-in-uiautomator-attributes-are-not-decoded.md |
  * | the same | `assert {element:{text}, ocr:{text}}` | passes: the screenshot shows the string — read exactly, or equal only under the recognizer's fold (src/verify/ocr-fold.ts: ’ “ ” – — … read as ASCII, Latin combining marks dropped) | docs/bugs/2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md (35321b4) |
  * | its centre in the status band, under the app's chrome, or in (or overlapping) Android's navigation band where the bar takes the tap (three buttons) | `ocr` | fails closed (`rendered text unchecked`): never a PASS and never a reading, which would be of what is drawn over it | docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md (596a379); ADR 0001 |
- * | in or overlapping Android's navigation band under gesture navigation (the app's: the handle drawn over it), or overlapping iOS's home-indicator band (the app's, truth.ts#navigationBandTakes; a centre IN it is no band at all, target-contract.ts#homeIndicatorBand: the open rows above) | `ocr` | passes (the text drawn whole beneath the handle, read right) or fails closed; never a FAIL on a reading — what the band leaves of the glyphs read as the element's text | docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md (e85bcdf); ADR 0009 |
+ * | in or overlapping Android's navigation band under gesture navigation (the app's: the handle drawn over it; iOS's home-indicator band is no band, target-contract.ts#judgedContext — a string there is judged by what else lies around it) | `ocr` | passes (the text drawn whole beneath the handle, read right) or fails closed; never a FAIL on a reading — what the band leaves of the glyphs read as the element's text | docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md (e85bcdf); ADR 0009 |
  *
  * Every row names its element by the string (`text:"…"`), as a test names a label and as ownPartsRows' tap does: a text
  * target's identifier may sit on a node the tree folds into its control (own-parts' L on iOS: the button carries the
@@ -58,23 +58,14 @@ export function ocrFailsClosed(platform: Platform, element: AssertElement, text:
   };
 }
 
-/**
- * Why a covered string may be missing from the replayed tree: its capture's tree of that source lists no node carrying
- * it (TargetTruth.textListed, measured from the tree: uiautomator dumps no node the user cannot see — text-under-bar's
- * P, its box listed by its uncovered strip above the button, its string not at all). Only then is a covered `ocr` row's
- * "not found" right; where the tree lists the string (S in the status band) it is no evidence, as everywhere.
- */
-export const unseenString = (t: Pick<TargetTruth, 'textListed'>, source: SourceKind | undefined): string | undefined =>
-  source !== undefined && t.textListed?.[source] === false ? `the ${source} capture lists no node carrying the string (TargetTruth.textListed): it is wholly under what is drawn over it` : undefined;
-
-export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source?: SourceKind): Expectation[] {
+export function textRows(platform: Platform, t: TargetTruth, judged: Geometry | undefined, cell: CellTruth | undefined, source?: SourceKind): Expectation[] {
   const text = t.text;
   if (text === undefined) return [];
-  const unseen = unseenString(t, source);
+  const unseen = source === undefined ? undefined : stringUnlistedBy(t, source);
   const covered = (e: Expectation): Expectation => classed(unseen === undefined ? e : { ...e, absent: unseen });
-  // By the geometry the target contract judges (target-contract.ts#judgedGeometry): iOS's home-indicator band is no
-  // band — a string there is an open one.
-  const g = judgedGeometry(platform, t.geometry) ?? 'whole';
+  // By the geometry the target contract judges (`judged`, target-contract.ts#contractOf): iOS's home-indicator band is
+  // no band — a string there is judged by what else lies around it.
+  const g = judged ?? 'whole';
   if (g === 'whole') {
     if (!t.reached) return [];
     return [
@@ -95,8 +86,8 @@ export function textRows(platform: Platform, t: TargetTruth, cell: CellTruth | u
   const { kind, name } = parseGeometry(g);
   if (g === 'status-band') return [covered(ocrFailsClosed(platform, { text }, text, 'the status band over it'))];
   if (kind === 'under-chrome') return [covered(ocrFailsClosed(platform, { text }, text, `${name} over it`))];
-  // In the navigation band, or overlapping it (its centre clear): who takes that band is truth.ts#navigationBandTakes'
-  // — the navigation mode's on Android, the app's on iOS.
+  // In the navigation band, or overlapping it (its centre clear) — Android's only: the judged geometry never names
+  // iOS's home-indicator band. Who takes it is truth.ts#navigationBandTakes', by the navigation mode.
   if (g === 'nav-band' || g === 'band-overlap:nav') {
     const takes = navigationBandTakes(platform, 'nav-band', cell?.navigation);
     if (takes === 'bar') return [covered(ocrFailsClosed(platform, { text }, text, 'the navigation bar over it'))];

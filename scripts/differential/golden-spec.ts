@@ -1,7 +1,7 @@
 import type { Platform, SourceKind } from './corpus.js';
 import type { CellTruth, TargetTruth } from '../truth/schema.js';
 import { elementOf, nodeFramesIn } from '../truth/truth.js';
-import { judgedGeometry, tapAsk } from '../truth/target-contract.js';
+import { contractOf } from '../truth/target-contract.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
@@ -77,18 +77,19 @@ export * from './golden-spec/rows.js';
  * (tests/differential/golden-wiring.test.ts); a unit test of a row's choice may leave it out.
  */
 export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind, tree?: string): Expectation[] {
-  // The target contract asks nothing of a target its truth contradicts (tapAsk undefined: a presented-over one
-  // reached, an open whole one not reached or not drawn) — consistency reports it broken.
-  if (t.declared === 'presented-over') return tapAsk(platform, t) === undefined ? [] : presentedOverRows(platform, t);
+  // The target contract, decided once (target-contract.ts#contractOf); it asks nothing of a target its truth
+  // contradicts (no tap clause: a presented-over one reached, an open whole one not reached or not drawn) —
+  // consistency reports it broken.
+  const c = contractOf(platform, t, cell);
+  if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap);
   const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
   // the screenshot) after the rows its geometry asks.
-  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, cell, source)]);
-  // By the geometry the contract judges (target-contract.ts#judgedGeometry): iOS's home-indicator band is no band, a
-  // target there asked what an open one is.
-  const g = judgedGeometry(platform, t.geometry);
-  if (g === undefined || g === 'whole') return tapAsk(platform, t) === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, nodes)) : openRows(platform, t, nodes);
-  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell)]);
+  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, c.geometry, cell, source)]);
+  // By the geometry the contract judges (judgedGeometry: iOS's home-indicator band is no band).
+  const g = c.geometry;
+  if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : openRows(platform, t, c, nodes);
+  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, c)]);
 }
 
 /**

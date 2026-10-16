@@ -73,14 +73,15 @@ describe('the rows each geometry asks', () => {
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band']],
     // In a scroll view a band target is asked `fully` too (target-contract.ts#fullyAsked), as the live golden asks it.
     ['status-band', { frame: rect(51, 10, 300, 64), reached: false, scrollView: 'list' }, ['tap: R-band', 'colour: fails (R-band: the status band', 'scroll_until: R-band', 'fully: R-fully']],
-    // iOS's home-indicator band is no band averi judges: judged whole, the open rows (target-contract.ts
-    // #homeIndicatorBand; consistency holds the target reached and drawn there, else it is broken and asked nothing).
-    // Android's navigation band: R-band (below).
-    ['nav-band', { frame: rect(51, 820, 300, 64), reached: true, drawn: 1 }, ['tap: Tapped', 'colour: passes on its own colour', 'scroll_until: reached with no swipe']],
+    // iOS's home-indicator band is no band averi judges (target-contract.ts#judgedContext; consistency holds a target
+    // centred there reached and drawn): a target there or overlapping it is judged by what else lies around it — here
+    // CELL's tab bar over the screen's bottom (a centre under it: R-under-chrome; its edge under it: R-overlap, the
+    // chrome's, `fully` asked in a scroll view or not). Android's navigation band: R-band (below); nothing else around
+    // it, the open rows (golden-spec.test.ts).
+    ['nav-band', { frame: rect(51, 820, 300, 64), reached: false, piece: rect(51, 820, 300, 0), reachedAtPiece: false }, ['tap: R-land: refused, nothing tapped', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
     ['under-chrome:tabBar', { frame: rect(51, 760, 300, 64), reached: false, piece: rect(51, 760, 300, 30), reachedAtPiece: true }, ['tap: R-land: refused, or Tapped inside its piece', 'colour: fails (R-under-chrome: tabBar', 'scroll_until: R-under-chrome (tabBar)']],
     ['chrome-overlap:tabBar', { frame: rect(51, 600, 300, 200), visible: rect(51, 600, 300, 200) }, ['tap: R-land: Tapped', 'colour: R-overlap: passes', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'fully: R-fully']],
-    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203) }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached']],
-    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203), scrollView: 'list' }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (band-overlap:nav): reached', 'fully: R-fully']],
+    ['band-overlap:nav', { frame: rect(51, 640, 300, 203), visible: rect(51, 640, 300, 203) }, ['tap: R-land: Tapped', 'colour: fails (R-overlap: tabBar', 'scroll_until: R-overlap (chrome-overlap:tabBar): reached', 'fully: R-fully']],
   ] as const)('%s', (g, over, expected) => {
     const got = says(rows(target(g, over as Partial<TargetTruth>)));
     expect(got).toHaveLength(expected.length);

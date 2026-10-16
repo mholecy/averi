@@ -1,19 +1,25 @@
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import { DRAWN, type Geometry, type Insets, type TargetTruth } from './schema.js';
-import { isOverlap, parseGeometry } from './truth.js';
+import { DRAWN, type Geometry, type Insets, type Rect, type TargetTruth } from './schema.js';
+import { geometryOf, isOverlap, parseGeometry, type GeometryContext } from './truth.js';
 
 /**
  * The target contract: what a coloured target is ASKED and what its truth implies each verb must answer — decided once,
- * from the target's TargetTruth (declared, reached, drawn, the measured geometry, listed, its scroll view), its platform
- * and the tree source replayed or run. Both goldens are its consumers, never its authors:
+ * from the target's TargetTruth (declared, reached, drawn, its frame and measured geometry, listed, its scroll view),
+ * its capture's screen, its platform and the tree source replayed or run (contractOf; unlistedBy, stringUnlistedBy per
+ * source). Both goldens are its consumers, never its authors:
  *  - the replayed golden (scripts/differential/golden-spec.ts, its façade, and the rows of golden-spec/: base, edges,
- *    bars, text, presented) turns a clause into a row — a call, a judge over the replayed tree's reply and the fake
- *    device's log — and stamps the clause on it (Expectation.asks);
+ *    bars, text, presented) hands each clause to the row that judges it — a call, a judge over the replayed tree's reply
+ *    and the fake device's log — the row recording the clause that chose it (Expectation.asks);
  *  - the live golden (live-visibility.ts#visibilityCases) turns it into a case — calls on the real lab app, a judge over
- *    the app's own log — and stamps it too (VisibilityCase.asks).
- * tests/truth/target-contract.test.ts holds them to it: for every committed truth target both ask, the stamped clauses
- * are equal, and the two judges agree on a refusal (static ↔ live parity). A rule about which band is a band, whether a
- * target may be missing from the tree, or what its tap and stops must do is written here and nowhere else.
+ *    the app's own log — recording it too (VisibilityCase.asks); it judges the app's state at the stop in the same
+ *    judged context (judgedContext).
+ * tests/truth/target-contract.test.ts holds them to it for every committed truth target both ask (static ↔ live
+ * parity): the recorded clauses are equal; and the two JUDGES agree, fed the same synthetic answers — a refusal that
+ * sent and fired nothing (both accept it unless the clause is `fire`), a `Tapped` that fired the target alone where the
+ * clause lands it (the replay accepts it unless the clause is `refuse`; the live oracle always, below), a stop with no
+ * swipe on the target where its capture lays it out (both accept it exactly where the clause `holds`). A rule about
+ * which band is a band, whether a target may be missing from the tree, or what its tap and stops must do is written
+ * here and nowhere else.
  *
  * What the two judges read differently is their ORACLE, not the contract: the replay knows only the capture's probe (a
  * raw tap at the centre fired the target or not) and the tree; the live golden reads the app's tap log. So a clause
@@ -21,33 +27,72 @@ import { isOverlap, parseGeometry } from './truth.js';
  * target alone is true of the app whatever the probe at its centre said (live-visibility.ts#judgeTap) — and live judges
  * no remedy's wording (the replay does: `scroll_until`, `close it first`). `fire` is the same in both: a refusal is
  * wrong.
+ *
+ * Residual, recorded: how a target is ADDRESSED is not the contract's yet. The open rows (golden-spec/base.ts) and every
+ * live case ask a text target by its text (truth.ts#selectorOf); the edge, band and chrome rows (golden-spec/rows.ts)
+ * ask by its identifier, so a text target with such a geometry (text-under-bar's S in the status band, text-nav-cut's T)
+ * is tapped `id:"…"` in the replay and `text:"…"` live. Moving the replay to selectorOf changes those rows' calls, and is
+ * left to a round that re-measures them.
  */
 
-// --- which bands are bands ---
+// --- which bands are bands: the geometry the contract judges by ---
 
 /**
- * iOS's home-indicator band (the safe area's bottom inset on iOS) is no band averi judges — ADR 0009's navigation band
- * is Android's, ADR 0008 is iOS's status band — and none the truth makes one: measured by B4 (truth.ts
- * #navigationBandTakes, docs/truth/band-probes-2026-10-16.md), raw taps there at (201,857) and (60,857) logged their
- * touch and fired N, the APP's, always; and consistency holds a target centred there reached and drawn as itself. So
- * the contract judges such a target as what it is to the app: `whole` (judgedGeometry), asked what an open target is —
- * the tap fires it, its colour passes, reached at once (ADR 0020: the truth outranks a hand-written expectation). The
- * one rule both goldens read — the replayed rows' choice by geometry (golden-spec.ts#expectations, golden-spec/text.ts)
- * and the live judge's geometry (live-visibility.ts#liveContext, through judgedSafeArea).
+ * The screen a geometry is judged on: the capture's (CellTruth) for the replayed golden, the app's state at the stop
+ * (LabState) for the live one — the same fields, read by one function (judgedContext).
  */
-export const homeIndicatorBand = (platform: Platform, g: Geometry | undefined) => platform === 'ios' && g === 'nav-band';
-
-/** The geometry the contract judges a target by: its measured one, iOS's home-indicator band read as `whole` (homeIndicatorBand). */
-export function judgedGeometry(platform: Platform, g: Geometry | undefined): Geometry | undefined {
-  return homeIndicatorBand(platform, g) ? 'whole' : g;
+export interface JudgedScreen {
+  screen: { width: number; height: number };
+  safeArea?: Insets;
+  scrollViews?: Record<string, Rect>;
+  chrome?: Record<string, Rect>;
 }
 
 /**
- * The system bands a geometry is judged against on a live screen (truth.ts#geometryOf's safe area): on iOS its status
- * band only — the home-indicator band is no band (homeIndicatorBand) — so a live geometry never says `nav-band` there.
+ * The system bands the contract judges a geometry against — on iOS its status band only. iOS's home-indicator band (the
+ * safe area's bottom inset) is no band averi judges — ADR 0009's navigation band is Android's, ADR 0008 is iOS's status
+ * band — and none the truth makes one, for any verb:
+ *  - a tap there is the app's: measured by B4 (truth.ts#navigationBandTakes, docs/truth/band-probes-2026-10-16.md), raw
+ *    taps at (201,857) and (60,857) logged their touch and fired N, always;
+ *  - what is drawn there is the target: consistency holds a target centred there drawn as itself (bands' N, iOS: 100 %
+ *    of its own colour, the indicator over it taking no measurable share) — so a sample or a reading of it measures the
+ *    target, as of one in the open;
+ *  - a stop there stops on the target: nothing averi models covers it (ADR 0018's amendment: inventing a 34-pt
+ *    home-indicator band would refuse real taps elsewhere).
+ * So a target whose centre lies in that band, or whose edge overlaps it, is judged by what else lies around it, as if
+ * the inset were not there — `whole` when nothing else does (ADR 0020: the truth outranks a hand-written expectation).
+ * The one context both goldens judge a geometry in (judgedGeometry for the replay, live-visibility.ts#liveGeometry for
+ * the live golden). Android's navigation band is a band: who takes it is the navigation mode's (navigationBandTakes).
+ * Where a swipe may touch down is another question (golden-spec/judges.ts#strokeable): a stroke from the home-indicator
+ * band is the system's go-home gesture, and stays off it.
  */
-export function judgedSafeArea(platform: Platform, safeArea: Insets): Insets {
-  return platform === 'ios' ? { ...safeArea, bottom: 0 } : safeArea;
+export function judgedContext(platform: Platform, s: JudgedScreen, view: string | undefined): GeometryContext {
+  const clip = view === undefined ? undefined : s.scrollViews?.[view];
+  return {
+    screen: { x: 0, y: 0, width: s.screen.width, height: s.screen.height },
+    ...(s.safeArea !== undefined && { safeArea: platform === 'ios' ? { ...s.safeArea, bottom: 0 } : s.safeArea }),
+    ...(clip !== undefined && { clip }),
+    ...(s.chrome !== undefined && { chrome: s.chrome }),
+  };
+}
+
+/**
+ * The geometry the contract judges a target by: truth.ts#geometryOf over its frame in the judged context
+ * (judgedContext) of its capture's screen — the live golden judges the app's state in that same context
+ * (live-visibility.ts#liveGeometry). The capture measured its geometry in the full context (every band); the judged one
+ * drops only iOS's home-indicator band, and geometryOf reads that band only where it names it (`nav-band` for a centre
+ * in it, `band-overlap:nav` from regionOverlap, which tries the status band first and the chrome after): so a measured
+ * geometry naming no navigation band is the judged one as measured, and one naming it on iOS is measured again in the
+ * judged context. tests/truth/target-contract.test.ts holds this over the committed truth (every target's geometry in
+ * the judged context equals this; it differs from the measured one for bands' N and Q on iOS only). Without the
+ * capture's screen (`cell` undefined: a unit test of one row), or of a target measured nothing (`geometry` undefined,
+ * every capture before phase 3), its measured geometry as recorded.
+ */
+export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen | undefined): Geometry | undefined {
+  if (t.geometry === undefined || cell === undefined) return t.geometry;
+  const dropsTheNavigationBand = platform === 'ios' && (cell.safeArea?.bottom ?? 0) > 0;
+  const namesIt = t.geometry === 'nav-band' || t.geometry === 'band-overlap:nav';
+  return dropsTheNavigationBand && namesIt ? geometryOf(t.frame, judgedContext(platform, cell, t.scrollView)) : t.geometry;
 }
 
 // --- the tree ---
@@ -64,6 +109,18 @@ export function judgedSafeArea(platform: Platform, safeArea: Insets): Insets {
  */
 export function unlistedBy(t: Pick<TargetTruth, 'listed'>, source: string): string | undefined {
   return t.listed?.[source as SourceKind] === false ? `the capture's ${source} tree does not list it` : undefined;
+}
+
+/**
+ * Why a text target's STRING may be missing from the tree of `source` — the string's own rule beside unlistedBy (the
+ * target's node): its capture's tree of that source lists no node carrying it (TargetTruth.textListed, measured from
+ * the tree: uiautomator dumps no node the user cannot see — text-under-bar's P, its box listed by its uncovered strip
+ * above the button, its string not at all). Only then is a covered `ocr` row's "not found" right (golden-spec/text.ts);
+ * where the tree lists the string (S in the status band) it is no evidence, as everywhere. No live case asks a string
+ * yet (the live golden's visibility cases tap and scroll; it reads no text).
+ */
+export function stringUnlistedBy(t: Pick<TargetTruth, 'textListed'>, source: string): string | undefined {
+  return t.textListed?.[source as SourceKind] === false ? `the ${source} capture lists no node carrying the string (TargetTruth.textListed): it is wholly under what is drawn over it` : undefined;
 }
 
 // --- the tap ---
@@ -84,14 +141,14 @@ export type TapAsk =
   | { must: 'refuse'; remedy?: 'scroll_until' | 'close it first' };
 
 /**
- * A target's tap clause, from its truth; undefined for a target the truth contradicts itself on (consistency breaks it:
+ * A target's tap clause, from its truth and its judged geometry (judgedGeometry); undefined for a target the truth contradicts itself on (consistency breaks it:
  * an open whole target not reached or not drawn, a presented-over one reached) — neither golden asks it. The rows
  * that cite each rule: golden-spec/rows.ts's table (R-off, R-outside-sv, R-sliver, R-land, R-band), presented.ts,
  * base.ts.
  */
-export function tapAsk(platform: Platform, t: TargetTruth): TapAsk | undefined {
+export function tapAsk(t: TargetTruth, judged: Geometry | undefined): TapAsk | undefined {
   if (t.declared === 'presented-over') return t.reached ? undefined : { must: 'refuse', remedy: 'close it first' };
-  const g = judgedGeometry(platform, t.geometry) ?? 'whole';
+  const g = judged ?? 'whole';
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? { must: 'fire', inside: 'node' } : undefined;
   if (g === 'off-screen' || g === 'outside-scroll-view' || g === 'sliver') return { must: 'refuse', remedy: 'scroll_until' };
   if (g === 'status-band' || g === 'nav-band') return t.reached ? { must: 'land-or-refuse', inside: 'visible' } : { must: 'refuse' };
@@ -114,8 +171,8 @@ export interface StopAsk {
 }
 
 /** The stop clause of `fully` or the plain stop on a target where its capture lays it out (stopHolds on its judged geometry). */
-export function stopAsk(platform: Platform, t: Pick<TargetTruth, 'geometry'>, fully: boolean): StopAsk {
-  return { fully, holds: stopHolds(judgedGeometry(platform, t.geometry) ?? 'whole', fully) };
+export function stopAsk(judged: Geometry | undefined, fully: boolean): StopAsk {
+  return { fully, holds: stopHolds(judged ?? 'whole', fully) };
 }
 
 /** Cut by its scroll view or the screen: the `fully` stop asks more of it than the plain one (R-fully). */
@@ -136,12 +193,31 @@ export function stopHolds(g: Geometry, fully: boolean): boolean {
  * Whether `fully: true` is asked of the target beside the plain stop (R-fully): a cut target (CUT); one whose edge the
  * chrome overlaps; and, in a scroll view only, one in a system band or overlapped at its edge by one — a target in no
  * scroll view there may be a pinned surface the `fully` stop stops on at once (ADR 0009 (b), (c)). On the judged
- * geometry (judgedGeometry): iOS's home-indicator band is no band.
+ * geometry (judgedGeometry).
  */
-export function fullyAsked(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'scrollView'>): boolean {
-  const g = judgedGeometry(platform, t.geometry);
+export function fullyAsked(g: Geometry | undefined, scrollView: string | undefined): boolean {
   if (g === undefined) return false;
   const { kind } = parseGeometry(g);
   if (CUT.includes(g) || kind === 'chrome-overlap') return true;
-  return (g === 'status-band' || g === 'nav-band' || kind === 'band-overlap') && t.scrollView !== undefined;
+  return (g === 'status-band' || g === 'nav-band' || kind === 'band-overlap') && scrollView !== undefined;
+}
+
+// --- the whole contract of a target ---
+
+/**
+ * What a target is asked, decided once — what both goldens read: its judged geometry, its tap clause, the plain stop's
+ * clause where its capture lays it out, and `fully`'s where it is asked (undefined: not asked). The replay hands each
+ * clause to the row that judges it (the row records the clause that chose it: Expectation.asks); the live golden to its
+ * case (VisibilityCase.asks). Whether the target may be missing from a tree is per source: unlistedBy.
+ */
+export interface TargetContract {
+  geometry: Geometry | undefined;
+  tap: TapAsk | undefined;
+  stop: StopAsk;
+  fully: StopAsk | undefined;
+}
+
+export function contractOf(platform: Platform, t: TargetTruth, cell: JudgedScreen | undefined): TargetContract {
+  const geometry = judgedGeometry(platform, t, cell);
+  return { geometry, tap: tapAsk(t, geometry), stop: stopAsk(geometry, false), fully: fullyAsked(geometry, t.scrollView) ? stopAsk(geometry, true) : undefined };
 }

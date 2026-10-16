@@ -44,7 +44,12 @@ export const notInTree = (reply: string) => /waiting for element .* to appear|ne
  * reply turns into another kind (a timeout into a refusal, a stop into `fully visible`) fails the ratchet though its
  * class and its device calls stay; and what the live judges classify a reply by (live-visibility.ts, LiveVerdict.kind).
  * `not found` (the target not in the tree: notInTree), `Tapped`, `visible` (scroll_until stopped on it), `PASS` and
- * `FAIL` (an assert's verdict), `refused` (any other ERROR), `other`.
+ * `FAIL` (an assert's verdict), `refused` (any other ERROR), `other` — in that precedence: `not found` first, so a reply
+ * that says the target never appeared is that, whatever else it opens with. The live judges test `Tapped` and `visible`
+ * through it since round 5 (they read claimsTap and VISIBLE_STOP before): a `Tapped …` or `Element … visible …` reply
+ * that also said "never appeared in the tree" or "waiting for element … to appear" would now count as no claim. No
+ * committed live record holds one (the rejudges are unchanged); a claim that also says it never found its target is
+ * no claim to hold the app to.
  */
 export type ReplyKind = 'not found' | 'Tapped' | 'visible' | 'PASS' | 'FAIL' | 'refused' | 'other';
 export function replyKind(reply: string): ReplyKind {

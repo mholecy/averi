@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
-import { fullyAsked, judgedGeometry } from '../../truth/target-contract.js';
+import type { TargetContract } from '../../truth/target-contract.js';
 import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } from './rows.js';
 
 /**
@@ -18,12 +18,13 @@ import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } fro
  * | under-chrome:<name> | R-under-chrome tap (R-land on its piece), colour, scroll_until |
  * | band-overlap:<band>, chrome-overlap:<name> | R-overlap: tap (R-land at its centre), colour (fails closed only where what it samples is overlapped), scroll_until reached with no swipe, R-fully (a band's: in a scroll view only) |
  *
- * What each row asks is the target contract's (scripts/truth/target-contract.ts), which the live golden's cases read
- * too: the tap's clause (tapAsk, through rows.ts#tapRow), the plain stop's (stopAsk, rows.ts#stopRow) and whether `fully`
- * is asked (fullyAsked: a band's, or a band-overlapped target's, in a scroll view only — one in none may be a pinned
+ * What each row asks is the target contract's (`c`, scripts/truth/target-contract.ts#contractOf), which the live
+ * golden's cases read too, handed to the row that judges it: the judged geometry, the tap's clause (rows.ts#tapRow), the
+ * plain stop's (rows.ts#stopRow) and `fully`'s where it is asked (fullyAsked: a band's, or a band-overlapped target's, in a scroll view only — one in none may be a pinned
  * surface the `fully` stop stops on at once, ADR 0009 (b), (c)). And which band is a band: iOS's home-indicator band is
- * none (target-contract.ts#homeIndicatorBand — measured the app's, a tap there fires the target beneath), so a target
- * centred there is judged `whole` and asked the open rows (golden-spec.ts#expectations, base.ts), never these.
+ * none (target-contract.ts#judgedContext — measured the app's: a tap there fires the target beneath, the target drawn
+ * as itself), so a target centred there or overlapping it is judged by what else lies around it — `whole`, the open
+ * rows (golden-spec.ts#expectations, base.ts), where nothing does.
  *
  * R-overlap, a whole target whose centre is clear but whose edge a band or the chrome overlaps past ADR 0002's slack:
  * the tap and the plain stop are centre-based (ADR 0009 N-a), so `Tapped` and reached at once; the colour assert fails
@@ -32,20 +33,20 @@ import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } fro
  * (ui-tree/standing.ts#fullyStanding), so it never stops on it where it is. A band's R-fully is asked only of a target
  * in a scroll view (fullyAsked, above).
  */
-export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation[] {
-  const g = judgedGeometry(platform, t.geometry);
+export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, c: TargetContract): Expectation[] {
+  const g = c.geometry;
   if (g === undefined) return [];
   const { kind, name } = parseGeometry(g);
-  const fully = fullyAsked(platform, t) ? [fullyRow(platform, t, cell)] : [];
+  const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   if (g === 'status-band' || g === 'nav-band') {
-    return [tapRow(platform, t, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band'), ...fully].map(classed);
+    return [tapRow(platform, t, c.tap, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop), ...fully].map(classed);
   }
   if (kind === 'under-chrome') {
     const chrome = name;
-    return [tapRow(platform, t, 'R-under-chrome'), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`)].map(classed);
+    return [tapRow(platform, t, c.tap, 'R-under-chrome'), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`, c.stop)].map(classed);
   }
   if (isOverlap(g)) {
-    return [tapRow(platform, t, 'R-overlap'), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`), ...fully].map(classed);
+    return [tapRow(platform, t, c.tap, 'R-overlap'), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`, c.stop), ...fully].map(classed);
   }
   return [];
 }
