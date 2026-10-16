@@ -21,9 +21,17 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    disagree about what a screen shows, the truth wins and the other is corrected. A disagreement between the app's
    frame and a tree's rect is a finding about the tree, not about the truth.
 2. **Golden judges classes, not wording.** Tapped or refused and the remedy named; passed or failed; reached or stopped;
-   a tap or a stroke sent or not. The table that maps a truth to its classes lives in code
-   (scripts/differential/golden-spec/*.ts — per cell family and phase 3's row types, behind the façade
-   golden-spec.ts), each row citing the rule or ADR that decides it. A reply saying the target is
+   a tap or a stroke sent or not. What a target is asked and what its truth implies each verb must answer — which band
+   is a band, the tap's clause (fire, land or refuse, refuse and with which remedy), where a stop holds, whether
+   `fully` is asked, whether the target may be missing from the tree — is decided in ONE module, the target contract
+   (scripts/truth/target-contract.ts). The replayed golden and the live golden are both its consumers, never its
+   authors: the replayed rows (scripts/differential/golden-spec/*.ts — per cell family and phase 3's row types, behind
+   the façade golden-spec.ts, each row citing the rule or ADR that decides it) turn a clause into a call and a judge over
+   a replayed reply, the live cases (scripts/truth/live-visibility.ts) into calls on the lab app judged by its own log;
+   each stamps the clause it judges, and a parity test holds the two equal for every committed truth target both ask
+   (tests/truth/target-contract.test.ts). Their oracles differ, not their contract: the replay knows the capture's probe
+   and the tree, the live golden the app's tap log. averi's replies are read by one module too
+   (scripts/truth/replies.ts: a reply's kind, its claims, its numbers, an ocr reading), for both. A reply saying the target is
    not in the tree is judged by its effect first: where the row rejects it (a tap refused without its remedy, a stroke
    beneath the presented layer), the mismatch is the row's own reason; where the row would accept it, it is no evidence
    either way — the "not in the tree" mismatch, never a pass — unless the row's truth allows the target to be absent (a
@@ -36,7 +44,7 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 4. **Known mismatches are a ratchet.** tests/differential/golden.test.ts lists each known mismatch — filed per cell
    family in tests/differential/golden/<family>.known.ts and aggregated there — by `<run>/<file> <target> <verb>` with
    its class (what its mismatch says first), its reply's kind (one of a closed set: not found, Tapped, visible, PASS,
-   FAIL, refused, other — `replyKind` in scripts/differential/golden-spec/judges.ts), the taps and swipes it sent, and
+   FAIL, refused, other — `replyKind` in scripts/truth/replies.ts), the taps and swipes it sent, and
    its note (the bug note, or why). A listed mismatch that stops occurring fails the test until it is struck off; a new
    one fails it until it is fixed or listed with its note; a listed one whose class, reply kind or device calls change
    fails it too — it still mismatches, but differently (a timeout turned into a refusal with the wrong remedy keeps its

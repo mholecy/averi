@@ -234,7 +234,7 @@ fixes judge); #10 not reproduced (no inverted bounds); lab findings LE1–LE4. W
 `fully: true` is a verb of its own (`fully`, judges.ts#Verb), so a target asked both stops keys two rows; the
 R-outside-sv colour asks for the colour the screen shows there (a pass measured the background); an edge row accepts a
 target missing from the tree only where its capture's tree of that source did not list it (TargetTruth.listed,
-edges.ts#notListed); R-stroke holds every touch-down inside the target's own scroll view where the truth names it;
+scripts/truth/target-contract.ts#unlistedBy); R-stroke holds every touch-down inside the target's own scroll view where the truth names it;
 R-band's tap is not expected refused where the probe fired the target.
 
 **B3 — presented (2026-10-16, iOS only: every note it calibrates is iOS's; the Android app builds none of its layers),
@@ -310,7 +310,7 @@ sheet-long-list-short R none). No row flips (879 checks, 257 mismatches,
 it (`CatalogCell.platforms`) and, on Android, the navigation mode it is captured under (`CatalogCell.navigation`);
 capture-run skips it elsewhere (catalog.ts#captureRefusal), so `bands` (gesture) and `bands-three-button` sit in one
 run. Android: `scroll-bounded-flush` (rows whose identified container is not clickable — uiautomator cuts it flush with
-its scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, judges.ts#FLUSH_PROBED),
+its scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, replies.ts#flushProbedSide),
 `scroll-sticky-cut` (the header one accessibility element: Compose cuts the row AND its content at it — #9
 STILL-RED-AFTER, lab finding VA1), `bands-three-button` (#23 still DOES-NOT-FAIL: the assert at 94bae14 does not pass on
 the bar). iOS: `sheet-long-list-short` (a row on the screen outside its table: #29's fix cures it, not #20's) and
