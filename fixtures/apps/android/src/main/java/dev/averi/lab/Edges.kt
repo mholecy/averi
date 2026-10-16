@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 
 /** A scroll container of an edges cell (Edges.swift#EdgeScroller): `height` null runs to the screen's bottom. */
@@ -123,17 +124,51 @@ private fun SplitBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modif
     }
 }
 
-/** The cell's target box: a SplitBox in SPLIT_CELLS, else an EdgeBox. */
+/**
+ * scroll-sticky-view (round 4, calibration.json #9): a SplitBox whose content is an Android View (AndroidView), not a
+ * Compose node — the container (the target's id, a Compose node) neither clickable nor merging, its content a
+ * clickable android.view.View of the target's colour labelled `Target <tag>`. Compose's accessibility takes what the
+ * merged sticky header covers out of the container's bounds, as on scroll-sticky-cut; the View's bounds are the View
+ * system's (View#getBoundsOnScreen, clipped by its parent views only, not by the LazyColumn's clip or the header), so
+ * they stay whole — the shape of mp-native's Account Detail (`row_0 66,480 948x84`, its children `66,403 948x143`).
+ */
+@Composable
+private fun ViewSplitBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modifier) {
+    val view = LocalView.current
+    Box(
+        modifier
+            .size(ROW_WIDTH, ROW_HEIGHT)
+            .testTag("lab.${cell.id}.${t.tag}")
+            .onGloballyPositioned { lab.frame(t.tag, screenFrame(view, it)) },
+    ) {
+        AndroidView(
+            factory = { context ->
+                android.view.View(context).apply {
+                    setBackgroundColor(t.color.toInt())
+                    contentDescription = "Target ${t.tag}"
+                    setOnClickListener { lab.event("tap", t.tag) }
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+/** The cell's target box: a ViewSplitBox on scroll-sticky-view, a SplitBox in SPLIT_CELLS, else an EdgeBox. */
 @Composable
 private fun RowBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modifier) {
-    if (cell.id in SPLIT_CELLS) SplitBox(cell, t, lab, modifier) else EdgeBox(cell, t, lab, modifier)
+    when {
+        cell.id == "scroll-sticky-view" -> ViewSplitBox(cell, t, lab, modifier)
+        cell.id in SPLIT_CELLS -> SplitBox(cell, t, lab, modifier)
+        else -> EdgeBox(cell, t, lab, modifier)
+    }
 }
 
 @Composable
 internal fun EdgesScreen(cell: Cell, lab: Lab) {
     systemBarsInsets(lab)
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }) {
-        if (cell.id == "scroll-sticky" || cell.id == "scroll-sticky-cut") {
+        if (cell.id == "scroll-sticky" || cell.id == "scroll-sticky-cut" || cell.id == "scroll-sticky-view") {
             StickyList(cell, lab)
         } else {
             // Laid out down a column (not offset): each container's clip is where the layout puts it.
@@ -202,7 +237,7 @@ private fun StickyList(cell: Cell, lab: Lab) {
                     // scroll-sticky-cut: the header one accessibility element (as a header with a title and an action
                     // is), so Compose takes what it covers out of the rows' bounds beneath it — mp-native's Account
                     // Detail, a row's container cut at its sticky date header (calibration.json #9).
-                    .then(if (cell.id == "scroll-sticky-cut") Modifier.semantics(mergeDescendants = true) {} else Modifier)
+                    .then(if (cell.id == "scroll-sticky-cut" || cell.id == "scroll-sticky-view") Modifier.semantics(mergeDescendants = true) {} else Modifier)
                     .onGloballyPositioned { lab.chrome("stickyHeader", screenFrame(view, it)) },
                 contentAlignment = Alignment.Center,
             ) { Text("Sticky header", color = Color.White) }

@@ -8,6 +8,12 @@
 that its fix (`d2b7744`, a node cut at a header read by its descendants' extent) cannot see: here the descendants are
 cut too.
 
+> **Contrast (round 4, 2026-10-16, `truth/r4-followups`):** `scroll-sticky-view` is this screen with R's content an
+> Android View (AndroidView) instead of a Compose node. uiautomator cuts the container alike (`[128,457][953,567]`) but
+> lists the View whole (`[128,391][953,567]`: the View system's bounds, not cut at the header) — the original note's
+> shape, which `d2b7744` reads: refused there, "fully visible" at `10fb02b` (calibration.json #9 CALIBRATED on it). So
+> this finding is the all-Compose row only: content cut with its container leaves the fix nothing to read.
+
 ## The screen
 
 `scroll-sticky-cut` (fixtures/apps/android/src/main/java/dev/averi/lab/Edges.kt): `scroll-sticky`'s LazyColumn

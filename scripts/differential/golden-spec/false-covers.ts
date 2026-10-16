@@ -1,5 +1,5 @@
 import type { Platform, SourceKind } from '../corpus.js';
-import type { CellTruth, TargetTruth } from '../../truth/schema.js';
+import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { openRows } from './base.js';
 import { dismissRow } from './rows.js';
 import { classed, type Expectation } from './judges.js';
@@ -20,9 +20,12 @@ import { classed, type Expectation } from './judges.js';
  * keyboard going after the dismissal, and the field then tapped — is the live golden's (phase 5).
  */
 
-/** A text target's rows: base.ts's open tap and scroll_until, asked by its text, as a test names a label. */
-export function ownPartsRows(platform: Platform, t: TargetTruth): Expectation[] {
-  return openRows(platform, t, `text:"${t.text}"`).filter((e) => e.verb !== 'colour');
+/**
+ * A text target's rows: base.ts's open tap and scroll_until, asked by its text, as a test names a label — the tap at the
+ * centre of the node the tree lists with that text (`nodes`, base.ts#openRows).
+ */
+export function ownPartsRows(platform: Platform, t: TargetTruth, nodes: readonly Rect[] = []): Expectation[] {
+  return openRows(platform, t, `text:"${t.text}"`, nodes).filter((e) => e.verb !== 'colour');
 }
 
 /**

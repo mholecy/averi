@@ -6,7 +6,7 @@ import type { LabDevice } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, controlPiece, listedIn, measuredGeometry, outOfProcessKeyboard, pieceAfterBack, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, controlPiece, imePanels, listedIn, measuredGeometry, outOfProcessKeyboard, pieceAfterBack, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -140,8 +140,14 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     // Android with the IME up: what averi's keyboard queries answer, for the golden mode's fake device to serve
     // (CellTruth.ime) — read after the trees and the screenshot, since it leaves the keyboard hidden.
     let afterBack: LabState | undefined;
+    let panels: Rect[] = [];
     if (s.keyboard?.visible === true && lab.ime !== undefined) {
-      await writeFile(join(opts.out, `${cell.id}.ime.json`), JSON.stringify(await lab.ime(), null, 1) + '\n');
+      const ime = await lab.ime();
+      // A floating IME's panels (truth.ts#imePanels): only on a cell captured floating (CatalogCell.ime), and always there.
+      panels = imePanels(ime.shown.touchable, s.keyboard.frame);
+      if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
+      if (cell.ime !== 'floating' && panels.length > 0) throw new Error(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
+      await writeFile(join(opts.out, `${cell.id}.ime.json`), JSON.stringify(ime, null, 1) + '\n');
       truth.ime = `${cell.id}.ime.json`;
       // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
       // back — its trees and the app's state, beside the truth (CellTruth.afterBack).
@@ -159,7 +165,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       await writeFile(join(opts.out, `${cell.id}.displays.txt`), await lab.displays());
       truth.displays = `${cell.id}.displays.txt`;
     }
-    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack);
+    if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
+    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack, panels);
     await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
     for (const t of trees) {
       manifest.captures.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
@@ -191,7 +198,7 @@ async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y:
 
 const described = (probe: readonly { kind: string; tag: string }[]) => (probe.length ? `, probe ${probe.map((e) => `${e.kind} ${e.tag}`).join('; ')}` : '');
 
-async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, png: PNG, broken: string[], log: (line: string) => void, afterBack?: LabState): Promise<FormTruth> {
+async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s: LabState, png: PNG, broken: string[], log: (line: string) => void, afterBack?: LabState, panels: Rect[] = []): Promise<FormTruth> {
   const frameOf = (tag: string): Rect => {
     const f = s.frames[tag];
     if (f === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${tag}`);
@@ -230,7 +237,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
   const controls: ControlTruth[] = [];
   for (const w of wanted) {
     const frame = s.frames[w.frame];
-    const situation = situationOf(frame, s, form, w);
+    const situation = situationOf(frame, s, form, w, panels);
     // One probe of this control (probe, then readControlProbe): relaunch, `first` when given, a raw tap at `where`.
     const field = form.fields.find((f) => f.tag === w.tag);
     const probeControl = async (where: Rect | { x: number; y: number }, first?: () => Promise<void>) => {
@@ -254,7 +261,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     }
     // A covered control: a second probe at the centre of its piece clear of the keyboard and the pinned submit, when
     // that is not its frame's — where a tap moved off the cover would land.
-    const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w) : null;
+    const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w, panels) : null;
     const second = frame === undefined ? undefined : pieceProbePoint(frame, piece);
     const atPiece = second === undefined ? undefined : { piece: piece!, reached: (await probeControl(second)).reached };
     const c: ControlTruth = {
@@ -269,7 +276,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       ...(atPiece !== undefined && { atPiece }),
     };
     controls.push(c);
-    const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
+    const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame, panels));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
     log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${back === undefined ? '' : ` (after back ${back.reached}${described(back.probe)})`}${back?.piece === undefined ? '' : ` (after back at its piece ${back.piece.reached})`}${atPiece === undefined ? '' : ` (at its piece ${atPiece.reached})`}${described(c.probe)}`);
   }
@@ -285,7 +292,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
   return {
     fields,
     controls,
-    keyboard: keyboard === undefined ? null : { frame: keyboard.frame, field: keyboard.field },
+    keyboard: keyboard === undefined ? null : { frame: keyboard.frame, field: keyboard.field, ...(panels.length > 0 && { panels }) },
     screenError,
     submits: (s.submits ?? []).map((x) => ({ valid: x.valid })),
     ...(form.picker?.open === true && s.frames.sheet !== undefined && { sheet: s.frames.sheet }),

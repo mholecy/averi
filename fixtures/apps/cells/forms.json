@@ -1,6 +1,6 @@
 {
   "family": "forms",
-  "note": "The form cells (phase 1b): fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android, phase 2b: the IME drawn over the form, which keeps its height; only the pinned submit bar rides above it). A pinned submit reports its bar as `<submit>.bar` (truth.ts#situationOf).",
+  "note": "The form cells (phase 1b): form-keyboard-floating (round 4, Android only) is form-keyboard captured with Gboard floating (`ime`: its panel over the fields, the inset only the 132-px strip — calibration.json #1; its form a copy of form-keyboard's: the catalog has no way to share one cell's form with another); fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android, phase 2b: the IME drawn over the form, which keeps its height; only the pinned submit bar rides above it). A pinned submit reports its bar as `<submit>.bar` (truth.ts#situationOf).",
   "cells": [
     {
       "id": "form-basic",
@@ -38,6 +38,30 @@
     },
     {
       "id": "form-keyboard",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "Transfer details",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue", "pinned": true },
+        "focus": "postcode"
+      }
+    },
+    {
+      "id": "form-keyboard-floating",
+      "platforms": ["android"],
+      "ime": "floating",
       "layer": "none",
       "targets": [],
       "form": {

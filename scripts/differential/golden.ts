@@ -110,14 +110,14 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       }
       // A live-only row (its truth a dynamic: golden-spec/judges.ts#Expectation.live) is the live golden's, never asked
       // here.
-      for (const e of expectations(recording.platform, t, truth, recording.source).filter((x) => x.live === undefined)) {
+      for (const e of expectations(recording.platform, t, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));
       }
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
     const brokenControls = (truth.form?.controls ?? []).flatMap((c) => {
-      const why = controlConsistency(c, outOfProcessKeyboard(recording.platform, truth.form?.keyboard?.frame));
+      const why = controlConsistency(c, outOfProcessKeyboard(recording.platform, truth.form?.keyboard?.frame, truth.form?.keyboard?.panels));
       return why === undefined ? [] : [`${c.tag}: ${why}`];
     });
     result.broken.push(...brokenControls);

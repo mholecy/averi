@@ -10,6 +10,8 @@ import {
   disposition,
   failing,
   isOpenCell,
+  notesOf,
+  pairsOf,
   plan,
   regressedElsewhere,
   results,
@@ -57,11 +59,17 @@ describe('calibration.json', () => {
     const bad = table.notes.flatMap((e) => [
       ...(STATUSES.test(e.status) ? [] : [`${e.n}: status ${e.status}`]),
       ...(e.expect === undefined || VERDICTS.includes(e.expect) ? [] : [`${e.n}: expect ${e.expect}`]),
-      ...[...(e.fix ?? []), e.before, e.after, ...(e.regressions ?? []).flatMap((r) => [r.broke, r.fixed])]
+      ...[...(e.fix ?? []), e.before, e.after, ...(e.pairs ?? []).flatMap((p) => [p.before, p.after]), ...(e.regressions ?? []).flatMap((r) => [r.broke, r.fixed])]
         .filter((s): s is string => s !== undefined && !SHA.test(s))
         .map((s) => `${e.n}: ${s} is no short SHA`),
       ...(e.after !== undefined && !(e.fix ?? []).includes(e.after) && e.afterNotFix === undefined ? [`${e.n}: after ${e.after} is none of its fix commits, and afterNotFix says not why`] : []),
       ...(e.afterNotFix !== undefined && (e.after === undefined || (e.fix ?? []).includes(e.after)) ? [`${e.n}: afterNotFix, but after ${e.after} is a fix commit`] : []),
+      ...(e.pairs ?? []).flatMap((p) => [
+        ...(e.status === 'calibrate' ? [] : [`${e.n}: ${e.status} has pairs`]),
+        ...(e.before === undefined ? [`${e.n}: pairs, but no pair of its own`] : []),
+        ...(p.expect === undefined || VERDICTS.includes(p.expect) ? [] : [`${e.n}: pair ${p.after} expect ${p.expect}`]),
+        ...(!(e.fix ?? []).includes(p.after) && p.afterNotFix === undefined ? [`${e.n}: pair after ${p.after} is none of its fix commits, and afterNotFix says not why`] : []),
+      ]),
     ]);
     expect(bad).toEqual([]);
   });
@@ -75,8 +83,8 @@ describe('calibration.json', () => {
     expect(VERDICTS).toEqual(['CALIBRATED', 'CALIBRATED-ON-DEFECT', 'DOES-NOT-FAIL', 'STILL-RED-AFTER', 'OPEN-RED', 'OPEN-NOT-REPRODUCED', 'NOT-ASKED', 'SIDE-DOES-NOT-LOAD']);
   });
 
-  it("a note calibrated or open names golden rows of the committed truth and the note's defect; any other names none", () => {
-    const bad = table.notes.flatMap((e) => {
+  it("a note calibrated or open names golden rows of the committed truth and the note's defect, each pair its own; any other names none", () => {
+    const bad = table.notes.flatMap(pairsOf).flatMap((e) => {
       const runs = e.status === 'calibrate' || e.status === 'open';
       if (!runs) return [...(e.checks === undefined ? [] : [`${e.n}: ${e.status} names rows`]), ...(e.partial === undefined ? [] : [`${e.n}: ${e.status} is partial`])];
       if (e.checks === undefined || e.checks.length === 0) return [`${e.n}: no rows`];
@@ -93,7 +101,7 @@ describe('calibration.json', () => {
   });
 
   it('a defect pattern compiles', () => {
-    for (const e of table.notes) if (e.defect !== undefined) expect(() => new RegExp(e.defect!)).not.toThrow();
+    for (const e of table.notes.flatMap(pairsOf)) if (e.defect !== undefined) expect(() => new RegExp(e.defect!)).not.toThrow();
   });
 
   // The commits against the history: each exists, each fix is in this branch, and `before` is the commit the first fix
@@ -106,7 +114,7 @@ describe('calibration.json', () => {
     }
   };
   const history = git('rev-parse', '--verify', 'HEAD') !== undefined && git('cat-file', '-e', 'b7c44de^{commit}') !== undefined;
-  it.skipIf(!history)('each commit exists; every fix is an ancestor of HEAD; before is the first parent of the first fix', () => {
+  it.skipIf(!history)("each commit exists; every fix is an ancestor of HEAD; before is the first parent of the first fix, a further pair's its after's", () => {
     const bad = table.notes.flatMap((e) => [
       ...[...(e.fix ?? []), e.before, ...(e.regressions ?? []).flatMap((r) => [r.broke, r.fixed])]
         .filter((s): s is string => s !== undefined && git('cat-file', '-e', `${s}^{commit}`) === undefined)
@@ -115,6 +123,11 @@ describe('calibration.json', () => {
       ...(e.fix !== undefined && e.before !== undefined && git('rev-parse', `${e.fix[0]}^1`) !== git('rev-parse', `${e.before}^{commit}`)
         ? [`${e.n}: before ${e.before} is not ${e.fix[0]}'s first parent`]
         : []),
+      // a further pair: its before is its after's first parent (the fix it judges alone)
+      ...(e.pairs ?? [])
+        .filter((p) => p.afterNotFix === undefined && git('rev-parse', `${p.after}^1`) !== git('rev-parse', `${p.before}^{commit}`))
+        .map((p) => `${e.n}: pair before ${p.before} is not ${p.after}'s first parent`),
+      ...(e.pairs ?? []).flatMap((p) => [p.before, p.after]).filter((c) => git('cat-file', '-e', `${c}^{commit}`) === undefined).map((c) => `${e.n}: ${c} is no commit`),
     ]);
     expect(bad).toEqual([]);
   });
@@ -242,6 +255,75 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
     const report = calibrationReport([cured]);
     expect(report).toContain("| aaaaaaa → bbbbbbb (the note's fix ccccccc does not cure this cell) | CALIBRATED |");
     expect(report).toContain("- after bbbbbbb (not the note's fix: ccccccc fixed the device tree only):");
+  });
+});
+
+describe('calibrate.ts — several fixes, one pair each (pairsOf)', () => {
+  const K3 = 'ios-iphone17-ios27/toolbar-dismiss-short.wda.json vs tap';
+  const note = entry({
+    n: '7',
+    fix: ['bbbbbbb', 'ddddddd'],
+    defect: 'toolbar',
+    partial: 'first',
+    needs: 'n',
+    remark: 'r',
+    regressions: [{ rows: [KX], broke: 'ddddddd', why: 'w' }],
+    pairs: [{ before: 'ccccccc', after: 'ddddddd', checks: [K3], defect: 'scrollable', expect: 'STILL-RED-AFTER' }],
+  });
+
+  it('a note without pairs is its one pair, unchanged', () => {
+    expect(pairsOf(entry())).toEqual([entry()]);
+    expect(pairsOf(entry({ pairs: [] }))).toEqual([entry()]);
+  });
+
+  it("a note with pairs: its own pair <n>.1, each further one <n>.2 … with its sides, rows, symptom and expectation; the note's needs, partial and remark the first pair's only", () => {
+    const [own, second] = pairsOf(note);
+    expect(own).toEqual({ ...note, pairs: undefined, n: '7.1' });
+    expect('pairs' in own).toBe(false);
+    expect(second).toEqual({ n: '7.2', note: 'x.md', status: 'calibrate', fix: ['bbbbbbb', 'ddddddd'], regressions: note.regressions, before: 'ccccccc', after: 'ddddddd', checks: [K3], defect: 'scrollable', expect: 'STILL-RED-AFTER' });
+    expect(plan(pairsOf(note))).toEqual(['aaaaaaa', 'bbbbbbb', 'ccccccc', 'ddddddd']);
+  });
+
+  it("each pair judged alone: the second fix's own symptom required red at its before, a regression counted at the pair that broke it", () => {
+    const runs = new Map<string, SideRun>([
+      ['aaaaaaa', side({ [K1]: 'covered by toolbar', [K3]: 'covered by toolbar', [KX]: undefined })],
+      ['bbbbbbb', side({ [K1]: undefined, [K3]: 'covered by scrollable', [KX]: undefined })],
+      ['ccccccc', side({ [K1]: undefined, [K3]: 'covered by scrollable', [KX]: undefined })],
+      ['ddddddd', side({ [K1]: undefined, [K3]: undefined, [KX]: 'red' })],
+    ]);
+    const rs = results(pairsOf({ ...note, pairs: [{ ...note.pairs![0], expect: undefined }] }), runs);
+    expect(rs.map((r) => [r.entry.n, r.verdict])).toEqual([['7.1', 'CALIBRATED'], ['7.2', 'CALIBRATED']]);
+    expect(rs[1].elsewhere).toEqual([KX]);
+    expect(failing(rs)).toEqual([]);
+    // the second fix's before red for the first fix's symptom only: not this pair's defect
+    const only = new Map(runs).set('ccccccc', side({ [K1]: undefined, [K3]: 'covered by toolbar', [KX]: undefined }));
+    expect(results(pairsOf(note), only).map((r) => r.verdict)).toEqual(['CALIBRATED', 'DOES-NOT-FAIL']);
+    // a pair's expect is its own
+    expect(failing(results(pairsOf(note), runs)).map((r) => r.entry.n)).toEqual(['7.2']);
+    const report = calibrationReport(rs);
+    expect(report).toContain('| 7.1 | x | calibrate | aaaaaaa → bbbbbbb | CALIBRATED (partial: first) |');
+    expect(report).toContain('| 7.2 | x | calibrate | ccccccc → ddddddd | CALIBRATED, regressed elsewhere: 1 row (recorded) |');
+  });
+});
+
+describe('calibrate.ts — --note (notesOf)', () => {
+  it('the notes named, in the table\'s order; all without --note; an unknown name is an error naming it', () => {
+    const t = { notes: [entry({ n: '1' }), entry({ n: '7' }), entry({ n: 'FU1' })] };
+    expect(notesOf(t, undefined).map((e) => e.n)).toEqual(['1', '7', 'FU1']);
+    expect(notesOf(t, ['FU1', '1']).map((e) => e.n)).toEqual(['1', 'FU1']);
+    expect(() => notesOf(t, ['7', '999', 'x'])).toThrow('calibrate --note: 999, x is no note of the table');
+  });
+
+  it('the command line refuses an unknown note before any checkout', () => {
+    let err: { status: number | null; stderr: string } | undefined;
+    try {
+      execFileSync(process.execPath, ['--import', 'tsx', `${ROOT}scripts/truth/calibrate.ts`, '--note', '999'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      err = e as { status: number | null; stderr: string };
+    }
+    expect(err?.status).not.toBe(0);
+    expect(err?.stderr).toContain('calibrate --note: 999 is no note of the table');
+    expect(err?.stderr).not.toContain('ReferenceError');
   });
 });
 

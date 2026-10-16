@@ -80,6 +80,13 @@ export interface CatalogCell {
    * both captures sit in one run and neither replaces the other (calibration.json #23).
    */
   navigation?: NavigationMode;
+  /**
+   * Android: the IME mode it is captured under — `floating` (Gboard's Floating tile, set by hand on the device before
+   * the capture and undone after: no adb command switches it): the capture refuses the cell unless the IME's touchable
+   * region holds a panel beyond its band (truth.ts#imePanels), and refuses every other form cell captured with one, so
+   * a docked capture is never a floating one's (calibration.json #1).
+   */
+  ime?: 'floating';
 }
 
 /** averi.yaml settings per platform, merged over the golden mode's own (`bundleId`, `treeSource`, `package`). */
@@ -477,8 +484,12 @@ export interface FieldTruth extends FieldState {
 export interface FormTruth {
   fields: FieldTruth[];
   controls: ControlTruth[];
-  /** The keyboard as the app last heard of it, when it is up. */
-  keyboard: { frame: Rect; field: string | null } | null;
+  /**
+   * The keyboard as the app last heard of it, when it is up. `panels`, Android under a floating IME only: the rects the
+   * IME window takes touches in beyond that band (truth.ts#imePanels, from CellTruth.ime's touchable region) — drawn
+   * over the app above the 132-px strip the app hears of; a control whose centre lies in one is `under-keyboard`.
+   */
+  keyboard: { frame: Rect; field: string | null; panels?: Rect[] } | null;
   /** The screen-level message, when shown, and its frame. */
   screenError: (Message & { frame: Rect }) | null;
   submits: { valid: boolean }[];

@@ -71,6 +71,17 @@
       "truth": "form-keyboard.truth.json"
     },
     {
+      "file": "form-keyboard-floating.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-keyboard-floating.png",
+      "truth": "form-keyboard-floating.truth.json"
+    },
+    {
       "file": "form-prefilled.xml",
       "source": "uiautomator",
       "form": "raw",
@@ -146,6 +157,17 @@
       },
       "screenshot": "scroll-sticky-cut.png",
       "truth": "scroll-sticky-cut.truth.json"
+    },
+    {
+      "file": "scroll-sticky-view.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky-view.png",
+      "truth": "scroll-sticky-view.truth.json"
     },
     {
       "file": "scroll-top-edge.xml",

@@ -298,7 +298,13 @@ lands: every tap within OPEN_TAP_REACH (a sixth of the extent, chosen between th
 0.313 of #26's C) of the probe's logged touch, and no "tapped the uncovered part" reply on a target measured uncovered.
 #26 calibrated on its tap. Follow-up: hold every open tap to the centre of the target's node in the recorded tree
 (exact, up to the tools' rounding) — it closes the reach's blind spot (a cover averi imagines over under a third of
-the target moves the tap under a sixth, and passes unless the reply says it moved).
+the target moves the tap under a sixth, and passes unless the reply says it moved). Done in round 4
+(truth/r4-followups): the open tap is held to the centre of the target's node in the replayed tree, ±1
+(base.ts#NODE_CENTRE_SLACK; truth.ts#nodeFramesIn, the harness's own reading of WDA's `rect`, idb's `frame`,
+uiautomator's `bounds`), the reach kept as the fallback where the tree lists no node for it whose centre the probe's touch agrees with (within
+the reach; several such frames: one of their centres) (66 of the 68 open taps have one node; idb's sheet-long-list and
+sheet-long-list-short R none). No row flips (879 checks, 257 mismatches,
+0 broken, each row's verdict as before); #26 still CALIBRATED; own-parts' N is now held to its text node's centre.
 
 **Round 3 — cell variants for partial notes (2026-10-16, truth/r3-variants).** A cell may name the platforms that build
 it (`CatalogCell.platforms`) and, on Android, the navigation mode it is captured under (`CatalogCell.navigation`);
@@ -315,9 +321,22 @@ round-3 merge (501ec21), for fidelity: each Android capture keeps the device's o
 (CellTruth.displays), which golden's fake device serves in place of its stock gesture-mode dump — `bands-three-button`
 was recaptured with it, so it is replayed against its three-button bar, not the gesture band (#23's verdict
 unchanged); since the round-3 review it is the one source of that IME-down dump, an IME-up capture's ImeCapture
-holding only what is extra. Follow-up:
+holding only what is extra. Round 4 (truth/r4-followups) adds `scroll-sticky-view` (Android): scroll-sticky-cut with
+R's content an Android View (AndroidView) — the container cut at the header, the View listed whole, #9's own shape:
+#9 CALIBRATED on it (10fb02b → d2b7744); VA1 stays the all-Compose row's. And `form-keyboard-floating` (Android, `ime:
+floating`): form-keyboard with Gboard switched to Floating by hand on averi_lab (the grid → the Floating tile; no adb
+command or setting switches Gboard's mode — tried nothing else; docked again after): the strip `[0,2088][1080,2220]` the
+inset, the panel `(71,1092,1008,1884)` the touchable region's second rect, four fields' centres under it
+(truth.ts#imePanels; situationOf holds them under-keyboard; readControlProbe no longer reads a focus left in place by a
+tap the panel took as a reach) — #1 CALIBRATED on them (7d9a783 → cb77485: Tapped with no back, a colour PASS on the
+panel, `fully visible after 0 swipes` before; back then a tap, failing closed, strokes clear of the panel after), its
+regression elsewhere at cb77485 the pinned submit between panel and strip, lab finding FU1. Follow-up:
 calibrate takes one before/after pair per note, so #7's two fixes share 5cff2ad → c3ebc62 — several pairs per note
-would verify each fix alone.
+would verify each fix alone. Done in round 4 (truth/r4-followups): a note may name `pairs`, one before/after per further fix, each
+judged alone (`<n>.1`, `<n>.2` …) — #7 CALIBRATED on both (5cff2ad → 7542021 on toolbar-dismiss, d928789 → c3ebc62 on
+toolbar-dismiss-short, each its own `covered by` symptom), #1's 9131730 CALIBRATED on the docked IME's scroll_until rows
+(the cb77485 pair, #1.1, CALIBRATED on form-keyboard-floating: below), #19's first fix cd4d177 STILL-RED-AFTER (as the note says); #5's
+1bc603a, 565b747 (a stale IME reading: live) and #8's c8c06a8 (no icon-button cell) unpaired, in their `needs`.
 
 ### Phase 4 — the matrix, generated
 

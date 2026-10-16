@@ -1,5 +1,5 @@
 import type { Platform } from '../corpus.js';
-import type { CellTruth, TargetTruth } from '../../truth/schema.js';
+import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
 import { openRows } from './base.js';
@@ -29,15 +29,16 @@ import { bandColour, bandTap, colourFails, fullyRow, landRow, notReachedStill, o
  * closed where what it reads — the sampler's 12 %-inset rect — is overlapped (ADR 0001, ADR 0002), else measures the
  * target; `fully: true` judges the bands as a region of the node (ADR 0009 N-a, `fully`) and any cover as covering
  * (ui-tree/standing.ts#fullyStanding), so it never stops on it where it is. A band's R-fully is asked only of a target
- * in a scroll view: one in none may be a pinned surface the `fully` stop stops on at once (ADR 0009 (b), (c)).
+ * in a scroll view: one in none may be a pinned surface the `fully` stop stops on at once (ADR 0009 (b), (c)). `nodes`:
+ * the target's nodes in the replayed tree, for the open tap (base.ts#openRows).
  */
-export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation[] {
+export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, nodes: readonly Rect[] = []): Expectation[] {
   const g = t.geometry;
   if (g === undefined) return [];
   const { kind, name } = parseGeometry(g);
   // iOS's home-indicator band: the tap is the app's, and consistency holds the target reached and drawn there
   // (truth.ts#navigationBandTakes) — else it is broken and asked nothing.
-  if (g === 'nav-band' && platform === 'ios') return openRows(platform, t);
+  if (g === 'nav-band' && platform === 'ios') return openRows(platform, t, undefined, nodes);
   if (g === 'status-band' || g === 'nav-band') {
     return [bandTap(platform, t), bandColour(platform, t, cell), notReachedStill(platform, t, cell, 'R-band')].map(classed);
   }

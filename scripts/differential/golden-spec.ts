@@ -1,5 +1,6 @@
 import type { Platform, SourceKind } from './corpus.js';
 import { DRAWN, type CellTruth, type TargetTruth } from '../truth/schema.js';
+import { nodeFramesIn } from '../truth/truth.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
@@ -58,11 +59,16 @@ export * from './golden-spec/rows.js';
  * geometry's rows read the bands and the chrome from; without it (`undefined`) no geometry row is asked. `source`, the
  * replayed tree's: whether its capture listed the target (TargetTruth.listed) — an edge row accepts a target its tree
  * did not. Both are required, as formExpectations' `source` is, so a caller cannot forget the capture it replays.
+ * `tree`, the replayed tree's payload: where it lists the target's node (truth.ts#nodeFramesIn, by the selector the
+ * open rows ask — its identifier, or a text target's text), the open tap is held to that node's centre
+ * (base.ts#atProbe); without it, to the reach around the probe point. golden.ts hands it every capture's
+ * (tests/differential/golden-wiring.test.ts); a unit test of a row's choice may leave it out.
  */
-export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind): Expectation[] {
+export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind, tree?: string): Expectation[] {
   if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
-  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? ownPartsRows(platform, t) : openRows(platform, t);
-  return cell === undefined ? [] : [...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell)];
+  const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, t.text !== undefined ? { text: t.text } : { id: t.id });
+  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? ownPartsRows(platform, t, nodes) : openRows(platform, t, undefined, nodes);
+  return cell === undefined ? [] : [...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell, nodes)];
 }
 
 /**

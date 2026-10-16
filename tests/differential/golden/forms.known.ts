@@ -10,6 +10,7 @@ const LAB_IOS = 'bug:2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap
 // window — here the picker's ModalBottomSheet — so the form beneath is not found and scroll_until strokes the sheet.
 const LAB_ANDROID_PRESENTED = 'bug:2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md';
 const LAB_ANDROID_BAR = 'bug:2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md';
+const LAB_ANDROID_FLOATING = 'bug:2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md';
 /** The Android picker sheet's scroll_until stroke (the sheet fully expanded, 1080x2220). */
 const ADB_SHEET_STROKE = 'adb shell input swipe 540 1768 540 608 1162';
 
@@ -38,6 +39,10 @@ export const forms: KnownFile = {
     // LAB FINDING F2A1, docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
     // — the phone field under the submit bar riding on the IME: Compose cuts its bounds at Continue, the bar's surface
     // has no node, so the plain stop reads a 970x42 strip with nothing over it.
+    // LAB FINDING FU1 — round 4's form-keyboard-floating (Gboard floating, its panel 71,1092 937x792 above the 132-px
+    // strip): the pinned submit between the panel and the strip is drawn and takes its tap, but scroll_until cuts the
+    // whole screen at the panel's top (the floating fix's documented full-width cut) and refuses it after two swipes.
+    ...keys(`${ANDROID}/form-keyboard-floating.xml`, ['submit'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: twice('adb shell input swipe 540 874 540 218 657'), note: 'lab finding FU1: the panel cut as a full-width band', as: LAB_ANDROID_FLOATING }),
     ...keys(`${ANDROID}/form-keyboard.xml`, ['phone'], ['scroll_until'], { cls: 'reached with no swipe where a tap fires submit invalid', kind: 'visible', calls: [], note: 'lab finding F2A1: the bar riding on the IME is not in the tree', as: LAB_ANDROID_BAR }),
     ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'uiautomator lists only the presented sheet: the tap times out (L1)', as: LAB_ANDROID_PRESENTED }),
     ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(ADB_SHEET_STROKE), note: 'uiautomator lists only the presented sheet: scroll_until strokes it twice (L1)', as: LAB_ANDROID_PRESENTED }),
@@ -46,6 +51,7 @@ export const forms: KnownFile = {
     [`${ANDROID}/form-basic.xml`]: 11,
     [`${ANDROID}/form-errors.xml`]: 12,
     [`${ANDROID}/form-keyboard.xml`]: 21,
+    [`${ANDROID}/form-keyboard-floating.xml`]: 18,
     [`${ANDROID}/form-picker.xml`]: 9,
     [`${ANDROID}/form-prefilled.xml`]: 11,
     [`${ANDROID}/form-shared-id.xml`]: 5,

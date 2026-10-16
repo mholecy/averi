@@ -1,4 +1,4 @@
-import type { Platform } from '../differential/corpus.js';
+import type { Platform, SourceKind } from '../differential/corpus.js';
 import { DRAWN, pct, type CatalogField, type CatalogForm, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
 /**
@@ -34,7 +34,7 @@ export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number
  * a pinned submit holds its bar: iOS's form-keyboard, first measured with it guessed as the submit's frame and 10 pt
  * above and below it, was recaptured with the bar Forms.swift reports (phase 3, round-3 review: situations unchanged).
  */
-export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }): Situation {
+export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }, panels: readonly Rect[] = []): Situation {
   if (frame === undefined) return 'not-rendered';
   const cy = frame.y + frame.height / 2;
   if (cy < 0 || cy >= s.screen.height) return 'off-screen';
@@ -43,6 +43,10 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
   const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
   if (k !== undefined && frame.y >= k.y) return 'under-keyboard';
   if (k !== undefined && frame.y + frame.height > k.y) return 'covered';
+  // A floating IME's panel (imePanels): over the control's centre, a tap there presses a key — under the keyboard as a
+  // docked one's band would be; over a part of it only, covered.
+  if (panels.some((p) => within({ x: frame.x + frame.width / 2, y: cy }, p))) return 'under-keyboard';
+  if (panels.some((p) => intersect(frame, p) !== null)) return 'covered';
   const bar = s.frames[`${form.submit.tag}.bar`];
   if (form.submit.pinned === true && own.tag !== form.submit.tag && bar !== undefined && within({ x: frame.x + frame.width / 2, y: cy }, bar)) return 'covered';
   return 'open';
@@ -55,6 +59,56 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
  */
 export function listedIn(payload: string, id: string): boolean {
   return payload.includes(`"${id}"`);
+}
+
+/**
+ * The frames of the nodes a raw tree's payload lists as the target — identified as `id` (WDA's `rawIdentifier` or
+ * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`), or, for a text target, labelled exactly `text` (WDA's
+ * `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) — each frame once, in the tree's own units (WDA's
+ * `rect`, idb's `frame`, uiautomator's `bounds`), in the payload's order. The harness's own reading, no averi code: the
+ * open tap's judge holds averi to the centre of the node it finds (golden-spec/base.ts#atProbe). An unreadable payload
+ * lists nothing.
+ */
+export function nodeFramesIn(payload: string, source: SourceKind, by: { id: string } | { text: string }): Rect[] {
+  const frames: Rect[] = [];
+  const add = (r: Rect) => {
+    if (!frames.some((f) => f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height)) frames.push(r);
+  };
+  const is = (...values: unknown[]) => values.some((v) => v === ('id' in by ? by.id : by.text));
+  if (source === 'uiautomator') {
+    const unescape = (s: string) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    for (const [node] of payload.matchAll(/<node\b[^>]*>/g)) {
+      const attr = (name: string) => {
+        const m = new RegExp(`\\s${name}="([^"]*)"`).exec(node);
+        return m === null ? undefined : unescape(m[1]);
+      };
+      if (!('id' in by ? is(attr('resource-id')) : is(attr('text'), attr('content-desc')))) continue;
+      const b = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(attr('bounds') ?? '');
+      if (b !== null) add({ x: +b[1], y: +b[2], width: +b[3] - +b[1], height: +b[4] - +b[2] });
+    }
+    return frames;
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(payload);
+  } catch {
+    return frames;
+  }
+  const rectOf = (r: unknown): Rect | undefined => {
+    const o = r as Partial<Rect> | null | undefined;
+    return typeof o?.x === 'number' && typeof o.y === 'number' && typeof o.width === 'number' && typeof o.height === 'number' ? { x: o.x, y: o.y, width: o.width, height: o.height } : undefined;
+  };
+  const visit = (n: unknown) => {
+    if (n === null || typeof n !== 'object') return;
+    if (Array.isArray(n)) return n.forEach(visit);
+    const o = n as Record<string, unknown>;
+    const match = source === 'idb' ? ('id' in by ? is(o.AXUniqueId) : is(o.AXLabel)) : 'id' in by ? is(o.rawIdentifier, o.name) : is(o.label);
+    const r = rectOf(source === 'idb' ? o.frame : o.rect);
+    if (match && r !== undefined) add(r);
+    for (const [k, v] of Object.entries(o)) if (k === 'value' || k === 'children') visit(v);
+  };
+  visit(json);
+  return frames;
 }
 
 /** The events a probe produced: what the app logged after the launch it was tapped on, without the time. */
@@ -79,8 +133,9 @@ export function readTargetProbe(events: readonly ProbeEvent[], tag: string): { r
 
 /**
  * A form control's probe: a field is reached when it took the focus (a country field, a button: when its tap fired;
- * a field the cell focuses on appear: when the tap leaves the focus on it), the submit when a submit fired, a picker
- * row when it was chosen.
+ * a field the cell focuses on appear: when the tap leaves the focus on it — and the app logged the tap's touch: a tap a
+ * floating IME's panel took leaves the focus where it was too), the submit when a submit fired, a picker row when it
+ * was chosen.
  */
 export function readControlProbe(
   events: readonly ProbeEvent[],
@@ -93,7 +148,7 @@ export function readControlProbe(
     : control.kind === 'button' ? e.kind === 'submit'
     : field?.kind === 'country' ? e.kind === 'tap' && e.tag === control.tag
     : e.kind === 'focus' && e.tag === control.tag;
-  const focusStays = control.kind === 'field' && field?.kind !== 'country' && focusAfter === control.tag;
+  const focusStays = control.kind === 'field' && field?.kind !== 'country' && focusAfter === control.tag && events.some((e) => e.kind === 'touch');
   return { reached: events.some(hit) || focusStays, probe: events.filter((e) => !hit(e)) };
 }
 
@@ -398,12 +453,12 @@ export function largestPiece(visible: Rect, covers: readonly Rect[]): Rect | nul
  * pinned submit's own frame (not its bar's: the bar's padding draws over the control but may let a tap through — it
  * is the probe at the piece that says, ControlTruth.reachedAtPiece). null when nothing of it is clear.
  */
-export function controlPiece(frame: Rect, s: LabState, form: CatalogForm, own: { tag: string }): Rect | null {
+export function controlPiece(frame: Rect, s: LabState, form: CatalogForm, own: { tag: string }, panels: readonly Rect[] = []): Rect | null {
   const visible = intersect(frame, screenOf(s));
   if (visible === null) return null;
   const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
   const submit = pinnedSubmit(s, form, own);
-  return largestPiece(visible, [k, submit].filter((r): r is Rect => r !== undefined));
+  return largestPiece(visible, [k, submit, ...panels].filter((r): r is Rect => r !== undefined));
 }
 
 /**
@@ -504,10 +559,29 @@ export function pieceProbePoint(frame: Rect, piece: Rect | null | undefined): { 
 /**
  * The keyboard whose touches the app cannot log: Android's IME draws in a window of its own process, so a probe tap
  * on it leaves no touch in the app (phase 2b's form cells). iOS's keyboard host window is the app's — its touches are
- * logged (the committed form-keyboard probes of vs, ks, ss and note hold their touch) — so it has none.
+ * logged (the committed form-keyboard probes of vs, ks, ss and note hold their touch) — so it has none. Android's are
+ * the band the app hears of and, under a floating IME, its panels (imePanels).
  */
-export function outOfProcessKeyboard(platform: Platform, keyboard: Rect | undefined): Rect | undefined {
-  return platform === 'android' ? keyboard : undefined;
+export function outOfProcessKeyboard(platform: Platform, keyboard: Rect | undefined, panels: readonly Rect[] = []): Rect[] {
+  return platform === 'android' && keyboard !== undefined ? [keyboard, ...panels] : [];
+}
+
+/**
+ * Android, a floating IME (Gboard's Floating mode): the panel(s) the IME window takes touches in beyond its inset band —
+ * the rects of the touchable region (`dumpsys window InputMethod`'s `touchable region=SkRegion((l,t,r,b)…)`, as
+ * ImeCapture.shown.touchable holds it, read while the input method says it is shown) other than the band itself
+ * (`band`, the keyboard frame the app hears of: under a floating Gboard only the 132-px strip at the screen's bottom,
+ * `[0,2088][1080,2220]` on averi_lab). The harness's own reading of the region averi reads
+ * (src/adapters/android.ts#parseTouchableRegion; docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Docked, the
+ * region is the band: none. Unreadable, or the input method not saying shown: none.
+ */
+export function imePanels(touchable: string, band: Rect): Rect[] {
+  if (!/\bmInputShown=true\b/.test(touchable)) return [];
+  const region = /touchable region=SkRegion\(((?:\(-?\d+,-?\d+,-?\d+,-?\d+\))*)\)/.exec(touchable);
+  if (region === null) return [];
+  return [...region[1].matchAll(/\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\)/g)]
+    .map(([, l, t, r, b]) => ({ x: +l, y: +t, width: +r - +l, height: +b - +t }))
+    .filter((p) => !(p.x === band.x && p.y === band.y && p.width === band.width && p.height === band.height));
 }
 
 /**
@@ -515,11 +589,11 @@ export function outOfProcessKeyboard(platform: Platform, keyboard: Rect | undefi
  * keyboard, outOfProcessKeyboard: the app cannot see that touch), an open control is reached, a hidden one not. A
  * `covered` control is not held to either: partly hidden, its centre may or may not be.
  */
-export function controlConsistency(c: ControlTruth, outOfProcess: Rect | undefined): string | undefined {
+export function controlConsistency(c: ControlTruth, outOfProcess: readonly Rect[]): string | undefined {
   const probed = c.frame !== undefined && c.situation !== 'off-screen' && c.situation !== 'not-rendered';
   if (probed) {
     const at = probePoint(c.frame!);
-    if (touchesAt(c.probe, at).length === 0 && !(outOfProcess !== undefined && within(at, outOfProcess))) return NOT_DELIVERED;
+    if (touchesAt(c.probe, at).length === 0 && !outOfProcess.some((k) => within(at, k))) return NOT_DELIVERED;
   } else if (c.reached || c.probe.length > 0) {
     return `${c.situation}, never probed, but the truth holds a probe`;
   }

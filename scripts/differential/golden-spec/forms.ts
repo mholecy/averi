@@ -222,7 +222,12 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
       return rows;
     }
     case 'under-keyboard': {
+      // What of the screen the keyboard takes: its band (from its top down) and, under a floating IME, its panels
+      // (FormTruth.keyboard.panels) — rects, not bands: beside a panel and between it and the strip the screen is the
+      // app's (lab finding FU1: src's full-width cut at the panel's top is a defect there, not the truth).
       const top = keyboard?.frame.y ?? Infinity;
+      const panels = keyboard?.panels ?? [];
+      const underKeyboard = (p: { x: number; y: number }) => p.y >= top || panels.some((r) => within(p, r));
       const rows: FormExpectation[] = [];
       if (platform !== 'android') {
         rows.push({
@@ -274,11 +279,11 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
         {
           target,
           verb: 'scroll_until',
-          says: `not reached without a swipe; every touch-down above the keyboard's top (y ${top})`,
+          says: `not reached without a swipe; every touch-down above the keyboard's top (y ${top})${panels.length === 0 ? '' : ` and off its panel${panels.length === 1 ? '' : 's'} ${panels.map((r) => `${r.x},${r.y} ${r.width}x${r.height}`).join(', ')}`}`,
           call: scroll,
           judge: (o) => {
             if (!o.reply.startsWith('ERROR') && swipes(o) === 0) return `reached with no swipe, under the keyboard: ${first(o)}`;
-            const under = touchDowns(o).filter((p) => p.y >= top);
+            const under = touchDowns(o).filter(underKeyboard);
             return under.length > 0 ? `touched down under the keyboard at ${pointsText(under)}: ${first(o)}` : undefined;
           },
         },

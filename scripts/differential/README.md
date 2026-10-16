@@ -105,10 +105,13 @@ file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, 
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks
-where it lands: `Tapped`, every tap sent at the target's probe point — the touch its app logged for the probe that
-fired it — within the middle third of its extent (`base.ts#atProbe`, `OPEN_TAP_REACH`, a chosen value between the
-measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313; a clipped node's centre may
-lie further off and is not this row's), and not saying it moved the tap off a cover over the centre (`tapped the
+where it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
+rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
+its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies
+within the reach below of the probe's touch, the device's word over the tree's: base.ts#nodeCentres), or, where that
+tree lists none so (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its app
+logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
+the measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313), and not saying it moved the tap off a cover over the centre (`tapped the
 uncovered part`); a tap moved off is averi steering around a cover that is not there (calibration.json #26).
 A row type is asked only of a target whose truth carries a measured `geometry` other than
 `whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
@@ -220,6 +223,11 @@ Pixel_3a dumps (CellTruth.ime), starting each call with the keyboard shown.
 It also writes the screen after that `back` — `<cell>.after-back.xml` and `<cell>.after-back.state.json`
 (CellTruth.afterBack) — whose dump the fake device answers once a call sends `input keyevent 4`, so a tap the guard
 moves through `back` is replayed against the layout the app takes then.
+Under a floating IME (Gboard's Floating tile, set by hand: `form-keyboard-floating`, `ime: floating` in the catalog —
+the capture refuses it docked, and refuses every other form cell floating) the app hears of the 132-px strip only; the
+capture reads the panel from the shown touchable region (truth.ts#imePanels) and holds a control whose centre lies
+under it `under-keyboard` (FormTruth.keyboard.panels), its scroll_until's touch-downs off the panel and the band (a touch-down beside the panel or between it and the strip is
+the app's: lab finding FU1).
 
 An Android capture writes the device's own `dumpsys window displays` with the IME down beside its truth
 (`<cell>.displays.txt`, CellTruth.displays — for a cell captured with the IME up, read after that `back`: the one
@@ -247,7 +255,11 @@ node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>�
 ```
 
 A note is CALIBRATED when every row it names is red before with the note's own symptom (`defect`, matched against the
-mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A side counts
+mismatch or the reply — a red row that differs only in a remedy's wording does not count) and green after. A note with
+several fixes names a before/after pair per further fix (`pairs`: each its own `before`, `after`, `checks`, `defect` and
+`expect`), each judged alone and reported as `<n>.1` (the note's own pair), `<n>.2` … — so #7's second fix needs its
+own symptom (`covered by scrollable`) red at its first parent, not only the first fix's; a note without `pairs` is its
+one pair, as before. A side counts
 only when it passes the canary: no check with a fault, the `open` cell replayed and green — a side miswired still prints
 JSON, every row an error a refusal row would accept. Every row of the corpus is compared at each fix: one green before
 and red after that the note does not name is reported as regressed elsewhere, and fails the run unless the note's

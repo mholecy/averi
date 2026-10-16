@@ -8,8 +8,11 @@ import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
   consistency,
+  controlPiece,
   controlConsistency,
+  imePanels,
   listedIn,
+  nodeFramesIn,
   otherControlsFired,
   outOfProcessKeyboard,
   pieceAfterBack,
@@ -49,6 +52,49 @@ const state = (over: Partial<LabState> = {}): LabState => ({
 const UNPINNED: CatalogForm = { ...FORM, submit: { tag: 'submit', title: 'Continue' } };
 const field = { tag: 'phone', inSheet: false };
 
+describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own reading', () => {
+  const T = 'fixtures/truth/';
+  const read = (f: string) => readFile(new URL(`../${T}${f}`, import.meta.url), 'utf8');
+  it('reads each source of the committed open cell: WDA rect, idb frame, uiautomator bounds', async () => {
+    expect(nodeFramesIn(await read('ios-iphone17-ios27/open.wda.json'), 'wda', { id: 'lab.open.A' })).toEqual([rect(51, 110, 300, 64)]);
+    expect(nodeFramesIn(await read('ios-iphone17-ios27/open.idb.json'), 'idb', { id: 'lab.open.A' })).toEqual([rect(51, 110, 300, 64)]);
+    expect(nodeFramesIn(await read('android-averi_lab-api33/open.xml'), 'uiautomator', { id: 'lab.open.A' })).toEqual([rect(127, 303, 825, 176)]);
+    // an id that only starts the same is not it
+    expect(nodeFramesIn(await read('ios-iphone17-ios27/open.wda.json'), 'wda', { id: 'lab.open' })).toEqual([]);
+  });
+  it('a text target by its label (WDA, idb) or its text or content-desc (uiautomator), exactly', () => {
+    const wda = JSON.stringify({ value: { label: 'x', rect: rect(0, 0, 9, 9), children: [{ label: 'Email', rect: rect(69, 493, 94, 18) }, { label: 'Email address', rect: rect(1, 1, 1, 1) }] } });
+    expect(nodeFramesIn(wda, 'wda', { text: 'Email' })).toEqual([rect(69, 493, 94, 18)]);
+    const idb = JSON.stringify([{ AXLabel: 'Email', frame: rect(69, 493, 93.67, 18) }, { AXLabel: 'Other', frame: rect(0, 0, 1, 1) }]);
+    expect(nodeFramesIn(idb, 'idb', { text: 'Email' })).toEqual([rect(69, 493, 93.67, 18)]);
+    const xml = '<hierarchy><node text="LOGIN" bounds="[10,20][110,60]" /><node text="" content-desc="A &amp; B" bounds="[0,0][5,5]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { text: 'LOGIN' })).toEqual([rect(10, 20, 100, 40)]);
+    expect(nodeFramesIn(xml, 'uiautomator', { text: 'A & B' })).toEqual([rect(0, 0, 5, 5)]);
+  });
+  it('each frame once; an unreadable payload lists nothing', () => {
+    const xml = '<hierarchy><node resource-id="a" bounds="[0,0][5,5]"><node resource-id="a" bounds="[0,0][5,5]" /></node><node resource-id="a" bounds="[0,0][5,9]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { id: 'a' })).toEqual([rect(0, 0, 5, 5), rect(0, 0, 5, 9)]);
+    expect(nodeFramesIn('not json', 'wda', { id: 'a' })).toEqual([]);
+  });
+});
+
+describe('imePanels — a floating IME\'s panels, from the touchable region', () => {
+  const BAND = rect(0, 2088, 1080, 132);
+  const shown = '  mShowRequested=true mShowExplicitlyRequested=true mShowForced=false mInputShown=true\n';
+  it('the rects beyond the band, while the input method says shown', () => {
+    expect(imePanels(`${shown}    touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))\n`, BAND)).toEqual([rect(71, 1092, 937, 792)]);
+  });
+  it('docked (the region is the band), hidden, or unreadable: none', () => {
+    expect(imePanels(`${shown}    touchable region=SkRegion((0,1398,1080,2220))\n`, rect(0, 1398, 1080, 822))).toEqual([]);
+    expect(imePanels('  mInputShown=false\n    touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))\n', BAND)).toEqual([]);
+    expect(imePanels(`${shown}    no region here\n`, BAND)).toEqual([]);
+  });
+  it('reads the committed docked capture as none', async () => {
+    const ime = JSON.parse(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/form-keyboard.ime.json', import.meta.url), 'utf8'));
+    expect(imePanels(ime.shown.touchable, rect(0, 1398, 1080, 822))).toEqual([]);
+  });
+});
+
 describe('situationOf', () => {
   it.each([
     ['open: centre on the screen, clear of the keyboard and the bar', rect(20, 456, 362, 34), state(), 'open'],
@@ -71,6 +117,24 @@ describe('situationOf', () => {
 
   it('the pinned submit itself is not covered by its own bar', () => {
     expect(situationOf(rect(20, 516.7, 362, 46.3), state(), FORM, { tag: 'submit', inSheet: false })).toBe('open');
+  });
+
+  it("a floating IME's panel: a centre under it is under the keyboard, a part of it only covered; the band as before", () => {
+    // averi_lab under a floating Gboard: the app hears of the 132-px strip only; the panel 71,1092 937x792 above it.
+    const s = state({ screen: rect(0, 0, 1080, 2220), frames: {}, keyboard: { frame: rect(0, 2088, 1080, 132), visible: true, field: 'postcode' } });
+    const panel = [rect(71, 1092, 937, 792)];
+    const form = UNPINNED;
+    expect(situationOf(rect(55, 1462, 970, 120), s, form, field, panel)).toBe('under-keyboard');
+    expect(situationOf(rect(55, 1000, 970, 120), s, form, field, panel)).toBe('covered');
+    expect(situationOf(rect(55, 900, 970, 120), s, form, field, panel)).toBe('open');
+    expect(situationOf(rect(55, 1462, 970, 120), s, form, field)).toBe('open');
+    expect(situationOf(rect(55, 2100, 970, 100), s, form, field, panel)).toBe('under-keyboard');
+  });
+
+  it("controlPiece clears a floating IME's panel too: ss's piece below the panel (form-keyboard-floating)", () => {
+    const s = state({ screen: rect(0, 0, 1080, 2220), frames: {}, keyboard: { frame: rect(0, 2088, 1080, 132), visible: true, field: 'postcode' } });
+    expect(controlPiece(rect(55, 1842, 970, 99), s, UNPINNED, field, [rect(71, 1092, 937, 792)])).toEqual(rect(55, 1884, 970, 57));
+    expect(controlPiece(rect(55, 1842, 970, 99), s, UNPINNED, field)).toEqual(rect(55, 1842, 970, 99));
   });
 
   it('presented-over: under an open picker sheet, unless it is in the sheet', () => {
@@ -104,6 +168,8 @@ describe('the probe', () => {
     const touch = ev('touch', '1,1');
     expect(readControlProbe([touch, ev('focus', 'phone')], { tag: 'phone', kind: 'field' }, { tag: 'phone', kind: 'text', title: '' }, 'phone').reached).toBe(true);
     expect(readControlProbe([touch], { tag: 'postcode', kind: 'field' }, { tag: 'postcode', kind: 'text', title: '' }, 'postcode').reached).toBe(true);
+    // a floating IME's panel took the tap (no touch logged): the focus stays where the cell put it, no reach
+    expect(readControlProbe([], { tag: 'postcode', kind: 'field' }, { tag: 'postcode', kind: 'text', title: '' }, 'postcode').reached).toBe(false);
     expect(readControlProbe([touch, ev('submit', 'invalid')], { tag: 'phone', kind: 'field' }, { tag: 'phone', kind: 'text', title: '' }, 'postcode')).toEqual({
       reached: false,
       probe: [touch, ev('submit', 'invalid')],
@@ -165,29 +231,31 @@ const KEYBOARD = rect(0, 573, 402, 301);
 
 describe('controlConsistency', () => {
   it('a probe tap with no touch is broken — but on an out-of-process keyboard (Android\'s IME: its touches are not the app\'s)', () => {
-    expect(controlConsistency(control({ probe: [] }), KEYBOARD)).toBeUndefined();
-    expect(controlConsistency(control({ probe: [] }), undefined)).toMatch(/no touch/);
-    expect(controlConsistency(control({ situation: 'open', reached: true, frame: rect(20, 456, 362, 34), probe: [] }), KEYBOARD)).toMatch(/no touch/);
+    expect(controlConsistency(control({ probe: [] }), [KEYBOARD])).toBeUndefined();
+    expect(controlConsistency(control({ probe: [] }), [])).toMatch(/no touch/);
+    expect(controlConsistency(control({ situation: 'open', reached: true, frame: rect(20, 456, 362, 34), probe: [] }), [KEYBOARD])).toMatch(/no touch/);
   });
 
   it('only Android\'s keyboard is out of process; iOS\'s touches are the app\'s', () => {
-    expect(outOfProcessKeyboard('android', KEYBOARD)).toEqual(KEYBOARD);
-    expect(outOfProcessKeyboard('ios', KEYBOARD)).toBeUndefined();
+    expect(outOfProcessKeyboard('android', KEYBOARD)).toEqual([KEYBOARD]);
+    expect(outOfProcessKeyboard('android', KEYBOARD, [rect(71, 1092, 937, 792)])).toEqual([KEYBOARD, rect(71, 1092, 937, 792)]);
+    expect(outOfProcessKeyboard('android', undefined, [rect(71, 1092, 937, 792)])).toEqual([]);
+    expect(outOfProcessKeyboard('ios', KEYBOARD)).toEqual([]);
     expect(controlConsistency(control({ probe: [] }), outOfProcessKeyboard('ios', KEYBOARD))).toMatch(/no touch/);
   });
 
   it('a control never probed (off the screen, not laid out) holds no probe', () => {
-    expect(controlConsistency(control({ situation: 'not-rendered', frame: undefined, probe: [] }), undefined)).toBeUndefined();
-    expect(controlConsistency(control({ situation: 'off-screen', frame: rect(0, 900, 402, 52), probe: [] }), undefined)).toBeUndefined();
-    expect(controlConsistency(control({ situation: 'off-screen', frame: rect(0, 900, 402, 52), reached: true, probe: [] }), undefined)).toMatch(/never probed/);
+    expect(controlConsistency(control({ situation: 'not-rendered', frame: undefined, probe: [] }), [])).toBeUndefined();
+    expect(controlConsistency(control({ situation: 'off-screen', frame: rect(0, 900, 402, 52), probe: [] }), [])).toBeUndefined();
+    expect(controlConsistency(control({ situation: 'off-screen', frame: rect(0, 900, 402, 52), reached: true, probe: [] }), [])).toMatch(/never probed/);
   });
 
   it('open but not reached, hidden but reached: broken; covered: either', () => {
-    expect(controlConsistency(control({ situation: 'open', frame: rect(20, 456, 362, 34), probe: [ev('touch', '201,473')] }), KEYBOARD)).toMatch(/open, but/);
-    expect(controlConsistency(control({ reached: true }), KEYBOARD)).toMatch(/under-keyboard, but the probe tap reached it/);
+    expect(controlConsistency(control({ situation: 'open', frame: rect(20, 456, 362, 34), probe: [ev('touch', '201,473')] }), [KEYBOARD])).toMatch(/open, but/);
+    expect(controlConsistency(control({ reached: true }), [KEYBOARD])).toMatch(/under-keyboard, but the probe tap reached it/);
     const phone = { situation: 'covered' as const, frame: rect(20, 530, 362, 34), probe: [ev('touch', '201,547'), ev('submit', 'invalid')] };
-    expect(controlConsistency(control({ ...phone }), KEYBOARD)).toBeUndefined();
-    expect(controlConsistency(control({ ...phone, reached: true }), KEYBOARD)).toBeUndefined();
+    expect(controlConsistency(control({ ...phone }), [KEYBOARD])).toBeUndefined();
+    expect(controlConsistency(control({ ...phone, reached: true }), [KEYBOARD])).toBeUndefined();
   });
 });
 
@@ -520,6 +588,32 @@ describe('capture of a form cell (Android)', () => {
     const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
     expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', afterBack: { reached: true, probe: [ev('touch', '201.0,621.0')] } });
     expect(truth.form!.controls.filter((c) => c.afterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);
+  }, 15_000);
+
+  // A floating IME (CatalogCell.ime): the panel read from the shown touchable region; the capture refuses a floating
+  // cell without one and any other form cell with one.
+  const floatingIme = (lab: FakeAndroidFormLab, band: string) => {
+    const ime = lab.ime.bind(lab);
+    lab.ime = async () => {
+      const r = await ime();
+      return { ...r, shown: { ...r.shown, touchable: `mInputShown=true\n    touchable region=SkRegion((20,300,380,500)${band})` } };
+    };
+  };
+  it('a form cell captured with the IME floating is refused unless the cell is marked so', async () => {
+    const lab = new FakeAndroidFormLab();
+    floatingIme(lab, '');
+    await expect(runForm(lab, [FORM_KEYBOARD])).rejects.toThrow(/the IME is floating \(a panel beyond its band: 20,300 360x200\) — dock it first/);
+  }, 15_000);
+  it('a cell marked ime: floating is refused docked (no panel beyond the band)', async () => {
+    await expect(runForm(new FakeAndroidFormLab(), [{ ...FORM_KEYBOARD, ime: 'floating' }])).rejects.toThrow(/captured with the IME floating only, but its touchable region holds no panel/);
+  }, 15_000);
+  it('a cell marked ime: floating, floating: the panel in its truth', async () => {
+    const lab = new FakeAndroidFormLab();
+    floatingIme(lab, '');
+    const { broken } = await runForm(lab, [{ ...FORM_KEYBOARD, ime: 'floating' }]);
+    const truth = JSON.parse(await readFile(join(out, 'form-k.truth.json'), 'utf8')) as CellTruth;
+    expect(truth.form!.keyboard!.panels).toEqual([rect(20, 300, 360, 200)]);
+    expect(broken.every((b) => !/no panel/.test(b))).toBe(true);
   }, 15_000);
 
   it('a pinned submit whose state reports no bar is refused: every control under it would read open', async () => {

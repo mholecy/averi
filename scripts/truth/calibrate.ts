@@ -13,7 +13,8 @@ import { FAMILIES } from './schema.js';
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
  * note's fix and pass after it. Golden runs (`--json`, the whole truth corpus) with THIS checkout's harness and truth
  * over the src of every before and after commit the notes of scripts/truth/calibration.json name (side.ts loads an
- * older src as it is), and each note that names golden rows gets a verdict from its rows:
+ * older src as it is), and each note that names golden rows gets a verdict from its rows — a note with several fixes
+ * one verdict per before/after pair (`pairs`, pairsOf: `<n>.1` its own, `<n>.2` … the further ones):
  *
  *   CALIBRATED            every named row red before WITH the note's defect (`defect`: the note's own symptom, a
  *                         pattern of the row's mismatch or of its reply where the mismatch quotes only its start),
@@ -115,6 +116,25 @@ export interface CalibrationEntry {
   needs?: string;
   regressions?: Regression[];
   remark?: string;
+  /**
+   * A note with several fixes: a before/after pair per further fix, each judged alone on its own rows and its own
+   * symptom (#7: 5cff2ad → 7542021 on the toolbar, d928789 → c3ebc62 on the scroll view). The note's own
+   * `before`/`after`/`checks`/`defect` are its first pair; a note without `pairs` has that one (pairsOf).
+   */
+  pairs?: CalibrationPair[];
+}
+
+/** One more before/after pair of a note (CalibrationEntry.pairs): the fields of the note's own pair, for one fix. */
+export interface CalibrationPair {
+  before: string;
+  /** The fix commit judged green — one of the note's `fix`, unless `afterNotFix` says why not. */
+  after: string;
+  afterNotFix?: string;
+  checks: string[];
+  defect: string;
+  expect?: Verdict;
+  partial?: string;
+  remark?: string;
 }
 
 export interface Calibration {
@@ -152,6 +172,29 @@ export function sideRunOf(json: GoldenJson): SideRun {
   faults.push(...open.filter((c) => c.mismatch !== undefined).map((c) => `${keyOf(c)} (open cell) red: ${c.mismatch}`));
   if (faults.length > 0) return { error: `canary: ${faults.length} fault${faults.length === 1 ? '' : 's'}; first ${faults[0].slice(0, 300)}` };
   return { checks: new Map(checks.map((c) => [keyOf(c), c])) };
+}
+
+/**
+ * A note as the pairs it is judged on: the note itself (its own pair; `pairs` dropped) and, for each further pair, the
+ * note with that pair's sides, rows, symptom and expectation, numbered `<n>.<i>` from 2 (the note's own pair `<n>.1`
+ * then). A pair keeps the note's `regressions` (each names the commit it broke at, so it counts only at the pair whose
+ * after that is) and not its `needs`, `partial` or `remark`, which are the first pair's.
+ */
+export function pairsOf(e: CalibrationEntry): CalibrationEntry[] {
+  const { pairs, ...own } = e;
+  if (pairs === undefined || pairs.length === 0) return [own];
+  return [
+    { ...own, n: `${e.n}.1` },
+    ...pairs.map((p, i): CalibrationEntry => ({
+      n: `${e.n}.${i + 2}`,
+      note: e.note,
+      status: e.status,
+      ...(e.fix !== undefined && { fix: e.fix }),
+      ...(e.verified !== undefined && { verified: e.verified }),
+      ...(e.regressions !== undefined && { regressions: e.regressions }),
+      ...p,
+    })),
+  ];
 }
 
 export const expected = (e: CalibrationEntry): Verdict => e.expect ?? (e.status === 'open' ? 'OPEN-RED' : 'CALIBRATED');
@@ -246,6 +289,14 @@ export function disposition(rs: readonly NoteResult[], out?: string, partial = f
   return { path: out, stale: `${out}.failed`, code };
 }
 
+/** The notes `--note` names (all without it), in the table's order; a name that is no note of the table is an error. */
+export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string[] | undefined): CalibrationEntry[] {
+  const notes = table.notes.filter((e) => only === undefined || only.includes(e.n));
+  const unknown = (only ?? []).filter((n) => !table.notes.some((e) => e.n === n));
+  if (unknown.length > 0) throw new Error(`calibrate --note: ${unknown.join(', ')} is no note of the table`);
+  return notes;
+}
+
 // --- the command line ---
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -255,8 +306,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const repo = fileURLToPath(new URL('../..', import.meta.url));
   const table = JSON.parse(await readFile(join(repo, 'scripts/truth/calibration.json'), 'utf8')) as Calibration;
   const only = values.note?.split(',').map((s) => s.trim());
-  const entries = table.notes.filter((e) => only === undefined || only.includes(e.n));
-  if (only !== undefined && entries.length !== only.length) throw new Error(`calibrate --note: ${only.filter((n) => !entries.some((e) => e.n === n)).join(', ')} is no note of the table`);
+  const entries = notesOf(table, only).flatMap(pairsOf);
   const { codeRoot } = await import('../differential/checkout.js');
   const worktrees = resolve(values.worktrees ?? join(tmpdir(), 'averi-calibration'));
   const run = promisify(execFile);
