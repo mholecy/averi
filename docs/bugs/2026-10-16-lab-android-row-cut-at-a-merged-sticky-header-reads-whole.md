@@ -5,8 +5,8 @@
 `averi_lab` AVD, Android 13 (API 33), 1080x2220, gesture navigation). averi = mobile-verify `truth/r3-variants` on
 `arch/round-20`'s `src/` (`debc9b2`). Replayed only. A shape of
 [2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md](2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md)
-that its fix (`d2b7744`, a node cut at a header read by its descendants' extent) cannot see: here the descendants are cut
-too.
+that its fix (`d2b7744`, a node cut at a header read by its descendants' extent) cannot see: here the descendants are
+cut too.
 
 ## The screen
 
@@ -19,10 +19,11 @@ identified container — a `testTag` Box, not clickable, holding a clickable box
 
 ## Truth
 
-`R` is `chrome-overlap:stickyHeader` (truth.ts#geometryOf): its centre `(541,479)` is clear of the header (its bottom 457)
-— the probe there fired `R` — but its top 66 px are under it. bars.ts' R-overlap rows: the tap lands (ok), the plain stop
-reaches it at once (ok), the colour assert fails closed because what it samples (the 12 %-inset rect of what shows) is
-overlapped by the header (ADR 0001, ADR 0002), and `fully: true` never stops on it where it is (ADR 0009 N-a, `fully`).
+`R` is `chrome-overlap:stickyHeader` (truth.ts#geometryOf): its centre `(541,479)` is clear of the header (its bottom
+457) — the probe there fired `R` — but its top 66 px are under it. bars.ts' R-overlap rows: the tap lands (ok), the
+plain stop reaches it at once (ok), the colour assert fails closed because what it samples (the 12 %-inset rect of what
+shows) is overlapped by the header (ADR 0001, ADR 0002), and `fully: true` never stops on it where it is (ADR 0009 N-a,
+`fully`).
 
 ## Observed (replayed)
 
@@ -48,8 +49,8 @@ here no descendant reaches past the cut.
 ## Cause (inferred from the dump and Compose's source; src not changed here)
 
 Compose's accessibility bounds are each node's bounds less what the nodes drawn after it, that are accessibility
-elements, cover (`getAllUncoveredSemanticsNodesToIntRect`): with the header one element, it takes its rect out of the row
-AND of the row's content, which are visited after it. Without it (the lab's `scroll-sticky`, the header a plain
+elements, cover (`getAllUncoveredSemanticsNodesToIntRect`): with the header one element, it takes its rect out of the
+row AND of the row's content, which are visited after it. Without it (the lab's `scroll-sticky`, the header a plain
 container) nothing is cut and averi already refuses (`under text "Sticky header" … drawn over it`). mp-native's Account
 Detail cut the row's container while its children kept their whole rect — the shape `d2b7744` reads; which Compose
 setup gives that was not found here. What the tree still says: the header, listed after `R`, ends EXACTLY where `R`'s

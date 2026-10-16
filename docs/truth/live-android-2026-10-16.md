@@ -3,7 +3,8 @@
 truth/r3-forms-android, src = arch/round-20's (debc9b2). Reproduce (adb outside the sandbox):
   node --import tsx scripts/truth/live.ts --serial emulator-5554 [--shots <dir>]
 k5's tap landed on note's 14-px strip below Continue ([55,2126][1025,2140] in the dump after back), in the bar's
-padding: the model's focus on note, no submit. LOUD b1d/b7: docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md (F2A2). -->
+padding: the model's focus on note, no submit. LOUD b1d/b7:
+docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md (F2A2). -->
 
 # Live golden: 20 cases, 18 ok, 2 loud, 0 mismatches, 0 skipped
 

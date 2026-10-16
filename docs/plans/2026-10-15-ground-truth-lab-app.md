@@ -297,12 +297,12 @@ the target moves the tap under a sixth, and passes unless the reply says it move
 
 **Round 3 — cell variants for partial notes (2026-10-16, truth/r3-variants).** A cell may name the platforms that build
 it (`CatalogCell.platforms`) and, on Android, the navigation mode it is captured under (`CatalogCell.navigation`);
-capture-run skips it elsewhere (catalog.ts#captureRefusal), so `bands` (gesture) and `bands-three-button` sit in one run.
-Android: `scroll-bounded-flush` (rows whose identified container is not clickable — uiautomator cuts it flush with its
-scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, judges.ts#FLUSH_PROBED), `scroll-sticky-cut`
-(the header one accessibility element: Compose cuts the row AND its content at it — #9 STILL-RED-AFTER, lab finding VA1),
-`bands-three-button` (#23 still DOES-NOT-FAIL: the assert at 94bae14 does not pass on the bar). iOS:
-`sheet-long-list-short` (a row on the screen outside its table: #29's fix cures it, not #20's) and
+capture-run skips it elsewhere (catalog.ts#captureRefusal), so `bands` (gesture) and `bands-three-button` sit in one
+run. Android: `scroll-bounded-flush` (rows whose identified container is not clickable — uiautomator cuts it flush with
+its scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, judges.ts#FLUSH_PROBED),
+`scroll-sticky-cut` (the header one accessibility element: Compose cuts the row AND its content at it — #9
+STILL-RED-AFTER, lab finding VA1), `bands-three-button` (#23 still DOES-NOT-FAIL: the assert at 94bae14 does not pass on
+the bar). iOS: `sheet-long-list-short` (a row on the screen outside its table: #29's fix cures it, not #20's) and
 `toolbar-dismiss-short` (a scroll view shorter than the screen over the title: #7's second fix, the pair 5cff2ad →
 c3ebc62). R-fully's flush acceptance is checked against the truth (the named edge flush with the target's scroll view,
 a swipe from inside it toward that edge); whether the probe reveals the row is live (phase 5). At the round-3 merge
