@@ -423,6 +423,28 @@
       "truth": "scroll-top-edge.truth.json"
     },
     {
+      "file": "scroll-top-edge-end.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-top-edge-end.png",
+      "truth": "scroll-top-edge-end.truth.json"
+    },
+    {
+      "file": "scroll-top-edge-end.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-top-edge-end.png",
+      "truth": "scroll-top-edge-end.truth.json"
+    },
+    {
       "file": "bands.wda.json",
       "source": "wda",
       "form": "raw",

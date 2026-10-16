@@ -39,6 +39,7 @@ describe('the cell catalog', () => {
       'edges/scroll-bounded-flush',
       'edges/scroll-sticky-cut',
       'edges/scroll-top-edge',
+      'edges/scroll-top-edge-end',
       'bars/bands',
       'bars/bands-three-button',
       'bars/pinned-bar',

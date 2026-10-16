@@ -159,6 +159,17 @@
       "truth": "scroll-top-edge.truth.json"
     },
     {
+      "file": "scroll-top-edge-end.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-top-edge-end.png",
+      "truth": "scroll-top-edge-end.truth.json"
+    },
+    {
       "file": "bands.xml",
       "source": "uiautomator",
       "form": "raw",

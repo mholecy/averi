@@ -328,6 +328,15 @@
       ]
     },
     {
+      "id": "scroll-top-edge-end",
+      "family": "edges",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#6D4C41", "slot": 0, "declared": "open", "scrollView": "page" },
+        { "tag": "T", "color": "#3949AB", "slot": 1, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
       "id": "bands",
       "family": "bars",
       "layer": "none",
