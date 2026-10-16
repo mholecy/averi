@@ -210,9 +210,10 @@ the forms, through the same `capture`).
 
 A limit of the Android replay, today: the fake device answers `dumpsys window` with ONE gesture-navigation Pixel_3a
 profile (its navigation bar `[0,2154][1080,2220]`) for every capture — `bands-three-button`, captured under three
-buttons (the bar `[0,2088][1080,2220]`), is replayed against the gesture profile's band (review round 1 of truth/r3-variants measured its verdicts the same
-under a dump patched to the captured bar). The per-capture `dumpsys` serving arrives with phase 2b's IME work
-(`CellTruth.ime` / `DeviceProfile.ime`, truth/r3-forms-android): follow-up at that merge.
+buttons (the bar `[0,2088][1080,2220]`), is replayed against the gesture profile's band (review round 1 of
+truth/r3-variants measured its verdicts the same under a dump patched to the captured bar). The per-capture `dumpsys`
+serving arrives with phase 2b's IME work (`CellTruth.ime` / `DeviceProfile.ime`, truth/r3-forms-android): follow-up at
+that merge.
 
 R-fully on a flush edge (rows.ts#fullyRow, #flushProbe): Android's uiautomator cuts a node flush with its scroll
 container's edge, and averi's `fully` stop probes such an edge with a swipe toward it (9c7885e). A replayed tree never
