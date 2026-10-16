@@ -57,8 +57,14 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
 ## Residuals accepted
 
 - The golden mode replays a static tree: what changes the screen (typing, a dismissal, a stroke's effect) is the live
-  golden's (scripts/truth/live.ts), which is not a vitest test.
-- OCR is judged on no real pixels yet, and the covering layer is not named per target (phase 4).
+  golden's (scripts/truth/live.ts), which needs the lab device and is not a vitest test. Its KNOWN
+  (scripts/truth/live-known.ts) is keyed by case and verdict class only — no reply kind, no strokes, a device's timing
+  moves them — and an entry marked `intermittent` may come out ok without failing the run; a known case not
+  intermittent that comes out ok fails it, as §4 asks. What a run read is recorded (docs/truth/live-records/) and
+  judged again in vitest without a device (tests/truth/live-rejudge.test.ts, through `live.ts --rejudge`).
+- OCR is judged on the real pixels — the host's own recognizer on the captured screenshot (phase 4) — but only where
+  the host has one: inside a sandbox (or off macOS) the `ocr` rows are skipped and counted, never red;
+  `GOLDEN_OCR=require` makes a skip an error. The covering layer is not named per target.
 
 ## Bug note
 

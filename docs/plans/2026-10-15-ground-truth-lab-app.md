@@ -355,14 +355,18 @@ platforms. golden-spec/text.ts asks any text target, by its string, the tree's `
 under-keyboard form row gains its OCR half. OCR is judged by the host's own recognizer on the captured screenshot
 (golden.ts#ocrAvailability, fake-device.ts#useRecognizer): each side compiles and runs its own; where Vision cannot
 read (not macOS, or inside a sandbox: `nilError`) the `ocr` rows are skipped and said so, counted, never red, and
-calibrate reads them NOT-ASKED. Golden with the recognizer 879 → 1087 checks, 257 → 285 mismatches, 0 broken. Lab
+calibrate reads them NOT-ASKED. Golden with the recognizer on r4-ocr itself 879 → 1087 checks, 257 → 285 mismatches;
+merged with r4-followups and r4-live (a15d43d) 1131 checks, 286 mismatches, 0 broken (inside the sandbox, no
+recognizer: 1131 checks, 260 mismatches, 0 broken, 86 `ocr` rows skipped). Lab
 notes OC1 (both platforms: Ľ read L', ĺ read í — no fold reaches them) and OC2 (iOS: an NBSP thousands separator read
 as nothing). Calibrated: #3's and #22's OCR halves, #23's band on a text across it (T colour; its cut-glyph OCR half
 still needs a node the tree cuts at the band — Compose dumps none: calibration.json), and the typographic-apostrophe
 note (TX1, 35321b4) on own-parts' N and text-sample's E and A. Typing the sample (F2A2, Android `type_text` non-ASCII;
 `2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md`) stays the live golden's: a replayed tree shows no typing —
 text-sample's strings are its inputs, not static rows. #36 (OCR in a presented sheet under WDA) needs a text target on
-a sheet's layer.
+a sheet's layer. Deferred to the next round (review round 4, P7): "phase 1b's text samples included" is not done — the
+form cells' titles and labels get no open `ocr` row; a form is asked OCR only for a control under the keyboard
+(golden-spec/forms.ts, fails closed).
 
 ### Phase 5 — live golden
 
@@ -381,8 +385,15 @@ notes LV1 (Android: a list moving through blank content read as exhausted), LV2 
 cut cut, intermittent), LV3 (iOS: the turn-back stroke touches down above the list) — live only, `excluded`; LE4
 measured live. Review round 1: the stop judged on the state read when scroll_until returned; a claim that the last
 swipes "did not change the screen" checked against the app's strokes whatever the tree listed; a live KNOWN
-(scripts/truth/live-known.ts, exit 1 only on an unknown MISMATCH); `--record` / `--rejudge` (docs/truth/live-records/);
-#12's live verdict CALIBRATED-ON-DEFECT, intermittent (one after-run of five leaves S cut).
+(scripts/truth/live-known.ts); `--record` / `--rejudge` (docs/truth/live-records/); #12's live verdict
+CALIBRATED-ON-DEFECT, intermittent (one after-run of five leaves S cut). Round-4 code review: the live KNOWN pins a
+case by its verdict class (weaker than ADR 0020 §4: no reply kind, no strokes), and live.ts exits 1 on an unknown
+MISMATCH and — in a run of this checkout — on a known case not marked `intermittent` that comes out ok (WDA's
+blur-menu-grouped C struck off by it; LV2's two the only intermittent ones); tests/truth/live-rejudge.test.ts rejudges
+both visibility records in vitest (no device; 73/62/3/8 and 222/178/5/39, 0 not known); every note a `bug:` or a
+`residual:` (idb's identifier-less UIKit table rows: lab note
+2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md); #7's second fix rerun live at d928789, the
+static pair's before (`pair: 2`).
 
 ### Alongside
 
