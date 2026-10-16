@@ -281,6 +281,13 @@ column has no golden verb yet) calibrated (docs/truth/calibration.md). On Androi
 no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView
 [177,1351][443,1412]), so neither #8's shape nor #18's.
 
+**Round 3 — the open tap at its probe point (2026-10-16, truth/r3-open-tap).** base.ts's open tap asks where the tap
+lands: every tap within OPEN_TAP_REACH (a sixth of the extent, chosen between the measured 0.081 of own-parts' N and
+0.313 of #26's C) of the probe's logged touch, and no "tapped the uncovered part" reply on a target measured uncovered.
+#26 calibrated on its tap. Follow-up: hold every open tap to the centre of the target's node in the recorded tree
+(exact, up to the tools' rounding) — it closes the reach's blind spot (a cover averi imagines over under a third of
+the target moves the tap under a sixth, and passes unless the reply says it moved).
+
 ### Phase 4 — the matrix, generated
 
 One template `Host(layer, geometry)` per platform; cells generated from `cells.json` (layer × geometry). Text cells for

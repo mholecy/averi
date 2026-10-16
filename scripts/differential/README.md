@@ -106,9 +106,10 @@ they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks
 where it lands: `Tapped`, every tap sent at the target's probe point — the touch its app logged for the probe that
-fired it — within the middle third of its extent (`base.ts#atProbe`, `PROBE_REACH`: a tree that draws the node
-another extent moves averi's centre by less); a tap moved further is averi steering around a cover that is not there
-(calibration.json #26). A row type is asked only of a target whose truth carries a measured `geometry` other than
+fired it — within the middle third of its extent (`base.ts#atProbe`, `OPEN_TAP_REACH`, a chosen value between the
+measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313; a clipped node's centre may
+lie further off and is not this row's), and not saying it moved the tap off a cover over the centre (`tapped the
+uncovered part`); a tap moved off is averi steering around a cover that is not there (calibration.json #26). A row type is asked only of a target whose truth carries a measured `geometry` other than
 `whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
 clips or its chrome — no capture before phase 3 does). A reply that says the target is not in the tree (a tap "waiting
 for element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within") is judged by its
