@@ -32,13 +32,41 @@ import { bandsOf, directionOf, geometryOf, intersect, isOverlap, type GeometryCo
  *  - sheet-long-list's UITableView reports no offset before its first scroll: the launch offset falls back to 0 — its
  *    real rest at launch (classStrokes' `o0`);
  *  - the stop is judged on the state read right after scroll_until returns (live.ts reads it between the calls), the
- *    tap on the state after the tap.
+ *    tap on the state after the tap. That read has no pause: a stroke the app has not yet written when it is read (its
+ *    rest still to come) is missing from it — unchangedClaimBroken then counts fewer strokes than swipes and silently
+ *    does not judge, and R-direction judges the strokes written so far.
  */
 
 export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
+/**
+ * Why a case is not ok, by the judge's rule — what the live KNOWN pins beside the note (live-known.ts), as the static
+ * ratchet pins a row's class: a known case failing by another rule is not known. `stop-claim` "visible" where the app
+ * does not bear the stop out; `tap-claim` `Tapped` with nothing or something else fired; `tap-refused-fired` a refusal
+ * while something fired; `tap-refused` (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N
+ * swipes did not change the screen" against the app's strokes; `R-direction` the strokes broke it; `failed-holds` a
+ * failure where the app shows the stop; `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`,
+ * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `dismissal` the
+ * dismissal's judge.
+ */
+export type VerdictClass =
+  | 'stop-claim'
+  | 'tap-claim'
+  | 'tap-refused-fired'
+  | 'tap-refused'
+  | 'unchanged-claim'
+  | 'R-direction'
+  | 'failed-holds'
+  | 'not-reached'
+  | 'presented-stop'
+  | 'presented-fired'
+  | 'presented-stroke'
+  | 'dismissal';
+
 export interface Verdict {
   outcome: Outcome;
   why: string;
+  /** The rule a verdict not ok was reached by. */
+  cls?: VerdictClass;
   /** The app's state behind the verdict (every scroll case's, any other case's not ok): live.ts prints it under the case. */
   app?: string;
 }
@@ -118,12 +146,12 @@ export function judgeTap(tag: string, fires: boolean, reply: string, state: LabS
   const own = fired.filter((e) => e.kind === 'tap' && e.tag === tag);
   const others = fired.filter((e) => !(e.kind === 'tap' && e.tag === tag));
   if (claimsTap(reply)) {
-    if (own.length === 0) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the app logged ${eventsText(fired)}` };
-    if (others.length > 0) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the app fired ${eventsText(others)} besides ${tag}` };
+    if (own.length === 0) return { outcome: 'MISMATCH', cls: 'tap-claim', why: `averi says ${short(reply)} — the app logged ${eventsText(fired)}` };
+    if (others.length > 0) return { outcome: 'MISMATCH', cls: 'tap-claim', why: `averi says ${short(reply)} — the app fired ${eventsText(others)} besides ${tag}` };
     return { outcome: 'ok', why: `${short(reply)}${fires ? '' : ' (fired, where the probe at its centre did not reach it)'}` };
   }
-  if (fired.length > 0) return { outcome: 'MISMATCH', why: `averi refused (${short(reply)}) — yet the app logged ${eventsText(fired)}` };
-  return fires ? { outcome: 'LOUD', why: `refused a target a tap reaches, nothing fired: ${short(reply)}` } : { outcome: 'ok', why: `refused, nothing fired: ${short(reply)}` };
+  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'tap-refused-fired', why: `averi refused (${short(reply)}) — yet the app logged ${eventsText(fired)}` };
+  return fires ? { outcome: 'LOUD', cls: 'tap-refused', why: `refused a target a tap reaches, nothing fired: ${short(reply)}` } : { outcome: 'ok', why: `refused, nothing fired: ${short(reply)}` };
 }
 
 // --- the dismissal (#7, #19) ---
@@ -136,17 +164,17 @@ export function judgeTap(tag: string, fires: boolean, reply: string, state: LabS
  */
 export function judgeDismissal(tag: string, reply: string, source: string, s: LabState, launched: LabState): Verdict {
   const typed = Object.entries(s.fields ?? {}).filter(([k, f]) => f.value !== launched.fields?.[k]?.value);
-  if (typed.length > 0) return { outcome: 'MISMATCH', why: `typed into ${typed.map(([k, f]) => `${k} (${JSON.stringify(f.value)})`).join(', ')}: ${short(reply)}` };
-  if ((s.submits ?? []).length > 0) return { outcome: 'MISMATCH', why: `the form was submitted: ${short(reply)}` };
+  if (typed.length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', why: `typed into ${typed.map(([k, f]) => `${k} (${JSON.stringify(f.value)})`).join(', ')}: ${short(reply)}` };
+  if ((s.submits ?? []).length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', why: `the form was submitted: ${short(reply)}` };
   const tapped = claimsTap(reply);
   const focus = s.focus ?? 'none';
-  if (tapped !== (s.focus === tag)) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${focus}` };
+  if (tapped !== (s.focus === tag)) return { outcome: 'MISMATCH', cls: 'dismissal', why: `averi says ${short(reply)} — the focus is on ${focus}` };
   if (tapped) return { outcome: 'ok', why: short(reply) };
   if (source === 'idb') return { outcome: 'ok', why: `refused (idb: the dismissal inert), focus on ${focus}: ${short(reply)}` };
   if (s.focus == null && launched.focus != null && /was not tapped: after .* was tapped .* to hide the soft keyboard/.test(reply)) {
     return { outcome: 'ok', why: `the keyboard dismissed (no field focused), then ${tag} refused: ${short(reply)}` };
   }
-  return { outcome: 'LOUD', why: `not tapped, the focus on ${focus}, though a dismissal is configured: ${short(reply)}` };
+  return { outcome: 'LOUD', cls: 'dismissal', why: `not tapped, the focus on ${focus}, though a dismissal is configured: ${short(reply)}` };
 }
 
 // --- the strokes (R-direction) ---
@@ -274,17 +302,17 @@ export function judgeScroll(
   const stop = c.fully ? 'fully visible' : 'visible';
   const tapped = tap === undefined ? undefined : judgeTap(c.tag, holds, tap, final, launched);
   const unchanged = unchangedClaimBroken(scroll, strokesSince(state, launched));
-  if (claimsVisible(scroll) && !holds) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
+  if (claimsVisible(scroll) && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
   // Whatever the tree listed: a claim about the screen the app's own strokes contradict.
-  if (unchanged !== undefined) return { outcome: 'MISMATCH', why: `${unchanged}: ${short(scroll)}`, app };
+  if (unchanged !== undefined) return { outcome: 'MISMATCH', cls: 'unchanged-claim', why: `${unchanged}: ${short(scroll)}`, app };
   // A target the tree does not list (uiautomator dumps no node not visible to the user): averi cannot tell where it
   // lies, nor which scroll view holds it — what R-stroke exempts too (golden-spec/rows.ts#strokeRow); its strokes are
   // reported, not judged.
-  if (breaks.length > 0 && c.unlisted !== true) return { outcome: 'MISMATCH', why: `R-direction: ${breaks.join('; ')} — averi: ${short(scroll)}`, app };
+  if (breaks.length > 0 && c.unlisted !== true) return { outcome: 'MISMATCH', cls: 'R-direction', why: `R-direction: ${breaks.join('; ')} — averi: ${short(scroll)}`, app };
   if (!claimsVisible(scroll)) {
     const unjudged = breaks.length > 0 ? ` (not in the tree: its strokes unjudged — ${breaks.join('; ')})` : '';
-    return holds ? { outcome: 'MISMATCH', why: `averi failed (${short(scroll)}) — the app shows it ${g} (${stop} as the stop needs)`, app } : { outcome: 'LOUD', why: `not reached (${g ?? 'no frame'}), and averi said so${unjudged}: ${short(scroll)}`, app };
+    return holds ? { outcome: 'MISMATCH', cls: 'failed-holds', why: `averi failed (${short(scroll)}) — the app shows it ${g} (${stop} as the stop needs)`, app } : { outcome: 'LOUD', cls: 'not-reached', why: `not reached (${g ?? 'no frame'}), and averi said so${unjudged}: ${short(scroll)}`, app };
   }
   if (tap === undefined || tapped === undefined) return { outcome: 'ok', why: short(scroll), app };
   if (tapped.outcome !== 'ok') return { ...tapped, why: `stopped (${short(scroll)}), then the tap: ${tapped.why}`, app };
@@ -299,9 +327,9 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   const app = appText(state, c.platform, c.tag, c.view, launched);
   const fired = firedSince(state, launched);
   const moved = strokesSince(state, launched).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
-  if (claimsVisible(scroll)) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
-  if (fired.length > 0) return { outcome: 'MISMATCH', why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
-  if (moved.length > 0) return { outcome: 'MISMATCH', why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
+  if (claimsVisible(scroll)) return { outcome: 'MISMATCH', cls: 'presented-stop', why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
+  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
+  if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
   return { outcome: 'ok', why: `refused, nothing moved or fired: ${short(scroll)}`, app };
 }
 
@@ -385,7 +413,11 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
   for (const b of TURN_BACK.filter((x) => x.cell === truth.cell)) {
     const t = truth.targets.find((x) => x.tag === b.tag);
     if (t?.scrollView === undefined) continue;
-    cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, `turn back: ${b.says}`), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
+    // A target its capture's tree of a source does not list: averi cannot see where it lies, so there is nothing to turn
+    // back toward — the case is said so, and its strokes are not held to R-direction under that source.
+    const unlisted = Object.entries(t.listed ?? {}).filter(([, l]) => l === false).map(([src]) => src);
+    const says = unlisted.length === 0 ? `turn back: ${b.says}` : `the wrong direction: ${b.says} — under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
+    cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
   }
   return cases;
 }

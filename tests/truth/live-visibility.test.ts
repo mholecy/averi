@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { classStrokes, directionBreaks, distanceAt, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, stopHolds, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
+import { knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 
 // The live golden's visibility judges (scripts/truth/live-visibility.ts): pure over the lab app's state — its tap log,
 // its scroll offsets and strokes, its frames — so they are pinned here without a device. iOS units: the iPhone 17's
@@ -240,5 +241,67 @@ describe('judgeScroll judges the stop where scroll_until left it', () => {
     const beneath = visibilityCases({ ...cell, targets: [{ ...t, declared: 'presented-over' }] }, 'ios').find((x) => x.id === 'scroll:c.T')!;
     const moved = state({ strokes: [stroke(200, 0, 'page')] });
     expect(beneath.judge(state(), ['ERROR close it first'], state(), 'wda', [moved]).outcome).toBe('MISMATCH');
+  });
+});
+
+describe('the tap after a stop is judged on the state after the tap', () => {
+  it('the target fires only in the final state: ok — judged on the stop\'s state it would read as nothing fired', () => {
+    const c = { tag: 'T', view: 'page', fully: false, platform: 'ios' as const };
+    const atStop = state({ frames: { T: { x: 51, y: 300, width: 300, height: 64 } }, offsets: { page: 80 }, strokes: [stroke(382, 80)] });
+    const final = state({ ...atStop, events: [{ kind: 'tap', tag: 'T', at }] });
+    expect(judgeScroll(c, ['Element id:"x" visible after 1 swipe', 'Tapped id:"x"'], final, state(), atStop).outcome).toBe('ok');
+  });
+});
+
+describe('the live KNOWN pins the rule a case fails by', () => {
+  it('a known case failing by its entry\'s rule is known; by another rule it is not', () => {
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim')).toMatch(/LV1|blank-content/);
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'stop-claim')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired')).toBeUndefined();
+    expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim')).toBeUndefined();
+  });
+  it('every entry names a note or residual and a rule', () => {
+    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.note} ${e.cls}`).toMatch(/^(android|ios) \w+ (tap|scroll|turn):\S+ (bug:|residual:|idb lists|calibration\.json).* \S+$/);
+  });
+});
+
+describe('the turn-back case of a target a source does not list', () => {
+  it('is said to ask no turn under that source', () => {
+    const t: TargetTruth = { tag: 'F', id: 'lab.scroll-bounded.F', color: '#000000', declared: 'open', frame: { x: 128, y: 3796, width: 825, height: 176 }, reached: false, probe: [], drawn: 0, seen: '#000000', geometry: 'off-screen', scrollView: 'lower', listed: { uiautomator: false } };
+    const cell: CellTruth = { cell: 'scroll-bounded', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t] };
+    expect(visibilityCases(cell, 'android').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/under uiautomator F is not in the tree, so no turn is asked there/);
+    expect(visibilityCases({ ...cell, targets: [{ ...t, listed: { wda: true } }] }, 'ios').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/^turn back: /);
+  });
+});
+
+describe('each rule names its class (what the live KNOWN pins)', () => {
+  const launched = state();
+  const c = { tag: 'T', view: 'page', fully: false, platform: 'ios' as const };
+  it('the tap', () => {
+    expect(judgeTap('T', true, 'Tapped', state({ events: [] }), launched).cls).toBe('tap-claim');
+    expect(judgeTap('T', true, 'Tapped', state({ events: [{ kind: 'tap', tag: 'T', at }, { kind: 'tab', tag: 'x', at }] }), launched).cls).toBe('tap-claim');
+    expect(judgeTap('T', false, 'ERROR', state({ events: [{ kind: 'dismissed', tag: 'x', at }] }), launched).cls).toBe('tap-refused-fired');
+    expect(judgeTap('T', true, 'ERROR', state(), launched).cls).toBe('tap-refused');
+  });
+  it('the scroll', () => {
+    expect(judgeScroll(c, ['Element id:"x" visible after 0 swipes', 'ERROR'], launched, launched).cls).toBe('stop-claim');
+    expect(judgeScroll(c, ['ERROR failed after 2 swipes', 'ERROR'], state({ strokes: [stroke(382, 382), stroke(382, 382)] }), launched).cls).toBe('R-direction');
+    const unchanged = 'ERROR failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted)';
+    expect(judgeScroll({ ...c, unlisted: true }, [unchanged, 'ERROR'], state({ strokes: [stroke(0, 400, 'upper'), stroke(400, 800, 'upper')] }), launched).cls).toBe('unchanged-claim');
+    const shown = state({ frames: { T: { x: 51, y: 300, width: 300, height: 64 } }, offsets: { page: 80 }, strokes: [stroke(382, 80)] });
+    expect(judgeScroll(c, ['ERROR failed after 1 swipe', 'ERROR'], shown, launched).cls).toBe('failed-holds');
+    expect(judgeScroll(c, ['ERROR failed', 'ERROR'], launched, launched).cls).toBe('not-reached');
+  });
+  it('beneath a presented layer, and the dismissal', () => {
+    const p = { tag: 'E', view: 'host', platform: 'ios' as const };
+    expect(judgePresentedScroll(p, ['Element id:"x" visible after 2 swipes'], state(), state()).cls).toBe('presented-stop');
+    expect(judgePresentedScroll(p, ['ERROR'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state()).cls).toBe('presented-fired');
+    expect(judgePresentedScroll(p, ['ERROR'], state({ strokes: [stroke(200, 0, 'host')] }), state()).cls).toBe('presented-stroke');
+    expect(judgeDismissal('vs', 'Tapped', 'wda', state({ focus: null }), state({ focus: 'postcode' })).cls).toBe('dismissal');
+    const field = (value: string) => ({ value, focused: false, error: null });
+    const was = state({ focus: 'postcode', fields: { vs: field('') }, submits: [] });
+    expect(judgeDismissal('vs', 'ERROR', 'wda', state({ focus: 'postcode', fields: { vs: field('x') }, submits: [] }), was).cls).toBe('dismissal');
+    expect(judgeDismissal('vs', 'ERROR', 'wda', state({ focus: 'postcode', fields: { vs: field('') }, submits: [{ at, valid: true, values: {} }] }), was).cls).toBe('dismissal');
+    expect(judgeDismissal('vs', 'ERROR covered', 'wda', was, was).cls).toBe('dismissal');
   });
 });

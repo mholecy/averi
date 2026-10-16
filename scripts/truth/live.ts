@@ -11,7 +11,7 @@ import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
-import { knownLive } from './live-known.js';
+import { knownEntry, knownLive } from './live-known.js';
 import { judgeDismissal, visibilityCases, type Verdict as VisibilityVerdict } from './live-visibility.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
@@ -503,10 +503,13 @@ if (rejudging !== undefined) {
 
 // --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH ---
 
-const known = (r: Result) => knownLive(platform, r.source, r.c.id);
+/** The note a not-ok case is known by — only when it failed by the rule its KNOWN entry pins (live-known.ts). */
+const known = (r: Result) => knownLive(platform, r.source, r.c.id, r.verdict.cls);
+/** A KNOWN entry whose case failed by another rule: unknown, and said so. */
+const otherRule = (r: Result) => (r.verdict.outcome !== 'ok' && known(r) === undefined ? knownEntry(platform, r.source, r.c.id) : undefined);
 const count = (o: Verdict['outcome']) => results.filter((r) => r.verdict.outcome === o).length;
 const unknown = results.filter((r) => r.verdict.outcome === 'MISMATCH' && known(r) === undefined);
-const cleared = results.filter((r) => r.verdict.outcome === 'ok' && known(r) !== undefined);
+const cleared = results.filter((r) => r.verdict.outcome === 'ok' && knownEntry(platform, r.source, r.c.id) !== undefined);
 const lines = [
   `<!-- averi: ${rejudging?.side ?? values.side ?? 'this checkout'}${rejudging !== undefined ? ` (rejudged from ${values.rejudge})` : ''} -->`,
   `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,
@@ -516,8 +519,14 @@ for (const source of sources) {
   lines.push(`## ${source}`);
   for (const r of results.filter((x) => x.source === source)) {
     const note = known(r);
-    const mark = note === undefined ? '' : r.verdict.outcome === 'ok' ? ` [known, ok this run: ${note}]` : ` [known: ${note}]`;
-    lines.push(`- ${r.verdict.outcome} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}${mark}`);
+    const entry = knownEntry(platform, r.source, r.c.id);
+    const other = otherRule(r);
+    const mark =
+      r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known, ok this run: ${entry.note}]`)
+      : note !== undefined ? ` [known: ${note}]`
+      : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'}, where KNOWN pins ${other.cls} (${other.note})]`
+      : '';
+    lines.push(`- ${r.verdict.outcome}${r.verdict.cls === undefined ? '' : ` (${r.verdict.cls})`} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}${mark}`);
     if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ')}`);
     if (r.verdict.app !== undefined) lines.push(`    app: ${r.verdict.app}`);
   }
