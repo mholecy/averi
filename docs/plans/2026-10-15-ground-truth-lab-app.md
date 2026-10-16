@@ -157,6 +157,18 @@ identifier (form-errors gives every title its own). The first B0 run called #28 
 and history keeps it); review round 1 corrected it to DOES-NOT-FAIL: at its before commit, 53da035, its rows are
 already refused, red only on #33's defect.
 
+**B3 — presented (2026-10-16, iOS only: every note it calibrates is iOS's; the Android app builds none of its layers).**
+Six cells (fixtures/apps/cells/presented.json): `sheet-medium-edges` (the medium sheet over a scrolled host; targets
+wholly above, wholly under the status bar, a 5-pt sliver, wholly below), `sheet-background` (a large sheet's bare
+background over the targets — #28's cell; CALIBRATED, no longer DOES-NOT-FAIL), `sheet-long-list` (a UIKit table in a
+large sheet, WDA parking the label of a row below the fold at the sheet's origin, #20), `dim-cover` (an RN-style
+transparent cover, #27), `blur-menu` and `blur-menu-grouped` (a menu over a blurred backdrop no tree lists, #31's
+residual; its rows listed in reading order, or before the screen beneath, #15). #27 and #28 calibrate at 41c394a
+(fix/r20-marks), not at their notes' 15896c5, which fixed the device trees only; the same 41c394a re-breaks #30, #32
+and #34's shape (lab note L3). A presented-over target is asked the presented rows whatever its measured geometry,
+never R-off / R-sliver (golden-spec/presented.ts). Measured on the way: iOS's status bar swallows a raw tap in the top
+of its band (truth.ts#statusBarMaySwallow).
+
 **B1 — the families and the plumbing (no cell, no capture).** So that phase 3's batches (B2 edges, B3 presented, B4
 bars, B5 false covers) are written in parallel worktrees without touching each other's files, every shared file is
 split by cell family — `base` (`open`), `presented` (`sheet-medium`, `alert-dim`), `forms` (the five form cells),

@@ -107,6 +107,25 @@
           ],
           "broke": "8a55d2b",
           "why": "fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2"
+        },
+        {
+          "rows": [
+            "ios-iphone17-ios27/blur-menu.idb.json W tap",
+            "ios-iphone17-ios27/blur-menu.idb.json W scroll_until",
+            "ios-iphone17-ios27/blur-menu.wda.json W tap",
+            "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
+          ],
+          "broke": "13d68a2",
+          "why": "the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4"
+        },
+        {
+          "rows": [
+            "ios-iphone17-ios27/blur-menu-grouped.idb.json W tap",
+            "ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until"
+          ],
+          "broke": "13d68a2",
+          "fixed": "8a55d2b",
+          "why": "the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)"
         }
       ],
       "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."
@@ -194,12 +213,27 @@
     {
       "n": "15",
       "note": "2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md",
-      "status": "needs-cell:presented",
+      "status": "calibrate",
       "fix": ["8a55d2b"],
       "before": "20053ae",
-      "verified": "merge-subject",
-      "needs": "presented/blur-menu or a chooser idb lists before the content behind it; the lab's idb presented cells list only the presented layer, so the order is never asked.",
-      "remark": "The analysis' 'regression dd50327→2f98900 (8c0fb41?)' is the idb pinned-bar row (L2): Tapped from b75b8b5 to dff7381, refused at 8c0fb41 — verified by a first-parent bisect over golden. 8a55d2b itself re-breaks it (#6's regressions)."
+      "after": "8a55d2b",
+      "verified": "golden",
+      "defect": "under button",
+      "checks": [
+        "ios-iphone17-ios27/blur-menu-grouped.idb.json W tap",
+        "ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until"
+      ],
+      "regressions": [
+        {
+          "rows": [
+            "ios-iphone17-ios27/form-keyboard.idb.json phone tap",
+            "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
+          ],
+          "broke": "8a55d2b",
+          "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since — lab note L2 (#6 records it too)"
+        }
+      ],
+      "remark": "presented/blur-menu-grouped: the menu card and the screen beneath it each an accessibility container, the card's first, so idb lists its rows K, W before A–D, and A (top 110, above W's 448) is ADR 0015's reading break — mp-native's chooser shape. W's colour row is green on both sides (no evidence). The ungrouped blur-menu lists the targets in reading order (A, B, K, W, C, D): no break, W refused at every commit — lab note L4. The analysis' 'regression dd50327→2f98900 (8c0fb41?)' is the idb pinned-bar row (L2): Tapped from b75b8b5 to dff7381, refused at 8c0fb41 — verified by a first-parent bisect over golden. 8a55d2b itself re-breaks it (recorded in regressions, as in #6's)."
     },
     {
       "n": "16",
@@ -270,12 +304,17 @@
     {
       "n": "20",
       "note": "2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md",
-      "status": "needs-cell:presented",
+      "status": "calibrate",
       "fix": ["83e282a"],
       "before": "7566443",
-      "verified": "merge-subject",
-      "needs": "presented/sheet-long-list: a sheet whose below-the-fold cells WDA lists (form-picker's ST is not in the tree, WDA or idb); rows: R-off, R-outside-sv.",
-      "remark": "Golden is identical at 7566443 and 83e282a."
+      "after": "83e282a",
+      "verified": "golden",
+      "defect": "^Tapped|no swipe",
+      "checks": [
+        "ios-iphone17-ios27/sheet-long-list.wda.json F tap",
+        "ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until"
+      ],
+      "remark": "presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Before: tap Tapped at the parked point, scroll_until 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). idb lists neither target by its id (KNOWN)."
     },
     {
       "n": "21",
@@ -304,7 +343,18 @@
         "ios-iphone17-ios27/sheet-medium.wda.json D colour"
       ],
       "needs": "The note's own shapes — the status bar and a pinned button drawn over the element — need bars/bands and a pinned-bar colour row.",
-      "remark": "Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element."
+      "remark": "Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks \"close it first\" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT.",
+      "expect": "CALIBRATED-ON-DEFECT",
+      "regressions": [
+        {
+          "rows": [
+            "ios-iphone17-ios27/blur-menu.idb.json W colour",
+            "ios-iphone17-ios27/blur-menu.wda.json W colour"
+          ],
+          "broke": "596a379",
+          "why": "the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4"
+        }
+      ]
     },
     {
       "n": "23",
@@ -343,33 +393,46 @@
     {
       "n": "27",
       "note": "2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md",
-      "status": "needs-cell:presented",
-      "fix": ["15896c5"],
+      "status": "calibrate",
+      "fix": ["15896c5", "41c394a"],
       "before": "53da035",
-      "verified": "merge-subject",
-      "needs": "presented/dim-cover: an RN-style transparent modal's screen-filling dimming leaf (unless the existing RN trees cover it).",
-      "remark": "15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped."
+      "after": "41c394a",
+      "verified": "golden",
+      "defect": "^Tapped|measured the layer over the target as the target|fully visible",
+      "checks": [
+        "ios-iphone17-ios27/dim-cover.wda.json A tap",
+        "ios-iphone17-ios27/dim-cover.wda.json A colour",
+        "ios-iphone17-ios27/dim-cover.wda.json A scroll_until",
+        "ios-iphone17-ios27/dim-cover.wda.json B tap",
+        "ios-iphone17-ios27/dim-cover.wda.json B colour",
+        "ios-iphone17-ios27/dim-cover.wda.json B scroll_until",
+        "ios-iphone17-ios27/dim-cover.wda.json C tap",
+        "ios-iphone17-ios27/dim-cover.wda.json C colour",
+        "ios-iphone17-ios27/dim-cover.wda.json C scroll_until",
+        "ios-iphone17-ios27/dim-cover.wda.json D tap",
+        "ios-iphone17-ios27/dim-cover.wda.json D colour",
+        "ios-iphone17-ios27/dim-cover.wda.json D scroll_until"
+      ],
+      "remark": "presented/dim-cover: a SwiftUI fullScreenCover with a clear background, its root a screen-sized identified container dimming the screen and holding a card (an RN transparent Modal's shape). 15896c5 fixed the note's Finportal tree, not this one: still Tapped / PASS / fully visible at 15896c5 and every first-parent commit to 20b800a; green from 41c394a (fix/r20-marks: WDA marks the presented layer), so the lab shape calibrates there. 15896c5 also turns alert-dim.wda C's refusal into 'close it first' — the remedy only (C was already refused at 53da035), not this note's Tapped."
     },
     {
       "n": "28",
       "note": "2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md",
       "status": "calibrate",
-      "fix": ["15896c5"],
+      "fix": ["15896c5", "41c394a"],
       "before": "53da035",
-      "after": "15896c5",
+      "after": "41c394a",
       "verified": "golden",
       "defect": "^Tapped|fully visible",
       "checks": [
-        "ios-iphone17-ios27/form-picker.wda.json name tap",
-        "ios-iphone17-ios27/form-picker.wda.json name scroll_until",
-        "ios-iphone17-ios27/form-picker.wda.json country tap",
-        "ios-iphone17-ios27/form-picker.wda.json country scroll_until",
-        "ios-iphone17-ios27/form-picker.wda.json submit tap",
-        "ios-iphone17-ios27/form-picker.wda.json submit scroll_until"
+        "ios-iphone17-ios27/sheet-background.wda.json B tap",
+        "ios-iphone17-ios27/sheet-background.wda.json B scroll_until",
+        "ios-iphone17-ios27/sheet-background.wda.json C tap",
+        "ios-iphone17-ios27/sheet-background.wda.json C scroll_until",
+        "ios-iphone17-ios27/sheet-background.wda.json D tap",
+        "ios-iphone17-ios27/sheet-background.wda.json D scroll_until"
       ],
-      "expect": "DOES-NOT-FAIL",
-      "needs": "presented/sheet-background: a page sheet whose bare background (no node of its own content) lies over a target of the screen beneath; rows: tap refused (not Tapped), scroll_until not 'fully visible' beneath the sheet. form-picker's picker sheet puts its rows over every target, so a row's refusal names the row, never the sheet's background.",
-      "remark": "The country picker sheet over the form. The note's symptom is Tapped / fully visible beneath a sheet where only its background lies over the target. At 2ae8b10 these rows answered so; by 53da035 (before the fix) they are already refused, as under a picker row — red only on the remedy's wording ('scroll_until it first', not 'close it first') and on the swipe beneath the sheet, which are #33's defect, not this note's. So this cell does not fail for #28."
+      "remark": "presented/sheet-background: a large sheet whose only content, S, lies at its top over A; B, C, D lie under its bare background. Before (53da035): Tapped, fully visible. 15896c5 fixed the note's Contacts tree, not this one: still red there and at every first-parent commit to 20b800a; green from 41c394a (fix/r20-marks), so the lab shape calibrates there. Was DOES-NOT-FAIL on form-picker (whose picker rows lie over every target, so a refusal named a row; the first B0 run's CALIBRATED there was corrected by review round 1) — the cell this note needed."
     },
     {
       "n": "29",
@@ -384,29 +447,36 @@
     {
       "n": "30",
       "note": "2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md",
-      "status": "needs-cell:presented",
+      "status": "calibrate",
       "fix": ["753b560"],
       "before": "4655113",
-      "verified": "merge-subject",
-      "needs": "presented/sheet-medium-edges: a target showing a sliver beside the sheet; rows: R-sliver, R-presented colour.",
-      "remark": "sheet-medium's targets are wholly beneath the sheet; golden is identical at 4655113 and 753b560."
+      "after": "753b560",
+      "verified": "golden",
+      "defect": "measured the layer over the target as the target",
+      "checks": ["ios-iphone17-ios27/sheet-medium-edges.wda.json E colour"],
+      "remark": "presented/sheet-medium-edges: E shows 5 pt at the screen's bottom beneath the medium sheet's dim. Before: PASS on the dim's colour; after: fails closed, close it first. Red again from 41c394a (fix/r20-marks) — 'failed without \"close it first\"', not this note's PASS — lab note L3."
     },
     {
       "n": "31",
       "note": "2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md",
       "status": "residual:open (the blur overlay has no node in either tree)",
-      "verified": "unverified",
-      "needs": "presented/blur-menu — to pin it as KNOWN."
+      "verified": "golden",
+      "remark": "Pinned as KNOWN residual (tests/differential/golden/presented.known.ts) on presented/blur-menu and blur-menu-grouped: A–D beneath the backdrop answer Tapped, a colour PASS on the blur and fully visible under idb and WDA (on the grouped WDA tree C is refused under the menu row W drawn over its centre, without 'close it first')."
     },
     {
       "n": "32",
       "note": "2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md",
-      "status": "needs-cell:presented",
+      "status": "calibrate",
       "fix": ["0c439ad"],
       "before": "83e282a",
-      "verified": "merge-subject",
-      "needs": "presented/sheet-medium-edges: a target below the fold beneath a sheet; rows: R-presented scroll_until (no stroke).",
-      "remark": "Golden is identical at 83e282a and 0c439ad."
+      "after": "0c439ad",
+      "verified": "golden",
+      "defect": "swiped \\d+× beneath",
+      "checks": [
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until"
+      ],
+      "remark": "presented/sheet-medium-edges: F wholly below, H wholly above the screen, beneath the medium sheet. Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3."
     },
     {
       "n": "33",
@@ -432,12 +502,19 @@
     {
       "n": "34",
       "note": "2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md",
-      "status": "needs-cell:presented",
+      "status": "calibrate",
       "fix": ["753b560"],
       "before": "4655113",
-      "verified": "merge-subject",
-      "needs": "presented/sheet-medium-edges: a target beneath a sheet wholly off screen or wholly under the status bar; rows: R-presented tap and colour.",
-      "remark": "Golden is identical at 4655113 and 753b560."
+      "after": "753b560",
+      "verified": "golden",
+      "defect": "without \"close it first\"",
+      "checks": [
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json H tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json G tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json G colour",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json F tap"
+      ],
+      "remark": "presented/sheet-medium-edges: H wholly above, F wholly below the screen, G wholly under the status bar, beneath the medium sheet; the colour row asks the remedy too (golden-spec/presented.ts). Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3."
     },
     {
       "n": "35",
@@ -552,6 +629,44 @@
         }
       ],
       "remark": "No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed row."
+    },
+    {
+      "n": "L3",
+      "note": "2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "without \"close it first\"|swiped \\d+× beneath a presented layer",
+      "checks": [
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json H tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json H colour",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json G tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json G colour",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json G scroll_until",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json E tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json E colour",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json E scroll_until",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json F tap",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json F colour",
+        "ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there)."
+    },
+    {
+      "n": "L4",
+      "note": "2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "under button|button \"Target C\"",
+      "checks": [
+        "ios-iphone17-ios27/blur-menu.idb.json W tap",
+        "ios-iphone17-ios27/blur-menu.idb.json W colour",
+        "ios-iphone17-ios27/blur-menu.idb.json W scroll_until",
+        "ios-iphone17-ios27/blur-menu.wda.json W tap",
+        "ios-iphone17-ios27/blur-menu.wda.json W colour",
+        "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
+      ],
+      "remark": "No fix yet: red at HEAD. Tap and scroll_until green at 16ae6bb, red from 13d68a2 (the cover judgement, #6) at every commit swept to debc9b2; the colour assert red from 596a379 (#22) at 7566443 and from 753b560 on, green at 20053ae and 8a55d2b. ADR 0015's reading break needs a later node above the target; SwiftUI's reading order lists none."
     }
   ],
   "excluded": [
