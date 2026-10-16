@@ -227,8 +227,9 @@ context). Until B4 measures it in both modes, the capture never taps a centre th
 target's `unprobed`), and consistency holds such a target to no probe; only the status bar's swallowed probe is
 measured (calibration.json #21, `systemBarSwallows`). An iOS status-band probe is taken: below the status bar's own
 height its touch is the app's, and the scroll-to-top it may also fire cannot reach the next probe (each relaunches the
-cell); in the top of the band (y < ~55 of 62 pt, measured by B3) the bar swallows it — no touch, and not reached
-(`truth.ts#statusBarMaySwallow`).
+cell); in the top of the band — a probe point above y 51 of 62 pt (`truth.ts#IOS_STATUS_BAR_SWALLOWS_ABOVE`, measured
+by B3 on the lab's iPhone 17, iOS 27.0, `open` cell: no touch at y ≤ 50, a touch at y ≥ 55) — the bar swallows it: no
+touch, and not reached (`truth.ts#statusBarMaySwallow`); a probe below that line with no touch is undelivered.
 
 ### Phase 4 — the matrix, generated
 
