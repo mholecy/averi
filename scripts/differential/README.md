@@ -136,7 +136,7 @@ coloured targets. Their truth (`CellTruth.form`) is the app's own model — per 
 shows with the identifier it shows it under, the keyboard's frame, the submits — and per control (field, submit, picker
 row) where its frame lies (open, under the keyboard, partly covered, under the sheet, off the screen, not laid out —
 measured from the app's frames by scripts/truth/truth.ts#situationOf, not declared) and what a raw tap at its centre
-did. `golden-spec/forms.ts#formExpectations` holds their rows: `assert … error:` by the field-error rules of
+did. `golden-spec/forms.ts#formRows` holds their rows: `assert … error:` by the field-error rules of
 docs/verification.md (each row names the rule it relies on, applied to the app's frames), titles and prefilled values
 read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a secure value never read back, a tap under the
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the

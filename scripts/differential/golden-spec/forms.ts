@@ -4,7 +4,10 @@ import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/sche
 import { otherControlsFired } from '../../truth/truth.js';
 import { BUDGET_MS, classed, closeFirst, failed, first, notTapped, ownWords, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, touchDowns, type Expectation } from './judges.js';
 
-/** The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formExpectations. */
+/**
+ * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
+ * asks them.
+ */
 
 /** docs/verification.md, "Forms & validation", "Field errors" — the rule a field-error row relies on. */
 export type PairingRule =
@@ -76,7 +79,7 @@ export type FormExpectation = Expectation & { target: string };
  * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent |
  * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
  */
-export function formExpectations(platform: Platform, truth: CellTruth): FormExpectation[] {
+export function formRows(platform: Platform, truth: CellTruth): FormExpectation[] {
   const form = truth.form;
   if (form === undefined) return [];
   const out: FormExpectation[] = [];

@@ -4,7 +4,7 @@ import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
 import { dismissRows, ownPartsRows } from './golden-spec/false-covers.js';
-import { formExpectations as formRows, type FormExpectation } from './golden-spec/forms.js';
+import { formRows, type FormExpectation } from './golden-spec/forms.js';
 import { presentedOverRows } from './golden-spec/presented.js';
 import type { Expectation } from './golden-spec/judges.js';
 
@@ -29,7 +29,7 @@ import type { Expectation } from './golden-spec/judges.js';
  * — and the judge overruled: a mismatch of one class, said first — `not in the tree:`. A row whose truth says the
  * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply.
  *
- * The form cells (phase 1b) add rows a replayed tree CAN judge — see golden-spec/forms.ts#formExpectations. What it
+ * The form cells (phase 1b) add rows a replayed tree CAN judge — see golden-spec/forms.ts#formRows. What it
  * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's
  * (scripts/truth/live.ts).
  *
@@ -66,7 +66,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
 }
 
 /**
- * A form cell's rows (golden-spec/forms.ts#formExpectations) — and, on a cell whose config taps its title to hide the
+ * A form cell's rows (golden-spec/forms.ts#formRows) — and, on a cell whose config taps its title to hide the
  * keyboard, R-dismiss (golden-spec/false-covers.ts#dismissRows) in place of each under-keyboard field's tap row, for
  * the capture's tree `source` (the dismissal acts under WDA only).
  */
