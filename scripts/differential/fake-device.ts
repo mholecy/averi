@@ -47,7 +47,11 @@ import type { ImeCapture } from '../truth/schema.js';
  *    caller asks — what a colour assert on that rect must sample; or, for
  *    a ground-truth capture (golden.ts), the screenshot the device showed.
  *  - `swiftc` compiles nothing (an empty file where the binary goes), and
- *    the "recognizer" reads no text in any region.
+ *    the "recognizer" reads no text in any region — unless the real one is
+ *    asked for (useRecognizer('vision'), the golden mode's OCR rows, phase 4):
+ *    then `swiftc` and the compiled recognizer (averi's own, under
+ *    `averi-ocr-bin`) are the host's, run as they are — macOS Vision reading
+ *    the screenshot the fake serves. Nothing else reaches a process.
  */
 
 /** The soft keyboard: hidden, docked (the API 33 band), or floating (Gboard's panel over a collapsed strip). */
@@ -109,6 +113,19 @@ interface DeviceState {
 }
 
 let current: DeviceState | undefined;
+
+/**
+ * Who reads text off a frame: `none` the fake recognizer (no text in any region, the differential's default), `vision`
+ * the host's — the side's own recognizer compiled by the real `swiftc` and run on the frame the fake serves (the golden
+ * mode's `ocr` rows, judged against real pixels: golden.ts#ocrAvailability). Set for the whole process.
+ */
+export type Recognizer = 'none' | 'vision';
+let recognizer: Recognizer = 'none';
+export function useRecognizer(r: Recognizer): void {
+  recognizer = r;
+}
+/** The OCR recognizer's commands: its compiler, and the binary averi caches under `averi-ocr-bin` (src/verify/ocr.ts). */
+const isRecognizer = (cmd: string) => cmd === 'swiftc' || cmd.includes('averi-ocr-bin');
 
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
@@ -337,6 +354,13 @@ type ExecFileCallback = (err: (Error & { code?: number | string; killed?: boolea
 
 function fakeExecFile(cmd: string, args: readonly string[] | undefined, opts: unknown, cb?: ExecFileCallback) {
   const callback = (typeof opts === 'function' ? opts : cb) as ExecFileCallback;
+  // The real recognizer (useRecognizer): the host's swiftc and the binary it built, in the host's environment (the fake
+  // DEVELOPER_DIR would send swiftc nowhere).
+  if (recognizer === 'vision' && isRecognizer(cmd) && realExecFile !== undefined) {
+    const given = typeof opts === 'object' && opts !== null ? (opts as Record<string, unknown>) : {};
+    const run = realExecFile as unknown as (file: string, args: string[], options: object, callback: ExecFileCallback) => unknown;
+    return run(cmd, [...(args ?? [])], { ...given, env: hostEnv() }, callback);
+  }
   let stdin: string | undefined;
   const child = {
     stdin: {
@@ -363,6 +387,29 @@ const refuse = (name: string) => () => {
 };
 
 let installed = false;
+/** The host's execFile and DEVELOPER_DIR, kept by installFakeDevice for the real recognizer (useRecognizer). */
+let realExecFile: typeof childProcess.execFile | undefined;
+let hostDeveloperDir: string | undefined;
+const hostEnv = (): NodeJS.ProcessEnv => {
+  const env = { ...process.env };
+  if (hostDeveloperDir === undefined) delete env.DEVELOPER_DIR;
+  else env.DEVELOPER_DIR = hostDeveloperDir;
+  return env;
+};
+
+/**
+ * The host's own exec, for the one thing the harness itself runs on the host: golden.ts's probe of the recognizer
+ * (ocrAvailability). Rejects as adapters/exec.ts does (an Error with its stderr), resolves stdout and stderr.
+ */
+export function hostExec(cmd: string, args: string[], stdin?: string): Promise<{ stdout: Buffer; stderr: string }> {
+  const run = realExecFile ?? childProcess.execFile;
+  return new Promise((resolve, reject) => {
+    const child = run(cmd, args, { encoding: 'buffer', maxBuffer: 64 << 20, timeout: 180_000, env: hostEnv() }, (err, stdout, stderr) =>
+      err ? reject(Object.assign(new Error(`${cmd}: ${err.message} ${stderr.toString('utf8')}`.trim()), { code: (err as { code?: unknown }).code })) : resolve({ stdout, stderr: stderr.toString('utf8') }),
+    );
+    if (stdin !== undefined) child.stdin?.end(stdin);
+  });
+}
 
 /**
  * Replace the process functions — before either side is imported, so their
@@ -375,6 +422,8 @@ export function installFakeDevice(): void {
   if (installed) return;
   installed = true;
   const cp = childProcess as unknown as Record<string, unknown>;
+  realExecFile = childProcess.execFile;
+  hostDeveloperDir = process.env.DEVELOPER_DIR;
   cp.execFile = fakeExecFile;
   for (const name of ['spawn', 'exec', 'execSync', 'execFileSync', 'spawnSync', 'fork']) cp[name] = refuse(name);
   syncBuiltinESMExports();
