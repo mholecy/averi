@@ -76,7 +76,7 @@ decide; the golden row is the check.
   back at `0,1966 1080x188`, Continue `55,1994 970x132`) Compose dumps note as `[55,2126][1025,2140]` — its 48-dp touch
   target with Continue taken out — and averi taps its centre, y 2133, 7 px below Continue's bottom. That reaches note
   only because this bar's padding is no touch target (the probe at that point after back focused note,
-  ControlTruth.reachedAtPieceAfterBack; at note's own centre, y 2074, the form was SUBMITTED). In an app whose bar
+  ControlTruth.afterBack.piece.reached; at note's own centre, y 2074, the form was SUBMITTED). In an app whose bar
   takes the touch (a clickable or a pointer-consuming surface), the same tree — the bar has no node either way — would
   get the same `Tapped`, and nothing would reach the field. Whether averi should keep tapping such a sliver of a
   control cut by a later sibling, or refuse it as under the tap minimum, is the owner's call; the golden row

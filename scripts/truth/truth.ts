@@ -399,12 +399,29 @@ export function largestPiece(visible: Rect, covers: readonly Rect[]): Rect | nul
  * is the probe at the piece that says, ControlTruth.reachedAtPiece). null when nothing of it is clear.
  */
 export function controlPiece(frame: Rect, s: LabState, form: CatalogForm, own: { tag: string }): Rect | null {
-  const visible = intersect(frame, { x: 0, y: 0, width: s.screen.width, height: s.screen.height });
+  const visible = intersect(frame, screenOf(s));
   if (visible === null) return null;
   const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
-  const submit = form.submit.pinned === true && own.tag !== form.submit.tag ? s.frames[form.submit.tag] : undefined;
+  const submit = pinnedSubmit(s, form, own);
   return largestPiece(visible, [k, submit].filter((r): r is Rect => r !== undefined));
 }
+
+/**
+ * Android, a control under the IME that a tap at its centre after one `back` did not reach: its piece in the layout
+ * after back (`after`, CellTruth.afterBack's state) — the largest part of its touch target (touchTargetOf, at the
+ * density the app reported) on the screen clear of the pinned submit's own frame there, as controlPiece clears it.
+ * null when nothing of it is clear. Where a second probe after back taps (ControlTruth.afterBack.piece).
+ */
+export function pieceAfterBack(frame: Rect, after: LabState, form: CatalogForm, own: { tag: string }): Rect | null {
+  const target = intersect(touchTargetOf(frame, after.density), screenOf(after));
+  if (target === null) return null;
+  const submit = pinnedSubmit(after, form, own);
+  return largestPiece(target, submit === undefined ? [] : [submit]);
+}
+
+const screenOf = (s: Pick<LabState, 'screen'>): Rect => ({ x: 0, y: 0, width: s.screen.width, height: s.screen.height });
+/** The pinned submit's own frame in `s`, when the form pins one and `own` is not it — what lies over a control there. */
+const pinnedSubmit = (s: LabState, form: CatalogForm, own: { tag: string }) => (form.submit.pinned === true && own.tag !== form.submit.tag ? s.frames[form.submit.tag] : undefined);
 
 /**
  * The edges of `frame` its scroll view's clip cuts — the clip's edge is where what shows of it ends, and the frame runs

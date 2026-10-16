@@ -357,13 +357,15 @@
             "tag": "invalid"
           }
         ],
-        "piece": {
-          "x": 55,
-          "y": 1370,
-          "width": 970,
-          "height": 25
-        },
-        "reachedAtPiece": true
+        "atPiece": {
+          "piece": {
+            "x": 55,
+            "y": 1370,
+            "width": 970,
+            "height": 25
+          },
+          "reached": true
+        }
       },
       {
         "tag": "vs",
@@ -379,13 +381,15 @@
         "reached": false,
         "probe": [],
         "seen": "#F0F0F3",
-        "reachedAfterBack": true,
-        "probeAfterBack": [
-          {
-            "kind": "touch",
-            "tag": "540,1528"
-          }
-        ]
+        "afterBack": {
+          "reached": true,
+          "probe": [
+            {
+              "kind": "touch",
+              "tag": "540,1528"
+            }
+          ]
+        }
       },
       {
         "tag": "ks",
@@ -401,13 +405,15 @@
         "reached": false,
         "probe": [],
         "seen": "#FFFFFF",
-        "reachedAfterBack": true,
-        "probeAfterBack": [
-          {
-            "kind": "touch",
-            "tag": "540,1710"
-          }
-        ]
+        "afterBack": {
+          "reached": true,
+          "probe": [
+            {
+              "kind": "touch",
+              "tag": "540,1710"
+            }
+          ]
+        }
       },
       {
         "tag": "ss",
@@ -423,13 +429,15 @@
         "reached": false,
         "probe": [],
         "seen": "#FFFFFF",
-        "reachedAfterBack": true,
-        "probeAfterBack": [
-          {
-            "kind": "touch",
-            "tag": "540,1892"
-          }
-        ]
+        "afterBack": {
+          "reached": true,
+          "probe": [
+            {
+              "kind": "touch",
+              "tag": "540,1892"
+            }
+          ]
+        }
       },
       {
         "tag": "note",
@@ -445,24 +453,28 @@
         "reached": false,
         "probe": [],
         "seen": "#F0F0F3",
-        "reachedAfterBack": false,
-        "probeAfterBack": [
-          {
-            "kind": "touch",
-            "tag": "540,2074"
-          },
-          {
-            "kind": "submit",
-            "tag": "invalid"
+        "afterBack": {
+          "reached": false,
+          "probe": [
+            {
+              "kind": "touch",
+              "tag": "540,2074"
+            },
+            {
+              "kind": "submit",
+              "tag": "invalid"
+            }
+          ],
+          "piece": {
+            "piece": {
+              "x": 55,
+              "y": 2126,
+              "width": 970,
+              "height": 14
+            },
+            "reached": true
           }
-        ],
-        "pieceAfterBack": {
-          "x": 55,
-          "y": 2126,
-          "width": 970,
-          "height": 14
-        },
-        "reachedAtPieceAfterBack": true
+        }
       },
       {
         "tag": "submit",

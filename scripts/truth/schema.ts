@@ -422,28 +422,34 @@ export interface ControlTruth {
   seen?: string;
   /**
    * Android, an `under-keyboard` control: a raw tap at its centre after one `back` hid the IME (LabDevice.hideKeyboard)
-   * reached it — what averi's tap guard does there (hide, find again, tap). Absent elsewhere.
+   * — what averi's tap guard does there (hide, find again, tap). Absent elsewhere.
    */
-  reachedAfterBack?: boolean;
-  /**
-   * The same probe's events (its touch first, then what fired: a `submit` where the bar dropped back to the screen's
-   * bottom lies over the control's centre). Present with `reachedAfterBack`.
-   */
-  probeAfterBack?: ProbeEvent[];
-  /**
-   * Not reached after back (`reachedAfterBack` false): the largest part of its touch target in the layout after back
-   * (truth.ts#touchTargetOf over CellTruth.afterBack's state) clear of the submit's frame there, and whether a raw tap
-   * at its centre, after one back, reached the control. Absent when there is no such part.
-   */
-  pieceAfterBack?: Rect;
-  reachedAtPieceAfterBack?: boolean;
+  afterBack?: {
+    /** The tap reached it. */
+    reached: boolean;
+    /**
+     * The probe's events (its touch first, then what fired: a `submit` where the bar dropped back to the screen's
+     * bottom lies over the control's centre).
+     */
+    probe: ProbeEvent[];
+    /**
+     * Not reached: its piece in the layout after back (truth.ts#pieceAfterBack, over CellTruth.afterBack's state) and
+     * whether a raw tap at its centre, after one back, reached the control. Absent when there is no such part.
+     */
+    piece?: PieceProbe;
+  };
   /**
    * A `covered` control: the largest part of its frame clear of the keyboard and the pinned submit (truth.ts#
    * controlPiece), and whether a second raw tap at its centre reached the control — probed when that centre is not
    * the frame's. Absent elsewhere.
    */
-  piece?: Rect;
-  reachedAtPiece?: boolean;
+  atPiece?: PieceProbe;
+}
+
+/** A second probe of a control: the piece of it tapped (at its centre, probePoint) and whether that reached it. */
+export interface PieceProbe {
+  piece: Rect;
+  reached: boolean;
 }
 
 /** A field as the app's model held it when the trees were read. */

@@ -12,6 +12,7 @@ import {
   listedIn,
   otherControlsFired,
   outOfProcessKeyboard,
+  pieceAfterBack,
   probePoint,
   readControlProbe,
   readTargetProbe,
@@ -418,7 +419,7 @@ describe('capture of a form cell (iOS)', () => {
     ]);
     expect(truth.form!.controls).toEqual([
       { tag: 'name', id: 'lab.form-k.name', kind: 'field', frame: rect(20, 160, 362, 34), situation: 'open', reached: true, probe: [ev('touch', '201.0,177.0')] },
-      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')], piece: { x: 20, y: 563, width: 362, height: 1 }, reachedAtPiece: false },
+      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')], atPiece: { piece: { x: 20, y: 563, width: 362, height: 1 }, reached: false } },
       { tag: 'vs', id: 'lab.form-k.vs', kind: 'field', frame: rect(20, 604, 362, 34), situation: 'under-keyboard', reached: false, probe: [ev('touch', '201.0,621.0')], seen: '#000000' },
       { tag: 'submit', id: 'lab.form-k.submit', kind: 'button', frame: rect(20, 516.7, 362, 46.3), situation: 'open', reached: true, probe: [ev('touch', '201.0,540.0')] },
     ]);
@@ -511,8 +512,8 @@ describe('capture of a form cell (Android)', () => {
     expect(JSON.parse(await readFile(join(out, 'form-k.after-back.state.json'), 'utf8')).cell).toBe('form-k');
     expect(JSON.parse(await readFile(join(out, 'form-k.ime.json'), 'utf8')).hidden.inputShown).toBe('mInputShown=false');
     const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
-    expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', reachedAfterBack: true, probeAfterBack: [ev('touch', '201.0,621.0')] });
-    expect(truth.form!.controls.filter((c) => c.reachedAfterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);
+    expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', afterBack: { reached: true, probe: [ev('touch', '201.0,621.0')] } });
+    expect(truth.form!.controls.filter((c) => c.afterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);
   }, 15_000);
 
   it('a pinned submit whose state reports no bar is refused: every control under it would read open', async () => {
@@ -532,6 +533,20 @@ describe('touchTargetOf: a Compose control\'s 48-dp touch target', () => {
     expect(touchTargetOf(rect(55, 2024, 970, 99), 2.75)).toEqual(rect(55, 2008, 970, 132));
     expect(touchTargetOf(rect(55, 1238, 970, 160), 2.75)).toEqual(rect(55, 1238, 970, 160));
     expect(touchTargetOf(rect(55, 2024, 970, 99), undefined)).toEqual(rect(55, 2024, 970, 99));
+  });
+});
+
+describe('pieceAfterBack: a control\'s piece in the layout after back', () => {
+  // averi_lab's form-keyboard after one back: note at 2024 (99 px, 2.75 dp/px), Continue pinned at 1994..2126.
+  const after = state({ screen: rect(0, 0, 1080, 2220), density: 2.75, frames: { submit: rect(55, 1994, 970, 132) }, keyboard: undefined });
+  it('is its touch target clear of the pinned submit\'s own frame — as controlPiece clears it — null when nothing is clear', () => {
+    expect(pieceAfterBack(rect(55, 2024, 970, 99), after, FORM, { tag: 'note' })).toEqual(rect(55, 2126, 970, 14));
+    expect(pieceAfterBack(rect(55, 1994, 970, 132), after, FORM, { tag: 'note' })).toBeNull();
+    expect(pieceAfterBack(rect(55, 2300, 970, 99), after, FORM, { tag: 'note' })).toBeNull();
+  });
+  it('clears no submit the form does not pin, nor the submit from itself', () => {
+    expect(pieceAfterBack(rect(55, 2024, 970, 99), after, UNPINNED, { tag: 'note' })).toEqual(rect(55, 2008, 970, 132));
+    expect(pieceAfterBack(rect(55, 1994, 970, 132), after, FORM, { tag: 'submit' })).toEqual(rect(55, 1994, 970, 132));
   });
 });
 

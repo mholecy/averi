@@ -339,9 +339,9 @@ const ANDROID_FORM: CellTruth = {
   form: {
     fields: [field('name', 330, { frame: rect(55, 330, 970, 99), error: { id: 'IbanError', text: 'Enter the recipient’s name' }, errorFrame: rect(55, 440, 600, 40) })],
     controls: [
-      control('vs', { frame: rect(55, 1478, 970, 99), situation: 'under-keyboard', reached: false, probe: [], seen: '#FFFFFF', reachedAfterBack: true, probeAfterBack: [{ kind: 'touch', tag: '540,1528' }, { kind: 'focus', tag: 'vs' }] }),
-      control('note', { frame: rect(55, 2024, 970, 99), situation: 'under-keyboard', reached: false, probe: [], reachedAfterBack: false, probeAfterBack: [{ kind: 'touch', tag: '540,2074' }, { kind: 'submit', tag: 'invalid' }], pieceAfterBack: rect(55, 2126, 970, 14), reachedAtPieceAfterBack: true }),
-      control('phone', { frame: rect(55, 1296, 970, 99), situation: 'covered', reached: false, probe: [{ kind: 'touch', tag: '540,1346' }, { kind: 'submit', tag: 'invalid' }], piece: rect(55, 1370, 970, 25), reachedAtPiece: true }),
+      control('vs', { frame: rect(55, 1478, 970, 99), situation: 'under-keyboard', reached: false, probe: [], seen: '#FFFFFF', afterBack: { reached: true, probe: [{ kind: 'touch', tag: '540,1528' }, { kind: 'focus', tag: 'vs' }] } }),
+      control('note', { frame: rect(55, 2024, 970, 99), situation: 'under-keyboard', reached: false, probe: [], afterBack: { reached: false, probe: [{ kind: 'touch', tag: '540,2074' }, { kind: 'submit', tag: 'invalid' }], piece: { piece: rect(55, 2126, 970, 14), reached: true } } }),
+      control('phone', { frame: rect(55, 1296, 970, 99), situation: 'covered', reached: false, probe: [{ kind: 'touch', tag: '540,1346' }, { kind: 'submit', tag: 'invalid' }], atPiece: { piece: rect(55, 1370, 970, 25), reached: true } }),
     ],
     keyboard: { frame: rect(0, 1398, 1080, 822), field: 'postcode' },
     screenError: { id: 'lab.f.banner_error', text: 'Payment wasn’t sent', frame: rect(55, 1700, 970, 50) },
@@ -427,13 +427,13 @@ describe('the Android form rows (phase 2b)', () => {
     // layout with no piece after back is replayed (no Tapped admitted).
     const noLayout = formExpectations('android', { ...ANDROID_FORM, afterBack: undefined }, 'uiautomator');
     expect(pick(noLayout, 'tap', 'note').live).toMatch(/live\.ts k5/);
-    const noPiece = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, pieceAfterBack: undefined, reachedAtPieceAfterBack: undefined } : c)) } }, 'uiautomator');
+    const noPiece = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, afterBack: { ...c.afterBack!, piece: undefined } } : c)) } }, 'uiautomator');
     expect(pick(noPiece, 'tap', 'note').live).toBeUndefined();
     check(pick(noPiece, 'tap', 'note').judge, [['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/]]);
   });
 
   it('a piece after back that no probe reached admits no Tapped', () => {
-    const unreached = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, reachedAtPieceAfterBack: false } : c)) } }, 'uiautomator');
+    const unreached = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, afterBack: { ...c.afterBack!, piece: { ...c.afterBack!.piece!, reached: false } } } : c)) } }, 'uiautomator');
     check(pick(unreached, 'tap', 'note').judge, [
       ['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/],
       ['ERROR … nothing was tapped', [], 'ok'],

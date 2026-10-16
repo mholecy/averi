@@ -74,18 +74,18 @@ export type FormExpectation = Expectation & { target: string };
  * | a field sharing its identifier with another field | tap / scroll_until | not asked: `id:` names every field of the component, not this one |
  * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
  * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
- * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.reachedAfterBack) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") |
- * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: probeAfterBack says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (pieceAfterBack, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
+ * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.afterBack.reached) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") |
+ * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: afterBack.probe says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (afterBack.piece, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
  * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
- * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.reachedAtPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
+ * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.atPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
  * | the same | scroll_until down | never "reached" without a swipe |
  * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent |
  * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
  */
 /**
- * Android's under-keyboard tap (ControlTruth.reachedAfterBack): `Tapped`, a `back` (`input keyevent 4`) sent before the
+ * Android's under-keyboard tap (ControlTruth.afterBack.reached): `Tapped`, a `back` (`input keyevent 4`) sent before the
  * tap, and exactly one tap, inside the control's frame.
  */
 export const tappedAfterBack =
@@ -100,7 +100,7 @@ export const tappedAfterBack =
     return undefined;
   };
 
-/** A covered control's tap where its piece was reached (ControlTruth.reachedAtPiece): refused with nothing sent, or `Tapped` with every tap inside the piece. */
+/** A covered control's tap where its piece was reached (ControlTruth.atPiece): refused with nothing sent, or `Tapped` with every tap inside the piece. */
 export const notTappedOrInPiece =
   (piece: Rect) =>
   (o: Outcome): string | undefined => {
@@ -109,7 +109,7 @@ export const notTappedOrInPiece =
   };
 
 /**
- * Android's under-keyboard tap where a tap at its centre after back did NOT reach it (ControlTruth.reachedAfterBack
+ * Android's under-keyboard tap where a tap at its centre after back did NOT reach it (ControlTruth.afterBack.reached
  * false): no tap within TOUCH_SLACK of that centre where it fired another control (`fires`, the probe's words); a
  * refusal sends nothing; `Tapped` only with every tap inside `piece` — its piece after back, given only where a probe
  * there reached it (none: no Tapped is right).
@@ -232,7 +232,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           call: tap,
           judge: (o) => notTapped(o) ?? (/\bsoft keyboard\b/i.test(ownWords(o)) ? undefined : said(o, 'refused without naming the keyboard')),
         });
-      } else if (c.reachedAfterBack === true) {
+      } else if (c.afterBack?.reached === true) {
         const frame = c.frame!;
         rows.push({
           target,
@@ -241,21 +241,21 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           call: tap,
           judge: tappedAfterBack(frame),
         });
-      } else if (c.reachedAfterBack === false) {
+      } else if (c.afterBack?.reached === false) {
         // After `back` the layout changes (the bar drops back to the screen's bottom): a raw tap at its centre then did
-        // not reach it — what it fired is the probe's (ControlTruth.probeAfterBack). averi finds the element again in
+        // not reach it — what it fired is the probe's (ControlTruth.afterBack.probe). averi finds the element again in
         // the layout after back: with that layout captured (CellTruth.afterBack, served by the fake device once `back`
         // is sent) the row is replayed — never a tap where the centre's probe fired another control, and Tapped only
-        // inside its piece there where a probe reached it (pieceAfterBack); without it, the live golden's (live.ts k5).
-        const fired = otherControlsFired(c.probeAfterBack ?? [], c.tag);
+        // inside its piece there where a probe reached it (afterBack.piece); without it, the live golden's (live.ts k5).
+        const fired = otherControlsFired(c.afterBack.probe, c.tag);
         const what = fired.length > 0 ? `fires ${fired.map((e) => `${e.kind} ${e.tag}`).join(', ')}` : 'does not reach it';
-        const piece = c.pieceAfterBack;
+        const piece = c.afterBack.piece?.piece;
         rows.push({
           target,
           verb: 'tap',
           says: `never a tap at its centre (after one back a tap there ${what}); Tapped only inside its piece after back${piece === undefined ? '' : ` ${pointsText([{ x: piece.x, y: piece.y }])} ${piece.width}x${piece.height}`}, where a probe reached it`,
           call: tap,
-          judge: tapAfterBackOnPiece(probePoint(c.frame!), fired.length > 0 ? what : undefined, c.reachedAtPieceAfterBack === true ? piece : undefined),
+          judge: tapAfterBackOnPiece(probePoint(c.frame!), fired.length > 0 ? what : undefined, c.afterBack.piece?.reached === true ? piece : undefined),
           ...(truth.afterBack === undefined && { live: 'no layout after back captured: averi finds the element again in the new tree, which a replayed tree (the IME-up layout) does not hold; live.ts k5 judges it on the model' }),
         });
       }
@@ -328,13 +328,13 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
       if (fired.length === 0) return [];
       const other = fired.map((e) => `${e.kind} ${e.tag}`).join(', ');
       return [
-        c.reachedAtPiece === true && c.piece !== undefined
+        c.atPiece?.reached === true
           ? {
               target,
               verb: 'tap',
-              says: `not tapped, or Tapped inside its piece ${pointsText([{ x: c.piece.x, y: c.piece.y }])} ${c.piece.width}x${c.piece.height} (a tap at its centre fires ${other}; one at its piece reached it)`,
+              says: `not tapped, or Tapped inside its piece ${pointsText([{ x: c.atPiece.piece.x, y: c.atPiece.piece.y }])} ${c.atPiece.piece.width}x${c.atPiece.piece.height} (a tap at its centre fires ${other}; one at its piece reached it)`,
               call: tap,
-              judge: notTappedOrInPiece(c.piece),
+              judge: notTappedOrInPiece(c.atPiece.piece),
             }
           : { target, verb: 'tap', says: `not tapped, nothing sent (a tap at its centre fires ${other})`, call: tap, judge: notTapped },
         {

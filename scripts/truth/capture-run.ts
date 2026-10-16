@@ -6,7 +6,7 @@ import type { LabDevice } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, controlPiece, intersect, largestPiece, listedIn, touchTargetOf, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, controlPiece, listedIn, measuredGeometry, outOfProcessKeyboard, pieceAfterBack, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -230,42 +230,32 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
   for (const w of wanted) {
     const frame = s.frames[w.frame];
     const situation = situationOf(frame, s, form, w);
+    // One probe of this control (probe, then readControlProbe): relaunch, `first` when given, a raw tap at `where`.
+    const field = form.fields.find((f) => f.tag === w.tag);
+    const probeControl = async (where: Rect | { x: number; y: number }, first?: () => Promise<void>) => {
+      const { events, after } = await probe(lab, cell.id, where, first);
+      return readControlProbe(events, w, field, after?.focus);
+    };
     let read: { reached: boolean; probe: ControlTruth['probe'] } = { reached: false, probe: [] };
-    if (frame !== undefined && situation !== 'off-screen' && situation !== 'not-rendered') {
-      const { events, after } = await probe(lab, cell.id, frame);
-      read = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
-    }
+    if (frame !== undefined && situation !== 'off-screen' && situation !== 'not-rendered') read = await probeControl(frame);
     // What the screen shows over a control laid under the keyboard: the colour a pixel assert there would measure.
     const seen = frame !== undefined && situation === 'under-keyboard' ? measure(png, frame, s.scale, '#000000').seen : undefined;
     // Android: what averi's tap guard does with a control under the IME — hide it (back), then tap — probed too.
-    let backAt: { reached: boolean; probe: ControlTruth['probe'] } | undefined;
-    if (frame !== undefined && situation === 'under-keyboard' && lab.hideKeyboard !== undefined) {
-      const { events, after } = await probe(lab, cell.id, frame, () => lab.hideKeyboard!());
-      backAt = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
-    }
-    // Not reached at its centre after back: a probe, after back, at its piece of the layout then — its touch target
-    // (truth.ts#touchTargetOf) clear of the submit's frame there.
-    let back: { piece: Rect; reached: boolean } | undefined;
-    const backFrame = afterBack?.frames[w.frame];
-    if (backAt?.reached === false && backFrame !== undefined && afterBack !== undefined) {
-      const submit = w.tag !== form.submit.tag ? afterBack.frames[form.submit.tag] : undefined;
-      const screen = { x: 0, y: 0, width: afterBack.screen.width, height: afterBack.screen.height };
-      const target = intersect(touchTargetOf(backFrame, afterBack.density), screen);
-      const piece = target === null ? null : largestPiece(target, submit === undefined ? [] : [submit]);
-      if (piece !== null) {
-        const { events, after } = await probe(lab, cell.id, piece, () => lab.hideKeyboard!());
-        back = { piece, reached: readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached };
-      }
+    const hide = lab.hideKeyboard === undefined ? undefined : () => lab.hideKeyboard!();
+    let back: ControlTruth['afterBack'];
+    if (frame !== undefined && situation === 'under-keyboard' && hide !== undefined) {
+      back = await probeControl(frame, hide);
+      // Not reached at its centre after back: a probe, after back, at its piece of the layout then (truth.ts
+      // #pieceAfterBack).
+      const backFrame = afterBack?.frames[w.frame];
+      const piece = !back.reached && backFrame !== undefined && afterBack !== undefined ? pieceAfterBack(backFrame, afterBack, form, w) : null;
+      if (piece !== null) back.piece = { piece, reached: (await probeControl(piece, hide)).reached };
     }
     // A covered control: a second probe at the centre of its piece clear of the keyboard and the pinned submit, when
     // that is not its frame's — where a tap moved off the cover would land.
     const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w) : null;
     const second = frame === undefined ? undefined : pieceProbePoint(frame, piece);
-    let reachedAtPiece: boolean | undefined;
-    if (second !== undefined) {
-      const { events, after } = await probe(lab, cell.id, second);
-      reachedAtPiece = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached;
-    }
+    const atPiece = second === undefined ? undefined : { piece: piece!, reached: (await probeControl(second)).reached };
     const c: ControlTruth = {
       tag: w.tag,
       id: w.id,
@@ -274,14 +264,13 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       situation,
       ...read,
       ...(seen !== undefined && { seen }),
-      ...(backAt !== undefined && { reachedAfterBack: backAt.reached, probeAfterBack: backAt.probe }),
-      ...(back !== undefined && { pieceAfterBack: back.piece, reachedAtPieceAfterBack: back.reached }),
-      ...(reachedAtPiece !== undefined && { piece: piece!, reachedAtPiece }),
+      ...(back !== undefined && { afterBack: back }),
+      ...(atPiece !== undefined && { atPiece }),
     };
     controls.push(c);
     const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
-    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${backAt === undefined ? '' : ` (after back ${backAt.reached}${described(backAt.probe)})`}${back === undefined ? '' : ` (after back at its piece ${back.reached})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
+    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${back === undefined ? '' : ` (after back ${back.reached}${described(back.probe)})`}${back?.piece === undefined ? '' : ` (after back at its piece ${back.piece.reached})`}${atPiece === undefined ? '' : ` (at its piece ${atPiece.reached})`}${described(c.probe)}`);
   }
   // The principal title a keyboard dismissal taps (CatalogForm.titleId): probed — a tap on it must end the editing.
   let title: FormTruth['title'];
