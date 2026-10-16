@@ -1,7 +1,8 @@
 import type { Platform } from '../corpus.js';
-import type { CellTruth, TargetTruth } from '../../truth/schema.js';
+import { DRAWN, type CellTruth, type TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
+import { openRows } from './base.js';
 import { bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
 
 /**
@@ -13,9 +14,15 @@ import { bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour
  *
  * | geometry | rows |
  * |---|---|
- * | status-band, nav-band | R-band tap, R-band colour, R-band scroll_until |
+ * | status-band, nav-band (Android) | R-band tap, R-band colour, R-band scroll_until |
+ * | nav-band on iOS: the home indicator's band | the open rows (base.ts), when the probe reached it and it is drawn |
  * | under-chrome:<name> | R-under-chrome tap (R-land on its piece), colour, scroll_until |
  * | band-overlap:<band>, chrome-overlap:<name> | R-overlap: tap (R-land at its centre), colour (fails closed only where what it samples is overlapped), scroll_until reached with no swipe, R-fully (a band's: in a scroll view only) |
+ *
+ * iOS's home-indicator band is no band averi judges (ADR 0009's navigation band is Android's; ADR 0008 is iOS's status
+ * band) and none the truth makes one: measured by B4 (truth.ts#bandTouchTells), a tap there is the app's and fires the
+ * target beneath. So a target centred there is asked what an open one is (ADR 0020: the truth outranks a hand-written
+ * expectation) — Tapped, its colour, reached at once.
  *
  * R-overlap, a whole target whose centre is clear but whose edge a band or the chrome overlaps past ADR 0002's slack:
  * the tap and the plain stop are centre-based (ADR 0009 N-a), so `Tapped` and reached at once; the colour assert fails
@@ -28,6 +35,7 @@ export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth): Ex
   const g = t.geometry;
   if (g === undefined) return [];
   const { kind, name } = parseGeometry(g);
+  if (g === 'nav-band' && platform === 'ios') return t.reached && t.drawn >= DRAWN ? openRows(platform, t) : [];
   if (g === 'status-band' || g === 'nav-band') {
     return [bandTap(platform, t), colourFails(platform, t, `R-band: the ${g === 'status-band' ? 'status' : 'navigation'} band over it`), notReachedStill(platform, t, cell, 'R-band')].map(classed);
   }
