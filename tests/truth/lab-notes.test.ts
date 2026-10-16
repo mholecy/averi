@@ -35,9 +35,12 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
 
 /**
  * Notes calibration.json lists that are not committed on this branch: fixed notes (calibrated, or a residual, or
- * excluded) written on docs/device-check-r5-r12 (5f1996e) or after it outside the truth branch. calibrate.ts reads no
- * note's text, only its rows, so they calibrate without it; but none of them may be open or be named by a KNOWN row
- * (checked below), and a note that lands here must be struck off this list.
+ * excluded). 20 of the 31 are committed in 5f1996e (docs/device-check-r5-r12, not merged here); the other 11 — the
+ * 2026-10-14/15 notes, ios-color-assert-on-a-row-outside… through ocr-assert-fails-on-a-typographic-apostrophe…, and
+ * the excluded android-numeric-character-references… — are in no commit on any ref, only untracked in the main
+ * checkout (the owner's to commit). calibrate.ts reads no note's text, only its rows, so they calibrate without it; but
+ * none of them may be open or be named by a KNOWN row (checked below), and a note that lands here must be struck off
+ * this list.
  */
 const NOT_ON_THIS_BRANCH: readonly string[] = [
   '2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md',

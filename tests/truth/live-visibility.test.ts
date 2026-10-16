@@ -271,6 +271,8 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
     expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired', 'refused')).toBeUndefined();
     expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim', 'visible')).toBeUndefined();
   });
+  // A consistency check of the data, not a second judge: live-visibility.ts produces `tap-claim` only on a `Tapped`
+  // reply and `stop-claim` only on a `visible` one, so an entry pinning either rule on another kind could never match.
   it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
     const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
     expect(bad).toEqual([]);

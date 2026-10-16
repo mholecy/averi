@@ -44,6 +44,22 @@ describe('live.ts --rejudge over the committed visibility records', () => {
   });
 });
 
+describe('live.ts --rejudge over a committed calibration record where LV2 reads as a stop claim', () => {
+  // LV2's flush cases are intermittent and ok in android-vis.json, so the record above never asks their entries' class
+  // or kind. cal12-d043e65-1.json (#12's live calibration, a --side run of d043e65) reads both as a stop claimed on
+  // `visible`: known by LV2's entries. Its one case not known, scroll-bounded-flush.S, is #12's own defect at that
+  // commit (a calibration, not HEAD's KNOWN): exit 1, as recorded.
+  it('cal12-d043e65-1.json: P.fully and S.fully known by LV2, S alone not known', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudge('cal12-d043e65-1.json', 'visibility');
+    expect(out).toMatch(/^# Live golden: 7 cases, 4 ok, 0 loud, 3 mismatches \(1 not known\), 0 skipped$/m);
+    const lv2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
+    for (const id of ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'])
+      expect(out).toMatch(new RegExp(`^- MISMATCH \\(stop-claim\\) ${id.replaceAll('.', '\\.')} .*\\[known: ${lv2.replaceAll('.', '\\.')}\\]$`, 'm'));
+    expect(out).toMatch(/^- MISMATCH \(stop-claim\) scroll:scroll-bounded-flush\.S scroll-bounded-flush: .*(?<!\])$/m);
+    expect(code).toBe(1);
+  });
+});
+
 describe('live.ts: a known case not intermittent that comes out ok fails the run (live-known.ts\'s ratchet)', () => {
   it('idb tap:blur-menu-grouped.C read as WDA read it (refused, nothing fired): FIXED, exit 1', { timeout: 60_000 }, async () => {
     type Rec = { platform: string; side: string; results: { source: string; id: string }[] };
