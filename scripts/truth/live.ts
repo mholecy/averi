@@ -95,7 +95,8 @@ interface Case {
   /** The platforms it runs on (both when unset). */
   platforms?: readonly ('ios' | 'android')[];
   calls: Call[];
-  judge(state: LabState, replies: string[], source: Source): Verdict;
+  /** `launched`: the model as the launch left it, before any call — what a LOUD case's field held. */
+  judge(state: LabState, replies: string[], source: Source, launched: LabState): Verdict;
 }
 
 const id = (cell: string, tag: string) => `id:"lab.${cell}.${tag}"`;
@@ -111,15 +112,18 @@ const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
 /** The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). */
 const holds =
   (tag: string, want: string) =>
-  (s: LabState, replies: string[]): Verdict => {
+  (s: LabState, replies: string[], _source?: Source, launched?: LabState): Verdict => {
     const got = valueOf(s, tag);
+    // LOUD splits by what averi left behind: the field as the launch left it, or changed (a part typed, a part cleared).
+    const before = launched === undefined ? undefined : valueOf(launched, tag);
+    const left = before === undefined ? '' : got === before ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
     const last = replies[replies.length - 1];
     if (got === want) {
       return failedReply(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
     }
     return claims(last)
       ? { outcome: 'MISMATCH', why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
-      : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}; averi: ${short(last)}` };
+      : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
   };
 
 const P = 'form-prefilled';
@@ -179,10 +183,25 @@ const CASES: Case[] = [
     dismiss: [TITLE],
     says: 'a fill under the keyboard with a dismissal (Android: none configured — back hides it)',
     calls: [fill(K, 'note', 'Thanks - ok')],
-    judge: (s, replies, source) => {
-      const v = holds('note', 'Thanks - ok')(s, replies);
+    judge: (s, replies, source, launched) => {
+      const v = holds('note', 'Thanks - ok')(s, replies, source, launched);
       // idb cannot hide the keyboard: a refusal with the field untouched is the documented answer there.
       return source === 'idb' && v.outcome === 'LOUD' && valueOf(s, 'note') === '' ? { outcome: 'ok', why: `refused (idb): ${short(replies[0])}` } : v;
+    },
+  },
+  {
+    id: 'k5',
+    cell: K,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'a tap on note, under the IME and, once back hid it, under the bar dropped to the bottom: never a submit',
+    calls: [{ tool: 'tap', args: { selector: id(K, 'note') } }],
+    judge: (s, [reply]) => {
+      const submits = (s.submits ?? []).length;
+      const tapped = reply.startsWith('Tapped');
+      if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×, focus ${s.focus}); averi: ${short(reply)}` };
+      if (s.focus === 'note') return tapped ? { outcome: 'ok', why: short(reply) } : { outcome: 'MISMATCH', why: `the focus is on note, but averi says ${short(reply)}` };
+      return tapped ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}, no submit` } : { outcome: 'ok', why: `refused, nothing fired (focus ${s.focus}): ${short(reply)}` };
     },
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },
@@ -329,11 +348,11 @@ try {
       for (const call of c.calls) replies.push(await callTool(client, call, config));
       await pause(800);
       const state = (await lab.state())!;
-      let verdict = c.judge(state, replies, source);
+      let verdict = c.judge(state, replies, source, launched);
       if (verdict.outcome !== 'ok') {
         // A miss is read again 3 s later: a model that catches up was the app's lag, not a lost value.
         await pause(3_000);
-        const late = c.judge((await lab.state())!, replies, source);
+        const late = c.judge((await lab.state())!, replies, source, launched);
         if (late.outcome !== verdict.outcome) verdict = { ...late, why: `${late.why} (only 3 s later; first read: ${verdict.why})` };
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
       }

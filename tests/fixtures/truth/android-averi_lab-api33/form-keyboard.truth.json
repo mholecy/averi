@@ -373,7 +373,13 @@
         "reached": false,
         "probe": [],
         "seen": "#F0F0F3",
-        "reachedAfterBack": true
+        "reachedAfterBack": true,
+        "probeAfterBack": [
+          {
+            "kind": "touch",
+            "tag": "540,1528"
+          }
+        ]
       },
       {
         "tag": "ks",
@@ -389,7 +395,13 @@
         "reached": false,
         "probe": [],
         "seen": "#FFFFFF",
-        "reachedAfterBack": true
+        "reachedAfterBack": true,
+        "probeAfterBack": [
+          {
+            "kind": "touch",
+            "tag": "540,1710"
+          }
+        ]
       },
       {
         "tag": "ss",
@@ -405,7 +417,13 @@
         "reached": false,
         "probe": [],
         "seen": "#FFFFFF",
-        "reachedAfterBack": true
+        "reachedAfterBack": true,
+        "probeAfterBack": [
+          {
+            "kind": "touch",
+            "tag": "540,1892"
+          }
+        ]
       },
       {
         "tag": "note",
@@ -421,7 +439,17 @@
         "reached": false,
         "probe": [],
         "seen": "#F0F0F3",
-        "reachedAfterBack": false
+        "reachedAfterBack": false,
+        "probeAfterBack": [
+          {
+            "kind": "touch",
+            "tag": "540,2074"
+          },
+          {
+            "kind": "submit",
+            "tag": "invalid"
+          }
+        ]
       },
       {
         "tag": "submit",

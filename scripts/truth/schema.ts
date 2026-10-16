@@ -395,6 +395,11 @@ export interface ControlTruth {
    */
   reachedAfterBack?: boolean;
   /**
+   * The same probe's events (its touch first, then what fired: a `submit` where the bar dropped back to the screen's
+   * bottom lies over the control's centre). Present with `reachedAfterBack`.
+   */
+  probeAfterBack?: ProbeEvent[];
+  /**
    * A `covered` control: the largest part of its frame clear of the keyboard and the pinned submit (truth.ts#
    * controlPiece), and whether a second raw tap at its centre reached the control — probed when that centre is not
    * the frame's. Absent elsewhere.

@@ -23,9 +23,9 @@ type_text { selector: 'id:"lab.form-basic.name"', text: 'O’Brien “Jr.” –
 app model: name = "O"
 ```
 
-Screenshots: the live run's `--shots` (scratch, not committed). Every ASCII case of the same run held its value
-(`Jan Novak`, the e-mail, the IBAN with spaces, `1234.56`, the PIN, the prefilled cells' clear and no-clear fills: 17
-of 19 cases ok).
+The run's summary is committed: docs/truth/live-android-2026-10-16.md (both cases LOUD, "field CHANGED (was \"\")").
+Every ASCII case of the same run held its value (`Jan Novak`, the e-mail, the IBAN with spaces, `1234.56`, the PIN,
+the prefilled cells' clear and no-clear fills: 18 of 20 cases ok).
 
 ## Why it matters
 

@@ -507,7 +507,7 @@ describe('capture of a form cell (Android)', () => {
     expect(truth.ime).toBe('form-k.ime.json');
     expect(JSON.parse(await readFile(join(out, 'form-k.ime.json'), 'utf8')).hidden.inputShown).toBe('mInputShown=false');
     const vs = truth.form!.controls.find((c) => c.tag === 'vs')!;
-    expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', reachedAfterBack: true });
+    expect(vs).toMatchObject({ situation: 'under-keyboard', reached: false, probe: [], seen: '#000000', reachedAfterBack: true, probeAfterBack: [ev('touch', '201.0,621.0')] });
     expect(truth.form!.controls.filter((c) => c.reachedAfterBack !== undefined).map((c) => c.tag)).toEqual(['vs']);
   }, 15_000);
 

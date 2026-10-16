@@ -222,11 +222,12 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
     // What the screen shows over a control laid under the keyboard: the colour a pixel assert there would measure.
     const seen = frame !== undefined && situation === 'under-keyboard' ? measure(png, frame, s.scale, '#000000').seen : undefined;
     // Android: what averi's tap guard does with a control under the IME — hide it (back), then tap — probed too.
-    let reachedAfterBack: boolean | undefined;
+    let afterBack: { reached: boolean; probe: ControlTruth['probe'] } | undefined;
     if (frame !== undefined && situation === 'under-keyboard' && lab.hideKeyboard !== undefined) {
       const { events, after } = await probe(lab, cell.id, frame, () => lab.hideKeyboard!());
-      reachedAfterBack = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached;
+      afterBack = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus);
     }
+    const reachedAfterBack = afterBack?.reached;
     // A covered control: a second probe at the centre of its piece clear of the keyboard and the pinned submit, when
     // that is not its frame's — where a tap moved off the cover would land.
     const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w) : null;
@@ -244,13 +245,13 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       situation,
       ...read,
       ...(seen !== undefined && { seen }),
-      ...(reachedAfterBack !== undefined && { reachedAfterBack }),
+      ...(afterBack !== undefined && { reachedAfterBack: afterBack.reached, probeAfterBack: afterBack.probe }),
       ...(reachedAtPiece !== undefined && { piece: piece!, reachedAtPiece }),
     };
     controls.push(c);
     const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
-    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${reachedAfterBack === undefined ? '' : ` (after back ${reachedAfterBack})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
+    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${afterBack === undefined ? '' : ` (after back ${afterBack.reached}${described(afterBack.probe)})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
   }
   // The principal title a keyboard dismissal taps (CatalogForm.titleId): probed — a tap on it must end the editing.
   let title: FormTruth['title'];
