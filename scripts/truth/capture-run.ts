@@ -25,8 +25,8 @@ import { consistency, controlConsistency, listedIn, measuredGeometry, outOfProce
  * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
  * phase 3: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the
  * bar's (truth.ts#systemBarSwallows, #statusBarMaySwallow, #navigationBandTakes — the last by the navigation mode an
- * Android capture records, LabDevice.navigation). One rule decides what is
- * never tapped, for the capture and consistency both: truth.ts#unprobedReason.
+ * Android capture records, LabDevice.navigation). One rule decides what is never tapped, for the capture and
+ * consistency both: truth.ts#unprobedReason.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown
  * and its identifier), the keyboard's frame and the submits, as the state file held them when the trees were read, plus
