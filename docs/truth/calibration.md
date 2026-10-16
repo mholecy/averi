@@ -12,12 +12,12 @@ open note on the working tree. See the script for the verdicts.
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the iOS leg only) |
 | 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 19 rows (recorded) |
-| 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → c3ebc62 | CALIBRATED |
+| 7 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → c3ebc62 | CALIBRATED (partial: one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up) |
 | 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | STILL-RED-AFTER (partial: not the note's shape: Compose cuts the row's content at the header too, so d2b7744's descendants' extent finds nothing past the cut (lab finding VA1)) |
 | 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | calibrate | 188740b → bd06470 | CALIBRATED |
-| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED, regressed elsewhere: 1 row (recorded) |
+| 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5)), regressed elsewhere: 1 row (recorded) |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | CALIBRATED |
 | 14 | 2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap | calibrate | d2b7744 → 81a7d62 | CALIBRATED |
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
@@ -159,7 +159,7 @@ Regressions recorded:
 
 The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 
-## 7: CALIBRATED
+## 7: CALIBRATED (partial: one pair for two fixes: calibrate requires the defect (toolbar or scrollable) before 5cff2ad and green at c3ebc62, so the second fix's own symptom (`covered by scrollable`, red at 7542021 and d928789) is required nowhere and the first fix is not machine-verified alone — both measured by hand (remark); several before/after pairs per note are a follow-up)
 
 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md — defect: `^no tap on the dismissal .*\(refused for a (toolbar|scrollable)\)`
 
@@ -221,14 +221,16 @@ scroll-sticky-cut's R (frame 128,391 825x176, its top 66 px under the header 0,3
 
 tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.
 
-## 12: CALIBRATED
+## 12: CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is live (phase 5))
 
 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md — defect: `fully visible`
 
 - before d043e65:
   - RED android-averi_lab-api33/scroll-bounded-flush.xml P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded-flush.P" fully visible after 0 swipes
+  - RED android-averi_lab-api33/scroll-bounded-flush.xml S fully — fully visible where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded-flush.S" fully visible after 0 swipes
 - after 9c7885e:
   - ok android-averi_lab-api33/scroll-bounded-flush.xml P fully — Element id:"lab.scroll-bounded-flush.P" fully visible after 1 swipe; its bottom edge lies on its scroll container's (0,303 1080x605), and a probe swipe toward it moved nothing — nothing of it is cut there
+  - ok android-averi_lab-api33/scroll-bounded-flush.xml S fully — Element id:"lab.scroll-bounded-flush.S" fully visible after 1 swipe; its bottom edge lies on its scroll container's (0,1046 1080x495), and a probe swipe toward it moved nothing — nothing of it is cut there
 
 Regressed elsewhere at 9c7885e (green at d043e65):
 
@@ -238,7 +240,7 @@ Regressions recorded:
 
 - android-averi_lab-api33/tabbar-floating.xml F scroll_until: broke at 9c7885e, fixed at bd06470 — the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470, bisected without a device (golden --only tabbar-floating over the first-parent commits 9c7885e..bd06470): red at 9c7885e and at 188740b, bd06470's first parent, green at bd06470 (the strokes touch down at (540,1598), above the bar)
 
-edges/scroll-bounded-flush (round 3, Android only): scroll-bounded's layout, each target an app row with an identified container that is not clickable — uiautomator cuts its bounds FLUSH with the container's edge (P `[128,798][953,908]` on `upper` ending at 908; a clickable node runs on 66 px past a clip, the lab's scroll-bounded P/S: LE1). Red at d043e65 (`fully visible after 0 swipes`); at 9c7885e the stop probes the flush edge — one swipe toward it — and, the replayed tree never moving, says `a probe swipe toward it moved nothing`: the probe's answer is the device's, so R-fully accepts a probed flush stop (rows.ts#FLUSH_PROBED) and the row is green. scroll-bounded's own P (cut but read whole, past its container) stays red on both sides: LE1.
+edges/scroll-bounded-flush (round 3, Android only): scroll-bounded's layout, each target an app row with an identified container that is not clickable — uiautomator cuts its bounds FLUSH with the container's edge (P `[128,798][953,908]` on `upper` ending at 908; a clickable node runs on 66 px past a clip, the lab's scroll-bounded P/S: LE1). Red at d043e65 (`fully visible after 0 swipes`); at 9c7885e the stop probes the flush edge — one swipe toward it — and, the replayed tree never moving, says `a probe swipe toward it moved nothing`: the probe's answer is the device's, so R-fully accepts a probed flush stop where the truth bears it out (rows.ts#flushProbe: P's bottom edge 908 is `upper`'s, the probe 540,788 → 540,697 drags up from inside it; S's 1541 is `lower`'s, 1443 → 1369) and both rows are green. scroll-bounded's own P (cut but read whole, past its container) stays red on both sides: LE1.
 
 ## 13: CALIBRATED
 
@@ -451,7 +453,7 @@ Calibrated through the overlay half of the fix: before, the colour assert passed
 
 Needs: OCR judged on real pixels (phase 4): a text cut at the navigation bar. The three-button capture (bars/bands-three-button, round 3) does not make the colour row fail: N (2132–2176, under the bar 2088–2220) is not reached and 0 % drawn; its tree node runs `[127,2088][952,2220]`, so the assert samples the bar's white and its tint (#F4EAF7, `seen`) mixed — asked for the colour the screen shows there (rows.ts#bandColour under three buttons), it fails at 94bae14 (57 % white, dE00 8.87) as at e85bcdf. A target whose node lies wholly on one colour of the bar would be needed for a pass at 94bae14.
 
-bands-three-button: bands' screen on the averi_lab AVD under three-button navigation (`navigation_mode` 0, the bar `[0,2088][1080,2220]`; restored to gesture, mode 2, after the capture), in the same run as bands' gesture capture (CatalogCell.navigation, catalog.ts#captureRefusal). Its N row is green on both sides — DOES-NOT-FAIL: the pre-fix assert does not pass on the bar, see needs. Under gesture navigation (bands.xml) N is reached, 90 % drawn and seen in its own colour beneath the handle, its row accepting a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020): green on both sides too.
+Replayed against the fake device's one gesture-navigation `dumpsys window` (the Pixel_3a profile's navigation bar [0,2154][1080,2220]), not the captured three-button bar [0,2088][1080,2220] — review round 1 measured the verdict unchanged under a dump patched to it; per-capture dumpsys serving is a follow-up at truth/r3-forms-android's merge (CellTruth.ime / DeviceProfile.ime). bands-three-button: bands' screen on the averi_lab AVD under three-button navigation (`navigation_mode` 0, the bar `[0,2088][1080,2220]`; restored to gesture, mode 2, after the capture), in the same run as bands' gesture capture (CatalogCell.navigation, catalog.ts#captureRefusal). Its N row is green on both sides — DOES-NOT-FAIL: the pre-fix assert does not pass on the bar, see needs. Under gesture navigation (bands.xml) N is reached, 90 % drawn and seen in its own colour beneath the handle, its row accepting a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020): green on both sides too.
 
 ## 26: CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts)
 
@@ -534,16 +536,18 @@ presented/sheet-background: a large sheet whose only content, S, lies at its top
 
 ## 29: CALIBRATED
 
-2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md — defect: `^passed on`
+2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md — defect: `^passed on|^Tapped`
 
 - before ec2893a:
   - RED ios-iphone17-ios27/scroll-bounded.wda.json O colour — passed on #FFFFFF: PASS  element id:"lab.scroll-bounded.O" fill within dE00 8 of #FFFFFF — sampled #FFFFFF (dominant, 100% of region) vs expected #FFFFFF → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/sheet-long-list-short.wda.json F colour — passed on #CFD8DC: PASS  element id:"lab.sheet-long-list-short.F" fill within dE00 8 of #CFD8DC — sampled #CFD8DC (dominant, 100% of region) vs expected #CFD8DC → dE00 0.00 ≤ 8; scale 3.000
+  - RED ios-iphone17-ios27/sheet-long-list-short.wda.json F tap — Tapped: Tapped id:"lab.sheet-long-list-short.F"
 - after b7eac90:
   - ok ios-iphone17-ios27/scroll-bounded.wda.json O colour — FAIL  element id:"lab.scroll-bounded.O" fill within dE00 8 of #FFFFFF — nothing of the element is drawn: it lies outside its scroll view scrollable (0,380 402x180) (element 51,620 300x64, screen 0,0 402x874) — scroll it 
   - ok ios-iphone17-ios27/sheet-long-list-short.wda.json F colour — FAIL  element id:"lab.sheet-long-list-short.F" fill within dE00 8 of #CFD8DC — nothing of the element is drawn: it lies outside its scroll view scrollable (0,62 402x384) (element 0,574 402x64, screen 0,0 402x874) — scrol
+  - ok ios-iphone17-ios27/sheet-long-list-short.wda.json F tap — ERROR id:"lab.sheet-long-list-short.F" is outside its scroll view scrollable (0,62 402x384) at (201,606): nothing of it is drawn (rect 0,574 402x64) — scroll_until it first; nothing was tapped
 
-edges/scroll-bounded's O, wholly below its scroll view `lower` (0,380 402x180) and on the screen, asked for the colour the screen shows there (the white background): WDA's assert passed on it at ec2893a and fails closed at b7eac90. Under idb the same row still passes at HEAD — idb lists no scroll view: lab finding LE2. Round 3: sheet-long-list-short's F (a UIKit table's row 8 in a large sheet, below the table's clip and over its footer, WDA's label parked at the sheet's origin) — the colour asked for the footer's #CFD8DC passes at ec2893a and fails closed at b7eac90, as O's does (also red at 7566443 and 83e282a: #20's fix does not reach it).
+edges/scroll-bounded's O, wholly below its scroll view `lower` (0,380 402x180) and on the screen, asked for the colour the screen shows there (the white background): WDA's assert passed on it at ec2893a and fails closed at b7eac90. Under idb the same row still passes at HEAD — idb lists no scroll view: lab finding LE2. Round 3: sheet-long-list-short's F (a UIKit table's row 8 in a large sheet, below the table's clip and over its footer, WDA's label parked at the sheet's origin) — the colour asked for the footer's #CFD8DC passes at ec2893a and fails closed at b7eac90, as O's does (also red at 7566443 and 83e282a: #20's fix does not reach it); its tap, Tapped at ec2893a (and at 7566443, 83e282a), is refused at b7eac90 — the defect gains `^Tapped` for it.
 
 ## 30: CALIBRATED
 

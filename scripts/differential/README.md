@@ -166,7 +166,10 @@ false-covers — scripts/truth/schema.ts#FAMILIES); both apps bundle `fixtures/a
 `node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1 when it is stale;
 tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app routes it to its
 family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged into the averi.yaml
-golden replays it under (`differential.ts#configFor`, through the truth's `config`). How to add a cell:
+golden replays it under (`differential.ts#configFor`, through the truth's `config`). A cell may name the platforms that
+build it (`platforms`) and, on Android, the navigation mode it is captured under (`navigation`): capture-run skips it
+elsewhere and says why (`catalog.ts#captureRefusal`, asked before the device's own `LabDevice.unsupported`), so `bands`
+(gesture) and `bands-three-button` sit in one run and neither replaces the other. How to add a cell:
 docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3, B1.
 
 The capture is one module, `scripts/truth/capture-run.ts#capture(lab, cells, opts)`, over a `LabDevice`
@@ -204,6 +207,18 @@ node --import tsx scripts/truth/capture-android.ts --serial <serial> --out tests
 
 The Android app builds the coloured-target cells; a form cell or another layer is skipped and said so (phase 2b brings
 the forms, through the same `capture`).
+
+A limit of the Android replay, today: the fake device answers `dumpsys window` with ONE gesture-navigation Pixel_3a
+profile (its navigation bar `[0,2154][1080,2220]`) for every capture — `bands-three-button`, captured under three
+buttons (the bar `[0,2088][1080,2220]`), is replayed against the gesture profile's band (review round 1 of truth/r3-variants measured its verdicts the same
+under a dump patched to the captured bar). The per-capture `dumpsys` serving arrives with phase 2b's IME work
+(`CellTruth.ime` / `DeviceProfile.ime`, truth/r3-forms-android): follow-up at that merge.
+
+R-fully on a flush edge (rows.ts#fullyRow, #flushProbe): Android's uiautomator cuts a node flush with its scroll
+container's edge, and averi's `fully` stop probes such an edge with a swipe toward it (9c7885e). A replayed tree never
+moves, so the probe's "moved nothing" is accepted — only where the truth bears it out: what shows of the target ends on
+the named side at its scroll view's edge, and a swipe touched down inside that scroll view dragging toward that edge.
+Whether the probe reveals the row and the stop goes on is the live golden's (phase 5).
 
 ### Calibration on the bug notes (phase 3)
 

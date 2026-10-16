@@ -290,7 +290,12 @@ scroll container: #12, #13 CALIBRATED, R-fully accepting a probed flush stop, ro
 `bands-three-button` (#23 still DOES-NOT-FAIL: the assert at 94bae14 does not pass on the bar). iOS:
 `sheet-long-list-short` (a row on the screen outside its table: #29's fix cures it, not #20's) and
 `toolbar-dismiss-short` (a scroll view shorter than the screen over the title: #7's second fix, the pair 5cff2ad →
-c3ebc62).
+c3ebc62). R-fully's flush acceptance is checked against the truth (the named edge flush with the target's scroll view,
+a swipe from inside it toward that edge); whether the probe reveals the row is live (phase 5). Follow-ups: the fake
+device serves one gesture-navigation `dumpsys window` for every Android capture, so `bands-three-button` is replayed
+against the gesture band (verdicts unchanged under a patched dump) — per-capture serving comes with truth/r3-forms-android
+(`CellTruth.ime` / `DeviceProfile.ime`), at its merge; and calibrate takes one before/after pair per note, so #7's two
+fixes share 5cff2ad → c3ebc62 — several pairs per note would verify each fix alone.
 
 ### Phase 4 — the matrix, generated
 
