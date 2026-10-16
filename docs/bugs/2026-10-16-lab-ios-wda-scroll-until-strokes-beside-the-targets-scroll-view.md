@@ -34,8 +34,9 @@ device: idb ui swipe 201 699 201 175 --duration 0.3   ×2
 → ERROR … failed after 2 swipes … — element in tree but never intersected the 402x874 viewport …
 ```
 
-The stroke is the screen's default (80 % → 20 % of its height). On the device it lands on the background and scrolls
-nothing; the reply blames the content ("exhausted, or the swipes were not taken"). For `O` it even names `lower` — the
+The stroke is the screen's default (80 % → 20 % of its height). Inferred from the replay and the committed frames, not
+measured on the device (no live run was made): touching down at y 699, below `lower`'s frame, it lands on the white
+background and should scroll nothing; the reply blames the content ("exhausted, or the swipes were not taken"). For `O` it even names `lower` — the
 tree tells averi which scroll view holds the row, and the stroke ignores it. idb, which lists no scroll view, strokes the
 same line for `F` (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md, LE2).
 

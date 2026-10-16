@@ -34,7 +34,8 @@ export const edges: KnownFile = {
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view — visible after 0 swipes', as: LE2 }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: idb lists no scroll view — the screen\'s stroke, beside the scroll view holding F', as: LE2 }),
     // LAB FINDING LE4 — WDA lists `lower` and O, F in it, yet scroll_until strokes the screen (201,699 → 175), below
-    // `lower`: on the device the stroke moves nothing, and the reply blames the content.
+    // `lower`: inferred from the replay and the committed frames (not measured on the device), the stroke moves
+    // nothing, and the reply blames the content.
     ...keys(`${IOS}/scroll-bounded.wda.json`, ['O', 'F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: the stroke touches down beside the target\'s own scroll view', as: LE4 }),
     // LAB FINDING LE3 — SwiftUI lists the pinned section header before the rows it lies over: no cover of R's top 24 pt.
     ...[`${IOS}/scroll-sticky.wda.json`, `${IOS}/scroll-sticky.idb.json`].flatMap((file) => [
