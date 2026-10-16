@@ -136,6 +136,10 @@ Owner request 2026-10-15.
 The pinned submit's bar is measured today from iOS's padding in points (scripts/truth/truth.ts#PINNED_BAR_PADDING,
 `situationOf`); phase 2b has the app report its bar's frame (e.g. `frames["submit.bar"]`) and `situationOf` read it
 on both platforms, the constant dropped.
+Done 2026-10-16 (`truth/r3-forms-android`): the six form cells (form-shared-id too) on `averi_lab`, golden 707 → 775
+checks (68 Android form rows, 7 mismatches, KNOWN: lab note F2A1 and L1's class on form-picker), the IME's readings
+captured and served (CellTruth.ime), `submit.bar` reported by both apps (the committed iOS truths' 62 control
+situations recomputed with it: unchanged), the live golden on Android 17 ok / 2 LOUD (lab note F2A2: non-ASCII typing).
 
 ### Phase 3 — calibration on the bug notes
 

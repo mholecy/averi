@@ -407,7 +407,7 @@ describe('capture of a form cell (iOS)', () => {
     const lab = new FakeIosFormLab();
     const { broken, manifest } = await runForm(lab, [FORM_KEYBOARD]);
     expect(broken).toEqual([]);
-    expect(lab.taps).toEqual(['form-k 201,177', 'form-k 201,547', 'form-k 201,621', 'form-k 201,540']);
+    expect(lab.taps).toEqual(['form-k 201,177', 'form-k 201,547', 'form-k 201,564', 'form-k 201,621', 'form-k 201,540']);
     const truth = await truthOf('form-k');
     expect(truth.targets).toEqual([]);
     expect(truth.form!.fields).toEqual([
@@ -417,7 +417,7 @@ describe('capture of a form cell (iOS)', () => {
     ]);
     expect(truth.form!.controls).toEqual([
       { tag: 'name', id: 'lab.form-k.name', kind: 'field', frame: rect(20, 160, 362, 34), situation: 'open', reached: true, probe: [ev('touch', '201.0,177.0')] },
-      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')] },
+      { tag: 'phone', id: 'lab.form-k.phone', kind: 'field', frame: rect(20, 530, 362, 34), situation: 'covered', reached: false, probe: [ev('touch', '201.0,547.0'), ev('submit', 'invalid')], piece: { x: 20, y: 563, width: 362, height: 1 }, reachedAtPiece: false },
       { tag: 'vs', id: 'lab.form-k.vs', kind: 'field', frame: rect(20, 604, 362, 34), situation: 'under-keyboard', reached: false, probe: [ev('touch', '201.0,621.0')], seen: '#000000' },
       { tag: 'submit', id: 'lab.form-k.submit', kind: 'button', frame: rect(20, 516.7, 362, 46.3), situation: 'open', reached: true, probe: [ev('touch', '201.0,540.0')] },
     ]);
