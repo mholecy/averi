@@ -266,7 +266,7 @@
           "rows": ["android-averi_lab-api33/tabbar-floating.xml F scroll_until"],
           "broke": "9c7885e",
           "fixed": "bd06470",
-          "why": "the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470"
+          "why": "the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470, bisected without a device (golden --only tabbar-floating over the first-parent commits 9c7885e..bd06470): red at 9c7885e and at 188740b, bd06470's first parent, green at bd06470 (the strokes touch down at (540,1598), above the bar)"
         }
       ]
     },
