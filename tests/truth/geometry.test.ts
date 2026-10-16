@@ -219,18 +219,17 @@ describe('consistency with a measured geometry', () => {
     // Measured, the same frame's geometry says what holds: its centre cut off by the screen's edge, never probed.
     expect(consistency({ ...off, geometry: 'centre-out' }, 'ios', { width: 402, height: 874 })).toBeUndefined();
   });
-  it('the status bar on Android swallows the probe (no touch, not reached), with or without a touch logged elsewhere', () => {
+  it('the status bar on Android swallows the probe (no touch, not reached); on iOS it may (the top of its band): no touch, not reached — else the touch is the app\'s, reached or not', () => {
     const band = T({ frame: rect(51, 10, 300, 64), geometry: 'status-band', reached: false, probe: [] });
     expect(consistency(band, 'android')).toBeUndefined();
     expect(consistency({ ...band, reached: true }, 'android')).toMatch(/through the system bar/);
+    expect(consistency(band, 'ios')).toBeUndefined();
+    expect(consistency({ ...band, reached: true }, 'ios')).toMatch(/reached it with no touch logged/);
+    expect(consistency({ ...band, geometry: 'whole' }, 'ios')).toMatch(/left no touch/);
+    expect(consistency({ ...band, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
+    expect(consistency({ ...band, reached: true, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
   });
-  it('every other band (measured, B4): the touch tells — logged, the target must be reached; none, it must not be', () => {
-    // iOS's status band: the status bar's window takes y < 54 (no touch), the app y 54–61 (the touch, reached).
-    const status = T({ frame: rect(51, 10, 300, 64), geometry: 'status-band', reached: false, probe: [] });
-    expect(consistency(status, 'ios')).toBeUndefined();
-    expect(consistency({ ...status, reached: true }, 'ios')).toBe('status-band, no touch in the app (the system bar took the tap), but the probe reached it');
-    expect(consistency({ ...status, reached: true, probe: [ev('touch', '201,42')] }, 'ios')).toBeUndefined();
-    expect(consistency({ ...status, probe: [ev('touch', '201,42')] }, 'ios')).toBe('status-band, the touch the app\'s, but the probe tap did not reach it');
+  it('the navigation band (measured, B4): the touch tells — logged, the target must be reached; none, it must not be', () => {
     // Android's navigation band: gesture navigation's touch is the app's (reached); three buttons swallow it (none).
     const nav = T({ frame: rect(51, 820, 300, 64), geometry: 'nav-band', reached: false, probe: [] });
     expect(consistency(nav, 'android')).toBeUndefined();
@@ -239,12 +238,12 @@ describe('consistency with a measured geometry', () => {
     expect(consistency({ ...nav, reached: true }, 'android')).toMatch(/^nav-band, no touch in the app/);
     // iOS's home-indicator band: the same rule (measured: the touch is the app's).
     expect(consistency({ ...nav, reached: true, probe: [ev('touch', '201,852')] }, 'ios')).toBeUndefined();
-    // The two rules never both claim a band; neither claims a geometry that is no band.
+    // The rules never both claim a band (the status bands are systemBarSwallows', statusBarMaySwallow's); none a geometry that is no band.
     expect([systemBarSwallows('android', 'status-band'), systemBarSwallows('android', 'nav-band'), systemBarSwallows('ios', 'status-band')]).toEqual([true, false, false]);
     expect([bandTouchTells('android', 'nav-band'), bandTouchTells('android', 'status-band'), bandTouchTells('ios', 'status-band'), bandTouchTells('ios', 'nav-band'), bandTouchTells('android', 'whole')]).toEqual([
       true,
       false,
-      true,
+      false,
       true,
       false,
     ]);
