@@ -178,6 +178,95 @@
           "probe": ["AL", "ST"]
         }
       }
+    },
+    {
+      "id": "form-shared-id",
+      "family": "forms",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "SWIFT payment",
+        "floatingTitles": true,
+        "fields": [
+          { "tag": "amount", "kind": "amount", "title": "Value*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "iban", "kind": "iban", "title": "IBAN*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "bic", "kind": "text", "title": "BIC*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "bank", "kind": "text", "title": "Payee’s bank name*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "name", "kind": "text", "title": "Payee’s name", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue to summary" }
+      }
+    },
+    {
+      "id": "own-parts",
+      "family": "false-covers",
+      "layer": "none",
+      "targets": [
+        { "tag": "L", "color": "#3949AB", "slot": 0, "declared": "open", "text": "LOGIN" },
+        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" }
+      ]
+    },
+    {
+      "id": "toolbar-dismiss",
+      "family": "false-covers",
+      "layer": "toolbar-screen",
+      "targets": [],
+      "form": {
+        "title": "SWIFT payment",
+        "titleId": "lab.toolbar-dismiss.title",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue to summary" },
+        "focus": "postcode"
+      },
+      "config": {
+        "ios": {
+          "keyboardDismiss": [
+            { "tap": { "id": "lab.toolbar-dismiss.title" } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "toolbar-dismiss-bar",
+      "family": "false-covers",
+      "layer": "toolbar-bar",
+      "targets": [],
+      "form": {
+        "title": "SWIFT payment",
+        "titleId": "lab.toolbar-dismiss-bar.title",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue to summary" },
+        "focus": "postcode"
+      },
+      "config": {
+        "ios": {
+          "keyboardDismiss": [
+            { "tap": { "id": "lab.toolbar-dismiss-bar.title" } }
+          ]
+        }
+      }
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "family": "forms",
-  "note": "The form cells (phase 1b): fields, errors, the keyboard, prefilled values, the picker sheet; the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android: phase 2b).",
+  "note": "The form cells (phase 1b): fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android: phase 2b).",
   "cells": [
     {
       "id": "form-basic",
@@ -138,6 +138,23 @@
           ],
           "probe": ["AL", "ST"]
         }
+      }
+    },
+    {
+      "id": "form-shared-id",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "SWIFT payment",
+        "floatingTitles": true,
+        "fields": [
+          { "tag": "amount", "kind": "amount", "title": "Value*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "iban", "kind": "iban", "title": "IBAN*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "bic", "kind": "text", "title": "BIC*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "bank", "kind": "text", "title": "Payee’s bank name*", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" },
+          { "tag": "name", "kind": "text", "title": "Payee’s name", "titleId": "lab.form-shared-id.component", "fieldId": "lab.form-shared-id.component" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue to summary" }
       }
     }
   ]

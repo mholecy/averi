@@ -14,7 +14,8 @@ import java.io.File
 /** The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported. */
 val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert")
 
-data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean)
+/** `text`: a text target (B5's own-parts) — this text drawn on its coloured control, the control's box `<tag>.box`. */
+data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null)
 
 /** `family`: base, presented, forms, edges, bars, false-covers — MainActivity's CellRouter routes by it. */
 data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null) {
@@ -41,6 +42,7 @@ object Catalog {
                     color = 0xFF000000L or (hex.toLongOrNull(16) ?: 0L),
                     slot = t.optInt("slot", 0),
                     onLayer = t.optString("in") == "layer",
+                    text = t.optString("text").ifEmpty { null },
                 )
             }
             Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null })
