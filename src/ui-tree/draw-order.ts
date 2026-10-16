@@ -156,9 +156,10 @@ export interface DrawOrder {
    * after the container's subtree whose rect meets the container's with
    * area and that draws (`NOT_DRAWN`'s `drawnOver` column) — never an
    * ancestor or a descendant: its own rows scroll with it. The container is
-   * found by its rect: the outermost node that clips (scroll-containers.ts#clips)
+   * found by its rect: the outermost node that scrolls (scroll-containers.ts#scrolls —
+   * Android's clipping scrollers, and WDA's scroll views, which clip nothing in its tree)
    * with that rect outside the keyboard, since the round carries containers
-   * as rects (geometry.ts#clipsOf's `scrollersOf`, #largestScroller). UNDEFINED when this
+   * as rects (interact/scroll-rounds.ts#targetScrollers, geometry.ts#largestScroller). UNDEFINED when this
    * tree has no such container (a rect of another read — the list has moved
    * since), so the caller can tell "nothing over it" from "not asked of this
    * tree".
@@ -1615,7 +1616,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
   const outOfDrawnOver = NOT_DRAWN.keyboard.drawnOver;
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
-    const found = order.find((p) => clips(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
+    const found = order.find((p) => scrolls(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p) ? [p.node] : []));
   };

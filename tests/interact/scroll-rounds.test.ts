@@ -1991,37 +1991,37 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     /** The same cell, read where no screen is presented over it (the popover closed): a tree of the cell alone. */
     const unpresented: Row = { found: [node({ role: 'container', label: 'add instant message', rect: { x: 20, y: 1306, width: 362, height: 52 } })] };
 
-    it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the action sheet WDA types in the popover\'s layer — reaching the whole screen — at the touch-down (201,699)', () => {
+    it('Contacts\' discard popover, keyboard down: the sheet\'s cell "add instant message" at y 1306 — one confirming read, no stroke (the one measured closed the popover and read "fully visible after 1 swipe"), the stop names the action sheet WDA types in the popover\'s layer — reaching the whole screen — at the touch-down (201,712)', () => {
       const played = play(IPHONE, [BELOW, BELOW]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 712 } } });
       expect(failureOf(played, 'role:container label:"add instant message"').message).toBe(
-        'scroll_until role:container label:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ' +
+        'scroll_until role:container label:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,712) on ' +
           'other "Are you sure you want to discard this new contact?" (10,78 240x169, reaching 0,0 402x874) — an action sheet is presented over it ("Are you sure you want to discard this new contact?") — close it first, ' +
           'and a swipe would land on the action sheet, so none was sent. Last rect {"x":20,"y":1306,"width":362,"height":52} in a 402x874 viewport',
       );
     });
 
-    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the action sheet at the touch-down (201,699)', () => {
+    it('Contacts\' discard popover, keyboard down, toward the TEXT "add instant message" — read at its cell, 20,1306, below the fold (not parked at the sheet\'s origin): one confirming read, no stroke, the stop names the action sheet at the touch-down (201,712)', () => {
       const tree = screens.contactsDiscardPopoverKeyboardDown;
       const text = [...everyNode(tree)].find((x) => x.role === 'text' && x.label === 'add instant message')!;
       expect(text.rect).toEqual({ x: 20, y: 1306, width: 362, height: 52 });
       const row: Row = { tree, found: [text] };
       const played = play(IPHONE, [row, row]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 712 } } });
       expect(failureOf(played, 'text:"add instant message"').message).toMatch(
-        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,699\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it /,
+        /^scroll_until text:"add instant message" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at \(201,712\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it /,
       );
     });
 
-    it('the SWIFT form under the Fees half sheet: `payee_city_input` below the fold — no stroke (the one measured moved the sheet to another detent), the stop names the sheet\'s form, on top at the touch-down', () => {
+    it('the SWIFT form under the Fees half sheet: `payee_city_input` below the fold — no stroke (the one measured moved the sheet to another detent), the stop names the sheet\'s dim, on top at the touch-down of the stroke drawn in the form\'s own scroll view (0,0 402x780), cut above the sheet drawn over it', () => {
       const field = rowOf('swiftFeesSheet', 'swift_payment.form.payee_city_input');
       for (const fully of [false, true]) {
         const played = play({ ...IPHONE, fully }, [field, field]);
         expect(strokesToward(played)).toEqual([]);
         expect(failureOf(played, 'id:swift_payment.form.payee_city_input').message).toContain(
-          '— element lies below the viewport, and the next swipe would touch down at (201,699) on scrollable (31,456 340x355) — a screen is presented over it',
+          '— element lies below the viewport, and the next swipe would touch down at (201,329) on container "dismiss popup" (-402,-874 1206x2622) — a screen is presented over it',
         );
       }
     });
@@ -2034,7 +2034,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [row, row]);
       expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
       expect(failureOf(played, 'id:TextFieldWithComponentStyle').message).toMatch(
-        /^scroll_until id:TextFieldWithComponentStyle stopped before any swipe — element lies outside the viewport, and the next swipe would touch down at \(201,699\) on /,
+        /^scroll_until id:TextFieldWithComponentStyle stopped before any swipe — element lies outside the viewport, and the next swipe would touch down at \(201,329\) on /,
       );
     });
 
@@ -2043,9 +2043,9 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [field, field]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       // Asked where the stroke would touch down above the keyboard (swipe.ts#strokeRoom's cut), not on its keys at (201,699).
-      expect(played.outcome).toMatchObject({ kind: 'presented', next: { touchDown: { x: 201, y: 459 } } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', next: { touchDown: { x: 201, y: 471 } } });
       expect(failureOf(played, 'role:container label:"add field"').message).toMatch(
-        /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,459\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
+        /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,471\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
       );
     });
 
@@ -2054,7 +2054,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play({ ...IPHONE, fully: true }, [name, name]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       expect(failureOf(played, 'text:"Payee’s name"').message).toContain(
-        '— element lies outside its scroll view scrollable (0,0 402x780): nothing of it is drawn, and the next swipe would touch down at (201,699) on scrollable (24,105 354x711) — a screen is presented over it',
+        '— element lies outside its scroll view scrollable (0,0 402x780): nothing of it is drawn, and the next swipe would touch down at (201,569) on scrollable (24,105 354x711) — a screen is presented over it',
       );
     });
 
@@ -2064,11 +2064,11 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [cell, cell]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
       expect(failureOf(played, 'role:container label:"add birthday"').message).toMatch(
-        /— element lies outside its scroll view scrollable \(0,62 402x812\): nothing of it is drawn, and the next swipe would touch down at \(201,699\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
+        /— element lies outside its scroll view scrollable \(0,62 402x812\): nothing of it is drawn, and the next swipe would touch down at \(201,712\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it /,
       );
       // Asked to scroll up, toward it: the stroke up would touch down on the popover's own scroll view, on top there.
       const up = play({ ...IPHONE, direction: 'up' }, [cell, cell]);
-      expect(failureOf(up, 'role:container label:"add birthday"').message).toMatch(/and the next swipe would touch down at \(201,175\) on scrollable \(10,166 240x81\) — a screen is presented over it /);
+      expect(failureOf(up, 'role:container label:"add birthday"').message).toMatch(/and the next swipe would touch down at \(201,224\) on scrollable \(10,166 240x81\) — a screen is presented over it /);
     });
 
     it('platform-blind, a synthetic shape on ANDROID (no Android device tree has a presented screen): in the viewport but cut to a sliver by its scroll container (the SWIFT form\'s "Payment details" toggle 66,1924 948x55 at the form\'s bottom edge), a sheet\'s scroll view presented over the rest of the form — the stroke would touch down on that sheet, so the stop is `presented` there as on iOS', () => {
@@ -2124,7 +2124,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const failed: Row = { error: 'WDA /source returned 500' };
       const played = play(IPHONE, [BELOW, failed, failed, failed]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'confirm', 'confirm', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 699 } } });
+      expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0, next: { touchDown: { x: 201, y: 712 } } });
     });
 
     it('sideways (synthetic: a carousel of the screen beneath, a presented dim over the screen): a card wholly right of the viewport, or left of it, is named on that side, and the next swipe would touch down on the dim', () => {
@@ -2146,7 +2146,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const played = play(IPHONE, [unpresented, unpresented, BELOW]);
       expect(played.outcome?.kind).toBe('bound');
       expect(failureOf(played, 'role:container label:"add instant message"').message).toMatch(
-        /\. The next swipe would have touched down at \(201,699\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it \("Are you sure you want to discard this new contact\?"\) — close it first$/,
+        /\. The next swipe would have touched down at \(201,712\) on other "Are you sure you want to discard this new contact\?" \(10,78 240x169, reaching 0,0 402x874\) — an action sheet is presented over it \("Are you sure you want to discard this new contact\?"\) — close it first$/,
       );
     });
 
@@ -2202,6 +2202,98 @@ describe('round — a target the strokes never bring into what its scroll view d
     const row: Row = { tree, found: [name] };
     const played = play({ ...IPHONE, maxSwipes: 5 }, [row, row, row]);
     expect(failureOf(played, 'id:payee_name_input').message).toContain('element in tree but never drawn: it lies outside its scroll view scrollable id:form (0,0 402x780) (last rect');
+  });
+});
+
+/**
+ * The stroke's container on a WDA tree (scroll-rounds.ts#targetScrollers): WDA marks no node as clipping, so the
+ * target's clipping chain is empty there and its scroll views are the ancestors that scroll (`Clips.drawnIn`). The
+ * lab app's cells, as WDA lists them on the iPhone 17 (402x874).
+ * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
+ * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md
+ */
+describe('round — a WDA target\'s strokes go over its own scroll view', () => {
+  const strokes = (played: Played) => played.steps.flatMap((s) => (s.do === 'stroke' && s.box !== undefined ? [{ box: s.box, from: scrollStroke({ ...s, box: s.box }).from }] : []));
+
+  it('scroll-bounded: O, below the bounded `lower` (0,380 402x180) and never drawn — the stroke goes over `lower`, touching down inside it, not over the screen below it (LE4)', () => {
+    const LOWER: Rect = { x: 0, y: 380, width: 402, height: 180 };
+    const o = node({ role: 'button', identifier: 'O', rect: { x: 51, y: 620, width: 300, height: 64 } });
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        node({ role: 'scrollable', identifier: 'upper', rect: { x: 0, y: 110, width: 402, height: 220 }, children: [node({ role: 'button', identifier: 'W', rect: { x: 51, y: 130, width: 300, height: 64 } })] }),
+        node({ role: 'scrollable', identifier: 'lower', rect: LOWER, children: [node({ role: 'button', identifier: 'S', rect: { x: 51, y: 400, width: 300, height: 64 } }), o] }),
+      ],
+    });
+    const row: Row = { tree, found: [o] };
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [row, row, row]);
+    const sent = strokes(played);
+    expect(sent.map((s) => s.box)).toEqual([LOWER, LOWER]);
+    for (const { from } of sent) expect(containsPoint(LOWER, from)).toBe(true);
+  });
+
+  it('tabbar-floating: R flung past the screen\'s top under the 200-pt header — the turned stroke touches down inside the list (0,200 402x674), not in the header (LV3)', () => {
+    const LIST: Rect = { x: 0, y: 200, width: 402, height: 674 };
+    const listRow = (y: number): Row => {
+      const r = node({ role: 'button', identifier: 'R', rect: { x: 24, y, width: 354, height: 52 } });
+      const tree = node({
+        role: 'container',
+        unclippedFrames: true,
+        rect: { x: 0, y: 0, width: 402, height: 874 },
+        children: [node({ role: 'other', label: 'Header', rect: { x: 0, y: 0, width: 402, height: 200 } }), node({ role: 'scrollable', identifier: 'list', rect: LIST, children: [r] })],
+      });
+      return { tree, found: [r] };
+    };
+    // Read short of the far edge (inside the list), then carried past the top by the stroke: the strokes turn.
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [listRow(1200), listRow(-391), listRow(-391)]);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+    const sent = strokes(played);
+    expect(sent.map((s) => s.box)).toEqual([LIST, LIST]);
+    for (const { from } of sent) expect(containsPoint(LIST, from)).toBe(true);
+  });
+
+  // A residual (LE4's note, for the stroke plan): the nearest scroll view is taken whatever its axis. Account Detail's
+  // card carousel (24,138 354x85) under the transactions list (0,180 402x694, listed after it): a card right of the
+  // carousel, scrolled for `down`, is stroked inside the carousel — a vertical 52-pt stroke touching down where the
+  // list is drawn over it — not over the screen (699 → 175, before). Pinned as it is today, not as it should be.
+  it('a card of a horizontal carousel, scrolled for `down`: the vertical stroke goes inside the carousel, and the failure names the list drawn over its touch-down (residual)', () => {
+    const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
+    const card = node({ role: 'other', label: 'My Account', rect: { x: 378, y: 138, width: 354, height: 85 } });
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        node({ role: 'scrollable', rect: CAROUSEL, children: [node({ role: 'other', label: 'Card 1', rect: { ...CAROUSEL } }), card] }),
+        node({ role: 'scrollable', identifier: 'transactions.list.container', rect: { x: 0, y: 180, width: 402, height: 694 }, children: [node({ role: 'cell', label: 'Row', rect: { x: 0, y: 300, width: 402, height: 60 } })] }),
+      ],
+    });
+    const row: Row = { tree, found: [card] };
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [row, row, row]);
+    const sent = strokes(played);
+    expect(sent.map((s) => s.box)).toEqual([CAROUSEL, CAROUSEL]);
+    expect(sent.map((s) => s.from)).toEqual([{ x: 201, y: 207 }, { x: 201, y: 207 }]); // as the differential replays the captured tree: 201 207 → 155
+    expect(failureOf(played, 'label:"My Account"').message).toMatch(/they touched down at 201,207 on scrollable \(id transactions\.list\.container\) at 0,180 402x694, drawn over the list 24,138 354x85/);
+  });
+
+  it('a floating bar drawn over the scroll view cuts the stroke above it, as on Android: the touch-down is not on the bar', () => {
+    const LIST: Rect = { x: 0, y: 300, width: 402, height: 574 };
+    const BAR: Rect = { x: 37, y: 743, width: 328, height: 87 };
+    const r = node({ role: 'button', identifier: 'R', rect: { x: 24, y: 1400, width: 354, height: 52 } });
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [node({ role: 'scrollable', identifier: 'list', rect: LIST, children: [r] }), node({ role: 'tabbar', label: 'Tab Bar', rect: BAR, children: [node({ role: 'button', label: 'home', rect: { x: 37, y: 755, width: 82, height: 64 } })] })],
+    });
+    const row: Row = { tree, found: [r] };
+    const played = play({ ...IPHONE, maxSwipes: 1 }, [row, row]);
+    expect(strokeCovers(played)).toEqual([BAR.y]);
+    const [first] = strokes(played);
+    expect(first?.box).toEqual(LIST);
+    expect(first !== undefined && containsPoint(LIST, first.from) && !containsPoint(BAR, first.from)).toBe(true);
   });
 });
 

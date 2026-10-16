@@ -682,7 +682,7 @@ interface State {
   readonly stuckOn: Direction | undefined;
   readonly backPending: boolean;
   /**
-   * The target's clipping containers, nearest first, each with what is
+   * The target's scroll views (`targetScrollers`), nearest first, each with what is
    * drawn over it, at the last read that found the target — the candidates
    * the round's stroke picks its container from (swipe.ts#strokeRoom), judged
    * for the stroke as drawn, `toward`; none of them with room, or none
@@ -719,6 +719,25 @@ interface StrokeContainer {
 
 /** The rects drawn over `rect` in this read, when it holds that container (`TreeFacts.scene`'s draw order). */
 const overIn = (facts: TreeFacts, rect: Rect): Rect[] | undefined => facts.scene.order.drawnOver(rect)?.map((n) => ({ ...n.rect }));
+
+/**
+ * The target's scroll views, nearest first, as rects — what its strokes may go over (`targetContainers`). Each tree
+ * names them in its own dialect, and only one of the two readers answers on a tree: its clipping ancestors
+ * (ui-tree/geometry.ts#Clips.scrollersOf — Android's, whose rects uiautomator has cut to them), else the ancestors
+ * that scroll on a tree of unclipped frames (`Clips.drawnIn`'s `scrollers` — WDA's, which marks no node as clipping,
+ * so its `scrollersOf` is empty for every node). Both empty — idb's flat list, which lists no scroll view, or a target
+ * under none — is the screen box. Measured (the lab app's `scroll-bounded`, WDA): with the chain alone the stroke for
+ * a row of the bounded `lower` (0,380 402x180) was drawn over the screen, touching down at (201,699) below it on the
+ * bare background — nothing moved, and the reply called the content exhausted while naming `lower`; the turned stroke
+ * for `tabbar-floating`'s R touched down at y 175, in the header above its list.
+ * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
+ * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md
+ */
+function targetScrollers(facts: TreeFacts, node: UiNode): readonly Rect[] {
+  const { clips } = facts.scene;
+  const chain = clips.scrollersOf(node);
+  return chain.length > 0 ? chain : (clips.drawnIn(node)?.scrollers.map((n) => n.rect) ?? []);
+}
 
 /**
  * The containers a round's stroke toward the target may go over, nearest
@@ -1024,8 +1043,8 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   if (best !== undefined) {
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
-    // The containers the strokes may go over: every clipping ancestor of
-    // the target, with what this read draws over each. Their room is judged
+    // The containers the strokes may go over: every scroll view of the
+    // target (`targetScrollers`), with what this read draws over each. Their room is judged
     // in `round`, for the stroke as drawn — `toward`, which a fling past the
     // target or a dropped target turns against the caller's direction, and
     // with that round's cover (judged for `rules.direction` alone, a strip
@@ -1035,7 +1054,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // stale, and may be another list — and the screen's largest scroller is
     // not taken either: a largest scroller with room that is not one of the
     // target's ancestors is a list that cannot hold the target.
-    s.targetContainers = facts.scene.clips.scrollersOf(best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
+    s.targetContainers = targetScrollers(facts, best.node).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] }));
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
