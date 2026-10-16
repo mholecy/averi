@@ -41,10 +41,13 @@ export function dismissalOf(truth: CellTruth): NonNullable<NonNullable<CellTruth
  * R-dismiss of a form cell (WDA only, see above): per field under the keyboard, its tap sends the configured dismissal.
  * `replaces` the form rows it stands in for (golden-spec/forms.ts's "refused naming the keyboard" tap of each).
  */
-export function dismissRows(platform: Platform, truth: CellTruth, source: SourceKind | undefined): { rows: (Expectation & { target: string })[]; replaces: Set<string> } {
+export function dismissRows(platform: Platform, truth: CellTruth, source: SourceKind): { rows: (Expectation & { target: string })[]; replaces: Set<string> } {
   const title = dismissalOf(truth);
   const keyboard = truth.form?.keyboard?.frame;
   const under = source === 'wda' && title !== undefined ? (truth.form?.controls ?? []).filter((c) => c.kind === 'field' && c.situation === 'under-keyboard') : [];
+  // A field under the keyboard with no keyboard frame is a truth that contradicts itself: refused loudly rather than
+  // judged by the looser row (no "nothing else tapped" without the keyboard's frame).
+  if (under.length > 0 && keyboard === undefined) throw new Error(`${truth.cell}: ${under.map((c) => c.tag).join(', ')} under the keyboard, but the truth holds no keyboard frame — R-dismiss cannot judge "nothing else tapped"`);
   return {
     rows: under.map((c) => classed(dismissRow(platform, c, { label: `id:"${title!.id}"`, frame: title!.frame }, keyboard))),
     replaces: new Set(under.map((c) => c.tag)),

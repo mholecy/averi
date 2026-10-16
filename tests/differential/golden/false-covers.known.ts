@@ -1,5 +1,4 @@
-import { ANDROID, IDB_STROKE_ABOVE_KEYBOARD, IOS, keys, NOT_IN_TREE, twice, type KnownFile } from './known.js';
-import { IDB_UNDER_KEYBOARD } from './forms.known.js';
+import { ANDROID, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS, keys, NOT_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The false-covers family's ratchet (fixtures/apps/cells/false-covers.json, phase 3 B5): own-parts (both platforms),
 // toolbar-dismiss and toolbar-dismiss-bar (iOS: form cells).

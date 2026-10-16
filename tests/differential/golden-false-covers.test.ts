@@ -110,6 +110,12 @@ describe('R-dismiss on a form whose config taps its title (toolbar-dismiss: #7, 
     expect(tap.judge(out('ERROR the keyboard is still up', ['idb ui tap 201 84', 'idb ui tap 201 621']))).toMatch(/^tapped under the keyboard at \(201,621\)/);
     expect(tap.judge(out('Tapped id:"lab.toolbar-dismiss.vs"', ['idb ui tap 201 84']))).toBe('Tapped while the keyboard still covers it: Tapped id:"lab.toolbar-dismiss.vs"');
   });
+  it('a field under the keyboard with no keyboard frame in the truth is refused loudly, not judged by a looser row', () => {
+    const noKeyboard = dismissCell();
+    noKeyboard.form = { ...noKeyboard.form!, keyboard: null };
+    expect(() => formExpectations('ios', noKeyboard, 'wda')).toThrow(/vs under the keyboard, but the truth holds no keyboard frame/);
+    expect(() => formExpectations('ios', noKeyboard, 'idb')).not.toThrow();
+  });
   it('under idb (the list inert there) the form\'s own row stands', () => {
     expect(formExpectations('ios', dismissCell(), 'idb').map((r) => `${r.target} ${r.verb} ${r.says}`)).toContain('vs tap refused naming the keyboard, nothing tapped');
   });
