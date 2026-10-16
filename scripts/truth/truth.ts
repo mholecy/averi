@@ -367,6 +367,20 @@ export function pieceOf(frame: Rect, ctx: GeometryContext): Rect | null {
 }
 
 /**
+ * A `covered` form control's piece: the largest part of its frame on the screen clear of the keyboard and of the
+ * pinned submit's own frame (not its bar's: the bar's padding draws over the control but may let a tap through — it
+ * is the probe at the piece that says, ControlTruth.reachedAtPiece). null when nothing of it is clear.
+ */
+export function controlPiece(frame: Rect, s: LabState, form: CatalogForm, own: { tag: string }): Rect | null {
+  const visible = intersect(frame, { x: 0, y: 0, width: s.screen.width, height: s.screen.height });
+  if (visible === null) return null;
+  const k = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
+  const submit = form.submit.pinned === true && own.tag !== form.submit.tag ? s.frames[form.submit.tag] : undefined;
+  const pieces = [k, submit].filter((r): r is Rect => r !== undefined).reduce<Rect[]>((ps, c) => ps.flatMap((p) => subtract(p, c)), [visible]);
+  return pieces.reduce<Rect | null>((best, p) => (best === null || area(p) > area(best) ? p : best), null);
+}
+
+/**
  * The edges of `frame` its scroll view's clip cuts — the clip's edge is where what shows of it ends, and the frame runs
  * on past it — each with what shows of the frame ACROSS that edge (`visible.height` at the top or bottom, its width at
  * a side): ADR 0013's sliver is `ui-tree/geometry.ts#Clips.cutSliver`'s, "what shows of the node across that edge"

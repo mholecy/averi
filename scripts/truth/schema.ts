@@ -394,6 +394,13 @@ export interface ControlTruth {
    * reached it — what averi's tap guard does there (hide, find again, tap). Absent elsewhere.
    */
   reachedAfterBack?: boolean;
+  /**
+   * A `covered` control: the largest part of its frame clear of the keyboard and the pinned submit (truth.ts#
+   * controlPiece), and whether a second raw tap at its centre reached the control — probed when that centre is not
+   * the frame's. Absent elsewhere.
+   */
+  piece?: Rect;
+  reachedAtPiece?: boolean;
 }
 
 /** A field as the app's model held it when the trees were read. */

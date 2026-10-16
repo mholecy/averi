@@ -78,7 +78,7 @@ export type FormExpectation = Expectation & { target: string };
  * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
  * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
- * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") |
+ * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.reachedAtPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
  * | the same | scroll_until down | never "reached" without a swipe |
  * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent |
  * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
@@ -278,7 +278,19 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
       if (fired.length === 0) return [];
       const other = fired.map((e) => `${e.kind} ${e.tag}`).join(', ');
       return [
-        { target, verb: 'tap', says: `not tapped, nothing sent (a tap at its centre fires ${other})`, call: tap, judge: notTapped },
+        c.reachedAtPiece === true && c.piece !== undefined
+          ? {
+              target,
+              verb: 'tap',
+              says: `not tapped, or Tapped inside its piece ${pointsText([{ x: c.piece.x, y: c.piece.y }])} ${c.piece.width}x${c.piece.height} (a tap at its centre fires ${other}; one at its piece reached it)`,
+              call: tap,
+              judge: (o) => {
+                if (!o.reply.startsWith('Tapped')) return notTapped(o);
+                const out = tapPoints(o).filter((p) => !within(p, c.piece!));
+                return out.length > 0 || tapPoints(o).length === 0 ? `Tapped outside its piece at ${pointsText(out)}: ${first(o)}` : undefined;
+              },
+            }
+          : { target, verb: 'tap', says: `not tapped, nothing sent (a tap at its centre fires ${other})`, call: tap, judge: notTapped },
         {
           target,
           verb: 'scroll_until',

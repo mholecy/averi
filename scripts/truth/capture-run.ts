@@ -5,7 +5,7 @@ import type { RunManifest } from '../differential/corpus.js';
 import type { LabDevice } from './lab-device.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
-import { consistency, controlConsistency, listedIn, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
+import { consistency, controlConsistency, controlPiece, listedIn, measuredGeometry, outOfProcessKeyboard, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, unprobedReason } from './truth.js';
 
 /**
  * The truth capture (docs/plans/2026-10-15-ground-truth-lab-app.md), one for both platforms — the device behind a
@@ -227,6 +227,15 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       const { events, after } = await probe(lab, cell.id, frame, () => lab.hideKeyboard!());
       reachedAfterBack = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached;
     }
+    // A covered control: a second probe at the centre of its piece clear of the keyboard and the pinned submit, when
+    // that is not its frame's — where a tap moved off the cover would land.
+    const piece = frame !== undefined && situation === 'covered' ? controlPiece(frame, s, form, w) : null;
+    const second = frame === undefined ? undefined : pieceProbePoint(frame, piece);
+    let reachedAtPiece: boolean | undefined;
+    if (second !== undefined) {
+      const { events, after } = await probe(lab, cell.id, second);
+      reachedAtPiece = readControlProbe(events, w, form.fields.find((f) => f.tag === w.tag), after?.focus).reached;
+    }
     const c: ControlTruth = {
       tag: w.tag,
       id: w.id,
@@ -236,11 +245,12 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
       ...read,
       ...(seen !== undefined && { seen }),
       ...(reachedAfterBack !== undefined && { reachedAfterBack }),
+      ...(reachedAtPiece !== undefined && { piece: piece!, reachedAtPiece }),
     };
     controls.push(c);
     const bad = controlConsistency(c, outOfProcessKeyboard(lab.platform, keyboard?.frame));
     if (bad !== undefined) broken.push(`${cell.id}/${w.tag}: ${bad}`);
-    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${reachedAfterBack === undefined ? '' : ` (after back ${reachedAfterBack})`}${described(c.probe)}`);
+    log(`${cell.id}/${w.tag}: ${situation}, reached ${c.reached}${reachedAfterBack === undefined ? '' : ` (after back ${reachedAfterBack})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}${described(c.probe)}`);
   }
   // The principal title a keyboard dismissal taps (CatalogForm.titleId): probed — a tap on it must end the editing.
   let title: FormTruth['title'];
