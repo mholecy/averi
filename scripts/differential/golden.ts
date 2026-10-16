@@ -98,7 +98,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       }
       // A live-only row (its truth a dynamic: golden-spec/judges.ts#Expectation.live) is the live golden's, never asked
       // here.
-      for (const e of expectations(recording.platform, t, truth).filter((x) => x.live === undefined)) {
+      for (const e of expectations(recording.platform, t, truth, recording.source).filter((x) => x.live === undefined)) {
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));
       }

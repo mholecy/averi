@@ -47,6 +47,15 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
   return 'open';
 }
 
+/**
+ * Whether a raw tree's payload (WDA's JSON, idb's JSON list, a uiautomator dump) lists a node identified as `id`: the
+ * id between quotes, as each payload writes an identifier (`"lab.x.A"`, `resource-id="lab.x.A"`), so `lab.x.A.box`
+ * is not `lab.x.A`.
+ */
+export function listedIn(payload: string, id: string): boolean {
+  return payload.includes(`"${id}"`);
+}
+
 /** The events a probe produced: what the app logged after the launch it was tapped on, without the time. */
 export function probeEvents(state: LabState | undefined, since: number): ProbeEvent[] {
   return (state?.events ?? []).slice(since).map(({ kind, tag }) => ({ kind, tag }));

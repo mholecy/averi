@@ -1,4 +1,4 @@
-import type { Platform } from '../corpus.js';
+import type { Platform, SourceKind } from '../corpus.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { colourFails, directionRow, fullyRow, landRow, notReachedStill, refusedTap, strokeRow } from './rows.js';
@@ -14,14 +14,16 @@ import { colourFails, directionRow, fullyRow, landRow, notReachedStill, refusedT
  * |---|---|
  * | off-screen | R-off tap, R-off colour, R-stroke, R-direction (live only: golden.ts never asks it) |
  * | outside-scroll-view | R-outside-sv tap, R-outside-sv colour (asked for the colour the screen shows there: a pass measured the background, #29), R-stroke, R-direction (live only) |
- *
- * On Android the off-screen and outside-scroll-view rows accept a target missing from the tree (notListed).
  * | sliver | R-sliver tap, R-sliver scroll_until, R-fully |
  * | partly-centre-in | R-land (Tapped inside what shows), R-fully |
  * | centre-out | R-land (refused, or Tapped inside its piece), R-fully |
+ *
+ * The off-screen and outside-scroll-view rows accept a target missing from the tree where its capture's tree of that
+ * source did not list it (notListed); R-stroke asks every touch-down inside the target's own scroll view where the truth
+ * names one (rows.ts#strokeRow).
  */
-export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation[] {
-  const absent = notListed(platform);
+export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, source?: SourceKind): Expectation[] {
+  const absent = notListed(t, source);
   switch (t.geometry) {
     case 'off-screen':
       return [
@@ -48,12 +50,13 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth): E
 }
 
 /**
- * Why an Android target off the screen or outside its scroll view's clip may be missing from the tree: uiautomator
- * dumps only the nodes visible to the user, and Compose marks such a node not visible (docs/bugs/
- * 2026-10-08-ios-tap-off-screen-reported-done.md, its Android part; measured on the lab's edges cells: scroll-bounded's
- * O and F, scroll-top-edge's A are not in the dump). A tap that waits for it, a colour assert that does not find it and
- * a scroll_until that swipes for it are then all averi can answer. iOS's trees list such a node (WDA and idb).
+ * Why a target off the screen or outside its scroll view's clip may be missing from the replayed tree: the capture's
+ * tree of that source did not list it (TargetTruth.listed, truth.ts#listedIn) — uiautomator dumps no node not visible
+ * to the user, so scroll-bounded's O and F and scroll-top-edge's A are not in the Android dump (docs/bugs/
+ * 2026-10-08-ios-tap-off-screen-reported-done.md, its Android part). A tap that waits for it, a colour assert that
+ * does not find it and a scroll_until that swipes for it are then all averi can answer. A target the tree lists, or a
+ * capture that did not record it, is held to be in the tree.
  */
-export function notListed(platform: Platform): string | undefined {
-  return platform === 'android' ? 'uiautomator dumps no node that is not visible to the user: a target off the screen or outside its scroll view is not in the tree' : undefined;
+export function notListed(t: Pick<TargetTruth, 'listed'>, source: SourceKind | undefined): string | undefined {
+  return source !== undefined && t.listed?.[source] === false ? `the capture's ${source} tree does not list it` : undefined;
 }

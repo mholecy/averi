@@ -242,6 +242,12 @@ export interface TargetTruth {
   /** The scroll view the target lies in (CatalogTarget.scrollView). */
   scrollView?: string;
   /**
+   * Whether each raw tree the capture read lists a node identified as the target (truth.ts#listedIn): `{wda: true,
+   * idb: true}`, `{uiautomator: false}` — uiautomator dumps no node not visible to the user. Recorded with a measured
+   * geometry only (absent before B2's review too): a target without it is held to be listed.
+   */
+  listed?: Partial<Record<'wda' | 'idb' | 'uiautomator', boolean>>;
+  /**
    * A second probe, at the piece's centre (probePoint(piece)), when it is not the frame's: fired the target's action.
    * Absent when not probed — the piece's centre is the frame's, or there is no piece.
    */

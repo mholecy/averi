@@ -9,6 +9,7 @@ import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, Probe
 import {
   consistency,
   controlConsistency,
+  listedIn,
   otherControlsFired,
   outOfProcessKeyboard,
   probePoint,
@@ -450,4 +451,14 @@ describe('capture of a form cell (iOS)', () => {
       expect.stringMatching(/^form-k\/submit: the probe tap left no touch/),
     ]);
   }, 15_000);
+});
+
+describe('listedIn: whether a raw tree lists a node identified as the target', () => {
+  it('the id between quotes, as WDA, idb and uiautomator write it — not a longer id that starts with it', () => {
+    expect(listedIn('{"rawIdentifier": "lab.c.A", "rect": {}}', 'lab.c.A')).toBe(true);
+    expect(listedIn('[{"AXUniqueId":"lab.c.A"}]', 'lab.c.A')).toBe(true);
+    expect(listedIn('<node resource-id="lab.c.A" bounds="[0,0][1,1]"/>', 'lab.c.A')).toBe(true);
+    expect(listedIn('<node resource-id="lab.c.A.box"/>', 'lab.c.A')).toBe(false);
+    expect(listedIn('<node resource-id="lab.c.B"/>', 'lab.c.A')).toBe(false);
+  });
 });

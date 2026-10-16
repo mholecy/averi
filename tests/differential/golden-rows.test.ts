@@ -115,20 +115,44 @@ describe('R-outside-sv colour: asked for the colour the screen shows there, so a
   });
 });
 
-describe('Android: a target off the screen or outside its scroll view may be missing from the tree (notListed)', () => {
+describe('a target off the screen or outside its scroll view that its capture\'s tree did not list may be missing (notListed)', () => {
   const NOT_FOUND = 'ERROR Timed out after 5000ms waiting for element id:"lab.edges.A" to appear';
-  const android = (g: Geometry) => expectations('android', target(g, { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }), CELL);
+  // On CELL's 402x874 screen, beside the scroll view `list` (380–560): accepted, as averi never saw which holds it.
+  const ADB_STROKE = 'adb shell input swipe 201 699 201 175 300';
+  const unlisted = { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, scrollView: 'list', listed: { uiautomator: false } };
+  const android = (g: Geometry) => expectations('android', target(g, unlisted), { ...CELL, scrollViews: { list: rect(0, 380, 402, 180) } }, 'uiautomator');
   it.each(['off-screen', 'outside-scroll-view'] as const)('%s: the tap that waited and sent nothing, the colour not found, the swipes for it — all accepted', (g) => {
     const rs = android(g);
     expect(verdict(rs, 'tap', out(NOT_FOUND))).toBeUndefined();
     expect(verdict(rs, 'colour', out('1/1 asserts FAILED\nFAIL  element id:"lab.edges.A" … — not found within 1 s'))).toBeUndefined();
-    expect(verdict(rs, 'scroll_until', out(`ERROR scroll_until failed after 2 swipes — element never appeared in the tree`, [IDB_STROKE, IDB_STROKE]))).toBeUndefined();
+    // Not listed, no scroll view to hold its strokes to: averi never saw which one holds it.
+    expect(verdict(rs, 'scroll_until', out(`ERROR scroll_until failed after 2 swipes — element never appeared in the tree`, [ADB_STROKE, ADB_STROKE]))).toBeUndefined();
     expect(verdict(rs, 'tap', out(TAPPED, ['adb shell input tap 201 940']))).toBe(`Tapped: ${TAPPED}`);
   });
-  it('on iOS (WDA and idb list such a node) the same replies are no answer', () => {
-    const rs = rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }));
-    expect(verdict(rs, 'tap', out(NOT_FOUND))).toBe(`refused without scroll_until: ${NOT_FOUND}`);
-    expect(verdict(rs, 'colour', out('1/1 asserts FAILED\nFAIL  element id:"lab.edges.A" … — not found within 1 s'))).toMatch(/^not in the tree: /);
+  it('listed by the replayed source (or not recorded, or another source unlisted): the same replies are no answer', () => {
+    for (const rs of [
+      expectations('android', target('off-screen', { ...unlisted, listed: { uiautomator: true } }), CELL, 'uiautomator'),
+      expectations('ios', target('off-screen', { ...unlisted, listed: { wda: true, idb: false } }), CELL, 'wda'),
+      rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null })),
+    ]) {
+      expect(verdict(rs, 'tap', out(NOT_FOUND))).toBe(`refused without scroll_until: ${NOT_FOUND}`);
+      expect(verdict(rs, 'colour', out('1/1 asserts FAILED\nFAIL  element id:"lab.edges.A" … — not found within 1 s'))).toMatch(/^not in the tree: /);
+    }
+  });
+});
+
+describe('R-stroke inside the target\'s own scroll view (where the truth names it and the capture its clip)', () => {
+  const cell: CellTruth = { ...CELL, scrollViews: { list: rect(0, 380, 402, 180) } };
+  const rs = expectations('ios', target('outside-scroll-view', { frame: rect(51, 620, 300, 64), reached: false, visible: null, scrollView: 'list' }), cell, 'wda');
+  it.each([
+    ['inside the scroll view', ['idb ui swipe 201 520 201 400 --duration 0.3'], undefined],
+    ['beside it, on the background (WDA on scroll-bounded)', [IDB_STROKE], 'touched down outside its scroll view list at (201,699): x'],
+  ])('%s', (_n, device, expected) => {
+    expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
+  });
+  it('a target in no scroll view, or one the state did not report: the screen\'s region only', () => {
+    const none = expectations('ios', target('outside-scroll-view', { frame: rect(51, 620, 300, 64), reached: false, visible: null, scrollView: 'other' }), cell, 'wda');
+    expect(verdict(none, 'scroll_until', out('x', [IDB_STROKE]))).toBeUndefined();
   });
 });
 
@@ -207,6 +231,13 @@ describe('R-band: refused, never measured, never reached where it is', () => {
   });
   it('the colour assert fails closed on the band (ADR 0001)', () => {
     expect(verdict(rs, 'colour', out(PASSED))).toMatch(/^passed on/);
+  });
+  it('a band target whose probe fired (iOS, below the bar\'s touch area) is not expected refused: Tapped inside it, or nothing sent', () => {
+    const fired = rows(target('status-band', { frame: rect(51, 22, 300, 64), visible: rect(51, 22, 300, 64), reached: true }));
+    expect(verdict(fired, 'tap', out(TAPPED, ['idb ui tap 201 54']))).toBeUndefined();
+    expect(verdict(fired, 'tap', out('ERROR: under the status bar — scroll_until it first'))).toBeUndefined();
+    expect(verdict(fired, 'tap', out(TAPPED, ['idb ui tap 201 100']))).toBe(`Tapped outside what shows of it at (201,100): ${TAPPED}`);
+    expect(verdict(fired, 'tap', out('ERROR: refused', ['idb ui tap 201 54']))).toBe('refused, but sent idb ui tap 201 54');
   });
 });
 
