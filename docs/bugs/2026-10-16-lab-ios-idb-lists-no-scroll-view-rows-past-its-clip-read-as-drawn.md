@@ -70,4 +70,5 @@ ADR records that decision, so it is filed here as an open finding with its rows.
 ## Rows (golden, KNOWN in tests/differential/golden/edges.known.ts)
 
 `ios-iphone17-ios27/scroll-bounded.idb.json P fully`, `S tap`, `S scroll_until`, `S fully`, `O tap`, `O colour`,
-`O scroll_until`.
+`O scroll_until`, and `F scroll_until` (the screen's stroke, `201 699 → 175`, touches down below `lower`, the scroll view
+that holds `F`; under WDA the same stroke is docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md).
