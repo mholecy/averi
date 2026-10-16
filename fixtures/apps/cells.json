@@ -70,6 +70,16 @@
       ]
     },
     {
+      "id": "sheet-long-list-short",
+      "family": "presented",
+      "layer": "sheet-list-short",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "R", "color": "#1E88E5", "slot": 1, "in": "layer", "declared": "open", "scrollView": "list" },
+        { "tag": "F", "color": "#FB8C00", "slot": 8, "in": "layer", "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
       "id": "dim-cover",
       "family": "presented",
       "layer": "dim-cover",
@@ -289,6 +299,26 @@
       ]
     },
     {
+      "id": "scroll-bounded-flush",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "W", "color": "#E53935", "slot": 0, "declared": "open", "scrollView": "upper" },
+        { "tag": "P", "color": "#1E88E5", "slot": 1, "declared": "open", "scrollView": "upper" },
+        { "tag": "S", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "lower" }
+      ]
+    },
+    {
+      "id": "scroll-sticky-cut",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "R", "color": "#00897B", "slot": 0, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
       "id": "scroll-top-edge",
       "family": "edges",
       "layer": "none",
@@ -301,6 +331,21 @@
       "id": "bands",
       "family": "bars",
       "layer": "none",
+      "navigation": "gesture",
+      "targets": [
+        { "tag": "S", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "O", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "W", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "Q", "color": "#FB8C00", "slot": 3, "declared": "open" },
+        { "tag": "N", "color": "#8E24AA", "slot": 4, "declared": "open" }
+      ]
+    },
+    {
+      "id": "bands-three-button",
+      "family": "bars",
+      "layer": "none",
+      "platforms": ["android"],
+      "navigation": "three-button",
       "targets": [
         { "tag": "S", "color": "#E53935", "slot": 0, "declared": "open" },
         { "tag": "O", "color": "#1E88E5", "slot": 1, "declared": "open" },
@@ -415,6 +460,38 @@
         "ios": {
           "keyboardDismiss": [
             { "tap": { "id": "lab.toolbar-dismiss-bar.title" } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "toolbar-dismiss-short",
+      "family": "false-covers",
+      "layer": "toolbar-screen-short",
+      "platforms": ["ios"],
+      "targets": [],
+      "form": {
+        "title": "SWIFT payment",
+        "titleId": "lab.toolbar-dismiss-short.title",
+        "fields": [
+          { "tag": "reference", "kind": "text", "title": "Payment reference" },
+          { "tag": "message", "kind": "text", "title": "Message for the recipient" },
+          { "tag": "street", "kind": "text", "title": "Street & number" },
+          { "tag": "city", "kind": "text", "title": "City / town" },
+          { "tag": "postcode", "kind": "text", "title": "Postcode" },
+          { "tag": "phone", "kind": "text", "title": "Phone – optional" },
+          { "tag": "vs", "kind": "text", "title": "Variable symbol" },
+          { "tag": "ks", "kind": "text", "title": "Constant symbol" },
+          { "tag": "ss", "kind": "text", "title": "Specific symbol" },
+          { "tag": "note", "kind": "text", "title": "Note “for me”" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue to summary" },
+        "focus": "postcode"
+      },
+      "config": {
+        "ios": {
+          "keyboardDismiss": [
+            { "tap": { "id": "lab.toolbar-dismiss-short.title" } }
           ]
         }
       }

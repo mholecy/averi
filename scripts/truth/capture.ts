@@ -23,8 +23,9 @@ import { AndroidLab, IosLab, type LabDevice } from './lab-device.js';
  * the caller's. `--family` keeps the cells of those families (schema.ts#FAMILIES), `--cells` those cells (both: the
  * named cells of those families; catalog.ts#selectCells — a name that matches nothing is an error, never an empty run).
  * A run of some cells adds to (or replaces those cells in) the run's manifest, from the same device only —
- * the description the guard reports equal to the manifest's. Exit code 1 when a cell is broken (its truth's sources
- * disagree).
+ * the description the guard reports equal to the manifest's. A cell built for another platform, or (Android) captured
+ * under another navigation mode than the device's, is skipped and said (catalog.ts#captureRefusal). Exit code 1 when a
+ * cell is broken (its truth's sources disagree).
  */
 
 export async function main(platform: 'ios' | 'android', argv: string[] = process.argv.slice(2)): Promise<void> {

@@ -137,6 +137,28 @@
       "truth": "sheet-long-list.truth.json"
     },
     {
+      "file": "sheet-long-list-short.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-long-list-short.png",
+      "truth": "sheet-long-list-short.truth.json"
+    },
+    {
+      "file": "sheet-long-list-short.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "sheet-long-list-short.png",
+      "truth": "sheet-long-list-short.truth.json"
+    },
+    {
       "file": "dim-cover.wda.json",
       "source": "wda",
       "form": "raw",
@@ -575,6 +597,28 @@
       },
       "screenshot": "toolbar-dismiss-bar.png",
       "truth": "toolbar-dismiss-bar.truth.json"
+    },
+    {
+      "file": "toolbar-dismiss-short.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "toolbar-dismiss-short.png",
+      "truth": "toolbar-dismiss-short.truth.json"
+    },
+    {
+      "file": "toolbar-dismiss-short.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "toolbar-dismiss-short.png",
+      "truth": "toolbar-dismiss-short.truth.json"
     }
   ]
 }

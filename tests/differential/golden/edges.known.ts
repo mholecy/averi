@@ -1,6 +1,7 @@
 import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.js';
 
-// The edges family's ratchet (fixtures/apps/cells/edges.json): scroll-bounded, scroll-sticky, scroll-top-edge — its
+// The edges family's ratchet (fixtures/apps/cells/edges.json): scroll-bounded, scroll-sticky, scroll-top-edge, and
+// round 3's Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut — its
 // rows by geometry (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
 // scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE4); this KNOWN owns the
 // ratchet, as presented.known.ts does for L1.
@@ -9,6 +10,7 @@ const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-conta
 const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const LE4 = 'bug:2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md';
+const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (201,699)';
 
 export const edges: KnownFile = {
@@ -42,10 +44,17 @@ export const edges: KnownFile = {
       ...keys(file, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the pinned header, listed first, is no cover of what the colour samples', as: LE3 }),
       ...keys(file, ['R'], ['fully'], { cls: 'fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the pinned header is no cover for fully: true', as: LE3 }),
     ]),
+    // LAB FINDING VA1 — Compose cuts a row (and its content) at a sticky header that is one accessibility element: the
+    // tree's row 128,457 825x110 begins at the header's bottom, its content cut alike, so nothing in it reaches under the
+    // header — averi samples the cut rect (a PASS on R's own colour) and calls it fully visible.
+    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the row cut at the header, its content too — the sample is the cut rect', as: VA1 }),
+    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['fully'], { cls: 'fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the row cut at the header reads whole', as: VA1 }),
   ]),
   counts: {
     [`${ANDROID}/scroll-bounded.xml`]: 14,
     [`${ANDROID}/scroll-sticky.xml`]: 4,
+    [`${ANDROID}/scroll-bounded-flush.xml`]: 8,
+    [`${ANDROID}/scroll-sticky-cut.xml`]: 4,
     [`${ANDROID}/scroll-top-edge.xml`]: 6,
     [`${IOS}/scroll-bounded.idb.json`]: 14,
     [`${IOS}/scroll-bounded.wda.json`]: 14,
