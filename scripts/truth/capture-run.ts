@@ -24,7 +24,8 @@ import { consistency, controlConsistency, measuredGeometry, outOfProcessKeyboard
  * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
  * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
  * phase 3: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the
- * bar's, its touch telling which (truth.ts#systemBarSwallows, #bandTouchTells). One rule decides what is
+ * bar's (truth.ts#systemBarSwallows, #statusBarMaySwallow, #navigationBandTakes — the last by the navigation mode an
+ * Android capture records, LabDevice.navigation). One rule decides what is
  * never tapped, for the capture and consistency both: truth.ts#unprobedReason.
  *
  * A form cell has no coloured targets: its truth is the app's own model of each field (value, focus, the error shown
@@ -67,6 +68,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const manifest: RunManifest = { platform: lab.platform, app: 'AveriLab', device, note: opts.note, captures: [] };
   const broken: string[] = [];
   const skipped: string[] = [];
+  // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
+  const navigation = await lab.navigation?.();
   const captured = new Set<string>();
   for (const cell of cells) {
     const why = lab.unsupported(cell);
@@ -94,6 +97,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       ...(s.scrollViews !== undefined && { scrollViews: s.scrollViews }),
       ...(s.chrome !== undefined && { chrome: s.chrome }),
       ...(cell.config !== undefined && { config: cell.config }),
+      ...(navigation !== undefined && { navigation }),
     };
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
@@ -121,7 +125,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         ...(unprobed !== undefined && { unprobed }),
       };
       truth.targets.push(target);
-      const bad = consistency(target, lab.platform, s.screen);
+      const bad = consistency(target, lab.platform, s.screen, navigation);
       if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
       log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
     }

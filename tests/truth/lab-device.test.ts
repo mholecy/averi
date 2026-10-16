@@ -142,4 +142,14 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     await lab.close();
     expect(calls).toEqual(['adb -s emulator-5556 emu avd name', 'adb -s emulator-5556 shell am force-stop dev.averi.lab']);
   });
+  it('reads the navigation mode from settings (0 three buttons, 2 gestures), only of the lab AVD', async () => {
+    for (const [mode, want] of [['2\n', 'gesture'], ['0\n', 'three-button'], ['1\n', 'two-button'], ['null\n', undefined]] as const) {
+      const { exec, calls } = fakeExec();
+      const answering: Exec = async (file, args) => (args.join(' ').endsWith('settings get secure navigation_mode') ? (calls.push(`${file} ${args.join(' ')}`), { stdout: mode }) : exec(file, args));
+      expect(await new AndroidLab('emulator-5556', { exec: answering }).navigation()).toBe(want);
+      expect(calls).toEqual(['adb -s emulator-5556 emu avd name', 'adb -s emulator-5556 shell settings get secure navigation_mode']);
+    }
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).navigation()).rejects.toThrow(/refused/);
+  });
 });

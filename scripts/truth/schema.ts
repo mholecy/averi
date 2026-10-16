@@ -294,7 +294,15 @@ export interface CellTruth {
   chrome?: Record<string, Rect>;
   /** The cell's averi.yaml variant (CatalogCell.config): golden replays it under this. */
   config?: CellConfig;
+  /**
+   * Android: the navigation mode the device was in (`settings get secure navigation_mode`), which decides who takes a
+   * tap in the navigation band (truth.ts#navigationBandTakes). Absent on iOS and on captures before B4.
+   */
+  navigation?: NavigationMode;
 }
+
+/** Android's `navigation_mode`: 0 `three-button`, 1 `two-button`, 2 `gesture`. */
+export type NavigationMode = 'three-button' | 'two-button' | 'gesture';
 
 /**
  * Where a form control is, measured from the app's frames (truth.ts#situationOf), not declared: `open` its centre on

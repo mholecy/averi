@@ -225,16 +225,19 @@ the raw tap, 1 s, the events since:
 | the same | status | (201,54), (60,54), (201,55), (201,58), (201,61) | the touch, and `tap O` beneath |
 | the same | home indicator (840–874 pt) | (201,857), (60,857) on N | the touch, and `tap N` |
 
-The AVD was set back to gesture navigation (`…navbar.gestural`; mode 2, the band at 2154 again) before its captures. So
-the capture probes a centre in any band (truth.ts#unprobedReason no longer names the navigation band), and
-consistency holds it to what the touch says: Android's status band swallows (systemBarSwallows, #21); in the
-navigation band, Android's or iOS's home indicator's (truth.ts#bandTouchTells), a logged touch means the target must be
-reached, none that it must not be. B1's iOS assumption did not hold: iOS's status bar swallows a tap in the top of its
-band — B3 measured it the same day on `open` (no touch at y 2–50, a touch from 55) and wrote the rule,
-truth.ts#statusBarMaySwallow, accepted above its line `IOS_STATUS_BAR_SWALLOWS_ABOVE` (51 pt; a probe below it with no
-touch is undelivered); B4's taps above agree and narrow the line (no touch up to 53, a touch from 54) — the constant is
-left at B3's 51, inside both measurements. averi refuses a tap in a band
-(ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts).
+The raw touch logs are docs/truth/band-probes-2026-10-16.md. The AVD was set back to gesture navigation
+(`…navbar.gestural`; mode 2, the band at 2154 again) before its captures. So the capture probes a centre in any band
+(truth.ts#unprobedReason no longer names the navigation band) and, on Android, records the navigation mode
+(`CellTruth.navigation`, AndroidLab.navigation: `settings get secure navigation_mode`); consistency holds the probe to
+what was measured: Android's status band swallows (systemBarSwallows, #21); the navigation band
+(truth.ts#navigationBandTakes) is the app's on iOS and under gesture navigation — the touch logged, the target reached
+(on iOS drawn too) — and the bar's under three buttons — not reached; with no mode recorded (or two buttons, not
+measured) a nav-band target is broken. No capture exists under three-button navigation yet (a follow-up). B1's iOS
+assumption did not hold: iOS's status bar swallows a tap in the top of its band — B3 measured it the same day on `open`
+(no touch at y 2–50, a touch from 55) and wrote the rule, truth.ts#statusBarMaySwallow, accepted above its line
+`IOS_STATUS_BAR_SWALLOWS_ABOVE` (51 pt; a probe below it with no touch is undelivered); B4's taps above agree and narrow
+the line (no touch up to 53, a touch from 54) — the constant is left at B3's 51, inside both measurements. averi refuses
+a tap in a band (ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts).
 
 ### Phase 4 — the matrix, generated
 
