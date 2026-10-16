@@ -28,7 +28,7 @@ open note on the working tree. See the script for the verdicts.
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
 | 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS)), regressed elsewhere: 6 rows (recorded) |
-| 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | CALIBRATED (partial: the navigation band's colour part (the static bands); OCR on real pixels is phase 4) |
+| 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | DOES-NOT-FAIL (partial: the navigation band's colour part (the static bands), on a gesture-navigation capture whose band is the app's; OCR on real pixels is phase 4) |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
 | 26 | 2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows | calibrate | 7566443 → 83e282a | CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts) |
@@ -229,7 +229,7 @@ Regressed elsewhere at 9c7885e (green at d043e65):
 
 Regressions recorded:
 
-- android-averi_lab-api33/tabbar-floating.xml F scroll_until: broke at 9c7885e, fixed at bd06470 — the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470
+- android-averi_lab-api33/tabbar-floating.xml F scroll_until: broke at 9c7885e, fixed at bd06470 — the stroke toward tabbar-floating's F touches down at (540,1886), on the floating tab bar — #11's defect (green at d043e65); cured by #11's fix bd06470, bisected without a device (golden --only tabbar-floating over the first-parent commits 9c7885e..bd06470): red at 9c7885e and at 188740b, bd06470's first parent, green at bd06470 (the strokes touch down at (540,1598), above the bar)
 
 Needs: edges/scroll-bounded variant (Android) whose uiautomator bounds are cut FLUSH with the scroll container's edge (mp-native's SWIFT form: `{y:242, height:92}` on a container from 242) — the lab's verticalScroll in an edge-to-edge window does not cut P at all.
 
@@ -370,6 +370,8 @@ toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty ch
   - ok ios-iphone17-ios27/sheet-long-list.wda.json F tap — ERROR id:"lab.sheet-long-list.F" is off screen at (201,1374) on a 402x874 screen (rect 0,1342 402x64) — scroll_until it first; nothing was tapped
   - ok ios-iphone17-ios27/sheet-long-list.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-long-list.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 402x874 viewpor
 
+Needs: R-outside-sv: a sheet-long-list target on the screen but outside its scroll view (a parked row whose cell lies below the table's clip yet above the screen's bottom — the table cut short of the sheet's foot); rows: R-outside-sv tap, colour, R-stroke.
+
 presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists the rows below the fold (13 on) with their label parked at the sheet's origin (F: StaticText 0,62 402x64, its cell 0,1342). Only R-off is asked: F lies off the screen, which takes precedence over outside its scroll view (truth.ts#geometryOf) — the note's own call, `fully: true`, is R-fully's and not asked of an off-screen target (partial); the plain stop asked by R-stroke shows the same 'fully visible after 0 swipes'. Before: tap Tapped at the parked point, scroll_until (R-stroke) 'fully visible after 0 swipes'; after: off screen, scroll_until it first, and two strokes. F's colour row is green on both sides (a FAIL either way: no evidence). No idb evidence: idb lists the table's labels without their identifiers and no row below the fold (KNOWN).
 
 ## 21: CALIBRATED
@@ -423,20 +425,22 @@ Regressions recorded:
 - ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour, ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour: broke at 596a379, fixed at 83e282a — the pixel assert asks the covers the tap asks: WDA's hidden host tab bar (#26) fails it closed until ADR 0019's hidden subtree
 - ios-iphone17-ios27/blur-menu.idb.json W colour, ios-iphone17-ios27/blur-menu.wda.json W colour: broke at 596a379, not fixed — the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4
 
-Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks "close it first" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT.
+Needs: the OCR half: phase 4 (the note covers the colour AND the OCR asserts; only the colour rows are golden's).
 
-## 23: CALIBRATED (partial: the navigation band's colour part (the static bands); OCR on real pixels is phase 4)
+Calibrated through the overlay half of the fix: before, the colour assert passed on the presented sheet's dim colour; after, it fails closed naming the 'dismiss popup' container drawn over the element. Since B3 the colour row beneath a presented layer also asks "close it first" (golden-spec/presented.ts, ADR 0018's 2026-10-14 pixel-assert remedy, which 753b560 brought): at 596a379 the FAIL names the dim without that remedy, so the rows stay red after on the remedy's wording, not the defect — CALIBRATED-ON-DEFECT. The status band and the pinned button (B4's bars cells, idb and WDA alike): bands S, centred in the status band under the status bar, passed on its own colour #E53935 at ad7ed11 (97 % of the region sampled) and fails closed at 596a379 naming the status bar drawn over the element; pinned-bar P, under the pinned Continue button, passed on #E53935 at ad7ed11 (66 % of the region) and fails closed at 596a379 naming button "Continue" drawn over the element — both green after.
+
+## 23: DOES-NOT-FAIL (partial: the navigation band's colour part (the static bands), on a gesture-navigation capture whose band is the app's; OCR on real pixels is phase 4)
 
 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md — defect: `^passed on`
 
 - before 94bae14:
-  - RED android-averi_lab-api33/bands.xml N colour — passed on #8E24AA: PASS  element id:"lab.bands.N" fill within dE00 8 of #8E24AA — sampled #8E24AA (dominant, 50% of region) vs expected #8E24AA → dE00 0.00 ≤ 8; scale 1.000
+  - ok android-averi_lab-api33/bands.xml N colour — PASS  element id:"lab.bands.N" fill within dE00 8 of #8E24AA — sampled #8E24AA (dominant, 50% of region) vs expected #8E24AA → dE00 0.00 ≤ 8; scale 1.000
 - after e85bcdf:
   - ok android-averi_lab-api33/bands.xml N colour — FAIL  element id:"lab.bands.N" fill within dE00 8 of #8E24AA — the navigation bar is drawn over the element (element 127,2121 825x99, navigation bar 0,2154 1080x66) — the capture would show it, not the element; scroll_un
 
-Needs: OCR judged on real pixels (phase 4): a text cut at the navigation bar.
+Needs: a three-button bands capture (the averi_lab AVD under three buttons, docs/truth/band-probes-2026-10-16.md: N not reached, its colour row expecting a FAIL), and OCR judged on real pixels (phase 4): a text cut at the navigation bar.
 
-bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).
+bands' N lies centred in the gesture navigation band (2154–2220). At 94bae14 the colour assert samples it and passes; at e85bcdf the navigation band fails it closed (D7's pixel part). Both are right under gesture navigation, the only mode captured: the band is the app's there (truth.ts#navigationBandTakes) and N is reached, 90 % drawn and seen in its own colour #8E24AA beneath the handle, so its colour row accepts a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020: the measured truth outranks a hand-written expectation) — the row is green on both sides, DOES-NOT-FAIL. The note's defect is a FAIL owed where the bar is drawn over the target, the row a three-button capture asks (FAIL expected). The note's own symptom — OCR reading glyphs cut at the bar — needs real pixels (phase 4).
 
 ## 26: CALIBRATED (partial: the colour rows and the plain stop; the tap, moved off the phantom button, still answers Tapped, which the open row accepts)
 
