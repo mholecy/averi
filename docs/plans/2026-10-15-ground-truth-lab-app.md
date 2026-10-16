@@ -50,7 +50,7 @@ matters for `Tapped` is whether the action fired.
 
 | truth | tap | colour assert | scroll_until (down) |
 |---|---|---|---|
-| reached, drawn ≥ 95 % | `Tapped` | pass with its own colour | reached, 0 swipes |
+| reached, drawn ≥ 95 % | `Tapped` (phase 3 round 3: at its probe point, golden-spec/base.ts#atProbe) | pass with its own colour | reached, 0 swipes |
 | not reached, declared `presented-over` | refused, `close it first`, nothing tapped | fail (asked with the colour the screenshot shows there, so a pass means it measured the cover) | stopped before any swipe, `close it first` |
 
   New rows are added with the cells that need them (outside its scroll view → scroll advice; partly drawn with centre
@@ -280,6 +280,13 @@ title) and `toolbar-dismiss-bar` (plus an itemless bar-sized UIToolbar over the 
 column has no golden verb yet) calibrated (docs/truth/calibration.md). On Android `own-parts`' N is a green control row,
 no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView
 [177,1351][443,1412]), so neither #8's shape nor #18's.
+
+**Round 3 — the open tap at its probe point (2026-10-16, truth/r3-open-tap).** base.ts's open tap asks where the tap
+lands: every tap within OPEN_TAP_REACH (a sixth of the extent, chosen between the measured 0.081 of own-parts' N and
+0.313 of #26's C) of the probe's logged touch, and no "tapped the uncovered part" reply on a target measured uncovered.
+#26 calibrated on its tap. Follow-up: hold every open tap to the centre of the target's node in the recorded tree
+(exact, up to the tools' rounding) — it closes the reach's blind spot (a cover averi imagines over under a third of
+the target moves the tap under a sixth, and passes unless the reply says it moved).
 
 ### Phase 4 — the matrix, generated
 

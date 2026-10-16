@@ -76,7 +76,7 @@ describe('golden over a capture whose truth carries a measured geometry', () => 
   it('asks each geometry its rows — expectations() handed the cell\'s truth', () => {
     expect(asked('A')).toEqual(['tap: R-band', 'colour: fails (R-band', 'scroll_until: R-band']);
     expect(asked('C')).toEqual(['tap: R-land', 'fully: R-fully']);
-    expect(asked('D')).toEqual(['tap: Tapped', 'colour: passes on its own colour #FB8C00', 'scroll_until: reached with no swipe']);
+    expect(asked('D')).toEqual(['tap: Tapped at its probe point (540,1876)', 'colour: passes on its own colour #FB8C00', 'scroll_until: reached with no swipe']);
   });
   it('never asks a live-only row: off the screen, R-off\'s three and not R-direction', () => {
     expect(asked('B')).toEqual(['tap: R-off', 'colour: fails (R-off', 'scroll_until: R-off, R-stroke']);

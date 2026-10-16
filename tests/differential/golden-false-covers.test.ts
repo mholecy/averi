@@ -32,7 +32,7 @@ describe('a text target on its own control (own-parts: #8, #18)', () => {
   const rows = expectations('android', t, undefined, 'uiautomator');
 
   it('asks a tap and a scroll_until by its text, never its colour', () => {
-    expect(rows.map((r) => `${r.verb} ${String(r.call.args.selector)} ${r.says}`)).toEqual(['tap text:"LOGIN" Tapped', 'scroll_until text:"LOGIN" reached with no swipe']);
+    expect(rows.map((r) => `${r.verb} ${String(r.call.args.selector)} ${r.says}`)).toEqual(['tap text:"LOGIN" Tapped at its probe point (540,412)', 'scroll_until text:"LOGIN" reached with no swipe']);
   });
   it('tap: Tapped; refused as under its own button is the mismatch (#8)', () => {
     expect(by(rows, 'tap').judge(out('Tapped text:"LOGIN"', ['adb shell input tap 540 412']))).toBeUndefined();
