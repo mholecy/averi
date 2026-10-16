@@ -231,7 +231,9 @@ consistency holds it to what the touch says: Android's status band swallows (sys
 navigation band, Android's or iOS's home indicator's (truth.ts#bandTouchTells), a logged touch means the target must be
 reached, none that it must not be. B1's iOS assumption did not hold: iOS's status bar swallows a tap in the top of its
 band — B3 measured it the same day on `open` (no touch at y 2–50, a touch from 55) and wrote the rule,
-truth.ts#statusBarMaySwallow; B4's taps above agree (no touch up to 53, a touch from 54). averi refuses a tap in a band
+truth.ts#statusBarMaySwallow, accepted above its line `IOS_STATUS_BAR_SWALLOWS_ABOVE` (51 pt; a probe below it with no
+touch is undelivered); B4's taps above agree and narrow the line (no touch up to 53, a touch from 54) — the constant is
+left at B3's 51, inside both measurements. averi refuses a tap in a band
 (ADR 0009 N-a, ADR 0008): R-band — on iOS the status band's only (golden-spec/bars.ts).
 
 ### Phase 4 — the matrix, generated
