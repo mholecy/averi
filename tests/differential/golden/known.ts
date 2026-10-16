@@ -1,4 +1,4 @@
-import type { ReplyKind } from '../../../scripts/differential/golden-spec.js';
+import type { ReplyKind } from '../../../scripts/truth/replies.js';
 import type { Family } from '../../../scripts/truth/schema.js';
 
 // What every family's KNOWN file (tests/differential/golden/<family>.known.ts) is written with; golden.test.ts
@@ -12,7 +12,7 @@ export interface Known {
   /** What the mismatch says first, up to its `: ` — the judge's reason, or `not in the tree` (vacuous). */
   cls: string;
   /**
-   * What kind of reply it is (GoldenCheck.kind, golden-spec/judges.ts#replyKind): a timeout turned refusal fails here.
+   * What kind of reply it is (GoldenCheck.kind, scripts/truth/replies.ts#replyKind): a timeout turned refusal fails here.
    */
   kind: ReplyKind;
   /** The taps and swipes the device was sent (GoldenCheck.calls), in order. */

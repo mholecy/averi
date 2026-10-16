@@ -1,9 +1,9 @@
 import type { Platform } from '../corpus.js';
-import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
+import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
-import { openRows } from './base.js';
-import { bandColour, bandTap, colourFails, fullyRow, landRow, notReachedStill, overlapColour, reachedAtOnce } from './rows.js';
+import type { TargetContract } from '../../truth/target-contract.js';
+import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } from './rows.js';
 
 /**
  * The band and chrome geometries' rows — a geometry group, named for the bars family (fixtures/apps/cells/bars.json,
@@ -14,46 +14,39 @@ import { bandColour, bandTap, colourFails, fullyRow, landRow, notReachedStill, o
  *
  * | geometry | rows |
  * |---|---|
- * | status-band, nav-band (Android) | R-band tap, R-band colour (in the navigation band under gesture navigation: a PASS on its own colour or a FAIL, rows.ts#bandColour), R-band scroll_until |
- * | nav-band on iOS: the home indicator's band | the open rows (base.ts) — consistency holds it reached and drawn |
+ * | status-band, nav-band (Android's) | R-band tap, R-band colour (in the navigation band under gesture navigation: a PASS on its own colour or a FAIL, rows.ts#bandColour), R-band scroll_until, R-fully (in a scroll view only) |
  * | under-chrome:<name> | R-under-chrome tap (R-land on its piece), colour, scroll_until |
  * | band-overlap:<band>, chrome-overlap:<name> | R-overlap: tap (R-land at its centre), colour (fails closed only where what it samples is overlapped), scroll_until reached with no swipe, R-fully (a band's: in a scroll view only) |
  *
- * iOS's home-indicator band is no band averi judges (ADR 0009's navigation band is Android's; ADR 0008 is iOS's status
- * band) and none the truth makes one: measured by B4 (truth.ts#navigationBandTakes), a tap there is the app's and fires
- * the target beneath. So a target centred there is asked what an open one is (ADR 0020: the truth outranks a
- * hand-written expectation) — Tapped, its colour, reached at once.
+ * What each row asks is the target contract's (`c`, scripts/truth/target-contract.ts#contractOf), which the live
+ * golden's cases read too, handed to the row that judges it: the judged geometry, the tap's clause (rows.ts#tapRow), the
+ * plain stop's (rows.ts#stopRow) and `fully`'s where it is asked (fullyAsked: a band's, or a band-overlapped target's, in a scroll view only — one in none may be a pinned
+ * surface the `fully` stop stops on at once, ADR 0009 (b), (c)). And which band is a band: iOS's home-indicator band is
+ * none (target-contract.ts#judgedContext — measured the app's: a tap there fires the target beneath, the target drawn
+ * as itself), so a target centred there or overlapping it is judged by what else lies around it — `whole`, the open
+ * rows (golden-spec.ts#expectations, base.ts), where nothing does.
  *
  * R-overlap, a whole target whose centre is clear but whose edge a band or the chrome overlaps past ADR 0002's slack:
  * the tap and the plain stop are centre-based (ADR 0009 N-a), so `Tapped` and reached at once; the colour assert fails
  * closed where what it reads — the sampler's 12 %-inset rect — is overlapped (ADR 0001, ADR 0002), else measures the
  * target; `fully: true` judges the bands as a region of the node (ADR 0009 N-a, `fully`) and any cover as covering
  * (ui-tree/standing.ts#fullyStanding), so it never stops on it where it is. A band's R-fully is asked only of a target
- * in a scroll view: one in none may be a pinned surface the `fully` stop stops on at once (ADR 0009 (b), (c)). `nodes`:
- * the target's nodes in the replayed tree, for the open tap (base.ts#openRows).
+ * in a scroll view (fullyAsked, above).
  */
-export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, nodes: readonly Rect[] = []): Expectation[] {
-  const g = t.geometry;
+export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, c: TargetContract): Expectation[] {
+  const g = c.geometry;
   if (g === undefined) return [];
   const { kind, name } = parseGeometry(g);
-  // iOS's home-indicator band: the tap is the app's, and consistency holds the target reached and drawn there
-  // (truth.ts#navigationBandTakes) — else it is broken and asked nothing.
-  if (g === 'nav-band' && platform === 'ios') return openRows(platform, t, nodes);
+  const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   if (g === 'status-band' || g === 'nav-band') {
-    return [bandTap(platform, t), bandColour(platform, t, cell), notReachedStill(platform, t, cell, 'R-band')].map(classed);
+    return [tapRow(platform, t, c, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop), ...fully].map(classed);
   }
   if (kind === 'under-chrome') {
     const chrome = name;
-    return [landRow(platform, t), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), notReachedStill(platform, t, cell, `R-under-chrome (${chrome})`)].map(classed);
+    return [tapRow(platform, t, c, 'R-under-chrome'), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`, c.stop)].map(classed);
   }
   if (isOverlap(g)) {
-    const band = kind === 'band-overlap';
-    return [
-      landRow(platform, t),
-      overlapColour(platform, t, cell),
-      reachedAtOnce(platform, t, cell, `R-overlap (${g})`),
-      ...(band && t.scrollView === undefined ? [] : [fullyRow(platform, t, cell)]),
-    ].map(classed);
+    return [tapRow(platform, t, c, 'R-overlap'), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`, c.stop), ...fully].map(classed);
   }
   return [];
 }

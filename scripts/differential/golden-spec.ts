@@ -1,6 +1,7 @@
 import type { Platform, SourceKind } from './corpus.js';
-import { DRAWN, type CellTruth, type TargetTruth } from '../truth/schema.js';
+import type { CellTruth, TargetTruth } from '../truth/schema.js';
 import { elementOf, nodeFramesIn } from '../truth/truth.js';
+import { contractOf } from '../truth/target-contract.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
@@ -35,6 +36,14 @@ import type { Expectation } from './golden-spec/judges.js';
  * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's
  * (scripts/truth/live.ts).
  *
+ * WHAT a coloured target is asked, and what its truth implies each verb must answer, is the target contract's
+ * (scripts/truth/target-contract.ts) — decided once, and read by the live golden's cases too (live-visibility.ts
+ * #visibilityCases): which band is a band (judgedGeometry: iOS's home-indicator band is none), the tap's clause
+ * (tapAsk), the stops' (stopAsk, fullyAsked), whether the target may be missing from the tree (unlistedBy). The rows
+ * here are the contract's replayed adapter: each turns a clause into a call and a judge over the replayed reply, and
+ * stamps the clause it judges (Expectation.asks; tests/truth/target-contract.test.ts holds the two goldens' clauses
+ * equal). What a reply says is read by scripts/truth/replies.ts alone.
+ *
  * The rows live in scripts/differential/golden-spec/ (one file per cell family of fixtures/apps/cells/), the judges
  * they share in golden-spec/judges.ts, phase 3's row types in golden-spec/rows.ts; this module is what the golden mode
  * and the tests import, and it picks a target's rows (expectations). A coloured target's rows are chosen by its truth —
@@ -68,13 +77,21 @@ export * from './golden-spec/rows.js';
  * (tests/differential/golden-wiring.test.ts); a unit test of a row's choice may leave it out.
  */
 export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind, tree?: string): Expectation[] {
-  if (t.declared === 'presented-over') return t.reached ? [] : presentedOverRows(platform, t);
+  // The target contract, decided once (target-contract.ts#contractOf); it asks nothing of a target its truth
+  // contradicts (no tap clause: a presented-over one reached, an open whole one not reached or not drawn) —
+  // consistency reports it broken.
+  // A measured geometry is judged on its capture's screen: without it (a unit test of one row) no geometry row is asked.
+  if (cell === undefined && t.declared !== 'presented-over' && t.geometry !== undefined && t.geometry !== 'whole') return [];
+  const c = contractOf(platform, t, cell);
+  if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap);
   const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
   // the screenshot) after the rows its geometry asks.
-  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, cell, source)]);
-  if (t.geometry === undefined || t.geometry === 'whole') return !(t.reached && t.drawn >= DRAWN) ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, nodes)) : openRows(platform, t, nodes);
-  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source), ...barRows(platform, t, cell, nodes)]);
+  const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, c.geometry, cell, source)]);
+  // By the geometry the contract judges (judgedGeometry: iOS's home-indicator band is no band).
+  const g = c.geometry;
+  if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : openRows(platform, t, c, nodes);
+  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, c)]);
 }
 
 /**

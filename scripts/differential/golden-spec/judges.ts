@@ -1,11 +1,14 @@
 import type { Call, Outcome } from '../differential.js';
-import { allPassed, ASSERT_SUMMARY, ASSERTS_FAILED, claimsTap, isError, VISIBLE_STOP } from '../../truth/replies.js';
+import { allPassed, claimsTap, firstLine, isError, notInTree } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
+import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
 
 /**
  * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an
- * expectation's shape, what a reply sent and said, and the one classification every row goes through (classed).
+ * expectation's shape, what a call SENT (the taps and swipes the fake device logged), and the one classification every
+ * row goes through (classed). What a reply SAYS is read by scripts/truth/replies.ts alone — the live judges' reader
+ * too; the helpers here that take an Outcome hand it its reply.
  */
 
 /**
@@ -34,6 +37,13 @@ export interface Expectation {
    * table is whole.
    */
   live?: string;
+  /**
+   * The target contract's clause the row judges (scripts/truth/target-contract.ts: a tap's TapAsk, a stop's StopAsk) —
+   * the live golden's case stamps the same clause (VisibilityCase.asks), and tests/truth/target-contract.test.ts holds
+   * the two equal for every committed truth target both ask. Unset on a row no live case asks (colour, text, ocr, the
+   * forms' rows).
+   */
+  asks?: TapAsk | StopAsk;
 }
 
 export const BUDGET_MS = 1_000;
@@ -52,52 +62,10 @@ export const strokes = (o: Outcome): { from: Point; to: Point }[] =>
 export const touchDowns = (o: Outcome) => strokes(o).map((s) => s.from);
 export const passed = (o: Outcome) => allPassed(o.reply);
 export const swipes = (o: Outcome) => touchDowns(o).length;
-/** The reply's first line — an assert's first verdict line, under its `N/N asserts …` summary. */
-export const first = (o: Outcome) => {
-  const lines = o.reply.split('\n');
-  return (ASSERT_SUMMARY.test(lines[0]) && lines.length > 1 ? lines[1] : lines[0]).slice(0, 200);
-};
-/** The reply without the selectors it echoes: `id:"lab.form-keyboard.vs"` must not read as the word keyboard. */
-export const ownWords = (o: Outcome) => o.reply.replace(/\b[a-z]+:"(?:[^"\\]|\\.)*"/gi, '<selector>');
+/** The reply's first line (replies.ts#firstLine) — an assert's first verdict line, under its `N/N asserts …` summary. */
+export const first = (o: Outcome) => firstLine(o.reply);
 export const said = (o: Outcome, what: string) => `${what}: ${first(o)}`;
 
-// --- reply grammar: the wording of averi's replies a judge reads, each beside the src that writes it ---
-
-/**
- * The reply says the element is not in the tree — no evidence of what covers it: the resolver's timeout (src/interact/
- * resolve.ts:358, "…waiting for element X to appear"), scroll_until's give-up (src/interact/scroll-text.ts:593,
- * "element never appeared in the tree"), the assert poll's (src/verify/poll-verdict.ts:78, "not found within N s").
- */
-export const notInTree = (o: Outcome) => /waiting for element .* to appear|never appeared in the tree|not found within/.test(o.reply);
-/** The reply's remedy for a target under a presented screen (src/ui-tree/standing.ts:425-426, "— close it first"). */
-export const closeFirst = (o: Outcome) => /close it first/.test(o.reply);
-/**
- * The reply names scroll_until as the remedy (the off-screen, outside-its-scroll-view and sliver refusals do: src/
- * interact/tap-judgement.ts:336, "scroll_until it first").
- */
-export const scrollAdvice = (o: Outcome) => /scroll_until/.test(ownWords(o));
-/**
- * averi's reply for a tap it moved off a node's centre to an uncovered piece (src/interact/tap-judgement.ts:325,
- * `Aim.moved`): `Tapped <selector> at (x,y) — its centre (x,y) is under …; tapped the uncovered part WxH`
- * (golden-spec/base.ts#atProbe).
- */
-export const MOVED_TAP = / at \(-?[\d.]+,-?[\d.]+\) — its centre \(-?[\d.]+,-?[\d.]+\) is .*; tapped the uncovered part \d+x\d+/;
-/**
- * The `fully` stop's own account of a flush edge it probed (src/interact/scroll-text.ts:226-227, the wording since
- * 9c7885e: "its <side> edge lies on its scroll container's (…), and a probe swipe toward it moved nothing"): the side
- * (golden-spec/rows.ts#flushProbe).
- */
-export const FLUSH_PROBED = /its (top|bottom|left|right) edge lies on its scroll container's .*a probe swipe toward it moved nothing/;
-/**
- * What a refused dismissal names as lying over it — `toolbar` (#7's first half: SwiftUI's screen-sized Toolbar host, #19's
- * bar), `scrollable` (#7's second half: a scroll view shorter than the screen, its frame over the title) — read from the
- * guard's own clause (src/interact/keyboard-in-tree.ts:361, `none of the configured dismissals is usable on this screen
- * (…)`, each skipped dismissal's `covered by <role> …` from :335-345), not from any "toolbar" in the reply: its advice
- * names the input-accessory toolbar whatever covered the dismissal (golden-spec/rows.ts#dismissRow).
- */
-// Errs safe: a `)` inside an earlier part of the clause (a selector's text) ends the match before `covered by`, and
-// the row then names no cover — the mismatch stays red, only its wording loses the role.
-export const DISMISSAL_COVERED = /none of the configured dismissals is usable[^(]*\([^)]*covered by ([a-z]+)/;
 const NOT_IN_TREE = 'not in the tree: ';
 /**
  * The one classification every row's judge goes through: the row's judge first — a reply it rejects is a mismatch of
@@ -110,28 +78,12 @@ export function classed<E extends Expectation>(e: E): E {
     ...e,
     judge: (o: Outcome) => {
       const why = judge(o);
-      return why !== undefined || e.absent !== undefined || !notInTree(o) ? why : `${NOT_IN_TREE}${first(o)}`;
+      return why !== undefined || e.absent !== undefined || !notInTree(o.reply) ? why : `${NOT_IN_TREE}${first(o)}`;
     },
   };
 }
 /** The taps and swipes the device was sent — what a reply DID, recorded on every golden check. */
 export const sent = (o: Outcome) => o.device.filter((c) => /^(idb ui|adb shell input) (tap|swipe) /.test(c));
-/**
- * What kind of reply it is, from a closed set — recorded on every golden check, so a known mismatch whose reply turns
- * into another kind (a timeout into a refusal, a stop into `fully visible`) fails the ratchet though its class and its
- * device calls stay: `not found` (the target not in the tree: notInTree), `Tapped`, `visible` (scroll_until stopped on
- * it), `PASS` and `FAIL` (an assert's verdict), `refused` (any other ERROR), `other`.
- */
-export type ReplyKind = 'not found' | 'Tapped' | 'visible' | 'PASS' | 'FAIL' | 'refused' | 'other';
-export function replyKind(o: Outcome): ReplyKind {
-  if (notInTree(o)) return 'not found';
-  if (claimsTap(o.reply)) return 'Tapped';
-  if (VISIBLE_STOP.test(o.reply)) return 'visible';
-  if (passed(o)) return 'PASS';
-  if (ASSERTS_FAILED.test(o.reply)) return 'FAIL';
-  if (isError(o.reply)) return 'refused';
-  return 'other';
-}
 /** A tap that must not land: not `Tapped`, and no tap sent. */
 export const notTapped = (o: Outcome) => (claimsTap(o.reply) ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
 /** A plain stop that must reach the target where it is: not an ERROR, and no swipe. */

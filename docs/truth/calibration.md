@@ -177,7 +177,7 @@ Each field under the docked IME asked for the colour the screenshot shows over i
   - ok ios-iphone17-ios27/scroll-top-edge.wda.json A tap — ERROR id:"lab.scroll-top-edge.A" is off screen at (201,-250) on a 402x874 screen (rect 51,-282 300x64) — scroll_until it first; nothing was tapped
   - ok ios-iphone17-ios27/scroll-top-edge.idb.json A tap — ERROR id:"lab.scroll-top-edge.A" is off screen at (201,-250) on a 402x874 screen (rect 51,-282 300x64) — scroll_until it first; nothing was tapped
 
-edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; golden-spec/edges.ts#notListed).
+edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; target-contract.ts#unlistedBy).
 
 ## 5: CALIBRATED
 
@@ -275,7 +275,7 @@ The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions).
 
 Live (phase 5, ios wda): **CALIBRATED**, 5cff2ad → 7542021, dismiss:toolbar-dismiss.ks, dismiss:toolbar-dismiss.ss, dismiss:toolbar-dismiss.note — The first fix alone, on toolbar-dismiss: refused before (the keyboard up, the focus on postcode), the title tapped and each field focused after. vs (straddling the keyboard's top) times out "to hold still" at 5cff2ad, 7542021 and c3ebc62 alike and is tapped at debc9b2 — not this note's. toolbar-dismiss-short stays refused at 7542021, as golden measured. (docs/truth/live-calibration-2026-10-16.md)
 
-A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
+A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar "Toolbar"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (replies.ts#dismissalCover): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).
 
 ## 7.2: CALIBRATED
 

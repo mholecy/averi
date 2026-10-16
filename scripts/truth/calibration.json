@@ -99,7 +99,7 @@
         "ios-iphone17-ios27/scroll-top-edge.wda.json A tap",
         "ios-iphone17-ios27/scroll-top-edge.idb.json A tap"
       ],
-      "remark": "edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; golden-spec/edges.ts#notListed)."
+      "remark": "edges/scroll-bounded's F (laid out below the screen) and scroll-top-edge's A (above it), both in WDA's and idb's trees: Tapped at 2ae8b10, refused off the screen with scroll advice at 1221b0f. On Android the rows are not asked of the note: uiautomator dumps no node off the screen (TargetTruth.listed; target-contract.ts#unlistedBy)."
     },
     {
       "n": "5",
@@ -238,7 +238,7 @@
         "ios-iphone17-ios27/toolbar-dismiss.wda.json ss tap",
         "ios-iphone17-ios27/toolbar-dismiss.wda.json note tap"
       ],
-      "remark": "A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar \"Toolbar\"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (judges.ts#DISMISSAL_COVERED): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).",
+      "remark": "A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar \"Toolbar\"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (replies.ts#dismissalCover): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).",
       "pairs": [
         {
           "before": "d928789",

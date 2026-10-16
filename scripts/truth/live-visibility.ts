@@ -1,7 +1,8 @@
 import type { Platform } from '../differential/corpus.js';
-import { claimsTap, screenUnchangedFor, swipesOf, VISIBLE_STOP } from './replies.js';
+import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
-import { bandsOf, directionOf, geometryOf, intersect, isOverlap, selectorOf, type GeometryContext } from './truth.js';
+import { contractOf, judgedContext, stopHolds, unlistedBy, type StopAsk, type TapAsk } from './target-contract.js';
+import { bandsOf, directionOf, geometryOf, intersect, selectorOf, type GeometryContext } from './truth.js';
 
 /**
  * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5; run by live.ts): averi's
@@ -12,10 +13,14 @@ import { bandsOf, directionOf, geometryOf, intersect, isOverlap, selectorOf, typ
  * says, the turn back of a stroke that did not bring the target closer (R-direction, golden-spec/rows.ts), and whether a
  * tap fired what it says.
  *
- * The cases come from the static truth (tests/fixtures/truth, one CellTruth per cell and platform): a tap on every
- * target, expected to fire where its probe fired (`reached`, or `reachedAtPiece`); a scroll_until toward every target
- * not `whole` (toward it: truth.ts#directionOf), with `fully: true` too where it is cut or overlapped; plus the turn-back
- * cases (TURN_BACK), whose direction is the wrong one on purpose. Everything here is pure: live.ts runs the calls.
+ * The cases come from the static truth (tests/fixtures/truth, one CellTruth per cell and platform), and WHAT each asks
+ * from the target contract (target-contract.ts), the one the replayed golden's rows read too: a tap on every target the
+ * contract asks one of, expected to fire where its clause is `fire` (tapAsk); a scroll_until toward every target in a
+ * scroll view not judged `whole` (judgedGeometry; toward it: truth.ts#directionOf), with `fully: true` too where the
+ * contract asks it (fullyAsked); plus the turn-back cases (TURN_BACK), whose direction is the wrong one on purpose. Each
+ * case stamps the clause it judges (VisibilityCase.asks; tests/truth/target-contract.test.ts holds it equal to the
+ * replayed row's). What a reply says is read by replies.ts alone (replyKind: what kind of reply a verdict rests on,
+ * LiveVerdict.kind). Everything here is pure: live.ts runs the calls.
  *
  * Verdicts, as live.ts's: `ok` the app holds what the case asks and the reply agrees; `LOUD` it does not, and averi
  * said so (an error); `MISMATCH` averi claimed what did not happen (`Tapped` with nothing fired or something else
@@ -69,6 +74,8 @@ export interface LiveVerdict {
   cls?: VerdictClass;
   /** The app's state behind the verdict (every scroll case's, any other case's not ok): live.ts prints it under the case. */
   app?: string;
+  /** What kind of reply the verdict rests on (replies.ts#replyKind, the closed set the static ratchet pins). */
+  kind?: ReplyKind;
 }
 
 /** What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab, select, submit). */
@@ -90,28 +97,13 @@ const eventsText = (es: readonly ProbeEvent[]) => (es.length === 0 ? 'nothing' :
 const rectText = (r: Rect | undefined | null) => (r === undefined || r === null ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
 const round = (n: number) => Math.round(n * 10) / 10;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 260);
-/** The reply claims the stop: `Element … visible after N swipes` (fully or not). */
-export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
 
 /**
- * What the target's geometry is judged against in the live state: the screen, the bands (iOS's home-indicator band is
- * no band averi judges — golden-spec/bars.ts — so only its status band), the target's scroll view's clip, the chrome.
+ * What the target's geometry is judged against in the live state: the contract's judged context
+ * (target-contract.ts#judgedContext — the one the replay judges a capture in: iOS's home-indicator band is no band), on
+ * the app's screen, bands, the target's scroll view's clip and the chrome as it reports them now.
  */
-export function liveContext(state: LabState, platform: Platform, view: string | undefined): GeometryContext {
-  const clip = view === undefined ? undefined : state.scrollViews?.[view];
-  return {
-    screen: { x: 0, y: 0, width: state.screen.width, height: state.screen.height },
-    ...(state.safeArea !== undefined && { safeArea: platform === 'ios' ? { ...state.safeArea, bottom: 0 } : state.safeArea }),
-    ...(clip !== undefined && { clip }),
-    ...(state.chrome !== undefined && { chrome: state.chrome }),
-  };
-}
-
-/** Where a stop may leave its target (truth.ts#geometryOf): the plain stop on a centre in what shows, clear of the bands and the chrome (R-overlap's whole target too); `fully` only on a whole one. */
-export function stopHolds(g: Geometry, fully: boolean): boolean {
-  if (fully) return g === 'whole';
-  return g === 'whole' || g === 'partly-centre-in' || isOverlap(g);
-}
+export const liveContext = (state: LabState, platform: Platform, view: string | undefined): GeometryContext => judgedContext(platform, state, view);
 
 /** The target's live geometry, from its frame as the app lays it out now; undefined when the app reported no frame. */
 export function liveGeometry(state: LabState, platform: Platform, tag: string, view: string | undefined): Geometry | undefined {
@@ -135,21 +127,22 @@ export function appText(state: LabState, platform: Platform, tag: string, view: 
 
 /**
  * A tap on `tag`, judged by the app's log: `Tapped` must have fired the target's action and nothing else; a refusal
- * must have fired nothing (a dismissed layer is something). A refusal of a target the probe reached is LOUD (`fires`
- * expected); a `Tapped` that fired it alone is ok either way — the truth's probe at the centre is not the only tap
- * that reaches it.
+ * must have fired nothing (a dismissed layer is something). A refusal of a target whose tap must fire (`fires`: the
+ * contract's clause `fire`, target-contract.ts#tapAsk) is LOUD; a `Tapped` that fired it alone is ok either way — the
+ * truth's probe at the centre is not the only tap that reaches it (the live oracle, the contract's header says).
  */
 export function judgeTap(tag: string, fires: boolean, reply: string, state: LabState, launched: LabState): LiveVerdict {
   const fired = firedSince(state, launched);
   const own = fired.filter((e) => e.kind === 'tap' && e.tag === tag);
   const others = fired.filter((e) => !(e.kind === 'tap' && e.tag === tag));
-  if (claimsTap(reply)) {
-    if (own.length === 0) return { outcome: 'MISMATCH', cls: 'tap-claim', why: `averi says ${short(reply)} — the app logged ${eventsText(fired)}` };
-    if (others.length > 0) return { outcome: 'MISMATCH', cls: 'tap-claim', why: `averi says ${short(reply)} — the app fired ${eventsText(others)} besides ${tag}` };
-    return { outcome: 'ok', why: `${short(reply)}${fires ? '' : ' (fired, where the probe at its centre did not reach it)'}` };
+  const kind = replyKind(reply);
+  if (kind === 'Tapped') {
+    if (own.length === 0) return { outcome: 'MISMATCH', cls: 'tap-claim', kind, why: `averi says ${short(reply)} — the app logged ${eventsText(fired)}` };
+    if (others.length > 0) return { outcome: 'MISMATCH', cls: 'tap-claim', kind, why: `averi says ${short(reply)} — the app fired ${eventsText(others)} besides ${tag}` };
+    return { outcome: 'ok', kind, why: `${short(reply)}${fires ? '' : ' (fired, where the probe at its centre did not reach it)'}` };
   }
-  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'tap-refused-fired', why: `averi refused (${short(reply)}) — yet the app logged ${eventsText(fired)}` };
-  return fires ? { outcome: 'LOUD', cls: 'tap-refused', why: `refused a target a tap reaches, nothing fired: ${short(reply)}` } : { outcome: 'ok', why: `refused, nothing fired: ${short(reply)}` };
+  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'tap-refused-fired', kind, why: `averi refused (${short(reply)}) — yet the app logged ${eventsText(fired)}` };
+  return fires ? { outcome: 'LOUD', cls: 'tap-refused', kind, why: `refused a target a tap reaches, nothing fired: ${short(reply)}` } : { outcome: 'ok', kind, why: `refused, nothing fired: ${short(reply)}` };
 }
 
 // --- the dismissal (#7, #19) ---
@@ -162,17 +155,18 @@ export function judgeTap(tag: string, fires: boolean, reply: string, state: LabS
  */
 export function judgeDismissal(tag: string, reply: string, source: string, s: LabState, launched: LabState): LiveVerdict {
   const typed = Object.entries(s.fields ?? {}).filter(([k, f]) => f.value !== launched.fields?.[k]?.value);
-  if (typed.length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', why: `typed into ${typed.map(([k, f]) => `${k} (${JSON.stringify(f.value)})`).join(', ')}: ${short(reply)}` };
-  if ((s.submits ?? []).length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', why: `the form was submitted: ${short(reply)}` };
-  const tapped = claimsTap(reply);
+  const kind = replyKind(reply);
+  if (typed.length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', kind, why: `typed into ${typed.map(([k, f]) => `${k} (${JSON.stringify(f.value)})`).join(', ')}: ${short(reply)}` };
+  if ((s.submits ?? []).length > 0) return { outcome: 'MISMATCH', cls: 'dismissal', kind, why: `the form was submitted: ${short(reply)}` };
+  const tapped = kind === 'Tapped';
   const focus = s.focus ?? 'none';
-  if (tapped !== (s.focus === tag)) return { outcome: 'MISMATCH', cls: 'dismissal', why: `averi says ${short(reply)} — the focus is on ${focus}` };
-  if (tapped) return { outcome: 'ok', why: short(reply) };
-  if (source === 'idb') return { outcome: 'ok', why: `refused (idb: the dismissal inert), focus on ${focus}: ${short(reply)}` };
-  if (s.focus == null && launched.focus != null && /was not tapped: after .* was tapped .* to hide the soft keyboard/.test(reply)) {
-    return { outcome: 'ok', why: `the keyboard dismissed (no field focused), then ${tag} refused: ${short(reply)}` };
+  if (tapped !== (s.focus === tag)) return { outcome: 'MISMATCH', cls: 'dismissal', kind, why: `averi says ${short(reply)} — the focus is on ${focus}` };
+  if (tapped) return { outcome: 'ok', kind, why: short(reply) };
+  if (source === 'idb') return { outcome: 'ok', kind, why: `refused (idb: the dismissal inert), focus on ${focus}: ${short(reply)}` };
+  if (s.focus == null && launched.focus != null && refusedAfterDismissal(reply)) {
+    return { outcome: 'ok', kind, why: `the keyboard dismissed (no field focused), then ${tag} refused: ${short(reply)}` };
   }
-  return { outcome: 'LOUD', cls: 'dismissal', why: `not tapped, the focus on ${focus}, though a dismissal is configured: ${short(reply)}` };
+  return { outcome: 'LOUD', cls: 'dismissal', kind, why: `not tapped, the focus on ${focus}, though a dismissal is configured: ${short(reply)}` };
 }
 
 // --- the strokes (R-direction) ---
@@ -300,21 +294,23 @@ export function judgeScroll(
   const stop = c.fully ? 'fully visible' : 'visible';
   const tapped = tap === undefined ? undefined : judgeTap(c.tag, holds, tap, final, launched);
   const unchanged = unchangedClaimBroken(scroll, strokesSince(state, launched));
-  if (claimsVisible(scroll) && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
+  const kind = replyKind(scroll);
+  const visible = kind === 'visible';
+  if (visible && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', kind, why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
   // Whatever the tree listed: a claim about the screen the app's own strokes contradict.
-  if (unchanged !== undefined) return { outcome: 'MISMATCH', cls: 'unchanged-claim', why: `${unchanged}: ${short(scroll)}`, app };
+  if (unchanged !== undefined) return { outcome: 'MISMATCH', cls: 'unchanged-claim', kind, why: `${unchanged}: ${short(scroll)}`, app };
   // A target the tree does not list (uiautomator dumps no node not visible to the user): averi cannot tell where it
   // lies, nor which scroll view holds it — what R-stroke exempts too (golden-spec/rows.ts#strokeRow); its strokes are
   // reported, not judged.
-  if (breaks.length > 0 && c.unlisted !== true) return { outcome: 'MISMATCH', cls: 'R-direction', why: `R-direction: ${breaks.join('; ')} — averi: ${short(scroll)}`, app };
-  if (!claimsVisible(scroll)) {
+  if (breaks.length > 0 && c.unlisted !== true) return { outcome: 'MISMATCH', cls: 'R-direction', kind, why: `R-direction: ${breaks.join('; ')} — averi: ${short(scroll)}`, app };
+  if (!visible) {
     const unjudged = breaks.length > 0 ? ` (not in the tree: its strokes unjudged — ${breaks.join('; ')})` : '';
-    return holds ? { outcome: 'MISMATCH', cls: 'failed-holds', why: `averi failed (${short(scroll)}) — the app shows it ${g} (${stop} as the stop needs)`, app } : { outcome: 'LOUD', cls: 'not-reached', why: `not reached (${g ?? 'no frame'}), and averi said so${unjudged}: ${short(scroll)}`, app };
+    return holds ? { outcome: 'MISMATCH', cls: 'failed-holds', kind, why: `averi failed (${short(scroll)}) — the app shows it ${g} (${stop} as the stop needs)`, app } : { outcome: 'LOUD', cls: 'not-reached', kind, why: `not reached (${g ?? 'no frame'}), and averi said so${unjudged}: ${short(scroll)}`, app };
   }
-  if (tap === undefined || tapped === undefined) return { outcome: 'ok', why: short(scroll), app };
+  if (tap === undefined || tapped === undefined) return { outcome: 'ok', kind, why: short(scroll), app };
   if (tapped.outcome !== 'ok') return { ...tapped, why: `stopped (${short(scroll)}), then the tap: ${tapped.why}`, app };
-  return { outcome: 'ok', why: `${short(scroll)}; then ${short(tap)}`, app };
+  return { outcome: 'ok', kind, why: `${short(scroll)}; then ${short(tap)}`, app };
 }
 
 /**
@@ -325,10 +321,11 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   const app = appText(state, c.platform, c.tag, c.view, launched);
   const fired = firedSince(state, launched);
   const moved = strokesSince(state, launched).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
-  if (claimsVisible(scroll)) return { outcome: 'MISMATCH', cls: 'presented-stop', why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
-  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
-  if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
-  return { outcome: 'ok', why: `refused, nothing moved or fired: ${short(scroll)}`, app };
+  const kind = replyKind(scroll);
+  if (kind === 'visible') return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
+  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
+  if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
+  return { outcome: 'ok', kind, why: `refused, nothing moved or fired: ${short(scroll)}`, app };
 }
 
 // --- the cases ---
@@ -344,19 +341,19 @@ export interface VisibilityCase {
   says: string;
   calls: VisibilityCall[];
   /**
+   * The target contract's clause the case judges (target-contract.ts): a tap case's TapAsk, a scroll case's StopAsk
+   * (the stop toward the target where its capture lays it out) — the replayed golden's row stamps the same
+   * (Expectation.asks). Unset on the cases no replayed row asks: the turn-back cases (a wrong direction on purpose) and
+   * the scroll beneath a presented layer.
+   */
+  asks?: TapAsk | StopAsk;
+  /**
    * `source`: the tree source the case ran under — a target its static capture's tree of that source did not list
    * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (live.ts reads one
    * between the calls of a visibility case).
    */
   judge(state: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]): LiveVerdict;
 }
-
-/** The target's static capture's tree of `source` did not list it (TargetTruth.listed): averi cannot know where it lies. */
-export const unlistedIn = (t: Pick<TargetTruth, 'listed'>, source: string) => t.listed?.[source as keyof NonNullable<TargetTruth['listed']>] === false;
-
-/** A cut or overlapped target: `fully: true` asks more of it than the plain stop (R-fully). */
-const CUT: readonly string[] = ['partly-centre-in', 'centre-out', 'sliver'];
-const fullyAsked = (g: Geometry | undefined) => g !== undefined && (CUT.includes(g) || isOverlap(g) || g === 'status-band' || g === 'nav-band');
 
 /**
  * The turn-back cases (#17, R-direction): a scroll_until whose direction is the WRONG one — the content at its end that
@@ -370,22 +367,28 @@ export const TURN_BACK: readonly { cell: string; tag: string; direction: 'up' | 
 ];
 
 /**
- * Every case of a cell's truth on its platform: a tap per target (`fires` where its probe fired), a scroll_until per
- * target not whole (toward it; `fully` too where it is cut or overlapped; a refusal case beneath a presented layer), and
- * the cell's turn-back cases. `withTap`: a tap follows each stop, judged with it.
+ * Every case of a cell's truth on its platform, as the target contract asks it (target-contract.ts): a tap per target
+ * the contract asks one of (`fires` where its clause is `fire`), a scroll_until per target in a scroll view not judged
+ * whole (toward it; `fully` too where fullyAsked; a refusal case beneath a presented layer), and the cell's turn-back
+ * cases. A tap follows each stop, judged with it.
  */
 export function visibilityCases(truth: CellTruth, platform: Platform): VisibilityCase[] {
   const cases: VisibilityCase[] = [];
   for (const t of truth.targets) {
-    // Reached at its centre: the tap must fire it. Else — or in a system band, where R-band takes a refusal even where
-    // the probe fired (Android's navigation band under gestures) — a refusal is as good (R-land, R-band: refused, or
-    // Tapped inside what shows) — but never a `Tapped` that fired nothing, or something else.
-    const fires = t.reached && t.geometry !== 'status-band' && t.geometry !== 'nav-band';
+    // The tap's clause (tapAsk): `fire` — reached at its centre, open or cut, iOS's home-indicator band included (no
+    // band: the app's, measured) — must fire it. Else — `land-or-refuse` (a system band whose probe fired, a piece) or
+    // `refuse` — a refusal is as good, but never a `Tapped` that fired nothing, or something else. A target the
+    // contract asks nothing of (its truth contradicts itself: consistency's to report) gets no case.
+    const contract = contractOf(platform, t, truth);
+    const ask = contract.tap;
+    if (ask === undefined) continue;
+    const fires = ask.must === 'fire';
     cases.push({
       id: `tap:${truth.cell}.${t.tag}`,
       cell: truth.cell,
-      says: `tap ${t.tag} (${t.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
+      says: `tap ${t.tag} (${contract.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
       calls: [{ tool: 'tap', args: { selector: selectorOf(t) } }],
+      asks: ask,
       judge: (s, [reply], launched) => judgeTap(t.tag, fires, reply, s, launched),
     });
     if (t.declared === 'presented-over') {
@@ -399,11 +402,12 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
       });
       continue;
     }
-    if (t.scrollView === undefined || t.geometry === undefined || t.geometry === 'whole') continue;
+    const g = contract.geometry;
+    if (t.scrollView === undefined || g === undefined || g === 'whole') continue;
     const view = t.scrollView;
-    for (const fully of fullyAsked(t.geometry) ? [false, true] : [false]) {
+    for (const stop of [contract.stop, ...(contract.fully === undefined ? [] : [contract.fully])]) {
       const direction = directionOf(t, truth);
-      cases.push(scrollCase(truth.cell, t, view, direction, fully, platform, `scroll_until ${t.tag} (${t.geometry}) ${direction}${fully ? ', fully' : ''}: stops on it as the app lays it out, every stroke on ${view} bringing it closer, then the tap fires it`));
+      cases.push({ ...scrollCase(truth.cell, t, view, direction, stop.fully, platform, `scroll_until ${t.tag} (${g}) ${direction}${stop.fully ? ', fully' : ''}: stops on it as the app lays it out, every stroke on ${view} bringing it closer, then the tap fires it`), asks: stop });
     }
   }
   for (const b of TURN_BACK.filter((x) => x.cell === truth.cell)) {
@@ -411,7 +415,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     if (t?.scrollView === undefined) continue;
     // A target its capture's tree of a source does not list: averi cannot see where it lies, so there is nothing to turn
     // back toward — the case is said so, and its strokes are not held to R-direction under that source.
-    const unlisted = Object.entries(t.listed ?? {}).filter(([, l]) => l === false).map(([src]) => src);
+    const unlisted = Object.keys(t.listed ?? {}).filter((src) => unlistedBy(t, src) !== undefined);
     const says = unlisted.length === 0 ? `turn back: ${b.says}` : `the wrong direction: ${b.says} — under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
     cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
   }
@@ -427,6 +431,6 @@ function scrollCase(cell: string, t: TargetTruth, view: string, direction: 'up' 
       { tool: 'scroll_until', args: { selector: selectorOf(t), direction, ...(fully && { fully: true }) } },
       { tool: 'tap', args: { selector: selectorOf(t) } },
     ],
-    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: unlistedIn(t, source) }, replies, s, launched, after[0] ?? s),
+    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: unlistedBy(t, source) !== undefined }, replies, s, launched, after[0] ?? s),
   };
 }

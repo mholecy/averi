@@ -1,6 +1,8 @@
 import type { Platform } from '../corpus.js';
 import type { TargetTruth } from '../../truth/schema.js';
-import { BUDGET_MS, classed, closeFirst, notInTree, notTapped, passed, said, swipes, type Expectation } from './judges.js';
+import { closeFirst, notInTree } from '../../truth/replies.js';
+import type { TapAsk } from '../../truth/target-contract.js';
+import { BUDGET_MS, classed, notTapped, passed, said, swipes, type Expectation } from './judges.js';
 
 /**
  * The presented family's rows (fixtures/apps/cells/presented.json): a coloured target beneath a presented layer — its
@@ -16,7 +18,7 @@ import { BUDGET_MS, classed, closeFirst, notInTree, notTapped, passed, said, swi
  * for an open target (golden-spec.ts#expectations): the remedy is to close the layer, and scroll advice cannot be
  * followed (scroll_until refuses beneath it).
  */
-export function presentedOverRows(platform: Platform, t: TargetTruth): Expectation[] {
+export function presentedOverRows(platform: Platform, t: TargetTruth, ask: TapAsk): Expectation[] {
   const selector = `id:"${t.id}"`;
   const element = { id: t.id };
   // A target measured wholly off the screen shows nothing there to ask for (its `seen` is no pixel's): it is asked for
@@ -25,10 +27,11 @@ export function presentedOverRows(platform: Platform, t: TargetTruth): Expectati
   const asked = offScreen ? t.color : t.seen;
   return ([
     {
+      asks: ask,
       verb: 'tap',
       says: 'refused: close it first, nothing tapped',
       call: { tool: 'tap', args: { platform, selector } },
-      judge: (o) => notTapped(o) ?? (closeFirst(o) ? undefined : said(o, 'refused without "close it first"')),
+      judge: (o) => notTapped(o) ?? (closeFirst(o.reply) ? undefined : said(o, 'refused without "close it first"')),
     },
     {
       verb: 'colour',
@@ -38,14 +41,14 @@ export function presentedOverRows(platform: Platform, t: TargetTruth): Expectati
       call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: asked }, timeout: BUDGET_MS }] } },
       judge: (o) =>
         passed(o) ? `passed on ${asked}: it measured ${offScreen ? 'what is not on the screen' : 'the layer over the target as the target'}`
-        : notInTree(o) || closeFirst(o) ? undefined
+        : notInTree(o.reply) || closeFirst(o.reply) ? undefined
         : said(o, 'failed without "close it first"'),
     },
     {
       verb: 'scroll_until',
       says: 'stops before any swipe: close it first',
       call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
-      judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath a presented layer`) : !closeFirst(o) ? said(o, 'no "close it first"') : undefined),
+      judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath a presented layer`) : !closeFirst(o.reply) ? said(o, 'no "close it first"') : undefined),
     },
   ] satisfies Expectation[]).map(classed);
 }

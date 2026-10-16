@@ -1,6 +1,7 @@
 import type { Platform, SourceKind } from '../corpus.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { openRows } from './base.js';
+import type { TargetContract } from '../../truth/target-contract.js';
 import { dismissRow } from './rows.js';
 import { classed, type Expectation } from './judges.js';
 
@@ -24,8 +25,8 @@ import { classed, type Expectation } from './judges.js';
  * A text target's rows: base.ts's open tap and scroll_until, asked by its text, as a test names a label — the tap at the
  * centre of the node the tree lists with that text (`nodes`, base.ts#openRows).
  */
-export function ownPartsRows(platform: Platform, t: TargetTruth, nodes: readonly Rect[] = []): Expectation[] {
-  return openRows(platform, t, nodes).filter((e) => e.verb !== 'colour');
+export function ownPartsRows(platform: Platform, t: TargetTruth, c: Pick<TargetContract, 'tap' | 'stop'>, nodes: readonly Rect[] = []): Expectation[] {
+  return openRows(platform, t, c, nodes).filter((e) => e.verb !== 'colour');
 }
 
 /**

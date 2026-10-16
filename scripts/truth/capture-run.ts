@@ -127,7 +127,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         seen,
         ...geometry,
         ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
-        // Whether each tree lists it — read by the edge rows (golden-spec/edges.ts#notListed), so recorded with a geometry.
+        // Whether each tree lists it — read by the edge rows (target-contract.ts#unlistedBy), so recorded with a geometry.
         ...(geometry.geometry !== undefined && { listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])) }),
         // Whether each tree lists its string (golden-spec/text.ts: a covered string's "not found" is right only there).
         ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) }),
