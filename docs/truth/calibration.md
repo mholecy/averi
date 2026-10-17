@@ -699,7 +699,7 @@ edges/scroll-bounded's O, wholly below its scroll view `lower` (0,380 402x180) a
 - after 753b560:
   - ok ios-iphone17-ios27/sheet-medium-edges.wda.json E colour — FAIL  element id:"lab.sheet-medium-edges.E" fill within dE00 8 of #327735 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,869 300x64) — the capture would show it, not the element; 
 
-presented/sheet-medium-edges: E shows 5 pt at the screen's bottom beneath the medium sheet's dim. Before: PASS on the dim's colour; after: fails closed, close it first. Red again from 41c394a (fix/r20-marks) — 'failed without "close it first"', not this note's PASS — lab note L3.
+presented/sheet-medium-edges: E shows 5 pt at the screen's bottom beneath the medium sheet's dim. Before: PASS on the dim's colour; after: fails closed, close it first. Red again from 41c394a (fix/r20-marks) — 'failed without "close it first"', not this note's PASS — lab note L3, green again from 468dc1b (round 5's 0b).
 
 ## 32: CALIBRATED
 
@@ -712,7 +712,7 @@ presented/sheet-medium-edges: E shows 5 pt at the screen's bottom beneath the me
   - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.F" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (-402,-874 1206x2622) — a screen 
   - ok ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.H" stopped before any swipe — element lies above the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (-402,-874 1206x2622) — a screen 
 
-presented/sheet-medium-edges: F wholly below, H wholly above the screen, beneath the medium sheet. Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3.
+presented/sheet-medium-edges: F wholly below, H wholly above the screen, beneath the medium sheet. Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3, green again from 468dc1b (round 5's 0b).
 
 ## 33: CALIBRATED
 
@@ -754,7 +754,7 @@ The note's symptom is both halves: a tap beneath the sheet refused with scroll a
   - ok ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the element; a screen i
   - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that scre
 
-presented/sheet-medium-edges: H wholly above, F wholly below the screen, G wholly under the status bar, beneath the medium sheet; the colour row asks the remedy too (golden-spec/presented.ts). Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3.
+presented/sheet-medium-edges: H wholly above, F wholly below the screen, G wholly under the status bar, beneath the medium sheet; the colour row asks the remedy too (golden-spec/presented.ts). Red again from 41c394a (fix/r20-marks) on the same defect — lab note L3, green again from 468dc1b (round 5's 0b).
 
 ## 35: CALIBRATED
 
