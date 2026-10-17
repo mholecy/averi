@@ -1,5 +1,11 @@
 # BUG: under WDA, `scroll_until` for a row of a bounded scroll view strokes the SCREEN, touching down beside that scroll view — the stroke moves nothing it holds, and the reply then names the very scroll view it never swiped
 
+> **Status (2026-10-17):** fixed, and measured so live by round 5's device check (src `b71cbbb`; see "Measured live at
+> the fix" below): every WDA stroke for a row of `lower` touches down inside it, and five of the seven live cases filed
+> here read ok — their KNOWN entries struck off. The two cases of F, whose strokes now go inside `lower` too, still fail
+> for other reasons, refiled: `turn:scroll-bounded.F` as LV4 (no turn without a sighting), `scroll:scroll-bounded.F` as
+> LV5 (intermittent: momentum past a 116-pt window).
+>
 > **Status (2026-10-16):** fixed on branch `arch/r21-strokes` (from `debc9b2`); unmeasured on a device. The cause was
 > not the one inferred below: the target IS found (WDA lists O and F, `best` is judged), but the stroke's candidates
 > were its CLIPPING chain alone (ui-tree/geometry.ts#Clips.scrollersOf), and WDA marks no node as clipping — the chain
@@ -109,3 +115,23 @@ stroke (y 175) lands in `upper`, which bounces at its top. The replies blame the
 swiping up", "a layout defect"). The same root makes the turned stroke for `tabbar-floating`'s R touch down above its
 list, in the header (docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md,
 LV3). Under idb (no scroll view listed) the same touch-downs, F's and the turn-back case's included.
+
+## Measured live at the fix (round 5's device check, 2026-10-17)
+
+`scripts/truth/live.ts --udid <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`, src
+`arch/round-21` `b71cbbb` (truth/phase-3 `2725e76`), WDA on 8120. Record: docs/truth/live-records/ios-vis.json;
+summary: docs/truth/live-ios-2026-10-17-visibility.md. Under WDA:
+
+```
+scroll_until P fully   touches (201,286) (201,154), tap (201,220)            strokes upper 0→102        P whole; Tapped, fired   ok
+scroll_until S         touches (201,524) (201,416), tap (201,401)            strokes lower 0→183.3      S 82 % (CLIPPED, said); Tapped, fired   ok
+scroll_until S fully   touches (201,524) (201,416) (201,416), tap (201,447)  strokes lower 0→180.7→137.3   S whole; Tapped, fired   ok
+scroll_until O         touches (201,524), tap (201,394)                      strokes lower 0→258.7      O 71 % (CLIPPED, said); Tapped, fired   ok
+sheet-long-list-short scroll_until F   touches (201,369), tap (201,121)      strokes list 0→485.3       F whole; Tapped, fired   ok
+scroll_until F         touches (201,524) ×4, (201,525), (201,416)            strokes lower 0→1052.3     F 18 %: failed at maxSwipes (LOUD) — LV5; ok in two reruns
+turn F (up)            touches (201,416) ×3                                  strokes lower 0→0 ×3       no turn back — LV4
+```
+
+Every stroke touches down inside the target's own scroll view (`upper` 110–330, `lower` 380–560, the table 62–446).
+LV3's turned stroke under WDA is cured by the same fix (its note).
+

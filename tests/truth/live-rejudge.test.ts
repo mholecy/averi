@@ -8,11 +8,11 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The live golden's committed visibility records (docs/truth/live-records/*-vis.json, review round 1's runs on the lab
- * devices) judged again by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a
- * live-known.ts entry that changes what the records read fails here, not first on a device. Pinned: the exit code (0:
- * no MISMATCH that live-known.ts does not explain, no known case not intermittent ok), no case not known, and the
- * counts of the summary's header.
+ * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, review round 1's run;
+ * ios-vis.json and ios-scroll-bounded-wda-2725e76-*.json, round 5's device check) judged again by this checkout's
+ * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
+ * records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not
+ * explain, no known case not intermittent ok), no case not known, and the counts of the summary's header.
  */
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -32,7 +32,12 @@ async function rejudge(record: string, groups: string): Promise<{ code: number; 
 describe('live.ts --rejudge over the committed visibility records', () => {
   it.each([
     ['android-vis.json', 'visibility', { cases: 73, ok: 62, loud: 3, mismatches: 8 }],
-    ['ios-vis.json', 'visibility,dismissal', { cases: 222, ok: 178, loud: 5, mismatches: 39 }],
+    // re-recorded by round 5's device check (src b71cbbb): LE4's and L3's cases and LV3's WDA one ok, struck off; the
+    // text family's 26 taps new; scroll-bounded F's two WDA cases refiled (LV4, LV5)
+    ['ios-vis.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 6, mismatches: 30 }],
+    // two reruns of scroll-bounded under WDA at the same src: LV5's case ok in both (it is intermittent), LV4's not
+    ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
+    ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

@@ -1328,7 +1328,15 @@
     },
     {
       "note": "2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md",
-      "why": "lab finding LV3: the turned stroke's touch-down, live only (live.ts --udid, case scroll:tabbar-floating.R); fixed under WDA with LE4 (958bd27, merged as fecb0b3), the fix awaiting the device check: the committed live record (ios-vis.json) is debc9b2's, so its live KNOWN entries stand until a live record at the fix reads the case ok"
+      "why": "lab finding LV3: the turned stroke's touch-down, live only (live.ts --udid, case scroll:tabbar-floating.R); fixed under WDA with LE4 (958bd27, merged as fecb0b3) and measured so by round 5's device check (ios-vis.json at b71cbbb's src: the turned stroke touches down at y 335, inside the list, and R is reached); open under idb, which lists no scroll view (LE2): its turned strokes still touch down at y 175, in the header"
+    },
+    {
+      "note": "2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md",
+      "why": "lab finding LV4: no turn back after strokes that moved nothing, live only (live.ts --udid, case turn:scroll-bounded.F under WDA): the rule it fails, R-direction, is declared live only (golden never asks it: a replayed tree never moves, so no stroke there brings a target closer)"
+    },
+    {
+      "note": "2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md",
+      "why": "lab finding LV5: scroll dynamics in a 180-pt scroll view, live only and intermittent (live.ts --udid, case scroll:scroll-bounded.F under WDA: not reached in one run of three at b71cbbb's src)"
     }
   ]
 }

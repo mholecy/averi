@@ -30,28 +30,23 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md': 'LV1: a list moving through blank content, live only',
   '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",
-  '2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md': "LV3: the turned stroke's touch-down, live only",
+  '2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md': "LV3: the turned stroke's touch-down, live only (idb: fixed under WDA)",
+  '2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md': 'LV4: no turn after strokes that moved nothing, live only (a replayed tree never moves)',
+  '2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md': "LV5: a stroke's reach in a short scroll view, live only (and intermittent)",
   '2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md': 'a fling in a lazy list: scroll dynamics, live only',
 };
 
 /**
  * The live KNOWN entries (by their case, `<platform> <source> <case id>`) of notes calibrated on the replay
  * (calibration.json `calibrate`, their static rows struck off) that stand until the device check: the committed live
- * record (docs/truth/live-records/ios-vis.json) is an older src's, whose replies `--rejudge` reads as they were, so
- * these cases still fail there by their rule; struck off — with their line here — once a live record at the fix reads
- * them ok (live.ts then exits 1 on each, as for any fixed case). Keyed by CASE, not by note: an entry filed under one
- * of these notes later, for a case not listed here, is held to the note being open like any other.
+ * record is an older src's, whose replies `--rejudge` reads as they were, so these cases still fail there by their
+ * rule; struck off — with their line here — once a live record at the fix reads them ok (live.ts then exits 1 on each,
+ * as for any fixed case). Keyed by CASE, not by note: an entry filed under one of these notes later, for a case not
+ * listed here, is held to the note being open like any other. Empty since round 5's device check (ios-vis.json at
+ * b71cbbb's src): LE4's and L3's cases read ok there and were struck off, but LE4's two cases of F, refiled as LV4 and
+ * LV5 (LIVE_ONLY, above).
  */
-const LE4_FILE = '2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md';
-const L3_FILE = '2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md';
-const LE4_FIXED = "LE4: fixed in fecb0b3 (round 5's 0a), calibrated; ios-vis.json is debc9b2's";
-const L3_FIXED = "L3: fixed in 468dc1b (round 5's 0b), calibrated; ios-vis.json is debc9b2's";
-const AWAITING_LIVE: Readonly<Record<string, { note: string; why: string }>> = Object.fromEntries([
-  ...['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'turn:scroll-bounded.F', 'scroll:sheet-long-list-short.F'].map(
-    (id) => [`ios wda ${id}`, { note: LE4_FILE, why: LE4_FIXED }] as const,
-  ),
-  ...['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G'].map((id) => [`ios wda ${id}`, { note: L3_FILE, why: L3_FIXED }] as const),
-]);
+const AWAITING_LIVE: Readonly<Record<string, { note: string; why: string }>> = {};
 
 /**
  * Notes calibration.json lists that are not committed on this branch: fixed notes (calibrated, or a residual, or

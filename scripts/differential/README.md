@@ -208,8 +208,8 @@ with its verdict class and the kind of reply it rests on — a weaker contract t
 `intermittent` case allowed ok, its header says why and what the committed records measured); the exit code is 1 on an unknown
 MISMATCH and, in a run of this checkout (not `--side`), on a known case not marked `intermittent` that comes out ok —
 fixed, to be struck off. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
-1's), and `--rejudge <file>` judges it again with this checkout's judges, no device
-(tests/truth/live-rejudge.test.ts does so for the two visibility records). Under iOS, idb's companion
+1's Android run, round 5's device check's iOS runs and the live calibrations'), and `--rejudge <file>` judges it again
+with this checkout's judges, no device (tests/truth/live-rejudge.test.ts does so for the visibility records). Under iOS, idb's companion
 must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
 /tmp/idb/<udid>_companion.sock`).
 

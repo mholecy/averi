@@ -20,9 +20,11 @@ import type { ReplyKind } from './replies.js';
  *
  * The kind is pinned since round 5 (it was not before: "a device's timing moves it" was assumed, not measured). The
  * committed records measured it (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): every entry's
- * kind below is what its case's record reads; every rule's group of entries reads one kind; and the one case with
+ * kind below is what its case's record reads; and the cases with
  * several records, LV2's two flush cases (android-vis.json at HEAD, cal12-*.json: three runs at 9c7885e, two at
- * d043e65), read `visible` in all six — ok in four, a stop-claim in two: the timing moves the outcome, not the kind.
+ * d043e65), read `visible` in all six — ok in four, a stop-claim in two: the timing moves the outcome, not the kind;
+ * LV5's case likewise (ios-vis.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at b71cbbb's src): `refused`
+ * where it is not reached, ok in two.
  * A run that reads another kind for a known case fails as NOT known, naming both: refile it (or widen the entry's
  * kind, with the records that show it) only once the note explains that reply too.
  */
@@ -30,12 +32,12 @@ import type { ReplyKind } from './replies.js';
 const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
 const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
-const LE4 = 'bug:2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
-const L3 = 'bug:2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md';
 const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
+const LV4 = 'bug:2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md';
+const LV5 = 'bug:2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md';
 const FLING = 'bug:2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md';
 const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
@@ -71,6 +73,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O'], LE2, 'stop-claim', 'visible'),
   ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O'], LE2, 'tap-claim', 'Tapped'),
   ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], LE2, 'R-direction', 'refused'),
+  // LV3 under idb only (no scroll view listed: its turned stroke still touches down in the header); fixed under WDA.
+  ...each('ios idb', ['scroll:tabbar-floating.R'], LV3, 'R-direction', 'refused'),
   ...each('ios idb', ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G'], NOT_YET_IN_TREE, 'presented-stop', 'visible'),
   ...each('ios idb', ['scroll:sheet-long-list.F'], FLING, 'R-direction', 'not found'),
   ...each('ios idb', ['tap:sheet-long-list.R', 'tap:sheet-long-list-short.R'], NO_ID, 'tap-refused', 'not found'),
@@ -79,14 +83,13 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // refused, nothing fired) — its WDA entry struck off once an ok came to read as fixed (round-4 review S8).
   ...each('ios idb', ['tap:blur-menu-grouped.C'], BLUR, 'tap-claim', 'Tapped'),
   // iOS, WDA
-  // LE4 and L3 are fixed (fecb0b3, 468dc1b: round 5's 0a and 0b) and calibrated on the replay; their entries stand
-  // until a live record at the fix reads these cases ok (ios-vis.json is debc9b2's) — tests/truth/lab-notes.test.ts's
-  // AWAITING_LIVE. LV3 below likewise (fixed under WDA by 0a; live only).
-  ...each('ios wda', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'turn:scroll-bounded.F', 'scroll:sheet-long-list-short.F'], LE4, 'R-direction', 'refused'),
-  ...each('ios wda', ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G'], L3, 'presented-stop', 'visible'),
+  // Round 5's device check (ios-vis.json, src b71cbbb): LE4's and L3's entries (fixed in fecb0b3, 468dc1b: round 5's
+  // 0a and 0b) and LV3's WDA one struck off, their cases ok — but LE4's two cases of F, whose strokes now go inside
+  // `lower` and still do not reach it, refiled as what they measured:
+  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'refused'),
+  ...each('ios wda', ['scroll:scroll-bounded.F'], LV5, 'not-reached', 'refused', 'intermittent'),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
-    ...each(`ios ${src}`, ['scroll:tabbar-floating.R'], LV3, 'R-direction', 'refused'),
     ...each(`ios ${src}`, ['scroll:scroll-sticky.R.fully'], LE3, 'stop-claim', 'visible'),
     ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.C', 'tap:blur-menu.D', 'tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'], BLUR, 'tap-claim', 'Tapped'),
     ...each(`ios ${src}`, ['tap:blur-menu.W'], MENU, 'tap-refused', 'refused'),
