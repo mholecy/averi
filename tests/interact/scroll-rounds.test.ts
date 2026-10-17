@@ -1877,7 +1877,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
   /**
    * A target NOT judged in the viewport — below the fold, under the soft keyboard — has no covers, so the stop above
    * never sees the presented screen; the stroke for it would touch down on that screen. Before every stroke the round
-   * asks where the stroke would touch down (swipe.ts#scrollStroke's `from`, the driver's own point) and, when a surface
+   * asks where the stroke would touch down (stroke-plan.ts#scrollStroke's `from`, the driver's own point) and, when a surface
    * of a screen presented over the target's lies there (ui-tree/draw-order.ts#DrawOrder.presentedAt), confirms with one
    * more read and stops `presented`, naming the reason it was not in the viewport and where the swipe would land.
    */
@@ -1941,7 +1941,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
       const field = { ...cellOf('contactsDiscardPopover', 'add field'), cover: coverOver({ x: 0, y: 573, width: 402, height: 301 }, NO_BACK), ofKeyboard: (n: UiNode) => n.ofKeyboard === true };
       const played = play(IPHONE, [field, field]);
       expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
-      // Asked where the stroke would touch down above the keyboard (swipe.ts#strokeRoom's cut), not on its keys at (201,699).
+      // Asked where the stroke would touch down above the keyboard (stroke-plan.ts#strokeRoom's cut), not on its keys at (201,699).
       expect(played.outcome).toMatchObject({ kind: 'presented', next: { touchDown: { x: 201, y: 471 } } });
       expect(failureOf(played, 'role:container label:"add field"').message).toMatch(
         /^scroll_until role:container label:"add field" stopped before any swipe — element lies under the soft keyboard: its centre \(201,661\) lies below the keyboard's top edge at y 573, and the next swipe would touch down at \(201,471\) on container "dismiss popup" \(0,0 402x874\) — a screen is presented over it \(a modal or a sheet\) — close it first; /,
@@ -2111,7 +2111,7 @@ describe('round — a target the strokes never bring into what its scroll view d
 });
 
 /**
- * The stroke's container on a WDA tree (scroll-rounds.ts#targetScrollers): WDA marks no node as clipping, so the
+ * The stroke's container on a WDA tree (stroke-plan.ts#targetScrollers): WDA marks no node as clipping, so the
  * target's clipping chain is empty there and its scroll views are the ancestors that scroll (`Clips.drawnIn`). The
  * lab app's cells, as WDA lists them on the iPhone 17 (402x874).
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
@@ -2120,7 +2120,8 @@ describe('round — a target the strokes never bring into what its scroll view d
 describe('round — a WDA target\'s strokes go over its own scroll view', () => {
   const strokes = (played: Played) => played.steps.flatMap((s) => (s.do === 'stroke' && s.box !== undefined ? [{ box: s.box, from: drawnFor(s).from }] : []));
 
-  it('tabbar-floating: R flung past the screen\'s top under the 200-pt header — the turned stroke touches down inside the list (0,200 402x674), not in the header (LV3)', () => {
+  it('tabbar-floating: R flung past the screen\'s top under the 200-pt header — the turned stroke touches down inside the list (0,200 402x674), not in the header', () => {
+    // Lab note LV3.
     const LIST: Rect = { x: 0, y: 200, width: 402, height: 674 };
     const listRow = (y: number): Row => {
       const r = node({ role: 'button', identifier: 'R', rect: { x: 24, y, width: 354, height: 52 } });

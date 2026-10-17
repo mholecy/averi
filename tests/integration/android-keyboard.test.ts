@@ -29,7 +29,7 @@ const touchable = "adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w
 // asked once per adapter, after the first settle, before the keyboard — the adapter memoizes it.
 const wmSize = 'adb -s emulator-5554 shell wm size';
 const PHYSICAL = 'Physical size: 1080x2220\n';
-// The status band, read with the screen size and memoized with it (2026-10-12, android.ts#statusBand): the same
+// The status band, read with the screen size and memoized with it (2026-10-12, types.ts#DeviceScreen.statusBand): the same
 // `dumpsys window displays` as the keyboard's query, asked once after `wm size` — these dumps hold no status bar, so no band.
 const band = query;
 

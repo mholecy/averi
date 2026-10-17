@@ -55,7 +55,9 @@ describe('the fallback: which adapter infers presented screens where the source 
     expect(presentation.over(row).givesWay('structural', at(dim))).toBe(false);
   });
 
-  it('the uiautomator adapter answers as the shape does today (lab note L1 is its to fix, not yet): the same surface, the same give-way, no layer at a point', () => {
+  // Lab note L1 (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md) is this
+  // adapter's to fix, not yet: until then it answers as the shape does.
+  it('the uiautomator adapter answers as the shape does today: the same surface, the same give-way, no layer at a point', () => {
     const { tree, row, dim } = modalShape({ paddedTouchTargets: true });
     const { presentation, at } = read(tree);
     expect(presentation.over(row).surface(at(dim))).toBe('inferred');

@@ -65,7 +65,7 @@ const usable = (screen: Bare): UsableScreen => ({ ...screen, oriented: screen.bo
 const IPHONE = usable({ box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 });
 const PIXEL = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 });
 const PLAIN = { of: 'stop' } as const;
-/** A keyboard line (ui-tree/keyboard-cover.ts#KeyboardLine): WDA's band by default, witnessed; idb's band, which no reading stands by. */
+/** A keyboard line (ui-tree/keyboard-position.ts#KeyboardLine): WDA's band by default, witnessed; idb's band, which no reading stands by. */
 const wda = (y: number): KeyboardLine => ({ y, witnessed: true });
 const idb = (y: number): KeyboardLine => ({ y, witnessed: false });
 const FULLY = { of: 'fully' } as const;

@@ -966,7 +966,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
  * Stage B (2026-10-07): the tap and type_text tools hand averi.yaml's
  * `app.ios.keyboardDismiss` to the keyboard guard (flow/tool-config.ts#
  * iosToolSettings over the call's one read, which also gives the tree
- * source; flow/load.ts#iosToolSettingsFor until 2026-10-08). The measured iOS login in points: `login_submit` under the band
+ * source; flow/load.ts's `iosToolSettingsFor` until 2026-10-08). The measured iOS login in points: `login_submit` under the band
  * the WDA source marks, the title above it; the fake plays the app (K5b: a
  * tap on the title hides the keyboard).
  */

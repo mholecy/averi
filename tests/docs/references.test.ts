@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
  * restating their rules. A pointer whose target was renamed, deleted or
  * never written sends the next reader nowhere, and nothing else notices:
  * the compiler does not read comments. This test resolves every such
- * reference in src/, ARCHITECTURE.md, the skill docs and the ADRs
+ * reference in src/, tests/, ARCHITECTURE.md, the skill docs and the ADRs
  * (docs/adr/) and names each
  * dangling one — an ADR named by its path (`docs/adr/<n>-<title>.md`)
  * included.
@@ -61,6 +61,8 @@ const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
   'docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md',
   // Untracked in the main checkout; cited by the decision record's amendment "a layer holding an alert".
   'docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md',
+  // Untracked in the main checkout (tests/truth/lab-notes.test.ts#NOT_ON_THIS_BRANCH); cited by tests/truth/truth.test.ts.
+  'docs/bugs/2026-10-15-android-numeric-character-references-in-uiautomator-attributes-are-not-decoded.md',
 ]);
 
 const filesUnder = (dir: string): string[] =>
@@ -71,7 +73,9 @@ const filesUnder = (dir: string): string[] =>
 
 const SRC = filesUnder('src').filter((f) => f.endsWith('.ts'));
 const TESTS = filesUnder('tests').filter((f) => f.endsWith('.ts'));
-const PROSE = [...SRC, 'ARCHITECTURE.md', ...filesUnder('skill').filter((f) => f.endsWith('.md')), ...filesUnder('docs/adr').filter((f) => f.endsWith('.md'))];
+const SCRIPTS = filesUnder('scripts').filter((f) => f.endsWith('.ts'));
+// The tests' prose too, except this file's own, whose examples (`a.ts#x`) name nothing.
+const PROSE = [...SRC, ...TESTS.filter((f) => f !== 'tests/docs/references.test.ts'), 'ARCHITECTURE.md', ...filesUnder('skill').filter((f) => f.endsWith('.md')), ...filesUnder('docs/adr').filter((f) => f.endsWith('.md'))];
 
 const text = new Map<string, string>();
 const read = (file: string): string => {
@@ -98,10 +102,14 @@ const declaredAt = (source: string, name: string): number =>
  */
 const withoutImports = (source: string): string => source.replace(/^import\b[^;]*;/gm, (m) => m.replace(/[^\n]/g, ' '));
 
-/** A reference into tests/ resolves against the tests, any other against src/. */
-function resolves(file: string, symbol: string): boolean {
+/**
+ * A reference into tests/ resolves against the tests, any other against src/ — and, written in a test (`from`), against
+ * the tests and the scripts too (a test's prose names its siblings by their bare names, `scroll.test.ts#wdaForm`,
+ * `rounds.ts#treeOf`, and the scripts it tests, `golden.ts#…`).
+ */
+function resolves(file: string, symbol: string, from: string): boolean {
   const [head, ...members] = symbol.split('.');
-  const pool = file.startsWith('tests/') ? TESTS : SRC;
+  const pool = file.startsWith('tests/') ? TESTS : from.startsWith('tests/') ? [...SRC, ...TESTS, ...SCRIPTS] : SRC;
   // Each member is declared inside what it is a member of: after it, before the next top-level declaration.
   return pool.some((f) => {
     if (f !== file && !f.endsWith(`/${file}`)) return false;
@@ -158,7 +166,7 @@ describe('references in the prose', () => {
           if (bare && (last === undefined || !/[\s`/,]/.test(text[m.index - 1] ?? ''))) continue;
           const owner = m[1] ?? last!;
           last = owner;
-          if (!resolves(owner, m[2])) out.push(`${file}:${line}  ${bare ? `${owner} … ${m[0]}` : m[0]}`);
+          if (!resolves(owner, m[2], file)) out.push(`${file}:${line}  ${bare ? `${owner} … ${m[0]}` : m[0]}`);
         }
         return out;
       }),

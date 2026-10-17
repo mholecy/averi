@@ -1233,7 +1233,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
  * iOS's status band counts as OFF the screen for a tap (2026-10-09, the owner's decision on device check C3-1.3 of
  * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): a plain `scroll_until` stopped with
  * `priority_select` at `24,-20` and the tap went to (201,6) — the status bar, which scrolled the form to its top.
- * The band is the top safe-area inset (interact/swipe.ts#iosStatusBand): 62 pt on the measured 402x874.
+ * The band is the top safe-area inset (adapters/ios-status-band.ts#iosStatusBand): 62 pt on the measured 402x874.
  */
 describe('iOS\'s status band (2026-10-09)', () => {
   const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };

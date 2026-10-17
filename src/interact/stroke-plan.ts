@@ -35,9 +35,9 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  * - `touchedOn(memory, facts, drawn)` — the node drawn over the container the last stroke sent went over that its
  *   touch-down hit (ui-tree/draw-order.ts#DrawOrder.drawnOverAt), for the fast fail's sentence.
  *
- * Presentation is asked through its existing interface — `Scene.presentedAt` and the draw order's `drawnOver` /
- * `drawnOverAt` — so the module that will own what is presented (the architecture review's A2) can replace what sits
- * behind those without touching the plan.
+ * Presentation is asked through its interface — `Scene.presentedAt` and the draw order's `drawnOver` / `drawnOverAt` —
+ * whose facts ui-tree/presentation.ts owns (one adapter per tree source); the plan reads no mark, no shape and no
+ * window of its own.
  *
  * WHICH SCROLL VIEW, and the axis. The candidates are the target's scroll views, nearest first (`targetScrollers`),
  * once a read has found it; before that the screen's largest scroller; none (the screen box) when the target was
@@ -53,7 +53,10 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  * outward), and its axis would be looked up from `ProbeAsk.facts` — the read's scene, which knows each scroller's node
  * — inside `planProbe`, so that question too stays here. Neither `round` nor the driver would change: they hand in
  * `toward` and take the plan. Not done here: it changes
- * where strokes land (a behaviour change for its own note and device check), and this module was a pure refactor.
+ * where strokes land, a behaviour change for its own note and device check. What this module holds is the plan as it
+ * stands: the move of the round's five pieces into one (A1, which changed no stroke), and the candidates' rule — the
+ * target's own scroll views, nearest first — that changed where a WDA stroke lands for a target not drawn (round 21's
+ * step 0a, docs/adr/0010-pixel-assert-keyboard-first.md records it).
  *
  * Pure: no adapter, no clock, no I/O.
  */

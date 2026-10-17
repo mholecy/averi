@@ -1603,7 +1603,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
 describe('presentedAt — the presented screen\'s surface at a point, asked for a target wherever it lies (ADR 0018)', () => {
   const screen = (key: string) => STACKED.screens[key];
   const find = (tree: UiNode, keep: (n: UiNode) => boolean) => [...everyNode(tree)].find(keep)!;
-  /** The touch-down of a 60 % stroke down over the 402x874 screen (swipe.ts#scrollStroke). */
+  /** The touch-down of a 60 % stroke down over the 402x874 screen (stroke-plan.ts#scrollStroke). */
   const TOUCH_DOWN = { x: 201, y: 699 };
 
   it('measured, Contacts\' discard popover with the keyboard down: the sheet\'s cell "add instant message" at y 1306, below the fold, has no covers — and the stroke\'s touch-down lies on the action sheet WDA types in the popover\'s layer, reaching the whole screen (not on the popover\'s own dim, a node of that layer)', () => {
