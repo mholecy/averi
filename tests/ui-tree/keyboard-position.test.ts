@@ -9,6 +9,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { strokeLine } from '../../src/interact/scroll-read.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
+import { lookAt, lookOn } from '../../src/ui-tree/look.js';
 import { GBOARD, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, screen, type FakeKeyboard } from '../helpers/fake.js';
 
@@ -267,10 +268,11 @@ describe('readingLine — asked of the reading at most once, and only when asked
 });
 
 /**
- * ONE KEYBOARD LINE for the pixel assert and `scroll_until`. The pixel poll (verify/pixel-poll.ts#overElement) and the
- * scroll read's stroke line (interact/scroll-read.ts#strokeLine) build their position with NO reading, the scroll
- * read's judgement (#judgeRead) with the read's `ofKeyboard` — so the two verbs could part on the band's line only if
- * a position's `line` read the reading, or a tree carried both idb's band and WDA's marks (the one synthetic row of
+ * ONE KEYBOARD LINE for the pixel assert and `scroll_until`. Each asks the position of its read's look
+ * (ui-tree/look.ts#Look.keyboard): the pixel poll's (verify/pixel-poll.ts#overElement) over the adapter's whole reading
+ * (ui-tree/look.ts#lookOn), the scroll read's — its judgement (interact/scroll-read.ts#judgeRead) and its stroke line
+ * (#strokeLine) — over the read's `ofKeyboard` alone (scroll-read.ts#factsOf) — so the two verbs could part on the
+ * band's line only if a position's `line` read the reading, or a tree carried both idb's band and WDA's marks (the one synthetic row of
  * the `line` table above where the pixel poll's exemption, `line`'s subject, is narrower than the scroll read's,
  * `owns`). Neither holds, and these pin both: `line` is the draw order's and the subject's alone, whatever the
  * reading; a band comes only with idb's flat list (draw-order.ts#drawOrder) and marks only from WDA's source
@@ -296,13 +298,16 @@ describe('one line for the pixel assert and scroll_until — `line` reads no rea
   it.each(trees)('%s: one source only, and every node\'s pixel line is the scroll read\'s as a position models it (owns ? none : line())', async (_name, source, read) => {
     const tree = await read();
     const order = sceneOf(tree).order;
-    // As the scroll read builds it: the reading's `ofKeyboard` (scroll.ts hands the round's reading's to the read).
-    const ofKeyboard = readKeyboard(new FakeAdapter({ s: tree }, 's'), tree).ofKeyboard;
+    // As the pixel poll builds its look: the adapter's whole reading (lookOn).
+    const pixelLook = lookOn(new FakeAdapter({ s: tree }, 's'), tree);
+    // As the scroll read builds its look: the reading's `ofKeyboard` alone (scroll.ts hands the round's reading's to the read).
+    const { ofKeyboard } = pixelLook.reading;
+    const scrollLook = lookAt(tree, { ofKeyboard });
     const nodes = every(tree);
     expect([order.keyboardBandTop !== undefined, nodes.some(ofKeyboard)]).toEqual([source === 'band', source === 'marks']);
-    const pixel = keyboardPosition(order);
-    const scroll = keyboardPosition(order, { ofKeyboard });
-    const stroke = strokeLine(undefined, { scene: sceneOf(tree) });
+    const pixel = pixelLook.keyboard;
+    const scroll = scrollLook.keyboard;
+    const stroke = strokeLine(undefined, scrollLook);
     for (const n of nodes) {
       expect(pixel.line(n)).toEqual(scroll.owns(n) ? undefined : scroll.line());
       if (!scroll.owns(n)) expect(pixel.line(n)).toEqual(stroke);

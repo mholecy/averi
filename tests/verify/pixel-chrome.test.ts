@@ -5,14 +5,15 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/geometry.js';
 import { sceneOf, type PixelRegionOf as Reads, type PixelStanding } from '../../src/ui-tree/standing.js';
+import { lookOn } from '../../src/ui-tree/look.js';
 import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 
-/** What the pixel assert's round says lies over `element` (verify/pixel-poll.ts#overElement), the measurement reading `reads` (its rect when omitted) — with glyphs for the ocr assert. */
-const over = (adapter: Parameters<typeof overElement>[0], tree: UiNode, element: UiNode, reads?: Reads, glyphs = false): Promise<string | undefined> =>
-  overElement(adapter, tree, element, { ...(reads !== undefined && { reads }), glyphs });
+/** What the pixel assert's round says lies over `element` (verify/pixel-poll.ts#overElement) on the round's look of `tree` (ui-tree/look.ts#lookOn), the measurement reading `reads` (its rect when omitted) — with glyphs for the ocr assert. */
+const over = (adapter: Parameters<typeof overElement>[0] & Parameters<typeof lookOn>[0], tree: UiNode, element: UiNode, reads?: Reads, glyphs = false): Promise<string | undefined> =>
+  overElement(adapter, lookOn(adapter, tree), element, { ...(reads !== undefined && { reads }), glyphs });
 
 const FIXTURES = new URL('../fixtures/', import.meta.url);
 const json = async (file: string) => JSON.parse(await readFile(new URL(file, FIXTURES), 'utf8'));
@@ -52,8 +53,9 @@ async function sweep(androidBand?: number, reads: Reads = (r) => r, androidNavig
   const misses: string[] = [];
   let judged = 0;
   for (const [name, tree, device] of await fixtureTrees(androidBand, androidNavigation)) {
+    // The round's look and the screen it is judged on: the usable screen on the device, else the tree's own.
+    const { scene } = lookOn({}, tree);
     const usable = (await usableScreen({ viewport: async () => device }, { tree })) ?? treeScreen(tree);
-    const scene = sceneOf(tree);
     for (const n of everyNode(tree)) {
       if (n === tree || n.ofKeyboard === true || !(n.rect.width * n.rect.height > 0)) continue;
       judged++;

@@ -1,15 +1,12 @@
 import type { Point, Rect } from '../adapters/types.js';
-import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
-import { keyboardPosition, type KeyboardPosition } from '../ui-tree/keyboard-position.js';
-import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { usableScreen } from '../ui-tree/usable-screen.js';
 import { inTreeModel } from './keyboard-in-tree.js';
 import {
   confirmHidden,
   lookAgain,
+  seenLook,
   withNote,
-  withScene,
   type ClearedLook,
   type DismissOptions,
   type DismissResult,
@@ -17,11 +14,10 @@ import {
   type KeyboardAdapter,
   type KeyboardModel,
   type ResolvedClear,
-  type SeenLook,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
 import { describeTarget, resolveSettled, type Target } from './resolve.js';
-import { judgeTap, type Aim, type TapLook } from './tap-judgement.js';
+import { judgeTap, type Aim } from './tap-judgement.js';
 
 /**
  * The soft-keyboard guard and the post-fill dismissal, written ONCE over
@@ -132,20 +128,20 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * why).
  */
 export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: Target, opts: GuardOptions): Promise<ResolvedClear> {
-  const first = withScene(await resolveSettled(adapter, target, opts));
-  // The keyboard read off the first look's tree — building it asks nothing;
-  // its questions are put below, in the module doc's order.
-  const reading = readKeyboard(adapter, first.tree);
-  const opened = judging(first, reading);
+  const first = seenLook(adapter, await resolveSettled(adapter, target, opts));
+  // The keyboard read off the first look's tree (its look's reading) —
+  // building it asked nothing; its questions are put below, in the module
+  // doc's order.
+  const { reading } = first.look;
   // The other rule every tap on a resolved node shares: its point must lie
   // ON the screen (tap-judgement.ts#judgeTap, the reasons there). Asked before the
   // keyboard is, so a target below the fold costs no `back` and no
   // dismissal tap; asked again of the node a guard that acted hands back,
   // since the layout moves when the keyboard goes (an iOS keyboard-avoiding
-  // scroll view scrolls back down). The screen comes from the first read's
-  // tree — the orientation does not turn inside one tap — or from the
-  // re-read a refusal makes first.
-  const judge = await judgeTap(adapter, target, opened.look, await usableScreen(adapter, { tree: first.tree }), opened.keyboard);
+  // scroll view scrolls back down). The screen comes from the first look —
+  // the orientation does not turn inside one tap — or from the re-read a
+  // refusal makes first.
+  const judge = await judgeTap(adapter, target, first, await usableScreen(adapter, first.look));
   const { screen } = judge;
   const at = tapPoint(first.node);
   const opening = await reading.over(at, first.node);
@@ -170,30 +166,23 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   const what = describeTarget(target);
   const ready = await model.guard({ target, opts, point: at, screen, verdict: opening, what, covered: `the soft keyboard covered ${what}` });
   if ('cleared' in ready) {
-    // Handed back clear, nothing sent: judged again on the tree that holds the node, off a reading of it.
-    const back = judging(ready.cleared, readKeyboard(adapter, ready.cleared.tree));
-    return clearOf(ready.cleared, await (await judgeTap(adapter, target, back.look, screen, back.keyboard)).aim());
+    // Handed back clear, nothing sent: judged again on the look that holds the node, off its reading.
+    return clearOf(ready.cleared, await (await judgeTap(adapter, target, ready.cleared, screen)).aim());
   }
   const { hiding } = ready;
   await hiding.perform();
-  const cleared = await confirmHidden<{ look: ClearedLook; reading: KeyboardReading }, { frame: Rect; point: Point }>(
+  const cleared = await confirmHidden<ClearedLook, { frame: Rect; point: Point }>(
     hiding.looks,
     async () => {
       const look = await lookAgain(adapter, target, opts, hiding.failed);
       return look.verdict.kind === 'covered'
         ? { stillUp: { frame: look.verdict.frame, point: look.point } }
-        : { gone: { look: withNote(look.resolved, hiding.hidden(look.verdict)), reading: look.reading } };
+        : { gone: withNote(look.resolved, hiding.hidden(look.verdict)) };
     },
     (seen, looks) => hiding.stillCovering(seen, looks),
   );
   // After the side effect: judged again with `sent`, the headline of any refusal.
-  const after = judging(cleared.look, cleared.reading);
-  return clearOf(cleared.look, await (await judgeTap(adapter, target, after.look, screen, after.keyboard, hiding.sent)).aim());
-}
-
-/** A look as the tap judges it (tap-judgement.ts#judgeTap): the look itself — its node, its tree and the scene it carries (keyboard-model.ts#SeenLook) — and where the keyboard lies on it, a position over that scene and the look's `reading`, whose remedy the refusals say. */
-function judging(look: SeenLook, reading: KeyboardReading): { look: TapLook; keyboard: { position: KeyboardPosition; remedy: KeyboardRemedy } } {
-  return { look, keyboard: { position: keyboardPosition(look.scene.order, reading), remedy: reading.remedy } };
+  return clearOf(cleared, await (await judgeTap(adapter, target, cleared, screen, hiding.sent)).aim());
 }
 
 /** The guard's answer: the look the tap goes to, with what its judgement aimed at. */

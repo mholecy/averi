@@ -10,23 +10,24 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * measured under, and the nodes that are the keyboard's own UI, under no
  * line. Built from a tree's draw order (idb's band, free) and, where a
  * reading is at hand, that reading (its line, asked lazily); every reader
- * asks a position for the line and none merges the sources itself. The tap,
- * its guard and the dismissal picker build one per look — a tree read and
- * the reading built off it — and the pixel poll one per tree it judges, with
- * no reading. `scroll_until`'s read builds more than one off one tree, none
- * holding a reading: one for its judgement (idb's band and the read's
- * keyboard marks; the round's reading cover, when it offers one, is preferred over the band (scroll-read.ts#judgeRead)),
- * and one for each stroke line (interact/scroll-read.ts#strokeLine), handed
- * the line of the cover the round, or its probe, applied:
+ * asks a position for the line and none merges the sources itself. ONE
+ * position per look, built by the look (ui-tree/look.ts#Look.keyboard, over
+ * the look's scene's draw order and its reading) and asked by every verb
+ * that judges that look:
  * - the tap (interact/tap-judgement.ts: the on-screen rule with the tree's own
  *   line, the chrome aim with the reading's merged in, only when its
  *   centre is covered) and the dismissal picker (interact/keyboard-in-tree.ts
- *   #pickDismissal, the same merged line);
+ *   #pickDismissal, the same merged line) — a look of the guard's, with the
+ *   adapter's whole reading;
  * - `scroll_until`'s read (interact/scroll-read.ts#judgeRead: idb's band as
  *   a cover, the keyboard's own UI judged against the whole screen; and
- *   #strokeLine, the line its strokes stay above);
+ *   #strokeLine, the line its strokes stay above, handed the line of the
+ *   cover the round, or its probe, applied) — the read's look, its reading
+ *   only the round's `ofKeyboard` (the round's reading cover, when it offers
+ *   one, is preferred over the band, and asked through the round's protocol);
  * - the pixel poll (verify/pixel-poll.ts#overElement: idb's band as a
- *   keyboard line of the element's standing).
+ *   keyboard line of the element's standing) — the round's look, with the
+ *   adapter's whole reading, of which it asks only `line`.
  * Here, in ui-tree/, for the reason the reading is: the pixel poll
  * (verify/) reads it too and may not import interact/.
  *
@@ -92,7 +93,7 @@ export interface KeyboardPosition {
    * and never again for this position; none, asking nothing, for a position
    * built without a reading that can be asked (the scroll read's, whose
    * round asks the same two through its own protocol — interact/scroll-read.ts
-   * #Cover — the stroke's and the pixel poll's).
+   * #Cover). The pixel poll never asks it.
    */
   readingLine(): Promise<KeyboardLine | undefined>;
   /**

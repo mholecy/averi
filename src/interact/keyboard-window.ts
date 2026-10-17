@@ -6,7 +6,7 @@ import {
   failedLookMessage,
   KeyboardGuardError,
   withNote,
-  withScene,
+  seenLook,
   type CoveredLook,
   type DismissResult,
   type Hiding,
@@ -326,7 +326,7 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
           const now = readKeyboard(adapter);
           let window = await now.over(judged);
           if (window.kind === 'clear' || window.kind === 'unknown') {
-            const settled = withScene(await resolveSettled(adapter, target, opts));
+            const settled = seenLook(adapter, await resolveSettled(adapter, target, opts));
             // The frame just read is tested against where the target is NOW —
             // free, the reading remembers it: a frame that left the old point
             // but lies over the new one (the layout moved while averi waited)
