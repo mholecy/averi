@@ -396,7 +396,7 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
         break;
       }
     }
-    const shown = flags ? presentedScreen(window) : undefined;
+    const shown = flags ? presentedScreen(window, window === (windows[0] ?? root)) : undefined;
     if (shown !== undefined && !layers.has(shown)) layers.set(shown, 'screen');
   }
   return { layers, elements };
@@ -409,7 +409,19 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
  * host's placeholder), the first that has VISIBLE CONTENT ON THE SCREEN — an element of a non-structural role,
  * `isVisible="1"`, sharing area with the Window — when at least one layer walked past before it has every element
  * `isVisible="0"`; and none when a layer with content is neither wholly invisible nor shown (a beneath only partly
- * `0`, or visible content parked off the screen: a dismissed sheet's leftover).
+ * `0`, or visible content parked off the screen: a dismissed sheet's leftover). When no layer with content follows the
+ * wholly invisible one, the first screen-sized layer after it with NO content that shows (some element below it
+ * `isVisible="1"` sharing area with the Window) is the presented one: a sheet laid only of empty frames — the lab's
+ * medium sheet over a scrolled host, its `dismiss popup` and its card nested `Other`s, nothing of a non-structural role
+ * (ADR 0018, "Amendment: a presented layer of only empty frames"). The hidden layer beneath is the fact; what the
+ * presented one holds only picks which later layer it is, so a content layer still wins over an empty one before it.
+ * What shows is asked of the layer's CHILDREN, never of the layer itself: Contacts' sheet with the keyboard up
+ * (corpus run16-ios/contacts-sheet-keyboard-wda.json) ends its Window with a bare shown leaf `Other 0,0 402x874`, which
+ * presents nothing; and a frame shown only off the Window shows nothing. Only in the APP's Window (`appWindow`: the
+ * payload's first — measured: the first Window in every corpus payload, 89 of 89 shown, holding every mark): a later
+ * Window — the keyboard's, the input host's, which read wholly `0` while the keyboard is down and are then not the
+ * keyboard's Windows (`keyboardMarks`) — lays no presented screen by empty frames alone.
+ * docs/bugs/2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md
  *
  * Measured (iPhone 17 simulator, iOS 27.0, WDA): over every raw capture of a page sheet, a SwiftUI half or expanded
  * sheet, an RN transparent modal, an alert and a popover, the screen beneath reads wholly `0` while the presented layer
@@ -418,23 +430,27 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
  * beside it — never one node's flag, never a target's own (a node's `isVisible` alone is no geometric truth: the pushed
  * form's phantom tab bar reads `0` on screen).
  */
-function presentedScreen(window: WdaElement): WdaElement | undefined {
+function presentedScreen(window: WdaElement, appWindow: boolean): WdaElement | undefined {
   const screen = usableRect(window.rect);
   if (screen === undefined) return undefined;
   const content = (e: WdaElement): boolean => !STRUCTURAL_ROLES.has(iosRoleOf(e.type, ROLE_MAP));
   const shownContent = (e: WdaElement): boolean => content(e) && onScreen(e, screen);
   let beneath = false;
+  let bare: WdaElement | undefined;
   for (const layer of window.children ?? []) {
     const rect = usableRect(layer.rect);
     if (rect === undefined || rectArea(rect) < rectArea(screen) * SCREEN_SIZED_FRACTION) continue;
-    if (!(layer.children ?? []).some((c) => someIn(c, content))) continue;
+    if (!(layer.children ?? []).some((c) => someIn(c, content))) {
+      if (appWindow && beneath && bare === undefined && (layer.children ?? []).some((c) => someIn(c, (e) => onScreen(e, screen)))) bare = layer;
+      continue;
+    }
     if (allIn(layer, (e) => isZero(e.isVisible))) {
       beneath = true;
       continue;
     }
     return beneath && someIn(layer, shownContent) ? layer : undefined;
   }
-  return undefined;
+  return bare;
 }
 
 /**

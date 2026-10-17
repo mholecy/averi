@@ -1,6 +1,8 @@
 import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { drawnOverText, nodeText, outsideScrollViewText, rectText, type Cut } from '../ui-tree/geometry.js';
-import type { KeyboardLine, KeyboardPosition } from '../ui-tree/keyboard-position.js';
+import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
+import type { Look, LookReading } from '../ui-tree/look.js';
+import type { KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive } from '../ui-tree/selectors.js';
 import { outsideItsScrollView, presentedRemedy, reachOf, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
@@ -168,8 +170,13 @@ export class ClippedRefusal extends PresentElementRefusal {}
 
 // ─── The judgement of a look ─────────────────────────────────────────────────
 
-/** One resolved node on one read, with that read's scene — the look the tap judges (`judgeTap`): a SeenLook's three fields the judgement reads, so a table test builds one without the settle loop. */
-export type TapLook = Pick<SeenLook, 'node' | 'tree' | 'scene'>;
+/** One resolved node on one read, with that read's look (ui-tree/look.ts#Look: its scene, its keyboard reading and position) — what the tap judges (`judgeTap`): a SeenLook's two fields, its look's reading only what the judgement asks (`TapReading`), so a table test builds one without the settle loop or an adapter. */
+export interface TapLook extends Pick<SeenLook, 'node'> {
+  readonly look: Look<TapReading>;
+}
+
+/** What the tap's judgement asks of a look's reading: what its keyboard position asks (the reading's line), and the remedy its refusals say. */
+export type TapReading = LookReading & Pick<KeyboardReading, 'remedy'>;
 
 /**
  * The tap's two standings of a node on one screen (ui-tree/standing.ts
@@ -189,8 +196,9 @@ export interface TapStandings {
   full(): Promise<TapStanding>;
 }
 
-/** The tap's two standings of `node` (`TapStandings`) on `screen`, its keyboard line `keyboard`'s. */
-export function tapStandings(scene: Scene, node: UiNode, screen: UsableScreen | undefined, keyboard: KeyboardPosition): TapStandings {
+/** The tap's two standings of `node` (`TapStandings`) on `screen`, over `look`'s scene, its keyboard line the look's keyboard position's. */
+export function tapStandings(look: Pick<Look, 'scene' | 'keyboard'>, node: UiNode, screen: UsableScreen | undefined): TapStandings {
+  const { scene, keyboard } = look;
   const own = keyboard.line(node);
   const judged = (line: KeyboardLine | undefined): TapStanding => scene.standing(node, screen, { of: 'tap', ...(line !== undefined && { keyboardTop: line }) });
   let first: TapStanding | undefined;
@@ -241,38 +249,32 @@ const offTheScreen = (s: TapStanding): s is OffTheScreen => (s.kind === 'offScre
  * THE tap judgement of a look (the module's doc): the on-screen rule now —
  * an OffScreenRefusal, after one fresh read of the screen, for a point off
  * it or under a system bar — and the rest (`TapJudge.aim`) when the caller
- * asks, after the keyboard guard. `look.tree` is the read that holds
- * `look.node`: the system-bar remedy looks the node up in it.
+ * asks, after the keyboard guard. `look.look` is the read that holds
+ * `look.node`: the system-bar remedy looks the node up in its tree; the
+ * keyboard's line is its position's, the refusals' remedy its reading's.
  */
-export async function judgeTap(
-  adapter: Pick<DeviceAdapter, 'viewport'>,
-  target: Target,
-  look: TapLook,
-  screen: UsableScreen | undefined,
-  keyboard: { readonly position: KeyboardPosition; readonly remedy: KeyboardRemedy },
-  sent?: string,
-): Promise<TapJudge> {
-  const { node, tree, scene } = look;
+export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target: Target, { node, look }: TapLook, screen: UsableScreen | undefined, sent?: string): Promise<TapJudge> {
+  const { scene } = look;
   const what = describeTarget(target);
-  const told: Told = { node, scene, remedy: keyboard.remedy, refusal: (finding: string): string => (sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`) };
+  const told: Told = { node, scene, remedy: look.reading.remedy, refusal: (finding: string): string => (sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`) };
   const judge = (on: UsableScreen | undefined, standings: TapStandings): TapJudge => ({
     screen: on,
     async aim() {
       const { first } = standings;
       // The reading's line only for a covered centre of a target on the screen and not cut.
       const standing = !offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? await standings.full() : first;
-      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(tree) }));
+      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(look.tree) }));
     },
   });
-  const first = tapStandings(scene, node, screen, keyboard.position);
+  const first = tapStandings(look, node, screen);
   const firstStanding = first.first;
   if (!offTheScreen(firstStanding)) return judge(screen, first);
-  const again = await usableScreen(adapter, { tree }, { fresh: true });
-  const second = tapStandings(scene, node, again, keyboard.position);
+  const again = await usableScreen(adapter, look, { fresh: true });
+  const second = tapStandings(look, node, again);
   const secondStanding = second.first;
   if (!offTheScreen(secondStanding)) return judge(again, second);
   // Refused on the screen read again; on the first look's when none could be read again.
-  const [judged, refused] = again === undefined && screen !== undefined ? [screen, firstStanding] : [again ?? treeScreen(tree), secondStanding];
+  const [judged, refused] = again === undefined && screen !== undefined ? [screen, firstStanding] : [again ?? treeScreen(look.tree), secondStanding];
   const reread =
     again !== undefined && screen !== undefined && (again.box.width !== screen.box.width || again.box.height !== screen.box.height)
       ? ` (read again before refusing; it was ${screen.box.width}x${screen.box.height})`
@@ -338,7 +340,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band — the only line no guard acts on — is found only in a flat
-      // list, which holds no presented screen (ui-tree/presented-by-shape.ts#presentedOver: the holder is the root);
+      // list, which holds no presented screen (ui-tree/presentation.ts#presentedOver, the shape adapter's: the holder is the root);
       // the type still lets this kind carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin
       // its rendering.
       throw new CoveredRefusal(

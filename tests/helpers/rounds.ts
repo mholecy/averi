@@ -3,7 +3,6 @@ import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
-import { scrollStroke } from '../../src/interact/swipe.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { node } from './fake.js';
 
@@ -80,19 +79,20 @@ export interface Row {
 }
 
 /**
- * The stroke a row hands back when it names none: the driver's own points
- * for the step (swipe.ts#scrollStroke) — the step carries every fact the
- * points are made of, its box decided by the round (deep/r3-scroll), so
- * nothing here re-derives geometry; until then a stand-in built from the
- * step's shape, which could not see the driver's own judgement of the box
- * (the probe drawn off its container under the IME passed through it). A
- * row that means another stroke — one shorter than twice TOUCH_SLOP —
- * hands it in `drawn`.
+ * The stroke a row hands back when it names none: the step's own `points`,
+ * the ones the driver sends (interact/stroke-plan.ts makes them once, the
+ * touch-down question asked at them — A1 of the round-21 architecture pass),
+ * so nothing here re-derives geometry; before deep/r3-scroll a stand-in
+ * built from the step's shape, which could not see the driver's own
+ * judgement of the box (the probe drawn off its container under the IME
+ * passed through it), and until A1 the same points made again from the
+ * step. A row that means another stroke — one shorter than twice
+ * TOUCH_SLOP — hands it in `drawn`.
  */
 export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => {
-  const { box } = step;
-  if (box === undefined) throw new Error('drawnFor: a stroke step with no box (the round had no gesture box)');
-  return scrollStroke({ ...step, box });
+  const { points } = step;
+  if (points === undefined) throw new Error('drawnFor: a stroke step with no points (the round had no gesture box)');
+  return points;
 };
 
 /**
@@ -143,6 +143,13 @@ export interface Played {
   /** The stop, when a row ended the scroll (the last row must). */
   outcome: ScrollOutcome | undefined;
 }
+
+/** A step as the round decided it, a stroke's `points` aside (`drawnFor` reads those): what a test compares whole. */
+export const decided = (step: RoundStep): RoundStep => {
+  if (step.do !== 'stroke') return step;
+  const { points: _points, ...rest } = step;
+  return rest;
+};
 
 /** Play `rows` through `round` from `startRounds(rules, screen)`. Throws when a stop comes before the last row — a table with rows nobody reads is a wrong table. */
 export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonly Row[]): Played {

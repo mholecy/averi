@@ -1,5 +1,30 @@
 # BUG: under WDA, `scroll_until` for a row of a bounded scroll view strokes the SCREEN, touching down beside that scroll view — the stroke moves nothing it holds, and the reply then names the very scroll view it never swiped
 
+> **Status (2026-10-16):** fixed on branch `arch/r21-strokes` (from `debc9b2`); unmeasured on a device. The cause was
+> not the one inferred below: the target IS found (WDA lists O and F, `best` is judged), but the stroke's candidates
+> were its CLIPPING chain alone (ui-tree/geometry.ts#Clips.scrollersOf), and WDA marks no node as clipping — the chain
+> is empty for every node of a WDA tree, so every WDA stroke for a found target went over the screen box. The fix
+> (interact/scroll-rounds.ts#targetScrollers): the chain, else the ancestors that scroll on a tree of unclipped
+> frames (`Clips.drawnIn`'s `scrollers`, the very scroll view the reply names); and draw-order.ts#drawnOver now finds
+> its container among the nodes that SCROLL, not only those that clip, so what WDA draws over the scroll view (a
+> floating tab bar's items, a pinned button above the keyboard) cuts the stroke as it does on Android. Golden (vs
+> `debc9b2`): the three KNOWN rows turn green — `scroll-bounded.wda.json` O and F (strokes `201 524 → 416`, inside
+> `lower`) and `sheet-long-list-short.wda.json` F (`201 369 → 139`, inside the table); 18 other WDA `scroll_until`
+> rows keep their verdict and kind — 16 with their strokes now inside the target's scroll view (scroll-bounded P
+> fully, S, S fully; sheet-long-list F; tabbar-floating R, F; toolbar-dismiss-short and form-keyboard, five each), and
+> `sheet-medium-edges.wda.json` F and H with the same strokes and a reply that now names the sheet's container drawn
+> over the touch-down (`drawnOver` answers on WDA; still mismatches, the presented-sheet note's). idb, which lists no
+> scroll view, is unchanged (LE2): its strokes still go over the screen. The differential (corpus-r19) replays
+> `scroll_until` only `down`, `up` and `fully`: sideways WDA strokes, which now go inside a carousel, are unexercised.
+>
+> **Residual (handed to A1, the stroke plan):** the nearest scroll view is taken WHATEVER ITS AXIS. Account Detail's
+> card carousel (`24,138 354x85`), a card right of it scrolled for `down`: the stroke, the screen's `699 → 175`
+> before, is now `207 → 155` inside the carousel, and the exhausted reply names the transactions list drawn over that
+> touch-down (70 differential diffs, all failing after 2 swipes as before). On a device a cross-axis drag in a
+> carousel is usually handed to the outer scroller, so it would move the page about 51 pt a stroke — unmeasured.
+> Pinned as it is today in tests/interact/scroll-rounds.test.ts ("a card of a horizontal carousel, scrolled for
+> `down`").
+
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/scroll-bounded.*`, captured by scripts/truth/capture.ts on the dedicated
 `averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `truth/b2-edges` on `arch/round-20`'s
@@ -45,7 +70,7 @@ same line for `F` (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-pa
 The stroke drawn in the target's own scroll view (`lower`), as interact/swipe.ts#strokeRoom draws one in a container
 when it has a candidate: `lower` is 180 pt tall, above MIN_STROKE_BOX (80).
 
-## Cause (inferred from the source, not traced in full; not changed here)
+## Cause (as first inferred from the source; superseded by the cause found, in the status above)
 
 interact/scroll-rounds.ts#strokeCandidates takes the target's containers once they are known (`targetContainers`), else
 the tree's main scroller (`facts.mainScroller`), and with no candidate that has room `strokeRoom` returns undefined and

@@ -1,5 +1,17 @@
 # BUG: on iOS, after a fling carries the target past the screen's top, `scroll_until`'s turn-back strokes touch down above the list (in the header) and move nothing — four strokes, then "content exhausted"
 
+> **Status (2026-10-16):** fixed under WDA on branch `arch/r21-strokes` (from `debc9b2`), with LE4
+> (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, the same root: WDA's empty
+> clipping chain, see its status); unmeasured on a device. Every stroke for R — the turned one too — is now drawn over
+> `list` and cut above the tab bar's items WDA lists over it: replayed, `201 645 → 311` twice, then the turned
+> `201 335 → 537` (touch-down inside the list, below the header's 200). Not fixed under idb, which lists no scroll
+> view (LE2): its turned stroke still touches down at y 175. What the evidence can show: the static golden replays
+> one unmoving tree, so it never sees the fling and never turns on its own — its `tabbar-floating` rows show only that
+> the forward strokes moved into the list (the third, turned call above is the stuck turn's, not the fling's); the
+> differential replays recorded device trees the same way. The turn after a fling is pinned by a unit test
+> (tests/interact/scroll-rounds.test.ts, "a WDA target's strokes go over its own scroll view"); that it moves the
+> list on a device is for the live golden (scripts/truth/live.ts, case `scroll:tabbar-floating.R`).
+
 Lab note LV3. **Measured 2026-10-16** on the `averi-lab iPhone 17` simulator (iOS 27.0, 402x874), averi =
 `arch/round-20`'s `src/` (`debc9b2`), through the live golden (`scripts/truth/live.ts --udid … --groups visibility`,
 both tree sources), the lab app's `tabbar-floating` cell (fixtures/apps/ios/AveriLab/Bars.swift). The app's own scroll
@@ -28,7 +40,7 @@ The first stroke (touch-down at y 699, inside the list) flings the list 1080–1
 sees it and turns. Every turned stroke touches down at y 175: above the list's top (200), in the header, which scrolls
 nothing. Four strokes move nothing; the reply calls the content exhausted, with all of that offset to scroll back.
 
-## Cause (not changed here)
+## Cause (as first inferred; see the status above for the cause found)
 
 The strokes are the screen's default band (80 % ↔ 20 % of its height: 699 ↔ 175), turned by swapping its ends — not
 drawn inside the target's own scroll view, which WDA lists (`list`, 0,200 402x640). The same root as

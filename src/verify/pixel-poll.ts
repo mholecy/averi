@@ -1,12 +1,12 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { coverText, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
-import { readKeyboard } from '../ui-tree/keyboard-cover.js';
-import { keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
+import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
+import { lookOn, type Look } from '../ui-tree/look.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { outsideItsScrollView, presentedRemedy, sceneOf, type PixelRegionOf, type PixelStanding, type Remedy, type Scene } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -353,17 +353,18 @@ class PixelPollMemory {
 }
 
 /**
- * What lies over the element in this round, worded for the miss with its
- * remedy — or undefined when nothing does and the round may capture. The
- * keyboard first, its remedy (hide it) being no scroll: the round's reading
+ * What lies over the element in this round's look (ui-tree/look.ts#Look,
+ * one a round), worded for the miss with its remedy — or undefined when
+ * nothing does and the round may capture. The
+ * keyboard first, its remedy (hide it) being no scroll: the look's reading
  * (`readKeyboard`, ui-tree/keyboard-cover.ts — the adapter's oracle when it
  * has one, else the round's own tree, the element itself the subject),
  * asked `overlapping`, the fail-closed geometric question that never asks
  * the witness (the header says why); then the element's standing for the
  * pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on
  * the usable screen (`judgeOver`), given idb's band as its keyboard line
- * (ui-tree/keyboard-position.ts#KeyboardPosition.line — no reading stands by it:
- * idb's reading is `unknown`), so an element its band meets is the same
+ * (the look's ui-tree/keyboard-position.ts#KeyboardPosition.line — no reading
+ * stands by it: idb's reading is `unknown`), so an element its band meets is the same
  * keyboard miss, quoting the band, and its keys are no covers named
  * instead. `reads`: what the measurement reads (`PixelPollSpec.reads`; the
  * whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert);
@@ -384,20 +385,15 @@ class PixelPollMemory {
  * of idb's band itself (a key) is the keyboard's own UI, measured.
  */
 export async function overElement(
-  adapter: Pick<DeviceAdapter, 'viewport' | 'keyboard' | 'keyboardAdvice'>,
-  tree: UiNode,
+  adapter: Pick<DeviceAdapter, 'viewport'>,
+  look: Look,
   element: UiNode,
-  {
-    reads = (rect) => rect,
-    glyphs = false,
-    scene = sceneOf(tree),
-    judgedOn = () => {},
-  }: { reads?: PixelRegionOf; glyphs?: boolean; scene?: Scene; judgedOn?: (screen: UsableScreen) => void } = {},
+  { reads = (rect) => rect, glyphs = false, judgedOn = () => {} }: { reads?: PixelRegionOf; glyphs?: boolean; judgedOn?: (screen: UsableScreen) => void } = {},
 ): Promise<string | undefined> {
-  const keyboard = readKeyboard(adapter, tree);
-  const frame = await keyboard.overlapping(element.rect, element);
-  if (frame !== undefined) return keyboardOver(element.rect, frame, keyboard.remedy);
-  return judgeOver(adapter, tree, element, { reads, glyphs, scene, judgedOn, keyboard: { line: keyboardPosition(scene.order).line(element), remedy: keyboard.remedy } });
+  const { reading } = look;
+  const frame = await reading.overlapping(element.rect, element);
+  if (frame !== undefined) return keyboardOver(element.rect, frame, reading.remedy);
+  return judgeOver(adapter, look, element, { reads, glyphs, judgedOn, keyboard: { line: look.keyboard.line(element), remedy: reading.remedy } });
 }
 
 /**
@@ -446,8 +442,8 @@ const hideKeyboard = ({ dismissal, advice }: KeyboardRemedy): string =>
  * in which order), worded — a system band (the status bar's, then the
  * navigation bar's), the navigation bar's possible cut, then the app's own
  * covers, or undefined when nothing is over it (it fails closed, ADR
- * 0001). The screen is the usable screen's single `oriented` box
- * (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; the
+ * 0001). The screen is the usable screen's single `oriented` box, of the
+ * look's tree (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; the
  * pixel purpose picks it, ui-tree/standing.ts#Scene; D6, ADR 0012), with
  * the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#treeScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
@@ -501,11 +497,12 @@ const hideKeyboard = ({ dismissal, advice }: KeyboardRemedy): string =>
  */
 async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
-  tree: UiNode,
+  look: Look,
   element: UiNode,
-  { reads, glyphs, scene, judgedOn, keyboard }: { reads: PixelRegionOf; glyphs: boolean; scene: Scene; judgedOn: (screen: UsableScreen) => void; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, judgedOn, keyboard }: { reads: PixelRegionOf; glyphs: boolean; judgedOn: (screen: UsableScreen) => void; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
-  const usable = (await usableScreen(adapter, { tree })) ?? treeScreen(tree);
+  const { scene } = look;
+  const usable = (await usableScreen(adapter, look)) ?? treeScreen(look.tree);
   judgedOn(usable);
   // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelRegionOf).
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
@@ -526,7 +523,7 @@ async function judgeOver(
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
-      // screen (ui-tree/presented-by-shape.ts#presentedOver: the holder is the root); the type still lets this kind
+      // screen (ui-tree/presentation.ts#presentedOver, the shape adapter's: the holder is the root); the type still lets this kind
       // carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin its rendering.
       return `${keyboardCovers(element.rect, standing.band)} — ${advice(standing.remedy, () => hideKeyboard(keyboard.remedy))}`;
     case 'systemBar': {
@@ -679,15 +676,15 @@ export async function pollPixels(
     const { rect } = found[0];
     const previous = memory.foundAt(rect);
     if (memory.outOfTime(deadline)) return undefined;
-    // The keyboard, then the system bands and what of the app is drawn over it — never a measurement.
-    const scene = sceneOf(tree);
+    // The keyboard, then the system bands and what of the app is drawn over it — never a measurement: one look a round.
+    const look = lookOn(adapter, tree);
     // One screen for the judge and the sampler: the one the standing was judged on (`judgedOn`), of which both ask THE
     // region (ui-tree/standing.ts#Scene.pixelRegion). Read where the judge reads it, after the keyboard: no extra device read.
     let screen: UsableScreen | undefined;
     const judgedOn = (s: UsableScreen): void => {
       screen = s;
     };
-    const over = await overElement(adapter, tree, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, scene, judgedOn });
+    const over = await overElement(adapter, look, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, judgedOn });
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
@@ -701,7 +698,7 @@ export async function pollPixels(
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
     // Measured on THE region the standing judged over (Scene.pixelRegion): the part its scroll views draw.
-    const verdict = await measure({ rect: scene.pixelRegion(found[0], screen), shot, measured });
+    const verdict = await measure({ rect: look.scene.pixelRegion(found[0], screen), shot, measured });
     // A failure no later round can change leaves the poll at once, as a refused capture does.
     if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;

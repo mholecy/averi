@@ -8,9 +8,8 @@ import type { UiNode } from '../adapters/types.js';
  * - `clips` — the tree source cut this node's descendants' rects to its own
  *   (`UiNode.clipsDescendants`). A fact about RECT TRUTHFULNESS: it is what
  *   makes a clip chain, a flush edge and a sliver's evidence
- *   (geometry.ts#clipsOf), the largest scroller (geometry.ts#largestScroller)
- *   and the container a drawn-over question names
- *   (draw-order.ts#DrawOrder.drawnOver). Only Android supplies it; iOS
+ *   (geometry.ts#clipsOf) and the largest scroller (geometry.ts#largestScroller).
+ *   Only Android supplies it; iOS
  *   frames are unclipped, so no iOS node clips and no iOS clip chain is
  *   invented. Not what marks a tree's frames unclipped: the source says
  *   that on the root (UiNode.unclippedFrames, geometry.ts#Clips.drawnIn) —
@@ -31,7 +30,10 @@ import type { UiNode } from '../adapters/types.js';
  *   is DRAWN: its frame cut by every ancestor that scrolls
  *   (geometry.ts#Clips.drawnIn — a scroll view draws none of its content
  *   outside its frame, while the tree lists that content at its laid-out
- *   rect).
+ *   rect) — and so the scroll views a WDA target's strokes go over
+ *   (interact/stroke-plan.ts#targetScrollers). And the container a
+ *   drawn-over question names (draw-order.ts#DrawOrder.drawnOver): a
+ *   clipping scroller on Android, a scroll view on WDA.
  *
  * So `clips(n) ⇒ scrolls(n)`, never the other way. One predicate would
  * either give iOS clip chains that do not exist or take scrolling away from

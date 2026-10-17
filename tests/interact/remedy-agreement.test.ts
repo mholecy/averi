@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { keyboardPosition, type KeyboardLine, type KeyboardPosition } from '../../src/ui-tree/keyboard-position.js';
+import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
+import { lookAt, lookOn } from '../../src/ui-tree/look.js';
 import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
-import type { MarkedLayer } from '../../src/ui-tree/draw-order.js';
+import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
@@ -20,9 +21,10 @@ import { node } from '../helpers/fake.js';
 // (verify/pixel-poll.ts) and scroll_until's stop (interact/scroll-rounds.ts). A table over the trees with a presented
 // screen: each verb's answer for the same target names the same remedy.
 
-// The pixel assert reads idb's band from the tree's own draw order (ui-tree/keyboard-position.ts#keyboardPosition), which
-// finds one only in idb's flat list, where no screen reads as presented over another: `idbLine` stands in for that
-// band, so the pixel assert's keyboard branch beneath a presented screen can be asked at all.
+// The tap and the pixel assert read idb's band from the look's keyboard position (ui-tree/look.ts#Look.keyboard, over
+// ui-tree/keyboard-position.ts#keyboardPosition), which finds one only in idb's flat list, where no screen reads as
+// presented over another: `idbLine` stands in for that band, so either verb's keyboard branch beneath a presented
+// screen can be asked at all.
 const { idbLine } = vi.hoisted(() => ({ idbLine: { value: undefined as { y: number; witnessed: boolean } | undefined } }));
 vi.mock('../../src/ui-tree/keyboard-position.js', async (orig) => {
   const real = await orig<typeof import('../../src/ui-tree/keyboard-position.js')>();
@@ -82,14 +84,13 @@ const ON_PIXEL: On = {
 };
 
 /**
- * The tap's refusal of `target` on `tree` (or its point), as the guard's clear path judges it. `position`: the keyboard
- * position to judge with — by default the tree's own, over a reading that sees no keyboard.
+ * The tap's refusal of `target` on `tree` (or its point), as the guard's clear path judges it: the look of the tree
+ * over a reading that sees no keyboard, its position the tree's own (or `idbLine`'s).
  */
-async function tapSaid(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE, position?: KeyboardPosition): Promise<string> {
-  const scene = sceneOf(tree);
-  const reading = { ofKeyboard: () => false, cover: async () => undefined, corroborated: async () => false };
+async function tapSaid(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE): Promise<string> {
+  const look = lookAt(tree, { ofKeyboard: () => false, cover: async () => undefined, corroborated: async () => false, remedy: NONE });
   try {
-    const judge = await judgeTap({ viewport: async () => device }, 'id:t', { node: target, tree, scene }, usable, { position: position ?? keyboardPosition(scene.order, reading), remedy: NONE });
+    const judge = await judgeTap({ viewport: async () => device }, 'id:t', { node: target, look }, usable);
     return JSON.stringify(await judge.aim());
   } catch (e) {
     return (e as Error).message;
@@ -98,11 +99,11 @@ async function tapSaid(tree: UiNode, target: UiNode, { device, usable }: On = ON
 
 /** The pixel assert's miss for `target` (an ocr assert: the whole rect read). */
 const pixelSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE): Promise<string | undefined> =>
-  overElement({ viewport: async () => device, keyboard: undefined, keyboardAdvice: 'ADV' }, tree, target, { glyphs: true });
+  overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { glyphs: true });
 
 /** The pixel assert's miss for `target` as a colour assert reads it: the sample rect (verify/color-parity.ts#colorSampleRect). */
 const colourSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE): Promise<string | undefined> =>
-  overElement({ viewport: async () => device, keyboard: undefined, keyboardAdvice: 'ADV' }, tree, target, { reads: colorSampleRect, glyphs: false });
+  overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { reads: colorSampleRect, glyphs: false });
 
 /** scroll_until's outcome for `target`: two reads of the same tree, the status band known. */
 function stopOf(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE) {
@@ -254,17 +255,25 @@ describe('presented first over a cut and over the soft keyboard — each verb\'s
     return { tree: beneathDim(BOX, [node({ role: 'scrollable', rect: { ...BOX }, children: [target] })], dimmed), target };
   };
   const BAND: KeyboardLine = { y: 524, witnessed: false };
-  const bandPosition: KeyboardPosition = { line: () => BAND, readingLine: async () => undefined, owns: () => false };
+  /** The tap's refusal with idb's band standing in at `BAND` (`idbLine`). */
+  const tapUnderBand = async (tree: UiNode, target: UiNode): Promise<string> => {
+    idbLine.value = BAND;
+    try {
+      return await tapSaid(tree, target);
+    } finally {
+      idbLine.value = undefined;
+    }
+  };
   const UNDER = "id:t is under the soft keyboard: its centre (201,530) lies below the keyboard's top edge at y 524, where a tap presses the keyboard";
 
   it('a tap whose centre lies under the keyboard\'s band, the part above it beneath a dim: the keyboard named, the presented screen\'s remedy in place of hiding it', async () => {
     const { tree, target } = underBand(true);
-    expect(await tapSaid(tree, target, ON_IPHONE, bandPosition)).toBe(`${UNDER} — ${PRESENTED_OVER}; nothing was tapped`);
+    expect(await tapUnderBand(tree, target)).toBe(`${UNDER} — ${PRESENTED_OVER}; nothing was tapped`);
   });
 
   it('…and with no dim, scroll it or hide the keyboard', async () => {
     const { tree, target } = underBand(false);
-    expect(await tapSaid(tree, target, ON_IPHONE, bandPosition)).toMatch(new RegExp(`^${UNDER.replace(/[()]/g, '\\$&')} — scroll_until it first, or hide the keyboard`));
+    expect(await tapUnderBand(tree, target)).toMatch(new RegExp(`^${UNDER.replace(/[()]/g, '\\$&')} — scroll_until it first, or hide the keyboard`));
   });
 
   it('a pixel assert on an element idb\'s band meets, beneath a dim: the keyboard named, the presented screen\'s remedy in place of hiding it', async () => {
@@ -586,7 +595,7 @@ describe('a target beneath an alert — the tap, the pixel assert and scroll_unt
     field.rect = { x: 24, y: 1200, width: 354, height: 52 };
     expect(await tapSaid(tree, field)).toBe(`id:t is off screen at (201,1226) on a 402x874 screen (rect 24,1200 354x52) — ${CLOSE_IT}; nothing was tapped`);
     expect(failureOf(stopOf(tree, field), 'id:t').message).toBe(
-      `scroll_until id:t stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on ${ALERT} — ` +
+      `scroll_until id:t stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,331) on ${ALERT} — ` +
         `${CLOSE_IT}, and a swipe would land on the alert, so none was sent. Last rect {"x":24,"y":1200,"width":354,"height":52} in a 402x874 viewport`,
     );
   });

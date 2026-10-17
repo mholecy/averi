@@ -1,10 +1,12 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
-import { coverLine, keyboardPosition, type KeyboardLine } from '../ui-tree/keyboard-position.js';
+import { coverLine, type KeyboardLine } from '../ui-tree/keyboard-position.js';
+import { lookAt, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, farEdgeFrames, sceneOf, type Scene, type Standing, type StandingScreen, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
+import { bandRect, farEdgeFrames, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
+import type { UsableScreen } from '../ui-tree/usable-screen.js';
 
 /**
  * What ONE read of the screen means for `scroll_until`: `judgeRead(read,
@@ -82,28 +84,25 @@ export interface RoundRead {
   remedy: KeyboardRemedy;
 }
 
-/** What the round asks of a tree that read — derived by `factsOf` (`judgeRead`), never handed in. */
-export interface TreeFacts {
-  /**
-   * The tree's scene (ui-tree/standing.ts#sceneOf), once a round: the
-   * judgement (`judge`, `Scene.standing`); a match's clipping ancestors,
-   * nearest first (`clips.scrollersOf`) — Android's scroll containers, to
-   * whose edges uiautomator has already cut the match's bounds; empty when
-   * it has none (every node of an iOS tree) — for the `fully: true` stop's
-   * flush check (PROBE_REACH) and the box the strokes are drawn in
-   * (swipe.ts#strokeRoom); what is drawn OVER a clipping container (the
-   * floating tab bar) — `order.drawnOver`, what a stroke over it keeps
-   * clear of (swipe.ts#strokeRoom cuts the box above them), and
-   * `order.drawnOverAt`, the one a stroke that still touched down on it
-   * names (`touchedOn`), asked of the rects `clips.scrollersOf` and
-   * `mainScroller` give, undefined when this tree has no container with
-   * that rect (one remembered from an earlier read: the list has moved
-   * since), never any on iOS, which has no clipping container; and idb's
-   * keyboard band (ui-tree/keyboard-position.ts#KeyboardPosition.line over `order`),
-   * the line the strokes stay above (`strokeLine`) and the round judges
-   * under (`bandCoverOf`).
-   */
-  scene: Scene;
+/**
+ * What the round asks of a tree that read — derived by `factsOf` (`judgeRead`), never handed in: the read's LOOK
+ * (ui-tree/look.ts#Look, with the round's synchronous reading facts, `RoundRead.ofKeyboard`) and the scroll's own facts
+ * of the tree. Of the look:
+ * - its `scene`, once a round: the judgement (`judge`, `Scene.standing`); a match's clipping ancestors, nearest first
+ *   (`clips.scrollersOf`) — Android's scroll containers, to whose edges uiautomator has already cut the match's
+ *   bounds; empty when it has none (every node of an iOS tree) — for the `fully: true` stop's flush check
+ *   (PROBE_REACH) and the box the strokes are drawn in (interact/stroke-plan.ts#planStroke); what is drawn OVER a
+ *   clipping container (the floating tab bar) — `order.drawnOver`, what a stroke over it keeps clear of
+ *   (stroke-plan.ts#strokeRoom cuts the box above them), and `order.drawnOverAt`, the one a stroke that still touched
+ *   down on it names (stroke-plan.ts#touchedOn), asked of the rects `clips.scrollersOf` and `mainScroller` give,
+ *   undefined when this tree has no container with that rect (one remembered from an earlier read: the list has moved
+ *   since), never any on iOS, which has no clipping container;
+ * - its `keyboard` position: idb's keyboard band (`line`), the line the strokes stay above (`strokeLine`) and the round
+ *   judges under (`bandCoverOf`), and which nodes are the keyboard's own (`owns`: the reading's `ofKeyboard`, idb's
+ *   band's nodes), judged against the whole screen. The reading's line is the round's protocol's (`coverOf`), never
+ *   the position's: the look holds no `cover` to ask.
+ */
+export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
   /**
    * The largest clipping container (ui-tree/geometry.ts#largestScroller) —
    * the screen's own scroll view, for a stroke while the target's own
@@ -133,8 +132,8 @@ export interface TreeFacts {
 }
 
 /**
- * `TreeFacts` of a tree: the scene's draw order and clip facts (each
- * derived on first use), the largest scroller, the fingerprint, the
+ * `TreeFacts` of a read: its look (the scene's draw order and clip facts and
+ * the keyboard position, each derived on first use), the largest scroller, the fingerprint, the
  * progress check and the sheet's detent. Derived ONCE per `judgeRead` — once per call of
  * scroll-rounds.ts#round that read — BEFORE the judgement, and handed to it
  * and along (`ReadJudgement.facts`, which the round keeps for the steps
@@ -147,9 +146,18 @@ export interface TreeFacts {
  * on a round that then asks for the witness too, a pure walk of an
  * in-memory tree beside a device read.
  */
-function factsOf(tree: UiNode): TreeFacts {
+function factsOf({ tree, ofKeyboard }: Pick<RoundRead, 'tree' | 'ofKeyboard'>): TreeFacts {
+  const look = lookAt(tree, { ofKeyboard });
+  // The look's members through getters: derived on first use, as the look derives them (a spread would evaluate them).
   return {
-    scene: sceneOf(tree),
+    tree,
+    reading: look.reading,
+    get scene() {
+      return look.scene;
+    },
+    get keyboard() {
+      return look.keyboard;
+    },
     mainScroller: largestScroller(tree),
     fingerprint: treeFingerprint(tree),
     loading: showsProgress(tree),
@@ -240,7 +248,7 @@ export interface ReadJudgement {
  * answer, on the round's re-entry) is not given yet. The module doc has
  * the rule.
  */
-export function judgeRead(read: RoundRead, screen: StandingScreen, fully: boolean, corroborated?: boolean): { ask: 'witness' } | ReadJudgement {
+export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean, corroborated?: boolean): { ask: 'witness' } | ReadJudgement {
   const viewport = screen.box;
   const { found } = read;
   // The stop's purpose, mapped from the tool's flag once (ui-tree/standing.ts#TouchPurpose).
@@ -253,11 +261,12 @@ export function judgeRead(read: RoundRead, screen: StandingScreen, fully: boolea
   // (ui-tree/draw-order.ts) — the judgement's covers, and the stroke's —
   // each match's clipping ancestors, for the plain stop's sliver rule
   // (`stops`), and the rest the round's steps after the judgement read.
-  const facts = factsOf(read.tree);
+  const facts = factsOf(read);
   const whole = judgeOver(found, screen, facts, stop);
-  // Where the keyboard lies on this read (ui-tree/keyboard-position.ts): idb's band from the scene's draw order, and
-  // which nodes are the keyboard's own — the read's `ofKeyboard`; the reading's line is the round's protocol's (`coverOf`).
-  const position = keyboardPosition(facts.scene.order, { ofKeyboard: read.ofKeyboard });
+  // Where the keyboard lies on this read (the look's position, ui-tree/keyboard-position.ts): idb's band from the scene's
+  // draw order, and which nodes are the keyboard's own — the read's `ofKeyboard`; the reading's line is the round's
+  // protocol's (`coverOf`).
+  const position = facts.keyboard;
   // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
   const band = offered !== undefined ? undefined : bandCoverOf(position.line(), viewport, read.remedy);
   const applied = offered ?? band;
@@ -328,20 +337,20 @@ function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { 
 const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined => (y <= 0 ? undefined : { width: viewport.width, height: y });
 
 /**
- * The top edge a stroke is kept above (swipe.ts#strokeRoom's `coverTop`):
- * the keyboard line (ui-tree/keyboard-position.ts#KeyboardPosition.line) of the applied
- * cover's line and idb's band (`TreeFacts.scene`'s draw order) — the band
+ * The top edge a stroke is kept above (stroke-plan.ts#strokeRoom's `coverTop`):
+ * the keyboard line (the read's look's ui-tree/keyboard-position.ts#KeyboardPosition.line) of the applied
+ * cover's line and idb's band (`TreeFacts.keyboard`) — the band
  * whether or not the round applied it (a moot band changes no judgement,
  * but a stroke on it touches a key: the Contacts form and the SWIFT form's
  * number pad were stroked from y 699).
  * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
  * No guard on where the band lies in the gesture box: a top at or below
- * the box's bottom changes no stroke (swipe.ts#strokeRoom and swipeVectorAbove keep the whole box — pinned in
+ * the box's bottom changes no stroke (stroke-plan.ts#strokeRoom and swipe.ts#swipeVectorAbove keep the whole box — pinned in
  * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
  * the band starts below the top bar's line, a fifth of the screen down.
  */
-export function strokeLine(cover: Cover | undefined, facts: Pick<TreeFacts, 'scene'>): KeyboardLine | undefined {
-  return keyboardPosition(facts.scene.order).line(undefined, cover?.line);
+export function strokeLine(cover: Cover | undefined, facts: Pick<TreeFacts, 'keyboard'>): KeyboardLine | undefined {
+  return facts.keyboard.line(undefined, cover?.line);
 }
 
 /**
@@ -362,7 +371,7 @@ export function strokeLine(cover: Cover | undefined, facts: Pick<TreeFacts, 'sce
  */
 function judge(
   found: readonly UiNode[],
-  frame: StandingScreen,
+  frame: UsableScreen,
   facts: Pick<TreeFacts, 'scene'>,
   stop: StopOf,
   cover?: { cover: Cover; owns: (node: UiNode) => boolean },
@@ -376,7 +385,7 @@ function judge(
 }
 
 /** The whole-screen judgement over every box that counts (`UsableScreen.boxes`): the best-revealed match in any — "either way up" when there are two. */
-function judgeOver(found: readonly UiNode[], frame: StandingScreen, facts: Pick<TreeFacts, 'scene'>, stop: StopOf): Judged | undefined {
+function judgeOver(found: readonly UiNode[], frame: UsableScreen, facts: Pick<TreeFacts, 'scene'>, stop: StopOf): Judged | undefined {
   return frame.boxes
     .map((box) => judge(found, { ...frame, box }, facts, stop))
     .reduce<Judged | undefined>((best, j) => (j !== undefined && (best === undefined || better(j, best) < 0) ? j : best), undefined);

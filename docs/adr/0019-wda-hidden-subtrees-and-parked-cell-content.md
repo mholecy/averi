@@ -92,7 +92,9 @@ presentation hides the presenting screen from accessibility, and where idb and u
 tree, WDA lists it whole with every node `isVisible="0"`. The parser now reads that fact once, for the LAYER
 (`adapters/wda-source.ts#presentedScreen`): a Window's first screen-sized layer with visible content on the screen,
 laid after screen-sized content layers of the same Window every node of which reads `isVisible="0"`, is marked
-presented (`UiNode.presentation` `screen`); draw order covers the screen beneath through it (ADR 0018).
+presented (`UiNode.presentation` `screen`) — or, in the app's Window with no content layer after them, its first
+screen-sized layer with no content whose frames below it show on the screen (since 2026-10-16: ADR 0018's "Amendment:
+a presented layer of only empty frames"); draw order covers the screen beneath through it (ADR 0018).
 
 - **What it reads, and what it never reads.** A whole layer's flags AND a visible later layer beside it — the two
   together, corroboration, never one flag alone. Never one node's flag (residual 2: `isVisible` alone is no geometric
@@ -104,8 +106,9 @@ presented (`UiNode.presentation` `screen`); draw order covers the screen beneath
 - **Decision 1's guard.** "Except a node that is the surface of a screen presented over the target's
   (`presentedSurface`)" now holds only on a tree whose source did not judge presented layers (no
   `UiNode.presentationsJudged` on its root — for `hidden`, which only a flagged payload sets, a snapshot printed before
-  the marks): there the surface is the shape fallback's (`presented-by-shape.ts#PresentedByShape.presentedSurface`). On
-  a judged tree no hidden node is excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover,
+  the marks): there the surface is the shape fallback's (`presentedSurface`; since 2026-10-16 in
+  `presentation.ts#byShape`, named `inferred` by `presentation.ts#PresentedOver`). On a judged tree no hidden node is
+  excepted. The guard's reason — the sheet's `Table`, `0/0` under the discard popover,
   must still cover the list beneath — holds by the mark instead: a marked layer covers the screen beneath through its
   own cover, which no row excuses, whatever its hidden nodes. Reading the marks in the guard (a hidden node of a marked
   layer covering as before) was measured and not taken: 36 replies on the three expanded country-sheet trees, wording

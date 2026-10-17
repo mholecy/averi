@@ -24,7 +24,13 @@ review): the presented layer is the tree source's fact — the WDA parser marks 
 and a marked layer covers what lies outside it through the whole screen; the Decision's conditions and the amendment
 "a labelled dim" are the fallback for a tree whose source did not judge presented layers; residuals 1, 2, 5 (iOS),
 6, 8 and 11 closed for WDA, 7 partly (a layer of only empty frames stands), 3, 4, 9 and 10 stand, 12–16 added (see
-"Amendment: the presented layer is the source's fact" below).
+"Amendment: the presented layer is the source's fact" below). Amended again 2026-10-16 (round 5 of phase 3, the lab
+finding L3): in the app's Window, a layer of only empty frames whose frames show on the screen, after the wholly
+invisible screen beneath, is the presented one when no content layer follows — residual 7 closed for WDA for that
+shape, standing for a bare frame and the rest (see "Amendment: a presented layer of only empty frames" below).
+Amended again 2026-10-16 (round 5 of phase 3, architecture step A2): where the rules live — the one reader of the
+marks and the shape fallback are adapters of one presentation module, `ui-tree/presentation.ts`; no decision changes
+(see "Amendment: one presentation module" below; the code pointers of the earlier sections name the new places).
 
 ## Context
 
@@ -53,11 +59,12 @@ layer's own surface.
 ## Decision
 
 (Since 2026-10-15 this Decision, its three conditions and the amendment "a labelled dim" are the FALLBACK, asked only
-of a tree whose source did not judge presented layers: `ui-tree/presented-by-shape.ts`. On a judged tree the
+of a tree whose source did not judge presented layers: since 2026-10-16 the presentation module's shape adapter,
+`ui-tree/presentation.ts#byShape` (until then `ui-tree/presented-by-shape.ts`). On a judged tree the
 presented layers are the ones the source marks — "Amendment: the presented layer is the source's fact".)
 
 A node on a screen PRESENTED over the target's covers the target — through its own surface — when it is a surface that
-draws its whole rect (`presented-by-shape.ts#givesWay`, the owner's option (a) on the review of the slice):
+draws its whole rect (`givesWay`, in `presentation.ts#byShape`; the owner's option (a) on the review of the slice):
 
 - in `structural`: a structural LEAF (no children) that FILLS THE SCREEN — the RN Modal's dimming root `forgot_overlay`;
   a smaller leaf stays excused (every unmapped Android leaf is an `other`, every RN View leaf under WDA too: an icon's
@@ -244,8 +251,8 @@ predicate answers for it unchanged.
 
 Decision: before EVERY stroke, for a target the read holds and has not judged in the viewport — wholly off it, under
 the soft keyboard, clipped or cut to a sliver, its centre under a system bar, or short of the stop under a node of its
-own screen — `scroll_until` asks where the stroke would touch down (`swipe.ts#scrollStroke`'s `from`, the driver's
-own point for that stroke: its container's box, above the keyboard line) and whether a surface of a screen presented
+own screen — `scroll_until` asks where the stroke would touch down (`stroke-plan.ts#planStroke`'s points' `from`, the
+driver's own point for that stroke — since 2026-10-16 the very points it sends: its container's box, above the keyboard line) and whether a surface of a screen presented
 over the target's lies there (`draw-order.ts#DrawOrder.presentedAt`: the last node after the target holding the point
 that draws over it as a target — the `target` column, as `exposure` asks first — and is a presented surface over its
 screen, `presentedSurface`, every condition above and the labelled-dim amendment unchanged). If one does, the round
@@ -407,7 +414,8 @@ Decision (Q1 (D)): a layer that holds a WDA `Alert` is a PRESENTED LAYER that co
 regardless of node frames — bare dim leaf or not, a same-frame `Toolbar` of the form included. The fact is the
 ADAPTER'S, not a shape's: `adapters/wda-source.ts#PRESENTATIONS` marks the `Alert` element (`UiNode.presentation:
 "alert"`; its role stays `container`) — the one place a source says a layer is presented, built so that a later
-decision may mark other presentations there, alerts only now. Draw order reads the mark (`draw-order.ts#markedLayers`):
+decision may mark other presentations there, alerts only now. Draw order reads the mark (since 2026-10-16 through the
+presentation module's marks adapter, `presentation.ts#byMarks`):
 the marked element covers every node drawn before it — not its ancestors, nor its own subtree — with its reach the
 whole screen, drawn whatever the rows say; it is the layer's ONE cover (what else its layer holds — the dim, the empty
 frame, the alert's texts and backdrop leaves — is drawn on it and no cover of its own), and that screen's surface
@@ -509,7 +517,8 @@ What the flags rule reads (Q3): a whole LAYER's flags AND a visible later layer 
 flag alone; never one node's flag (ADR 0019's residual 2: `isVisible` alone is no geometric truth) and never the
 target's own. No shape corroboration is asked. `ui_snapshot` prints all three fields, as it prints `hidden`.
 
-**Draw order reads the marks** (`draw-order.ts#markOf`, the one reader; `markedLayers`): a marked layer covers what
+**Draw order reads the marks** (the one reader, then `draw-order.ts`'s `markOf`; since 2026-10-16
+`presentation.ts#markOf`, in the marks adapter `byMarks`, which draw order asks): a marked layer covers what
 lies OUTSIDE it and is drawn before it — never a layer holding the target, nor one inside it, nor the keyboard's own
 nodes — through the whole screen, whatever the frames around it, for every question but `drawnOver`. So a layer's own
 nodes are never beneath it: `tap id:"PopoverDismissRegion"`, the popover's own dim and the way to close it, stays
@@ -533,8 +542,9 @@ false refusals on the five popover trees). How each kind covers:
 
 **The shape rule is the fallback (Q1).** The Decision's three conditions and the amendment "a labelled dim" —
 `presentedOver`, `givesWay`, `presentedSurface`, the frame rows' `overPresented` / `surfaceCandidate`, and the `hidden`
-row's guard (ADR 0019) — live in ONE module, `ui-tree/presented-by-shape.ts`, which `draw-order.ts#drawOrder` builds
-only for a tree whose root is not `presentationsJudged`: Android's uiautomator tree, idb's flat list (where it never
+row's guard (ADR 0019) — live in ONE module (then `ui-tree/presented-by-shape.ts`; since 2026-10-16 the shape adapter
+of the presentation module, `presentation.ts#byShape`), which is built only for a tree whose root is not
+`presentationsJudged`: Android's uiautomator tree, idb's flat list (where it never
 holds), a WDA payload with no flags, and every snapshot printed before the marks — the normalized trees in the tests'
 fixtures and in the corpus. A judged tree never reaches it: there the marked layers are the presented ones, and a later
 screen-sized layer the source did not mark presents nothing. What both read of a node's place (`Placed`, `holderOf`,
@@ -589,7 +599,7 @@ alert, and a non-modal sheet.
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
 | 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands |
-| 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **stands** for a layer of only empty frames: the flags rule skips a layer with no non-structural element, so it is not marked | stands |
+| 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
 | 10 a strip with no node at a list's bottom | stands (no presentation) | stands |
@@ -611,6 +621,104 @@ Residuals 12–17 below are this amendment's. Risks, none measured (the device p
 - **A lingering dismissed layer**: guarded by "visible content ON the screen" (a leftover parked at y 874 marks
   nothing; pinned on a synthetic tree); a leftover WDA kept visible on the screen over a beneath still `0` would be
   marked.
+
+## Amendment: a presented layer of only empty frames (2026-10-16)
+
+The lab's ground truth (phase 3, `presented/sheet-medium-edges`, fixtures/apps/ios/AveriLab/Presented.swift#ScrolledHost)
+found residual 7's standing part as a regression: a SwiftUI medium sheet with no content of its own, presented over a
+`ScrollView` scrolled 200 pt down. WDA lists the host's layer wholly `isVisible="0"` and the sheet's layer after it
+shown — `dismiss popup` (`-402,-874 1206x2622`) and the card (`8,415 386x451`) as nested `Other`s, every one `1`, no
+element of a non-structural role. The flags rule walked past that layer as one with no content, so nothing was marked;
+the root is `presentationsJudged`, so the shape rule, which had read the labelled dim as the sheet's surface (the
+amendment "a labelled dim"), was not asked either, and the five targets beneath — above the screen, under the status
+bar, a 5-pt sliver at the bottom, wholly off it below, whole under the dim — got scroll or status-bar advice and
+`scroll_until` stroked onto the sheet (15 golden rows red from the amendment "the presented layer is the source's fact",
+41c394a; green from 753b560 to 20b800a). Adding one visible `Button` to the sheet's card in a copy of the tree marks the
+layer and turns them back: the scrolled host is not the cause, the empty sheet is.
+
+**Decision: the hidden layer beneath is the fact; content only picks which later layer is presented.** In
+`wda-source.ts#presentedScreen`, in the APP's Window (the payload's first — measured: the first Window in every corpus
+payload, 89 of 89 shown, holding every mark), when a layer wholly `0` was walked past and NO content layer follows it in
+the Window, the first screen-sized layer after it that has no content and SHOWS — some element BELOW it, a child or
+deeper, never the layer itself, `isVisible="1"` and sharing area with the Window — is marked `screen`. A bare shown leaf
+presents nothing: Contacts' sheet with the keyboard up (corpus run16-ios/contacts-sheet-keyboard-wda.json) ends its
+Window with `Other 0,0 402x874`, shown, no children, after its marked sheet — read as the layer itself it would be
+marked wherever no content layer came first, a false "close it first" on every tap. Nor does a layer whose shown frames
+all lie off the Window. Everything else is as decided: a content layer after the beneath is still the one marked, even
+with an empty layer between them; a content layer neither hidden nor shown (a leftover parked off the screen) still
+marks nothing; an empty layer with no wholly `0` layer before it, or one nothing of which shows, marks nothing. The rule
+still reads a whole layer's flags and a visible later layer beside it — the corroboration Q3 asked for — never one
+node's flag; what changed is only that the later layer need not hold a button. Draw order is unchanged: a `screen`
+layer's own nodes stay covers judged by the rows, so the labelled `dismiss popup` is named over the whole target (`M`),
+and the anonymous layer where nothing of it draws.
+
+Not taken: asking the shape rule on a judged tree whose layers the source marked none of (the suspect first named:
+`presentationsJudged` switching the fallback off wholesale). It would ask the shape again of every judged tree on which
+the source marked nothing — Safari's capsule layer, the pass-through shapes of residual 1 — where the source's silence
+is the answer, and here the source already holds the fact: the beneath reads wholly `0`.
+
+New risk, beside "a lingering dismissed layer": an EMPTY layer WDA keeps shown on the screen after a dismissal, over a
+beneath still `0`, is now marked — a false refusal while the beneath reads hidden, as for a content leftover.
+
+Why the app's Window only: the keyboard's and the input host's Windows read wholly `0` while the keyboard is down, and
+are then not the keyboard's Windows the search skips (`keyboardMarks`' roots). Over corpus-r19's 58 raw WDA payloads,
+57 later Windows (on 44 payloads) read their first layer wholly `0`; 56 hold that layer alone, and the one with a layer
+after it (contacts-sheet-keyboard's input host) has a hidden layer of `Other`s only, no beneath. So none was marked by
+the rule even unlimited, but a shown empty layer appearing there during a keyboard transition would be marked a
+presented screen in a Window drawn over the app's whole screen. Limiting the rule to the first Window costs nothing on
+the corpus and the lab (every `screen` mark of the corpus is in the first Window), and leaves residual 3 — a
+presentation in a later Window — as it stood.
+
+**The harness** (corpus-r19, 648 trees, 309 raw, 385 712 calls, against debc9b2): 0 diffs — no recorded device tree
+lays a presented layer of only empty frames, so the rule changes nothing the corpus holds. Golden (the lab truth, 1131
+checks): the 15 WDA rows of `sheet-medium-edges` turn green, no other row changes (260 → 245 mismatches).
+
+## Amendment: one presentation module (2026-10-16)
+
+The architecture review of 2026-10-16 (candidate A2, round 5 of phase 3) found "what is presented over what" answered
+in pieces: draw order read the marks (`markOf`, `markedOnScreen`, `markedLayers`, `laterFor`, `presentedPress`, the
+no-target `markedAt`), built the shape fallback with its own frame rows handed in as a callback (`FRAME_EXCUSES`, so
+the fallback's `givesWay` could name a surface from the rows that excuse it), and asked the fallback's
+`presentedSurface` from three places (`Exposure.presented`, `lastPresentedSurface`, the `hidden` row) — while Android,
+whose uiautomator dump lists only the presented window (the lab note L1, 2026-10-15, on truth/phase-3), had no place a
+fix could land but beside the WDA shapes.
+
+**Decision: only where the rules live changes.** `ui-tree/presentation.ts` is the one module; its interface is the
+test surface (tests/ui-tree/presentation.test.ts):
+
+- `presentationOf(tree, walk)` — built by draw order over its own walk (`placed.ts#walkOf`, moved there from
+  `drawOrder`), once per tree;
+- `over(node)` — what is presented over a target (`PresentedOver`): which later node a typed layer leaves undrawn
+  (`drawn`), which is a marked layer's cover reaching the whole screen (`wholeScreen`), which is the surface of a screen
+  presented over it and on what evidence (`surface`: `fact` for a node of a marked `screen` layer, `inferred` for the
+  shape's — the `hidden` row lets only an inference outvote WDA's hidden flag, as ADR 0019 decided), and which frame
+  excuse gives way (`givesWay`);
+- `topmostAt(point)` — the marked layer a stroke for no target lands on (`markedAt`'s fact; draw order still names
+  what of a `screen` layer draws there, by its no-target column);
+- `press(surface)` — the `MarkedLayer` and reach a sentence quotes (was `DrawOrder.presentedPress`; `DrawOrder`
+  now hands the module on as `presentation`, and `standing.ts#Scene.presentedAt` keeps its signature);
+- `fallback` — which adapter infers what the source did not judge.
+
+Behind it, three adapters, composed per tree: BY MARKS (`byMarks`, holding `markOf` — **the one reader of
+`UiNode.presentation` / `presentationElement` is now `presentation.ts#markOf`**; read on every tree), BY SHAPE
+(`byShape`, the former `presented-by-shape.ts` whole: `presentedOver`, `givesWay`, `presentedSurface`,
+`OVER_PRESENTED`), asked only of an unjudged tree that is not Android's, and BY UIAUTOMATOR (`byUiautomator`), asked of
+Android's tree (the uiautomator root's `paddedTouchTargets` mark). The frame excuses moved to `placed.ts#FRAME_EXCUSES`
+beside the other frame predicates, so the shape adapter asks them directly and draw order hands it no callback. The
+WDA parser's marking (`wda-source.ts#presentedLayers`, `presentedScreen`) stays in the parser: it reads WDA's raw
+elements and flags, which ui-tree never sees; the module reads what it marks.
+
+The uiautomator adapter knows no fact of its own yet and answers as the shape adapter — what Android got before: a
+pure move. Its doc says how L1 lands there: read the dump's window facts (a window smaller than the screen — a dialog;
+a screen-wide clickable scrim before the content — a sheet) into a layer, answer `topmostAt` and `press` with it, and
+`scroll_until` for a target not in the tree stops "close it first" through the same `Scene.presentedAt` the WDA marks
+already use. That fix is a later step with its own golden rows.
+
+Everything decided above stands: the source's marks first, the shape only as the fallback, the target's own
+visibility never evidence alone; every residual reads as before. **The harness:** golden row by row identical to
+`468dc1b`, the differential over corpus-r19 against `468dc1b` 0 diffs. The code pointers of the earlier sections were
+moved to the new places (`presented-by-shape.ts` → `presentation.ts#byShape`, draw order's `markOf` / `markedLayers`
+→ `presentation.ts#markOf` / `byMarks`); their text is otherwise unchanged.
 
 ## Residuals accepted
 
@@ -683,6 +791,13 @@ Residuals 12–17 below are this amendment's. Risks, none measured (the device p
    covered through that layer's mark (the alert's bare dim, by the typed mark). Stands for a layer of ONLY empty frames
    (`container`/`other`, no non-structural element): `wda-source.ts#presentedScreen` skips a layer with no content, so
    it is not marked, and the screen beneath reads as before.
+   **Closed for WDA** (2026-10-16) for a shown layer with shown frames below it: in the app's Window, when no content
+   layer follows the wholly `0` beneath, the first screen-sized layer after it with no content whose children or
+   deeper frames show on the screen is marked `screen` (the amendment "a presented layer of only empty frames"; the
+   lab's medium sheet over a scrolled host, docs/bugs/2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md).
+   Stands for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an
+   empty sheet followed by a content leftover parked off the screen (that layer, neither hidden nor shown, ends the
+   walk with no mark), a layer in a later Window, and on a tree whose source did not judge, as before.
 8. **A presented sheet's own bare dimming leaf stays excused** (Contacts' `container -402,-874 1206x2622`: an
    unidentified, unlabelled frame) — except in a layer holding an alert, which covers the whole screen by the adapter's
    mark whatever its dim is (see "Amendment: a layer holding an alert"). Above a large-detent sheet (its form `scrollable 0,62 402x812`) the list beneath

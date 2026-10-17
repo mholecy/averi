@@ -3,17 +3,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
-import { keyboardPosition } from '../../src/ui-tree/keyboard-position.js';
-import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
-import { sceneOf, type Scene } from '../../src/ui-tree/standing.js';
+import { lookAt, type Look } from '../../src/ui-tree/look.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
-import { judgeTap, OffScreenRefusal, tapStandings, type Aim } from '../../src/interact/tap-judgement.js';
+import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
+import type { Scene } from '../../src/ui-tree/standing.js';
+import { judgeTap, OffScreenRefusal, tapStandings, type Aim, type TapReading } from '../../src/interact/tap-judgement.js';
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 
-// THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look and a screen — no settle
-// loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a hand-made reading that
-// counts what it is asked. Each row's sentence is the one the tap's integration cases pin through `tapElement`
+// THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look (ui-tree/look.ts#lookAt)
+// and a screen — no settle loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a
+// hand-made reading that counts what it is asked. Each row's sentence is the one the tap's integration cases pin through `tapElement`
 // (tests/interact/resolve.test.ts); here it is the rule, one row per standing kind.
 
 // sceneOf (ui-tree/standing.ts), counted: the look's-scene rows below pin that a judgement derives no scene of its own.
@@ -55,7 +55,10 @@ function viewport(first: DeviceScreen, again: DeviceScreen = first) {
 
 const find = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id || n.label === id)!;
 
-/** Judge `id` on `tree` as the guard's first look does: the usable screen read off the adapter, a position over the look's scene and `kb`'s reading. */
+/** The look of `tree` with `kb`'s reading and `remedy` — what the tap's judgement asks of a reading (`TapReading`). */
+const lookWith = (tree: UiNode, kb: ReturnType<typeof reading>, remedy: KeyboardRemedy = BACK): Look<TapReading> => lookAt(tree, { ...kb.reading, remedy });
+
+/** Judge `id` on `tree` as the guard's first look does: the usable screen of the look's tree read off the adapter, the look's keyboard position over its scene and `kb`'s reading. */
 async function judge(
   tree: UiNode,
   id: string,
@@ -63,10 +66,10 @@ async function judge(
   { kb = reading(undefined), remedy = BACK, sent }: { kb?: ReturnType<typeof reading>; remedy?: KeyboardRemedy; sent?: string } = {},
 ) {
   const { adapter, freshReads } = viewport(device.first, device.again);
-  const look = { node: find(tree, id), tree, scene: sceneOf(tree) };
-  const screen = await usableScreen(adapter, { tree });
+  const look = lookWith(tree, kb, remedy);
+  const screen = await usableScreen(adapter, look);
   freshReads.length = 0;
-  const outcome = await judgeTap(adapter, id, look, screen, { position: keyboardPosition(look.scene.order, kb.reading), remedy }, sent)
+  const outcome = await judgeTap(adapter, id, { node: find(tree, id), look }, screen, sent)
     .then((j) => j.aim())
     .catch((e: unknown) => e as Error);
   return { outcome, freshReads, asked: kb.asked };
@@ -290,10 +293,9 @@ describe('judgeTap(…).aim() — outside what its scroll view draws (a WDA tree
 
   it('not by the on-screen rule before the guard: judgeTap lets the look through (the guard may hide a keyboard its scroll view was laid out above), and aim() refuses it', async () => {
     const tree = atRest(name());
-    const look = { node: find(tree, 'payee_name_input'), tree, scene: sceneOf(tree) };
+    const look = lookWith(tree, reading(undefined));
     const { adapter } = viewport(IPHONE);
-    const screen = await usableScreen(adapter, { tree });
-    const judged = await judgeTap(adapter, 'payee_name_input', look, screen, { position: keyboardPosition(look.scene.order, reading(undefined).reading), remedy: BACK });
+    const judged = await judgeTap(adapter, 'payee_name_input', { node: find(tree, 'payee_name_input'), look }, await usableScreen(adapter, look));
     await expect(judged.aim()).rejects.toBeInstanceOf(OffScreenRefusal);
   });
 
@@ -477,16 +479,16 @@ describe('the reading\'s line — asked lazily, once', () => {
     expect((await judge(sheet(), 'next', { first: PIXEL }, { kb: reading(1380) })).asked).toEqual({ cover: 0, corroborated: 0 });
     const kb = reading(1380);
     const tree = sheet();
-    const look = { node: find(tree, 'row'), tree, scene: sceneOf(tree) };
-    await judgeTap(viewport(PIXEL).adapter, 'row', look, undefined, { position: keyboardPosition(look.scene.order, kb.reading), remedy: BACK });
+    await judgeTap(viewport(PIXEL).adapter, 'row', { node: find(tree, 'row'), look: lookWith(tree, kb) }, undefined);
     expect(kb.asked).toEqual({ cover: 0, corroborated: 0 });
   });
 });
 
 describe('the look\'s scene — judgeTap reads it and derives none', () => {
-  /** `tree`'s scene as a spy: what judgeTap asks of it (`standing`, `clips`) is recorded, and answered by the real scene. */
-  function spyScene(tree: UiNode) {
-    const real = sceneOf(tree);
+  /** The look of `tree` with its scene a spy: what judgeTap asks of it (`standing`, `clips`) is recorded, and answered by the look's real scene. */
+  function spyScene(tree: UiNode, kb: ReturnType<typeof reading>) {
+    const look = lookWith(tree, kb);
+    const real = look.scene;
     const asked: string[] = [];
     const scene: Scene = {
       get order() {
@@ -500,13 +502,13 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
       pixelRegion: (...args) => (asked.push('pixelRegion'), real.pixelRegion(...args)),
       presentedAt: (...args) => (asked.push('presentedAt'), real.presentedAt(...args)),
     };
-    return { scene, asked };
+    Object.defineProperty(look, 'scene', { get: () => scene });
+    return { look, asked };
   }
   async function judgeOn(tree: UiNode, id: string, kb: ReturnType<typeof reading>) {
-    const { scene, asked } = spyScene(tree);
-    const position = keyboardPosition(scene.order, kb.reading);
+    const { look, asked } = spyScene(tree, kb);
     walks.n = 0;
-    const outcome = await judgeTap(viewport(PIXEL).adapter, id, { node: find(tree, id), tree, scene }, undefined, { position, remedy: BACK })
+    const outcome = await judgeTap(viewport(PIXEL).adapter, id, { node: find(tree, id), look }, undefined)
       .then((j) => j.aim())
       .catch((e: unknown) => e as Error);
     return { outcome, asked, walks: walks.n };
@@ -520,11 +522,11 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
   });
   it("a centre under the navigation bar: refused with the remedy the look's scene's standing carries (in no scroll view) — judgeTap asks the scene's standing, not its clips, and walks no scene", async () => {
     const tree = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'button', label: 'Pay', identifier: 'pay', rect: { x: 0, y: 2160, width: 1080, height: 60 } })] });
-    const { scene, asked } = spyScene(tree);
+    const { look, asked } = spyScene(tree, reading(undefined));
     const { adapter } = viewport(PIXEL);
-    const screen = await usableScreen(adapter, { tree });
+    const screen = await usableScreen(adapter, look);
     walks.n = 0;
-    const refused = await judgeTap(adapter, 'pay', { node: find(tree, 'pay'), tree, scene }, screen, { position: keyboardPosition(scene.order, reading(undefined).reading), remedy: BACK }).catch((e: unknown) => e);
+    const refused = await judgeTap(adapter, 'pay', { node: find(tree, 'pay'), look }, screen).catch((e: unknown) => e);
     expect(refused).toBeInstanceOf(OffScreenRefusal);
     expect(asked).toContain('standing');
     expect((refused as Error).message).toContain('it lies in no scroll view');
@@ -536,22 +538,19 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
 describe('tapStandings — the tap\'s two standings of a node', () => {
   it('`full()` IS `first` when the reading\'s line changes no line (none to merge, or the same line)', async () => {
     const tree = sheet();
-    const scene = sceneOf(tree);
-    const standings = tapStandings(scene, find(tree, 'row'), undefined, keyboardPosition(scene.order, reading(undefined).reading));
+    const standings = tapStandings(lookWith(tree, reading(undefined)), find(tree, 'row'), undefined);
     expect(await standings.full()).toBe(standings.first);
   });
   it('`full()` judges again with the merged line when the reading has one', async () => {
     const tree = sheet();
-    const scene = sceneOf(tree);
-    const standings = tapStandings(scene, find(tree, 'row'), undefined, keyboardPosition(scene.order, reading(1350).reading));
+    const standings = tapStandings(lookWith(tree, reading(1350)), find(tree, 'row'), undefined);
     expect(standings.first.kind).toBe('reachable');
     expect((await standings.full()).kind).toBe('covered');
   });
   it('idb\'s band alone: the line is the tree\'s own, so `full()` is `first`, asking the reading once', async () => {
     const tree = await numberPad();
-    const scene = sceneOf(tree);
     const kb = reading(undefined);
-    const standings = tapStandings(scene, find(tree, 'swift_payment.form.value_date_select'), undefined, keyboardPosition(scene.order, kb.reading));
+    const standings = tapStandings(lookWith(tree, kb), find(tree, 'swift_payment.form.value_date_select'), undefined);
     expect(await standings.full()).toBe(standings.first);
     expect(kb.asked).toEqual({ cover: 1, corroborated: 0 });
   });

@@ -59,20 +59,6 @@ describe('an alert covers the whole screen beneath it', () => {
     expect(order.presentedAt(byLabel(tree, 'Leave'), { x: 201, y: 699 })).toBeUndefined();
   });
 
-  it('the press a sentence quotes (`presentedPress`): the alert reaches the whole screen and is handed on as its layer — its kind and label, not the node; any other surface presses its rect, no layer', async () => {
-    const tree = await alertTree();
-    const order = drawOrder(tree);
-    const alert = order.presentedOver(byId(tree, 'form.note_input'))!;
-    expect(order.presentedPress(alert)).toEqual({ surface: alert, reach: IPHONE, layer: { kind: 'alert', label: 'Leave the form' } });
-    const dim = node({ role: 'other', rect: IPHONE });
-    expect(order.presentedPress(dim)).toEqual({ surface: dim, reach: IPHONE });
-    const sheet = node({ role: 'container', rect: rect(0, 400, 402, 474) });
-    expect(order.presentedPress(sheet)).toEqual({ surface: sheet, reach: rect(0, 400, 402, 474) });
-    const unlabelled = node({ role: 'container', rect: rect(41, 365, 320, 172), presentation: 'alert' });
-    const withIt = node({ role: 'container', rect: IPHONE, children: [node({ role: 'container', rect: IPHONE }), unlabelled] });
-    expect(drawOrder(withIt).presentedPress(unlabelled).layer).toEqual({ kind: 'alert' });
-  });
-
   it('a pixel assert on the field reads the alert over the whole screen', async () => {
     const tree = await alertTree();
     expect(drawOrder(tree).paintsOver(byId(tree, 'form.note_input'), IPHONE).map((c) => [desc(c.node), c.reach])).toEqual([[ALERT, IPHONE]]);
