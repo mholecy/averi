@@ -3,7 +3,7 @@ import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Geometry, TargetTruth } from '../../truth/schema.js';
 import { navigationBandTakes, parseGeometry, type AssertElement } from '../../truth/truth.js';
 import { failedClosedUnchecked, readingOf, readSomething } from '../../truth/replies.js';
-import { stringUnlistedBy } from '../../truth/target-contract.js';
+import { bandNamed, stringUnlistedBy } from '../../truth/target-contract.js';
 import { BUDGET_MS, classed, first, passed, passes, said, type Expectation } from './judges.js';
 
 /**
@@ -88,7 +88,7 @@ export function textRows(platform: Platform, t: TargetTruth, judged: Geometry | 
   if (kind === 'under-chrome') return [covered(ocrFailsClosed(platform, { text }, text, `${name} over it`))];
   // In the navigation band, or overlapping it (its centre clear) — Android's only: the judged geometry never names
   // iOS's home-indicator band. Who takes it is truth.ts#navigationBandTakes', by the navigation mode.
-  if (g === 'nav-band' || g === 'band-overlap:nav') {
+  if (bandNamed(g) === 'nav') {
     const takes = navigationBandTakes(platform, 'nav-band', cell?.navigation);
     if (takes === 'bar') return [covered(ocrFailsClosed(platform, { text }, text, 'the navigation bar over it'))];
     if (takes === 'app') {

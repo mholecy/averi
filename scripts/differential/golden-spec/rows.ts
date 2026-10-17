@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
-import { judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
+import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
@@ -77,7 +77,7 @@ export function tapRow(platform: Platform, t: TargetTruth, c: Pick<TargetContrac
     case 'refuse':
       if (ask.remedy === 'scroll_until') return refusedTap(platform, t, row, ask, opts);
       if (ask.remedy === 'close it first') throw new Error(`${t.id}: a presented target's tap is presented.ts's`);
-      return c.geometry === 'status-band' || c.geometry === 'nav-band' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+      return isBand(c.geometry) ? bandTap(platform, t, ask) : landRow(platform, t, ask);
     case 'land-or-refuse':
       return ask.inside === 'visible' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
     case 'fire':
@@ -156,8 +156,9 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string, opt
  * around it (target-contract.ts#judgedContext).
  */
 export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth): Expectation {
-  const g = t.geometry === 'status-band' ? 'status' : 'navigation';
-  const takes = t.geometry === 'nav-band' ? navigationBandTakes(platform, t.geometry, cell.navigation) : undefined;
+  const band = bandNamed(t.geometry);
+  const g = band === 'status' ? 'status' : 'navigation';
+  const takes = band === 'nav' ? navigationBandTakes(platform, 'nav-band', cell.navigation) : undefined;
   // Android's navigation bar under three buttons is drawn over the target: asked for the colour the screen shows there
   // (the bar's, TargetTruth.seen), so that a pass means it measured the bar (calibration.json #23, as R-outside-sv's
   // colour asks for the background: #29).

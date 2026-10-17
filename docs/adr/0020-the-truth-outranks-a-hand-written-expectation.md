@@ -35,12 +35,13 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    Their oracles differ, not their contract: the replay knows the capture's probe and the tree, the live golden the
    app's tap log (so a `Tapped` that fired the target alone is true live even where the replay requires a refusal).
    How a target is addressed (its text or its identifier) is not yet the contract's: the replay's edge, band and chrome
-   rows ask a text target by its identifier, the live cases by its text — a residual the contract's header records. averi's replies are read by one module too
-   (scripts/truth/replies.ts: a reply's kind, its claims, its numbers, an ocr reading), for both. A reply saying the target is
-   not in the tree is judged by its effect first: where the row rejects it (a tap refused without its remedy, a stroke
-   beneath the presented layer), the mismatch is the row's own reason; where the row would accept it, it is no evidence
-   either way — the "not in the tree" mismatch, never a pass — unless the row's truth allows the target to be absent (a
-   lazy row not laid out). Wording stays the OLD/NEW differential's business.
+   rows ask a text target by its identifier, the live cases by its text — a residual the contract's header records.
+   averi's replies are read by one module too (scripts/truth/replies.ts: a reply's kind, its claims, its numbers, an ocr
+   reading), for both. A reply saying the target is not in the tree is judged by its effect first: where the row rejects
+   it (a tap refused without its remedy, a stroke beneath the presented layer), the mismatch is the row's own reason;
+   where the row would accept it, it is no evidence either way — the "not in the tree" mismatch, never a pass — unless
+   the row's truth allows the target to be absent (a lazy row not laid out). Wording stays the OLD/NEW differential's
+   business.
 3. **A broken cell is reported, not judged.** When a capture's sources disagree with each other — declared open but not
    reached, a probe tap that left no touch in the app, an open control the probe did not reach (the consistency checks
    of scripts/truth/truth.ts) — it says nothing about averi: it is listed broken and the run fails until the cell is

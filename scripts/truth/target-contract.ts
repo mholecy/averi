@@ -18,8 +18,12 @@ import { geometryOf, isOverlap, parseGeometry, type GeometryContext } from './tr
  * sent and fired nothing (both accept it unless the clause is `fire`), a `Tapped` that fired the target alone where the
  * clause lands it (the replay accepts it unless the clause is `refuse`; the live oracle always, below), a stop with no
  * swipe on the target where its capture lays it out (both accept it exactly where the clause `holds`). A rule about
- * which band is a band, whether a target may be missing from the tree, or what its tap and stops must do is written
- * here and nowhere else.
+ * which band is a band (judgedContext, and the two predicates every reader branches on: isBand, bandNamed), whether a
+ * target may be missing from the tree, or what its tap and stops must do is written here and nowhere else. Who TAKES a
+ * raw tap in a band is no rule of the contract but a measurement of the capture's (truth.ts#systemBarSwallows,
+ * #statusBarMaySwallow, #navigationBandTakes): consistency holds the probe to it, and the rows whose answer the
+ * measurement decides — R-band's colour (golden-spec/rows.ts#bandColour) and the ocr row in Android's navigation band
+ * (golden-spec/text.ts#textRows) — read it there; the tap's clause reads only what the probe did (`reached`).
  *
  * What the two judges read differently is their ORACLE, not the contract: the replay knows only the capture's probe (a
  * raw tap at the centre fired the target or not) and the tree; the live golden reads the app's tap log. So a clause
@@ -36,6 +40,24 @@ import { geometryOf, isOverlap, parseGeometry, type GeometryContext } from './tr
  */
 
 // --- which bands are bands: the geometry the contract judges by ---
+
+/** A system band a geometry names: the status band, or Android's navigation band (never iOS's, judgedContext). */
+export type Band = 'status' | 'nav';
+
+/** Whether the target's centre lies in a system band (`status-band`, `nav-band`): R-band's targets. */
+export const isBand = (g: Geometry | undefined): g is 'status-band' | 'nav-band' => g === 'status-band' || g === 'nav-band';
+
+/**
+ * The system band a geometry places the target in — its centre there (isBand) or a whole target's edge overlapping it
+ * past the slack (`band-overlap:<band>`) — or undefined: it names none.
+ */
+export function bandNamed(g: Geometry | undefined): Band | undefined {
+  if (g === 'status-band') return 'status';
+  if (g === 'nav-band') return 'nav';
+  if (g === 'band-overlap:status') return 'status';
+  if (g === 'band-overlap:nav') return 'nav';
+  return undefined;
+}
 
 /**
  * The screen a geometry is judged on: the capture's (CellTruth) for the replayed golden, the app's state at the stop
@@ -90,8 +112,7 @@ export function judgedContext(platform: Platform, s: JudgedScreen, view: string 
 export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen): Geometry | undefined {
   if (t.geometry === undefined) return undefined;
   const dropsTheNavigationBand = platform === 'ios' && (cell.safeArea?.bottom ?? 0) > 0;
-  const namesIt = t.geometry === 'nav-band' || t.geometry === 'band-overlap:nav';
-  return dropsTheNavigationBand && namesIt ? geometryOf(t.frame, judgedContext(platform, cell, t.scrollView)) : t.geometry;
+  return dropsTheNavigationBand && bandNamed(t.geometry) === 'nav' ? geometryOf(t.frame, judgedContext(platform, cell, t.scrollView)) : t.geometry;
 }
 
 // --- the tree ---
@@ -150,7 +171,7 @@ export function tapAsk(t: TargetTruth, judged: Geometry | undefined): TapAsk | u
   const g = judged ?? 'whole';
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? { must: 'fire', inside: 'node' } : undefined;
   if (g === 'off-screen' || g === 'outside-scroll-view' || g === 'sliver') return { must: 'refuse', remedy: 'scroll_until' };
-  if (g === 'status-band' || g === 'nav-band') return t.reached ? { must: 'land-or-refuse', inside: 'visible' } : { must: 'refuse' };
+  if (isBand(g)) return t.reached ? { must: 'land-or-refuse', inside: 'visible' } : { must: 'refuse' };
   // R-land: reached at its centre — cut with its centre in what shows, or a whole one overlapped at its edge.
   if ((g === 'partly-centre-in' || isOverlap(g)) && t.reached) return { must: 'fire', inside: 'visible' };
   // Its centre covered or cut away (centre-out, under-chrome): its piece, where the second probe fired there.
@@ -196,9 +217,8 @@ export function stopHolds(g: Geometry, fully: boolean): boolean {
  */
 export function fullyAsked(g: Geometry | undefined, scrollView: string | undefined): boolean {
   if (g === undefined) return false;
-  const { kind } = parseGeometry(g);
-  if (CUT.includes(g) || kind === 'chrome-overlap') return true;
-  return (g === 'status-band' || g === 'nav-band' || kind === 'band-overlap') && scrollView !== undefined;
+  if (CUT.includes(g) || parseGeometry(g).kind === 'chrome-overlap') return true;
+  return bandNamed(g) !== undefined && scrollView !== undefined;
 }
 
 // --- the whole contract of a target ---

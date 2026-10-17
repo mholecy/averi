@@ -133,7 +133,8 @@ describe('R-dismiss on a form whose config taps its title (toolbar-dismiss: #7, 
   });
 });
 
-describe('a pristine form whose fields and titles share one identifier (form-shared-id: FE2)', () => {
+describe('a pristine form whose fields and titles share one identifier (form-shared-id)', () => {
+  // calibration.json FE2.
   const C = 'lab.form-shared-id.component';
   const shared = (tag: string, y: number) => field(tag, y, { id: C, titleId: C, title: `${tag}*`, titleFrame: rect(28, y - 10, 60, 16) });
   const fields = [shared('amount', 150), shared('iban', 220), shared('bic', 290)];

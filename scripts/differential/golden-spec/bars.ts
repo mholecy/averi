@@ -2,7 +2,7 @@ import type { Platform } from '../corpus.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
-import type { TargetContract } from '../../truth/target-contract.js';
+import { isBand, type TargetContract } from '../../truth/target-contract.js';
 import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } from './rows.js';
 
 /**
@@ -38,7 +38,7 @@ export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, c: 
   if (g === undefined) return [];
   const { kind, name } = parseGeometry(g);
   const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
-  if (g === 'status-band' || g === 'nav-band') {
+  if (isBand(g)) {
     return [tapRow(platform, t, c, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop), ...fully].map(classed);
   }
   if (kind === 'under-chrome') {

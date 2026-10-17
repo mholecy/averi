@@ -5,8 +5,8 @@ import type { Platform, SourceKind } from '../../scripts/differential/corpus.js'
 import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, type Expectation } from '../../scripts/differential/golden-spec.js';
 import { liveGeometry, visibilityCases, type VisibilityCase } from '../../scripts/truth/live-visibility.js';
-import type { CellTruth, LabState, TargetTruth } from '../../scripts/truth/schema.js';
-import { contractOf, fullyAsked, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
+import type { CellTruth, Geometry, LabState, TargetTruth } from '../../scripts/truth/schema.js';
+import { bandNamed, contractOf, fullyAsked, isBand, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
 import { geometryOf, probePoint } from '../../scripts/truth/truth.js';
 import { probeDelivered } from '../../scripts/differential/golden-spec/base.js';
 
@@ -24,6 +24,18 @@ const IOS = { screen: { width: 402, height: 874 }, safeArea: { top: 62, left: 0,
 const ANDROID = { screen: { width: 1080, height: 2220 }, safeArea: { top: 63, left: 0, bottom: 66, right: 0 } };
 
 describe('the contract\'s rules', () => {
+  it('which geometry names a band: a centre in one (isBand) or a whole target overlapped at its edge by one (bandNamed) — the predicates every reader branches on', () => {
+    const all: Geometry[] = ['whole', 'partly-centre-in', 'centre-out', 'sliver', 'outside-scroll-view', 'off-screen', 'status-band', 'nav-band', 'under-chrome:fab', 'band-overlap:status', 'band-overlap:nav', 'chrome-overlap:toolbar'];
+    expect(all.filter(isBand)).toEqual(['status-band', 'nav-band']);
+    expect(all.map((g) => [g, bandNamed(g)]).filter(([, b]) => b !== undefined)).toEqual([
+      ['status-band', 'status'],
+      ['nav-band', 'nav'],
+      ['band-overlap:status', 'status'],
+      ['band-overlap:nav', 'nav'],
+    ]);
+    expect([isBand(undefined), bandNamed(undefined)]).toEqual([false, undefined]);
+  });
+
   it('iOS\'s home-indicator band is no band — one judged context for both goldens; Android\'s navigation band is one', () => {
     // A target 51,800 300x50 on iOS overlaps the home-indicator band (840–874) past the slack: measured band-overlap:nav,
     // judged whole — by the replay (judgedGeometry over the capture) and the live golden (liveGeometry over the state) alike.

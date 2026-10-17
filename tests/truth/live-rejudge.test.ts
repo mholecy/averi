@@ -44,12 +44,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
   });
 });
 
-describe('live.ts --rejudge over a committed calibration record where LV2 reads as a stop claim', () => {
-  // LV2's flush cases are intermittent and ok in android-vis.json, so the record above never asks their entries' class
+describe('live.ts --rejudge over a committed calibration record where the flush probe\'s intermittent cases read as a stop claim', () => {
+  // Lab note LV2. Its flush cases are intermittent and ok in android-vis.json, so the record above never asks their entries' class
   // or kind. cal12-d043e65-1.json (#12's live calibration, a --side run of d043e65) reads both as a stop claimed on
   // `visible`: known by LV2's entries. Its one case not known, scroll-bounded-flush.S, is #12's own defect at that
   // commit (a calibration, not HEAD's KNOWN): exit 1, as recorded.
-  it('cal12-d043e65-1.json: P.fully and S.fully known by LV2, S alone not known', { timeout: 60_000 }, async () => {
+  it('cal12-d043e65-1.json: P.fully and S.fully known by the flush probe\'s note, S alone not known', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('cal12-d043e65-1.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 7 cases, 4 ok, 0 loud, 3 mismatches \(1 not known\), 0 skipped$/m);
     const lv2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
