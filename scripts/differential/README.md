@@ -145,7 +145,8 @@ bug:<docs/bugs file>` or `residual:<decision>`. `tests/truth/lab-notes.test.ts` 
 one's `as`, the live KNOWN's `note`) and calibration.json to docs/bugs: every `bug:` an existing note, every `residual:`
 a calibration.json residual's status or an ADR's numbered residual, every note calibration.json expects OPEN-RED with
 its rows in KNOWN filed as it, and every note a KNOWN row is filed as an open note of calibration.json (but the
-live-only ones it lists, each excluded from the calibration with its reason).
+live-only ones it lists, each excluded from the calibration with its reason, and the notes calibrated on the replay
+whose live KNOWN entries await a live record at their fix, `AWAITING_LIVE`, each with its reason).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no
 coloured targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it

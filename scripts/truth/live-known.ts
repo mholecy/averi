@@ -79,6 +79,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // refused, nothing fired) — its WDA entry struck off once an ok came to read as fixed (round-4 review S8).
   ...each('ios idb', ['tap:blur-menu-grouped.C'], BLUR, 'tap-claim', 'Tapped'),
   // iOS, WDA
+  // LE4 and L3 are fixed (fecb0b3, 468dc1b: round 5's 0a and 0b) and calibrated on the replay; their entries stand
+  // until a live record at the fix reads these cases ok (ios-vis.json is debc9b2's) — tests/truth/lab-notes.test.ts's
+  // AWAITING_LIVE. LV3 below likewise (fixed under WDA by 0a; live only).
   ...each('ios wda', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'turn:scroll-bounded.F', 'scroll:sheet-long-list-short.F'], LE4, 'R-direction', 'refused'),
   ...each('ios wda', ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G'], L3, 'presented-stop', 'visible'),
   // iOS, both sources

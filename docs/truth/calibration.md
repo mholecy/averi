@@ -50,12 +50,12 @@ open note on the working tree. See the script for the verdicts.
 | TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
-| L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | open | working tree | OPEN-RED |
+| L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | open | working tree | OPEN-RED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
-| LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | open | working tree | OPEN-RED |
+| LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | open | working tree | OPEN-RED |
@@ -885,14 +885,14 @@ Regressions recorded:
 
 No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed row.
 
-## L3: OPEN-RED
+## L3: CALIBRATED
 
 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md — defect: `without "close it first"|swiped \d+× beneath a presented layer`
 
-- working tree:
+- before fecb0b3:
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.H" is off screen at (201,-56) on a 402x874 screen (rect 51,-88 300x64) — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.H" fill within dE00 8 of #E53935 — nothing of the element lies on the screen (element 51,-88 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until th
-  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.H" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.H" failed after 2 swipes (the last 2, swiping down, did not move it: they touched down at 201,699 on container at 8,415 386x451, drawn over the list 0,0 4
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.G" is under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 51,-20 300x64) — it lies in a scroll view — 
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json G scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.G" failed after 3 swipes — its centre stays under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar
@@ -901,12 +901,28 @@ No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed r
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json E scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.E" failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 8% of it is in the viewport, and the content is exhausted: swiping down no lo
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.F" fill within dE00 8 of #FB8C00 — nothing of the element lies on the screen (element 51,1009 300x64, screen 0,0 402x874) — scroll it on-screen: scroll_until t
-  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersec
+  - RED ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.F" failed after 2 swipes (the last 2, swiping down, did not move it: they touched down at 201,699 on container at 8,415 386x451, drawn over the list 0,0 4
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M tap — refused without "close it first": ERROR id:"lab.sheet-medium-edges.M" is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M colour — failed without "close it first": FAIL  element id:"lab.sheet-medium-edges.M" fill within dE00 8 of #721D88 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show i
   - RED ios-iphone17-ios27/sheet-medium-edges.wda.json M scroll_until — swiped 3× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium-edges.M" failed after 3 swipes — element is in the viewport but under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it — 0
+- after 468dc1b:
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json H tap — ERROR id:"lab.sheet-medium-edges.H" is off screen at (201,-56) on a 402x874 screen (rect 51,-88 300x64) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json H colour — FAIL  element id:"lab.sheet-medium-edges.H" fill within dE00 8 of #E53935 — nothing of the element lies on the screen (element 51,-88 300x64, screen 0,0 402x874) — a screen is presented over the element (a modal or a she
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json H scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.H" stopped before any swipe — element lies above the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (-402,-874 1206x2622) — a screen 
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json G tap — ERROR id:"lab.sheet-medium-edges.G" is under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to the status bar (rect 51,-20 300x64) — a screen is presented over it (a modal or a she
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json G colour — FAIL  element id:"lab.sheet-medium-edges.G" fill within dE00 8 of #317ABA — the status bar is drawn over the element (element 51,-20 300x64, status bar 0,0 402x62) — the capture would show it, not the element; a screen i
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json G scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.G" stopped before any swipe — element is in the viewport but its centre stays under the status bar at (201,12), in the top 62 of the screen (tree units), where a tap goes to 
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json E tap — ERROR id:"lab.sheet-medium-edges.E" is off screen at (201,901) on a 402x874 screen — only 8% of it (rect 51,869 300x64) is on screen, and a tap goes to its centre — a screen is presented over it (a modal or a sheet) — cl
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json E colour — FAIL  element id:"lab.sheet-medium-edges.E" fill within dE00 8 of #327735 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,869 300x64) — the capture would show it, not the element; 
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json E scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.E" stopped before any swipe — element is in the viewport but under container "dismiss popup" (-402,-874 1206x2622), drawn over it — 0% of it shows — a screen is presented ove
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F tap — ERROR id:"lab.sheet-medium-edges.F" is off screen at (201,1041) on a 402x874 screen (rect 51,1009 300x64) — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that scre
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F colour — FAIL  element id:"lab.sheet-medium-edges.F" fill within dE00 8 of #FB8C00 — nothing of the element lies on the screen (element 51,1009 300x64, screen 0,0 402x874) — a screen is presented over the element (a modal or a sh
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.F" stopped before any swipe — element lies below the viewport, and the next swipe would touch down at (201,699) on container "dismiss popup" (-402,-874 1206x2622) — a screen 
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json M tap — ERROR id:"lab.sheet-medium-edges.M" is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it fir
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json M colour — FAIL  element id:"lab.sheet-medium-edges.M" fill within dE00 8 of #721D88 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show it, not the element; 
+  - ok ios-iphone17-ios27/sheet-medium-edges.wda.json M scroll_until — ERROR scroll_until id:"lab.sheet-medium-edges.M" stopped before any swipe — element is in the viewport but under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,322), drawn over it — 0% of it shows — a
 
-No fix yet: red at HEAD, a regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there). M, whole on the screen under the dim, is the cell's positive control (its probe delivered) and is red the same way.
+A regression of 41c394a (fix/r20-marks) — green from 753b560 to 20b800a (#30, #32, #34 calibrate there) — fixed by round 5's 0b, 440786e on arch/r21-presented (wda-source.ts#presentedScreen marks a presented layer of only empty frames), merged into arch/round-21 as 468dc1b: the pair is that merge and its first parent fecb0b3 (arch/round-21 with LE4's fix already in, so this pair judges L3's fix alone), as the table pairs the other fixes merged to a mainline (#29, #35). Before: every row red, tap and colour without "close it first", scroll_until swiped beneath the sheet; after: each "close it first", scroll_until stopped before any swipe. M, whole on the screen under the dim, is the cell's positive control (its probe delivered) and is red and cured the same way.
 
 ## L4: OPEN-RED
 
@@ -971,16 +987,20 @@ No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.draw
 
 No fix yet: red at HEAD.
 
-## LE4: OPEN-RED
+## LE4: CALIBRATED
 
 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md — defect: `touched down outside its scroll view`
 
-- working tree:
+- before 0e179aa:
   - RED ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until — touched down outside its scroll view lower at (201,699) (201,699): ERROR scroll_until id:"lab.scroll-bounded.O" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never drawn
   - RED ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until — touched down outside its scroll view lower at (201,699) (201,699): ERROR scroll_until id:"lab.scroll-bounded.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never inter
   - RED ios-iphone17-ios27/sheet-long-list-short.wda.json F scroll_until — touched down outside its scroll view list at (201,699) (201,699): ERROR scroll_until id:"lab.sheet-long-list-short.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
+- after fecb0b3:
+  - ok ios-iphone17-ios27/scroll-bounded.wda.json O scroll_until — ERROR scroll_until id:"lab.scroll-bounded.O" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never drawn: it lies outside its scrol
+  - ok ios-iphone17-ios27/scroll-bounded.wda.json F scroll_until — ERROR scroll_until id:"lab.scroll-bounded.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 402x874 viewport
+  - ok ios-iphone17-ios27/sheet-long-list-short.wda.json F scroll_until — ERROR scroll_until id:"lab.sheet-long-list-short.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never drawn: it lies outside it
 
-No fix yet: red at HEAD. Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view. Also sheet-long-list-short's F (round 3): the stroke touches down at (201,699), on the footer beside the sheet's table.
+Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view. Also sheet-long-list-short's F (round 3): the stroke touched down at (201,699), on the footer beside the sheet's table. Fixed by round 5's 0a, 958bd27 on arch/r21-strokes (a WDA target's strokes go over its own scroll views: WDA marks no node as clipping, so the clipping chain was empty), merged into arch/round-21 as fecb0b3 (the branch's tip 1bd8148 adds only the notes): the pair is that merge and its first parent 0e179aa (arch/r21-kbline's merge, no src change from debc9b2), as the table pairs the other fixes merged to a mainline (#29, #35). After: O and F stroked inside `lower` (201 524 → 416), sheet-long-list-short's F inside the table (201 369 → 139).
 
 ## VA1: OPEN-RED
 

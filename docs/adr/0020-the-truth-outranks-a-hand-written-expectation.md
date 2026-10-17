@@ -59,7 +59,9 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    between them (tests/truth/lab-notes.test.ts, round 5): a row filed as a bug (`as: bug:<file>`) names an existing
    note, one filed as a residual names a decision recorded (a calibration.json residual, an ADR's numbered residual);
    every note the calibration expects OPEN-RED has its rows here, each filed as it; and every note a row is filed as is
-   an open note of the calibration, but the live-only notes that test lists, each with its reason.
+   an open note of the calibration, but the live-only notes that test lists, each with its reason, and the notes
+   calibrated on the replay whose live entries await a live record at their fix (listed there too, each with its
+   reason, and held to have no static row).
 
 ## Consequences
 

@@ -15,7 +15,8 @@ import { KNOWN } from '../differential/golden/files.js';
 //      ≥ 1 KNOWN row (calibrate.ts asks an open note for rows) and, when its fix strikes them off, its calibration is
 //      what turns, not a row filed elsewhere;
 //   3. conversely, every note a KNOWN row (static or live) is filed as is an open note of calibration.json — except
-//      the live-only notes below, each excluded from the calibration with its reason.
+//      the live-only notes below, each excluded from the calibration with its reason, and the notes calibrated on the
+//      replay whose live cases still await a live record at their fix (AWAITING_LIVE, below), each with its reason.
 // Filing a note, or striking one off when it is fixed, therefore touches all three places in one commit or fails here.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -31,6 +32,17 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",
   '2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md': "LV3: the turned stroke's touch-down, live only",
   '2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md': 'a fling in a lazy list: scroll dynamics, live only',
+};
+
+/**
+ * Notes calibrated on the replay (calibration.json `calibrate`, their static rows struck off) whose live KNOWN entries
+ * stand until the device check: the committed live record (docs/truth/live-records/ios-vis.json) is an older src's,
+ * whose replies `--rejudge` reads as they were, so those cases still fail there by their rule; struck off — with this
+ * exemption — once a live record at the fix reads them ok (live.ts then exits 1 on each, as for any fixed case).
+ */
+const AWAITING_LIVE: Readonly<Record<string, string>> = {
+  '2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md': "LE4: fixed in fecb0b3 (round 5's 0a), calibrated; ios-vis.json is debc9b2's",
+  '2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md': "L3: fixed in 468dc1b (round 5's 0b), calibrated; ios-vis.json is debc9b2's",
 };
 
 /**
@@ -155,11 +167,24 @@ describe('calibration.json ↔ the KNOWN rows', () => {
     expect(bad).toEqual([]);
   });
 
-  it('every `bug:` a KNOWN row (static or live) is filed as is an open note of calibration.json, or live-only and excluded there', () => {
+  it('every `bug:` a KNOWN row (static or live) is filed as is an open note of calibration.json, or live-only and excluded there, or a live entry awaiting its live record', () => {
     const open = new Set(table.notes.filter((e) => expected(e) === 'OPEN-RED').map((e) => e.note));
     const bad = named
       .filter(({ where, name }) => !where.startsWith('calibration.json') && name.startsWith('bug:'))
+      .filter(({ where, name }) => !(where.startsWith('live ') && AWAITING_LIVE[name.slice(4)] !== undefined))
       .flatMap(({ where, name }) => (open.has(name.slice(4)) || LIVE_ONLY[name.slice(4)] !== undefined ? [] : [`${where}: ${name} is no open note of calibration.json`]));
+    expect(bad).toEqual([]);
+  });
+
+  it('each note awaiting its live record is calibrated in calibration.json and filed by a live KNOWN entry — no static row, no stale exemption', () => {
+    const calibrated = new Set(table.notes.filter((e) => e.status === 'calibrate').map((e) => e.note));
+    const live = new Set(Object.values(LIVE_KNOWN).map((e) => e.note));
+    const statics = new Set(Object.values(KNOWN).map((v) => v.as));
+    const bad = Object.keys(AWAITING_LIVE).flatMap((f) => [
+      ...(calibrated.has(f) ? [] : [`${f}: not calibrated in calibration.json`]),
+      ...(live.has(`bug:${f}`) ? [] : [`${f}: no live KNOWN entry files it — strike the exemption off`]),
+      ...(statics.has(`bug:${f}`) ? [`${f}: a static row files it — the replay still reads it red`] : []),
+    ]);
     expect(bad).toEqual([]);
   });
 

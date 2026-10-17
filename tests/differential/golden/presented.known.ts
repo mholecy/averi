@@ -8,16 +8,14 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 // exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
 const LAB_ANDROID = 'bug:2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md';
 // Phase 3 (B3): the lab findings of the presented cells, open — and the residual of calibration.json #31.
-const LAB_EDGES = 'bug:2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md';
 const LAB_MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
-const LE4 = 'bug:2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 /** Review round 4's P4 (calibration.json NI1): idb lists a UIKit table's labels without their identifiers. */
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
-/** The short stroke down after two IDB_UP, the third of G's and blur-menu-grouped C's strokes. */
+/** The short stroke down after two IDB_UP, the third of blur-menu-grouped C's strokes (and of sheet-medium-edges.wda G's until L3's fix). */
 const IDB_DOWN_SHORT = 'idb ui swipe 201 699 201 568 --duration 0.3';
 /**
  * The slot targets' probe points (Base.swift#Slot) and the colour the screenshot shows over each under the blur menu:
@@ -68,16 +66,10 @@ export const presented: KnownFile = {
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
       ];
     }),
-    // LAB FINDING (calibration.json L3): beneath the medium sheet over a scrolled host, WDA's targets wholly above, wholly
-    // under the status bar, a 5-pt sliver, wholly below — and M, whole on the screen under the dim — get scroll or
-    // status-bar advice and scroll_until swipes the sheet — green from 753b560 to 20b800a (#30, #32, #34 calibrate there),
-    // red from 41c394a (fix/r20-marks).
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F', 'M'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'G', 'E', 'F', 'M'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'lab finding: scroll or status-bar advice beneath the sheet', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['H', 'F'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: strokes on the sheet for a target off the screen beneath it', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['G'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: 'lab finding: strokes on the sheet for a target under the status bar beneath it', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['E'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a sliver beneath it', as: LAB_EDGES }),
-    ...keys(`${IOS}/sheet-medium-edges.wda.json`, ['M'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes on the sheet for a whole target under its dim', as: LAB_EDGES }),
+    // LAB FINDING L3 — fixed on arch/r21-presented (440786e, round 5's 0b), merged with arch/round-21: WDA marks the
+    // empty medium sheet over the scrolled host as the presented screen, so H, G, E, F, M of sheet-medium-edges.wda get
+    // "close it first" and scroll_until stops before any swipe — all 15 rows green, struck off here, calibrated in
+    // scripts/truth/calibration.json.
     // sheet-long-list.idb.json — idb lists the UIKit table's labels without their accessibility identifiers (AXUniqueId
     // null), and none of the rows below the fold: neither target answers to its id. R's rows are NI1's (filed as its
     // note); F's, a tree source's limit no note files.
@@ -88,12 +80,12 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists no row below the fold' }),
     // sheet-long-list-short (round 3): the same table cut short of the sheet's foot. Under idb R answers to no id, as
-    // above (F, below the table's clip, is refused or fails as its rows ask: green). Under WDA F's stroke touches down
-    // on the footer, beside the table holding it — lab finding LE4 (edges.known.ts), here on a UIKit table in a sheet.
+    // above (F, below the table's clip, is refused or fails as its rows ask: green). Under WDA F's stroke touched down
+    // on the footer, beside the table holding it — lab finding LE4 (edges.known.ts), fixed on arch/r21-strokes: the
+    // stroke goes inside the table (201 369 → 139), the row green and struck off.
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
-    ...keys(`${IOS}/sheet-long-list-short.wda.json`, ['F'], ['scroll_until'], { cls: 'touched down outside its scroll view list at (201,699) (201,699)', kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: the stroke touches down on the footer, beside the table holding F', as: LE4 }),
     // RESIDUAL #31 (ADR 0018 residual 9): the blur menu's backdrop has no node in either tree — A, B, D beneath it read
     // as open. C's centre lies under the menu row W (its probe fires W): on the grouped variant's WDA tree C is refused
     // under W, truly, but not "close it first" (#31's); elsewhere C reads as open — L4's misreading, below.

@@ -5,13 +5,12 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
 // scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it) — its
 // rows by geometry (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
-// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE4); this KNOWN owns the
-// ratchet, as presented.known.ts does for L1.
+// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE3; LE4 is calibrated since
+// round 5's 0a); this KNOWN owns the ratchet, as presented.known.ts does for L1.
 
 const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
 const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
-const LE4 = 'bug:2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (201,699)';
 
@@ -37,10 +36,9 @@ export const edges: KnownFile = {
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['colour'], { cls: 'passed on #FFFFFF', kind: 'PASS', calls: [], note: 'lab finding: idb lists no scroll view — the colour measured the background (#29 under idb)', as: LE2 }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view — visible after 0 swipes', as: LE2 }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: idb lists no scroll view — the screen\'s stroke, beside the scroll view holding F', as: LE2 }),
-    // LAB FINDING LE4 — WDA lists `lower` and O, F in it, yet scroll_until strokes the screen (201,699 → 175), below
-    // `lower`: inferred from the replay and the committed frames (not measured on the device), the stroke moves
-    // nothing, and the reply blames the content.
-    ...keys(`${IOS}/scroll-bounded.wda.json`, ['O', 'F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: the stroke touches down beside the target\'s own scroll view', as: LE4 }),
+    // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
+    // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
+    // struck off here, calibrated in scripts/truth/calibration.json.
     // LAB FINDING LE3 — SwiftUI lists the pinned section header before the rows it lies over: no cover of R's top 24 pt.
     ...[`${IOS}/scroll-sticky.wda.json`, `${IOS}/scroll-sticky.idb.json`].flatMap((file) => [
       ...keys(file, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the pinned header, listed first, is no cover of what the colour samples', as: LE3 }),
