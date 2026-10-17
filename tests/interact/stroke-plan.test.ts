@@ -13,10 +13,10 @@ import { stackedLayers } from '../helpers/stacked-layers.js';
  * `scroll_until`'s stroke plan through its interface (interact/stroke-plan.ts, A1 of the round-21 architecture pass):
  * a read's facts and the course's direction in, the stroke as the driver sends it out — its scroll view, box, cover
  * and points — with the presented surface at its touch-down and the node a sent stroke touched down on. The tests
- * that until A1 drove swipe.ts#strokeRoom and #scrollStroke with hand-made rects, and the single-read stroke
- * decisions tests/interact/scroll-rounds.test.ts asked of a whole round, are asked here of the plan; what spans
- * reads and the course (a turn, a failed read, a remembered scroll view across the round's own reads) stays the
- * round's to test.
+ * that until A1 drove swipe.ts's `strokeRoom` and `scrollStroke` (now stroke-plan.ts#strokeRoom, #scrollStroke) with
+ * hand-made rects, and the single-read stroke decisions tests/interact/scroll-rounds.test.ts asked of a whole round,
+ * are asked here of the plan; what spans reads and the course (a turn, a failed read, a remembered scroll view across
+ * the round's own reads) stays the round's to test.
  */
 
 /** The Pixel_3a's screen, the gesture box the tests stroke in. */
@@ -175,7 +175,8 @@ describe('which scroll view — the target\'s own, nearest first; the screen\'s 
     expect(planOn(screenOf([scroller(LIST), loose]), 'down', { target: loose }).stroke.box).toEqual(BOX);
   });
 
-  it('WDA (no node clips; the scroll views are its scrolling ancestors): scroll-bounded\'s O below the bounded `lower` is stroked inside `lower`, not over the screen below it (LE4)', () => {
+  it('WDA (no node clips; the scroll views are its scrolling ancestors): scroll-bounded\'s O below the bounded `lower` is stroked inside `lower`, not over the screen below it', () => {
+    // Lab note LE4.
     const LOWER: Rect = { x: 0, y: 380, width: 402, height: 180 };
     const PHONE: Rect = { x: 0, y: 0, width: 402, height: 874 };
     const o = node({ role: 'button', identifier: 'O', rect: { x: 51, y: 620, width: 300, height: 64 } });

@@ -4,7 +4,7 @@
 > not the one inferred below: the target IS found (WDA lists O and F, `best` is judged), but the stroke's candidates
 > were its CLIPPING chain alone (ui-tree/geometry.ts#Clips.scrollersOf), and WDA marks no node as clipping — the chain
 > is empty for every node of a WDA tree, so every WDA stroke for a found target went over the screen box. The fix
-> (interact/scroll-rounds.ts#targetScrollers): the chain, else the ancestors that scroll on a tree of unclipped
+> (interact/scroll-rounds.ts#targetScrollers, since A1 interact/stroke-plan.ts#targetScrollers): the chain, else the ancestors that scroll on a tree of unclipped
 > frames (`Clips.drawnIn`'s `scrollers`, the very scroll view the reply names); and draw-order.ts#drawnOver now finds
 > its container among the nodes that SCROLL, not only those that clip, so what WDA draws over the scroll view (a
 > floating tab bar's items, a pinned button above the keyboard) cuts the stroke as it does on Android. Golden (vs
@@ -21,9 +21,12 @@
 > card carousel (`24,138 354x85`), a card right of it scrolled for `down`: the stroke, the screen's `699 → 175`
 > before, is now `207 → 155` inside the carousel, and the exhausted reply names the transactions list drawn over that
 > touch-down (70 differential diffs, all failing after 2 swipes as before). On a device a cross-axis drag in a
-> carousel is usually handed to the outer scroller, so it would move the page about 51 pt a stroke — unmeasured.
-> Pinned as it is today in tests/interact/scroll-rounds.test.ts ("a card of a horizontal carousel, scrolled for
-> `down`").
+> carousel is usually handed to the outer scroller, so it would move the page about 51 pt a stroke — UNMEASURED: no
+> device has run it, and no lab cell can show it (none holds a horizontal scroll view); it is on round 5's
+> device-check list (the account-detail screen of the app the differential replays, or a new lab cell: a card
+> carousel inside a vertical list, a card off its right edge asked for `down`). Pinned as it is today in
+> tests/interact/scroll-rounds.test.ts ("a card of a horizontal carousel, scrolled for `down`") and
+> tests/interact/stroke-plan.test.ts ("a card of a horizontal carousel, stroked for `down`").
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/scroll-bounded.*`, captured by scripts/truth/capture.ts on the dedicated

@@ -408,8 +408,7 @@ function byShape(screenArea: number): PresentationAdapter {
  * window read as presented by shape (on the corpus it fires only on SystemUI's notification shade, a misreading).
  *
  * Where the uiautomator facts belong, and how lab note L1 lands here
- * (2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md, among truth/phase-3's bug notes,
- * not tracked on this branch). That fix should bring a dedicated root mark ("the dump lists only the active window",
+ * (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md). That fix should bring a dedicated root mark ("the dump lists only the active window",
  * in the dialect of `UiNode.flatList` / `unclippedFrames`) rather than keep reading `paddedTouchTargets` for it:
  * `uiautomator dump` lists the ACTIVE window only. With a Compose `AlertDialog` up, the dump IS the dialog's window —
  * a root window smaller than the screen (`[155,851][925,1368]` of 1080x2220) — and with a `ModalBottomSheet` up, the

@@ -845,7 +845,7 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
  * iOS's status band is off the screen for `scroll_until`'s stop too (2026-10-09, device check C3-1.3 of
  * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md): one 0.3-s stroke (`idb ui swipe 201 699 201
  * 175`) flung `priority_select` from 771 to `24,-20`, its centre (201,6) — on the screen and under no tree node — and
- * the plain stop stopped there; the tap that followed went to the status bar. interact/swipe.ts#iosStatusBand.
+ * the plain stop stopped there; the tap that followed went to the status bar. adapters/ios-status-band.ts#iosStatusBand.
  */
 describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   /** The SWIFT form as idb lists it, `priority_select` (at `start`, else where the fixture has it) moved by each stroke to the next of `ys` (the last one standing). */

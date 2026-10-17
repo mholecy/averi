@@ -29,11 +29,17 @@ import { sceneOf, type Scene } from './standing.js';
  *   `frameOver`, `overlapping` and its `remedy`); `scroll_until`'s pure read holds only the synchronous facts its round
  *   hands in (`ofKeyboard`), its two async questions asked by the round's protocol (interact/scroll-read.ts#Cover).
  *
- * The screen is not a look's: a verb asks ui-tree/usable-screen.ts#usableScreen of the look's tree (a Look is a
- * TreeRead) and falls back to its `treeScreen` itself, because which look's screen it judges on is the verb's — the
- * tap judges every look of one tap on its FIRST look's screen (the orientation does not turn inside one tap) and reads
- * it again `fresh` before refusing, the pixel poll each round on that round's, `scroll_until` on a frame and gesture
- * box interact/swipe.ts#screenBox reads and keeps across rounds.
+ * The screen is not a look's — BY DECISION, where the architecture review's candidate (A3) put it in the Look: a verb
+ * asks ui-tree/usable-screen.ts#usableScreen of the look's tree (a Look is a TreeRead) and falls back to its
+ * `treeScreen` itself, because which look's screen it judges on is the verb's — the tap judges every look of one tap
+ * on its FIRST look's screen (the orientation does not turn inside one tap) and reads it again `fresh` before
+ * refusing, the pixel poll each round on that round's, `scroll_until` on a frame and gesture box
+ * interact/swipe.ts#screenBox reads and keeps across rounds. A screen held by each look would hand the tap a later
+ * look's screen and `scroll_until` a frame that moves between its rounds, so the three lifetimes stay with their verbs.
+ *
+ * Pinned twice, on purpose: tests/ui-tree/look.test.ts holds the contract above, and tests/interact/look-scene.test.ts
+ * keeps its walk-counting mocks (`sceneOf`, `readKeyboard`) as the one-walk-per-read pin — no type can say that a
+ * verb did not derive a second scene of a look's tree, only a count of the walks can.
  */
 export interface Look<R extends LookReading = KeyboardReading> {
   /** The tree read. */
