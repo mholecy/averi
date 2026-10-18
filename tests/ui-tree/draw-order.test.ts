@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
-import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { drawOrder, minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
@@ -2042,5 +2042,17 @@ describe('exposure.centreExcused — the later nodes the target column excused t
     expect(order.exposure(title, IPHONE)).toMatchObject({ covers: [bar], centreCover: bar, centreExcused: [twin] });
     // The box ends at 740, above the centre: the twin still meets what shows, but no tap lands at the centre.
     expect(order.exposure(title, rect(0, 0, 402, 740))).toMatchObject({ covers: [], centreExcused: [] });
+  });
+});
+
+describe('minTapPiece: the least piece a tap may be aimed at, one formula for averi and the harness', () => {
+  it('6 % of the screen\'s shorter side, rounded — 24 pt on the 402-pt iPhone 17, 65 px on the 1080-px Pixel 3a, either orientation', () => {
+    expect(minTapPiece({ width: 402, height: 874 })).toBe(24);
+    expect(minTapPiece({ width: 1080, height: 2220 })).toBe(65);
+    expect(minTapPiece({ width: 2220, height: 1080 })).toBe(65);
+  });
+  it('is what the draw order\'s exposure answers as its minPiece', () => {
+    const target = uiNode({ role: 'button', identifier: 't', rect: rect(0, 0, 100, 100) });
+    expect(drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 1080, 2220), children: [target] })).exposure(target, rect(0, 0, 1080, 2220)).minPiece).toBe(65);
   });
 });
