@@ -264,6 +264,17 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: short, points: swipeVector(short, 'down', 'content') });
   });
 
+  it('a clear stretch the cut for what is drawn over it leaves without room (a bar over the stretch above a carousel filling the page below): judged as before the rule — the page\'s stroke, over the carousel — never the screen box', () => {
+    const row = ROW();
+    const low: Rect = { x: 0, y: 280, width: 402, height: 594 };
+    const bar = node({ role: 'other', label: 'bar', rect: { x: 0, y: 240, width: 402, height: 30 } });
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(low, cards(low)), row]), bar]);
+    const { stroke, memory } = planOn(tree, 'down', { target: row, gesture: PHONE });
+    expect(stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'down', 'content') });
+    // The page is the scroll view the stroke went over: a touch-down on a node drawn over it is named.
+    expect(touchedOn(strokeSent(memory), factsOf(tree), { from: { x: 201, y: 250 }, to: { x: 201, y: 200 } })?.container).toEqual(PAGE);
+  });
+
   it('a card of that carousel, stroked for `down`: the carousel scrolls only across, so the stroke goes over the page — the outer scroll view — clear of the carousel', () => {
     const [first, card] = cards(CAROUSEL);
     const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, [first, card]), ROW()])]);

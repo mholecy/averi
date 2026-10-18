@@ -114,7 +114,8 @@ was reported done at (201,827), 3 pt below CONTINUE.
   content past its frame on one axis alone; unknown — today's behaviour — for a Compose lazy list or grid, a
   RecyclerView, a WDA scroll view whose content fits, and idb. Fallbacks: no candidate along the stroke with room —
   the pick as before (the nearest with room, whatever its axis: mp-native's Account Detail as captured, whose carousel
-  no list holds); no clear stretch with room — the stroke as before, over the nested scroll view; the `fully: true`
+  no list holds); no clear stretch with room, or none left with room by the cut for what is drawn over the scroll view — the stroke
+  as before, over the nested scroll view; the `fully: true`
   probe never goes over a scroll view that scrolls only across it (unchecked, not a probe that moves nothing). Still
   UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
   the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown

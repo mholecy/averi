@@ -52,7 +52,8 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  * the longest stretch of the page clear of it). The fallbacks, stated: no candidate along the stroke with room — the
  * pick as before the axis (the nearest with room, whatever its axis: a card of a carousel no vertical list holds,
  * scrolled for `down`, is still stroked inside the carousel, mp-native's Account Detail as captured); no stretch clear
- * of a cross-axis scroll view with room — the stroke as before, over it; the probe (`planProbe`) never goes over a
+ * of a cross-axis scroll view with room, or none the cut for what is drawn over it leaves room in — the stroke as
+ * before, over it (`roomAmong`); the probe (`planProbe`) never goes over a
  * scroll view that scrolls only across it (no room, `flush.why: 'room'`, rather than a probe that moves nothing and is
  * read as checked). Why: a gesture belongs to the view the finger first touches, and a carousel touched down on by a
  * vertical drag hands the outer list part of it at most (~51 pt a stroke on iOS, inferred, UNMEASURED: no lab cell held
@@ -426,18 +427,30 @@ function strokeRoom(box: Rect | undefined, candidates: readonly ScrollView[], to
   return roomAmong(box, along, toward, coverTop) ?? (otherwise === 'any axis' && along.length < candidates.length ? roomAmong(box, candidates, toward, coverTop) : undefined);
 }
 
-/** `strokeRoom`'s judgement over `candidates`, nearest first: the first with room, in its clear lane (`clearLane`), above the keyboard and what is drawn over it. */
+/**
+ * `strokeRoom`'s judgement over `candidates`, nearest first: the first with room, in its clear lane (`clearLane`),
+ * above the keyboard and what is drawn over it. A lane the cut for what is drawn over it leaves without room is the
+ * fallback's as much as no lane at all: the candidate is then judged whole, as before the rule (`met`) — never
+ * dropped for a lane, which would hand the stroke to an outer scroll view or the screen box (a bar over the stretch
+ * above a carousel filling the page below: the lane 180–280 cut at the bar's 240 to 60).
+ */
 function roomAmong(box: Rect, candidates: readonly ScrollView[], toward: Direction, coverTop: number | undefined): StrokeRoom | undefined {
   for (const { rect: within, over, axes } of candidates) {
     const met = rectIntersection(box, within);
     if (met === undefined) continue;
     const lane = clearLane(met, axes, toward, coverTop);
-    const drawn = overlayTop(lane, over, toward, coverTop);
-    const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
-    const room = roomIn(lane, toward, top);
-    if (room !== undefined) return { within, box: room, ...(top !== undefined && { coverTop: top }) };
+    const room = roomOver(lane, over, toward, coverTop) ?? (lane === met ? undefined : roomOver(met, over, toward, coverTop));
+    if (room !== undefined) return { within, ...room };
   }
   return undefined;
+}
+
+/** The room in `box` — a candidate's part, or its lane — above the keyboard and what is drawn over it (`overlayTop`, `roomIn`): the box the stroke is drawn in and the cover's top edge, or undefined. */
+function roomOver(box: Rect, over: readonly Rect[], toward: Direction, coverTop: number | undefined): Omit<StrokeRoom, 'within'> | undefined {
+  const drawn = overlayTop(box, over, toward, coverTop);
+  const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
+  const room = roomIn(box, toward, top);
+  return room === undefined ? undefined : { box: room, ...(top !== undefined && { coverTop: top }) };
 }
 
 /** The axis a stroke toward `toward` moves the content along. */
