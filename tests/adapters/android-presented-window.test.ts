@@ -140,7 +140,7 @@ describe('scroll_until for a target the tree cannot list beneath the presented w
     const played = play(RULES, [row, row]);
     expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
     expect(failureOf(played, 'id:"lab.alert-dim.D"').message).toBe(
-      'scroll_until id:"lab.alert-dim.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on ' +
+      'scroll_until id:"lab.alert-dim.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on the dim outside ' +
         `container (155,851 770x517) — ${presentedStop({ kind: 'dialog' })}, so none was sent.`,
     );
   });

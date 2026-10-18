@@ -1,5 +1,5 @@
 import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
+import { containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -291,8 +291,17 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
         ? `, and swiping ${back} would only push it out through that edge`
         : `, and swiping ${back} was tried earlier in the scroll`;
 
-/** `, and the next swipe would touch down at (x,y) on <the surface>` — where the `presented` stop's held-back stroke would have landed (`next`); empty when it was judged in the frame. */
-const touchDownText = (next: PresentedTouchDown | undefined): string => (next === undefined ? '' : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${coverText(next.surface, next.reach)}`);
+/**
+ * `, and the next swipe would touch down at (x,y) on <the surface>` — where the `presented` stop's held-back stroke
+ * would have landed (`next`); empty when it was judged in the frame. A touch-down outside where the surface reaches is
+ * said to land on the dim outside it: Android's dialog window, listed alone, reaches only its own rect, and a touch
+ * beside it lands on the dim the dialog lays around it (which dismisses it) —
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md.
+ */
+const touchDownText = (next: PresentedTouchDown | undefined): string =>
+  next === undefined
+    ? ''
+    : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${containsPoint(next.reach, next.touchDown) ? '' : 'the dim outside '}${coverText(next.surface, next.reach)}`;
 
 const pointText = (p: Point): string => `(${p.x},${p.y})`;
 
