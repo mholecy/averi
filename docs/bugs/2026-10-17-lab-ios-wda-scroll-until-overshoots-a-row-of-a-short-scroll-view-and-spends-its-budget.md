@@ -1,6 +1,6 @@
 # BUG: under WDA, `scroll_until` for a row far down a short (180-pt) scroll view carries the list past it with momentum, turns once at the last swipe, and fails at maxSwipes with the row 18 % drawn — one run in three
 
-> **Status (2026-10-18):** fixed under WDA on branch `arch/r22-lv4` (from `arch/round-22` `b71cbbb`); unmeasured on a
+> **Status (2026-10-18):** fixed under WDA at `fe31a3c` on `arch/r22-lv4` (the carry model reworked by review round 1, ADR 0021); unmeasured on a
 > device — the live KNOWN `ios wda scroll:scroll-bounded.F` (intermittent) is the device check's to judge, over several
 > runs. Diagnosis from this note's measurements: the strokes' reach is not the fault (60 % of `lower`, 108 pt), the
 > fling is — ≈ 2.4 × the drag here (259 pt) as on the SwiftUI form (344 → 729–970 pt), roughly in proportion to the

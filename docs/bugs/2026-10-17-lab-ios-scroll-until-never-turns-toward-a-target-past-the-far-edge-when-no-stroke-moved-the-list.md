@@ -1,6 +1,6 @@
 # BUG (or a decision to record): on iOS, `scroll_until` asked the wrong way for a row of a scroll view already at its end that way strokes three times, moves nothing, and fails with the right direction as advice — it never turns back toward the target the tree places past the far edge
 
-> **Status (2026-10-18):** fixed under WDA at `b41d311` on `arch/r22-lv4` (from `arch/round-22` `b71cbbb`), the owner's (b)
+> **Status (2026-10-18):** fixed under WDA at `1a1871f` on `arch/r22-lv4` (rebased onto `arch/round-22` `8b2530c`; review round 1 fixes after it, ADR 0021) (from `arch/round-22` `b71cbbb`), the owner's (b)
 > as decided on 2026-10-17; unmeasured on a device — the live KNOWN `ios wda turn:scroll-bounded.F` is the device
 > check's to judge. The caller's direction is stroked first; the read after the one stroke up finds every match where
 > it was and the tree listing `lower`'s content ending at its top (nothing of it above 380), so the content is PROVEN
