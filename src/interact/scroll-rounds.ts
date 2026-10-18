@@ -599,12 +599,7 @@ type Frame = UsableScreen;
  */
 interface State {
   readonly rules: RoundRules;
-  /**
-   * The COURSE's direction — where the content lies for the scroll: the caller's (`rules.direction`) until the end
-   * turn, its opposite after (`EndTurn`). What the far edge, the fling's turn and the strokes are judged against.
-   */
-  readonly course: Direction;
-  /** The end turn, once made (`EndTurn`: at most one a scroll) — carried by the stop, whatever its kind. */
+  /** The end turn, once made (`EndTurn`: at most one a scroll) — carried by the stop, whatever its kind; the course's direction after it (`courseOf`). */
   readonly endTurn: EndTurn | undefined;
   readonly swipes: number;
   /** A `stop` was returned: no further round. */
@@ -728,6 +723,12 @@ interface State {
   readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
 }
 
+/**
+ * The COURSE's direction — where the content lies for the scroll: the caller's (`rules.direction`) until the end turn,
+ * its opposite after (`EndTurn.to`). What the far edge, the fling's turn and the strokes are judged against.
+ */
+const courseOf = (s: State): Direction => s.endTurn?.to ?? s.rules.direction;
+
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
 export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
   const box: Rect = { x: 0, y: 0, ...asBuilt };
@@ -757,7 +758,6 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     confirmReads: 0,
     presentedHold: undefined,
     strokesSent: 0,
-    course: rules.direction,
     endTurn: undefined,
     lastStroke: rules.direction,
     turns: 0,
@@ -1052,11 +1052,11 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
     // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
-    const beyond = beyondFarEdgeIn(farFacts(best), s.course, frames);
+    const beyond = beyondFarEdgeIn(farFacts(best), courseOf(s), frames);
     // Kept whatever the target showed: only a read with none of it in the
     // frame reaches the failure's `past` (`left` needs it never in the
     // frame, `offFrame` this read's match at visible 0).
-    const { far } = FAR_EDGE[s.course];
+    const { far } = FAR_EDGE[courseOf(s)];
     s.lastPast = beyond ? { side: far, clippedOut: best.node.clippedOut === far } : undefined;
     // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md
     // Or IN the frame at that edge: across it — clipped there, or into a system
@@ -1073,10 +1073,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // `facts.reaches`): CONTINUE pinned at idb's flat list reaches the
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
-    const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, s.course, cover, f));
+    const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, courseOf(s), cover, f));
     const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.reaches.some(overFar));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
-    if (!beyondFarEdgeIn(farFacts(best), s.course, uncutFrames)) s.seenShort = true;
+    if (!beyondFarEdgeIn(farFacts(best), courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
@@ -1172,7 +1172,7 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  */
 function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean } {
   const back = s.backPending && s.stuckOn !== undefined ? OPPOSITE[s.stuckOn] : undefined;
-  const toward = s.dropped ?? back ?? (s.carriedPast ? OPPOSITE[s.course] : s.course);
+  const toward = s.dropped ?? back ?? (s.carriedPast ? OPPOSITE[courseOf(s)] : courseOf(s));
   // A turn: drawn the other way from the last stroke sent — the one test the
   // reach and the turn count share. The FIRST stroke is one too when it is
   // drawn back from a target read at the far edge in the frame (`observe`):
@@ -1598,7 +1598,7 @@ const named = ({ role, label, identifier, rect }: UiNode): EndTurn['scrollView']
 function turnsAtEnd(s: State, best: Judged, view: UiNode, facts: TreeFacts): boolean {
   if (s.endTurn !== undefined) return false;
   const inside = facts.scene.clips.drawnIn(best.node)?.scrollers.includes(view) === true;
-  return inside && beyondFarEdge(best.node.rect, s.course, view.rect);
+  return inside && beyondFarEdge(best.node.rect, courseOf(s), view.rect);
 }
 
 /**
@@ -1609,9 +1609,9 @@ function turnsAtEnd(s: State, best: Judged, view: UiNode, facts: TreeFacts): boo
  * `turns` — the failure's "turned round N times: a fling" — does not count it.
  */
 function turnAtEnd(s: Mutable<State>, view: UiNode): void {
-  s.endTurn = { from: s.course, to: OPPOSITE[s.course], after: s.swipes, unmoved: Math.min(s.allUnmovedStrokes, s.swipes), scrollView: named(view) };
-  s.course = OPPOSITE[s.course];
-  s.lastStroke = s.course;
+  const from = courseOf(s);
+  s.endTurn = { from, to: OPPOSITE[from], after: s.swipes, unmoved: Math.min(s.allUnmovedStrokes, s.swipes), scrollView: named(view) };
+  s.lastStroke = OPPOSITE[from];
   s.seenShort = true;
   s.carriedPast = false;
   s.lastPast = undefined;
@@ -1659,7 +1659,7 @@ function shortfall(s: State, { readError, found, best, viewport, cover }: BoundR
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
     // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
     const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
-    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[s.course].far }) };
+    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }) };
   }
   // In the tree: scroll-read.ts#judge scores every match, so this read judged one and `past` is this read's.
   return {
