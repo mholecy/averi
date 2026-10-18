@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
-import { CARRY_CEILING, carried, planStroke, seeRead, startStrokes, type StrokeMemory } from '../../src/interact/stroke-plan.js';
+import { CARRY_CEILING, carried, planStroke, seeRead, startStrokes, UNMEASURED_CARRY, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { largestScroller } from '../../src/ui-tree/geometry.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
@@ -123,8 +123,8 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
     return points.from.y - points.to.y;
   };
 
-  it('nothing measured: the full stroke; measured 2.44 a point, 153 pt needed: ~63 pt of travel', () => {
-    expect(travelFor(seen, 153)).toBe(108);
+  it(`nothing measured: the stroke at UNMEASURED_CARRY (${UNMEASURED_CARRY}) a point, 153 pt needed: ~55 pt of travel; measured 2.44 a point: ~63 pt`, () => {
+    expect(travelFor(seen, 153)).toBeCloseTo(153 / UNMEASURED_CARRY, 0);
     expect(travelFor(carried(seen, { moved: 263, drawn: drag(108) }), 153)).toBeCloseTo(153 / (263 / 108), 0);
   });
 
@@ -140,10 +140,16 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
     expect(travelFor(carried(seen, { moved: 115, drawn: drag(48) }), 120)).toBeCloseTo(120 / (115 / 48), 0);
   });
 
-  it(`a sample past CARRY_CEILING (${CARRY_CEILING}) × the travel, one the wrong way, or one of a tap, is no stroke's: dropped`, () => {
-    expect(travelFor(carried(seen, { moved: 760, drawn: drag(108) }), 153)).toBe(108);
-    expect(travelFor(carried(seen, { moved: -200, drawn: drag(108) }), 153)).toBe(108);
-    expect(travelFor(carried(seen, { moved: 30, drawn: drag(20) }), 153)).toBe(108);
+  it(`a sample past CARRY_CEILING (${CARRY_CEILING}) × the travel, one the wrong way, or one of a tap, is no stroke's: dropped — the stroke is the unmeasured one`, () => {
+    const unmeasured = travelFor(seen, 153);
+    expect(travelFor(carried(seen, { moved: 760, drawn: drag(108) }), 153)).toBe(unmeasured);
+    expect(travelFor(carried(seen, { moved: -200, drawn: drag(108) }), 153)).toBe(unmeasured);
+    expect(travelFor(carried(seen, { moved: 30, drawn: drag(20) }), 153)).toBe(unmeasured);
+  });
+
+  it('the first measured sample replaces UNMEASURED_CARRY, smaller or not: 2.1 a point measured, the stroke is longer than the unmeasured one', () => {
+    expect(travelFor(carried(seen, { moved: 227, drawn: drag(108) }), 153)).toBeCloseTo(153 / (227 / 108), 0);
+    expect(travelFor(carried(seen, { moved: 227, drawn: drag(108) }), 153)).toBeGreaterThan(travelFor(seen, 153));
   });
 
   it('only where one stroke could skip the window: a window that lets the target travel further than a full stroke carries it keeps the full stroke', () => {
@@ -153,7 +159,9 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
 
   it('the rounds offer a sample only of the same node at the same size: a judged match that switched nodes between reads measures nothing', () => {
     // WDA list 0,300 402x200 (content running on below it); the match read as `a` at y 900, then as `b` at y 600 — 300 pt
-    // "moved" for a 120-pt stroke, under the ceiling — then `b` again. Measured, the next stroke would be cut short.
+    // "moved" for a 120-pt stroke (2.5 a point), under the ceiling — then `b` again. Measured, the next stroke would be
+    // cut to what `b` still needs over 2.5; unmeasured, over UNMEASURED_CARRY: 232 pt (to the list's middle) of a
+    // 120-pt full stroke.
     const list: Rect = { x: 0, y: 300, width: 402, height: 200 };
     const rowOf = (label: string, y: number): Row => {
       const m = node({ role: 'button', identifier: 't', label, rect: { x: 0, y, width: 402, height: 64 } });
@@ -162,6 +170,7 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
     };
     const played = play({ ...RULES, maxSwipes: 2, screen: { width: 402, height: 874 } }, [rowOf('a', 900), rowOf('b', 600), rowOf('b', 600)]);
     const reaches = played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []));
-    expect(reaches).toEqual([1, 1]);
+    expect(reaches[0]).toBe(1);
+    expect(reaches[1]).toBeCloseTo(232 / UNMEASURED_CARRY / 120, 5);
   });
 });
