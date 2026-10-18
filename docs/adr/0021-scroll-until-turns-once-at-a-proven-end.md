@@ -2,7 +2,8 @@
 
 Status: decisions 1–3 accepted, 2026-10-17 (owner, on lab note LV4, option (b): the three conditions and the
 one-stroke stop); decision 4 (lab note LV5's carry model) implemented 2026-10-18 on `arch/r22-lv4` under the round-6
-brief, pending the owner and the device check. Open point for the owner: the uiautomator exclusion (below).
+brief, pending the owner and the device check. Open points for the owner, both on uiautomator (below): the
+exclusion from the turn, and the one-stroke stop.
 
 ## Context
 
@@ -62,6 +63,15 @@ brief, pending the owner and the device check. Open point for the owner: the uia
   ruled is not proof. Android keeps the caller's direction and fails with the advice, as before; its strokes drag at
   `dragSpeed` (no fling), so the carry model has nothing to do there. If the owner accepts two identical unmoved
   strokes touching down on nothing drawn over the list as proof on Android, the turn extends there.
+- **uiautomator: the one-stroke stop — also open for the owner.** Off WDA the stop still needs
+  `UNMOVED_STROKES_EXHAUST` (2, scroll-rounds.ts) identical strokes that moved nothing, and the stuck test likewise
+  (then one stroke back), so a scroll that cannot move anything costs at least two swipes and their settles before it
+  fails. Measured on the golden replay of the Android lab app (truth/round-6): F2A1's phone (`form-keyboard.xml`, a
+  form that fits above the IME, nothing to scroll) still fails after 3 swipes — `540 1034 → 424` twice, then one back
+  up — though round 6's fix (6d8f8de) made its verdict right. Whether one unmoved stroke, touching down on nothing
+  drawn over its scroll view, may end the scroll there too is the same question as the turn's — what on uiautomator's
+  tree may stand for the end WDA lists — asked for the stop alone: a one-stroke stop that is wrong costs a failure
+  where a second stroke would have moved the list; a two-stroke stop that is right costs a swipe and a settle.
 - **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged.
 
 ## Consequences and residuals
