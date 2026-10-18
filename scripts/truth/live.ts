@@ -12,8 +12,9 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { judgeDismissal, touchesSince, visibilityCases, type LiveVerdict } from './live-visibility.js';
-import { allPassed, claimsDone, claimsTap, isError, replyKind } from './replies.js';
+import { holds, judgeNoteFill, judgePhoneScroll, short, valueOf } from './live-forms.js';
+import { judgeDismissal, visibilityCases, type LiveVerdict } from './live-visibility.js';
+import { allPassed, claimsTap, isError } from './replies.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
 /**
@@ -144,26 +145,6 @@ const fill = (cell: string, tag: string, text: string, clear?: boolean): Call =>
   tool: 'type_text',
   args: { selector: id(cell, tag), text, ...(clear !== undefined && { clear }) },
 });
-const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
-const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
-
-/** The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). */
-const holds =
-  (tag: string, want: string) =>
-  (s: LabState, replies: string[], _source?: Source, launched?: LabState): LiveVerdict => {
-    const got = valueOf(s, tag);
-    // LOUD splits by what averi left behind: the field as the launch left it, or changed (a part typed, a part cleared).
-    const before = launched === undefined ? undefined : valueOf(launched, tag);
-    const left = before === undefined ? '' : got === before ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
-    const last = replies[replies.length - 1];
-    if (got === want) {
-      return isError(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
-    }
-    return claimsDone(last)
-      ? { outcome: 'MISMATCH', why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
-      : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
-  };
-
 const P = 'form-prefilled';
 const B = 'form-basic';
 const K = 'form-keyboard';
@@ -221,20 +202,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     dismiss: [TITLE],
     says: 'a fill under the keyboard with a dismissal (Android: none configured — back hides it; then note is a strip under the bar, refused by design)',
     calls: [fill(K, 'note', 'Thanks - ok')],
-    judge: (s, replies, source, launched) => {
-      const v = holds('note', 'Thanks - ok')(s, replies, source, launched);
-      // idb cannot hide the keyboard: a refusal with the field untouched is the documented answer there.
-      if (source === 'idb' && v.outcome === 'LOUD' && valueOf(s, 'note') === '') return { outcome: 'ok', why: `refused (idb): ${short(replies[0])}` };
-      // Android: once back hid the IME, note lies under the bar dropped to the bottom, its dump a 14-px strip cut by
-      // Continue (F2A1). A fill is REFUSED BY DESIGN there, as the tap (the owner's decision of 2026-10-18): ok when
-      // refused naming the remedy (scroll it out from under the bar, or dismiss the keyboard first), every field as the
-      // launch left it, nothing submitted.
-      const untouched = Object.entries(s.fields ?? {}).every(([k, f]) => f.value === launched.fields?.[k]?.value);
-      if (source === 'uiautomator' && v.outcome === 'LOUD' && untouched && (s.submits ?? []).length === 0 && /scroll_until it out from under|dismiss it first/.test(replies[0])) {
-        return { outcome: 'ok', why: `refused by design (F2A1: a fill into a strip under the tap minimum), every field untouched, no submit: ${short(replies[0])}` };
-      }
-      return v;
-    },
+    judge: (s, replies, source, launched) => judgeNoteFill(s, replies, source, launched),
   },
   {
     id: 'k5',
@@ -274,27 +242,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     platforms: ['android'],
     says: 'scroll_until phone, under the bar riding on the IME: no stop while its centre lies under the bar or the IME, never a submit (the strokes counted)',
     calls: [{ tool: 'scroll_until', args: { selector: id(K, 'phone'), direction: 'down' } }],
-    judge: (s, [reply], _source, launched) => {
-      const submits = (s.submits ?? []).length;
-      const touches = touchesSince(s, launched);
-      const strokes = `${touches.length} stroke(s) the app logged${touches.length === 0 ? '' : ` at ${touches.map((t) => `(${t})`).join(' ')}`}`;
-      if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); ${strokes}; averi: ${short(reply)}` };
-      // Where the app lays phone out when scroll_until returns: its centre under the bar (the surface with no node) or
-      // the IME is no stop; clear of both, a stop is right — the part of it the bar's top padding still covers is said.
-      const phone = s.frames.phone;
-      const bar = s.frames['submit.bar'];
-      const ime = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
-      const cy = phone === undefined ? undefined : phone.y + phone.height / 2;
-      const under = (r: { y: number; height: number } | undefined | null) => r != null && cy !== undefined && cy >= r.y && cy < r.y + r.height;
-      const covered = phone == null || bar == null ? 0 : Math.max(0, Math.min(phone.y + phone.height, bar.y + bar.height) - Math.max(phone.y, bar.y));
-      const where = phone == null ? 'phone not laid out' : `phone ${phone.y}–${phone.y + phone.height} (launched ${launched.frames.phone?.y ?? '?'}), ${covered} px of it under the bar`;
-      if (replyKind(reply) === 'visible') {
-        return under(bar) || under(ime) || phone == null
-          ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — phone's centre lies under the ${under(bar) ? 'bar' : 'IME'}; ${where}; ${strokes}` }
-          : { outcome: 'ok', why: `stopped with phone's centre clear of the bar and the IME (${where}); ${strokes}: ${short(reply)}` };
-      }
-      return { outcome: 'ok', why: `no stop, nothing submitted (${where}); ${strokes}: ${short(reply)}` };
-    },
+    judge: (s, replies, source, launched) => judgePhoneScroll(s, replies, source, launched),
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },
   { id: 'b1d', cell: B, says: 'fill, no clear, a name with diacritics', calls: [fill(B, 'name', 'Jan Šťastný')], judge: holds('name', 'Jan Šťastný') },
