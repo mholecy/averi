@@ -16,8 +16,8 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * that judges that look:
  * - the tap (interact/tap-judgement.ts: the on-screen rule with the tree's own
  *   line, the chrome aim with the reading's merged in, only when its
- *   centre is covered) and the dismissal picker (interact/keyboard-in-tree.ts
- *   #pickDismissal, the same merged line) — a look of the guard's, with the
+ *   centre is covered) and the dismissal strategies (interact/keyboard-dismissal.ts
+ *   #configuredStrategy and #blankPoint, the same merged line) — a look of the guard's, with the
  *   adapter's whole reading;
  * - `scroll_until`'s read (interact/scroll-read.ts#judgeRead: idb's band as
  *   a cover, the keyboard's own UI judged against the whole screen; and

@@ -41,7 +41,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   TapJudge.aim for the tap and the fill's focus tap,
  *   standing.ts#Scene.standing for `scroll_until`'s stop, and the tap's
  *   standing again for the in-tree keyboard dismissal picker,
- *   interact/keyboard-in-tree.ts#pickDismissal).
+ *   interact/keyboard-dismissal.ts#configuredStrategy).
  *   docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  * - `paintsOver(node, within)` — a pixel assert's chrome
  *   (ui-tree/standing.ts#Scene.standing's pixel purpose): which of
@@ -343,7 +343,7 @@ export interface Exposure {
    * own unlabelled control (`ownControl`), a row of a scroll view it is not
    * in (`scrolledContent`) are excused for where a touch lands on the node,
    * not for what else the touch triggers. One reader: the in-tree dismissal
-   * picker (interact/keyboard-in-tree.ts#pickDismissal), which refuses a
+   * picker (interact/keyboard-dismissal.ts#configuredStrategy), which refuses a
    * candidate whose centre an interactive one of them holds (ADR 0016).
    * Judged in the same pass as `covers`, no second walk.
    */
@@ -602,7 +602,7 @@ const NOT_DRAWN = {
    * dimming view is a wrapper holding its card, an RN ScrollView in it
    * whose rows are below the title) reads as not covering, and the tap
    * lands on it; for the
-   * in-tree keyboard dismissal (interact/keyboard-in-tree.ts#pickDismissal),
+   * in-tree keyboard dismissal (interact/keyboard-dismissal.ts#configuredStrategy),
    * on the guard's path a keyboard that stays, or a target gone, ends in
    * `AfterDismissalTap`; a tap that hides the keyboard AND does something
    * of its own passes silently (`hidden by tapping <title> before
@@ -1137,7 +1137,7 @@ const NOT_DRAWN = {
    * platforms differently (and an adapter with the oracle never reads the
    * keyboard from its tree: a band there is no cover either). The in-tree
    * keyboard dismissal picker judges the keyboard first, by the reading's
-   * band (interact/keyboard-in-tree.ts#pickDismissal); a keyboard-owned
+   * band (interact/keyboard-dismissal.ts#configuredStrategy); a keyboard-owned
    * node outside the band does not refuse a dismissal (ADR 0016's
    * residual) unless it is a control holding the dismissal's centre
    * (`Exposure.centreExcused`).

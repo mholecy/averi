@@ -105,7 +105,7 @@ import { cutByRemedy, cutRemedy, cutSliverText, underKeyboardText, type Keyboard
  * refusal's headline: the target was not tapped, but something was.
  *
  * Its interface: `judgeTap` (and its `TapJudge`), `tapStandings` (the
- * dismissal picker asks it too, keyboard-in-tree.ts#pickDismissal), the
+ * dismissal picker asks it too, keyboard-dismissal.ts#configuredStrategy), the
  * three refusals, `Aim` and `movedTapText`. What it judges is found and
  * settled by resolve.ts; the cut and side phrases it shares with
  * `scroll_until` and the picker are target-text.ts's.
@@ -194,7 +194,7 @@ export type TapReading = LookReading & Pick<KeyboardReading, 'remedy'>;
  *   itself when the merge changes no line (the same `y` and `witnessed`).
  * The one expression of "the tap's standing with the reading's line": the
  * tap asks `full()` only when its centre is covered (`judgeTap`), the
- * dismissal picker always (keyboard-in-tree.ts#pickDismissal).
+ * dismissal picker always (keyboard-dismissal.ts#configuredStrategy).
  */
 export interface TapStandings {
   readonly first: TapStanding;

@@ -9,7 +9,7 @@ import { SIDES } from './swipe.js';
  * one wording for every verb that says it: the tap's refusal (tap-judgement.ts),
  * the wait's hint (resolve.ts#zeroAreaHint), `scroll_until`'s failures
  * (scroll-text.ts) and the dismissal picker's skip lines
- * (keyboard-in-tree.ts#whyNotTapped) — and the picker's short name for a
+ * (keyboard-dismissal.ts#whyNotTapped) — and the picker's short name for a
  * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
  * the shared wording. Phrases, not policies: what counts as cut is
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
@@ -176,7 +176,7 @@ export function cutRemedy(edge: Edge): string {
 }
 
 /**
- * A cover as the dismissal picker's skip line names it (keyboard-in-tree.ts
+ * A cover as the dismissal strategies' skip lines name it (keyboard-dismissal.ts
  * #whyNotTapped): `button "Sign in"`, `toolbar` — its role and its label
  * quoted, an empty label as `""`; nothing else.
  *

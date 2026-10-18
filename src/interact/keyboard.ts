@@ -1,9 +1,9 @@
-import type { Point, Rect } from '../adapters/types.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { usableScreen } from '../ui-tree/usable-screen.js';
 import { inTreeModel } from './keyboard-in-tree.js';
 import {
   confirmHidden,
+  KeyboardGuardError,
   lookAgain,
   seenLook,
   withNote,
@@ -14,6 +14,7 @@ import {
   type KeyboardAdapter,
   type KeyboardModel,
   type ResolvedClear,
+  type StillCovering,
 } from './keyboard-model.js';
 import { windowModel } from './keyboard-window.js';
 import { describeTarget, resolveSettled, type Target } from './resolve.js';
@@ -87,8 +88,8 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  *   takes a second look, the hide delay first, and
  *   picks a configured dismissal), which may hand the node back clear with
  *   a note, refuse with nothing sent, or name the `Hiding`. Then ONE side
- *   effect (`back`, or a tap on the picked element — the model's; never
- *   repeated) and the confirming looks (`confirmHidden`): the hide delay,
+ *   effect (`back`, or the move of the strategy the in-tree model chose —
+ *   the model's; never repeated) and the confirming looks (`confirmHidden`): the hide delay,
  *   the target resolved AGAIN with the same options (an adjustResize
  *   activity re-lays-out when the keyboard goes, and so does the iOS
  *   keyboard-avoiding layout: the node the first read chose is no longer
@@ -97,8 +98,12 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  *   `keyboardHidden` sentence; still covering on the last look, or the
  *   target not coming back on any: the model's failure, which says what
  *   was done to the screen first (`back` was pressed; that tap cannot be
- *   untapped). One look after `back`, KEYBOARD_HIDE_CONFIRM_LOOKS after a
- *   dismissal tap — the model's number, its reason beside it.
+ *   untapped) — or, still covering, the in-tree model's NEXT hiding, its
+ *   next dismissal strategy chosen on that last look (`Hiding.stillCovering`,
+ *   interact/keyboard-dismissal.ts), performed and confirmed the same way
+ *   until one hides the keyboard or none is left. One look after `back`,
+ *   KEYBOARD_HIDE_CONFIRM_LOOKS after each in-tree move — the model's
+ *   number, its reason beside it.
  *
  * Cost on Android: what the reading's `over` asks on the first look, and
  * what the look after a dismissal and the re-check rounds add — every
@@ -169,20 +174,26 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     // Handed back clear, nothing sent: judged again on the look that holds the node, off its reading.
     return clearOf(ready.cleared, await (await judgeTap(adapter, target, ready.cleared, screen)).aim());
   }
-  const { hiding } = ready;
-  await hiding.perform();
-  const cleared = await confirmHidden<ClearedLook, { frame: Rect; point: Point }>(
-    hiding.looks,
-    async () => {
-      const look = await lookAgain(adapter, target, opts, hiding.failed);
+  // Each hiding: its one side effect, then its confirming looks; still covered on the last, the model's refusal — or,
+  // in-tree, the next hiding it chose on that look, performed and confirmed the same way.
+  let { hiding } = ready;
+  for (;;) {
+    const current = hiding;
+    await current.perform();
+    const seen = await confirmHidden<ClearedLook, StillCovering>(current.looks, async () => {
+      const look = await lookAgain(adapter, target, opts, current.failed);
       return look.verdict.kind === 'covered'
-        ? { stillUp: { frame: look.verdict.frame, point: look.point } }
-        : { gone: withNote(look.resolved, hiding.hidden(look.verdict)) };
-    },
-    (seen, looks) => hiding.stillCovering(seen, looks),
-  );
-  // After the side effect: judged again with `sent`, the headline of any refusal.
-  return clearOf(cleared, await (await judgeTap(adapter, target, cleared, screen, hiding.sent)).aim());
+        ? { stillUp: { frame: look.verdict.frame, point: look.point, resolved: look.resolved } }
+        : { gone: withNote(look.resolved, current.hidden(look.verdict)) };
+    });
+    if ('gone' in seen) {
+      // After the side effects: judged again with `sent`, the headline of any refusal.
+      return clearOf(seen.gone, await (await judgeTap(adapter, target, seen.gone, screen, current.sent)).aim());
+    }
+    const next = await current.stillCovering(seen.stillUp, seen.looks);
+    if (next instanceof KeyboardGuardError) throw next;
+    hiding = next;
+  }
 }
 
 /** The guard's answer: the look the tap goes to, with what its judgement aimed at. */

@@ -42,11 +42,15 @@ interface FillSpec extends ElementSpec {
  * the screen title was measured to (docs/bugs/2026-10-05-ios-tap-lands-on-
  * soft-keyboard.md, K5b) — or `accessory: true`, the input-accessory
  * toolbar's trailing button (the app's "Done" above a number pad, K4). The
- * list is ordered: the first entry whose element is on screen is used.
+ * list is ordered: the first entry whose element is on screen is used, and
+ * — since 2026-10-18 — the next one when that left the keyboard up; a
+ * non-empty list also opts the guard into averi's own fallbacks after it
+ * (a blank point of the target's scroll view, then a drag of it:
+ * docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md).
  * Opt-in and app-specific on purpose: which element is neutral is the
  * app's business, and the keyboard's own return key SUBMITS (K5d). A `tap`
  * must resolve to a NON-INTERACTIVE element: the guard drops interactive
- * matches (interact/keyboard-in-tree.ts#pickDismissal — a title and a button sharing
+ * matches (interact/keyboard-dismissal.ts#configuredStrategy — a title and a button sharing
  * a label must never tap the button), and a spec that names an interactive
  * `role:` outright is refused at parse time, where the author reads it.
  */

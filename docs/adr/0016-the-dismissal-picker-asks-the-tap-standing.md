@@ -2,11 +2,14 @@
 
 Status: accepted, 2026-10-13 (owner decision: the sweep's list of every changed pick approved; residual 1 decided as
 the explicit refusal).
+Refined 2026-10-18 by docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md: the picker is
+now the configured strategy of an ordered list (`interact/keyboard-dismissal.ts#configuredStrategy`), judged as below;
+a configured entry that was tapped and left the keyboard up is followed by the next, then by averi's own fallbacks.
 
 ## Context
 
 Under WDA the keyboard guard taps a configured dismissal (`tap: id:login_title`) to hide the keyboard
-(`interact/keyboard-in-tree.ts#pickDismissal`). The picker had its own precedence for "can a tap land here":
+(`interact/keyboard-dismissal.ts#configuredStrategy`). The picker had its own precedence for "can a tap land here":
 
 1. the reading's `ofKeyboard` ("the keyboard's own control");
 2. the band's `frameOver` ("under the keyboard");
