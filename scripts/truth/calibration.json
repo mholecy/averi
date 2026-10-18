@@ -1056,14 +1056,17 @@
       "note": "2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md",
       "status": "open",
       "verified": "golden",
-      "defect": "fully visible|^Tapped|reached where it is",
+      "defect": "fully visible|^Tapped|reached where it is|^passed on",
       "checks": [
         "android-averi_lab-api33/scroll-bounded.xml P fully",
         "android-averi_lab-api33/scroll-bounded.xml S tap",
         "android-averi_lab-api33/scroll-bounded.xml S scroll_until",
-        "android-averi_lab-api33/scroll-bounded.xml S fully"
+        "android-averi_lab-api33/scroll-bounded.xml S fully",
+        "android-averi_lab-api33/carousel-in-list.xml C tap",
+        "android-averi_lab-api33/carousel-in-list.xml C colour",
+        "android-averi_lab-api33/carousel-in-list.xml C scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30)."
+      "remark": "No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes."
     },
     {
       "n": "LE2",

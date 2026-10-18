@@ -981,15 +981,18 @@ No fix yet: red at HEAD, both ways. W (the menu row, listed just before C) refus
 
 ## LE1: OPEN-RED
 
-2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md — defect: `fully visible|^Tapped|reached where it is`
+2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md — defect: `fully visible|^Tapped|reached where it is|^passed on`
 
 - working tree:
   - RED android-averi_lab-api33/scroll-bounded.xml P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.P" fully visible after 0 swipes
   - RED android-averi_lab-api33/scroll-bounded.xml S tap — Tapped: Tapped id:"lab.scroll-bounded.S"
   - RED android-averi_lab-api33/scroll-bounded.xml S scroll_until — reached where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.S" fully visible after 0 swipes
   - RED android-averi_lab-api33/scroll-bounded.xml S fully — fully visible where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.S" fully visible after 0 swipes
+  - RED android-averi_lab-api33/carousel-in-list.xml C tap — Tapped: Tapped id:"lab.carousel-in-list.C"
+  - RED android-averi_lab-api33/carousel-in-list.xml C colour — passed on #EEEEEE: PASS  element id:"lab.carousel-in-list.C" fill within dE00 8 of #EEEEEE — sampled #EEEEEE (dominant, 100% of region) vs expected #EEEEEE → dE00 0.00 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/carousel-in-list.xml C scroll_until — no swipe: Element id:"lab.carousel-in-list.C" fully visible after 0 swipes
 
-No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30).
+No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes.
 
 ## LE2: OPEN-RED
 
