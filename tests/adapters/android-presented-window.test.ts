@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
-import { ElementNotFoundError, resolveSettled } from '../../src/interact/resolve.js';
+import { ACTIVE_WINDOW_HINT, presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { ElementNotFoundError, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
@@ -196,5 +196,59 @@ describe('tap: the wait for a target the tree cannot list beneath the presented 
     const error = await waitFails(capture('open'), 'id:"nothing.here"');
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toMatch(/waiting for element id:"nothing.here" to appear/);
+  });
+});
+
+// ADR 0018's residuals 18 and 19 (accepted by the owner, 2026-10-18): a presented window the dump gives no fact for — the
+// fully expanded picker sheet (form-picker: no scrim, only Material's "Drag handle"), a full-screen dialog — is not
+// marked, so the screen beneath is missing from the tree with no presented wording. Every reply that says a target is
+// not in a uiautomator tree, and does not already say a window is presented, carries the one hint (standing.ts#
+// ACTIVE_WINDOW_HINT): the tree lists only the active window, so close an open sheet or dialog first.
+describe('a target not in a uiautomator tree that marks no presented window: the active-window hint', () => {
+  const adapter = (tree: UiNode) => ({ uiTree: async () => tree });
+  const FAST = { ambiguous: 'first' as const, timeoutMs: 30, pollMs: 2 };
+  const fails = (p: Promise<unknown>): Promise<Error> =>
+    p.then(
+      () => {
+        throw new Error('resolved');
+      },
+      (e: unknown) => e as Error,
+    );
+
+  it('form-picker (the expanded sheet, unmarked): the tap\'s wait for the form\'s name field says to close an open sheet first — still absence', async () => {
+    const error = await fails(resolveSettled(adapter(capture('form-picker')), 'id:"lab.form-picker.name"', FAST));
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toBe(`Timed out after 30ms waiting for element id:"lab.form-picker.name" to appear\n  (${ACTIVE_WINDOW_HINT})`);
+    expect(ACTIVE_WINDOW_HINT).toMatch(/close it first/);
+  });
+
+  it('…and so does the presence check (an optional flow step, fill\'s field) — the same path', async () => {
+    const error = await fails(resolvePresent(adapter(capture('form-picker')), 'id:"lab.form-picker.submit"', FAST));
+    expect(error.message).toBe(`Timed out after 30ms waiting for element id:"lab.form-picker.submit" to appear\n  (${ACTIVE_WINDOW_HINT})`);
+  });
+
+  it('a plain uiautomator screen carries it too: nothing in the tree tells an unmarked sheet from none', async () => {
+    expect((await fails(resolveSettled(adapter(capture('open')), 'id:"nothing.here"', FAST))).message).toContain(`(${ACTIVE_WINDOW_HINT})`);
+  });
+
+  it('not where the presented wording already says it (alert-dim), nor on a tree listing every window (WDA, idb)', async () => {
+    expect((await fails(resolveSettled(adapter(capture('alert-dim')), 'id:"lab.alert-dim.A"', FAST))).message).not.toContain(ACTIVE_WINDOW_HINT);
+    const { activeWindowOnly: _, ...everyWindow } = capture('form-picker');
+    expect((await fails(resolveSettled(adapter(everyWindow), 'id:"lab.form-picker.name"', FAST))).message).toBe('Timed out after 30ms waiting for element id:"lab.form-picker.name" to appear');
+  });
+
+  it('scroll_until on form-picker: "never appeared in the tree" carries the hint, said once', () => {
+    const row: Row = { tree: capture('form-picker'), found: [] };
+    const message = failureOf(play(RULES, [row, row, row]), 'id:"lab.form-picker.name"').message;
+    expect(message).toContain(`element never appeared in the tree (${ACTIVE_WINDOW_HINT})`);
+    expect(message.split(ACTIVE_WINDOW_HINT)).toHaveLength(2);
+  });
+
+  it('scroll_until on a tree listing every window: no hint', () => {
+    const { activeWindowOnly: _, ...everyWindow } = capture('form-picker');
+    const row: Row = { tree: everyWindow, found: [] };
+    const message = failureOf(play(RULES, [row, row, row]), 'id:"lab.form-picker.name"').message;
+    expect(message).toContain('element never appeared in the tree');
+    expect(message).not.toContain(ACTIVE_WINDOW_HINT);
   });
 });
