@@ -414,6 +414,21 @@ carousel-in-list,own-parts`, then their rows into edges.known.ts and false-cover
 - `false-covers/own-parts` I — the iOS icon button (expected: SwiftUI lists the button alone, labelled Close, tapped by
   its label); calibration.json #8's `needs`.
 
+### Round 7 — the owner's decisions of 2026-10-18 on round 6's open points
+
+- **HIGH: lab cell #18 — a React Native text field** (calibration.json #18's `needs`): an RN `TextInput` whose tree
+  lists its own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under the field, as mp-native's do) — the
+  half of #18 no lab field reproduces (neither SwiftUI's TextField nor UIKit's UITextField lists one). First in round 7.
+- **Android presented windows the parser does not mark** (ADR 0018's residual 19, accepted with the active-window
+  hint): a **full-screen dialog** (a `Dialog` with `usePlatformDefaultWidth = false` / a full-screen `DialogFragment`,
+  its window at 0,0 the screen's size) and a **Views `BottomSheetDialog`** (its `touch_outside` scrim, labelled or not:
+  does the scrim rule hold?). Each with a target beneath it: the tap's wait and `scroll_until` read with the hint, and
+  whether the window could be marked from the dump.
+- **Eyes: verify a "fully" claim with pixels** (ADR 0013's residual, live case k7): where a node-less sibling's padding
+  — a bar riding on the IME, an inset its surface draws but its node does not span — may lie over the target, a
+  `fully visible` stop is checked against the screenshot (the target's colour across its whole frame), so the 18 px of
+  phone under the bar's top padding are seen, not assumed away.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,
