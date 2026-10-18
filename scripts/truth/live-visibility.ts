@@ -1,3 +1,4 @@
+import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
@@ -322,6 +323,37 @@ export function judgeScroll(
 }
 
 /**
+ * An Android turn-back case (TURN_BACK, on uiautomator), judged by ADR 0021's decision of 2026-10-18 (the owner, on
+ * round 6's Android device check): NO turn there — unmoved strokes on uiautomator are no proof of an end — and the
+ * two-stroke stop kept: the tool reports the direction, the agent turns. So the case is ok when averi, having turned
+ * no stroke toward the target (none of its own scroll view's strokes brought it closer), fails loudly naming the
+ * direction the target lies (`turnTo`, `direction: "<it>"`) with at most UNMOVED_STROKES_EXHAUST unmoved swipes in
+ * the whole call — counted, not located: its swipes less the strokes the app logged moving the target's scroll view (a
+ * swipe that moves nothing may log none, so which of them were unmoved is not known, only how many). Else judgeScroll's verdict stands — R-direction's turn on WDA's cases, a claim the strokes contradict, a stop
+ * the app does not bear out. Measured: turn:scroll-collapsing.A (lab note #10), 4 swipes down, the last 2 unmoved,
+ * `scroll_until it with direction: "up"` (docs/truth/live-android-2026-10-18-visibility.md); turn:scroll-bounded.F
+ * names no direction (F unlisted, no side ever read) and stays LOUD, honest.
+ */
+export function judgeAndroidTurn(
+  c: Parameters<typeof judgeScroll>[0] & { turnTo: Direction },
+  replies: readonly string[],
+  final: LabState,
+  launched: LabState,
+  atStop: LabState = final,
+): LiveVerdict {
+  const v = judgeScroll(c, replies, final, launched, atStop);
+  if (v.outcome === 'ok' || (v.cls !== 'R-direction' && v.cls !== 'not-reached')) return v;
+  const [scroll] = replies;
+  const moved = strokesSince(atStop, launched).filter((s) => s.view === c.view && Math.abs(s.to - s.from) > MOVE_SLACK);
+  const turned = (classStrokes(atStop, launched, c.platform, c.tag, c.view, c.axis) ?? []).some((s) => s.cls === 'closer');
+  const swipes = swipesOf(scroll) ?? 0;
+  const unmoved = swipes - moved.length;
+  const named = scroll.includes(`direction: "${c.turnTo}"`);
+  if (turned || !named || unmoved > UNMOVED_STROKES_EXHAUST || v.kind === 'visible') return v;
+  return { outcome: 'ok', kind: v.kind, why: `no turn on uiautomator (ADR 0021): ${swipes} swipes, the last ${unmoved} unmoved, failed naming direction: "${c.turnTo}" — ${short(scroll)}`, app: v.app };
+}
+
+/**
  * A scroll_until for a target beneath a presented layer (`declared: presented-over`): no stop where it lies covered, no
  * stroke on the screen beneath (it would move the host under the layer or drag the layer), the layer not dismissed.
  * A target in no scroll view (alert-dim's, sheet-medium's: the layer over a screen that does not scroll) has nothing a
@@ -368,6 +400,9 @@ export interface VisibilityCase {
    */
   judge(state: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]): LiveVerdict;
 }
+
+/** The way opposite a turn-back case's direction — the way its target lies. */
+const OPPOSITE_WAY = { up: 'down', down: 'up' } as const;
 
 /**
  * The turn-back cases (#17, R-direction): a scroll_until whose direction is the WRONG one — the content at its end that
@@ -430,8 +465,24 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     // A target its capture's tree of a source does not list: averi cannot see where it lies, so there is nothing to turn
     // back toward — the case is said so, and its strokes are not held to R-direction under that source.
     const unlisted = [...new Set([...Object.keys(t.listed ?? {}), ...Object.keys(t.textListed ?? {})])].filter((src) => askedUnlistedBy(t, src) !== undefined);
-    const says = unlisted.length === 0 ? `turn back: ${b.says}` : `the wrong direction: ${b.says} — under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
-    cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
+    // On Android no turn is asked at all (ADR 0021, the owner's decision of 2026-10-18): judgeAndroidTurn.
+    const unlistedSays = `under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
+    const says =
+      platform === 'android'
+        ? `no turn on uiautomator (ADR 0021): ${b.says} — averi keeps ${b.direction} and fails loudly naming ${OPPOSITE_WAY[b.direction]} after at most ${UNMOVED_STROKES_EXHAUST} unmoved strokes${unlisted.length === 0 ? '' : `; ${unlistedSays}`}`
+        : unlisted.length === 0
+          ? `turn back: ${b.says}`
+          : `the wrong direction: ${b.says} — ${unlistedSays}`;
+    const sc = scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says);
+    const view = t.scrollView;
+    cases.push({
+      ...sc,
+      id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}`,
+      ...(platform === 'android' && {
+        judge: (s: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]) =>
+          judgeAndroidTurn({ tag: t.tag, view, fully: b.fully === true, platform, unlisted: askedUnlistedBy(t, source) !== undefined, axis: axisOf(b.direction), turnTo: OPPOSITE_WAY[b.direction] }, replies, s, launched, after[0] ?? s),
+      }),
+    });
   }
   return cases;
 }

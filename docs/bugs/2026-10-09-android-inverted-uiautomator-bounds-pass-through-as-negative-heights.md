@@ -23,6 +23,15 @@
 > point for the owner; until decided the case is KNOWN (scripts/truth/live-known.ts) as this note's open part
 > (calibration.json #10 `openLive`). The replayed verdicts hold live: `tap A` refused naming scroll_until, `scroll_until
 > A up` reached it in 1 swipe (the list 715 → 0) and the tap fired. docs/truth/live-android-2026-10-18-visibility.md.
+>
+> **Decided (2026-10-18, the owner; ADR 0021 "Where it applies, and where not"):** on uiautomator NO turn — unmoved
+> strokes there are no proof — and the two-stroke stop KEPT: the tool reports the direction, the agent turns. The
+> live measure above is that rule (4 swipes, the last 2 unmoved, then a loud failure naming `up`), so it is no defect:
+> the Android turn judge (scripts/truth/live-visibility.ts#judgeAndroidTurn) reads `turn:scroll-collapsing.A` ok —
+> no turn, at most two unmoved strokes, the target's direction named — struck off live-known.ts, calibration.json #10's
+> `openLive` closed. Shown without a device: `live.ts --rejudge docs/truth/live-records/android-vis.json --groups
+> visibility` reads 111 cases / 98 ok / 3 loud / 10 mismatches, 0 not known (the record at e98b87e; at b71cbbb the case
+> reads ok too). The note is calibrated whole: its replayed rows (DOES-NOT-FAIL) and its live turn (decided).
 
 ## Summary
 

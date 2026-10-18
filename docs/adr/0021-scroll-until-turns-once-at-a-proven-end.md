@@ -2,8 +2,9 @@
 
 Status: decisions 1–3 accepted, 2026-10-17 (owner, on lab note LV4, option (b): the three conditions and the
 one-stroke stop); decision 4 (lab note LV5's carry model) implemented 2026-10-18 on `arch/r22-lv4` under the round-6
-brief, pending the owner and the device check. Open points for the owner, both on uiautomator (below): the
-exclusion from the turn, and the one-stroke stop.
+brief, pending the owner and the device check. The two points on uiautomator decided 2026-10-18 (owner, on round 6's
+Android device check): NO turn, and the two-stroke stop KEPT — unmoved strokes on uiautomator are no proof; the tool
+reports the direction, the agent turns (below).
 
 ## Context
 
@@ -59,27 +60,35 @@ exclusion from the turn, and the one-stroke stop.
 ## Where it applies, and where not
 
 - **WDA**: decided — its frames are unclipped, so a scroll view's content is listed where it lies.
-- **uiautomator: excluded — an open point for the owner.** Its reads cannot prove the end: rects are cut to the
+- **uiautomator: no turn — decided (owner, 2026-10-18).** Its reads cannot prove the end: rects are cut to the
   scroll container, so content past the edge reads flush with it; Compose omits nodes past the edge altogether; a
   RecyclerView's child index is no adapter position, so the first row listed says nothing of rows before it; and
-  `scrollable` stays `true` at the end. The only evidence left is strokes that changed nothing — which the owner
-  ruled is not proof. Android keeps the caller's direction and fails with the advice, as before; its strokes drag at
-  `dragSpeed` (no fling), so the carry model has nothing to do there. If the owner accepts two identical unmoved
-  strokes touching down on nothing drawn over the list as proof on Android, the turn extends there.
-- **uiautomator: the one-stroke stop — also open for the owner.** Off WDA the stop still needs
-  `UNMOVED_STROKES_EXHAUST` (2, scroll-rounds.ts) identical strokes that moved nothing, and the stuck test likewise
-  (then one stroke back), so a scroll that cannot move anything costs at least two swipes and their settles before it
-  fails. The golden replay of the Android lab app (truth/round-6) shows it on F2A1's phone (`form-keyboard.xml`):
-  the replayed tree never moves, so it fails after 3 swipes — `540 1034 → 424` twice, then one back up — though round
-  6's fix (6d8f8de) made its verdict right. That is the replay's figure, not the device's: live (round 6's Android
-  device check, 2026-10-18, docs/truth/live-android-2026-10-18-visibility.md, case k7) the form does scroll above the
-  IME, and ONE stroke touching down at `540,1034` moved it 167 px and stopped on phone — no unmoved stroke at all. The
-  live unmoved strokes are elsewhere: `turn:scroll-collapsing.A` (4 swipes down, the last 2 moving nothing, no turn —
-  lab note #10's open part) and `turn:scroll-bounded.F` (2 swipes up at `540,424` in `upper`, at its top: neither
-  moves anything, F unlisted). Whether one unmoved stroke, touching down on nothing
-  drawn over its scroll view, may end the scroll there too is the same question as the turn's — what on uiautomator's
-  tree may stand for the end WDA lists — asked for the stop alone: a one-stroke stop that is wrong costs a failure
-  where a second stroke would have moved the list; a two-stroke stop that is right costs a swipe and a settle.
+  `scrollable` stays `true` at the end. The only evidence left is strokes that changed nothing, and unmoved strokes on
+  uiautomator are no proof (a stroke not taken moves nothing too). So Android keeps the caller's direction and fails
+  LOUDLY naming the direction that reveals the target — the tool reports the direction, the agent turns. Its strokes
+  drag at `dragSpeed` (no fling), so the carry model has nothing to do there either.
+- **uiautomator: the two-stroke stop — kept (owner, 2026-10-18).** Off WDA the stop needs `UNMOVED_STROKES_EXHAUST`
+  (2, scroll-rounds.ts) identical strokes that moved nothing — the rule: after two consecutive identical strokes that
+  changed nothing (the target's matches where they were, or with no target the whole tree), the content is taken as
+  exhausted that way and the scroll fails, naming the side the target was last seen past and the direction that
+  brings it back; the stuck test likewise (then one stroke back). A scroll that cannot move anything therefore costs
+  two swipes and their settles before it fails — the price of never calling one untaken stroke an end. Measured live
+  (round 6's Android device check, 2026-10-18, docs/truth/live-android-2026-10-18-visibility.md):
+  `turn:scroll-collapsing.A` (lab note #10) — `direction: "down"` toward A, a row scrolled above the list with
+  inverted bounds: 4 swipes down touching down at `540,1820`, the first two moving the list 715 → 1984 → 2488 (A
+  carried from y -11 to -1784), the last 2 unmoved — the rule — then the loud failure `failed after 4 swipes (the
+  last 2, swiping down, did not change the screen …) — element was in the tree before the first swipe, clipped out
+  above its scroll container, … — scroll_until it with direction: "up"`, naming `up`; no turn. And
+  `turn:scroll-bounded.F`: 2 swipes up at `540,424` in `upper` at its top, neither moving anything, F unlisted (Compose
+  dumps no node past the edge) — `failed after 2 swipes (the last 2, swiping up, did not change the screen …) —
+  element never appeared in the tree`: no side was ever read, so no direction is named (the strokes never ran to an
+  end the caller's way after one that moved: `Shortfall.absent`'s `unsearched` needs that). The live judge holds
+  Android's turn cases to exactly this (scripts/truth/live-visibility.ts, `judgeAndroidTurn`): no turn, at most
+  `UNMOVED_STROKES_EXHAUST` unmoved swipes in the whole call (its swipes less the strokes the app logged moving the
+  target's scroll view — a swipe that moves nothing may log none, so they are counted, not located), and a loud failure naming the target's direction — not
+  R-direction's turn, which WDA's turn cases keep. F2A1's phone was cited here as an unmoved scroll on the replay
+  (`form-keyboard.xml`: the replayed tree never moves, 3 swipes — `540 1034 → 424` twice, then one back up); live
+  (case k7) ONE stroke at `540,1034` moved the form 167 px and stopped on phone — no unmoved stroke at all.
 - **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged.
 
 ## Consequences and residuals
