@@ -38,7 +38,7 @@
 Lab note LV4. **Found 2026-10-17** by round 5's device check: the live golden (`scripts/truth/live.ts --udid
 <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`) on the `averi-lab iPhone 17`
 simulator (iOS 27.0, 402x874), averi = `arch/round-21`'s `src/` (`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port
-8120. Records: docs/truth/live-records/ios-vis.json and ios-scroll-bounded-wda-2725e76-1.json, -2.json (three runs, the
+8120. Records: docs/truth/live-records/ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-1.json, -2.json (three runs, the
 same in each). Summary: docs/truth/live-ios-2026-10-17-visibility.md.
 
 The case was filed under LE4 (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md):

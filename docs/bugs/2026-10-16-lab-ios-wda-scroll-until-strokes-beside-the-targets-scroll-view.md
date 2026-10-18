@@ -134,7 +134,7 @@ LV3). Under idb (no scroll view listed) the same touch-downs, F's and the turn-b
 ## Measured live at the fix (round 5's device check, 2026-10-17)
 
 `scripts/truth/live.ts --udid <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`, src
-`arch/round-21` `b71cbbb` (truth/phase-3 `2725e76`), WDA on 8120. Record: docs/truth/live-records/ios-vis.json;
+`arch/round-21` `b71cbbb` (truth/phase-3 `2725e76`), WDA on 8120. Record: docs/truth/live-records/ios-vis-2725e76.json;
 summary: docs/truth/live-ios-2026-10-17-visibility.md. Under WDA:
 
 ```

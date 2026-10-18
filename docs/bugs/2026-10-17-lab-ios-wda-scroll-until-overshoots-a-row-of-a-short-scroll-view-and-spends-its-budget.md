@@ -34,7 +34,7 @@
 Lab note LV5. **Found 2026-10-17** by round 5's device check: the live golden (`scripts/truth/live.ts --udid
 <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`, then `--sources wda --cells
 scroll-bounded` twice) on the `averi-lab iPhone 17` simulator (iOS 27.0, 402x874), averi = `arch/round-21`'s `src/`
-(`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port 8120. Records: docs/truth/live-records/ios-vis.json (the
+(`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port 8120. Records: docs/truth/live-records/ios-vis-2725e76.json (the
 failing run) and ios-scroll-bounded-wda-2725e76-1.json, -2.json (two ok runs). Summary:
 docs/truth/live-ios-2026-10-17-visibility.md.
 
@@ -48,7 +48,7 @@ offset lies in 884–1000 (a 116-pt window). One stroke (`201 524 → 416`, a 10
 (O's case: 0→258.7); the app logs the strokes sent while it still decelerates as one.
 
 ```
-run 1 (ios-vis.json)  touches (201,524) ×4, (201,525), (201,416)   strokes lower 0→1052.3 (one)   F 51,327.7 (18 % drawn)
+run 1 (ios-vis-2725e76.json)  touches (201,524) ×4, (201,525), (201,416)   strokes lower 0→1052.3 (one)   F 51,327.7 (18 % drawn)
 → ERROR scroll_until id:"lab.scroll-bounded.F" failed after 6 swipes (maxSwipes) — element reached the viewport but
   stayed CLIPPED at top, 18% of it is in the viewport (last rect {"x":51,"y":327,"width":300,"height":65}). It was
   turned round 1 time: a swipe carried it past the viewport (a fling), …, so the next was drawn the other way

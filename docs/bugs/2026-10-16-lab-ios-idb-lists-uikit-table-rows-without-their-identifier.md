@@ -4,7 +4,8 @@
 ground truth (`tests/fixtures/truth/ios-iphone17-ios27/sheet-long-list*.idb.json`, captured by scripts/truth/capture.ts
 on the dedicated `averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `src/` at `debc9b2`.
 Measured on the device (the live run of review round 1, `docs/truth/live-records/ios-vis.json` as a51ab1b committed
-it; round 5's re-record at `b71cbbb`, which replaced it, reads the same) and in the committed
+it; round 5's re-record at `b71cbbb`, which replaced it — kept as `ios-vis-2725e76.json` since round 6's iOS check
+replaced it in turn — reads the same) and in the committed
 captures; no averi code changed here.
 
 ## The screen
@@ -25,7 +26,7 @@ sheet-long-list-short.idb.json  StaticText AXLabel "Target R"  AXUniqueId null  
 
 Every row of the table under idb has `AXUniqueId: null` (`Row 0` … `Row 12`, `Target R`), while WDA lists the targets'
 identifiers. The app sets the identifier (WDA reads it from the same process); idb's accessibility listing drops it.
-The live golden, under idb (`live-records/ios-vis.json`, review round 1's run):
+The live golden, under idb (`live-records/ios-vis.json` as a51ab1b committed it, review round 1's run):
 
 ```
 idb  tap { selector: 'id:"lab.sheet-long-list.R"' }
