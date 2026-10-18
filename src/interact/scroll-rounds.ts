@@ -1081,10 +1081,11 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
   // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved, and never while a
-  // progress node shows (content may yet load there). The flush probe (PROBE_REACH) never reaches it: it is sent from
-  // a stop in the frame, and a read that finds the target unmoved after it still has it in the frame (not `offFrame`),
-  // while one that lost it changed the tree — so no exhaustion, and no proof, follows a probe; its own answer is the
-  // stop it checks (pinned in tests/interact/scroll-end-turn.test.ts).
+  // progress node shows (content may yet load there). The flush probe (PROBE_REACH) never meets it, by the trees'
+  // dialects: a probe is planned only over CLIPPING ancestors (`scrollersOf`), which only Android's tree marks, and the
+  // proof needs `Clips.endsAt`, which only a tree of unclipped frames (WDA's) answers — no real source gives both. The
+  // probe's own answer is the stop it checks (pinned, on a synthetic tree carrying both marks, in
+  // tests/interact/scroll-end-turn.test.ts).
   const unmovedNow = (offFrame && allUnmoved && !loading) || (found.length === 0 && treeUnmoved);
   // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
   // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
@@ -1156,7 +1157,8 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * And, on a tree that lists the target where it lies (WDA's), no stroke
  * reaches further than the target still needs at what a stroke of this
  * scroll was measured to carry it (`stillNeeds`, interact/stroke-plan.ts#carried): a short scroll view's
- * fling carried a row past its window between two reads (lab note LV5).
+ * fling carried a row past its window between two reads (lab note LV5) —
+ * and any window one stroke can skip, a long list's final approach too.
  *
  * A target IN the frame at the far edge turns the strokes too
  * (`observe`'s `atFarEdge`): across that edge, its centre in the status

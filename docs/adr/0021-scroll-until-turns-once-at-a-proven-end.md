@@ -1,8 +1,8 @@
 # 21. `scroll_until` turns once toward the target at an end the tree proves, and a short scroll view's strokes carry it no further than it needs
 
-Status: accepted, 2026-10-17 (owner), the decision on lab note LV4 (option (b));
-implemented 2026-10-18 on `arch/r22-lv4`, with lab note LV5's carry model, after code review round 1. Open point for
-the owner: the uiautomator exclusion (below).
+Status: decisions 1–3 accepted, 2026-10-17 (owner, on lab note LV4, option (b): the three conditions and the
+one-stroke stop); decision 4 (lab note LV5's carry model) implemented 2026-10-18 on `arch/r22-lv4` under the round-6
+brief, pending the owner and the device check. Open point for the owner: the uiautomator exclusion (below).
 
 ## Context
 
@@ -44,7 +44,10 @@ the owner: the uiautomator exclusion (below).
    after a stroke measures what it carried the target, per point of the finger's actual travel, of the same node at
    the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept. Once the
    target lies short of its window and a stroke at the turns' reach would carry it further than the window lets it
-   travel whole, the stroke's travel is cut to what brings it to the window's middle over that carry.
+   travel whole, the stroke's travel is cut to what brings it to the window's middle over that carry. Any window one
+   stroke can skip, not only a short scroll view's: on a long WDA list the final approach is cut too (a carry of ≈ 2.4
+   × a 420-pt stroke, ~1000 pt, is more than a ~650-pt slack); only a window wider than one stroke's carry keeps the
+   full stroke.
 
 ## Where it applies, and where not
 

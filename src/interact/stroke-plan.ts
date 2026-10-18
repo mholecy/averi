@@ -356,10 +356,15 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
  * moved the wrong way, when the stroke was no stroke (under twice TOUCH_SLOP: a tap), or when it lies past
  * CARRY_CEILING × the travel — no fling carries that far: content inserted above, a nested scroll carried by an outer
  * one, a match the tree renamed in place. The LARGEST sample is kept, not the last: a read taken mid-fling understates
- * one, and a stroke shorter than needed costs one more stroke where one longer than needed costs a turn.
+ * one, and a stroke shorter than needed costs one more stroke where one longer than needed costs a turn. Residual:
+ * the round's identity (role, id, label) cannot tell duplicate matches with the same label apart — a judged match that
+ * switches to its twin between reads offers the gap between them as a sample; CARRY_CEILING bounds what such a sample
+ * can do (it is dropped past 4 × the travel, and one under it cuts strokes no shorter than a real fling of that size).
  *
  * `carryReach` applies it: when a stroke at the reach the turns left would carry the target further than its window
- * lets it travel whole (`StillNeeds.slack`) — only then can one stroke skip the window, the case the model is for —
+ * lets it travel whole (`StillNeeds.slack`) — only then can one stroke skip the window, the case the model is for:
+ * any window one stroke can skip, not only a short scroll view's (on a long WDA list the final approach is cut too: a
+ * carry of ≈ 2.4 × a 420-pt stroke, ~1000 pt, is more than a ~650-pt slack) —
  * the travel is cut to what the target needs to reach the window's middle over the carry, as a reach of the full
  * stroke over this box; never above the turns' reach, never under `shortenStroke`'s floors. Proportional because the
  * drag keeps its 300 ms whatever its length: a shorter drag is a slower one, and its fling shrinks with it (the linear
