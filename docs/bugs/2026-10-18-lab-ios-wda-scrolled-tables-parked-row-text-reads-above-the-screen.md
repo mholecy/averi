@@ -1,7 +1,7 @@
 # BUG: under WDA, once a UIKit table has scrolled, the text of a row below the fold is parked ABOVE the screen — averi reads the row there, strokes away from it and turns until the budget runs out
 
 > **Status (2026-10-18):** open; measured live only (round 6's iOS device check). KNOWN as this note
-> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30`). Not a carry-model fault (ADR 0021 decision 4):
+> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30`, R-direction: three turns in every run). Not a carry-model fault (ADR 0021 decision 4):
 > the carry case was built to measure that model, and this defect comes first — averi never sees where the row is.
 
 Lab note LV6. **Found 2026-10-18** by round 6's iOS device check: the live golden's new long-list carry case
@@ -63,5 +63,11 @@ view's top moved up by any amount, its x and size the cell's.
 
 - Live only so far: the golden captures each cell at launch (offset 0), where the shape holds. The two raw trees above
   are committed for the fix's unit test.
-- ADR 0021 decision 4's long-list measurement waits on it: the carry case cannot judge the carry while averi misreads
-  where the row is.
+- ADR 0021 decision 4's long-list measurement waits on it — and fixing LV6 alone would still not make it: the
+  carry case cannot fail on a missing cut, since the table's last offset (1748) lies inside Row 30's window
+  (1172–1748), so a full final stroke rests at the end, inside the window; no row of the 40 has a window wholly before
+  the end and past one stroke's carry (≈ 1040 pt). It needs a longer table (the plan's round 7). What the case does
+  judge — no turn (counted from the app's touch-downs and the reply's own words, the app's strokes merging those sent
+  mid-fling) — is what this note breaks: every run reads three turns.
+- Records: docs/truth/live-records/ios-vis.json, ios-vis-b71cbbb.json (the same at round 5's src),
+  ios-wda-bounded-long-list-11683c3-1…3.json.

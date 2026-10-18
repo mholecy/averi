@@ -23,7 +23,7 @@ import type { ReplyKind } from './replies.js';
  * kind below is what its case's record reads; and the cases with
  * several records, LV2's two flush cases (android-vis.json at HEAD, cal12-*.json: three runs at 9c7885e, two at
  * d043e65), read `visible` in all six — ok in four, a stop-claim in two: the timing moves the outcome, not the kind;
- * LV5's case likewise (round 5's ios-vis.json, since replaced, and ios-scroll-bounded-wda-2725e76-*.json, three runs at
+ * LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
  * b71cbbb's src): `refused` where it is not reached, ok in two.
  * A run that reads another kind for a known case fails as NOT known, naming both: refile it, or widen the entry (`also`:
  * the other rule and kind, with the committed record that reads it — round 6's iOS device check, where the runs of one
@@ -44,9 +44,9 @@ const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-re
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
+const CAROUSEL_FLING = 'bug:2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md';
 const LV6 = 'bug:2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md';
-/** Round 6's iOS device check's records at round 6's src (truth/round-6 11683c3): the full run, and the WDA smoke run. */
-const R6_FULL = 'ios-vis.json';
+/** Round 6's iOS device check's WDA smoke run at round 6's src (truth/round-6 11683c3). */
 const R6_SMOKE = 'ios-wda-bounded-long-list-11683c3-1.json';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
@@ -119,21 +119,24 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:carousel-in-list.C'], LE2, 'R-direction', 'refused'),
   ...each('ios idb', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stop', 'visible'),
   // iOS, WDA
-  // Round 5's device check (ios-vis.json, src b71cbbb): LE4's and L3's entries (fixed in fecb0b3, 468dc1b: round 5's
+  // Round 5's device check (ios-vis-2725e76.json, src b71cbbb): LE4's and L3's entries (fixed in fecb0b3, 468dc1b: round 5's
   // 0a and 0b) and LV3's WDA one struck off, their cases ok — but LE4's two cases of F, whose strokes now go inside
   // `lower` and still do not reach it, refiled as what they measured:
   // Round 6's device check (11683c3, ADR 0021): averi now turns and says so — but not after one unmoved stroke: 2
   // strokes up moving nothing before the turn in three runs of four (F then reached, `visible`: ios-vis.json,
   // ios-wda-bounded-long-list-11683c3-2.json, -3.json), 4 in the other (the budget spent, `refused`: -1.json). Each a
-  // second unmoved stroke not turned back: R-direction still.
-  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'refused', undefined, [{ cls: 'R-direction', kind: 'visible', record: R6_FULL }]),
+  // second unmoved stroke not turned back: R-direction still. (Round 5's record, ios-vis-2725e76.json, and the
+  // b71cbbb run read `refused` too: no turn at all there.)
+  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'visible', undefined, [{ cls: 'R-direction', kind: 'refused', record: R6_SMOKE }]),
   // LV5's `ios wda scroll:scroll-bounded.F` struck off by round 6's iOS device check: ok in all four runs at 11683c3
   // (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json: `lower` at rest at 915–981, inside F's 884–1000
   // window), where round 5's src overshot to 1052 in one run of three and to 1006 (F cut, a plain stop) today.
   // Round 6's long-list carry case (live-visibility.ts#CARRY): the row's parked text read above the screen once the
-  // table has scrolled, turned three times and failed at maxSwipes — not reached (LOUD) in ios-vis.json and -3.json,
-  // the last stroke away from it (R-direction) in -1.json and -2.json.
-  ...each('ios wda', ['carry:sheet-long-list.Row30'], LV6, 'not-reached', 'refused', undefined, [{ cls: 'R-direction', kind: 'refused', record: R6_SMOKE }]),
+  // table has scrolled, turned three times (the touch log and the reply agree) and failed at maxSwipes, in every run.
+  ...each('ios wda', ['carry:sheet-long-list.Row30'], LV6, 'R-direction', 'refused'),
+  // carousel-in-list's C: one sideways stroke flings the carousel 447–532 pt, C's centre inside over 177–531 only; at
+  // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
+  ...each('ios wda', ['scroll:carousel-in-list.C'], CAROUSEL_FLING, 'stop-claim', 'visible', 'intermittent'),
   // blur-menu-grouped's C: WDA lists the menu row W over it, so the stop is refused — after three strokes on the blur
   // (no node: residual 9), "content exhausted … a layout defect".
   ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
@@ -157,5 +160,9 @@ export const knownEntry = (platform: string, source: string, id: string): KnownL
  */
 export const knownLive = (platform: string, source: string, id: string, cls: VerdictClass | undefined, kind: ReplyKind | undefined): string | undefined => {
   const e = knownEntry(platform, source, id);
-  return e !== undefined && [e, ...(e.also ?? [])].some((x) => x.cls === cls && x.kind === kind) ? e.note : undefined;
+  return e !== undefined && explains(e, cls, kind) ? e.note : undefined;
 };
+
+/** Whether an entry explains a failure by `cls` on `kind`: its own pair, or one of its `also` — each rule with its kind. */
+export const explains = (e: Pick<KnownLive, 'cls' | 'kind' | 'also'>, cls: VerdictClass | undefined, kind: ReplyKind | undefined): boolean =>
+  [e, ...(e.also ?? [])].some((x) => x.cls === cls && x.kind === kind);

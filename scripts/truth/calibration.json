@@ -1109,9 +1109,11 @@
         "ios-iphone17-ios27/scroll-bounded.idb.json O tap",
         "ios-iphone17-ios27/scroll-bounded.idb.json O colour",
         "ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until",
-        "ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until"
+        "ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until",
+        "ios-iphone17-ios27/carousel-in-list.idb.json C colour",
+        "ios-iphone17-ios27/carousel-in-list.idb.json C scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it."
+      "remark": "No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen — its colour passes on the page's background (#EEEEEE), and scroll_until strokes sideways across the screen's middle (`322 437 → 80 437` twice, then one back), outside the carousel; its tap is refused (off screen at its centre). WDA answers all three rows as the truth does."
     },
     {
       "n": "LE3",
@@ -1391,7 +1393,7 @@
     },
     {
       "note": "2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md",
-      "why": "lab finding LV3: the turned stroke's touch-down, live only (live.ts --udid, case scroll:tabbar-floating.R); fixed under WDA with LE4 (958bd27, merged as fecb0b3) and measured so by round 5's device check (ios-vis.json at b71cbbb's src: the turned stroke touches down at y 335, inside the list, and R is reached); open under idb, which lists no scroll view (LE2): its turned strokes still touch down at y 175, in the header"
+      "why": "lab finding LV3: the turned stroke's touch-down, live only (live.ts --udid, case scroll:tabbar-floating.R); fixed under WDA with LE4 (958bd27, merged as fecb0b3) and measured so by round 5's device check (ios-vis-2725e76.json at b71cbbb's src: the turned stroke touches down at y 335, inside the list, and R is reached); open under idb, which lists no scroll view (LE2): its turned strokes still touch down at y 175, in the header"
     },
     {
       "note": "2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md",
@@ -1400,6 +1402,10 @@
     {
       "note": "2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md",
       "why": "lab finding LV5: scroll dynamics in a 180-pt scroll view, live only and intermittent (live.ts --udid, case scroll:scroll-bounded.F under WDA: not reached in one run of three at b71cbbb's src); fixed live by ADR 0021's carry model — ok in all four runs of round 6's iOS device check at 11683c3 (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json), its live KNOWN entry struck off"
+    },
+    {
+      "note": "2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md",
+      "why": "triage: a carousel card's stop claimed on a read still moving, the fling then carrying its centre out — live only and intermittent (live.ts --udid, case scroll:carousel-in-list.C under WDA: claimed at b71cbbb's src, ok at 11683c3)"
     },
     {
       "note": "2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md",

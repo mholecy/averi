@@ -1,5 +1,5 @@
 import type { Platform } from '../differential/corpus.js';
-import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, type ReplyKind } from './replies.js';
+import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
@@ -449,8 +449,9 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
  * frame is the table's clip moved by the row's place and the table's offset (`carryRow`), as F's report (row 20 at
  * 62 + 1280 − offset) bears out. Whole over the offsets 1172–1748 (the table's end: 40 rows, 812 pt shown), past one
  * stroke's carry from the top (≈ 1048 pt, round 5's record). The table ends there, so a full final stroke would come to
- * rest at its end, still in the window: the turn and the overshoot are what is judged, and the strokes the app logged
- * (the summary's `app:` line) show whether the final one was cut — at rest short of the end, or at it.
+ * rest at its end, still in the window: the case cannot fail on a missing cut — no row of the 40 has a window wholly
+ * before the end and past one carry (a longer table is the plan's round 7). The turn and the overshoot are what is
+ * judged, and the strokes the app logged (the summary's `app:` line) show where the final one came to rest.
  */
 export const CARRY = { cell: 'sheet-long-list', view: 'list', row: 30, rowHeight: 64, tag: 'Row30', text: 'Row 30' } as const;
 
@@ -463,9 +464,23 @@ export function carryRow(state: LabState): LabState {
 }
 
 /**
+ * The turns of a scroll's strokes over `clip` by the app's touch log: each touch-down's half of the clip — the lower
+ * half a stroke `down` (content up), the upper a stroke `up` — and every change from one to the other a turn. The app
+ * merges strokes sent while the table still moves into one (live-visibility.ts's caveats), so its strokes undercount
+ * the turns; its touch-downs do not.
+ */
+export function touchTurns(state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>, clip: Rect): number {
+  const mid = clip.y + clip.height / 2;
+  const sides = touchesSince(state, launched).map((t) => Number(t.split(',')[1]) >= mid);
+  return sides.filter((s, i) => i > 0 && s !== sides[i - 1]).length;
+}
+
+/**
  * The carry case's judge: judgeScroll's stop and R-direction on the row's derived frame, and on top what the ADR asks
- * of the carry — no stroke of the table back up (a turn), none that carried the row from below its window to above it
- * (the overshoot a full final stroke makes where the window is narrower than its carry).
+ * of the carry — no turn (a stroke of the table back up, a touch-down on the other half of it after one on the first
+ * (touchTurns), or averi saying it turned (replies.ts#turnsSaid): the logged strokes alone miss turns merged into a
+ * fling), none that carried the row from below its window to above it (the overshoot a full final stroke makes where
+ * the window is narrower than its carry).
  */
 export function judgeCarry(reply: string, final: LabState, launched: LabState): LiveVerdict {
   const [state, start] = [carryRow(final), carryRow(launched)];
@@ -478,8 +493,12 @@ export function judgeCarry(reply: string, final: LabState, launched: LabState): 
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
   const past = strokes.filter((s) => top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
+  const clip = start.scrollViews?.[CARRY.view];
+  const touched = clip === undefined ? 0 : touchTurns(state, start, clip);
+  const said = turnsSaid(reply);
   const breaks = [
     ...turned.map((s) => `a stroke back up (${round(s.from)}→${round(s.to)}): averi turned`),
+    ...(turned.length === 0 && Math.max(touched, said) > 0 ? [`turned ${Math.max(touched, said)}× (touch-downs ${touched}, the reply ${said})`] : []),
     ...past.map((s) => `a stroke carried it past its window (${round(s.from)}→${round(s.to)}: from below to above it)`),
   ];
   return breaks.length === 0 ? verdict : { outcome: 'MISMATCH', cls: 'R-direction', kind: verdict.kind, why: `R-direction (carry): ${breaks.join('; ')} — averi: ${short(reply)}`, app: verdict.app };

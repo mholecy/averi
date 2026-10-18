@@ -1,13 +1,17 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { carryRow, classStrokes, directionBreaks, distanceAt, judgeCarry, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { carryRow, touchTurns, classStrokes, directionBreaks, distanceAt, judgeCarry, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
+import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
-import { knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
+import { explains, knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 
 // The live golden's visibility judges (scripts/truth/live-visibility.ts): pure over the lab app's state — its tap log,
 // its scroll offsets and strokes, its frames — so they are pinned here without a device. iOS units: the iPhone 17's
 // 402x874 pt, its status band 62 pt.
 
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SCREEN = { x: 0, y: 0, width: 402, height: 874 };
 const at = 1;
 
@@ -201,6 +205,21 @@ describe('the long-list carry case (ADR 0021 decision 4, LV5): Row 30 of sheet-l
   it('a stop the table does not bear out: judgeScroll\'s stop claim', () => {
     expect(judgeCarry(reply, table({ offsets: { list: 1048 }, strokes: [stroke(0, 1048, 'list')] }), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
   });
+  it('a turn the app\'s strokes do not show (merged into one fling) is read from the touch-downs and from the reply', () => {
+    const touch = (y: number) => ({ kind: 'touch' as const, tag: `201.0,${y}.0`, at });
+    const turned = table({ offsets: { list: 1460 }, strokes: [stroke(0, 1460, 'list')], events: [touch(712), touch(224), touch(712)] });
+    expect(touchTurns(turned, launched, { x: 0, y: 62, width: 402, height: 812 })).toBe(2);
+    expect(judgeCarry(reply, turned, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction', why: expect.stringMatching(/turned 2× \(touch-downs 2, the reply 0\)/) });
+    const said = table({ offsets: { list: 1460 }, strokes: [stroke(0, 1460, 'list')], events: [touch(712), touch(712)] });
+    expect(judgeCarry(`${reply}. It was turned round 1 time: …`, said, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/the reply 1/) });
+    expect(judgeCarry(reply, said, launched).outcome).toBe('ok');
+  });
+  it('the turns a reply says: the fling\'s count, and ADR 0021\'s end turn as one', () => {
+    expect(turnsSaid('ERROR … It was turned round 3 times: a swipe carried it past')).toBe(3);
+    expect(turnsSaid('ERROR … It was turned round 1 time: a swipe')).toBe(1);
+    expect(turnsSaid('Element … fully visible after 6 swipes; 2 swipes up, the last of which did not move it — … so averi turned down, as the tree places')).toBe(1);
+    expect(turnsSaid('Element … visible after 1 swipe')).toBe(0);
+  });
   it('asked on iOS alone, under WDA alone, by its text', () => {
     const t: CellTruth = { cell: 'sheet-long-list', layer: 'sheet-list', device: 'd', screen: { width: 402, height: 874 }, scale: 3, targets: [] };
     const ios = visibilityCases(t, 'ios').find((c) => c.id === 'carry:sheet-long-list.Row30');
@@ -324,6 +343,34 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
   it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
     const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
     expect(bad).toEqual([]);
+  });
+  it('an `also` explains its own rule on its own kind only — never its rule on the entry\'s kind, nor another rule on its kind', () => {
+    const e = { cls: 'not-reached' as const, kind: 'refused' as const, also: [{ cls: 'stop-claim' as const, kind: 'visible' as const, record: 'r.json' }] };
+    expect(explains(e, 'not-reached', 'refused')).toBe(true);
+    expect(explains(e, 'stop-claim', 'visible')).toBe(true);
+    expect(explains(e, 'stop-claim', 'refused')).toBe(false);
+    expect(explains(e, 'not-reached', 'visible')).toBe(false);
+    expect(explains({ cls: 'R-direction', kind: 'visible' }, 'R-direction', 'refused')).toBe(false);
+  });
+  // Each `also` names the committed record that reads it: the record exists, and its case, judged again by this
+  // checkout's judge (visibilityCases over the case's static truth), fails by that rule on that kind.
+  it('every `also` names a committed record whose case reads that rule and kind', () => {
+    const alsos = Object.entries(LIVE_KNOWN).flatMap(([key, e]) => (e.also ?? []).map((a) => ({ key, ...a })));
+    expect(alsos.length).toBeGreaterThan(0);
+    for (const { key, cls, kind, record } of alsos) {
+      const [platform, source, id] = key.split(' ');
+      const file = `${ROOT}docs/truth/live-records/${record}`;
+      expect(existsSync(file), `${key}: ${record}`).toBe(true);
+      const rec = JSON.parse(readFileSync(file, 'utf8')) as { platform: string; results: { source: string; id: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState }[] };
+      const r = rec.results.find((x) => x.source === source && x.id === id);
+      expect(r, `${key}: not in ${record}`).toBeDefined();
+      const cell = id.split(':')[1].replace(/\.[^.]+(\.fully)?$/, '');
+      const run = platform === 'ios' ? 'ios-iphone17-ios27' : 'android-averi_lab-api33';
+      const truth = JSON.parse(readFileSync(`${ROOT}tests/fixtures/truth/${run}/${cell}.truth.json`, 'utf8')) as CellTruth;
+      const c = visibilityCases(truth, platform as 'ios' | 'android').find((x) => x.id === id)!;
+      const v = c.judge(r!.state, r!.replies, r!.launched, source, r!.after);
+      expect({ key, cls: v.cls, kind: v.kind }).toEqual({ key, cls, kind });
+    }
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
   it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {

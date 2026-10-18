@@ -5,9 +5,11 @@ found — 2026-10-18: the averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0 runt
 lab's own derived data (averi-wda-lab), idb's companion on the simulator; the iOS lab app built from truth/r6-device-ios
 (= truth/round-6 11683c3's app: carousel-in-list, own-parts I, scroll-collapsing). Two srcs, the same harness (this
 branch's cases and judges):
-  - before: round 5's src b71cbbb (`--side`, a detached checkout), record ios-vis-b71cbbb.json;
+  - before: round 5's src b71cbbb (`--side`, a detached checkout), record ios-vis-b71cbbb.json — a new run of this
+    harness's cases at that src, not round 5's own run (ios-vis-2725e76.json: ios-vis.json as round 5 recorded it,
+    renamed here; 248 cases, visibility and dismissal);
   - after: round 6's src 11683c3 (truth/round-6: S1 LV4/LV5 WDA end turn and carry, S2 F2A1, S3 L1, S4 axis-aware
-    strokes), record ios-vis.json (replacing round 5's), and three WDA runs of scroll-bounded and sheet-long-list
+    strokes), record ios-vis.json (round 5's renamed ios-vis-2725e76.json), and three WDA runs of scroll-bounded and sheet-long-list
     (ios-wda-bounded-long-list-11683c3-1…3.json).
 Reproduce (outside the sandbox):
   node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb,wda --groups forms,visibility,dismissal [--side <checkout>] [--record <file>]
@@ -25,10 +27,14 @@ below. The previous iOS run (src b71cbbb, visibility and dismissal): docs/truth/
   inside the carousel (24,138 354x85), along its axis, green; own-parts I green under both sources (calibration.json
   #8's `needs` done).
 - **A long-list carry case** (live-visibility.ts#CARRY, WDA only): `scroll_until text:"Row 30"` on sheet-long-list,
-  the row's frame derived from the table's clip and offset — ADR 0021 decision 4's long-list measurement. It found LV6
-  first (below).
+  the row's frame derived from the table's clip and offset, its turns counted from the app's touch-downs and the
+  reply's own words (the app merges strokes sent mid-fling) — meant as ADR 0021 decision 4's long-list measurement. It
+  found LV6 first (below), and it cannot measure the cut even once LV6 is fixed: the table's last offset (1748) lies
+  inside Row 30's window (1172–1748), so a full final stroke rests at the end, inside the window, and no row of the 40
+  has a window wholly before the end and past one stroke's carry (≈ 1040 pt). A longer table is the plan's round 7.
 - `KnownLive.also` (live-known.ts): a second rule and kind a committed record of the same commit reads, named with that
-  record — runs of one commit differ in which shows (LV4, LV6).
+  record — runs of one commit differ in which shows (LV4: `visible` where F was reached, `refused` in the run that spent
+  its budget); a test holds every `also` to its record.
 - 351 cases a src (forms 40, visibility 287, dismissal 24); round 5's run had 248 (visibility and dismissal). New since
   then: the forms group on this harness (40), the 48 refusal cases beneath a presented layer in no scroll view (L1's,
   first run on iOS), carousel-in-list (12), own-parts I (2), the carry case (1).
@@ -37,12 +43,14 @@ below. The previous iOS run (src b71cbbb, visibility and dismissal): docs/truth/
 
 | src | cases | ok | loud | mismatches | not known (HEAD's KNOWN) |
 |---|---|---|---|---|---|
-| b71cbbb (round 5) | 351 | 270 | 15 | 66 | 3 — forms b4, p2 (idb); WDA carousel C (stop claimed) |
-| 11683c3 (round 6) | 351 | 270 | 15 | 66 | 3 — forms b1 (WDA), b4, p2 (idb): the lab model's lost last character |
-| 11683c3, visibility and dismissal (live-rejudge.test.ts) | 311 | 242 | 6 | 63 | 0 |
+| b71cbbb (round 5) | 351 | 270 | 14 | 67 | 2 — forms b4, p2 (idb); WDA carousel C known (the triage note, intermittent) |
+| 11683c3 (round 6) | 351 | 270 | 14 | 67 | 3 — forms b1 (WDA), b4, p2 (idb): the lab model's lost last character |
+| 11683c3, visibility and dismissal (live-rejudge.test.ts) | 311 | 242 | 5 | 64 | 0 |
 
-The two runs differ in five cases' outcomes only; the rest — every presented refusal, every tap, the dismissals — read
-the same at both srcs.
+The two runs differ in two cases' outcomes only (WDA's b1, a forms flake with the same reply; WDA's carousel C), and
+16 cases' replies differ (the scroll-bounded and turn cases, carousel C and B, sheet-long-list-short F, the carry case,
+idb's tabbar-floating R, the non-ASCII and clear fills: wording or swipe counts); the rest — every presented refusal,
+every tap, the dismissals — read the same at both srcs.
 
 # What turned
 
@@ -92,11 +100,14 @@ rows without identifier, idb's sheet-medium-edges H/G (residual 6), the fling in
 2. **LV6 blocks every far row of a UIKit table under WDA** once the table has scrolled (a bank app's transaction
    list): the row reads above the screen, scroll_until turns away from it, a tap or assert is refused or advised
    upward. The fix is ADR 0019's parked shape widened to the scrolled case — the owner's call how narrow (the shape was
-   added against a carousel's chips read as parked). Until then ADR 0021 decision 4's long-list half is unmeasured.
+   added against a carousel's chips read as parked). ADR 0021 decision 4's long-list half stays unmeasured even then:
+   sheet-long-list is too short for it (above).
 3. **A carousel's one stroke flings past its card's whole window** (C at 50–74 % after one stroke, both srcs). At
-   b71cbbb the stop was claimed with C's centre a point outside the carousel (the tap then refused); at 11683c3 ok. The
-   carry model needs a measured stroke first, so it cannot shorten a first stroke; not KNOWN (ok at HEAD), worth a
-   rerun.
+   b71cbbb the stop was claimed on a read still moving, the fling then carrying C's centre a point out of the carousel
+   (the tap then refused); at 11683c3 ok. The carry model needs a measured stroke first, so it cannot shorten a first
+   stroke. Filed as a triage note
+   (docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md), KNOWN
+   `intermittent`.
 4. **idb dismisses a sheet** while scrolling for a target beneath it (sheet-medium, sheet-background A, B), then
    claims the stop — residual 6's cost on idb, larger than "stroked for": the caller's sheet is gone. WDA refuses all
    of them.

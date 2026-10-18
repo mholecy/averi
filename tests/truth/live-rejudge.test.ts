@@ -39,15 +39,18 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis.json', 'visibility', { cases: 111, ok: 97, loud: 3, mismatches: 11 }],
     // re-recorded by round 6's iOS device check (src 11683c3; the forms group run too, judged apart): the presented
     // refusal cases new (WDA ok, idb residual 6, the blur residual 9), round 6's new cells' cases new (carousel-in-list
-    // C under idb LE2), the long-list carry case new (LV6), LV4's turn now `visible` (also)
-    ['ios-vis.json', 'visibility,dismissal', { cases: 311, ok: 242, loud: 6, mismatches: 63 }],
+    // C under idb LE2), the long-list carry case new (LV6), LV4's turn `visible` (its entry's primary kind)
+    ['ios-vis.json', 'visibility,dismissal', { cases: 311, ok: 242, loud: 5, mismatches: 64 }],
+    // round 5's own run (src b71cbbb, harness 2725e76: ios-vis.json until round 6 re-recorded it): LV5's failing run
+    // reads LOUD, its entry struck off since (round 6: ok four times at 11683c3)
+    ['ios-vis-2725e76.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 6, mismatches: 30 }],
     // round 6's WDA smoke run of scroll-bounded and sheet-long-list at the same src: LV4 spent its budget (4 strokes up
-    // before the turn), LV5's case ok, the carry case's last stroke away (LV6's also)
+    // before the turn: LV4's also), LV5's case ok, the carry case turned three times (LV6)
     ['ios-wda-bounded-long-list-11683c3-1.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
     // its two reruns: LV5's case ok in both (struck off: four ok of four at this src), LV4 turning after 2 unmoved
-    // strokes and reaching F, the carry case R-direction in one, not reached in the other
+    // strokes and reaching F, the carry case turning three times in both
     ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
-    ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 16, ok: 14, loud: 1, mismatches: 1 }],
+    ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
     // two reruns of scroll-bounded under WDA at the same src: LV5's case ok in both (it is intermittent), LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
@@ -93,16 +96,16 @@ describe('live.ts --rejudge over the committed record of round 5\'s src (a --sid
 });
 
 describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a --side run of b71cbbb), round 6\'s iOS device check', () => {
-  // The same cases and lab build as ios-vis.json (src 11683c3), the forms group with them. Its cases not known: two
-  // forms fills whose model lost the IBAN's last digit (lab note 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-
-  // characters.md: a forms case has no KNOWN), and carousel-in-list C under WDA — one sideways stroke inside the
-  // carousel (as at 11683c3) whose fling left C's centre a point outside the carousel, the stop claimed: a calibration,
-  // not HEAD's KNOWN: exit 1, as recorded.
-  it('ios-vis-b71cbbb.json: b4, p2 and WDA\'s carousel C not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
+  // A new run of this harness's cases at round 5's src (not round 5's own run: ios-vis-2725e76.json), the same lab
+  // build as ios-vis.json (src 11683c3), the forms group with them. HEAD's KNOWN explains every visibility case not ok
+  // — WDA's carousel C, its stop claimed on a read still moving, by the triage note's intermittent entry. Its cases not
+  // known are two forms fills whose model lost the IBAN's last digit (lab note
+  // 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md): a forms case has no KNOWN, so exit 1.
+  it('ios-vis-b71cbbb.json: forms b4 and p2 not known, every visibility case as HEAD knows it', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
-    expect(out).toMatch(/^# Live golden: 351 cases, 270 ok, 15 loud, 66 mismatches \(3 not known\), 0 skipped$/m);
+    expect(out).toMatch(/^# Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches \(2 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([a-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
-    expect(unknown.sort()).toEqual(['b4', 'p2', 'scroll:carousel-in-list.C']);
+    expect(unknown.sort()).toEqual(['b4', 'p2']);
     expect(code).toBe(1);
   });
 });

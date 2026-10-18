@@ -34,6 +34,7 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",
   '2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md': "LV3: the turned stroke's touch-down, live only (idb: fixed under WDA)",
   '2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md': 'LV4: no turn after strokes that moved nothing, live only (a replayed tree never moves)',
+  '2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md': "a carousel card's stop on a read still moving, live only (and intermittent)",
   '2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md': "LV6: a scrolled table's parked rows, live only (the golden captures at rest)",
   '2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md': 'a fling in a lazy list: scroll dynamics, live only',
 };
@@ -44,7 +45,7 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
  * record is an older src's, whose replies `--rejudge` reads as they were, so these cases still fail there by their
  * rule; struck off — with their line here — once a live record at the fix reads them ok (live.ts then exits 1 on each,
  * as for any fixed case). Keyed by CASE, not by note: an entry filed under one of these notes later, for a case not
- * listed here, is held to the note being open like any other. Empty since round 5's device check (ios-vis.json at
+ * listed here, is held to the note being open like any other. Empty since round 5's device check (ios-vis-2725e76.json at
  * b71cbbb's src): LE4's and L3's cases read ok there and were struck off, but LE4's two cases of F, refiled as LV4 and
  * LV5 (LIVE_ONLY, above).
  */

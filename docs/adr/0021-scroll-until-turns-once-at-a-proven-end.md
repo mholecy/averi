@@ -3,7 +3,10 @@
 Status: decisions 1–3 accepted, 2026-10-17 (owner, on lab note LV4, option (b): the three conditions and the
 one-stroke stop); decision 4 (lab note LV5's carry model) implemented 2026-10-18 on `arch/r22-lv4` under the round-6
 brief, pending the owner and the device check. Open points for the owner, both on uiautomator (below): the
-exclusion from the turn, and the one-stroke stop.
+exclusion from the turn, and the one-stroke stop. Device-checked on iOS 2026-10-18 (round 6, WDA, below): the turn
+holds (once, toward the target, said); the one-stroke stop does not (2–4 unmoved strokes before the proof held, in
+four runs); decision 4 holds on `lower` (F landed in its window four times of four), its long-list half unmeasured —
+no lab cell can measure it yet.
 
 ## Context
 
@@ -112,7 +115,11 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
   losing the proof — F reads 300x64 at launch and 300x65 after a stroke — or a read still bouncing at the top; no trace
   of averi's reads was kept to tell which). `ios wda turn:scroll-bounded.F` stays KNOWN (lab note LV4).
 - **The carry model (decision 4)** holds on `lower`: F landed whole in all four runs (`lower` at rest at 915–981 of its
-  884–1000 window; LV5 struck off). Its long-list half is unmeasured: the live case built for it (a far row of
-  `sheet-long-list`, `CARRY` in scripts/truth/live-visibility.ts) is blocked by a WDA reading of scrolled tables (lab note LV6,
-  docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md).
+  884–1000 window; LV5 struck off). Its long-list half is unmeasured, and no lab cell can measure it yet: the live
+  case built for it (a far row of `sheet-long-list`, `CARRY` in scripts/truth/live-visibility.ts) is blocked by a WDA
+  reading of scrolled tables (lab note LV6,
+  docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md) — and with LV6 fixed it
+  still could not fail on a missing cut: the table's last offset (1748) lies inside Row 30's window (1172–1748), so a
+  full final stroke comes to rest at the end, inside the window; no row of its 40 has a window wholly before the end
+  and past one stroke's carry (≈ 1040 pt). The measurement needs a longer table (the plan's round 7).
 
