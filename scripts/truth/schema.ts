@@ -68,7 +68,10 @@ export interface CatalogCell {
    * The family whose file holds it — set by the generator (scripts/truth/catalog.ts), never written in a family file.
    */
   family?: Family;
-  /** `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`. */
+  /**
+   * `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`; Android's `dialog-fullscreen` and
+   * `bottom-sheet-dialog` (round 7); the iOS app's own layers of phase 3.
+   */
   layer: string;
   targets: CatalogTarget[];
   /** A form cell (phase 1b): fields, a submit, maybe a picker — no coloured targets. */
