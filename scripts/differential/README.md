@@ -107,7 +107,7 @@ R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direc
 asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
 it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
 rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
-its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies
+its identifier, a text target's text, or a label target's label — from the capture golden replays; a node counts only where its centre lies
 within the reach below of the probe's touch, the device's word over the tree's: base.ts#nodeCentres), or, where that
 tree lists none so (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its
 app logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
@@ -122,7 +122,13 @@ effect first — a tap refused without its remedy, a stroke beneath the presente
 where the row would accept it is it no evidence either way, its mismatch said to be of that class first (`not in the
 tree: …`). Except where the capture's tree really did not list the target: an edge row's `Expectation.absent`, set from
 the truth's `TargetTruth.listed` for the replayed source (`scripts/truth/target-contract.ts#unlistedBy` — uiautomator dumps no node
-the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent for it).
+the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent for it). A wait
+whose hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out above its
+scroll container …"), is no such reply: the target is in the tree, refused for where it lies (replies.ts#notInTree;
+edges/scroll-collapsing's A, #10). A scroll is asked toward the target (truth.ts#directionOf): `right` or `left` for
+one wholly beside its scroll view's clip and level with it (a carousel's card, edges/carousel-in-list), else `down` or
+`up` by its centre; R-stroke holds every swipe along that direction's axis (its larger leg on it, either way — a turn
+back too): a stroke across a carousel's axis moves the page, not the carousel (rows.ts#strokeRow).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
@@ -161,7 +167,8 @@ keyboard tapped and reached with no swipe, `scroll_until` touching down above th
 submit whose probe tap submitted the form neither tapped nor "reached" without a swipe, and a lazy picker row swiped for
 on the sheet. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error`
 assert, asked with the same-identifier title below it, fails; no tap is asked by an identifier fields share.
-`golden-spec/false-covers.ts` asks a text target (`own-parts`) by its text — Tapped, reached with no swipe — and, under
+`golden-spec/false-covers.ts` asks a text target (`own-parts` L, N) by its text and a label target (`own-parts` I, an
+icon button's icon: CatalogTarget.label) by its label, `label:"…"` — Tapped, reached with no swipe — and, under
 WDA, R-dismiss of a form whose config taps its principal title (`toolbar-dismiss`, `toolbar-dismiss-bar`: a toolbar
 over the title in the tree) in place of the form's under-keyboard tap row; the façade's `formExpectations` takes the
 capture's source for it (the keyboardDismiss list is inert under idb). A replayed tree shows the dismissal sent, not the
@@ -200,7 +207,8 @@ node --import tsx scripts/truth/live.ts --udid <lab udid> --groups visibility,di
 Phase 5 (`--groups forms,visibility,dismissal`, any of them; `forms` alone by default, so the reproduce lines of the
 earlier summaries stay true): the visibility cases are built from each coloured-target cell's static truth by
 `scripts/truth/live-visibility.ts` — taps judged by the app's tap log, scroll_until by the target's live geometry and by R-direction over the strokes the app logs (LabState.offsets,
-.strokes: both apps report them); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
+.strokes: both apps report them), judged along the scroll view's axis — across a carousel, whose offset the apps report
+from its leading edge, for a card asked `right` or `left` (live-visibility.ts#distanceAt); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
 own keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
 calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs of
 one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
