@@ -81,8 +81,8 @@ SWIFT form did, per the 2026-10-09 notes).
 `Row(Modifier.horizontalScroll(…))` carousel `66,380 948x234` inside a `verticalScroll` page, its second card `C`
 laid out at `1014,380 948x234` — right of the carousel's clip, its first 66 px on the screen, nothing of it drawn
 (`carousel-in-list.png`: the page's `#EEEEEE` there). uiautomator lists it as `[1014,380][1080,614]`: cut to the
-SCREEN's right edge, not to its container's — the same premise failing across. averi judges that strip on the screen
-alone:
+SCREEN's right edge, not to its container's — the same premise failing across. averi (truth/round-6 ee377d2, whose
+src is round 5's b71cbbb) judges that strip on the screen alone:
 
 ```
 tap { selector: 'id:"lab.carousel-in-list.C"' }          → Tapped   (adb shell input tap 1047 497: the background)
@@ -91,7 +91,9 @@ scroll_until { … C, direction: "right" }                  → Element … full
 ```
 
 So on Android the card's R-stroke — a sideways stroke inside the carousel, what an axis-aware stroke choice is judged
-on — is never asked of averi: it stops at once. Expected: the iOS capture of the cell measures the stroke (WDA listing
+on — is never asked of averi: it stops at once. Of the fix directions above only the first covers C: judging the rect
+by its scrolling ancestor (`drawnIn` for uiautomator) finds nothing of it drawn in the carousel. The second does not:
+C lies wholly outside the clip, its strip beginning flush at the carousel's right edge (1014), so it crosses no edge. Expected: the iOS capture of the cell measures the stroke (WDA listing
 C with its unclipped frame, as it lists scroll-bounded's rows) — unmeasured: no iOS capture on 2026-10-18 (the host's
 Xcode 27.1 expects a newer CoreSimulator; no WebDriverAgent ran). Pending in docs/plans/2026-10-15-ground-truth-lab-app.md
 (Pending captures, round 6).
