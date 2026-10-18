@@ -2,7 +2,7 @@ import type { DeviceAdapter, Selector, UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import type { Edge } from '../ui-tree/geometry.js';
 import { presentationOf, type MarkedLayer } from '../ui-tree/presentation.js';
-import { presentedRemedy } from '../ui-tree/standing.js';
+import { activeWindowHint, presentedRemedy } from '../ui-tree/standing.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive } from '../ui-tree/selectors.js';
 import { SIDES } from './swipe.js';
@@ -278,12 +278,14 @@ export async function resolveSettled(
   let run = 0; // consecutive rounds that resolved it, up to the last tree read
   let zeroHint: string | undefined;
   let alone: MarkedLayer | undefined;
+  let windowHint: string | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
       zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
       alone = resolved === undefined ? listedAlone(tree) : undefined;
+      windowHint = resolved === undefined ? activeWindowHint(tree) : undefined;
       if (resolved === undefined) {
         lastRect = undefined;
         run = 0;
@@ -325,7 +327,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome, zeroHint, alone);
+  throw notFound(target, timeoutMs, outcome, zeroHint, alone, windowHint);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -361,8 +363,11 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * its id at 0×0 too, which is why the hint names both (`zeroAreaHint`
  * words it, and names the side when Android dumped them clipped out).
  * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
+ * `windowHint`: the last tree read lists the active window only and matched nothing (ui-tree/standing.ts
+ * #ACTIVE_WINDOW_HINT) — beneath the headline in the same place, when no zero-area hint and no presented window
+ * (`alone`, whose own sentence says more) claim it: a sheet or dialog the tree does not mark may hide the target.
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string, alone?: MarkedLayer): Error {
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string, alone?: MarkedLayer, windowHint?: string): Error {
   // Beneath a presented window listed alone the target is not known absent: nobody saw the screen beneath. A plain
   // Error, as scroll_until's stop there (an optional step is skipped with this headline, never "(not present)").
   if (alone !== undefined && outcome.readError === undefined && zeroHint === undefined) {
@@ -371,7 +376,7 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
         `(the tree source lists the active window alone) — ${presentedRemedy('it', alone)}`,
     );
   }
-  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint), {
+  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint ?? windowHint), {
     sighted: false,
     ...outcome,
   });
@@ -432,18 +437,20 @@ export async function resolvePresent(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let zeroHint: string | undefined;
   let alone: MarkedLayer | undefined;
+  let windowHint: string | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
       zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
       alone = resolved === undefined ? listedAlone(tree) : undefined;
+      windowHint = resolved === undefined ? activeWindowHint(tree) : undefined;
       return resolved;
     },
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome, zeroHint, alone);
+  throw notFound(target, timeoutMs, outcome, zeroHint, alone, windowHint);
 }
 
 // ─── Refused on a present element ────────────────────────────────────────────

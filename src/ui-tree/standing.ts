@@ -439,6 +439,22 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
 };
 
 /**
+ * THE hint beneath a reply that says a target is not in a tree whose source lists the ACTIVE WINDOW ONLY
+ * (`UiNode.activeWindowOnly`, uiautomator) and that does not already say a window is presented (`presentedRemedy`'s
+ * words, for a window the presentation module marks): a sheet or a dialog it does not mark — a fully expanded
+ * bottom sheet whose dump carries no scrim (form-picker), a full-screen dialog, a window against the screen's edge —
+ * still hides the screen beneath from the tree, and nothing in the dump tells it from no window at all (ADR 0018's
+ * residuals 18 and 19, accepted by the owner 2026-10-18 with this hint). So every such reply says what the tree is and
+ * what to do if a sheet or dialog is up, as a possibility, never as the cause: the tap's and fill's wait "to appear"
+ * (interact/resolve.ts#notFound) and `scroll_until`'s "never appeared in the tree" (interact/scroll-text.ts, the
+ * `absent` shortfall). Not under WDA or idb, which list every window. Said once, here.
+ */
+export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
+
+/** ACTIVE_WINDOW_HINT for a tree whose source lists the active window only; undefined for any other. */
+export const activeWindowHint = (tree: Pick<UiNode, 'activeWindowOnly'>): string | undefined => (tree.activeWindowOnly === true ? ACTIVE_WINDOW_HINT : undefined);
+
+/**
  * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no
  * swipe was sent — one on that screen may dismiss it; under a layer the tree source types (an alert, an action sheet,
  * a popover, a dialog: `layer`) it is named, and a swipe would land on it. With no typed layer, the one sentence the
