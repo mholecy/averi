@@ -17,7 +17,7 @@ import { KNOWN } from '../differential/golden/files.js';
 //   3. conversely, every note a KNOWN row (static or live) is filed as is an open note of calibration.json — except
 //      the live-only notes below, each excluded from the calibration with its reason, the live cases of a note
 //      calibrated on the replay that still await a live record at its fix (AWAITING_LIVE, below, case by case), and a
-//      static row of a note calibrated PARTIALLY that its calibration does not name (`partiallyOpen`, below).
+//      static row a note calibrated PARTIALLY lists as left open (its `open`, by row: `partiallyOpen`, below).
 // Filing a note, or striking one off when it is fixed, therefore touches all three places in one commit or fails here.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -59,14 +59,25 @@ const NOT_ON_THIS_BRANCH: readonly string[] = [];
 
 /**
  * A static KNOWN row (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
- * `partial` saying what of the note its fix covers — when the row is none of the rows it calibrates (its `checks`,
- * green after its fix): the part `partial` leaves open, red until a fix or a decision of the owner's (L1: its fix
- * marks the AlertDialog and the half-expanded sheet; form-picker's fully expanded sheet stays open, round 6's code
- * review P1). Round 6 extended the rule for it: an open note expects every row red (OPEN-RED), a calibrated one every
- * row green after its fix, and neither says "calibrated, some rows still open".
+ * `partial` saying what of the note its fix covers — only when that note's `open` lists the row: the part `partial`
+ * leaves open, red until a fix or a decision of the owner's (L1: its fix marks the AlertDialog and the half-expanded
+ * sheet; form-picker's fully expanded sheet stays open, round 6's code review P1). Keyed by ROW, as AWAITING_LIVE is
+ * by case: a row filed as a partial note that its `open` does not list is held to the note being open like any other.
+ * Round 6 extended the rule for it: an open note expects every row red (OPEN-RED), a calibrated one every row green
+ * after its fix, and neither says "calibrated, some rows still open".
  */
 const partiallyOpen = (note: string, key: string): boolean =>
-  table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && !(e.checks ?? []).includes(key));
+  table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.open ?? []).includes(key));
+
+/** Rule 3 over `entries` (every place a note is named, `named`): each `bug:` of a KNOWN row that is filed where it may not be. */
+function misfiled(entries: readonly { where: string; name: string }[]): string[] {
+  const open = new Set(table.notes.filter((e) => expected(e) === 'OPEN-RED').map((e) => e.note));
+  return entries
+    .filter(({ where, name }) => !where.startsWith('calibration.json') && name.startsWith('bug:'))
+    .filter(({ where, name }) => !(where.startsWith('live ') && AWAITING_LIVE[where.slice('live '.length)]?.note === name.slice(4)))
+    .filter(({ where, name }) => !(where.startsWith('static ') && partiallyOpen(name.slice(4), where.slice('static '.length))))
+    .flatMap(({ where, name }) => (open.has(name.slice(4)) || LIVE_ONLY[name.slice(4)] !== undefined ? [] : [`${where}: ${name} is no open note of calibration.json`]));
+}
 
 /** Every place a note is named: where, and the name (`bug:<file>`, `residual:<what>`, or anything else, refused). */
 const named: readonly { where: string; name: string }[] = [
@@ -127,12 +138,26 @@ describe('every note a lab ratchet names is filed', () => {
 });
 
 describe('calibration.json ↔ the KNOWN rows', () => {
-  it('a partial calibration leaves open only the rows it does not calibrate: L1\'s form-picker rows, not its own', () => {
-    const l1 = '2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md';
-    expect(partiallyOpen(l1, 'android-averi_lab-api33/form-picker.xml name tap')).toBe(true);
-    expect(partiallyOpen(l1, 'android-averi_lab-api33/alert-dim.xml A tap')).toBe(false);
-    // A note calibrated whole (no `partial`) leaves no row open: F2A1.
-    expect(partiallyOpen('2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md', 'android-averi_lab-api33/form-picker.xml name tap')).toBe(false);
+  it('each row a partial calibration leaves open (`open`) is a static KNOWN row filed as that note, none of the rows it calibrates, on a note with a `partial`', () => {
+    const bad = table.notes.flatMap((e) =>
+      (e.open ?? []).flatMap((k) => [
+        ...(e.status === 'calibrate' && e.partial !== undefined ? [] : [`#${e.n}: \`open\` without a partial calibration`]),
+        ...(KNOWN[k] === undefined ? [`#${e.n}: ${k} is no KNOWN row`] : KNOWN[k].as === `bug:${e.note}` ? [] : [`#${e.n}: ${k} is filed as ${KNOWN[k].as ?? 'nothing'}`]),
+        ...((e.checks ?? []).includes(k) ? [`#${e.n}: ${k} is one of the rows it calibrates`] : []),
+      ]),
+    );
+    expect(bad).toEqual([]);
+    expect(table.notes.find((e) => e.n === 'L1')?.open).toHaveLength(6);
+  });
+
+  it('a row filed as a partially calibrated note that its `open` does not list is misfiled — fab.xml\'s L and K refiled as #2 or as L1', () => {
+    const noteOf = (n: string) => table.notes.find((e) => e.n === n)!.note;
+    const refiled = [
+      { where: 'static android-averi_lab-api33/fab.xml L tap', name: `bug:${noteOf('2')}` },
+      { where: 'static android-averi_lab-api33/fab.xml K tap', name: `bug:${noteOf('L1')}` },
+    ];
+    expect(misfiled(refiled)).toHaveLength(2);
+    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }])).toEqual([]);
   });
 
   it('the notes calibration.json lists that this branch has not got: exactly NOT_ON_THIS_BRANCH, none open', () => {
@@ -156,13 +181,7 @@ describe('calibration.json ↔ the KNOWN rows', () => {
   });
 
   it('every `bug:` a KNOWN row (static or live) is filed as is an open note of calibration.json, or live-only and excluded there, or a live entry awaiting its live record, or a static row a partial calibration leaves open', () => {
-    const open = new Set(table.notes.filter((e) => expected(e) === 'OPEN-RED').map((e) => e.note));
-    const bad = named
-      .filter(({ where, name }) => !where.startsWith('calibration.json') && name.startsWith('bug:'))
-      .filter(({ where, name }) => !(where.startsWith('live ') && AWAITING_LIVE[where.slice('live '.length)]?.note === name.slice(4)))
-      .filter(({ where, name }) => !(where.startsWith('static ') && partiallyOpen(name.slice(4), where.slice('static '.length))))
-      .flatMap(({ where, name }) => (open.has(name.slice(4)) || LIVE_ONLY[name.slice(4)] !== undefined ? [] : [`${where}: ${name} is no open note of calibration.json`]));
-    expect(bad).toEqual([]);
+    expect(misfiled(named)).toEqual([]);
   });
 
   it('each live case awaiting its live record is a live KNOWN entry filed as its note, a note calibrated in calibration.json — no static row, no stale exemption', () => {

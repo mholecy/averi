@@ -965,6 +965,14 @@
       "after": "d43df5d",
       "verified": "golden",
       "partial": "AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) open",
+      "open": [
+        "android-averi_lab-api33/form-picker.xml name tap",
+        "android-averi_lab-api33/form-picker.xml country tap",
+        "android-averi_lab-api33/form-picker.xml submit tap",
+        "android-averi_lab-api33/form-picker.xml name scroll_until",
+        "android-averi_lab-api33/form-picker.xml country scroll_until",
+        "android-averi_lab-api33/form-picker.xml submit scroll_until"
+      ],
       "defect": "without \"close it first\"|swiped \\d+× beneath a presented layer",
       "checks": [
         "android-averi_lab-api33/alert-dim.xml A tap",
