@@ -7,10 +7,10 @@ import { isInteractive } from '../ui-tree/selectors.js';
 import { outsideItsScrollView, presentedRemedy, reachOf, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
-import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutByRemedy, cutRemedy, cutSliverText, hideKeyboardHow, underKeyboardText, type KeyboardUp } from './target-text.js';
+import { cutByRemedy, cutRemedy, cutSliverText, hideClause, hideKeyboardHow, underKeyboardText, type KeyboardUp } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -481,4 +481,4 @@ const cutAdvice = (cut: Cut): string => `${cutRemedy(cut.edge)} (${cut.within ==
  * tap the author adds, worded as every remedy words it
  * (target-text.ts#hideKeyboardHow), and the adapter's `advice`.
  */
-const hideIt = (remedy: KeyboardRemedy): string => `hide the keyboard (${hideKeyboardHow(remedy)}); ${cannotHide(remedy.advice)}`;
+const hideIt = (remedy: KeyboardRemedy): string => hideClause(remedy, `hide the keyboard (${hideKeyboardHow(remedy)})`);

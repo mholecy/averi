@@ -2,11 +2,11 @@ import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from 
 import { axisOfEdge, containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutByRemedy, cutRemedy, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
+import { cutByRemedy, cutRemedy, hideClause, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
@@ -277,8 +277,7 @@ const STILL_MOVING = 'still moving at the last read (a fling not yet over, or an
  * flow", the deliberate exception recorded in keyboard-window.ts.
  */
 function hideToJudgeWholeScreen(remedy: KeyboardRemedy): string {
-  const again = `to reach it with the keyboard down, hide it first (${hideKeyboardHow(remedy)}) and scroll again`;
-  return remedy.dismissal === 'back' ? again : `${again}; ${cannotHide(remedy.advice)}`;
+  return hideClause(remedy, `to reach it with the keyboard down, hide it first (${hideKeyboardHow(remedy)}) and scroll again`);
 }
 
 /** What the stop judged against, for "never intersected …". */
