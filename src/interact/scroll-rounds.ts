@@ -7,7 +7,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedEnd, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
-import { OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
+import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -555,9 +555,6 @@ export const PROBE_REACH = 0.25;
  * a cut deeper than the probe moves the row takes another probe.
  */
 export const PROBE_MAX_TRAVEL_FRACTION = 0.08;
-
-/** The axis a scroll along `direction` runs on: `flushEdges`' along it. */
-const axisOf = (direction: Direction): 'vertical' | 'horizontal' => (direction === 'up' || direction === 'down' ? 'vertical' : 'horizontal');
 
 /**
  * Where the match lies flush, of `chain` (clipping ancestors, nearest
@@ -1201,7 +1198,7 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
   const window = found.frames.reduce<Rect | undefined>((w, f) => (w === undefined ? undefined : rectIntersection(w, f)), found.drawn);
   if (window === undefined) return undefined;
   const { rect } = found;
-  const vertical = toward === 'up' || toward === 'down';
+  const vertical = axisOf(toward) === 'vertical';
   // Along the scroll: how far past the window's near edge the target's far end lies, and the room the window leaves it.
   const [lo, len, wLo, wLen] = vertical ? [rect.y, rect.height, window.y, window.height] : [rect.x, rect.width, window.x, window.width];
   const need = toward === 'down' || toward === 'right' ? lo + len - (wLo + wLen) : wLo - lo;

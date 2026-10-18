@@ -1,5 +1,5 @@
-import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type Stroke } from '../adapters/types.js';
-import { inferScreenSize, type Edge } from '../ui-tree/geometry.js';
+import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type ScrollAxis, type Stroke } from '../adapters/types.js';
+import { axisOfEdge, inferScreenSize, type Edge } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import { usableScreenOf, type UsableScreen } from '../ui-tree/usable-screen.js';
 
@@ -42,6 +42,9 @@ export const SIDES: Readonly<Record<Edge, SideWords>> = {
  * proof (stroke-plan.ts#strokedEnd) and its sentences (scroll-text.ts).
  */
 export const EDGE_TOWARD: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
+
+/** The axis a scroll toward `direction` moves the content along — the axis of the edge it brings content in through (ui-tree/geometry.ts#axisOfEdge). */
+export const axisOf = (direction: Direction): ScrollAxis => axisOfEdge(EDGE_TOWARD[direction]);
 
 /**
  * Which thing `direction` names. A `swipe:` step names the FINGER's movement

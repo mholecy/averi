@@ -1,9 +1,9 @@
-import type { Point, Rect, ScrollAxis, Stroke, UiNode } from '../adapters/types.js';
+import type { Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { containsPoint, rectIntersection, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
-import { EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
+import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
  * `scroll_until`'s STROKE PLAN: of one round, which scroll view the stroke goes over, the box it is drawn in, the
@@ -452,7 +452,7 @@ function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'
  */
 function scrollStroke(step: { toward: Direction; reach: number; coverTop?: number; box: Rect; maxTravel?: number }): Stroke {
   const { toward, reach, coverTop, box, maxTravel } = step;
-  const side = toward === 'up' || toward === 'down' ? box.height : box.width;
+  const side = axisOf(toward) === 'vertical' ? box.height : box.width;
   const stroke = shortenStroke(fullStroke(box, toward, coverTop), reach, side);
   const travel = strokeLength(stroke);
   return maxTravel === undefined || travel <= maxTravel ? stroke : shortenStroke(stroke, maxTravel / travel, side);
@@ -478,7 +478,7 @@ export const MIN_STROKE_BOX = Math.ceil((2 * TOUCH_SLOP) / (2 * SWIPE_REACH_FRAC
 
 /** `met` — a scroll view already met with the gesture box — when it is at least MIN_STROKE_BOX along the stroke above `coverTop`: the one judgement of room. */
 function roomIn(met: Rect, toward: Direction, coverTop?: number): Rect | undefined {
-  const side = toward === 'up' || toward === 'down' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
+  const side = axisOf(toward) === 'vertical' ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) - met.y : met.width;
   return side >= MIN_STROKE_BOX ? met : undefined;
 }
 
@@ -554,9 +554,6 @@ function roomOver(box: Rect, over: readonly Rect[], toward: Direction, coverTop:
   const room = roomIn(box, toward, top);
   return room === undefined ? undefined : { box: room, ...(top !== undefined && { coverTop: top }) };
 }
-
-/** The axis a stroke toward `toward` moves the content along. */
-const axisOf = (toward: Direction): ScrollAxis => (toward === 'up' || toward === 'down' ? 'vertical' : 'horizontal');
 
 /** The scroll view scrolls on the other axis than the stroke's ALONE, as its tree says (`ScrollView.axes`): a stroke along it would move nothing of it. Unknown is not across. */
 const acrossOnly = ({ axes }: ScrollView, toward: Direction): boolean => axes?.axis !== undefined && axes.axis !== axisOf(toward);

@@ -892,7 +892,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     const view = [...everyNode(tree)].find((n) => isScrollViewOf(n, scroller));
     if (view === undefined) return undefined;
     // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
-    if (scrollAxis(view, unclipped) !== (edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal')) return undefined;
+    if (scrollAxis(view, unclipped) !== axisOfEdge(edge)) return undefined;
     const r = view.rect;
     const past: Record<Edge, (d: Rect) => boolean> = {
       top: (d) => d.y < r.y - 1,
@@ -908,7 +908,16 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
 export function across(rect: Rect, edge: Edge): number {
-  return edge === 'top' || edge === 'bottom' ? rect.height : rect.width;
+  return axisOfEdge(edge) === 'vertical' ? rect.height : rect.width;
+}
+
+/**
+ * The axis along which content comes in through `edge`: `vertical` for the top or bottom, `horizontal` for a side —
+ * the one edge → axis mapping, read by `Clips.endsAt` and scroll_until's sentences (interact/scroll-text.ts), and by
+ * interact/swipe.ts#axisOf for a direction (through its EDGE_TOWARD), so ui-tree imports nothing of interact.
+ */
+export function axisOfEdge(edge: Edge): ScrollAxis {
+  return edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal';
 }
 
 /**
