@@ -3,15 +3,15 @@ import { axisOfEdge, containsPoint, coverText, drawnOverText, frameText, nodeTex
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { countOf } from '../util/count.js';
-import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
-import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutByRemedy, cutRemedy, hideClause, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
-import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
+import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
+import { countOf } from '../util/count.js';
+import { absenceError, type WaitEvidence } from './resolve.js';
+import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
+import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, revealText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -204,7 +204,6 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
   return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
 }
-
 
 /** `1 swipe up did not move it`, `2 swipes up did not move it`, or — some of them moved it — `3 swipes up, the last of which did not move it` / `…, the last 2 of which did not move it`. */
 function unmovedText({ after, unmoved, way }: EndTurn): string {

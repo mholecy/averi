@@ -887,7 +887,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     axes.set(found, facts);
     return facts;
   };
-    const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
+  const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
     if (!ancestry || !unclipped) return undefined;
     const view = [...everyNode(tree)].find((n) => isScrollViewOf(n, scroller));
     if (view === undefined) return undefined;
