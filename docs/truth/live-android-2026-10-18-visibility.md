@@ -71,16 +71,21 @@ text` fails on non-ASCII, LOUD).
 1. **ADR 0021's uiautomator turn.** `turn:scroll-collapsing.A` is the live measure: averi strokes the caller's `down`
    until two unmoved strokes, the reply naming `up`. The note #10 symptom is the turn itself; the case stays KNOWN
    until the owner decides whether two identical unmoved strokes may prove the end on Android.
-2. **ADR 0021's one-stroke stop.** ADR 0021 cites F2A1's phone as a form that fits ("fails after 3 swipes — 540 1034 →
+2. **ADR 0021's one-stroke stop.** ADR 0021 cited F2A1's phone as a form that fits ("fails after 3 swipes — 540 1034 →
    424 twice, then one back up" on the replay). Live it is not: the form scrolls above the IME, ONE stroke at
    540,1034 brought phone out from under the bar and the scroll stopped on it ("fully visible after 1 swipe"). So
-   F2A1's phone is no example of an unmoved scroll on the device; the stop question stands on cases like
-   scroll-collapsing's A and scroll-bounded's F, whose last two strokes move nothing.
-3. **F2A1's refusal and fills**: k3 (a fill into note after back) is now refused for the strip it used to type through.
-   Honest (LOUD), the field untouched — the owner's 2026-10-17 decision's consequence for `type_text` too.
-4. **"fully visible" with 18 px under a surface with no node** (k7): the bar's top padding covers phone's bottom 18 px
-   after the stroke; averi cannot see it (F2A1's cause). A plain stop is right (its centre is clear); the wording
-   overstates.
+   F2A1's phone is no example of an unmoved scroll on the device (ADR 0021 now says so, the replay's figure kept as
+   the replay's); the stop question stands on `turn:scroll-collapsing.A` (4 swipes, the last 2 unmoved, no turn) and
+   `turn:scroll-bounded.F` (2 swipes up at 540,424 in `upper` at its top, neither moving anything).
+3. **Open: F2A1's refusal and fills.** k3 (a fill into note after back) is now refused for the strip it used to type
+   through. Honest (LOUD), the field untouched — the owner's 2026-10-17 decision's consequence for `type_text` too: is
+   a fill into a control cut to a sub-minimum strip by a later node to be refused like the tap (as now), or typed
+   through when the strip reaches the field (as this app's padding lets it)? The owner's.
+4. **Open: "fully visible" with 18 px under a surface with no node** (k7). After the stroke the bar's top padding
+   covers phone's bottom 18 px (of 99); averi cannot see it (F2A1's cause: the bar has no node). A plain stop is right
+   (its centre is clear, a tap there focuses phone); the reply's "fully visible" overstates by those 18 px (a
+   `fully: true` call was not run live). Whether that wording is a residual of the tree (accepted, as ADR 0018's
+   residual 9 accepts an overlay with no node) or wants a hedge is the owner's.
 
 # The run itself
 
