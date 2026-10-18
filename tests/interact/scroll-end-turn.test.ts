@@ -49,6 +49,13 @@ describe('the end proof — the tree lists where a scroll view\'s content ends (
     expect(clips.endsAt({ x: 0, y: 0, width: 10, height: 10 }, 'top')).toBeUndefined();
   });
 
+  it('finds the scroll view by its exact rect, as its axes are found: one remembered half a pixel off proves nothing', () => {
+    const { clips } = sceneOf(CAPTURE);
+    const off: Rect = { ...LOWER, y: LOWER.y + 0.5 };
+    expect(clips.axesOf(off)).toBeUndefined();
+    expect(clips.endsAt(off, 'top')).toBeUndefined();
+  });
+
   it('only along the axis the scroll view scrolls on: a horizontal carousel lists nothing below its bottom, and that proves no end for a vertical stroke', () => {
     const carousel: Rect = { x: 24, y: 138, width: 354, height: 85 };
     const tree = node({

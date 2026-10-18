@@ -735,7 +735,9 @@ export interface Clips {
    */
   axesOf(container: Rect): ScrollAxes | undefined;
   /**
-   * The scroll view of rect `scroller` (within a pixel; the first in tree order that scrolls), when the tree shows its
+   * The scroll view of rect `scroller` (found as `axesOf` finds its scroll view: scroll-containers.ts#isScrollViewOf,
+   * that exact rect — the one the stroke plan remembered and drew over, whose cut and axes the same read finds by it
+   * exactly; one moved by a pixel is found by none of them, and no proof is the safe answer), when the tree shows its
    * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
    * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`drawnIn`'s
    * dialect, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
@@ -887,7 +889,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
   };
     const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
     if (!ancestry || !unclipped) return undefined;
-    const view = [...everyNode(tree)].find((n) => scrolls(n) && sameRectWithinPixel(n.rect, scroller));
+    const view = [...everyNode(tree)].find((n) => isScrollViewOf(n, scroller));
     if (view === undefined) return undefined;
     // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
     if (scrollAxis(view, unclipped) !== (edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal')) return undefined;
