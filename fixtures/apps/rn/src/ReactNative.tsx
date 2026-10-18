@@ -13,8 +13,11 @@ import type { Cell, Lab, Target } from './lab';
 //   (its container 24,431 354x52, the label 42,446 103x22, the field 42,447 318x20): the label 18 pt in and 21 down,
 //   the field 18 pt in on both sides and one point below the label's top, 20 tall, after the label in the order and
 //   drawn over it (transparent). `M` the same with a MULTILINE TextInput (a UITextView on iOS, itself a scroll view)
-//   running the box's height, the label inside it — the multiline neighbour. A tap on the label lands on the field:
-//   its focus logs the target's `tap`;
+//   from one point below the label's top to 4 pt above the box's foot — the multiline neighbour. Its top lies below the
+//   label's so the label comes first in the order (iOS lists RN's views by their frames' tops: laid from the box's top,
+//   WDA listed the field, with its two indicators, before the label) — and WDA lists, under the text view, `Other
+//   'Horizontal scroll bar, 1 page'` (value `0 %`, one bare thumb) over the label's centre: #18's indicator. A tap on a
+//   label lands on its field: its focus logs the target's `tap`;
 // - a label target (CatalogTarget.label): the field with an icon — a single-line TextInput and, at its trailing end, a
 //   44-pt icon button labelled by the target's label (a white ×, identified lab.<cell>.<tag>, its frame `<tag>`): a
 //   press logs the target's `tap` and empties the field.
@@ -146,7 +149,7 @@ const styles = StyleSheet.create({
   label: { position: 'absolute', left: 18, top: 21, fontSize: 15, lineHeight: 22, color: '#1F2933' },
   line: { position: 'absolute', left: 18, right: 18, top: 22, height: 20, padding: 0, margin: 0, fontSize: 15, color: '#1F2933', backgroundColor: 'transparent' },
   beforeIcon: { right: 62, color: '#FFFFFF' },
-  multiline: { position: 'absolute', left: 18, right: 18, top: 4, bottom: 4, paddingTop: 18, paddingBottom: 0, paddingHorizontal: 0, margin: 0, fontSize: 15, color: '#1F2933', backgroundColor: 'transparent', textAlignVertical: 'top' },
+  multiline: { position: 'absolute', left: 18, right: 18, top: 22, bottom: 4, paddingTop: 0, paddingBottom: 0, paddingHorizontal: 0, margin: 0, fontSize: 15, color: '#1F2933', backgroundColor: 'transparent', textAlignVertical: 'top' },
   icon: { position: 'absolute', right: 10, top: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   glyph: { color: '#FFFFFF', fontSize: 24, lineHeight: 28 },
 });
