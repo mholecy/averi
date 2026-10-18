@@ -37,7 +37,8 @@
 > premise does not hold on the device: the form DOES scroll above the IME, the stroke moved it 167 px (phone 1296 → 1129),
 > leaving phone's centre clear of the bar and of the IME, 18 px of its bottom under the bar's top padding (the surface
 > with no node: averi cannot see those 18 px, so "fully" overstates by them). So the replay's "fails after 3 swipes" (two
-> unmoved strokes and one back) is not what the device does: 1 stroke, a right stop. A consequence of the refusal: live
+> unmoved strokes and one back) is not what the device does: 1 stroke, a right stop. The "its strokes move nothing on
+> this screen (the form fits)" above is the replay's reading; ADR 0021's one-stroke-stop point is corrected to say so. A consequence of the refusal: live
 > case k3 (fill note under the IME, back hides it) was ok before — the fill tapped the 14-px strip and typed — and is now
 > LOUD, refused for the same strip, the field untouched: an honest refusal the owner's 2026-10-17 decision implies.
 > docs/truth/live-android-2026-10-18-visibility.md.

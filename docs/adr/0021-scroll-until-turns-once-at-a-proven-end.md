@@ -69,9 +69,14 @@ exclusion from the turn, and the one-stroke stop.
 - **uiautomator: the one-stroke stop — also open for the owner.** Off WDA the stop still needs
   `UNMOVED_STROKES_EXHAUST` (2, scroll-rounds.ts) identical strokes that moved nothing, and the stuck test likewise
   (then one stroke back), so a scroll that cannot move anything costs at least two swipes and their settles before it
-  fails. Measured on the golden replay of the Android lab app (truth/round-6): F2A1's phone (`form-keyboard.xml`, a
-  form that fits above the IME, nothing to scroll) still fails after 3 swipes — `540 1034 → 424` twice, then one back
-  up — though round 6's fix (6d8f8de) made its verdict right. Whether one unmoved stroke, touching down on nothing
+  fails. The golden replay of the Android lab app (truth/round-6) shows it on F2A1's phone (`form-keyboard.xml`):
+  the replayed tree never moves, so it fails after 3 swipes — `540 1034 → 424` twice, then one back up — though round
+  6's fix (6d8f8de) made its verdict right. That is the replay's figure, not the device's: live (round 6's Android
+  device check, 2026-10-18, docs/truth/live-android-2026-10-18-visibility.md, case k7) the form does scroll above the
+  IME, and ONE stroke touching down at `540,1034` moved it 167 px and stopped on phone — no unmoved stroke at all. The
+  live unmoved strokes are elsewhere: `turn:scroll-collapsing.A` (4 swipes down, the last 2 moving nothing, no turn —
+  lab note #10's open part) and `turn:scroll-bounded.F` (2 swipes up at `540,424` in `upper`, at its top: neither
+  moves anything, F unlisted). Whether one unmoved stroke, touching down on nothing
   drawn over its scroll view, may end the scroll there too is the same question as the turn's — what on uiautomator's
   tree may stand for the end WDA lists — asked for the stop alone: a one-stroke stop that is wrong costs a failure
   where a second stroke would have moved the list; a two-stroke stop that is right costs a swipe and a settle.

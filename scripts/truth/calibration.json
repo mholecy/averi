@@ -1179,7 +1179,7 @@
       "verified": "golden",
       "defect": "reached with no swipe where a tap fires",
       "checks": ["android-averi_lab-api33/form-keyboard.xml phone scroll_until"],
-      "remark": "Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater: a control Compose cut to a strip under the tap minimum by a node drawn after it is a sliver; the owner's decision of 2026-10-17, ADR 0013's refinement), merged into arch/round-22 as 8b2530c with its review fixes (wording only): the pair is 6d8f8de itself and its parent b71cbbb (round 5's src). Before: phone reached with no swipe, its strip under the bar riding on the IME; after: no stop — it fails after 3 swipes naming the bar."
+      "remark": "Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater: a control Compose cut to a strip under the tap minimum by a node drawn after it is a sliver; the owner's decision of 2026-10-17, ADR 0013's refinement), merged into arch/round-22 as 8b2530c with its review fixes (wording only): the pair is 6d8f8de itself and its parent b71cbbb (round 5's src). Before: phone reached with no swipe, its strip under the bar riding on the IME; after: no stop — it fails after 3 swipes naming the bar. (The replay's: its tree never moves. Live, round 6's Android device check, 2026-10-18, case k7: the form scrolls above the IME — one stroke at 540,1034 moved it 167 px and stopped on phone, its centre clear of the bar; tap phone and tap note refused, no submit.)"
     },
     {
       "n": "FU1",
