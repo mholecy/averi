@@ -749,10 +749,14 @@ export interface Clips {
    * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
    * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
    * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
-   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual: a lazy list (a table) lists only the
-   * rows it has laid out, so one resting on a row boundary with its earlier rows dropped reads as ending at its top —
-   * interact/scroll-rounds.ts asks this only of a read that a stroke over that scroll view left unmoved, which a list
-   * with rows past that edge would not have been. Cost: one walk of that scroll view's subtree, per ask (asked at most
+   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual, stated as it is: a lazy list (a
+   * table) lists only the rows it has laid out, so one resting EXACTLY on a row boundary with its earlier rows dropped
+   * (a sticky section header pinned at its top reads the same) lists nothing past its top and reads as ending there.
+   * Nothing in the reads rules that out: interact/scroll-rounds.ts asks this only of a read a stroke left unmoved, but
+   * a stroke not taken leaves it unmoved too — so a stroke not taken over a lazy list resting on a boundary is a false
+   * proof (one stroke, then a turn or a failure that calls the content exhausted). What makes it rare, not impossible:
+   * a list at rest lies on a boundary by chance (a flung list stops anywhere along a row), and the stroke must also go
+   * untaken, with nothing drawn over its touch-down (that withholds the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most
    * once a round, after a stroke).
    */
   endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
