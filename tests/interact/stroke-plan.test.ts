@@ -243,6 +243,25 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     expect(on(CAROUSEL, stroke.points?.from) || on(CAROUSEL, stroke.points?.to)).toBe(false);
   });
 
+  it('the LONGEST clear stretch, not the first: a carousel high on the page (300–385) leaves 120 above it and 489 below — the stroke is drawn below', () => {
+    const row = ROW();
+    const high: Rect = { ...CAROUSEL, y: 300 };
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(high, cards(high)), row])]);
+    const { stroke } = planOn(tree, 'down', { target: row, gesture: PHONE });
+    expect(stroke.box).toEqual({ ...PAGE, y: 385, height: 874 - 385 });
+    expect(on(high, stroke.points?.from) || on(high, stroke.points?.to)).toBe(false);
+  });
+
+  it('the stretch ends at the keyboard: a carousel at 400–485 under a keyboard at 700 leaves 220 above it and 215 between it and the keyboard (389 to the page\'s bottom, which the keyboard covers) — the stroke is drawn above it, clear of the keyboard', () => {
+    const row = ROW();
+    const mid: Rect = { ...CAROUSEL, y: 400 };
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(mid, cards(mid)), row])]);
+    const { stroke } = planOn(tree, 'down', { target: row, gesture: PHONE, keyboardTop: 700 });
+    expect(stroke).toMatchObject({ box: { ...PAGE, height: 400 - 180 }, coverTop: 700 });
+    expect(on(mid, stroke.points?.from) || on(mid, stroke.points?.to)).toBe(false);
+    expect(Math.max(stroke.points!.from.y, stroke.points!.to.y)).toBeLessThan(400);
+  });
+
   it('a nested scroll view whose axis the tree cannot tell (its cards fit its frame: no content past it) is not kept off — the stroke is the page\'s as before', () => {
     const row = ROW();
     const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, [node({ role: 'button', rect: { ...CAROUSEL } })]), row])]);
