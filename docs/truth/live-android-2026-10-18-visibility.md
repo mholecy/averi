@@ -93,6 +93,30 @@ text` fails on non-ASCII, LOUD).
    screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT). `form-picker`'s six rows are filed as residual
    18; lab cells for a full-screen dialog and a Views `BottomSheetDialog` are planned.
 
+# The active-window hint, run live (round 6's closing review)
+
+Decision 5's hint had only been read off replayed trees. Run on the device on 2026-10-18 (averi_lab, emulator-5554,
+booted `-no-snapshot-save`; lab app and src built from truth/r6-cr2 ea070d2 = truth/round-6 9d1aaf8 + arch/r22-cr2),
+a narrow run, record docs/truth/live-records/android-vis-hint-ea070d2.json (not pinned in live-rejudge.test.ts, which
+pins the full-group records):
+
+  node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups forms,visibility --cases c2,c3,c4,tap:scroll-bounded.O,scroll:scroll-bounded.O,tap:scroll-bounded.F,scroll:scroll-bounded.F,turn:scroll-bounded.F,<tap: and scroll: of alert-dim and sheet-medium A–D> --record <file>
+
+24 cases, 21 ok, 1 loud, 2 mismatches (0 not known):
+- **form-picker's expanded sheet** — new forms cases c2–c4 (live.ts; live-forms.ts#judgeUnderSheet): a tap on name,
+  country, submit with the picker sheet open and fully expanded (no scrim, no presented window marked: residual 18).
+  All ok: nothing fired (no row selected, no submit, the sheet not dismissed, no field focused), and each reply is the
+  wait with the hint beneath it, verbatim: `Timed out after 5000ms waiting for element id:"lab.form-picker.name" to
+  appear` / `(the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)`.
+- **scroll_until "never appeared"** — scroll:scroll-bounded.O and .F: `… — element never appeared in the tree (the tree
+  lists only the active window: if a sheet or a dialog is open over the screen, close it first) — if it lies above, try
+  direction: "up"`; turn:scroll-bounded.F the same, swiping up; their taps' waits carry it as c2–c4's. Verdicts as
+  before: O and F LV1's `unchanged-claim` (known), turn F LOUD (not-reached).
+- **Said once, and only where no window is marked**: counted per reply over the record, every reply above carries
+  "close it first" exactly once; none of L1's 16 presented cases (tap and scroll_until on alert-dim and sheet-medium
+  A–D, all ok) carries the hint — their presented remedy alone, once each (`… — a dialog is presented over it — close it
+  first`, `… — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it …`).
+
 # The run itself
 
 The first run at e98b87e (docs/truth/live-records/android-vis-e98b87e-run1.json) had three tool calls hang past the
