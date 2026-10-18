@@ -192,6 +192,17 @@
       "truth": "scroll-top-edge-end.truth.json"
     },
     {
+      "file": "carousel-in-list.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-in-list.png",
+      "truth": "carousel-in-list.truth.json"
+    },
+    {
       "file": "bands.xml",
       "source": "uiautomator",
       "form": "raw",

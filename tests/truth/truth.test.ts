@@ -7,8 +7,10 @@ import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
+  axisOf,
   consistency,
   controlPiece,
+  directionOf,
   controlConsistency,
   elementOf,
   imePanels,
@@ -60,6 +62,23 @@ describe('elementOf / selectorOf — what a row asks a target by, replayed and l
     expect(elementOf({ id: 'lab.c.A' })).toEqual({ id: 'lab.c.A' });
     expect(selectorOf({ id: 'lab.c.N', text: 'Payee’s name' })).toBe('text:"Payee’s name"');
     expect(selectorOf({ id: 'lab.c.A' })).toBe('id:"lab.c.A"');
+  });
+});
+
+describe('directionOf — toward the target, along its scroll view\'s axis', () => {
+  const screen = { width: 402, height: 874 };
+  const carousel = rect(24, 138, 354, 85);
+  const at = (frame: Rect, scrollView?: string) => directionOf({ frame, visible: null, ...(scrollView !== undefined && { scrollView }) }, { screen, scrollViews: { carousel } });
+  it('a card wholly right (left) of its carousel\'s clip, on its rows: `right` (`left`) — along x', () => {
+    expect(at(rect(378, 138, 354, 85), 'carousel')).toBe('right');
+    expect(at(rect(-330, 138, 354, 85), 'carousel')).toBe('left');
+    expect(axisOf('right')).toBe('x');
+    expect(axisOf('down')).toBe('y');
+  });
+  it('anything else up or down by its centre, as before: in no scroll view, or one the state does not report, or beside the clip but off its rows', () => {
+    expect(at(rect(378, 138, 354, 85))).toBe('up');
+    expect(at(rect(378, 138, 354, 85), 'other')).toBe('up');
+    expect(at(rect(378, 900, 354, 85), 'carousel')).toBe('down');
   });
 });
 

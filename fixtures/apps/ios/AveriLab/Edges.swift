@@ -69,6 +69,8 @@ struct EdgesScreen: View {
             Color.white
             if cell.id == "scroll-sticky" {
                 StickyList(cell: cell, screen: screen)
+            } else if cell.id == "carousel-in-list" {
+                CarouselList(cell: cell, screen: screen)
             } else {
                 ForEach(EdgeLayout.scrollers(cell.id), id: \.id) { s in
                     EdgeScrollView(cell: cell, scroller: s, screen: screen)
@@ -155,5 +157,102 @@ struct StickyList: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.scrollView("list", $0) }
         .position(x: screen.width / 2, y: l.top + l.height / 2)
         .onAppear { position.scrollTo(y: l.offset) }
+    }
+}
+
+/// carousel-in-list: a page (the whole screen, scrolled 300 on appear) holding a horizontal card carousel (24 pt in,
+/// 354×85, on the screen at 138) above a list of rows (300×64, from content 560, 80 apart): U above the screen (content
+/// 100: off-screen, `up`), B the list's 11th row (content 1360, below the screen: off-screen, `down`), and in the
+/// carousel C, the card right of the first (its content x 354: on the screen at 378–402, right of the carousel's clip —
+/// outside-scroll-view, its scroll toward it `right`). The banking screen of
+/// docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md (its residual: the carousel
+/// `24,138 354x85` near the top, a long list below). Each scroll view reports its offset along its axis (labScroll).
+/// Edges.kt lays out the same numbers in dp.
+enum CarouselLayout {
+    static let content: CGFloat = 2400
+    static let offset: CGFloat = 300
+    static let rows: [String: CGFloat] = ["U": 100, "B": 1360]
+    static let listTop: CGFloat = 560
+    static let listPitch: CGFloat = 80
+    static let listRows = 22
+    static let carouselTop: CGFloat = 438
+    static let carouselX: CGFloat = 24
+    static let cardHeight: CGFloat = 85
+    /// The cards in carousel order: a filler, C, a filler.
+    static let cards = 3
+}
+
+struct CarouselList: View {
+    @EnvironmentObject var lab: Lab
+    let cell: Cell
+    let screen: CGSize
+    @State private var position = ScrollPosition()
+
+    var body: some View {
+        let l = CarouselLayout.self
+        let cardWidth = screen.width - 2 * l.carouselX
+        ScrollView {
+            ZStack(alignment: .topLeading) {
+                Color.clear.frame(width: screen.width, height: l.content)
+                ForEach(0..<l.listRows, id: \.self) { i in
+                    let y = l.listTop + CGFloat(i) * l.listPitch
+                    if !l.rows.values.contains(y) {
+                        Rectangle().fill(Color(hex: "#B0BEC5")).frame(width: Slot.size.width, height: Slot.size.height)
+                            .position(x: screen.width / 2, y: y + Slot.size.height / 2)
+                    }
+                }
+                ForEach(cell.targets.filter { l.rows[$0.tag] != nil }, id: \.tag) { t in
+                    TargetView(cell: cell, target: t).position(x: screen.width / 2, y: l.rows[t.tag]! + Slot.size.height / 2)
+                }
+                Carousel(cell: cell, card: CGSize(width: cardWidth, height: l.cardHeight))
+                    .position(x: screen.width / 2, y: l.carouselTop + l.cardHeight / 2)
+            }
+            .frame(width: screen.width, height: l.content)
+        }
+        .labScroll("page", lab)
+        .scrollPosition($position)
+        .scrollIndicators(.hidden)
+        .contentMargins(0, for: .scrollContent)
+        .ignoresSafeArea()
+        .background(Color(hex: "#EEEEEE"))
+        .frame(width: screen.width, height: screen.height)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.scrollView("page", $0) }
+        .position(x: screen.width / 2, y: screen.height / 2)
+        .onAppear { position.scrollTo(y: l.offset) }
+    }
+}
+
+/// The carousel: a horizontal scroll view one card wide, its cards edge to edge — C the second.
+struct Carousel: View {
+    @EnvironmentObject var lab: Lab
+    let cell: Cell
+    let card: CGSize
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                ForEach(0..<CarouselLayout.cards, id: \.self) { i in
+                    if i == 1, let c = cell.targets.first(where: { $0.tag == "C" }) {
+                        Button {
+                            lab.event("tap", c.tag)
+                        } label: {
+                            Rectangle().fill(Color(hex: c.color))
+                        }
+                        .buttonStyle(Flat())
+                        .frame(width: card.width, height: card.height)
+                        .accessibilityIdentifier("lab.\(cell.id).\(c.tag)")
+                        .accessibilityLabel("Target \(c.tag)")
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.frame(c.tag, $0) }
+                    } else {
+                        Rectangle().fill(Color(hex: "#90A4AE")).frame(width: card.width, height: card.height)
+                    }
+                }
+            }
+        }
+        .labScroll("carousel", lab, axis: .horizontal)
+        .scrollIndicators(.hidden)
+        .contentMargins(0, for: .scrollContent)
+        .frame(width: card.width, height: card.height)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.scrollView("carousel", $0) }
     }
 }

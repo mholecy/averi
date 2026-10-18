@@ -75,6 +75,26 @@ SWIFT form did, per the 2026-10-09 notes).
 - Or, narrower: treat a rect that crosses its scrollable ancestor's edge like one flush with it (the sliver rule and the
   `fully` probe).
 
+## Across a carousel (round 6, 2026-10-18)
+
+`carousel-in-list` (Edges.kt#CarouselInList, captured on `averi_lab` at truth/r6-cells): a Compose
+`Row(Modifier.horizontalScroll(…))` carousel `66,380 948x234` inside a `verticalScroll` page, its second card `C`
+laid out at `1014,380 948x234` — right of the carousel's clip, its first 66 px on the screen, nothing of it drawn
+(`carousel-in-list.png`: the page's `#EEEEEE` there). uiautomator lists it as `[1014,380][1080,614]`: cut to the
+SCREEN's right edge, not to its container's — the same premise failing across. averi judges that strip on the screen
+alone:
+
+```
+tap { selector: 'id:"lab.carousel-in-list.C"' }          → Tapped   (adb shell input tap 1047 497: the background)
+assert { element: { id: … C }, color: { expected: "#EEEEEE" } } → PASS (the background measured: #29's shape)
+scroll_until { … C, direction: "right" }                  → Element … fully visible after 0 swipes
+```
+
+So on Android the card's R-stroke — a sideways stroke inside the carousel, what an axis-aware stroke choice is judged
+on — is never asked of averi: it stops at once. The iOS capture of the cell (WDA lists C with its unclipped frame) is
+the one that measures the stroke.
+
 ## Rows (golden, KNOWN in tests/differential/golden/edges.known.ts)
 
-`android-averi_lab-api33/scroll-bounded.xml P fully`, `S tap`, `S scroll_until`, `S fully`.
+`android-averi_lab-api33/scroll-bounded.xml P fully`, `S tap`, `S scroll_until`, `S fully`;
+`android-averi_lab-api33/carousel-in-list.xml C tap`, `C colour`, `C scroll_until`.

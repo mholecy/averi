@@ -66,6 +66,15 @@ describe('the distance a stroke changes (R-direction)', () => {
     expect(distanceAt(318, f0, 382, region)).toBe(0);
     expect(distanceAt(900, f0, 382, region)).toBe(582);
   });
+  it('along a horizontal scroll view\'s axis (a carousel\'s card, asked `right`): its x moved by the offset across', () => {
+    const carousel = { x: 66, y: 380, width: 948, height: 234 };
+    const card = { x: 1014, y: 380, width: 948, height: 234 };
+    expect(distanceAt(0, card, 0, carousel, 'x')).toBe(948);
+    expect(distanceAt(948, card, 0, carousel, 'x')).toBe(0);
+    expect(distanceAt(0, card, 0, carousel)).toBe(0); // along y it already shows: the axis decides
+    const s = state({ scrollViews: { carousel }, frames: { C: card }, offsets: { carousel: 0 }, strokes: [stroke(0, 400, 'carousel'), stroke(400, 0, 'carousel')] });
+    expect(classStrokes(s, state({ scrollViews: { carousel }, frames: { C: card }, offsets: { carousel: 0 } }), 'android', 'C', 'carousel', 'x')?.map((c) => c.cls)).toEqual(['closer', 'away']);
+  });
   it('classes each stroke of its own scroll view: away, still, closer', () => {
     const s = state({ strokes: [stroke(382, 900), stroke(900, 900), stroke(900, 200), stroke(0, 50, 'other')] });
     expect(classStrokes(s, state(), 'ios', 'T', 'page')?.map((c) => c.cls)).toEqual(['away', 'still', 'closer']);
@@ -153,6 +162,10 @@ describe('visibilityCases', () => {
     const cs = visibilityCases(truth('scroll-top-edge-end', [target({ geometry: 'status-band', scrollView: 'page', visible: { x: 51, y: 0, width: 300, height: 62 } })]), 'ios');
     expect(cs.find((c) => c.id === 'scroll:scroll-top-edge-end.T')?.calls[0].args.direction).toBe('up');
     expect(cs.find((c) => c.id === 'turn:scroll-top-edge-end.T')?.calls[0].args.direction).toBe('down');
+  });
+  it('toward a carousel\'s card: `right`, its case judged along x', () => {
+    const cs = visibilityCases({ ...truth('carousel-in-list', [target({ tag: 'C', id: 'lab.c.C', geometry: 'outside-scroll-view', scrollView: 'carousel', visible: null, frame: { x: 378, y: 138, width: 354, height: 85 } })]), scrollViews: { carousel: { x: 24, y: 138, width: 354, height: 85 } } }, 'ios');
+    expect(cs.find((c) => c.id === 'scroll:carousel-in-list.C')?.calls[0].args.direction).toBe('right');
   });
   it('beneath a presented layer: the refusal case', () => {
     const cs = visibilityCases(truth('sheet-medium-edges', [target({ declared: 'presented-over', geometry: 'off-screen', scrollView: 'host' })]), 'ios');

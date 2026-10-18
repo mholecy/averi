@@ -371,6 +371,16 @@
       ]
     },
     {
+      "id": "carousel-in-list",
+      "family": "edges",
+      "layer": "none",
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
       "id": "bands",
       "family": "bars",
       "layer": "none",

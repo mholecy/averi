@@ -227,7 +227,11 @@ export interface LabState {
   chrome?: Record<string, Rect>;
   // Phase 5's live oracle (scripts/truth/live.ts, live-visibility.ts) — optional: written by the scroll views of the
   // coloured-target cells from the round-4 apps on; no capture reads them.
-  /** Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top. */
+  /**
+   * Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top — across it
+   * from its leading edge for a horizontal one (carousel-in-list's `carousel`), which live-visibility.ts#judgeScroll
+   * judges along that axis.
+   */
   offsets?: Record<string, number>;
   /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */
   strokes?: Stroke[];

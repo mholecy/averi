@@ -3,8 +3,10 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // The edges family's ratchet (fixtures/apps/cells/edges.json): scroll-bounded, scroll-sticky, scroll-top-edge (and
 // round 4's scroll-top-edge-end, its content ending at the screen's bottom: #17's turn-back, live), and round 3's
 // Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
-// scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it) — its
-// rows by geometry (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
+// scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it), and
+// round 6's carousel-in-list (both platforms; captured on Android only so far: on 2026-10-18 the host's CoreSimulator,
+// older than Xcode 27.1 expects, ran no WebDriverAgent on the lab simulator) — its rows by geometry
+// (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
 // scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE3; LE4 is calibrated since
 // round 5's 0a); this KNOWN owns the ratchet, as presented.known.ts does for L1.
 
@@ -25,6 +27,14 @@ export const edges: KnownFile = {
     ...keys(`${ANDROID}/scroll-bounded.xml`, ['S'], ['fully'], { cls: 'fully visible where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: a sliver past its container read as whole', as: LE1 }),
     ...keys(`${ANDROID}/scroll-bounded.xml`, ['S'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['adb shell input tap 541 1563'], note: 'lab finding: Tapped below its container, where nothing of it is drawn', as: LE1 }),
     ...keys(`${ANDROID}/scroll-bounded.xml`, ['S'], ['scroll_until'], { cls: 'reached where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the plain stop on a sliver past its container', as: LE1 }),
+    // LE1 across: carousel-in-list's C, the card right of the carousel (a Compose horizontalScroll Row), is dumped as
+    // the strip of it right of the carousel's clip, [1014,380][1080,614], where nothing of it is drawn (the page's
+    // background): Tapped there, its colour PASSES on the background, and the stop calls it visible — so its R-stroke
+    // (a sideways scroll inside the carousel, what the axis-aware stroke choice is judged on) is never reached on
+    // Android.
+    ...keys(`${ANDROID}/carousel-in-list.xml`, ['C'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['adb shell input tap 1047 497'], note: 'lab finding: a card past its carousel\'s clip read as drawn — Tapped on the background', as: LE1 }),
+    ...keys(`${ANDROID}/carousel-in-list.xml`, ['C'], ['colour'], { cls: 'passed on #EEEEEE', kind: 'PASS', calls: [], note: 'lab finding: a card past its carousel\'s clip — the colour measured the background (#29\'s shape)', as: LE1 }),
+    ...keys(`${ANDROID}/carousel-in-list.xml`, ['C'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'lab finding: a card past its carousel\'s clip — visible after 0 swipes, no sideways stroke', as: LE1 }),
     // LAB FINDING LE2 — idb lists no scroll view: P, S and O are judged on the screen alone. O (outside its scroll view)
     // Tapped on the background, its colour PASSES on the background, and the stop calls it visible; S Tapped and
     // reached; P and S "fully visible". WDA answers every one of these rows as the truth does.
@@ -61,6 +71,7 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-sticky-view.xml`]: 4,
     [`${ANDROID}/scroll-top-edge.xml`]: 7,
     [`${ANDROID}/scroll-top-edge-end.xml`]: 7,
+    [`${ANDROID}/carousel-in-list.xml`]: 9,
     [`${IOS}/scroll-bounded.idb.json`]: 14,
     [`${IOS}/scroll-bounded.wda.json`]: 14,
     [`${IOS}/scroll-sticky.idb.json`]: 4,

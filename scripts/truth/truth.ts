@@ -654,11 +654,24 @@ export function controlConsistency(c: ControlTruth, outOfProcess: readonly Rect[
   return undefined;
 }
 
+/** Where content lies, as scroll_until's `direction` names it (`down`: below the current view). */
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
 /**
- * Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the
- * screen), else `up`.
+ * Toward the target: across, along a horizontal scroll view's axis, where the target lies wholly right (`right`) or
+ * left (`left`) of its scroll view's clip (CellTruth.scrollViews) with its rows overlapping the clip's — a card of a
+ * carousel (edges/carousel-in-list), which only a sideways scroll brings into view; else `down` when its frame's centre
+ * lies at or below the centre of what shows of it (else of the screen), else `up`.
  */
-export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pick<CellTruth, 'screen'>): 'up' | 'down' {
+export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews'>): Direction {
+  const clip = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
+  if (clip !== undefined && t.frame.y < clip.y + clip.height && clip.y < t.frame.y + t.frame.height) {
+    if (t.frame.x >= clip.x + clip.width) return 'right';
+    if (t.frame.x + t.frame.width <= clip.x) return 'left';
+  }
   const shown = t.visible ?? { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
   return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
 }
+
+/** The axis a `direction` scrolls along: `y` for up and down, `x` for left and right. */
+export const axisOf = (d: Direction): 'x' | 'y' => (d === 'left' || d === 'right' ? 'x' : 'y');

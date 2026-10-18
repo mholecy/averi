@@ -394,12 +394,15 @@ extension UIApplication {
 
 extension View {
     /// Reports this SwiftUI scroll view's content offset and its strokes to the lab under `id` (Lab.offset,
-    /// Lab.scrolling): the live golden's oracle of which scroll view a stroke moved, and which way.
-    func labScroll(_ id: String, _ lab: Lab) -> some View {
-        self
-            .onScrollGeometryChange(for: Double.self) { Double($0.contentOffset.y + $0.contentInsets.top) } action: { _, y in lab.offset(id, y) }
+    /// Lab.scrolling): the live golden's oracle of which scroll view a stroke moved, and which way. `axis`: the one it
+    /// scrolls along — a horizontal one (carousel-in-list's carousel) reports its offset across its content from its
+    /// leading edge.
+    func labScroll(_ id: String, _ lab: Lab, axis: Axis = .vertical) -> some View {
+        let along = { (g: ScrollGeometry) in Double(axis == .vertical ? g.contentOffset.y + g.contentInsets.top : g.contentOffset.x + g.contentInsets.leading) }
+        return self
+            .onScrollGeometryChange(for: Double.self) { along($0) } action: { _, y in lab.offset(id, y) }
             .onScrollPhaseChange { _, phase, context in
-                lab.scrolling(id, phase != .idle, Double(context.geometry.contentOffset.y + context.geometry.contentInsets.top))
+                lab.scrolling(id, phase != .idle, along(context.geometry))
             }
     }
 }

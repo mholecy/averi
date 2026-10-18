@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -176,6 +178,8 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }) {
         if (cell.id == "scroll-sticky" || cell.id == "scroll-sticky-cut" || cell.id == "scroll-sticky-view") {
             StickyList(cell, lab)
+        } else if (cell.id == "carousel-in-list") {
+            CarouselInList(cell, lab, maxWidth, maxHeight)
         } else {
             // Laid out down a column (not offset): each container's clip is where the layout puts it.
             val screenHeight = maxHeight
@@ -262,4 +266,93 @@ private fun StickyList(cell: Cell, lab: Lab) {
         for (t in cell.targets) item { RowBox(cell, t, lab) }
         items(15) { Box(Modifier.fillMaxWidth().height(ROW_HEIGHT)) }
     }
+}
+
+/**
+ * Edges.swift#CarouselLayout in dp: carousel-in-list — a page (the whole screen, scrolled 300 dp on appear) holding a
+ * horizontal card carousel (24 dp in, 344×85 dp, on the screen at 138 dp) above a list of rows (300×64 dp, from
+ * content 560, 80 dp apart): U above the screen (content 100: off-screen, `up`), B the list's 11th row (content 1360,
+ * below the screen: off-screen, `down`), and in the carousel C, the card right
+ * of the first (its content x 344: on the screen at 368–392 dp, right of the carousel's clip — outside-scroll-view, its
+ * scroll toward it `right`). The banking screen of docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-
+ * targets-scroll-view.md (its residual: the carousel `24,138 354x85` near the top, a long list below).
+ */
+private object CarouselLayout {
+    val CONTENT = 2400.dp
+    val OFFSET = 300.dp
+    val U = 100.dp
+    val B = 1360.dp
+    /** The list's rows below the carousel: the first's top, their pitch, how many (B is one of them). */
+    val ROWS_TOP = 560.dp
+    val ROW_PITCH = 80.dp
+    const val ROWS = 22
+    val CAROUSEL_TOP = 438.dp
+    val CAROUSEL_X = 24.dp
+    val CARD_HEIGHT = 85.dp
+    /** The cards in carousel order: a filler, C, a filler. */
+    const val CARDS = 3
+}
+
+@Composable
+private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: Dp) {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val l = CarouselLayout
+    val page = rememberScrollState(with(density) { l.OFFSET.roundToPx() })
+    val carousel = rememberScrollState(0)
+    val cardWidth = screenWidth - l.CAROUSEL_X * 2
+    ReportScroll(lab, "page", { page.isScrollInProgress }, { page.value })
+    ReportScroll(lab, "carousel", { carousel.isScrollInProgress }, { carousel.value })
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(screenHeight)
+            .background(Color(0xFFEEEEEE))
+            .onGloballyPositioned { lab.scrollView("page", screenFrame(view, it)) }
+            .verticalScroll(page),
+    ) {
+        Box(Modifier.fillMaxWidth().height(l.CONTENT)) {
+            for (i in 0 until l.ROWS) {
+                val y = l.ROWS_TOP + l.ROW_PITCH * i
+                if (y == l.B) continue
+                Box(Modifier.align(Alignment.TopCenter).offset(y = y).size(ROW_WIDTH, ROW_HEIGHT).background(Color(0xFFB0BEC5)))
+            }
+            for ((tag, y) in listOf("U" to l.U, "B" to l.B)) {
+                val t = cell.targets.firstOrNull { it.tag == tag } ?: continue
+                EdgeBox(cell, t, lab, Modifier.align(Alignment.TopCenter).offset(y = y))
+            }
+            Box(
+                Modifier
+                    .offset(x = l.CAROUSEL_X, y = l.CAROUSEL_TOP)
+                    .size(cardWidth, l.CARD_HEIGHT)
+                    .onGloballyPositioned { lab.scrollView("carousel", screenFrame(view, it)) }
+                    .horizontalScroll(carousel),
+            ) {
+                Row {
+                    val c = cell.targets.firstOrNull { it.tag == "C" }
+                    for (i in 0 until l.CARDS) {
+                        if (i == 1 && c != null) {
+                            CardBox(cell, c, lab, Modifier.size(cardWidth, l.CARD_HEIGHT))
+                        } else {
+                            Box(Modifier.size(cardWidth, l.CARD_HEIGHT).background(Color(0xFF90A4AE)))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A carousel card: EdgeBox at the card's size. */
+@Composable
+private fun CardBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier) {
+    val view = LocalView.current
+    Box(
+        modifier
+            .testTag("lab.${cell.id}.${t.tag}")
+            .semantics { contentDescription = "Target ${t.tag}" }
+            .background(Color(t.color))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { lab.event("tap", t.tag) }
+            .onGloballyPositioned { lab.frame(t.tag, screenFrame(view, it)) },
+    )
 }
