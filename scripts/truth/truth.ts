@@ -681,3 +681,6 @@ export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible' | 'scrollVi
 
 /** The axis a `direction` scrolls along: `y` for up and down, `x` for left and right. */
 export const axisOf = (d: Direction): 'x' | 'y' => (d === 'left' || d === 'right' ? 'x' : 'y');
+
+/** The coordinate across `axis` (`axisOf`'s): `y` for `x`, `x` for `y`. */
+export const otherAxis = (axis: 'x' | 'y'): 'x' | 'y' => (axis === 'x' ? 'y' : 'x');
