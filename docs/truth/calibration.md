@@ -49,7 +49,7 @@ open note on the working tree. See the script for the verdicts.
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
 | TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
-| L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
+| L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | b71cbbb → d43df5d | CALIBRATED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | open | working tree | OPEN-RED |
@@ -59,7 +59,7 @@ open note on the working tree. See the script for the verdicts.
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
-| F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | open | working tree | OPEN-RED |
+| F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | open | working tree | OPEN-RED |
@@ -902,21 +902,46 @@ form-shared-id: a pristine form whose five fields and their floating titles (eac
 
 A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.ts, by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability). own-parts' N draws Payee’s name (U+2019); asked `ocr` for that string the recognizer reads Payee's name: at 92f2a46 the assert fails on the reading (≠), at 35321b4 it passes, naming the fold (’ vs '). text-sample's E draws the same string (16 pt, both platforms), and its A the note's Slovak `Prihlásiť sa`, which the same fix folds (a combining mark off): read `Prihlásit sa`, red at 92f2a46 and green at 35321b4 alike. Its neighbours that the fold does not reach are lab notes OC1 (Ľ read L', ĺ read í) and OC2 (iOS: an NBSP thousands separator read as nothing), KNOWN in text.known.ts.
 
-## L1: OPEN-RED
+## L1: CALIBRATED
 
-2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md — defect: `swiped \d+× beneath a presented layer`
+2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md — defect: `without "close it first"|swiped \d+× beneath a presented layer`
 
-- working tree:
+- before b71cbbb:
+  - RED android-averi_lab-api33/alert-dim.xml A tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.A" to appear
   - RED android-averi_lab-api33/alert-dim.xml A scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.alert-dim.A" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appe
+  - RED android-averi_lab-api33/alert-dim.xml B tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.B" to appear
   - RED android-averi_lab-api33/alert-dim.xml B scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.alert-dim.B" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appe
+  - RED android-averi_lab-api33/alert-dim.xml C tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.C" to appear
   - RED android-averi_lab-api33/alert-dim.xml C scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.alert-dim.C" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appe
+  - RED android-averi_lab-api33/alert-dim.xml D tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.alert-dim.D" to appear
   - RED android-averi_lab-api33/alert-dim.xml D scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.alert-dim.D" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appe
+  - RED android-averi_lab-api33/sheet-medium.xml A tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.sheet-medium.A" to appear
   - RED android-averi_lab-api33/sheet-medium.xml A scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium.A" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never a
+  - RED android-averi_lab-api33/sheet-medium.xml B tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.sheet-medium.B" to appear
   - RED android-averi_lab-api33/sheet-medium.xml B scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium.B" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never a
+  - RED android-averi_lab-api33/sheet-medium.xml C tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.sheet-medium.C" to appear
   - RED android-averi_lab-api33/sheet-medium.xml C scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium.C" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never a
+  - RED android-averi_lab-api33/sheet-medium.xml D tap — refused without "close it first": ERROR Timed out after 5000ms waiting for element id:"lab.sheet-medium.D" to appear
   - RED android-averi_lab-api33/sheet-medium.xml D scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.sheet-medium.D" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never a
+- after d43df5d:
+  - ok android-averi_lab-api33/alert-dim.xml A tap — ERROR Timed out after 5000ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+  - ok android-averi_lab-api33/alert-dim.xml A scroll_until — ERROR scroll_until id:"lab.alert-dim.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (155,851 770x517) — a dialog is presented over it — close it f
+  - ok android-averi_lab-api33/alert-dim.xml B tap — ERROR Timed out after 5000ms: element id:"lab.alert-dim.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+  - ok android-averi_lab-api33/alert-dim.xml B scroll_until — ERROR scroll_until id:"lab.alert-dim.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (155,851 770x517) — a dialog is presented over it — close it f
+  - ok android-averi_lab-api33/alert-dim.xml C tap — ERROR Timed out after 5000ms: element id:"lab.alert-dim.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+  - ok android-averi_lab-api33/alert-dim.xml C scroll_until — ERROR scroll_until id:"lab.alert-dim.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (155,851 770x517) — a dialog is presented over it — close it f
+  - ok android-averi_lab-api33/alert-dim.xml D tap — ERROR Timed out after 5000ms: element id:"lab.alert-dim.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+  - ok android-averi_lab-api33/alert-dim.xml D scroll_until — ERROR scroll_until id:"lab.alert-dim.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (155,851 770x517) — a dialog is presented over it — close it f
+  - ok android-averi_lab-api33/sheet-medium.xml A tap — ERROR Timed out after 5000ms: element id:"lab.sheet-medium.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a
+  - ok android-averi_lab-api33/sheet-medium.xml A scroll_until — ERROR scroll_until id:"lab.sheet-medium.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal 
+  - ok android-averi_lab-api33/sheet-medium.xml B tap — ERROR Timed out after 5000ms: element id:"lab.sheet-medium.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a
+  - ok android-averi_lab-api33/sheet-medium.xml B scroll_until — ERROR scroll_until id:"lab.sheet-medium.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal 
+  - ok android-averi_lab-api33/sheet-medium.xml C tap — ERROR Timed out after 5000ms: element id:"lab.sheet-medium.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a
+  - ok android-averi_lab-api33/sheet-medium.xml C scroll_until — ERROR scroll_until id:"lab.sheet-medium.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal 
+  - ok android-averi_lab-api33/sheet-medium.xml D tap — ERROR Timed out after 5000ms: element id:"lab.sheet-medium.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a
+  - ok android-averi_lab-api33/sheet-medium.xml D scroll_until — ERROR scroll_until id:"lab.sheet-medium.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal 
 
-No fix yet: red at HEAD, with the stroke beneath the presented layer in the mismatch. Red at every commit swept (7d9a783 … 92f2a46).
+Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment "Android's presented window"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out "to appear" without "close it first", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's "not found" is vacuous), and form-picker's fully expanded sheet as ADR 0018's residual 18 (tests/differential/golden/forms.known.ts).
 
 ## L2: OPEN-RED
 
@@ -1074,14 +1099,16 @@ No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and 
 
 No fix yet: red at HEAD. bars.known.ts and text.known.ts own the ratchet; this entry only links the note to its rows (the `fully` stop, the colour assert passing on P's uncovered part, and the plain stop on text-under-bar's P — its centre under the pinned button — asked by its identifier, which reads it reached: the same uncovered-bounds form on the plain-stop path, not fullyStanding's).
 
-## F2A1: OPEN-RED
+## F2A1: CALIBRATED
 
 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md — defect: `reached with no swipe where a tap fires`
 
-- working tree:
+- before b71cbbb:
   - RED android-averi_lab-api33/form-keyboard.xml phone scroll_until — reached with no swipe where a tap fires submit invalid: Element id:"lab.form-keyboard.phone" visible after 0 swipes — CLIPPED at bottom, 67% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]. A rect assert or screenshot on this elem
+- after 6d8f8de:
+  - ok android-averi_lab-api33/form-keyboard.xml phone scroll_until — ERROR scroll_until id:"lab.form-keyboard.phone" failed after 3 swipes — element is in the viewport but cut at its top edge by container id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out o
 
-No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row.
+Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater: a control Compose cut to a strip under the tap minimum by a node drawn after it is a sliver; the owner's decision of 2026-10-17, ADR 0013's refinement), merged into arch/round-22 as 8b2530c with its review fixes (wording only): the pair is 6d8f8de itself and its parent b71cbbb (round 5's src). Before: phone reached with no swipe, its strip under the bar riding on the IME; after: no stop — it fails after 3 swipes naming the bar.
 
 ## FU1: OPEN-RED
 

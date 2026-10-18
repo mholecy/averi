@@ -959,20 +959,31 @@
     {
       "n": "L1",
       "note": "2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["d43df5d"],
+      "before": "b71cbbb",
+      "after": "d43df5d",
       "verified": "golden",
-      "defect": "swiped \\d+× beneath a presented layer",
+      "defect": "without \"close it first\"|swiped \\d+× beneath a presented layer",
       "checks": [
+        "android-averi_lab-api33/alert-dim.xml A tap",
         "android-averi_lab-api33/alert-dim.xml A scroll_until",
+        "android-averi_lab-api33/alert-dim.xml B tap",
         "android-averi_lab-api33/alert-dim.xml B scroll_until",
+        "android-averi_lab-api33/alert-dim.xml C tap",
         "android-averi_lab-api33/alert-dim.xml C scroll_until",
+        "android-averi_lab-api33/alert-dim.xml D tap",
         "android-averi_lab-api33/alert-dim.xml D scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml A tap",
         "android-averi_lab-api33/sheet-medium.xml A scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml B tap",
         "android-averi_lab-api33/sheet-medium.xml B scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml C tap",
         "android-averi_lab-api33/sheet-medium.xml C scroll_until",
+        "android-averi_lab-api33/sheet-medium.xml D tap",
         "android-averi_lab-api33/sheet-medium.xml D scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD, with the stroke beneath the presented layer in the mismatch. Red at every commit swept (7d9a783 … 92f2a46)."
+      "remark": "Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment \"Android's presented window\"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out \"to appear\" without \"close it first\", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous), and form-picker's fully expanded sheet as ADR 0018's residual 18 (tests/differential/golden/forms.known.ts)."
     },
     {
       "n": "L2",
@@ -1151,11 +1162,14 @@
     {
       "n": "F2A1",
       "note": "2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["6d8f8de"],
+      "before": "b71cbbb",
+      "after": "6d8f8de",
       "verified": "golden",
       "defect": "reached with no swipe where a tap fires",
       "checks": ["android-averi_lab-api33/form-keyboard.xml phone scroll_until"],
-      "remark": "No fix yet: red at HEAD (and at every side the Android keyboard notes ran: 98e49b7, 9131730, 926b826, 95f75f4, 7d9a783, cb77485). forms.known.ts owns the ratchet; this entry only links the note to its row."
+      "remark": "Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater: a control Compose cut to a strip under the tap minimum by a node drawn after it is a sliver; the owner's decision of 2026-10-17, ADR 0013's refinement), merged into arch/round-22 as 8b2530c with its review fixes (wording only): the pair is 6d8f8de itself and its parent b71cbbb (round 5's src). Before: phone reached with no swipe, its strip under the bar riding on the IME; after: no stop — it fails after 3 swipes naming the bar."
     },
     {
       "n": "FU1",

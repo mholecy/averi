@@ -1,12 +1,10 @@
-import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, twice, type KnownFile } from './known.js';
+import { ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim (phase 1/2);
 // sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS).
 
-// This KNOWN owns the ratchet for the lab finding's rows too (L1); scripts/truth/calibration.json owns only the link
-// from its note to the rows. A fix that strikes those rows off here turns L1 OPEN-NOT-REPRODUCED, and calibrate.ts
-// exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
-const LAB_ANDROID = 'bug:2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md';
+// The lab finding L1's tap and scroll_until rows were this KNOWN's until round 6's fix (d43df5d on arch/r22-l1)
+// struck them off; scripts/truth/calibration.json calibrates the note on them.
 // Phase 3 (B3): the lab findings of the presented cells, open — and the residual of calibration.json #31.
 const LAB_MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
@@ -45,16 +43,15 @@ export const presented: KnownFile = {
       ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
       ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
     ]),
-    // LAB FINDING, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
+    // LAB FINDING L1, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
     // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
-    // the tree, as on idb. The tap waits 5 s "to appear" (no false Tapped, no "close it first"); the colour assert
-    // fails "not found" (vacuous); scroll_until strokes 1776 → 444 twice, and on the device that stroke dismisses the
-    // dialog (it lands on its dim) or expands the sheet.
-    ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
-      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'lab finding: uiautomator lists only the presented window; the tap times out', as: LAB_ANDROID }),
-      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'lab finding: uiautomator lists only the presented window', as: LAB_ANDROID }),
-      ...keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(ADB_STROKE), note: 'lab finding: strokes beneath the presented layer (dismisses the dialog / expands the sheet)', as: LAB_ANDROID }),
-    ]),
+    // the tree, as on idb. Fixed by round 6 (d43df5d, merged with arch/round-22): the window is marked presented, so
+    // the tap's wait says "close it first" and scroll_until stops before any swipe — the 16 tap and scroll_until rows
+    // green, struck off here, calibrated in scripts/truth/calibration.json. The colour assert still fails "not found":
+    // no evidence either way (vacuous), as idb's above — no note's, the fix leaves the assert's wait as it was.
+    ...['alert-dim', 'sheet-medium'].flatMap((cell) =>
+      keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
+    ),
     // --- phase 3 (B3), iOS ---
     // idb lists only the presented layer (as on sheet-medium): beneath the medium sheet over the scrolled host, the large
     // sheet's bare background and the transparent cover, the targets are not in the tree.
