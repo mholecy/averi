@@ -414,6 +414,9 @@ describe('each rule names its class (what the live KNOWN pins)', () => {
   it('beneath a presented layer, and the dismissal', () => {
     const p = { tag: 'E', view: 'host', platform: 'ios' as const };
     expect(judgePresentedScroll(p, ['Element id:"x" visible after 2 swipes'], state(), state()).cls).toBe('presented-stop');
+    // … and a stop claimed after the stroke dismissed the layer says so (LW1), still a presented-stop
+    const closed = judgePresentedScroll(p, ['Element id:"x" fully visible after 1 swipe'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state());
+    expect(closed).toMatchObject({ cls: 'presented-stop', why: expect.stringMatching(/ — the app logged dismissed sheet: averi closed the presented layer and claimed the stop$/) });
     expect(judgePresentedScroll(p, ['ERROR'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state()).cls).toBe('presented-fired');
     expect(judgePresentedScroll(p, ['ERROR'], state({ strokes: [stroke(200, 0, 'host')] }), state()).cls).toBe('presented-stroke');
     // a touch on the layer is no evidence against a target in a scroll view (the stroke may move the layer's own list) …

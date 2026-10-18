@@ -370,7 +370,12 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   const moved = strokesSince(state, launched).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
   const touched = c.view === undefined ? touchesSince(state, launched) : [];
   const kind = replyKind(scroll);
-  if (kind === 'visible') return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
+  // A stop claimed after a stroke that dismissed the layer (LW1: a Views sheet's scrim stroked) is said so: the target
+  // is visible then, on a screen averi uncovered without being asked.
+  if (kind === 'visible') {
+    const why = fired.length > 0 ? `the app logged ${eventsText(fired)}: averi closed the presented layer and claimed the stop` : 'the target lies beneath the presented layer';
+    return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — ${why}`, app };
+  }
   if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
   if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
   if (touched.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked the presented layer over a target in no scroll view: ${touched.length} touch(es) at ${touchPointsText(touched)} — averi: ${short(scroll)}`, app };

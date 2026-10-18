@@ -148,7 +148,7 @@ What averi does, per verb (every run alike):
 | verb | dialog-fullscreen A–D | bottom-sheet-dialog A–D | S (each) |
 |---|---|---|---|
 | tap | times out "to appear" + the hint `(the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)`; nothing fired — ok | the same — ok | Tapped, fired — ok |
-| colour assert | `FAIL … not found within 3 s` (no hint: asserts carry none) — ok | the same — ok | (not asked) |
+| colour assert | `FAIL … not found within 3 s` (no hint: at round 7's base, e856afc, asserts carried none) — ok | the same — ok | (not asked) |
 | scroll_until | two strokes on the dialog (touch-downs (540,444) up for A, B; (540,1776) down for C, D), nothing moves or is dismissed, then "never appeared in the tree" + the hint — MISMATCH `presented-stroke`, residual 19 | A, B: ONE stroke from (540,444) — on `touch_outside` — `dismissed sheet`, then "fully visible after 1 swipe" on the uncovered screen — MISMATCH `presented-stop`, **lab note LW1**; C, D: two strokes on the sheet, then the hint — `presented-stroke`, LW1 | — |
 
 Answers to the round's questions: the tap's wait and `scroll_until`'s shortfall DO read with the active-window hint;

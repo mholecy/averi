@@ -1,7 +1,8 @@
 # BUG: a Views `BottomSheetDialog` is no presented window on uiautomator — `scroll_until` for a target beneath it strokes its `touch_outside` scrim, dismisses the sheet and reports the target "fully visible"
 
-> **Status (2026-10-19):** open; measured on the lab (round 7, T2). KNOWN as this note: its 12 replayed rows
-> (tests/differential/golden/presented.known.ts, `bottom-sheet-dialog.xml` A–D tap, colour, scroll_until) and its four
+> **Status (2026-10-19):** open; measured on the lab (round 7, T2). KNOWN as this note: its 8 replayed rows
+> (tests/differential/golden/presented.known.ts, `bottom-sheet-dialog.xml` A–D tap and scroll_until; the four colour
+> rows are KNOWN as no note's, `not in the tree`, as alert-dim's) and its four
 > live scroll cases (scripts/truth/live-known.ts, `android uiautomator scroll:bottom-sheet-dialog.A`–`D`). A src
 > proposal below (the window CAN be marked from the dump, by Material's own view ids); not scheduled from the truth
 > branch. The full-screen Compose dialog measured beside it has no such signal: ADR 0018's residual 19 stands for it
@@ -60,7 +61,8 @@ edges fail too.
   the active-window hint beneath it — "(the tree lists only the active window: if a sheet or a dialog is open over the
   screen, close it first)". Honest (ADR 0018 decision 5); ok live, red in the replay as residual 19's/18's class (`not
   in the tree (active-window hint)`: the hint's conditional, not the presented remedy).
-- colour assert A–D: "FAIL … not found within 3 s" — no hint (the asserts do not carry it, decision 5); ok live.
+- colour assert A–D: "FAIL … not found within 3 s" — no hint (at round 7's base, e856afc, the asserts carried none:
+  decision 5); ok live.
 - `scroll_until` A, B (asked `up`): ONE stroke, touching down at (540,444) — on
   `touch_outside` — which DISMISSES the sheet; the screen beneath is the active window then, A in it, and the reply is
   `Element id:"lab.bottom-sheet-dialog.A" fully visible after 1 swipe`. The app logs `dismissed sheet`. Nothing in the
@@ -82,22 +84,25 @@ The window can be marked from the dump: Material Components lays a `BottomSheetD
 - a node whose resource-id's entry is **`touch_outside`** (`…:id/touch_outside`), `clickable="true"`, childless;
 - followed AT ONCE by its sibling whose entry is **`design_bottom_sheet`** (`…:id/design_bottom_sheet`);
 - both children of `…:id/coordinator`; the scrim spans the coordinator (`[0,66][1080,2154]`), the sheet shares its
-  left, width and bottom (`[0,1164][1080,2154]`), its top inside the scrim.
+  left, width and bottom (`[0,1164][1080,2154]`), its top inside the scrim — at or below the scrim's top (`>=`: a
+  sheet dragged or opened to full height would start where the scrim does; unmeasured).
 
 Proposed rule, beside the scrim shape in `presentedWindow` (it reads the raw dump, as the scrim's `clickable` is
 read): a window holding a clickable, childless `…:id/touch_outside` followed at once by `…:id/design_bottom_sheet`
-of the same left and width, its bottom the scrim's and its top inside it, is a `screen`. The geometry is read against
+of the same left and width, its bottom the scrim's and its top inside it (at or below the scrim's top, EQUAL
+included — a fully expanded sheet), is a `screen`. The geometry is read against
 the SCRIM, not the window's edges (the coordinator fits the bars). Matching the entry name, not the full id (the
 package is the app's). Not a relaxation of the scrim shape to unlabelled leaves: an unlabelled full-width clickable
 leaf over a full-width sibling is common app content (a card's touch layer), and the label was the shape's guard
 against it; the ids are Material's own. What it changes: the marks adapter then reads the window as any marked
 screen (ADR 0018 decision 3) — `scroll_until` for a target not in the tree stops before any swipe, "close it first";
-the tap's wait ends with the presented remedy instead of the hint. Expected golden: the 12 rows of this note green
-(tap 4, scroll_until 4 to the presented remedy; colour 4 stay "not found" — the assert's wait is not the mark's, as
-alert-dim's and sheet-medium's colour rows, KNOWN `not in the tree`), so the colour rows are refiled with those.
+the tap's wait ends with the presented remedy instead of the hint. Expected golden: the 8 rows of this note green
+(tap 4, scroll_until 4 to the presented remedy); the colour 4 stay "not found", KNOWN `not in the tree` as no note's,
+as alert-dim's and sheet-medium's colour rows are.
 Residual it would state: an app's own bottom sheet built without Material's dialog (a custom Dialog, a Compose
-`ModalBottomSheet` fully expanded — residual 18) is still unmarked; and a `BottomSheetDialogFragment` uses the same
-layout (unmeasured, expected to match).
+`ModalBottomSheet` fully expanded — residual 18) is still unmarked; a FULLY EXPANDED `BottomSheetDialog` (the sheet's
+top at the scrim's, or the scrim covered whole) is unmeasured — the rule's `>=` is written for it, no capture holds
+it; and a `BottomSheetDialogFragment` uses the same layout (unmeasured, expected to match).
 
 ## The full-screen dialog (dialog-fullscreen): no signal — residual 19 stands
 

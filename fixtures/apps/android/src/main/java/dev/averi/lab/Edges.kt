@@ -6,7 +6,7 @@ package dev.averi.lab
 // outside its clip, overlapped by a sticky header) or of the screen (off it, resting in the status band) — Edges.swift's
 // layout tables, the same numbers in dp. Each target is a 300×64 dp box at a fixed place in a scroll container's
 // content, the container at a fixed place on the screen and scrolled to a fixed offset from its first frame. A target
-// reports its UNCLIPPED frame (Lab.kt#screenFrame — Base.kt's boundsInWindow is clipped by the container, and the truth
+// reports its UNCLIPPED frame (Lab.kt#screenFrame — Base.kt's boundsInRoot is clipped by the container, and the truth
 // must see where the frame runs on past the clip); the state reports what its geometry is
 // measured against (scripts/truth/truth.ts#geometryOf): the system bars' insets, each container's clip, the sticky
 // header as chrome.

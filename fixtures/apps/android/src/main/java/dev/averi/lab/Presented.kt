@@ -152,8 +152,8 @@ internal fun PresentedLayer(cell: Cell, lab: Lab) {
  * own target on it. No outside to touch: back (or Close) dismisses it. Compose lays the window itself, between the
  * system bars at full width (measured `[0,66][1080,2153]` on averi_lab, `(1081x2087) gr=CENTER`): FLAG_LAYOUT_NO_LIMITS,
  * no fitted insets and MATCH_PARENT set on the window after it is shown are overridden by Compose's own size, so a
- * window at 0,0 the screen's size is not what a Compose app gets (docs/bugs/2026-10-19-lab-android-presented-windows-
- * the-parser-does-not-mark-full-screen-dialog-and-bottom-sheet-dialog.md).
+ * window at 0,0 the screen's size is not what a Compose app gets (docs/bugs/2026-10-19-lab-android-views-bottom-sheet-
+ * dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md, "The full-screen dialog").
  */
 @Composable
 private fun FullScreenDialog(cell: Cell, lab: Lab, dismissed: () -> Unit) {
