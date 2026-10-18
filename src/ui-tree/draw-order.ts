@@ -1,4 +1,4 @@
-import { INPUT_ROLE, rectArea, rectIntersection, sameRect, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { INPUT_ROLE, rectArea, rectIntersection, sameRect, sameRectWithinPixel, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
@@ -397,6 +397,8 @@ interface SeenFor extends Seen {
   readonly bottomChrome: ReadonlySet<Placed>;
   /** The tree's source lists a control's touch target as its wrapper (`UiNode.paddedTouchTargets` on its root): `ownControl`'s padded shape is asked only then. */
   readonly paddedTouchTargets: boolean;
+  /** How far a label may overhang its own field on this tree's screen, in its units (`labelOverhang`): `ownControl`'s text input. */
+  readonly labelOverhang: number;
 }
 
 /**
@@ -471,25 +473,89 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
 };
 
 /**
- * How far a label may overhang the text input it lies in and still be read
- * as that field's (`fieldOf`, the `ownControl` row), on every side, in the
- * tree's units: 2, "up to 1–2 pt";
- * measured, the SWIFT form's `Payee’s name` `42,446 103x22` over its
- * `textfield 42,447 318x20`, 1 pt above and below. In pixels on Android, so
- * there a third of that — stricter, the safe direction.
- * docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md
+ * How far a label may overhang its own text input and still be read as that field's (`ownField`, the `ownControl`
+ * row), on every side: 2 pt — "up to 1–2 pt", the owner's, against the SWIFT form's `Payee’s name` `42,446 103x22`
+ * over its `textfield 42,447 318x20` under WDA, 1 pt above and below — or 2 dp on Android, as a fraction of the
+ * screen's shorter side (`labelOverhang`): the tree's units are points on iOS and pixels on Android, and a
+ * physical size is what the allowance means. Measured on Android: React Native lays a field's floating label 1 dp
+ * above its EditText, 3 px at density 2.75 (round 7's RN lab app: `Payee’s name` `177,360 255x61` over its field
+ * `177,363 726x55`), refused while the allowance was 2 tree units. Scaled by the screen, as `minTapPiece` is, and not
+ * by the density: the draw order is the tree's (and the uiautomator parser's widening's, before any device read),
+ * and no tree carries its density — `dumpsys window displays` does, read for the system bands after the tree (the
+ * choice in docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md). A phone's shorter side is 320–440 pt or
+ * dp, so on every phone the allowance is 2 pt or dp to the rounding: 2 pt on the 402-pt iPhone 17 (and on a 320-pt
+ * one), 5 px on the 1080-px averi_lab (1.8 dp), 7 px on a 1440-px phone at 3.5, 4 px on a 720-px one at 2.
+ * Residual, stated: a tablet's is wider in its own units — 4 pt on an 820-pt iPad, 4 dp on an 800-dp tablet.
+ * docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md
  */
-export const LABEL_OVERHANG = 2;
+export const LABEL_OVERHANG_FRACTION = 0.005;
+
+/** The overhang a label may have over its own field on `screen`, in the tree's units: LABEL_OVERHANG_FRACTION of its shorter side, rounded (the one formula, `SeenFor.labelOverhang`'s). */
+export const labelOverhang = (screen: { readonly width: number; readonly height: number }): number => Math.round(LABEL_OVERHANG_FRACTION * Math.min(screen.width, screen.height));
 
 /**
- * The `ownControl` row's text input: `control` is one (`INPUT_ROLE`),
- * holds `target`'s centre, and holds its rect whole once grown by
- * `LABEL_OVERHANG` on every side.
+ * THE FIELD'S OUTERMOST SELF: a text input and every wrapper that is NOTHING BUT it (`nothingBut`) are one node to its
+ * label — the field its label's siblings list. React Native's text input component view (RCTTextInputComponentView)
+ * hosts the UITextField / UITextView as its child, and WDA lists both — `text 'Payee’s name' 69,131 94x23`, then
+ * `Other 69,132 264x20` holding `TextField 69,132 264x20` (round 7's RN lab app on the iPhone 17) — so the input is
+ * its label's nephew, behind a wrapper that draws nothing the input does not. `outermostSelf` is the outermost of
+ * `placed` and its ancestors that are nothing but it (the one a sibling test asks); `inputOf` the text input a node
+ * is, down through such wrappers (what the field's own tests ask). Narrow on purpose: a wrapper that is named, holds
+ * anything else, is interactive or of another rect is a node of its own, and the input inside it no sibling of the
+ * label. idb lists the RN input flat, and Android as its EditText alone: there the self is the input.
+ * docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md
  */
-const fieldOf = (control: UiNode, target: Rect): boolean =>
-  control.role === INPUT_ROLE &&
-  containsPoint(control.rect, rectCentre(target)) &&
-  rectWithin(target, { x: control.rect.x - LABEL_OVERHANG, y: control.rect.y - LABEL_OVERHANG, width: control.rect.width + 2 * LABEL_OVERHANG, height: control.rect.height + 2 * LABEL_OVERHANG });
+const outermostSelf = (placed: Placed): Placed => {
+  let self = placed;
+  while (self.parent !== undefined && nothingBut(self.parent.node, self.node)) self = self.parent;
+  return self;
+};
+
+/** The text input `node` is — itself, or the one it is nothing but, down through its wrappers (`outermostSelf`'s doc) — or undefined. */
+const inputOf = (node: UiNode): UiNode | undefined => {
+  let self = node;
+  while (self.children.length === 1 && nothingBut(self, self.children[0])) self = self.children[0];
+  return self.role === INPUT_ROLE ? self : undefined;
+};
+
+/** `wrapper` is nothing but `inner`: an unnamed (no label, identifier or value) `container` — never interactive — whose only child it is, of its rect to a sub-unit (`sameRectWithinPixel`). */
+const nothingBut = (wrapper: UiNode, inner: UiNode): boolean =>
+  wrapper.role === 'container' &&
+  !wrapper.label &&
+  !wrapper.identifier &&
+  !wrapper.value &&
+  wrapper.children.length === 1 &&
+  wrapper.children[0] === inner &&
+  sameRectWithinPixel(wrapper.rect, inner.rect);
+
+/** An interactive node with no label and no value: what the `ownControl` row's control is, in every shape. */
+const unlabelledControl = (node: UiNode): boolean => isInteractive(node) && !node.label && !node.value;
+
+/**
+ * The `ownControl` row's text button, list row or icon button: `control`, an unlabelled control and a sibling of
+ * `target`, holds its rect whole and spans its parent's width (`spansWidth`) or — on a tree whose source pads touch
+ * targets — is padded in it (`paddedOn`); the parent not screen-sized.
+ */
+const ownButton = (control: Placed, { target, screenArea, paddedTouchTargets }: SeenFor): boolean =>
+  unlabelledControl(control.node) &&
+  siblingOf(control, target) &&
+  rectWithin(target.node.rect, control.node.rect) &&
+  (spansWidth(control.node.rect, control.parent.node.rect) || (paddedTouchTargets && paddedOn(control.node.rect, control.parent.node.rect, target.node.rect))) &&
+  !screenSized(control.parent.node, screenArea);
+
+/**
+ * The `ownControl` row's text input: `placed` is an unlabelled one (`inputOf`: it, or the one it is nothing but),
+ * that input holds `target`'s centre and holds its rect whole once grown by the label overhang (`labelOverhang`) on
+ * every side, and its outermost self (`outermostSelf`) is `target`'s sibling — in any parent: React Native lays its
+ * fields in the screen's own view (round 7's RN lab app, Android and WDA alike), and a text input that tight on a
+ * label is no scrim, whatever its parent's size.
+ */
+const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor): boolean => {
+  const input = inputOf(placed.node);
+  if (input === undefined || !unlabelledControl(input) || !containsPoint(input.rect, rectCentre(target.node.rect))) return false;
+  const { x, y, width, height } = input.rect;
+  return rectWithin(target.node.rect, { x: x - overhang, y: y - overhang, width: width + 2 * overhang, height: height + 2 * overhang }) && siblingOf(outermostSelf(placed), target);
+};
 
 /**
  * `row`'s frame excuse of `placed` (placed.ts#FRAME_EXCUSES: `structural`, `screenSizedHost`, `contentFramed`, whose
@@ -904,10 +970,11 @@ const NOT_DRAWN = {
    * a sibling of a NON-INTERACTIVE target, that holds the target's rect whole
    * and either SPANS ITS PARENT'S FULL WIDTH — the parent's x and width
    * exactly (`spansWidth`) — or is PADDED in it on all four sides, evenly and
-   * centred on the target (`paddedOn`); or a TEXT INPUT holding the target's
-   * centre, the target overhanging it by at most `LABEL_OVERHANG`
-   * (`fieldOf`, below); the parent not the screen's size
-   * (`screenSized`), nor the control. `target` only (the bug note above,
+   * centred on the target (`paddedOn`) — `ownButton`; or a TEXT INPUT holding
+   * the target's centre, the target overhanging it by at most the label
+   * overhang, its outermost self the target's sibling (`ownField`, below);
+   * the parent of the first two not the screen's size (`screenSized`), and
+   * no control filling the screen. `target` only (the bug note above,
    * `onTarget`'s, a regression of this column's first form):
    * a Compose `Button` reaches uiautomator as a wrapper holding its label
    * text and, AFTER it, an unlabelled clickable `button` — mp-native's
@@ -990,8 +1057,9 @@ const NOT_DRAWN = {
    * And a THIRD shape, the text input over its own label (ADR 0014): an
    * unlabelled, unvalued text
    * input that holds the label's centre, the label overhanging it by at
-   * most `LABEL_OVERHANG` on any side (`fieldOf`) — neither spanning its
-   * parent nor padded in it. Measured under WDA on the SWIFT form: `container
+   * most the label overhang on any side (`labelOverhang`: 2 pt or dp, as a
+   * share of the screen) — neither spanning its parent nor padded in it
+   * (`ownField`). Measured under WDA on the SWIFT form: `container
    * swift_payment.form.payee_name_input 24,431 354x52` → `text 'Payee’s
    * name' 42,446 103x22`, then `textfield 42,447 318x20` — the label 1 pt
    * taller than the field above and below, so not held whole, and the field
@@ -1005,22 +1073,18 @@ const NOT_DRAWN = {
    * labelled or valued field (one holding typed text: the label it lies on
    * is then not its placeholder — a residual, stated: a placeholder label
    * WDA keeps listing over a filled field is refused); any other control
-   * of that shape (a button).
+   * of that shape (a button). Its sibling is the field's OUTERMOST SELF
+   * (`outermostSelf`): React Native's component view, which WDA lists as an
+   * unnamed `Other` of the input's rect holding the input alone — `text
+   * 'Payee’s name' 69,131 94x23`, then `Other 69,132 264x20` → `TextField
+   * 69,132 264x20` (round 7's RN lab app) — is the field, not a node
+   * between it and its label. A wrapper named, interactive, of another rect
+   * or holding anything else is not: the field in it still covers.
    * docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md
    * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
    */
   ownControl: {
-    target: (placed, { target, screenArea, paddedTouchTargets }) =>
-      siblingOf(placed, target) &&
-      isInteractive(placed.node) &&
-      !placed.node.label &&
-      !placed.node.value &&
-      !isInteractive(target.node) &&
-      ((rectWithin(target.node.rect, placed.node.rect) &&
-        (spansWidth(placed.node.rect, placed.parent.node.rect) || (paddedTouchTargets && paddedOn(placed.node.rect, placed.parent.node.rect, target.node.rect)))) ||
-        fieldOf(placed.node, target.node.rect)) &&
-      !screenSized(placed.parent.node, screenArea) &&
-      !fillsScreen(placed.node.rect, screenArea),
+    target: (placed, about) => !isInteractive(about.target.node) && (ownButton(placed, about) || ownField(placed, about)) && !fillsScreen(placed.node.rect, about.screenArea),
   },
 
   /**
@@ -1470,6 +1534,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const flatList = !listsAncestry(tree);
   const paddedTouchTargets = tree.paddedTouchTargets === true;
   const minPiece = minTapPiece(screen);
+  const overhang = labelOverhang(screen);
   const order = walkOf(tree);
   /** What is presented over what (presentation.ts#presentationOf), over this walk. */
   const presentation = presentationOf(tree, order);
@@ -1517,6 +1582,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
     readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine),
     bottomChrome,
     paddedTouchTargets,
+    labelOverhang: overhang,
   });
   /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);

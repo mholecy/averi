@@ -87,7 +87,7 @@ const OCR: Reads = (r: Rect): Rect => r; // the ocr assert reads the whole rect
 describe('Scene.standing for the pixel assert over every fixture node (round 8)', () => {
   it('the ocr reader (the whole rect): the covers named are chrome only — nothing that takes a touch and hides no pixel', async () => {
     const { judged, misses } = await sweep(undefined, OCR);
-    expect(judged).toBe(1820);
+    expect(judged).toBe(1846);
     expect(coversNamed(misses)).toEqual({
       'button "Continue to summary" (24,512 354x44, reaching 24,512 354x77)': 1,
       'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)': 20,
@@ -101,13 +101,17 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'text "Create contact" (154,115 407x77)': 2,
       'text "Phone (Mobile)" (176,1871 233x44)': 1,
       'text "Phone (Mobile)" (176,725 233x44)': 1,
+      // The RN lab app's fields over their own boxes (wda-source-rn-field.json): a field's pixels lie on its card.
+      'textfield id:lab.rn-field.I.field (69,312 220x20)': 1,
+      'textfield id:lab.rn-field.M.field (69,492 264x38)': 1,
+      'textfield id:lab.rn-field.N.field (69,132 264x20)': 1,
       // Nothing of the node on the screen (below the fold, or in a scroll view's content above it): no capture shows any
       // of it — 105 — or, on the screen, nothing of it drawn: 38 nodes of MyPort's keyboard trees listed below their
       // login ScrollView, laid out above the keyboard (0,0 402x539 / 402x566, 2FA's 402x518), the drawn frame's.
       offScreen: 143,
     });
-    // Every iOS window and screen-sized root reaches into the band: an ocr crop of it would read the clock.
-    expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(190);
+    // Every iOS window and screen-sized root reaches into the band: an ocr crop of it would read the clock (the RN lab app's ten among them).
+    expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(200);
   });
 
   it('the colour reader (the part of the rect on the screen, inset 12 % a side): the same chrome, and a screen-sized root under the content listed over it', async () => {
@@ -125,6 +129,10 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'text "Payee’s city" (42,724 87x20)': 1,
       'text "The IBAN belongs to a country outside the SEPA area" (24,640 354x40)': 1,
       'textfield id:TextFieldWithComponentStyle (42,425 318x20)': 2,
+      // The RN lab app's fields over their own boxes, and M's over the screen-sized root's sample (wda-source-rn-field.json).
+      'textfield id:lab.rn-field.I.field (69,312 220x20)': 1,
+      'textfield id:lab.rn-field.M.field (69,492 264x38)': 2,
+      'textfield id:lab.rn-field.N.field (69,132 264x20)': 1,
       'container (154,88 407x132)': 2,
       'container (66,1840 948x248)': 8,
       'container id:nav.tab_cards (540,1876 219x176)': 1,
