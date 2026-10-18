@@ -261,6 +261,8 @@ export interface EndTurn {
   to: Direction;
   /** The swipes sent before the turn — the caller's way, the last of them the one that proved the end. */
   after: number;
+  /** How many of the last of them moved nothing (the proof's one, or more when the one before it proved nothing yet: a read still settling, a stroke the tree could not judge). */
+  unmoved: number;
   /** The scroll view whose content ends the caller's way, as a sentence names it. */
   scrollView: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
 }
@@ -1604,7 +1606,7 @@ function turnsAtEnd(s: State, best: Judged, view: UiNode, facts: TreeFacts): boo
  * `turns` — the failure's "turned round N times: a fling" — does not count it.
  */
 function turnAtEnd(s: Mutable<State>, view: UiNode): void {
-  s.endTurn = { from: s.course, to: OPPOSITE[s.course], after: s.swipes, scrollView: named(view) };
+  s.endTurn = { from: s.course, to: OPPOSITE[s.course], after: s.swipes, unmoved: Math.min(s.allUnmovedStrokes, s.swipes), scrollView: named(view) };
   s.course = OPPOSITE[s.course];
   s.lastStroke = s.course;
   s.seenShort = true;

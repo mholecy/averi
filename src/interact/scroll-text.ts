@@ -208,6 +208,12 @@ export function describeScrollResult(r: ScrollUntilResult): string {
 /** The edge of a scroll view past which lies the content a scroll toward `direction` brings in: its top for `up`. */
 const edgeToward = (direction: Direction): Edge => (direction === 'up' ? 'top' : direction === 'down' ? 'bottom' : direction);
 
+/** `1 swipe up did not move`, `2 swipes up did not move`, or — some of them moved it — `3 swipes up, the last of which did not move` / `…, the last 2 of which did not move`. */
+function unmovedText({ after, unmoved, from }: EndTurn): string {
+  if (unmoved >= after) return `${swipesText(after)} ${from} did not move`;
+  return `${swipesText(after)} ${from}, the last ${unmoved === 1 ? '' : `${unmoved} `}of which did not move`;
+}
+
 /**
  * The end turn's clause (scroll-rounds.ts#EndTurn), before the detent's in every reply and failure that made one —
  * `; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi
@@ -217,7 +223,7 @@ const edgeToward = (direction: Direction): Edge => (direction === 'up' ? 'top' :
 const endTurnText = (turn: EndTurn | undefined): string =>
   turn === undefined
     ? ''
-    : `; ${swipesText(turn.after)} ${turn.from} did not move ${nodeText(turn.scrollView)} — the tree lists its content ending at its ${edgeToward(turn.from)} — ` +
+    : `; ${unmovedText(turn)} ${nodeText(turn.scrollView)} — the tree lists its content ending at its ${edgeToward(turn.from)} — ` +
       `so averi turned ${turn.to}, as the tree places the element ${SIDES[edgeToward(turn.to)].past} it`;
 
 /**

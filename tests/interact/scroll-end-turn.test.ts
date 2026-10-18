@@ -92,7 +92,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     // The turned strokes keep the full reach: no fling carried F past — it was never near.
     // (The last is shortened to what F still needs once a stroke was measured to carry it: scroll-rounds.ts#stillNeeds, LV5.)
     expect(played.steps.flatMap((s) => (s.do === 'stroke' ? [decided(s)] : [])).slice(0, 4)).toMatchObject([{ reach: 1 }, { reach: 1 }, { reach: 1 }, { reach: 1 }]);
-    expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { from: 'up', to: 'down', after: 1 } });
+    expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { from: 'up', to: 'down', after: 1, unmoved: 1 } });
     expect(describeScrollResult(resultOf(played))).toBe(
       'fully visible after 5 swipes; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi turned down, as the tree places the element below it',
     );
@@ -155,7 +155,9 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     // At(-20): the content pulled 20 pt down past its top — it still lists nothing above `lower`, but it moved.
     const played = play({ ...IPHONE, maxSwipes: 8 }, [at(0), at(-20), at(0), at(0), at(260), at(520), at(780), at(930), at(930)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'down', 'down', 'down']);
-    expect(played.outcome).toMatchObject({ kind: 'visible', endTurn: { from: 'up', to: 'down', after: 3 } });
+    expect(played.outcome).toMatchObject({ kind: 'visible', endTurn: { from: 'up', to: 'down', after: 3, unmoved: 1 } });
+    // Not "3 swipes up did not move": the first two did (the bounce).
+    expect(describeScrollResult(resultOf(played))).toMatch(/; 3 swipes up, the last of which did not move scrollable \(0,380 402x180\) — the tree lists its content ending at its top — so averi turned down/);
   });
 
   it('uiautomator (Android): a target dumped clipped out past the far edge of a list the strokes do not move — no turn, the tree cannot list where the content ends; the strokes go the caller\'s way to the bound and the failure names the side, as before', () => {
