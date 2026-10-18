@@ -10,8 +10,9 @@ const LAB_IOS = 'bug:2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap
 // fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix
 // (d43df5d, round 6) marks the AlertDialog and the half-expanded sheet but not a sheet whose dump carries no scrim.
 // L1 is calibrated on those (calibration.json); these rows are ADR 0018's residual 18, accepted by the owner 2026-10-18
-// with the active-window hint every Android not-found now carries — the taps' "to appear" reads "close it first" in
-// it, so their judge finds them vacuous (`not in the tree`) where it found them refused without the remedy before.
+// with the active-window hint every Android tap/fill wait and scroll_until not-found now carries — the taps' "to
+// appear" reads "close it first" in it, so their judge finds them vacuous (`not in the tree`) where it found them
+// refused without the remedy before.
 const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a fully expanded sheet is no presented window';
 const LAB_ANDROID_FLOATING = 'bug:2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md';
 /** The Android picker sheet's scroll_until stroke (the sheet fully expanded, 1080x2220). */
