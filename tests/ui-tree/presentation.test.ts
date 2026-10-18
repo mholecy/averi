@@ -30,9 +30,11 @@ const modalShape = (root: Partial<UiNode> = {}) => {
 };
 
 describe('the fallback: which adapter infers presented screens where the source did not judge them', () => {
-  it('a judged tree (`presentationsJudged`) has none — only the marks; a uiautomator root (`paddedTouchTargets`) the uiautomator adapter; any other tree the shape', () => {
+  it('a judged tree (`presentationsJudged`) has none — only the marks; a root listing the active window only (`activeWindowOnly`) the uiautomator adapter; any other tree the shape', () => {
     expect(presentationOf(modalShape({ presentationsJudged: true }).tree).fallback).toBeUndefined();
-    expect(presentationOf(modalShape({ paddedTouchTargets: true }).tree).fallback).toBe('uiautomator');
+    expect(presentationOf(modalShape({ activeWindowOnly: true }).tree).fallback).toBe('uiautomator');
+    // Compose's padded touch targets are another mark of the same source, read for the padded shape alone.
+    expect(presentationOf(modalShape({ paddedTouchTargets: true }).tree).fallback).toBe('shape');
     expect(presentationOf(modalShape().tree).fallback).toBe('shape');
   });
 
@@ -55,15 +57,23 @@ describe('the fallback: which adapter infers presented screens where the source 
     expect(presentation.over(row).givesWay('structural', at(dim))).toBe(false);
   });
 
-  // Lab note L1 (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md) is this
-  // adapter's to fix, not yet: until then it answers as the shape does.
-  it('the uiautomator adapter answers as the shape does today: the same surface, the same give-way, no layer at a point', () => {
-    const { tree, row, dim } = modalShape({ paddedTouchTargets: true });
+  // Its own question — the window listed alone, lab note L1 — is pinned over the lab's captures in
+  // tests/adapters/android-presented-window.test.ts.
+  it('the uiautomator adapter, its window unmarked, answers as the shape does: the same surface, the same give-way, no layer at a point, none alone', () => {
+    const { tree, row, dim } = modalShape({ activeWindowOnly: true });
     const { presentation, at } = read(tree);
     expect(presentation.over(row).surface(at(dim))).toBe('inferred');
     expect(presentation.over(row).givesWay('structural', at(dim))).toBe(true);
     expect(presentation.topmostAt({ x: 201, y: 699 })).toBeUndefined();
     expect(presentation.press(dim)).toEqual({ surface: dim, reach: IPHONE });
+    expect(presentation.alone).toBeUndefined();
+  });
+
+  it('only the root\'s mark is a window listed alone: a marked layer inside the tree is not', () => {
+    const { tree, modal } = modalShape({ activeWindowOnly: true });
+    modal.presentation = 'screen';
+    expect(presentationOf(tree).alone).toBeUndefined();
+    expect(presentationOf({ ...tree, presentation: 'dialog' }).alone).toEqual({ kind: 'dialog', label: 'Example' });
   });
 
   it('a screen presented by its frames alone is not asked of no target, and named by no layer', () => {

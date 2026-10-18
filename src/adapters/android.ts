@@ -1217,6 +1217,8 @@ interface RawNode {
   'content-desc'?: string;
   focusable?: string;
   'long-clickable'?: string;
+  /** "true" on a node that takes a click — read only for a sheet's scrim (`presentedWindow`). */
+  clickable?: string;
   /** "true" on a node that scrolls now — its descendants' bounds are clipped to it (types.ts#UiNode.clipsDescendants). */
   scrollable?: string;
   bounds?: string;
@@ -1245,14 +1247,62 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
   // An arrow, not `roots.map(normalizeNode)`: map would hand its index in as `around`.
   const grown = new Map<UiNode, Rect>();
   const children = roots.map((root) => normalizeNode(root, { grown }));
-  // The source's mark (types.ts#UiNode.paddedTouchTargets): Compose lists a control's touch target as its wrapper.
-  // Set before the widening: the draw order judging it reads the mark.
+  // The source's marks: Compose lists a control's touch target as its wrapper (types.ts#UiNode.paddedTouchTargets),
+  // the dump lists the active window only (`activeWindowOnly`), and that window, when the dump shows it presented, is
+  // marked so (`presentation`, `presentedWindow`). Set before the widening: the draw order judging it reads the marks.
+  const presented = children.length === 1 ? presentedWindow(roots[0], children[0].rect) : undefined;
   const tree: UiNode =
     children.length === 1
-      ? { ...children[0], paddedTouchTargets: true }
-      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true };
+      ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, ...(presented !== undefined && { presentation: presented }) }
+      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true };
   widenUnderCovers(tree, grown, drawnOverStrip);
   return tree;
+}
+
+/**
+ * The PRESENTED WINDOW the dump is, when its one window shows it is one (types.ts#UiNode.presentation on the root):
+ * `uiautomator dump` lists the active window only (`UiNode.activeWindowOnly`), so with a dialog or a bottom sheet up
+ * the dump IS that window and the screen beneath is not in it. Read here, where the raw dump is — the scrim's
+ * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags (wda-source.ts
+ * #presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks, #byUiautomator).
+ * - `dialog`: a window of some area NOT ANCHORED AT THE SCREEN'S ORIGIN. An app's full-screen window starts at 0,0
+ *   whatever its bars; one that floats over what it was opened from — a dialog laid in the middle, a popup beside its
+ *   anchor — does not. Measured: the lab's Compose AlertDialog, `[155,851][925,1368]` on 1080x2220 (alert-dim); a touch
+ *   outside it dismisses it.
+ * - `screen`: a full-screen window whose content lays a SCRIM above a SHEET — some node's child that is clickable,
+ *   labelled and childless, spanning the window's width from its top edge, followed at once by a sibling spanning
+ *   the width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the lab's half-expanded
+ *   Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"` `[0,0][1080,1110]`, the sheet
+ *   `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height.
+ * Residuals, stated: a fully expanded sheet dumps no scrim (form-picker's country picker: only the sheet and its
+ *   drag handle) and is no presented window here; a floating window anchored at the origin (a popup at the top-left
+ *   corner) and a full-screen dialog are none either; a window of a split screen's lower half reads as a `dialog`; an
+ *   app's own clickable, labelled leaf laid from its window's top edge at full width, with a full-width sibling under it
+ *   to the bottom, reads as a scrim. What a mark changes is asked only for a target the tree does not hold
+ *   (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false `Tapped`.
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
+ */
+function presentedWindow(window: RawNode, rect: Rect): 'dialog' | 'screen' | undefined {
+  if (rectArea(rect) === 0) return undefined;
+  if (rect.x > 0 || rect.y > 0) return 'dialog';
+  const childrenOf = (n: RawNode): RawNode[] => (n.node === undefined ? [] : Array.isArray(n.node) ? n.node : [n.node]);
+  const bottom = rect.y + rect.height;
+  const scrimAbove = (scrim: RawNode, sheet: RawNode): boolean => {
+    const s = parseBounds(scrim.bounds);
+    const below = parseBounds(sheet.bounds);
+    return (
+      scrim.clickable === 'true' &&
+      emptyToNull(scrim['content-desc']) !== null &&
+      childrenOf(scrim).length === 0 &&
+      s.x === rect.x && s.width === rect.width && s.y === rect.y && s.height > 0 &&
+      below.x === rect.x && below.width === rect.width && below.y + below.height === bottom && below.y > s.y && below.y <= s.y + s.height
+    );
+  };
+  const holds = (n: RawNode): boolean => {
+    const kids = childrenOf(n);
+    return kids.some((kid, i) => i + 1 < kids.length && scrimAbove(kid, kids[i + 1])) || kids.some(holds);
+  };
+  return holds(window) ? 'screen' : undefined;
 }
 
 /**
