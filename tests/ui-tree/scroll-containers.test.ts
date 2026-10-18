@@ -115,13 +115,29 @@ describe('scrollAxis — the one axis a scroll view scrolls on, as each source c
 
   it('the extent is the scroll view\'s OWN content: a nested scroll view counts by its frame, not by its cards; past both axes, or neither, says nothing', () => {
     const page = { x: 0, y: 0, width: 402, height: 874 };
-    const carousel = node({ role: 'scrollable', rect: { x: 24, y: 300, width: 354, height: 85 }, children: [node({ role: 'button', rect: { x: 378, y: 300, width: 354, height: 85 } })] });
+    const carousel = node({ role: 'scrollable', rect: { x: 24, y: 300, width: 354, height: 85 }, children: [node({ role: 'button', rect: { x: 24, y: 300, width: 354, height: 85 } }), node({ role: 'button', rect: { x: 378, y: 300, width: 354, height: 85 } })] });
     const fits = node({ role: 'scrollable', rect: page, children: [carousel] });
     expect([scrollAxis(fits, true), scrollAxis(carousel, true)]).toEqual([undefined, 'horizontal']);
-    const long = node({ role: 'scrollable', rect: page, children: [carousel, node({ role: 'button', rect: { x: 24, y: 1400, width: 354, height: 52 } })] });
+    const long = node({ role: 'scrollable', rect: page, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 1500 }, children: [carousel, node({ role: 'button', rect: { x: 24, y: 1400, width: 354, height: 52 } })] })] });
+    // A row wholly past the frame alone does not say it runs on (it may be laid out off it): unknown.
+    expect(scrollAxis(node({ role: 'scrollable', rect: page, children: [node({ role: 'button', rect: { x: 24, y: 1400, width: 354, height: 52 } })] }), true)).toBeUndefined();
     expect(scrollAxis(long, true)).toBe('vertical');
     const twoWay = node({ role: 'scrollable', rect: page, children: [node({ role: 'image', rect: { x: -100, y: -100, width: 800, height: 1200 } })] });
     expect(scrollAxis(twoWay, true)).toBeUndefined();
+  });
+
+  it('content laid out WHOLLY off the frame\'s side is no horizontal extent — a drawer at x −300, swipe-action buttons past a row\'s end, a page beside it; nor is a bleed a few points past both sides — a page whose content fits reads unknown, not horizontal', () => {
+    const page = { x: 0, y: 0, width: 402, height: 874 };
+    const row = node({ role: 'button', rect: { x: 0, y: 200, width: 402, height: 60 } });
+    const fitting = (...off: UiNode[]) => scrollAxis(node({ role: 'scrollable', rect: page, children: [row, ...off] }), true);
+    const drawer = node({ role: 'other', rect: { x: -300, y: 0, width: 300, height: 874 }, children: [node({ role: 'button', rect: { x: -280, y: 100, width: 260, height: 44 } }), node({ role: 'button', rect: { x: -280, y: 150, width: 260, height: 44 } })] });
+    expect(fitting(drawer)).toBeUndefined();
+    const actions = [node({ role: 'button', label: 'Delete', rect: { x: 402, y: 200, width: 80, height: 60 } }), node({ role: 'button', label: 'More', rect: { x: 482, y: 200, width: 80, height: 60 } })];
+    expect(fitting(...actions)).toBeUndefined();
+    expect(fitting(node({ role: 'other', rect: { x: 402, y: 0, width: 402, height: 874 }, children: [node({ role: 'button', rect: { x: 430, y: 300, width: 100, height: 44 } }), node({ role: 'button', rect: { x: 540, y: 300, width: 100, height: 44 } })] }))).toBeUndefined();
+    expect(fitting(node({ role: 'image', rect: { x: -10, y: 100, width: 422, height: 200 } }))).toBeUndefined();
+    // A drawer beside a page whose content runs on down: vertical, the drawer no veto.
+    expect(scrollAxis(node({ role: 'scrollable', rect: page, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 2000 } }), drawer] }), true)).toBe('vertical');
   });
 
   it('Clips.axesOf: the scroll view of a rect, its axis and its nested scroll views\' — undefined for a rect the tree holds none of', async () => {
@@ -130,7 +146,7 @@ describe('scrollAxis — the one axis a scroll view scrolls on, as each source c
     expect(facts.axesOf({ x: 24, y: 138, width: 354, height: 85 })).toEqual({ axis: 'horizontal', nested: [] });
     expect(facts.axesOf({ x: 0, y: 180, width: 402, height: 694 })).toEqual({ axis: 'vertical', nested: [] });
     expect(facts.axesOf({ x: 0, y: 181, width: 402, height: 694 })).toBeUndefined();
-    const carousel = node({ role: 'scrollable', rect: { x: 24, y: 600, width: 354, height: 85 }, children: [node({ role: 'button', rect: { x: 378, y: 600, width: 354, height: 85 } })] });
+    const carousel = node({ role: 'scrollable', rect: { x: 24, y: 600, width: 354, height: 85 }, children: [node({ role: 'button', rect: { x: 24, y: 600, width: 354, height: 85 } }), node({ role: 'button', rect: { x: 378, y: 600, width: 354, height: 85 } })] });
     const page = node({ role: 'scrollable', scrollAxis: 'vertical', rect: { x: 0, y: 180, width: 402, height: 694 }, children: [carousel] });
     expect(clipsOf(node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [page] }), { ancestry: true, unclipped: true }).axesOf(page.rect)).toEqual({
       axis: 'vertical',

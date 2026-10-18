@@ -111,7 +111,11 @@ was reported done at (201,827), 3 pt below CONTINUE.
   such a carousel is moved off it. The axis per source (`ui-tree/scroll-containers.ts#scrollAxis`): Android by class
   (`ScrollView`, `ListView`, … vertical; `HorizontalScrollView`, `ViewPager` horizontal — a Compose `verticalScroll`
   dumps as `ScrollView`, `horizontalScroll` as `HorizontalScrollView`); WDA's `Table` vertical, else a scroll view's
-  content past its frame on one axis alone; unknown — today's behaviour — for a Compose lazy list or grid, a
+  content that runs on past its frame on one axis alone — a node straddling the frame's edge by a quarter of its side,
+  or one wholly past it continuing a same-sized sibling inside it, never any node past it (a drawer at x −300,
+  swipe-action buttons, a page beside a fitting page read nothing). False readings left: a node of a fitting page
+  straddling its side by a quarter without scrolling (an overflowing row it clips), and a same-sized sibling beside a
+  fitting page's content (a pager's page the tree lists as no scroll view) — each reads that page horizontal; unknown — today's behaviour — for a Compose lazy list or grid, a
   RecyclerView, a WDA scroll view whose content fits, and idb. Fallbacks: no candidate along the stroke with room —
   the pick as before (the nearest with room, whatever its axis: mp-native's Account Detail as captured, whose carousel
   no list holds); no clear stretch with room, or none left with room by the cut for what is drawn over the scroll view — the stroke
