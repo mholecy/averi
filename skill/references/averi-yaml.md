@@ -89,6 +89,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
   - **A failed `assert`:** `N/M flow asserts failed`.
   - **A step with no element of its own:** a `wait:` or `branch:` that timed out (the text names what it waited for); a `swipe` or a `type` that failed; a `launch` the device refused (not one with no `app.<platform>` section: that is a config refusal).
   - **A malformed `timeout:` on a nested step** (a `wait:`, `scroll_until`, or a tap inside a `branch:` or platform override): `Invalid duration "…"`. The optional `tap`'s own malformed `timeout:` is a config refusal.
+  - **Android: a dialog or sheet listed alone:** `Timed out … is not in the tree, which lists only the window presented on top … — close it first`. uiautomator lists only the active window, so with a dialog or a bottom sheet up the screen beneath was not seen: the element is not known to be absent.
   - **A dead device:** `(last UI tree read failed: …)`. The device could not be read, which is not the same as the element being missing. The exception is a `fill` whose field could not be read again after its focus tap: it fails the flow (below).
 
   The first three are skipped deliberately. Each of the others means the step got further than "the interstitial is absent": the element was found, or the step failed on something other than an element. Read such a skip as a descriptor or app bug, not a missing interstitial.

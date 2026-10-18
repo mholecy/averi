@@ -1380,7 +1380,12 @@ export class FlowEngine {
         // WAS there (and was not refused a tap, nor a fill's value — those
         // threw above), or nobody could see the screen at the end, or what
         // failed was no element at all (a `wait:` or `branch:`
-        // timeout says what it waited for).
+        // timeout says what it waited for). Nobody saw the screen, too, when
+        // the last read listed a presented window ALONE (Android: a dialog or
+        // a sheet, uiautomator dumping the active window only): the wait's
+        // plain Error says so — "… is not in the tree, which lists only the
+        // window presented on top … — close it first" (interact/resolve.ts
+        // #notFound) — and the step is skipped with it, not "(not present)".
         //
         // Until 2026-10-08 the engine deduced this from missing evidence: a
         // `present` flag set by the tap's presence poll, and for the other
