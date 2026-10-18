@@ -734,6 +734,23 @@ export interface Clips {
    * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
    */
   axesOf(container: Rect): ScrollAxes | undefined;
+  /**
+   * The scroll view of rect `scroller` (within a pixel; the first in tree order that scrolls), when the tree shows its
+   * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
+   * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`drawnIn`'s
+   * dialect, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
+   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container at
+   * 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
+   * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts every rect to its scroll
+   * container, so content past an edge reads flush with it (or is not listed at all), and idb's flat list lists no
+   * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
+   * asked: any of them says "not provably the end", the safe answer. Residual: a lazy list (a table) lists only the
+   * rows it has laid out, so one resting on a row boundary with its earlier rows dropped reads as ending at its top —
+   * interact/scroll-rounds.ts asks this only of a read that a stroke over that scroll view left unmoved, which a list
+   * with rows past that edge would not have been. Cost: one walk of that scroll view's subtree, per ask (asked at most
+   * once a round, after a stroke).
+   */
+  endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
 }
 
 /** A scroll view's axis and those of the scroll views nested in it (`Clips.axesOf`). */
@@ -859,7 +876,21 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     axes.set(found, facts);
     return facts;
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf };
+    const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
+    if (!ancestry || !unclipped) return undefined;
+    const view = [...everyNode(tree)].find((n) => scrolls(n) && sameRectWithinPixel(n.rect, scroller));
+    if (view === undefined) return undefined;
+    const r = view.rect;
+    const past: Record<Edge, (d: Rect) => boolean> = {
+      top: (d) => d.y < r.y - 1,
+      bottom: (d) => d.y + d.height > r.y + r.height + 1,
+      left: (d) => d.x < r.x - 1,
+      right: (d) => d.x + d.width > r.x + r.width + 1,
+    };
+    const under = [...everyNode(view)].filter((d) => d !== view && rectArea(d.rect) > 0);
+    return under.some((d) => past[edge](d.rect)) ? undefined : view;
+  };
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, endsAt };
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */

@@ -1,5 +1,5 @@
 import type { Point, Rect, ScrollAxis, Stroke, UiNode } from '../adapters/types.js';
-import { containsPoint, rectIntersection, type ScrollAxes } from '../ui-tree/geometry.js';
+import { containsPoint, rectIntersection, type Edge, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -311,6 +311,25 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
   const { role, label, identifier, rect } = on;
   return { at: { ...drawn.from }, on: { role, label, identifier, rect: { ...rect } }, container };
 }
+
+/**
+ * The scroll view the last stroke sent went over (`within`), when THIS read's tree shows its content ending at the
+ * edge `toward` reveals (ui-tree/geometry.ts#Clips.endsAt: for content that lies up, its top) — nothing of it lies
+ * that way, so no stroke toward `toward` over it can move anything in: the content is exhausted that way by what the
+ * tree lists, not by strokes that changed nothing (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST, which cannot tell a list
+ * at its end from strokes not taken). Undefined when the stroke went over the gesture box whole (no scroll view), when
+ * this tree holds no scroll view of that rect, when its content lies past that edge, and on every tree that does not
+ * list content past its scroll view's frame (Android's, idb's: `endsAt`). Asked by the round of the read after a
+ * stroke that moved nothing; one walk of that scroll view's subtree.
+ * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
+ */
+export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, toward: Direction): UiNode | undefined {
+  const { within } = open(memory);
+  return within === undefined ? undefined : facts.scene.clips.endsAt(within, REVEALED_BY[toward]);
+}
+
+/** The edge of a scroll view past which lies the content a stroke toward `toward` brings in (swipe.ts#SIDES' `reveals`, inverted). */
+const REVEALED_BY: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
 
 /** The rects drawn over `rect` in this read, when it holds that scroll view (`TreeFacts.scene`'s draw order). */
 const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined => facts.scene.order.drawnOver(rect)?.map((n) => ({ ...n.rect }));

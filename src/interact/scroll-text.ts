@@ -9,9 +9,9 @@ import { absenceError, type WaitEvidence } from './resolve.js';
 import { cutByRemedy, cutRemedy, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
-import { OPPOSITE, type Direction } from './swipe.js';
+import { OPPOSITE, SIDES, type Direction } from './swipe.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -96,6 +96,8 @@ export interface ScrollUntilResult {
   covered?: { by: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; shows: number };
   /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
+  /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (scroll-rounds.ts#EndTurn); the reply says so. */
+  endTurn?: EndTurn;
 }
 
 /**
@@ -137,6 +139,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(o.flush !== undefined && { flush: o.flush }),
     ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
     ...(o.detent !== undefined && { detent: o.detent }),
+    ...(o.endTurn !== undefined && { endTurn: o.endTurn }),
   };
 }
 
@@ -191,7 +194,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   if (r.clipped.length === 0 && r.covered === undefined) {
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
-    return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}${detentText(r.detent)}`;
+    return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
   }
   // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.
@@ -199,8 +202,23 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
   const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
-  return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${detentText(r.detent)}`;
+  return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
 }
+
+/** The edge of a scroll view past which lies the content a scroll toward `direction` brings in: its top for `up`. */
+const edgeToward = (direction: Direction): Edge => (direction === 'up' ? 'top' : direction === 'down' ? 'bottom' : direction);
+
+/**
+ * The end turn's clause (scroll-rounds.ts#EndTurn), before the detent's in every reply and failure that made one —
+ * `; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi
+ * turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end, and
+ * that averi, not the caller, chose the way after. Empty when no end turn was made.
+ */
+const endTurnText = (turn: EndTurn | undefined): string =>
+  turn === undefined
+    ? ''
+    : `; ${swipesText(turn.after)} ${turn.from} did not move ${nodeText(turn.scrollView)} — the tree lists its content ending at its ${edgeToward(turn.from)} — ` +
+      `so averi turned ${turn.to}, as the tree places the element ${SIDES[edgeToward(turn.to)].past} it`;
 
 /**
  * The detent clause, last in every reply and failure (scroll-rounds.ts#DetentMove): a sheet moved during the call —
@@ -318,7 +336,7 @@ const pointText = (p: Point): string => `(${p.x},${p.y})`;
  */
 export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
   const { message, absence } = failureText(o, describe);
-  const full = `${message}${detentText(o.detent)}`;
+  const full = `${message}${endTurnText(o.endTurn)}${detentText(o.detent)}`;
   return absence === undefined ? new Error(full) : absenceError(full, absence);
 }
 
@@ -558,9 +576,15 @@ function boundText(by: BoundBy, swipes: number): string {
       // list, so THAT is named first — not led by "content exhausted", which
       // a flow reads as "the list ends" — and the other causes after it: the
       // tree cannot say the node takes touches.
+      const verb = by.unchanged === 'tree' ? 'did not change the screen' : 'did not move it';
+      // Proven by the tree (scroll-rounds.ts#BoundBy's `ends`): where the content ends is listed — no other cause to keep.
+      if (by.ends !== undefined) {
+        const which = by.ends.strokes === 1 ? `swiping ${by.lastStroke}` : `the last ${by.ends.strokes}, swiping ${by.lastStroke},`;
+        return `after ${swipesText(swipes)} (${which} ${verb}: the tree lists the content of ${nodeText(by.ends.scrollView)} ending at its ${edgeToward(by.lastStroke)} — content exhausted)`;
+      }
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
       const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken`;
-      return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${by.unchanged === 'tree' ? 'did not change the screen' : 'did not move it'}: ${why})`;
+      return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
