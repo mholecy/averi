@@ -17,7 +17,8 @@ import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { readFileSync } from 'node:fs';
 import { parseDump } from '../helpers/android-dumps.js';
-import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
+import { presentedRemedy } from '../../src/ui-tree/standing.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -2048,7 +2049,7 @@ flows:
     });
 
     // A window the dump does not mark (form-picker's fully expanded sheet): the presence check's ElementNotFoundError
-    // carries the active-window hint (ui-tree/standing.ts#ACTIVE_WINDOW_HINT; pinned in
+    // carries the active-window hint (ui-tree/miss.ts#ACTIVE_WINDOW_HINT; pinned in
     // tests/adapters/android-presented-window.test.ts, resolvePresent on form-picker). It is absence, so the step is
     // skipped "(not present)" — with the hint after it, once: the interstitial may lie beneath a sheet the tree does
     // not list.
@@ -2071,6 +2072,29 @@ flows:
     it('…not on a tree listing every window', async () => {
       const { activeWindowOnly: _, ...everyWindow } = formPickerTree();
       expect(await skipOf(new FakeAdapter({ sheet: everyWindow }, 'sheet'), 'tap: { id: lab.form-picker.name }')).toEqual(['skipped id:"lab.form-picker.name" (not present)']);
+    });
+
+    it('an optional wait: on an element the uiautomator tree never held: skipped with its headline and the hint after it, once', async () => {
+      expect(await skipOf(formPicker(), 'wait: { element: { id: lab.form-picker.name }, timeout: 20ms }')).toEqual([
+        `skipped step (Timed out after 20ms waiting for element id:"lab.form-picker.name" (${ACTIVE_WINDOW_HINT}))`,
+      ]);
+    });
+
+    it('a wait: on an element beneath a dialog the tree lists alone says the presented remedy beneath its headline, as the tap does', async () => {
+      const raw = readFileSync(new URL('../fixtures/uiautomator-lab-alert-dim.xml', import.meta.url), 'utf8');
+      const fake = new FakeAdapter({ dialog: parseDump(raw.slice(0, raw.lastIndexOf('>') + 1)) }, 'dialog');
+      const flow = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - wait: { element: { id: lab.alert-dim.A }, timeout: 20ms }
+`);
+      const error = (await FlowEngine.run(flow, fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error.message.split('\n').slice(0, 2)).toEqual([
+        'Timed out after 20ms waiting for element id:"lab.alert-dim.A"',
+        `  (the tree lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })})`,
+      ]);
     });
 
     it('a flow\'s wait: on an element a uiautomator tree never held says the hint beneath its headline; on a tree listing every window, nothing', async () => {

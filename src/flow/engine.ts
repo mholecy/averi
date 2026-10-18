@@ -12,7 +12,7 @@ import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
-import { activeWindowHint, withActiveWindowHint } from '../ui-tree/standing.js';
+import { missCarried, missNote, missOf, withMissNote, type CarriesMiss, type Miss } from '../ui-tree/miss.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
@@ -371,6 +371,22 @@ export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
  */
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
 
+/** A wait's explanation, asked at its timeout of the last tree it read (undefined when it read none): its probable-cause note, and the miss it carries. */
+type TimeoutHint = (lastTree: UiNode | undefined) => { hint?: string; miss?: Miss };
+
+/**
+ * A `wait:` on an element that timed out with what its last read saw said beneath its headline (ui-tree/miss.ts):
+ * it carries that miss, so an optional step's one-line skip says it too (`skipReason`).
+ */
+class WaitMissedError extends Error implements CarriesMiss {
+  constructor(
+    message: string,
+    readonly miss: Miss,
+  ) {
+    super(message);
+  }
+}
+
 /**
  * An optional step's skip reason when it is not "(not present)": the
  * headline, and — when the error is a poll timeout carrying a read error —
@@ -380,14 +396,14 @@ const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
  * reads exactly like a slow screen; ElementNotFoundError is never thrown in that
  * case, so the skip line is the one place that tells a dead device from an
  * absent interstitial. Only that line: a FlowError's later lines are its
- * trace, and a skip line is one line.
+ * trace, and a skip line is one line. A timeout that says what its last
+ * read saw (a `wait:` on an element, `WaitMissedError`; ui-tree/miss.ts)
+ * says its note after the headline the same way — the note it says beneath.
  */
-/** A wait's probable cause, asked at its timeout of the last tree it read (undefined when it read none). */
-type TimeoutHint = (lastTree: UiNode | undefined) => string | undefined;
-
 const skipReason = (e: unknown): string => {
   const readError = readErrorLine(errorMessage(e));
-  return readError === undefined ? headline(e) : `${headline(e)} ${readError}`;
+  if (readError !== undefined) return `${headline(e)} ${readError}`;
+  return withMissNote(headline(e), missCarried(e));
 };
 
 /**
@@ -1261,8 +1277,8 @@ export class FlowEngine {
    * ensureStateLadder's state waits and branch polls describe conditions a single
    * id does not own.
    */
-  private waitHint(cond: Condition, lastTree: UiNode | undefined): string | undefined {
-    return waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind, lastTree);
+  private waitHint(cond: Condition, lastTree: UiNode | undefined): { hint?: string; miss?: Miss } {
+    return { hint: waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind, lastTree), miss: waitMiss(cond, lastTree) };
   }
 
   /**
@@ -1402,10 +1418,10 @@ export class FlowEngine {
         // its headline, now because it is not ElementNotFoundError — even
         // when a target that did not come back is its `cause`: something was
         // sent.
-        // An absence on a tree that lists the active window only says so after "(not present)", as its message does
-        // (ui-tree/standing.ts#ACTIVE_WINDOW_HINT): the interstitial may be beneath a sheet the tree does not list.
+        // An absence says what its last read saw after "(not present)", the note its message says (ui-tree/miss.ts
+        // #missNote): on a tree that lists the active window only the interstitial may be beneath a sheet it does not list.
         const absent = e instanceof ElementNotFoundError && !sighted;
-        const reason = absent ? withActiveWindowHint('(not present)', e.windowHint) : `(${skipReason(e)})`;
+        const reason = absent ? withMissNote('(not present)', e.miss) : `(${skipReason(e)})`;
         this.log('optional', `skipped ${tap ? describeElementSpec(tap.spec) : 'step'} ${reason}`);
       }
     }
@@ -1553,7 +1569,11 @@ export class FlowEngine {
     const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
     if (!outcome.timedOut) return outcome.value;
     const bareNote = outcome.undecidedTree === undefined ? undefined : bareTimeoutNote(outcome.undecidedTree);
-    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? hint?.(outcome.lastTree)));
+    const { hint: said, miss } = hint?.(outcome.lastTree) ?? {};
+    const message = pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? said);
+    // The miss rides on the error only where its note is what the message says beneath the headline.
+    const saidMiss = miss !== undefined && bareNote === undefined && outcome.readError === undefined && missNote(miss) !== undefined;
+    throw saidMiss ? new WaitMissedError(message, miss) : new Error(message);
   }
 
   /**
@@ -1651,10 +1671,10 @@ export const idbContainerIdHint = (id: string): string =>
  * something that stayed; a state/any/all condition is not one target's
  * story). Two causes, each a fact about the tree source, on platforms that
  * never meet:
- * - the last tree read lists the active window only (uiautomator): the
- *   active-window hint (ui-tree/standing.ts#activeWindowHint, which decides
- *   it for every not-found reply) — the element may lie beneath a sheet or
- *   a dialog the tree does not list;
+ * - what the last tree read saw (`waitMiss`, ui-tree/miss.ts#missOf, which
+ *   decides it for every not-found reply): a source that lists the active
+ *   window only (uiautomator) — a window it lists alone, presented over the
+ *   screen beneath, or one it does not mark that may hide the element;
  * - idb's container id, which fires only when every part holds: the device
  *   is iOS, its tree source is idb, and the step waited for the element by
  *   its ID ALONE. Only then is the
@@ -1675,15 +1695,20 @@ export function waitTimeoutHint(
   treeSource: IosTreeSourceKind | undefined,
   lastTree?: UiNode,
 ): string | undefined {
-  if (cond.element === undefined || cond.absent) return undefined;
-  const windowHint = activeWindowHint(lastTree);
-  if (windowHint !== undefined) return windowHint;
-  if (platform !== 'ios' || treeSource !== 'idb') return undefined;
+  const miss = waitMiss(cond, lastTree);
   const spec = cond.element;
+  if (miss === undefined || spec === undefined) return undefined;
+  const note = missNote(miss);
+  if (note !== undefined) return note;
+  if (platform !== 'ios' || treeSource !== 'idb') return undefined;
   const fields = SELECTOR_FIELDS.filter((f) => spec[f] !== undefined);
   if (fields.length !== 1 || fields[0] !== 'id' || spec.id === undefined) return undefined;
   return idbContainerIdHint(spec.id);
 }
+
+/** What a `wait:`'s last tree saw of an element it waited to be PRESENT (ui-tree/miss.ts#missOf); undefined for any other condition. */
+export const waitMiss = (cond: Condition, lastTree: UiNode | undefined): Miss | undefined =>
+  cond.element === undefined || cond.absent ? undefined : missOf({ tree: lastTree });
 
 /**
  * A tap step's `timeout:` is step configuration, not selector vocabulary —

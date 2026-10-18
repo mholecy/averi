@@ -1,8 +1,7 @@
 import type { DeviceAdapter, Selector, UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import type { Edge } from '../ui-tree/geometry.js';
-import { presentationOf, type MarkedLayer } from '../ui-tree/presentation.js';
-import { activeWindowHint, presentedRemedy } from '../ui-tree/standing.js';
+import { missNote, missOf, presentedAloneHeadline, type CarriesMiss, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive } from '../ui-tree/selectors.js';
 import { SIDES } from './swipe.js';
@@ -158,15 +157,15 @@ export class AmbiguityRefusal extends Error {}
  *
  * Same message shape as every poll timeout (pollTimeoutMessage); same
  * `Error` to every caller that does not ask — the MCP tools print the
- * message unchanged. `windowHint` is the active-window hint its message
- * carries (ui-tree/standing.ts#ACTIVE_WINDOW_HINT), when it carries one: for
- * the engine's one-line skip, "(not present)", which says it after the words
- * (`absenceError` sets it, from the caller that worded the message).
+ * message unchanged. `miss` is what the wait's last read saw
+ * (ui-tree/miss.ts#Miss), whose note its message carries: for the engine's
+ * one-line skip, "(not present)", which says it after the words
+ * (`absenceError` sets it from the wait's evidence).
  */
-export class ElementNotFoundError extends Error {
+export class ElementNotFoundError extends Error implements CarriesMiss {
   constructor(
     message: string,
-    readonly windowHint?: string,
+    readonly miss: Miss,
   ) {
     super(message);
   }
@@ -248,8 +247,8 @@ export interface ResolvedSettled extends Resolved {
  * - no round resolved the target: ElementNotFoundError, "…waiting for element
  *   X to appear" (when the last read succeeded; see ElementNotFoundError for why
  *   a wait whose last read failed is a plain Error with the same wording) —
- *   unless that last read listed a presented window ALONE (`listedAlone`,
- *   Android's dialog or sheet): then a plain Error, "…: element X is not in
+ *   unless that last read listed a presented window ALONE (ui-tree/miss.ts's
+ *   `presented`, Android's dialog or sheet): then a plain Error, "…: element X is not in
  *   the tree, which lists only the window presented on top … — close it first"
  *   (`notFound`), since nobody saw the screen beneath;
  * - some round did, but no two consecutive ones agreed on its rect (it kept
@@ -286,12 +285,10 @@ export async function resolveSettled(
   let sighted = false;
   let sightings = 0;
   let run = 0; // consecutive rounds that resolved it, up to the last tree read
-  let miss: Miss | undefined; // the last tree read, when it did not resolve the target
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      miss = resolved === undefined ? missOf(tree, target) : undefined;
       if (resolved === undefined) {
         lastRect = undefined;
         run = 0;
@@ -333,7 +330,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome, miss);
+  throw notFound(target, timeoutMs, outcome);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -344,6 +341,8 @@ export interface WaitEvidence {
   treesRead: number;
   /** The LAST read's error, when the last read failed. */
   readError?: Error;
+  /** What the last read saw of a target no round matched (ui-tree/miss.ts#missOf) — the absence carries it. */
+  miss?: Miss;
 }
 
 /**
@@ -352,69 +351,34 @@ export interface WaitEvidence {
  * ElementNotFoundError when no round matched the target, at least one tree
  * was read and the last read succeeded; a plain Error with the same
  * message otherwise — the element was seen, or nobody could see the screen
- * at the end (see ElementNotFoundError). The caller words the message, and
- * hands the active-window hint it put in it (`windowHint`), which the absence
- * carries for a one-line reader.
+ * at the end (see ElementNotFoundError). The caller words the message (with
+ * `seen.miss`'s note in it, ui-tree/miss.ts), and the absence carries that
+ * miss for a one-line reader.
  */
-export function absenceError(message: string, seen: WaitEvidence, windowHint?: string): Error {
-  return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message, windowHint) : new Error(message);
+export function absenceError(message: string, seen: WaitEvidence): Error {
+  return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message, seen.miss ?? { of: 'none' }) : new Error(message);
 }
-
-/**
- * What the last tree read saw of a target it did not resolve — the evidence `notFound` words beneath its headline.
- * Built by `missOf` only, once per read that missed; undefined once a later read resolved it.
- */
-interface Miss {
-  /** It matched only zero-area nodes (`zeroAreaHint`'s words). */
-  readonly zeroHint?: string;
-  /** The tree lists a presented window alone (`listedAlone`). */
-  readonly alone?: MarkedLayer;
-  /** The tree's source lists the active window only (ui-tree/standing.ts#activeWindowHint's words). */
-  readonly windowHint?: string;
-}
-
-/** The one builder of a `Miss`: every fact a missed read can carry, asked of that read. */
-const missOf = (tree: UiNode, target: Target): Miss => ({ zeroHint: zeroAreaHint(tree, target), alone: listedAlone(tree), windowHint: activeWindowHint(tree) });
 
 /**
  * A wait that never resolved its target, worded for what it waited for —
- * nothing about settling. `miss` (`Miss`), what the last tree read that missed saw — `zeroHint`: the last tree read matched the
- * target, but only with zero-area nodes (idb reports a node scrolled above the top of a scroll view as 0×0, and the wait read
- * "to appear" for a node the snapshot showed). The hint says so beneath the
- * headline (pollTimeoutMessage drops it when the last read failed). Still
- * absence for ElementNotFoundError's purpose — nothing was ever ACTIONABLE,
- * and a collapsed view, the case the zero-area rule was written for, carries
- * its id at 0×0 too, which is why the hint names both (`zeroAreaHint`
- * words it, and names the side when Android dumped them clipped out).
- * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
- * `windowHint`: the last tree read lists the active window only and matched nothing (ui-tree/standing.ts
- * #ACTIVE_WINDOW_HINT) — beneath the headline in the same place, when no zero-area hint and no presented window
- * (`alone`, whose own sentence says more) claim it: a sheet or dialog the tree does not mark may hide the target.
+ * nothing about settling — and for what its last read saw (ui-tree/miss.ts#missOf,
+ * the one decision; this wait's own fact is the zero-area match, `zeroAreaHint`:
+ * idb reports a node scrolled above the top of a scroll view as 0×0, and the wait
+ * read "to appear" for a node the snapshot showed; still absence for
+ * ElementNotFoundError's purpose — nothing was ever ACTIONABLE, and a collapsed
+ * view, the case the zero-area rule was written for, carries its id at 0×0 too,
+ * which is why the hint names both. docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md).
+ * The miss's note goes beneath the headline (pollTimeoutMessage drops it when the
+ * last read failed: `unread`). A `presented` miss says itself in place of the
+ * headline, as a plain Error: beneath a presented window listed alone the target is
+ * not known absent — nobody saw the screen beneath (an optional step is skipped with
+ * this headline, never "(not present)", as scroll_until's stop there).
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, miss: Miss | undefined): Error {
-  const { zeroHint, alone, windowHint } = miss ?? {};
-  // Beneath a presented window listed alone the target is not known absent: nobody saw the screen beneath. A plain
-  // Error, as scroll_until's stop there (an optional step is skipped with this headline, never "(not present)").
-  if (alone !== undefined && outcome.readError === undefined && zeroHint === undefined) {
-    return new Error(
-      `Timed out after ${timeoutMs}ms: element ${describeTarget(target)} is not in the tree, which lists only the window presented on top ` +
-        `(the tree source lists the active window alone) — ${presentedRemedy('it', alone)}`,
-    );
-  }
-  // The zero-area hint, which says the target IS in the tree, claims the line first: the absence then carries no window hint.
-  const hint = zeroHint ?? windowHint;
-  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, hint), { sighted: false, ...outcome }, zeroHint === undefined ? windowHint : undefined);
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number; lastTree?: UiNode }): Error {
+  const miss = missOf({ tree: outcome.lastTree, readError: outcome.readError }, (tree) => zeroAreaHint(tree, target));
+  if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss.layer)}`);
+  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, missNote(miss)), { sighted: false, ...outcome, miss });
 }
-
-/**
- * The presented layer `tree` lists ALONE (ui-tree/presentation.ts#Presentation.alone): a source that lists the active
- * window only, that window presented — so a target this read did not find may lie beneath it, unlisted. Asked of a
- * read that did not resolve the target only, so a found target never pays the walk.
- * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
- */
-// The root-mark test is a cost guard only: `alone` is undefined without it anyway, and it spares a tree of any other
-// source the presentation's walk on every read that missed its target.
-const listedAlone = (tree: UiNode): MarkedLayer | undefined => (tree.activeWindowOnly === true ? presentationOf(tree).alone : undefined);
 
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
 const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
@@ -459,18 +423,9 @@ export async function resolvePresent(
   opts: SettleOptions,
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
-  let miss: Miss | undefined; // the last tree read, when it did not resolve the target
-  const outcome = await pollTree(
-    adapter,
-    (tree) => {
-      const resolved = resolveNow(tree, target, opts);
-      miss = resolved === undefined ? missOf(tree, target) : undefined;
-      return resolved;
-    },
-    { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
-  );
+  const outcome = await pollTree(adapter, (tree) => resolveNow(tree, target, opts), { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS });
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome, miss);
+  throw notFound(target, timeoutMs, outcome);
 }
 
 // ─── Refused on a present element ────────────────────────────────────────────

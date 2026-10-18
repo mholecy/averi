@@ -160,7 +160,7 @@ export type PollOutcome<T> =
       /**
        * The last tree read, whatever the predicate said of it — a round whose read failed leaves it standing, as
        * `undecidedTree`. For a timeout that words what the tree WAS, not what it held: a not-found on a tree whose
-       * source lists the active window only carries the hint (ui-tree/standing.ts#activeWindowHint).
+       * source lists the active window only carries the hint (ui-tree/miss.ts#missOf).
        */
       lastTree?: UiNode;
     };
