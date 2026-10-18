@@ -1,0 +1,15 @@
+{
+  "family": "react-native",
+  "note": "React Native's own text fields, built by the React Native lab app alone (fixtures/apps/rn, src/ReactNative.tsx; scripts/truth/schema.ts#appOf) — round 7, calibration.json #18's field half: mp-native's RN field lists its own scroll indicator (`container 'Horizontal scroll bar, 1 page'`) under the field, over its floating label, which neither SwiftUI's TextField nor UIKit's UITextField does. rn-field: N a single-line TextInput's floating label (mp-native's SWIFT payee field), I the field with an icon (a trailing 44-pt icon button labelled Clear, a label target), M a multiline TextInput's label (the label inside the field) — each target on a box of its colour, its field identified lab.<cell>.<tag>.field; a tap on a label focuses its field (logged as the target's tap), the icon's press empties its field. Every field reports its value and focus (LabState.fields, by the target's tag): the live golden's forms cases on the RN fields.",
+  "cells": [
+    {
+      "id": "rn-field",
+      "layer": "none",
+      "targets": [
+        { "tag": "N", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "Payee’s name" },
+        { "tag": "I", "color": "#3949AB", "slot": 1, "declared": "open", "label": "Clear" },
+        { "tag": "M", "color": "#FFE0B2", "slot": 2, "declared": "open", "text": "Message for the recipient" }
+      ]
+    }
+  ]
+}
