@@ -250,6 +250,17 @@ const form: CellTruth = {
 describe('the form rows', () => {
   const rows = formExpectations('ios', form, 'wda');
 
+  it('ui_snapshot: an error whose frame the capture did not record is judged by no rule — none, or its own message', () => {
+    const frameless = formExpectations('ios', { ...form, form: { ...form.form!, fields: [field('name', 160, { error: { id: 'lab.f.name', text: 'Required' } })] } }, 'wda');
+    const r = pick(frameless, 'snapshot', 'name');
+    expect(r.says).toBe('no error (lab.f.name: no frame of it captured, no pairing judged), or its own "Required"');
+    check(r.judge, [
+      [SNAP({}), [], 'ok'],
+      [SNAP({ error: 'Required' }), [], 'ok'],
+      [SNAP({ error: 'Other' }), [], /^reads "Other" as its error, where none is paired/],
+    ]);
+  });
+
   it('every kind of row is asked', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual([
       'name error',

@@ -133,15 +133,16 @@ export const tapAfterBackOnPiece =
 
 /**
  * What ui_snapshot's `error` column may say of `field` (snapshotRow): `error`, the message it must carry (undefined:
- * none), and `or`, its own shown message accepted beside none. On iOS the message the field shows where the rules of
+ * none), and `or`, its own shown message accepted beside none (`why`: the reason). On iOS the message the field shows where the rules of
  * verification.md (Field errors, pairingOf) pair it, else none. On Android none, or the field's own message: that averi
  * sets no `error` there is verification.md's contract, not the truth — the truth is the message the field shows (ADR
  * 0020, decision 1), so an averi that pairs it is right too; only another string is wrong.
  */
-export function snapshotErrorOf(platform: Platform, fields: readonly FieldTruth[], field: FieldTruth): { error: string | undefined; or?: string } {
+export function snapshotErrorOf(platform: Platform, fields: readonly FieldTruth[], field: FieldTruth): { error: string | undefined; or?: string; why?: string } {
   if (field.error === null) return { error: undefined };
-  if (platform === 'android') return { error: undefined, or: field.error.text };
-  if (field.errorFrame === undefined) return { error: undefined };
+  if (platform === 'android') return { error: undefined, or: field.error.text, why: 'Android sets none' };
+  // No frame of the message captured: the rules cannot be applied to it, so neither answer is ruled out.
+  if (field.errorFrame === undefined) return { error: undefined, or: field.error.text, why: `${field.error.id}: no frame of it captured, no pairing judged` };
   return { error: PAIRS.has(pairingOf(fields, field, field.error.id, field.errorFrame)) ? field.error.text : undefined };
 }
 
@@ -162,7 +163,7 @@ const spaced = (v: string) => v.replace(/\s+/g, ' ').trim();
  * field is not open (ControlTruth.situation), so a snapshot that lists no textfield there is no claim either way.
  */
 function snapshotRow(platform: Platform, fields: readonly FieldTruth[], f: FieldTruth, listedOrNot: boolean): FormExpectation {
-  const { error: expected, or } = snapshotErrorOf(platform, fields, f);
+  const { error: expected, or, why } = snapshotErrorOf(platform, fields, f);
   const centre = { x: f.frame.x + f.frame.width / 2, y: f.frame.y + f.frame.height / 2 };
   return {
     target: f.tag,
@@ -171,7 +172,7 @@ function snapshotRow(platform: Platform, fields: readonly FieldTruth[], f: Field
       expected !== undefined
         ? `its error is ${JSON.stringify(expected)}`
         : or !== undefined
-          ? `no error (Android sets none), or its own ${JSON.stringify(or)}`
+          ? `no error (${why}), or its own ${JSON.stringify(or)}`
           : `no error${platform === 'android' ? ' (Android sets none)' : f.error === null ? ' (none shown)' : ` (${f.error.id}: the rules pair it with none)`}`,
     call: { tool: 'ui_snapshot', args: { platform, filter: 'role:textfield' } },
     judge: (o) => {
