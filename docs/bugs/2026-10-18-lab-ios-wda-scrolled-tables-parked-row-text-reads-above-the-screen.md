@@ -1,7 +1,7 @@
 # BUG: under WDA, once a UIKit table has scrolled, the text of a row below the fold is parked ABOVE the screen — averi reads the row there, strokes away from it and turns until the budget runs out
 
 > **Status (2026-10-18):** open; measured live only (round 6's iOS device check). KNOWN as this note
-> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30`, R-direction: three turns in every run). Not a carry-model fault (ADR 0021 decision 4):
+> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30` (since round 7 `carry:sheet-long-list.L`), R-direction: three turns in every run). Not a carry-model fault (ADR 0021 decision 4):
 > the carry case was built to measure that model, and this defect comes first — averi never sees where the row is.
 
 Lab note LV6. **Found 2026-10-18** by round 6's iOS device check: the live golden's new long-list carry case
@@ -71,3 +71,8 @@ view's top moved up by any amount, its x and size the cell's.
   mid-fling) — is what this note breaks: every run reads three turns.
 - Records: docs/truth/live-records/ios-vis.json, ios-vis-b71cbbb.json (the same at round 5's src),
   ios-wda-bounded-long-list-11683c3-1…3.json.
+- Round 7 (2026-10-19, truth/r7-lab-fixes): the longer table is in — sheet-long-list 56 rows, target L at row 30 with
+  its own identifier, whole over 1172–1920, before the table's end (2772). The carry case is `carry:sheet-long-list.L`
+  (asked by id; round 6's `Row30` case gone), KNOWN as this note, with L's own scroll case: two live runs, each turned
+  three times, L's label parked above the screen as Target F's was (docs/truth/live-ios-2026-10-19-lab-fixes.md,
+  docs/truth/live-records/ios-long-list-r7-lab-1.json, -2.json).

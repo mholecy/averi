@@ -1,7 +1,7 @@
 {
   "_comment" : [
-      "REAL WebDriverAgent `GET /source?format=json` bytes of the lab app's `sheet-long-list` cell at rest (the table at offset 0),",
-      "from the truth lab's corpus (tests/fixtures/truth/ios-iphone17-ios27/sheet-long-list.wda.json), averi-lab iPhone 17",
+      "REAL WebDriverAgent `GET /source?format=json` bytes of the lab app's `sheet-long-list` cell at rest (round 6's 40-row table, offset 0),",
+      "from the truth lab's corpus (truth/round-6 5589fbe: tests/fixtures/truth/ios-iphone17-ios27/sheet-long-list.wda.json), averi-lab iPhone 17",
       "simulator, iOS 27.0, 402x874 pt. UNEDITED below this `_comment` key, which is the only addition (the parser unwraps",
       "`value`). Every below-the-fold row's content parked at 0,62 402x64, its cell where it is: Row 30's at 0,1982."
   ],
