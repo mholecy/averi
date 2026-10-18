@@ -346,14 +346,15 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
 }
 
 /**
- * THE CARRY MODEL (lab note LV5; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): how far a stroke carries its target, measured in this scroll, so a stroke reaches no
- * further than the target still needs. Measured under WDA: one stroke over the lab app's 180-pt `lower` (a 108-pt
- * drag, `201 524 → 416`, its 60 %) moved it about 259 pt — momentum carries a UIScrollView on after the finger lifts,
- * roughly in proportion to the lift speed (adapters/ios.ts#swipe: a 344-pt stroke carried the SwiftUI form 729–970 pt;
- * both ≈ 2.1–2.8 × the drag at the fixed 300 ms) — while F is whole in `lower` only over a 116-pt window of its offsets
- * (884–1000). Four full strokes landed 906, 929 — or 1052, past the window, after which the turn came with the sixth
- * and last swipe and the scroll failed at maxSwipes with F 18 % drawn (one run in three). The strokes' own reach is not
- * the fault (60 % of the scroll view, as anywhere); the fling is, and its size varies by run (226–263 pt).
+ * THE CARRY MODEL (lab note LV5; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): how far a stroke carries
+ * its target, measured in this scroll, so a stroke reaches no further than the target still needs. Measured under WDA:
+ * one stroke over the lab app's 180-pt `lower` (a 108-pt drag, `201 524 → 416`, its 60 %) moved it about 259 pt —
+ * momentum carries a UIScrollView on after the finger lifts, roughly in proportion to the lift speed
+ * (adapters/ios.ts#swipe: a 344-pt stroke carried the SwiftUI form 729–970 pt; both ≈ 2.1–2.8 × the drag at the fixed
+ * 300 ms) — while F is whole in `lower` only over a 116-pt window of its offsets (884–1000). Four full strokes landed
+ * 906, 929 — or 1052, past the window, after which the turn came with the sixth and last swipe and the scroll failed at
+ * maxSwipes with F 18 % drawn (one run in three). The strokes' own reach is not the fault (60 % of the scroll view, as
+ * anywhere); the fling is, and its size varies by run (226–263 pt).
  *
  * `carried` keeps the sample: what the read right after a stroke of the course found the target moved, the way the
  * content went, per point of the finger's ACTUAL travel (the stroke as drawn — `shortenStroke`'s floors, a box the

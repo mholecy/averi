@@ -54,18 +54,14 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  * - `stop`: the scroll is over; `outcome` says how (interact/scroll-text.ts
  *   renders it — the reply or the failure, one switch over its kind).
  *
- * ORDER inside a round, fixed: the read's judgement, its `ask witness`
- * included (interact/scroll-read.ts#judgeRead); motion observed (a read that read only);
- * the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
- * stop flush with a clipping scroll container, the probe — `ask witness`
- * first for a band the moot rule left unasked — PROBE_REACH; then `ask
- * unlocated` on a `fully: true` stop with no cover under it); stuck; the
- * confirming read, or the read after a probe, that did not read; covered
- * (nothing above the band); the end turn (`EndTurn`), which takes an
- * exhaustion it applies to out of the bound; the bound (exhausted, maxSwipes, deadline —
- * and `ask unlocated` of a round that read); the stroke. The witness comes before the deadline is consulted, so a witness
- * that waits out its 2 s counts against the scroll's budget: the driver
- * stamps `elapsedMs` afresh on every call, re-entry included.
+ * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead);
+ * motion observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
+ * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
+ * PROBE_REACH; then `ask unlocated` on a `fully: true` stop with no cover under it); stuck; the confirming read, or the
+ * read after a probe, that did not read; covered (nothing above the band); the end turn (`EndTurn`), which takes an
+ * exhaustion it applies to out of the bound; the bound (exhausted, maxSwipes, deadline — and `ask unlocated` of a round
+ * that read); the stroke. The witness comes before the deadline is consulted, so a witness that waits out its 2 s
+ * counts against the scroll's budget: the driver stamps `elapsedMs` afresh on every call, re-entry included.
  *
  * BOUND: at most 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes` non-ask steps
  * (25 at the defaults) — a stroke spends one of `maxSwipes` and earns at most
@@ -229,14 +225,15 @@ export type ScrollOutcome = (
 ) & { detent?: DetentMove; endTurn?: EndTurn };
 
 /**
- * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): the strokes went the caller's way first and
- * the read after one of them proved the content exhausted that way — the stroke moved no match, and the tree shows
- * the content of the scroll view it went over ENDING at the edge that way (`Observed.ends`,
- * interact/stroke-plan.ts#strokedEnd) — while the tree places the target wholly past the OPPOSITE (far) edge of that
- * same scroll view, inside it. Then the strokes turn ONCE toward the target, at full reach (no fling carried it past:
- * it was never near), and every reply and failure says so (the proof — the caller's way, the scroll view named, the
- * strokes that moved nothing — `to`, and the swipes sent `after` which). Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of `lower`
- * (0,380 402x180) at its top stroked up three times, moved nothing and failed advising `down`.
+ * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below;
+ * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): the strokes went the caller's way first and the read after
+ * one of them proved the content exhausted that way — the stroke moved no match, and the tree shows the content of the
+ * scroll view it went over ENDING at the edge that way (`Observed.ends`, interact/stroke-plan.ts#strokedEnd) — while
+ * the tree places the target wholly past the OPPOSITE (far) edge of that same scroll view, inside it. Then the strokes
+ * turn ONCE toward the target, at full reach (no fling carried it past: it was never near), and every reply and failure
+ * says so (the proof — the caller's way, the scroll view named, the strokes that moved nothing — `to`, and the swipes
+ * sent `after` which). Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of
+ * `lower` (0,380 402x180) at its top stroked up three times, moved nothing and failed advising `down`.
  *
  * Until then a target never sighted short of the far edge was "the caller's direction to honour" (`beyondFarEdgeIn`,
  * `nextStroke`): nothing is guessed from a screen no stroke changed. The decision refines that rule, it does not drop
@@ -979,10 +976,10 @@ interface Observed {
    * target (not the flush check's probe) that moved nothing: every match where it was, or, with no target in the tree,
    * the whole tree unchanged; never while a progress node shows, nor of a stroke that touched down on a node drawn over
    * its scroll view (`touchedOn`: that node may have taken it, and the fast fail names it first); and only of a scroll
-   * view that scrolls along the stroke's axis (geometry.ts#Clips.endsAt). What counts as proof, stated: the tree's listing of
-   * the content, not the strokes — a stroke not taken moves nothing too, but cannot make a list's content end where
-   * the tree shows it ending; and the read unmoved besides, so a list still settling (a bounce at its end, momentum
-   * from an earlier stroke) reads moved and proves nothing until a read finds it still.
+   * view that scrolls along the stroke's axis (geometry.ts#Clips.endsAt). What counts as proof, stated: the tree's
+   * listing of the content, not the strokes — a stroke not taken moves nothing too, but cannot make a list's content
+   * end where the tree shows it ending; and the read unmoved besides, so a list still settling (a bounce at its end,
+   * momentum from an earlier stroke) reads moved and proves nothing until a read finds it still.
    */
   ends: UiNode | undefined;
 }

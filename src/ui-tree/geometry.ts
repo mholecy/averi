@@ -741,25 +741,25 @@ export interface Clips {
    * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
    * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`drawnIn`'s
    * dialect, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
-   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container at
-   * 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
+   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container
+   * at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
    * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts every rect to its scroll
    * container, so content past an edge reads flush with it (or is not listed at all), and idb's flat list lists no
    * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
-   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG
-   * that edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
+   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG that
+   * edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
    * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
    * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
    * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
-   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual, stated as it is: a lazy list (a
-   * table) lists only the rows it has laid out, so one resting EXACTLY on a row boundary with its earlier rows dropped
-   * (a sticky section header pinned at its top reads the same) lists nothing past its top and reads as ending there.
-   * Nothing in the reads rules that out: interact/scroll-rounds.ts asks this only of a read a stroke left unmoved, but
-   * a stroke not taken leaves it unmoved too — so a stroke not taken over a lazy list resting on a boundary is a false
-   * proof (one stroke, then a turn or a failure that calls the content exhausted). What makes it rare, not impossible:
-   * a list at rest lies on a boundary by chance (a flung list stops anywhere along a row), and the stroke must also go
-   * untaken, with nothing drawn over its touch-down (that withholds the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most
-   * once a round, after a stroke).
+   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual,
+   * stated as it is: a lazy list (a table) lists only the rows it has laid out, so one resting EXACTLY on a row
+   * boundary with its earlier rows dropped (a sticky section header pinned at its top reads the same) lists nothing
+   * past its top and reads as ending there. Nothing in the reads rules that out: interact/scroll-rounds.ts asks this
+   * only of a read a stroke left unmoved, but a stroke not taken leaves it unmoved too — so a stroke not taken over a
+   * lazy list resting on a boundary is a false proof (one stroke, then a turn or a failure that calls the content
+   * exhausted). What makes it rare, not impossible: a list at rest lies on a boundary by chance (a flung list stops
+   * anywhere along a row), and the stroke must also go untaken, with nothing drawn over its touch-down (that withholds
+   * the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most once a round, after a stroke).
    */
   endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
 }
