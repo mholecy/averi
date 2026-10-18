@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from './target-text.js';
+import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
@@ -153,6 +153,9 @@ function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): st
   const { centreCover, shows } = judged.standing.facts;
   return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(shows)}% of it shows`;
 }
+
+/** The soft keyboard a match was judged under (`Judged.under`), as a cut-by remedy names it (target-text.ts#cutByRemedy). */
+const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : { lineY: under.line.y, remedy: under.remedy });
 
 /** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (target-text.ts#cutSliverText). */
 function sliverText({ judged, cut, minPiece }: Extract<Shortfall, { of: 'sliver' }>): string {
@@ -344,6 +347,16 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       // Cut to a sliver by its scroll container at the end of the content (ui-tree/standing.ts#Scene.standing):
       // the rest stays past the container's edge however it is swiped — or the node only reads cut (geometry.ts#evidentCut's residual).
+      // Cut by a node drawn after it (geometry.ts#Cut.by): the rest stays under that node — with the keyboard up, a bar riding on it.
+      if (short.of === 'sliver' && short.cut.by !== undefined) {
+        const keyboard = keyboardUp(judged);
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
+              `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays under that ${short.cut.by.role} at the end of the content — ` +
+              `${keyboard === undefined ? 'a layout defect (no clearance for a pinned bar?)' : `${dismissKeyboardFirstText(keyboard)}, and scroll again`}; a tap refuses it so cut. ${last}`,
+        };
+      }
       if (short.of === 'sliver') {
         return {
           message:
@@ -588,7 +601,9 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but ${systemBarText(short)}${region} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'sliver': {
-      return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${cutRemedy(short.cut.edge)})`;
+      const { by } = short.cut;
+      const remedy = by === undefined ? cutRemedy(short.cut.edge) : cutByRemedy(by, keyboardUp(short.judged));
+      return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':
       return `element never appeared in the tree${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;

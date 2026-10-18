@@ -1,5 +1,6 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { nodeText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -71,14 +72,62 @@ export function untriedSideText(side: Edge): string {
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
  * part…`. Said by the tap's refusal
  * (tap-judgement.ts#judgeTap), by `scroll_until`'s sliver failures
- * (scroll-text.ts) and by the picker's skip line — one wording.
+ * (scroll-text.ts) and by the picker's skip line — one wording. A cut by a
+ * node drawn after it (`Cut.by`) is `cutByText`'s.
  */
 export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
+  if (cut.by !== undefined) return cutByText(cut.by, cut, shown, minPiece);
   const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;
   return (
     `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)})${within}; only a ${shown.width}x${shown.height} part of it shows, ` +
     `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
   );
+}
+
+/**
+ * `cutSliverText`'s sentence for a node cut by a node drawn after it (`Cut.by`): `cut at its top edge by container
+ * id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later
+ * node covers, so the rest of it lies under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across
+ * that edge, under the 65 a tap needs` — where the part that shows lies, which the rect it was dumped with is.
+ */
+function cutByText(by: UiNode, cut: Cut, shown: Rect, minPiece: number): string {
+  return (
+    `cut at its ${cut.edge} edge by ${nodeText(by)}, drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
+    `so the rest of it lies under that ${by.role}; only a ${shown.width}x${shown.height} part of it shows, at ${shown.x},${shown.y}, ` +
+    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
+  );
+}
+
+/** The soft keyboard a remedy names: up, its top edge (a keyboard line's `y`), and what the adapter can hide it with. */
+export interface KeyboardUp {
+  readonly lineY: number;
+  readonly remedy: KeyboardRemedy;
+}
+
+/**
+ * The first half of the remedy for a node cut by a node drawn after it while the soft keyboard is up (`Cut.by`, the
+ * owner's decision for lab note F2A1): `the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key
+ * back from the MCP tools; …) — a bar riding on it goes down with it` — a submit bar laid on the IME's inset moves off
+ * the field when the keyboard goes. How to hide it is the adapter's (`KeyboardRemedy`), as `scroll_until`'s own
+ * sentence says it (scroll-text.ts#hideToJudgeWholeScreen).
+ */
+export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string {
+  const how =
+    remedy.dismissal === 'back'
+      ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow'
+      : `tap a neutral element such as the screen title — a tap: step in a flow; ${cannotHide(remedy.advice)}`;
+  return `the soft keyboard is up (its top edge at y ${lineY}): dismiss it first (${how}) — a bar riding on it goes down with it`;
+}
+
+/**
+ * The remedy for a node cut by a node drawn after it (`Cut.by`), as the tap's refusal and `scroll_until`'s bound
+ * failure say it: with the soft keyboard up, dismiss it first, or scroll the list (`dismissKeyboardFirstText`); else
+ * scroll the list — `scroll_until it out from under that container first`. Not `cutRemedy`'s scroll toward the edge:
+ * the rest lies under the node, not past the edge of anything that scrolls.
+ */
+export function cutByRemedy(by: UiNode, keyboard: KeyboardUp | undefined): string {
+  const scroll = `scroll_until it out from under that ${by.role} first`;
+  return keyboard === undefined ? scroll : `${dismissKeyboardFirstText(keyboard)} — or ${scroll}`;
 }
 
 /** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */

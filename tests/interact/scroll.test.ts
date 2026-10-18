@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
@@ -1202,5 +1203,61 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     const fake = idbForm(tree, street, 589);
     await expect(scrollUntilVisible(fake, 'text:"Payee’s street"', { ...FAST, maxSwipes: 1 })).rejects.toThrow();
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
+  });
+});
+
+/**
+ * Lab note F2A1 (docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md), the
+ * owner's decision of 2026-10-17: a control dumped as the strip a node drawn after it leaves (Compose's bounds less what
+ * that node covers) is no stop — `phone` under the submit bar riding on the IME answered "visible after 0 swipes"
+ * though the user sees only the bar's grey. The plain stop strokes on (the bar is drawn outside the field's scroll view,
+ * so a scroll may bring it out from under it), and, the strokes moving nothing, fails naming the bar and the way past —
+ * with the keyboard up, dismiss it first. Real captures of the lab's `form-keyboard`, served unchanged by every read.
+ */
+describe('scrollUntilVisible — a control cut by a node drawn after it is no stop (lab note F2A1)', () => {
+  const capture = async (name: string): Promise<UiNode> => parseDump(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
+  const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
+  const CUT =
+    "cut at its top edge by container id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, " +
+    'so the rest of it lies under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs';
+  const fakeOf = async (name: string): Promise<FakeAdapter> => {
+    const fake = new FakeAdapter({ s: await capture(name) }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    return fake;
+  };
+
+  it('phone, the IME up: strokes on, then fails naming the bar — dismiss the keyboard first, and scroll again', async () => {
+    const fake = await fakeOf('android-lab-form-keyboard.xml');
+    fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+    const failure = await scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', FAST).catch((e: unknown) => e as Error);
+    expect((failure as Error).message).toContain(`element is in the viewport but ${CUT} — and the content is exhausted`);
+    expect((failure as Error).message).toContain(
+      'The rest of it stays under that container at the end of the content — the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; ' +
+        '`dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it, and scroll again; a tap refuses it so cut.',
+    );
+    expect(fake.swipes.length).toBeGreaterThan(0);
+  });
+
+  it('…at the bound (maxSwipes: 0): what it was short of, and both ways past', async () => {
+    const fake = await fakeOf('android-lab-form-keyboard.xml');
+    fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+    await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
+      `element reached the viewport but stayed ${CUT} (last rect {"x":55,"y":1370,"width":970,"height":42}) — a tap refuses it so cut (the soft keyboard is up (its top edge at y 1398): ` +
+        'dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it — ' +
+        'or scroll_until it out from under that container first)',
+    );
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('note after back, the keyboard down: no stop on its 14-px strip, and the stuck sentence says the app leaves it no clearance', async () => {
+    const fake = await fakeOf('android-lab-form-keyboard-after-back.xml');
+    await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.note"', FAST)).rejects.toThrow(
+      'The rest of it stays under that container at the end of the content — a layout defect (no clearance for a pinned bar?); a tap refuses it so cut.',
+    );
+  });
+
+  it('phone after back, whole above the bar: stops with no swipe', async () => {
+    const fake = await fakeOf('android-lab-form-keyboard-after-back.xml');
+    expect(await scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', FAST)).toMatchObject({ swipes: 0, visible: 1, clipped: [] });
   });
 });

@@ -52,6 +52,8 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * - `coversOf(node, region)` — the uiautomator parser's widening, through
  *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
  *   drawn over the strip a node cut short of its own content would gain?
+ *   And the sliver rule's cut by a later node (standing.ts#cutByLater): what
+ *   is drawn over the pixel row just past a thin control's edge?
  * - `presentedAt(node, point)` — `scroll_until`'s stroke
  *   (standing.ts#Scene.presentedAt): is the touch-down of a
  *   stroke for a target not judged in the viewport on a surface of a screen

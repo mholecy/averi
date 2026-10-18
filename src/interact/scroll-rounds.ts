@@ -803,7 +803,8 @@ interface FarFacts {
 const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   rect: { ...node.rect },
   ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
-  ...(facts.sliver !== undefined && { slicedAt: facts.sliver.edge }),
+  // A container's cut only: the rest of a node cut by a node drawn after it lies under that node, not past the far edge (geometry.ts#Cut.by).
+  ...(facts.sliver !== undefined && facts.sliver.by === undefined && { slicedAt: facts.sliver.edge }),
   ...(facts.drawn !== undefined && { drawn: { ...facts.drawn } }),
 });
 
