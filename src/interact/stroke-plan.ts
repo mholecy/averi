@@ -1,4 +1,4 @@
-import type { Point, Rect, Stroke, UiNode } from '../adapters/types.js';
+import { sameRect, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
 import { containsPoint, quoted, rectIntersection, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
@@ -106,8 +106,8 @@ interface Memory {
   readonly within: Rect | undefined;
   /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `within`. */
   readonly chosen: Rect | undefined;
-  /** The carry model's measure (`carried`): the most a stroke of this scroll carried its target per point of finger travel; undefined until one did. */
-  readonly carry: number | undefined;
+  /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did. */
+  readonly carry: { readonly within: Rect | undefined; readonly perPoint: number } | undefined;
 }
 
 const open = (m: StrokeMemory): Memory => m as unknown as Memory;
@@ -225,7 +225,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const room = strokeRoom(gesture, candidates, toward, kept, 'any axis');
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
-  const reach = box === undefined ? turnsReach : carryReach(m.carry, still, strokeLength(fullStroke(box, toward, coverTop)), turnsReach);
+  const reach = box === undefined ? turnsReach : carryReach(carryOver(m.carry, room?.within), still, strokeLength(fullStroke(box, toward, coverTop)), turnsReach);
   const points = box === undefined ? undefined : scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box });
   const stroke: PlannedStroke = { toward, reach, ...(coverTop !== undefined && { coverTop }), ...(box !== undefined && { box: { ...box } }), ...(points !== undefined && { points }) };
   const press = read === undefined || points === undefined ? undefined : read.facts.scene.presentedAt(points.from, read.target);
@@ -358,7 +358,10 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
  *
  * `carried` keeps the sample: what the read right after a stroke of the course found the target moved, the way the
  * content went, per point of the finger's ACTUAL travel (the stroke as drawn — `shortenStroke`'s floors, a box the
- * plan cut, another scroll view: the unit stays a point of travel). A sample is the round's to offer only of the same
+ * plan cut: the unit stays a point of travel). It is kept FOR THE SCROLL VIEW the stroke went over (`within`, the
+ * gesture box whole as one too): a fling is that scroll view's, so a carry measured over one is never applied to a
+ * stroke over another — `strokeRoom` falling back to an outer scroll view, or the target found in another list — and
+ * a sample over another scroll view replaces it (`carryOver`). A sample is the round's to offer only of the same
  * node at the same size, on a tree that lists it where it lies (scroll-rounds.ts#observe); here it is dropped when it
  * moved the wrong way, when the stroke was no stroke (under twice TOUCH_SLOP: a tap), or when it lies past
  * CARRY_CEILING × the travel — no fling carries that far: content inserted above, a nested scroll carried by an outer
@@ -383,7 +386,15 @@ export function carried(memory: StrokeMemory, { moved, drawn }: { moved: number;
   const travel = strokeLength(drawn);
   if (moved <= 0 || travel < 2 * TOUCH_SLOP || moved > CARRY_CEILING * travel) return memory;
   const m = open(memory);
-  return close({ ...m, carry: Math.max(m.carry ?? 0, moved / travel) });
+  const kept = carryOver(m.carry, m.within) ?? 0;
+  return close({ ...m, carry: { within: m.within === undefined ? undefined : { ...m.within }, perPoint: Math.max(kept, moved / travel) } });
+}
+
+/** The carry measured over the scroll view `within` (undefined: the gesture box whole), or undefined: none measured, or measured over another (`carried`). Found by the exact rect, as the plan remembers its scroll views. */
+function carryOver(carry: Memory['carry'], within: Rect | undefined): number | undefined {
+  if (carry === undefined) return undefined;
+  const same = carry.within === undefined || within === undefined ? carry.within === within : sameRect(carry.within, within);
+  return same ? carry.perPoint : undefined;
 }
 
 /**

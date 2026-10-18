@@ -43,7 +43,9 @@ brief, pending the owner and the device check. Open point for the owner: the uia
    where `UNMOVED_STROKES_EXHAUST`'s two identical unmoved strokes stay the rule wherever the tree cannot list the end.
 4. **The carry model (LV5)** (`stroke-plan.ts#carried`, `scroll-rounds.ts#stillNeeds`): on the same trees, the read
    after a stroke measures what it carried the target, per point of the finger's actual travel, of the same node at
-   the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept. Once the
+   the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept — kept for the
+   scroll view the stroke went over: a carry measured over one is never applied to a stroke over another (the plan
+   falling back to an outer scroll view), and a sample over another replaces it (round 6's code review, P5). Once the
    target lies short of its window and a stroke at the turns' reach would carry it further than the window lets it
    travel whole, the stroke's travel is cut to what brings it to the window's middle over that carry. Any window one
    stroke can skip, not only a short scroll view's: on a long WDA list the final approach is cut too (a carry of ≈ 2.4

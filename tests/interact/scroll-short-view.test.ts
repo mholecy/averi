@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
-import { CARRY_CEILING, carried, planStroke, seeRead, startStrokes, type StrokeMemory } from '../../src/interact/stroke-plan.js';
+import { CARRY_CEILING, carried, planStroke, seeRead, startStrokes, strokeSent, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { largestScroller } from '../../src/ui-tree/geometry.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
@@ -114,7 +114,9 @@ describe('a stroke no further than the target still needs — a short scroll vie
 describe('the carry model (interact/stroke-plan.ts#carried): per point of finger travel, the largest sample, bounded', () => {
   const facts = { scene: sceneOf(CAPTURE), mainScroller: largestScroller(CAPTURE) };
   const f = [...everyNode(CAPTURE)].find((n) => n.identifier === F);
-  const seen = seeRead(startStrokes(), { facts, line: undefined, target: f });
+  const read = seeRead(startStrokes(), { facts, line: undefined, target: f });
+  /** The memory once a stroke over `lower` was sent: what the read after it measures is `lower`'s carry. */
+  const seen = strokeSent(planStroke(read, { toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory);
   /** A stroke of `travel` points straight up the screen. */
   const drag = (travel: number) => ({ from: { x: 201, y: 524 }, to: { x: 201, y: 524 - travel } });
   /** The travel of the stroke the plan draws over `lower` (its full stroke: 108) for what F still needs. */
@@ -145,6 +147,15 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
     expect(travelFor(carried(seen, { moved: 760, drawn: drag(108) }), 153)).toBe(108);
     expect(travelFor(carried(seen, { moved: -200, drawn: drag(108) }), 153)).toBe(108);
     expect(travelFor(carried(seen, { moved: 30, drawn: drag(20) }), 153)).toBe(108);
+  });
+
+  it('kept for the scroll view the stroke went over: one measured over another (here the gesture box whole) is not applied over `lower`, and a sample over `lower` replaces it', () => {
+    // No stroke sent yet: the sample is of a stroke over no scroll view of the plan's — the gesture box whole.
+    const overBox = carried(read, { moved: 263, drawn: drag(108) });
+    expect(travelFor(overBox, 153)).toBe(108);
+    // Then a stroke over `lower`, which carried less: its own sample, not the larger one measured over the box.
+    const thenLower = carried(strokeSent(planStroke(overBox, { toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory), { moved: 194, drawn: drag(108) });
+    expect(travelFor(thenLower, 153)).toBeCloseTo(153 / (194 / 108), 0);
   });
 
   it('only where one stroke could skip the window: a window that lets the target travel further than a full stroke carries it keeps the full stroke', () => {
