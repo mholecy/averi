@@ -350,8 +350,8 @@ function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined
  *
  * Why so narrow (docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md, "Amendment: the parked frame of a
  * scrolled table"): the scroll-view shape was added against content scrolled out SIDEWAYS read as parked (a carousel's
- * chip past its scroller); above the view, only the content origin's column is taken — a row's content scrolled out
- * of a scroll view's top, sideways of its left edge, or below it keeps its rect. Unmeasured, so not taken: a
+ * chip past its scroller); outside the view, only the content origin's column above it is taken — an unlaid cell's
+ * element above the view off its left edge, or beside or below the view, keeps its rect. Unmeasured, so not taken: a
  * horizontally scrolled view's parked frame (moved left, not up).
  */
 function atParkedFrame(own: Rect, view: Rect): boolean {

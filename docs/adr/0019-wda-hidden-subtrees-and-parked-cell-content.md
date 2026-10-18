@@ -9,6 +9,10 @@ Amended 2026-10-15 (owner decisions Q1 and Q3 on the round-20 architecture revie
 presented layer is the source's fact"): the parser reads a whole layer's flags to mark a presented screen, never one
 node's and never a target's; Decision 1's guard is the shape fallback's, asked only of a tree whose source did not
 judge presented layers; residual 3 closed for WDA (see "Amendment: the presented layer is the source's fact" below).
+Amended 2026-10-18 (round 7, task A2, orchestrator's decision under the owner's delegation: "widen the parked rule to
+the scrolled case, as narrowly as the evidence allows"): Decision 2's scroll-view shape is the PARKED FRAME, inside the
+scroll view at rest or wholly above it at its left edge once it has scrolled (see "Amendment: the parked frame of a
+scrolled table" below).
 
 ## Context
 
@@ -149,6 +153,42 @@ a presented layer of only empty frames"); draw order covers the screen beneath t
 - **`isVisible="0"` too.** A child drawn outside its cell is drawn where it says; on screen, a laid-out cell's content
   lies inside it (`add phone` and its button).
 
+## Amendment: the parked frame of a scrolled table (2026-10-18)
+
+docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md (lab note LV6). Decision 2
+reads, since this amendment:
+
+> In a WDA tree, an element with `isVisible="0"` is PARKED, and placed at its nearest `Cell` ancestor's rect, when its
+> rect shares no area with that cell's, lies at the PARKED FRAME of the scroll view the cell lies in, and the cell shares
+> no area with that scroll view. An element lies at the parked frame when it shares area with the scroll view (at
+> rest), or lies wholly above it at its left edge — its x the scroll view's, its bottom at or above the view's top
+> (scrolled).
+
+- **What was measured.** WDA parks an unlaid cell's content at the scroll view's CONTENT ORIGIN, the element's size:
+  the view's top-left moved up by its offset. The lab's `sheet-long-list` (a UITableView of 40 rows of 64 pt in a large
+  sheet, `Table 0,62 402x812`; iPhone 17 simulator, iOS 27.0, WDA 16.1.7), three raw reads: at offset 0 every
+  below-the-fold row's text and wrappers at `0,62 402x64` (81 elements); after 273 pt at `0,-212 402x65` (72, Row 30's
+  text there, its cell at `0,1708`); after 522 pt at `0,-460 402x64` (75). Each parked frame is Row 0's own place. At
+  rest the frame lies inside the view — Decision 2's shape held, and the golden captures (each cell at launch) never
+  showed the defect; scrolled, it lies above the screen, shared no area with the view, and was taken at face value:
+  `scroll_until text:"Row 30"` down read the row above the screen after its first stroke and turned up three times
+  until its budget ran out, in every live run.
+- **Why this narrow.** The scroll-view shape was added against content scrolled out sideways read as parked (a
+  carousel's chip past its scroller, a collection view's card past its edge); those negatives still hold, as does a
+  badge hung off an on-screen cell. Above the view only the content origin's column is taken — the left edge, which
+  every measured parked frame shares with its view (Contacts' `0,62` on its `Table 0,62`; the lab's `0,…` on its
+  `Table 0,62`). An unlaid cell's element above the view off its left edge, beside the view or below it keeps its rect.
+  At rest nothing changes: Contacts' two scroll-bar indicators, parked inside the view but not at its origin
+  (`297,62 30x22`, `0,70 330x11`), are placed as before.
+- **The sweep.** Over every raw WDA capture in tests/fixtures (the two Contacts sheets, the long list at rest and
+  scrolled twice, the lab's carousel-in-list, Account Detail's cards, the SWIFT form, the lab's bounded scroll views)
+  the parser moves exactly the parked elements: 41, 41, 81, 72, 75 and none elsewhere
+  (tests/adapters/wda-source-visibility.test.ts). The golden harness (1344 checks over the truth corpus, captured at
+  launch) gives byte-identical replies before and after.
+- **Not taken, unmeasured:** a horizontally scrolled view's parked frame (moved left, not up), and a scroll view
+  whose content is inset from its left edge (its parked frame, if WDA parks there, would sit off that edge and keep
+  its rect above the view).
+
 ## Measured
 
 Tests (red first, each mutation-checked; 18 mutants, all killed — among them the rule without the guard, the literal
@@ -229,6 +269,9 @@ target on screen was lost.
    printed before the marks), and for a presentation WDA's flags do not show so (a beneath not wholly `0`:
    mid-animation or a non-modal sheet, unmeasured — ADR 0018's risks).
 4. **A parked element that meets its cell's rect** (a cell parked near the sheet's origin) keeps its parked frame.
+   Measured 2026-10-18: after 273 pt the lab's Target R (row 1), its cell at `0,-148 402x65`, its text parked at
+   `0,-212 402x65` — 65-pt frames 64 apart share a point's strip, so it stays at the parked frame; both lie above the
+   screen, and the next read lays it out or parks it again.
 5. **Content parked in a container that is not a `Cell`, or in a cell no scroll view holds** (a SwiftUI `List` row
    was not measured) is not placed.
 6. **A hidden node of a marked presented layer is never named** (2026-10-15, the amendment above). On a judged tree
