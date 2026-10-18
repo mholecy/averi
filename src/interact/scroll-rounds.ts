@@ -1446,7 +1446,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, { readError, found, best, viewport, cover, windowHint: read === undefined ? undefined : activeWindowHint(read.tree) }, by),
+      short: shortfall(s, { readError, found, best, viewport, cover, windowHint: activeWindowHint(read?.tree) }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,

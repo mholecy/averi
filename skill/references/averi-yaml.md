@@ -79,6 +79,7 @@ For platforms that need different steps, a step can be `{ android: <step>, ios: 
 
 - An optional `tap` gives its element ~1.5 s to appear, then skips. Add `timeout:` to widen that window for interstitials that wait on the network. The full window is spent on every run where the interstitial never shows, so prefer a gate state (see SKILL.md) when the alternative screen is detectable.
 - An optional step is skipped when its element is absent: the trace reads `skipped … (not present)`, meaning the element was never found on a readable screen.
+  - On Android the line goes on `(not present) (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)`: uiautomator lists the active window only, so an element beneath a sheet or a dialog the tree does not list reads as absent.
 - It is also skipped, with its own failure in the parentheses instead of `(not present)`, in exactly these cases:
   - **After averi acted on the keyboard:** a soft keyboard failure after averi pressed `back` (`Pressed back to hide the soft keyboard …`) or tapped a configured dismissal (`Tapped … to hide the soft keyboard …`). averi cannot know the element is still there.
   - **Lost on the second look:** the keyboard guard saw the element on a first look, and it did not resolve again on the second (`… the second look failed …`).

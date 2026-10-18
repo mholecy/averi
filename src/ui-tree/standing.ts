@@ -438,25 +438,35 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
 };
 
 /**
- * THE hint beneath a reply that says a target is not in a tree whose source lists the ACTIVE WINDOW ONLY
- * (`UiNode.activeWindowOnly`, uiautomator) and that does not already say a window is presented (`presentedRemedy`'s
- * words, for a window the presentation module marks): a sheet or a dialog it does not mark — a fully expanded
- * bottom sheet whose dump carries no scrim (form-picker), a full-screen dialog, a window against the screen's edge —
- * still hides the screen beneath from the tree, and nothing in the dump tells it from no window at all (ADR 0018's
- * residuals 18 and 19, accepted by the owner 2026-10-18 with this hint). So every such reply says what the tree is and
- * what to do if a sheet or dialog is up, as a possibility, never as the cause. It reaches, through `activeWindowHint`
- * (the one test of such a tree, interact/resolve.ts#missOf and interact/scroll-rounds.ts's bound): the never-resolved
- * wait "to appear" (interact/resolve.ts#notFound) of both of its pollers — `resolveSettled`, the tap's and fill's wait,
- * and `resolvePresent`, the presence check a flow's optional tap runs (flow/engine.ts#runOptionalSteps: its error
- * carries it, though the skipped step's line, an ElementNotFoundError's, reads only "(not present)") — and
- * `scroll_until`'s "never appeared in the tree" (interact/scroll-text.ts, the `absent` shortfall); a flow's tap, fill
- * and scroll_until steps through the same. Not a flow's `wait:` step (flow/engine.ts#waitFor polls conditions, not
- * these), nor the asserts' "not found". Not under WDA or idb, which list every window. Said once, here.
+ * THE hint a reply carries when it says a target is not in a tree whose source lists the ACTIVE WINDOW ONLY
+ * (`UiNode.activeWindowOnly`, uiautomator) and does not already say a window is presented (`presentedRemedy`'s words,
+ * for a window the presentation module marks): a sheet or a dialog it does not mark — a fully expanded bottom sheet
+ * whose dump carries no scrim (form-picker), a full-screen dialog, a window against the screen's edge — still hides
+ * the screen beneath from the tree, and nothing in the dump tells it from no window at all (ADR 0018's residuals 18
+ * and 19, accepted by the owner 2026-10-18 with this hint; decision 5 puts it on every not-found, round 7). So every
+ * such reply says what the tree is and what to do if a sheet or dialog is up, as a possibility, never as the cause.
+ *
+ * One decision (`activeWindowHint`, of the last tree the miss read) and two shapes, by the reply's layout — the hint
+ * goes where that reply puts its last read's error, and is dropped when that read failed (the fresher fact):
+ * - beneath a THROWN poll timeout's headline, as every hint of one (ui-tree/read-tree.ts#pollTimeoutMessage): the
+ *   tap's and fill's wait and the presence check "… to appear" (interact/resolve.ts#notFound, where a zero-area
+ *   match's hint, which says the target IS in the tree, takes the line first), and a flow's `wait:` on an element
+ *   (flow/engine.ts#waitTimeoutHint);
+ * - after a ONE-LINE not-found, in a parenthesis (`withActiveWindowHint`): `scroll_until`'s "element never appeared in
+ *   the tree" (interact/scroll-text.ts, the `absent` shortfall), every assert's "not found within …"
+ *   (verify/poll-verdict.ts#notFound — the tree asserts', the rect assert's, the color and ocr asserts'), and the
+ *   skip line of an optional step whose target was never found, "(not present)" (flow/engine.ts#runOptionalSteps:
+ *   the ElementNotFoundError carries the hint its message carries, interact/resolve.ts#absenceError).
+ * Never under WDA or idb, which list every window. Said once, here.
  */
 export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
 
-/** ACTIVE_WINDOW_HINT for a tree whose source lists the active window only; undefined for any other. */
-export const activeWindowHint = (tree: Pick<UiNode, 'activeWindowOnly'>): string | undefined => (tree.activeWindowOnly === true ? ACTIVE_WINDOW_HINT : undefined);
+/** ACTIVE_WINDOW_HINT for a tree whose source lists the active window only; undefined for any other, or for no tree read. */
+export const activeWindowHint = (tree: Pick<UiNode, 'activeWindowOnly'> | undefined): string | undefined =>
+  tree?.activeWindowOnly === true ? ACTIVE_WINDOW_HINT : undefined;
+
+/** A one-line not-found `what`, the active-window hint after it in a parenthesis when there is one (ACTIVE_WINDOW_HINT's doc). */
+export const withActiveWindowHint = (what: string, hint: string | undefined): string => (hint === undefined ? what : `${what} (${hint})`);
 
 /**
  * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no

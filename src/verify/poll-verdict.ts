@@ -1,5 +1,6 @@
-import type { Rect } from '../adapters/types.js';
+import type { Rect, UiNode } from '../adapters/types.js';
 import { PollMiss } from '../ui-tree/read-tree.js';
+import { activeWindowHint, withActiveWindowHint } from '../ui-tree/standing.js';
 import { formatSeconds } from '../util/duration.js';
 import type { MeasuredFrame } from './capture.js';
 
@@ -73,7 +74,13 @@ export const verdictToPoll = (verdict: PollVerdict | undefined): { detail?: stri
   return verdict?.detail === undefined ? undefined : new PollMiss(verdict.detail);
 };
 
-/** "not found within N s" (formatSeconds), plus the last tree-read error when there was one. */
-export const notFound = (timeoutMs: number, readError?: Error): string =>
-  `not found within ${formatSeconds(timeoutMs)}` +
-  (readError === undefined ? '' : ` (last UI tree read failed: ${readError.message})`);
+/**
+ * Every assert's "not found within N s" (formatSeconds), of the poll's last round: the last tree-read error when that
+ * read failed; else, when the last tree read lists the active window only, the active-window hint
+ * (ui-tree/standing.ts#ACTIVE_WINDOW_HINT — the element may lie beneath a sheet or a dialog the tree does not list),
+ * in the same place.
+ */
+export const notFound = (timeoutMs: number, last: { readError?: Error; lastTree?: UiNode }): string => {
+  const headline = `not found within ${formatSeconds(timeoutMs)}`;
+  return last.readError !== undefined ? `${headline} (last UI tree read failed: ${last.readError.message})` : withActiveWindowHint(headline, activeWindowHint(last.lastTree));
+};

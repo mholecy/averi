@@ -158,9 +158,19 @@ export class AmbiguityRefusal extends Error {}
  *
  * Same message shape as every poll timeout (pollTimeoutMessage); same
  * `Error` to every caller that does not ask — the MCP tools print the
- * message unchanged.
+ * message unchanged. `windowHint` is the active-window hint its message
+ * carries (ui-tree/standing.ts#ACTIVE_WINDOW_HINT), when it carries one: for
+ * the engine's one-line skip, "(not present)", which says it after the words
+ * (`absenceError` sets it, from the caller that worded the message).
  */
-export class ElementNotFoundError extends Error {}
+export class ElementNotFoundError extends Error {
+  constructor(
+    message: string,
+    readonly windowHint?: string,
+  ) {
+    super(message);
+  }
+}
 
 export interface ResolveOptions {
   ambiguous: Ambiguity;
@@ -342,10 +352,12 @@ export interface WaitEvidence {
  * ElementNotFoundError when no round matched the target, at least one tree
  * was read and the last read succeeded; a plain Error with the same
  * message otherwise — the element was seen, or nobody could see the screen
- * at the end (see ElementNotFoundError). The caller words the message.
+ * at the end (see ElementNotFoundError). The caller words the message, and
+ * hands the active-window hint it put in it (`windowHint`), which the absence
+ * carries for a one-line reader.
  */
-export function absenceError(message: string, seen: WaitEvidence): Error {
-  return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message) : new Error(message);
+export function absenceError(message: string, seen: WaitEvidence, windowHint?: string): Error {
+  return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message, windowHint) : new Error(message);
 }
 
 /**
@@ -389,10 +401,9 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
         `(the tree source lists the active window alone) — ${presentedRemedy('it', alone)}`,
     );
   }
-  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint ?? windowHint), {
-    sighted: false,
-    ...outcome,
-  });
+  // The zero-area hint, which says the target IS in the tree, claims the line first: the absence then carries no window hint.
+  const hint = zeroHint ?? windowHint;
+  return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, hint), { sighted: false, ...outcome }, zeroHint === undefined ? windowHint : undefined);
 }
 
 /**

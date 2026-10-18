@@ -7,6 +7,9 @@ import { ACTIVE_WINDOW_HINT, presentedRemedy, presentedStop } from '../../src/ui
 import { ElementNotFoundError, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { FakeAdapter } from '../helpers/fake.js';
+import { formatSeconds } from '../../src/util/duration.js';
+import { Verifier } from '../../src/verify/assert.js';
 
 // ANDROID'S PRESENTED WINDOW (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md):
 // `uiautomator dump` lists the ACTIVE window only, so beneath an AlertDialog or a ModalBottomSheet the screen's targets
@@ -250,5 +253,49 @@ describe('a target not in a uiautomator tree that marks no presented window: the
     const message = failureOf(play(RULES, [row, row, row]), 'id:"lab.form-picker.name"').message;
     expect(message).toContain('element never appeared in the tree');
     expect(message).not.toContain(ACTIVE_WINDOW_HINT);
+  });
+});
+
+// Round 7 (ADR 0018 decision 5, refined): every assert's "not found within …" on such a tree carries the hint too, in
+// the place its last read's error would take (verify/poll-verdict.ts#notFound) — the tree asserts', the rect
+// assert's and the pixel asserts'. Not a found element's wrong content, not a failed last read, not a tree listing
+// every window.
+describe('an assert whose element is not in a uiautomator tree: the active-window hint after "not found within …"', () => {
+  const verifier = (tree: UiNode) => new Verifier(new FakeAdapter({ sheet: tree }, 'sheet'), { pollMs: 2, timeoutMs: 30 });
+  const NOT_FOUND = `not found within ${formatSeconds(30)}`;
+  const WITH_HINT = `${NOT_FOUND} (${ACTIVE_WINDOW_HINT})`;
+  const name = { id: 'lab.form-picker.name' };
+
+  it('form-picker: the element, text, rect and color asserts each say it once', async () => {
+    const v = verifier(capture('form-picker'));
+    expect((await v.assert({ element: name })).detail).toBe(WITH_HINT);
+    expect((await v.assert({ element: name, text: 'Name' })).detail).toBe(WITH_HINT);
+    expect((await v.assert({ element: name, rect: { x: 0, w: 100, h: 10, frameWidth: 360 } })).detail).toBe(WITH_HINT);
+    expect((await v.assert({ element: name, color: { expected: '#FFFFFF' } })).detail).toBe(WITH_HINT);
+  });
+
+  it('not a found element whose content differs, nor an absent assert, which passes', async () => {
+    const v = verifier(capture('form-picker'));
+    const wrong = await v.assert({ element: { id: 'lab.form-picker.country.AL' }, text: 'Austria' });
+    expect(wrong.detail).toBe('element found but content was: "Albania"');
+    expect((await v.assert({ element: name, absent: true })).pass).toBe(true);
+  });
+
+  it('not on a tree listing every window', async () => {
+    const { activeWindowOnly: _, ...everyWindow } = capture('form-picker');
+    expect((await verifier(everyWindow).assert({ element: name })).detail).toBe(NOT_FOUND);
+  });
+
+  it('not when the last read failed: the read error takes its place', async () => {
+    const tree = capture('form-picker');
+    let reads = 0;
+    const fake = new FakeAdapter({ sheet: tree }, 'sheet');
+    const uiTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (reads++ > 0) throw new Error('adb gone');
+      return uiTree();
+    };
+    const detail = (await new Verifier(fake, { pollMs: 2, timeoutMs: 30 }).assert({ element: name })).detail;
+    expect(detail).toBe(`${NOT_FOUND} (last UI tree read failed: adb gone)`);
   });
 });

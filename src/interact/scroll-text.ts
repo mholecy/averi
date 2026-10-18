@@ -8,7 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { cutByRemedy, cutRemedy, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf, withActiveWindowHint } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
@@ -339,13 +339,16 @@ const pointText = (p: Point): string => `(${p.x},${p.y})`;
  * the caller spelled it (resolve.ts#describeTarget).
  */
 export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
-  const { message, absence } = failureText(o, describe);
+  const { message, absence, windowHint } = failureText(o, describe);
   const full = `${message}${endTurnText(o.endTurn)}${detentText(o.detent)}`;
-  return absence === undefined ? new Error(full) : absenceError(full, absence);
+  return absence === undefined ? new Error(full) : absenceError(full, absence, windowHint);
 }
 
-/** `scrollFailure`'s sentence, one case per kind, and the evidence of absence for the kinds judged by it (`covered`, `bound`). */
-function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): { message: string; absence?: WaitEvidence } {
+/**
+ * `scrollFailure`'s sentence, one case per kind, the evidence of absence for the kinds judged by it (`covered`,
+ * `bound`), and the active-window hint the sentence carries (the `absent` shortfall's).
+ */
+function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): { message: string; absence?: WaitEvidence; windowHint?: string } {
   switch (o.kind) {
     case 'stuck': {
       const { short, viewport } = o;
@@ -511,7 +514,11 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         o.presented === undefined
           ? ''
           : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedRemedy('it', o.presented.layer)}`;
-      return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
+      return {
+        message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`,
+        absence: o.evidence,
+        windowHint: o.short.of === 'absent' ? o.short.windowHint : undefined,
+      };
     }
   }
 }
@@ -643,7 +650,7 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':
-      return `element never appeared in the tree${short.windowHint !== undefined ? ` (${short.windowHint})` : ''}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
+      return `${withActiveWindowHint('element never appeared in the tree', short.windowHint)}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':

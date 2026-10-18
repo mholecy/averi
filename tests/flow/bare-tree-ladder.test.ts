@@ -12,6 +12,7 @@ import { parseConfig } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
 import { EngineSession } from '../../src/flow/launch.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { parseDump } from '../helpers/android-dumps.js';
@@ -479,6 +480,8 @@ flows:
     ]);
   });
 
+  // The rendered tree is a uiautomator dump, which lists the active window only: in the bare note's place, the
+  // active-window hint every not-found on such a tree carries (ui-tree/standing.ts#ACTIVE_WINDOW_HINT).
   it('wait: for a present element on the decor gets the bare note too; one rendered tree after it clears the note', async () => {
     const bare = timeline(() => ANDROID_DECOR);
     expect((await failure(FlowEngine.run(ABSENT_CFG, bare.fake, FAST, { flow: 'wait_login' }))).message.split('\n')[1]).toMatch(
@@ -486,7 +489,7 @@ flows:
     );
     const rendered = timeline((ms) => (ms < 20 ? ANDROID_DECOR : ANDROID_HOME));
     const error = await failure(FlowEngine.run(ABSENT_CFG, rendered.fake, FAST, { flow: 'wait_login' }));
-    expect(error.message).toMatch(/^Timed out after 60ms waiting for element id:"login_screen"\n\nSteps that ran before the failure:/);
+    expect(error.message.startsWith(`Timed out after 60ms waiting for element id:"login_screen"\n  (${ACTIVE_WINDOW_HINT})\n\nSteps that ran before the failure:`)).toBe(true);
   });
 
   it('wait: on an id under iOS idb, a bare last tree gets the bare note — not the idb container-id hint, which is about what a rendered tree held', async () => {

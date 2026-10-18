@@ -12,6 +12,7 @@ import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
+import { activeWindowHint, withActiveWindowHint } from '../ui-tree/standing.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
@@ -381,6 +382,9 @@ const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
  * absent interstitial. Only that line: a FlowError's later lines are its
  * trace, and a skip line is one line.
  */
+/** A wait's probable cause, asked at its timeout of the last tree it read (undefined when it read none). */
+type TimeoutHint = (lastTree: UiNode | undefined) => string | undefined;
+
 const skipReason = (e: unknown): string => {
   const readError = readErrorLine(errorMessage(e));
   return readError === undefined ? headline(e) : `${headline(e)} ${readError}`;
@@ -1244,7 +1248,7 @@ export class FlowEngine {
   private async runWait(spec: StepPayload<'wait'>): Promise<void> {
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.waitTimeoutMs;
     const cond: Condition = spec.element ? { element: spec.element } : { state: spec.state };
-    await this.waitFor(cond, timeoutMs, describeCondition(cond), this.waitHint(cond));
+    await this.waitFor(cond, timeoutMs, describeCondition(cond), (lastTree) => this.waitHint(cond, lastTree));
     this.log('wait', describeCondition(cond));
   }
 
@@ -1252,12 +1256,13 @@ export class FlowEngine {
    * The engine's half of `waitTimeoutHint`: platform and tree-source kind
    * both come from the ADAPTER, never from `app.ios.treeSource` — why is on
    * `DeviceAdapter.treeSourceKind` (adapters/types.ts). An adapter that does
-   * not say (unknown kind) gets no hint. Only the `wait:` step asks;
+   * not say (unknown kind) gets no idb hint. `lastTree` is the wait's last
+   * tree read, which the active-window hint is a fact of. Only the `wait:` step asks;
    * ensureStateLadder's state waits and branch polls describe conditions a single
    * id does not own.
    */
-  private waitHint(cond: Condition): string | undefined {
-    return waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind);
+  private waitHint(cond: Condition, lastTree: UiNode | undefined): string | undefined {
+    return waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind, lastTree);
   }
 
   /**
@@ -1397,8 +1402,11 @@ export class FlowEngine {
         // its headline, now because it is not ElementNotFoundError — even
         // when a target that did not come back is its `cause`: something was
         // sent.
+        // An absence on a tree that lists the active window only says so after "(not present)", as its message does
+        // (ui-tree/standing.ts#ACTIVE_WINDOW_HINT): the interstitial may be beneath a sheet the tree does not list.
         const absent = e instanceof ElementNotFoundError && !sighted;
-        this.log('optional', `skipped ${tap ? describeElementSpec(tap.spec) : 'step'} (${absent ? 'not present' : skipReason(e)})`);
+        const reason = absent ? withActiveWindowHint('(not present)', e.windowHint) : `(${skipReason(e)})`;
+        this.log('optional', `skipped ${tap ? describeElementSpec(tap.spec) : 'step'} ${reason}`);
       }
     }
   }
@@ -1502,7 +1510,7 @@ export class FlowEngine {
    * 2026-10-08). A timeout whose last tree could not decide the condition
    * says so beneath its headline (pollUntil), in place of `hint`.
    */
-  private async waitFor(cond: Condition, timeoutMs: number, what: string, hint?: string): Promise<void> {
+  private async waitFor(cond: Condition, timeoutMs: number, what: string, hint?: TimeoutHint): Promise<void> {
     await this.pollUntil(
       async (tree) => pollOnVerdict(await this.evaluate(cond, tree), true),
       timeoutMs,
@@ -1518,7 +1526,8 @@ export class FlowEngine {
    * this adds is the flow's verdict on a timeout — an exception, worded as
    * the step the caller was waiting on, with the read error beneath it so a
    * genuinely broken device stays diagnosable. A caller's `hint` (a probable
-   * cause it knows, see waitTimeoutHint) is handed over as is — whether it
+   * cause it knows of the wait's last tree read, see waitTimeoutHint) is
+   * asked at the timeout and handed over as is — whether it
    * shows beneath a failed read is pollTimeoutMessage's rule, not this one's.
    *
    * Since 2026-10-08 the predicate is three-valued like the conditions it
@@ -1539,12 +1548,12 @@ export class FlowEngine {
     fn: (tree: UiNode) => Promise<T | undefined | typeof Undecided>,
     timeoutMs: number,
     what: string,
-    hint?: string,
+    hint?: TimeoutHint,
   ): Promise<T> {
     const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
     if (!outcome.timedOut) return outcome.value;
     const bareNote = outcome.undecidedTree === undefined ? undefined : bareTimeoutNote(outcome.undecidedTree);
-    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? hint));
+    throw new Error(pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? hint?.(outcome.lastTree)));
   }
 
   /**
@@ -1637,9 +1646,18 @@ export const idbContainerIdHint = (id: string): string =>
   'If the screen is showing, set app.ios.treeSource: wda in averi.yaml, or wait on a button/row id idb does show';
 
 /**
- * The probable cause a `wait:` timeout may name, or nothing. Fires only when
- * every part holds: the device is iOS, its tree source is idb, and the step
- * waited for an element to be present by its ID ALONE. Only then is the
+ * The probable cause a `wait:` timeout may name, or nothing — only for a
+ * step that waited for an element to be PRESENT (`absent` waits are about
+ * something that stayed; a state/any/all condition is not one target's
+ * story). Two causes, each a fact about the tree source, on platforms that
+ * never meet:
+ * - the last tree read lists the active window only (uiautomator): the
+ *   active-window hint (ui-tree/standing.ts#activeWindowHint, which decides
+ *   it for every not-found reply) — the element may lie beneath a sheet or
+ *   a dialog the tree does not list;
+ * - idb's container id, which fires only when every part holds: the device
+ *   is iOS, its tree source is idb, and the step waited for the element by
+ *   its ID ALONE. Only then is the
  * timeout a statement about the id: findBySpec ANDs every selector field
  * (ui-tree/selectors.ts conditionsOf), so `{ id, text }` can time out with
  * the id in every read and the text the one that never matched — and the
@@ -1649,15 +1667,18 @@ export const idbContainerIdHint = (id: string): string =>
  * Everything else stays silent: `absent` waits are about something that
  * stayed, text/label selectors are not what idb drops, and a state/any/all
  * condition is not one id's story. Pure — the engine supplies the adapter's
- * platform and kind (waitHint).
+ * platform and kind, and the wait's last tree (waitHint).
  */
 export function waitTimeoutHint(
   cond: Condition,
   platform: Platform,
   treeSource: IosTreeSourceKind | undefined,
+  lastTree?: UiNode,
 ): string | undefined {
-  if (platform !== 'ios' || treeSource !== 'idb') return undefined;
   if (cond.element === undefined || cond.absent) return undefined;
+  const windowHint = activeWindowHint(lastTree);
+  if (windowHint !== undefined) return windowHint;
+  if (platform !== 'ios' || treeSource !== 'idb') return undefined;
   const spec = cond.element;
   const fields = SELECTOR_FIELDS.filter((f) => spec[f] !== undefined);
   if (fields.length !== 1 || fields[0] !== 'id' || spec.id === undefined) return undefined;

@@ -349,13 +349,14 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
-  it('tap and the troubleshooting reference quote the active-window hint the tap\'s, fill\'s and scroll_until\'s not-found carry on Android with no window marked presented — not the asserts\' nor a flow\'s wait: steps', async () => {
+  it('tap, assert and the troubleshooting reference quote the active-window hint every not-found carries on Android with no window marked presented — the waits\', scroll_until\'s, the asserts\', a flow\'s wait: and an optional step\'s skip', async () => {
     const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
     expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it (on every such tap or fill wait on Android, unless the target matched only 0×0 nodes, whose hint takes its place:`);
     expect(description('tap')).toContain(
-      'and so does a flow\'s tap, fill and scroll_until step (the same waits); a skipped optional tap\'s line reads "(not present)", without the hint; a flow\'s wait: steps and the asserts\' "not found" do not.',
+      'and so do a flow\'s tap, fill and scroll_until steps (the same waits), a flow\'s wait: on an element (beneath its "Timed out …"), every assert\'s "not found within …" (after it) and a skipped optional step\'s line ("(not present) (…)"): every reply that says a target is not in such a tree, once.',
     );
-    expect(TROUBLESHOOTING).toContain(`\`element never appeared in the tree\` carries \`(${ACTIVE_WINDOW_HINT})\``);
+    expect(description('assert')).toContain(`On Android an assert whose element is not in the tree fails "not found within … (${ACTIVE_WINDOW_HINT})"`);
+    expect(TROUBLESHOOTING).toContain(`\`element never appeared in the tree\`, every assert's \`not found within …\`, a flow's \`wait:\` on an element and an optional step's \`(not present)\` carry \`(${ACTIVE_WINDOW_HINT})\``);
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
