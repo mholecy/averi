@@ -306,7 +306,7 @@ describe('the turn-back case of a target a source does not list', () => {
     expect(visibilityCases({ ...cell, targets: [{ ...t, listed: { idb: false, wda: true } }] }, 'ios').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/under idb F is not in the tree, so no turn is asked there/);
     expect(visibilityCases({ ...cell, targets: [{ ...t, listed: { wda: true } }] }, 'ios').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/^turn back: /);
     // On Android no turn is asked of any turn-back case (ADR 0021, 2026-10-18): judgeAndroidTurn, below.
-    expect(visibilityCases(cell, 'android').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/^no turn on uiautomator \(ADR 0021\): .* fails loudly naming down after at most 2 unmoved strokes$/);
+    expect(visibilityCases(cell, 'android').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/^no turn on uiautomator \(ADR 0021\): .* fails loudly naming down after at most 2 unmoved strokes; under uiautomator F is not in the tree, so no turn is asked there, only an honest reply$/);
   });
 });
 
@@ -381,6 +381,12 @@ describe('judgeAndroidTurn: no turn on uiautomator, a loud failure naming the wa
   it('the wrong direction named, or none: not ok', () => {
     expect(judgeAndroidTurn(c, [failed(4, 2, 'down'), TAP], after(away, 4), launched).outcome).toBe('MISMATCH');
     expect(judgeAndroidTurn(c, ['ERROR scroll_until failed after 4 swipes (the last 2, swiping down, did not change the screen) — element never appeared in the tree', TAP], after(away, 4), launched).outcome).not.toBe('ok');
+  });
+
+  it('a turn — a stroke that brought it closer — then a loud failure naming the way: not ok (no turn is the rule on uiautomator)', () => {
+    const turned = [...away, stroke(2488, 1984, 'list')];
+    const v = judgeAndroidTurn(c, [failed(4, 1), TAP], after(turned, 4), launched);
+    expect(v.outcome).not.toBe('ok');
   });
 
   it('a claim the app\'s strokes contradict stays its own mismatch', () => {
