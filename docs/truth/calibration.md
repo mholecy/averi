@@ -49,7 +49,7 @@ open note on the working tree. See the script for the verdicts.
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
 | TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
-| L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | b71cbbb → d43df5d | CALIBRATED |
+| L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | b71cbbb → d43df5d | CALIBRATED (partial: AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) open) |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | open | working tree | OPEN-RED |
@@ -902,7 +902,7 @@ form-shared-id: a pristine form whose five fields and their floating titles (eac
 
 A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.ts, by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability). own-parts' N draws Payee’s name (U+2019); asked `ocr` for that string the recognizer reads Payee's name: at 92f2a46 the assert fails on the reading (≠), at 35321b4 it passes, naming the fold (’ vs '). text-sample's E draws the same string (16 pt, both platforms), and its A the note's Slovak `Prihlásiť sa`, which the same fix folds (a combining mark off): read `Prihlásit sa`, red at 92f2a46 and green at 35321b4 alike. Its neighbours that the fold does not reach are lab notes OC1 (Ľ read L', ĺ read í) and OC2 (iOS: an NBSP thousands separator read as nothing), KNOWN in text.known.ts.
 
-## L1: CALIBRATED
+## L1: CALIBRATED (partial: AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) open)
 
 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md — defect: `without "close it first"|swiped \d+× beneath a presented layer`
 
@@ -941,7 +941,7 @@ A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.t
   - ok android-averi_lab-api33/sheet-medium.xml D tap — ERROR Timed out after 5000ms: element id:"lab.sheet-medium.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a
   - ok android-averi_lab-api33/sheet-medium.xml D scroll_until — ERROR scroll_until id:"lab.sheet-medium.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal 
 
-Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment "Android's presented window"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out "to appear" without "close it first", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's "not found" is vacuous), and form-picker's fully expanded sheet as ADR 0018's residual 18 (tests/differential/golden/forms.known.ts).
+Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment "Android's presented window"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out "to appear" without "close it first", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's "not found" is vacuous). Partial: form-picker's fully expanded sheet dumps no scrim and is not marked — its six tap and scroll_until rows stay KNOWN filed as this note, open (tests/differential/golden/forms.known.ts), not as a residual: ADR 0018's residual 18 awaits the owner.
 
 ## L2: OPEN-RED
 
