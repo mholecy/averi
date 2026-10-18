@@ -1,5 +1,5 @@
-import { MIN_TAP_PIECE_FRACTION } from '../../src/ui-tree/draw-order.js';
-import { touchesSince, type LiveVerdict } from './live-visibility.js';
+import { minTapPiece as minPieceOn } from '../../src/ui-tree/draw-order.js';
+import { touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
 import { claimsDone, isError, replyKind } from './replies.js';
 import type { LabState, Rect } from './schema.js';
 
@@ -34,8 +34,8 @@ export const holds =
 export const underBar = (field: Rect | undefined | null, bar: Rect | undefined | null): number =>
   field == null || bar == null ? 0 : Math.max(0, Math.min(field.y + field.height, bar.y + bar.height) - Math.max(field.y, bar.y));
 
-/** The least piece a tap may be aimed at on the app's screen (src/ui-tree/draw-order.ts, as averi computes it). */
-export const minTapPiece = (s: LabState): number => Math.round(MIN_TAP_PIECE_FRACTION * Math.min(s.screen.width, s.screen.height));
+/** The least piece a tap may be aimed at on the app's screen: averi's own formula (src/ui-tree/draw-order.ts#minTapPiece). */
+export const minTapPiece = (s: LabState): number => minPieceOn(s.screen);
 
 /**
  * k3: fill note under the keyboard (Android: no dismissal configured — `back` hides it). idb cannot hide the keyboard:
@@ -70,7 +70,7 @@ export function judgeNoteFill(s: LabState, replies: string[], source: string, la
 export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string, launched: LabState): LiveVerdict {
   const submits = (s.submits ?? []).length;
   const touches = touchesSince(s, launched);
-  const strokes = `${touches.length} stroke(s) the app logged${touches.length === 0 ? '' : ` at ${touches.map((t) => `(${t})`).join(' ')}`}`;
+  const strokes = `${touches.length} stroke(s) the app logged${touches.length === 0 ? '' : ` at ${touchPointsText(touches)}`}`;
   if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); ${strokes}; averi: ${short(reply)}` };
   const phone = s.frames.phone;
   const bar = s.frames['submit.bar'];

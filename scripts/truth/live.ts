@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { holds, judgeNoteFill, judgePhoneScroll, short, valueOf } from './live-forms.js';
-import { judgeDismissal, visibilityCases, type LiveVerdict } from './live-visibility.js';
+import { judgeDismissal, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
@@ -121,7 +121,7 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-interface Case {
+interface Case extends RunsUnder {
   id: string;
   group: 'forms' | 'visibility' | 'dismissal';
   cell: string;
@@ -132,8 +132,6 @@ interface Case {
   keyboard?: true;
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
-  /** The tree sources it runs under (`--sources`' every one when unset): live-visibility.ts's carry case, WDA's alone. */
-  sources?: readonly string[];
   calls: Call[];
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state

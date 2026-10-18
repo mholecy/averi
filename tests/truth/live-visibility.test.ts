@@ -181,7 +181,7 @@ describe('visibilityCases', () => {
   });
 });
 
-describe('the long-list carry case (ADR 0021 decision 4, LV5): Row 30 of sheet-long-list under WDA', () => {
+describe('the long-list carry case (LV5): Row 30 of sheet-long-list under WDA', () => {
   // The table: 0,62 402x812, 40 rows of 64 pt; Row 30 at content y 1920, whole over offsets 1172–1748.
   const table = (over: Partial<LabState> = {}) => state({ frames: {}, scrollViews: { list: { x: 0, y: 62, width: 402, height: 812 } }, offsets: undefined, ...over });
   const launched = table();
@@ -214,7 +214,7 @@ describe('the long-list carry case (ADR 0021 decision 4, LV5): Row 30 of sheet-l
     expect(judgeCarry(`${reply}. It was turned round 1 time: …`, said, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/the reply 1/) });
     expect(judgeCarry(reply, said, launched).outcome).toBe('ok');
   });
-  it('the turns a reply says: the fling\'s count, and ADR 0021\'s end turn as one', () => {
+  it('the turns a reply says: the fling\'s count, and the end turn as one', () => {
     expect(turnsSaid('ERROR … It was turned round 3 times: a swipe carried it past')).toBe(3);
     expect(turnsSaid('ERROR … It was turned round 1 time: a swipe')).toBe(1);
     expect(turnsSaid('Element … fully visible after 6 swipes; 2 swipes up, the last of which did not move it — … so averi turned down, as the tree places')).toBe(1);
@@ -417,7 +417,7 @@ describe('each rule names its class (what the live KNOWN pins)', () => {
     expect(judgePresentedScroll(p, ['ERROR'], touch, state()).outcome).toBe('ok');
     // … but over a target in none (L1's alert, its half sheet) any touch is a stroke on the layer
     const none = { tag: 'A', view: undefined, platform: 'android' as const };
-    expect(judgePresentedScroll(none, ['ERROR'], touch, state())).toMatchObject({ outcome: 'MISMATCH', cls: 'presented-stroke' });
+    expect(judgePresentedScroll(none, ['ERROR'], touch, state())).toMatchObject({ outcome: 'MISMATCH', cls: 'presented-stroke', why: expect.stringMatching(/: 1 touch\(es\) at \(540,1776\) — averi: ERROR$/) });
     expect(judgePresentedScroll(none, ['ERROR close it first'], state(), state()).outcome).toBe('ok');
     expect(judgeDismissal('vs', 'Tapped', 'wda', state({ focus: null }), state({ focus: 'postcode' })).cls).toBe('dismissal');
     const field = (value: string) => ({ value, focused: false, error: null });
@@ -450,27 +450,27 @@ describe('judgeAndroidTurn: no turn on uiautomator, a loud failure naming the wa
   it('the live measure: 4 swipes, the last 2 unmoved, no turn, `up` named — ok (judgeScroll alone: R-direction)', () => {
     const s = after(away, 4);
     expect(judgeScroll(c, [failed(4, 2), TAP], s, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction' });
-    expect(judgeAndroidTurn(c, [failed(4, 2), TAP], s, launched)).toMatchObject({ outcome: 'ok', kind: 'refused', why: expect.stringMatching(/^no turn on uiautomator \(ADR 0021\): 4 swipes, the last 2 unmoved, failed naming direction: "up"/) });
+    expect(judgeAndroidTurn(c, [failed(4, 2), TAP], s, launched, s)).toMatchObject({ outcome: 'ok', kind: 'refused', why: expect.stringMatching(/^no turn on uiautomator \(ADR 0021\): 4 swipes, the last 2 unmoved, failed naming direction: "up"/) });
   });
 
   it('more unmoved strokes than the two-stroke stop: not ok', () => {
-    expect(judgeAndroidTurn(c, [failed(5, 3), TAP], after(away, 5), launched).outcome).toBe('MISMATCH');
+    expect(judgeAndroidTurn(c, [failed(5, 3), TAP], after(away, 5), launched, after(away, 5)).outcome).toBe('MISMATCH');
   });
 
   it('the wrong direction named, or none: not ok', () => {
-    expect(judgeAndroidTurn(c, [failed(4, 2, 'down'), TAP], after(away, 4), launched).outcome).toBe('MISMATCH');
-    expect(judgeAndroidTurn(c, ['ERROR scroll_until failed after 4 swipes (the last 2, swiping down, did not change the screen) — element never appeared in the tree', TAP], after(away, 4), launched).outcome).not.toBe('ok');
+    expect(judgeAndroidTurn(c, [failed(4, 2, 'down'), TAP], after(away, 4), launched, after(away, 4)).outcome).toBe('MISMATCH');
+    expect(judgeAndroidTurn(c, ['ERROR scroll_until failed after 4 swipes (the last 2, swiping down, did not change the screen) — element never appeared in the tree', TAP], after(away, 4), launched, after(away, 4)).outcome).not.toBe('ok');
   });
 
   it('a turn — a stroke that brought it closer — then a loud failure naming the way: not ok (no turn is the rule on uiautomator)', () => {
     const turned = [...away, stroke(2488, 1984, 'list')];
-    const v = judgeAndroidTurn(c, [failed(4, 1), TAP], after(turned, 4), launched);
+    const v = judgeAndroidTurn(c, [failed(4, 1), TAP], after(turned, 4), launched, after(turned, 4));
     expect(v.outcome).not.toBe('ok');
   });
 
   it('a claim the app\'s strokes contradict stays its own mismatch', () => {
     const moved = [...away, stroke(2488, 2600, 'list')];
-    expect(judgeAndroidTurn(c, [failed(3, 2), TAP], after(moved, 3), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'unchanged-claim' });
+    expect(judgeAndroidTurn(c, [failed(3, 2), TAP], after(moved, 3), launched, after(moved, 3))).toMatchObject({ outcome: 'MISMATCH', cls: 'unchanged-claim' });
   });
 
   it('the case on Android is judged so; on iOS it keeps the turn judge', () => {

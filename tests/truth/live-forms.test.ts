@@ -41,6 +41,7 @@ describe('k7: scroll_until phone — the stop ok, "fully" overstating by what th
   const { replies, launched, state } = k('k7');
   it('the record: ok, the 18 px under the bar said', () => {
     expect(judgePhoneScroll(state, replies, 'uiautomator', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/18 px of it under the bar.*— "fully" overstates by 18 px \(ADR 0013 residual\)$/) });
+    expect(judgePhoneScroll(state, replies, 'uiautomator', launched).why).toContain('; 1 stroke(s) the app logged at (540,1034): ');
   });
   it('a submit: MISMATCH', () => {
     expect(judgePhoneScroll({ ...state, submits: [{ at: 1 }] } as LabState, replies, 'uiautomator', launched).outcome).toBe('MISMATCH');

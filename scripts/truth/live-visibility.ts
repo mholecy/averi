@@ -92,9 +92,11 @@ export function strokesSince(state: Pick<LabState, 'strokes'>, launched: Pick<La
 /** Where each touch since the launch began (the app's `touch` events, `x,y`) — a stroke's touch-down, a tap's point. */
 export const touchesSince = (state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>): string[] =>
   state.events.slice(launched.events.length).filter((e) => e.kind === 'touch').map((e) => e.tag);
+/** Touches as every summary line words them (touchesSince's `x,y`): `(x,y) (x,y) …` — the one formatter. */
+export const touchPointsText = (ts: readonly string[]): string => ts.map((t) => `(${t})`).join(' ');
 const touchesText = (state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>) => {
   const ts = touchesSince(state, launched);
-  return ts.length === 0 ? 'none' : ts.map((t) => `(${t})`).join(' ');
+  return ts.length === 0 ? 'none' : touchPointsText(ts);
 };
 const eventsText = (es: readonly ProbeEvent[]) => (es.length === 0 ? 'nothing' : es.map((e) => `${e.kind} ${e.tag}`).join(', '));
 const rectText = (r: Rect | undefined | null) => (r === undefined || r === null ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
@@ -339,7 +341,7 @@ export function judgeAndroidTurn(
   replies: readonly string[],
   final: LabState,
   launched: LabState,
-  atStop: LabState = final,
+  atStop: LabState,
 ): LiveVerdict {
   const v = judgeScroll(c, replies, final, launched, atStop);
   if (v.outcome === 'ok' || (v.cls !== 'R-direction' && v.cls !== 'not-reached')) return v;
@@ -370,7 +372,7 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   if (kind === 'visible') return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
   if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
   if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
-  if (touched.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked the presented layer over a target in no scroll view: ${touched.length} touch(es) at ${touched.map((t) => `(${t})`).join(' ')} — averi: ${short(scroll)}`, app };
+  if (touched.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked the presented layer over a target in no scroll view: ${touched.length} touch(es) at ${touchPointsText(touched)} — averi: ${short(scroll)}`, app };
   return { outcome: 'ok', kind, why: `refused, nothing moved or fired: ${short(scroll)}`, app };
 }
 
@@ -381,7 +383,13 @@ export interface VisibilityCall {
   args: Record<string, unknown>;
 }
 
-export interface VisibilityCase {
+/** Where a live case runs: the one declaration of a case's tree sources, live.ts's cases and this module's alike. */
+export interface RunsUnder {
+  /** The tree sources the case runs under (`--sources`' every one, the platform's, when unset): the carry case is WDA's alone. */
+  sources?: readonly string[];
+}
+
+export interface VisibilityCase extends RunsUnder {
   id: string;
   cell: string;
   says: string;
@@ -393,8 +401,6 @@ export interface VisibilityCase {
    * the scroll beneath a presented layer.
    */
   asks?: TapAsk | StopAsk;
-  /** The tree sources the case runs under (all of the platform's when unset): the carry case is WDA's alone. */
-  sources?: readonly string[];
   /**
    * `source`: the tree source the case ran under — a target its static capture's tree of that source did not list
    * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (live.ts reads one
@@ -517,7 +523,7 @@ export function carryRow(state: LabState): LabState {
 /**
  * The turns of a scroll's strokes over `clip` by the app's touch log: each touch-down's half of the clip — the lower
  * half a stroke `down` (content up), the upper a stroke `up` — and every change from one to the other a turn. The app
- * merges strokes sent while the table still moves into one (live-visibility.ts's caveats), so its strokes undercount
+ * merges strokes sent while the table still moves into one (the oracle's caveats in this module's doc, the first), so its strokes undercount
  * the turns; its touch-downs do not.
  */
 export function touchTurns(state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>, clip: Rect): number {
