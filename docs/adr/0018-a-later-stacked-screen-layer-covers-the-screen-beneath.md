@@ -752,6 +752,13 @@ else, and knew no fact of its own.
      only beside a landscape cutout, letterboxed or pillarboxed in compat mode, or as a split screen's lower window; a
      dialog laid in the middle floats off both. Named "a dialog is presented over it — close it first"; `scroll_until`'s
      stop adds "a swipe would land on the dialog".
+     **A departure from round 5's recorded plan** ("One presentation module" above, and `byUiautomator`'s doc then:
+     "a window smaller than the screen"): the parser has no screen size. The adapter's `wm size` is memoized as a
+     pending read (viewport-memo.ts) with no answer to peek at before a tree's first read; awaiting it would add an adb
+     call before the first dump and make the mark depend on which verb read first. Floating off both edges needs no
+     screen size; first written as "not anchored at the origin" (either axis), the review of round 6 found that it
+     marked an app window offset on one axis (the lab's plain screen shifted 120 px right read as a dialog). Where the
+     window facts are read moved too, from the adapter the plan named to the parser (decision 2: the scrim's `clickable`).
    - `screen` — a full-screen window whose content lays a SCRIM above a SHEET: some node's child clickable, labelled
      and childless, spanning the window's width from its top edge, followed at once by a sibling spanning the width
      to the window's bottom edge from no lower than the scrim's bottom. Named as a presented screen.
