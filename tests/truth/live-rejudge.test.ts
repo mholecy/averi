@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * ios-vis.json and ios-scroll-bounded-wda-2725e76-*.json, round 5's device check) judged again by this checkout's
+ * ios-vis.json and ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check;
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's) judged again by this checkout's
  * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
  * records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not
  * explain, no known case not intermittent ok), no case not known, and the counts of the summary's header.
@@ -36,9 +37,17 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // L1's eight presented scroll cases new and ok, round 6's new cells' cases new — carousel-in-list's C known as LE1,
     // the turn of scroll-collapsing's A as #10's open part
     ['android-vis.json', 'visibility', { cases: 111, ok: 97, loud: 3, mismatches: 11 }],
-    // re-recorded by round 5's device check (src b71cbbb): LE4's and L3's cases and LV3's WDA one ok, struck off; the
-    // text family's 26 taps new; scroll-bounded F's two WDA cases refiled (LV4, LV5)
-    ['ios-vis.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 6, mismatches: 30 }],
+    // re-recorded by round 6's iOS device check (src 11683c3; the forms group run too, judged apart): the presented
+    // refusal cases new (WDA ok, idb residual 6, the blur residual 9), round 6's new cells' cases new (carousel-in-list
+    // C under idb LE2), the long-list carry case new (LV6), LV4's turn now `visible` (also)
+    ['ios-vis.json', 'visibility,dismissal', { cases: 311, ok: 242, loud: 6, mismatches: 63 }],
+    // round 6's WDA smoke run of scroll-bounded and sheet-long-list at the same src: LV4 spent its budget (4 strokes up
+    // before the turn), LV5's case ok, the carry case's last stroke away (LV6's also)
+    ['ios-wda-bounded-long-list-11683c3-1.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
+    // its two reruns: LV5's case ok in both (struck off: four ok of four at this src), LV4 turning after 2 unmoved
+    // strokes and reaching F, the carry case R-direction in one, not reached in the other
+    ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
+    ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 16, ok: 14, loud: 1, mismatches: 1 }],
     // two reruns of scroll-bounded under WDA at the same src: LV5's case ok in both (it is intermittent), LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
@@ -79,6 +88,21 @@ describe('live.ts --rejudge over the committed record of round 5\'s src (a --sid
     expect(out).toMatch(/^# Live golden: 133 cases, 108 ok, 5 loud, 20 mismatches \(9 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([a-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual(['k7', ...['alert-dim', 'sheet-medium'].flatMap((c) => ['A', 'B', 'C', 'D'].map((t) => `scroll:${c}.${t}`))].sort());
+    expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a --side run of b71cbbb), round 6\'s iOS device check', () => {
+  // The same cases and lab build as ios-vis.json (src 11683c3), the forms group with them. Its cases not known: two
+  // forms fills whose model lost the IBAN's last digit (lab note 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-
+  // characters.md: a forms case has no KNOWN), and carousel-in-list C under WDA — one sideways stroke inside the
+  // carousel (as at 11683c3) whose fling left C's centre a point outside the carousel, the stop claimed: a calibration,
+  // not HEAD's KNOWN: exit 1, as recorded.
+  it('ios-vis-b71cbbb.json: b4, p2 and WDA\'s carousel C not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudge('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
+    expect(out).toMatch(/^# Live golden: 351 cases, 270 ok, 15 loud, 66 mismatches \(3 not known\), 0 skipped$/m);
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([a-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown.sort()).toEqual(['b4', 'p2', 'scroll:carousel-in-list.C']);
     expect(code).toBe(1);
   });
 });

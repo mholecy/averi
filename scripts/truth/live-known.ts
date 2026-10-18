@@ -23,10 +23,11 @@ import type { ReplyKind } from './replies.js';
  * kind below is what its case's record reads; and the cases with
  * several records, LV2's two flush cases (android-vis.json at HEAD, cal12-*.json: three runs at 9c7885e, two at
  * d043e65), read `visible` in all six — ok in four, a stop-claim in two: the timing moves the outcome, not the kind;
- * LV5's case likewise (ios-vis.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at b71cbbb's src): `refused`
- * where it is not reached, ok in two.
- * A run that reads another kind for a known case fails as NOT known, naming both: refile it (or widen the entry's
- * kind, with the records that show it) only once the note explains that reply too.
+ * LV5's case likewise (round 5's ios-vis.json, since replaced, and ios-scroll-bounded-wda-2725e76-*.json, three runs at
+ * b71cbbb's src): `refused` where it is not reached, ok in two.
+ * A run that reads another kind for a known case fails as NOT known, naming both: refile it, or widen the entry (`also`:
+ * the other rule and kind, with the committed record that reads it — round 6's iOS device check, where the runs of one
+ * commit differ in which shows) only once the note explains that reply too.
  */
 
 const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
@@ -37,13 +38,16 @@ const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
 const LV4 = 'bug:2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md';
-const LV5 = 'bug:2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md';
 const FLING = 'bug:2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md';
 const INVERTED = 'bug:2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md';
 const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
+const LV6 = 'bug:2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md';
+/** Round 6's iOS device check's records at round 6's src (truth/round-6 11683c3): the full run, and the WDA smoke run. */
+const R6_FULL = 'ios-vis.json';
+const R6_SMOKE = 'ios-wda-bounded-long-list-11683c3-1.json';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
 
@@ -57,10 +61,22 @@ export interface KnownLive {
   kind: ReplyKind;
   /** Runs of the same commit differ: an ok run of it is no fix (see the header). */
   intermittent?: true;
+  /**
+   * The other rule and kind a committed record of the same commit reads for the case, each with that record
+   * (docs/truth/live-records): the note explains both, runs differ in which one shows (the header's widening).
+   */
+  also?: readonly Alternative[];
 }
 
-const each = (prefix: string, ids: readonly string[], note: string, cls: VerdictClass, kind: ReplyKind, intermittent?: 'intermittent') =>
-  ids.map((id) => [`${prefix} ${id}`, { note, cls, kind, ...(intermittent !== undefined && { intermittent: true as const }) }] as const);
+/** A rule and kind a known case also fails by, and the committed record that reads it. */
+export interface Alternative {
+  cls: VerdictClass;
+  kind: ReplyKind;
+  record: string;
+}
+
+const each = (prefix: string, ids: readonly string[], note: string, cls: VerdictClass, kind: ReplyKind, intermittent?: 'intermittent', also?: readonly Alternative[]) =>
+  ids.map((id) => [`${prefix} ${id}`, { note, cls, kind, ...(intermittent !== undefined && { intermittent: true as const }), ...(also !== undefined && { also }) }] as const);
 
 export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntries([
   // Android
@@ -92,25 +108,54 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // blur-menu-grouped's C under idb only: WDA lists the menu row W over C's centre and refuses the tap (ok live:
   // refused, nothing fired) — its WDA entry struck off once an ok came to read as fixed (round-4 review S8).
   ...each('ios idb', ['tap:blur-menu-grouped.C'], BLUR, 'tap-claim', 'Tapped'),
+  // Round 6's iOS device check (ios-vis.json at 11683c3): the refusal case beneath a presented layer in no scroll view
+  // (L1's, first run on iOS). idb lists the presented layer alone, the target not in it: a target not yet in the tree is
+  // stroked for (residual 6, as sheet-medium-edges' H and G) — two strokes on the layer, the half sheet and the
+  // backgrounded sheet dismissed by the first (then the target found: "fully visible after 1 swipe") or not.
+  ...each('ios idb', ['scroll:sheet-medium.A', 'scroll:sheet-medium.B', 'scroll:sheet-background.A', 'scroll:sheet-background.B'], NOT_YET_IN_TREE, 'presented-stop', 'visible'),
+  ...each('ios idb', ['scroll:sheet-medium.C', 'scroll:sheet-medium.D', 'scroll:sheet-background.C', 'scroll:sheet-background.D', ...['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`])], NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
+  // idb lists no carousel (LE2 across, as edges.known.ts files C's replayed rows): strokes across the screen's middle,
+  // none moving the carousel, the reply "content exhausted … a layout defect".
+  ...each('ios idb', ['scroll:carousel-in-list.C'], LE2, 'R-direction', 'refused'),
+  ...each('ios idb', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stop', 'visible'),
   // iOS, WDA
   // Round 5's device check (ios-vis.json, src b71cbbb): LE4's and L3's entries (fixed in fecb0b3, 468dc1b: round 5's
   // 0a and 0b) and LV3's WDA one struck off, their cases ok — but LE4's two cases of F, whose strokes now go inside
   // `lower` and still do not reach it, refiled as what they measured:
-  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'refused'),
-  ...each('ios wda', ['scroll:scroll-bounded.F'], LV5, 'not-reached', 'refused', 'intermittent'),
+  // Round 6's device check (11683c3, ADR 0021): averi now turns and says so — but not after one unmoved stroke: 2
+  // strokes up moving nothing before the turn in three runs of four (F then reached, `visible`: ios-vis.json,
+  // ios-wda-bounded-long-list-11683c3-2.json, -3.json), 4 in the other (the budget spent, `refused`: -1.json). Each a
+  // second unmoved stroke not turned back: R-direction still.
+  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'refused', undefined, [{ cls: 'R-direction', kind: 'visible', record: R6_FULL }]),
+  // LV5's `ios wda scroll:scroll-bounded.F` struck off by round 6's iOS device check: ok in all four runs at 11683c3
+  // (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json: `lower` at rest at 915–981, inside F's 884–1000
+  // window), where round 5's src overshot to 1052 in one run of three and to 1006 (F cut, a plain stop) today.
+  // Round 6's long-list carry case (live-visibility.ts#CARRY): the row's parked text read above the screen once the
+  // table has scrolled, turned three times and failed at maxSwipes — not reached (LOUD) in ios-vis.json and -3.json,
+  // the last stroke away from it (R-direction) in -1.json and -2.json.
+  ...each('ios wda', ['carry:sheet-long-list.Row30'], LV6, 'not-reached', 'refused', undefined, [{ cls: 'R-direction', kind: 'refused', record: R6_SMOKE }]),
+  // blur-menu-grouped's C: WDA lists the menu row W over it, so the stop is refused — after three strokes on the blur
+  // (no node: residual 9), "content exhausted … a layout defect".
+  ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
     ...each(`ios ${src}`, ['scroll:scroll-sticky.R.fully'], LE3, 'stop-claim', 'visible'),
     ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.C', 'tap:blur-menu.D', 'tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'], BLUR, 'tap-claim', 'Tapped'),
     ...each(`ios ${src}`, ['tap:blur-menu.W'], MENU, 'tap-refused', 'refused'),
+    // The scroll case beneath the blur (round 6's iOS check, first run on iOS): the overlay with no node unseen, the stop
+    // at once.
+    ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.C', 'scroll:blur-menu.D', 'scroll:blur-menu-grouped.A', 'scroll:blur-menu-grouped.B', 'scroll:blur-menu-grouped.D'], BLUR, 'presented-stop', 'visible'),
   ]),
 ]);
 
 /** The KNOWN entry of a live case, whatever it failed by. */
 export const knownEntry = (platform: string, source: string, id: string): KnownLive | undefined => LIVE_KNOWN[`${platform} ${source} ${id}`];
 
-/** The note a live case's failure is known by — undefined unless it failed by the rule, on the kind of reply, its entry pins. */
+/**
+ * The note a live case's failure is known by — undefined unless it failed by the rule, on the kind of reply, its entry
+ * pins (or one of its `also`).
+ */
 export const knownLive = (platform: string, source: string, id: string, cls: VerdictClass | undefined, kind: ReplyKind | undefined): string | undefined => {
   const e = knownEntry(platform, source, id);
-  return e !== undefined && e.cls === cls && e.kind === kind ? e.note : undefined;
+  return e !== undefined && [e, ...(e.also ?? [])].some((x) => x.cls === cls && x.kind === kind) ? e.note : undefined;
 };
