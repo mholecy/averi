@@ -1,4 +1,4 @@
-import { clips, scrollAxis, scrolls } from './scroll-containers.js';
+import { clips, isScrollViewOf, scrollAxis, scrolls } from './scroll-containers.js';
 import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
@@ -728,7 +728,8 @@ export interface Clips {
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
    * that scroll, at any depth; one of its own rect left out) with theirs, each as scroll-containers.ts#scrollAxis says
    * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
-   * view of that rect (the list moved). Cost: one walk of the tree per rect asked, kept for the life of the `Clips`.
+   * view of that rect (the list moved). Found as draw order finds its container (scroll-containers.ts#isScrollViewOf).
+   * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
    */
   axesOf(container: Rect): ScrollAxes | undefined;
 }
@@ -843,21 +844,17 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     }
     return drawn.get(node);
   };
-  const axes = new Map<string, ScrollAxes | undefined>();
+  const axes = new Map<UiNode, ScrollAxes>();
   const axesOf = (container: Rect): ScrollAxes | undefined => {
-    const key = `${container.x},${container.y},${container.width},${container.height}`;
-    if (axes.has(key)) return axes.get(key);
-    const found = [...everyNode(tree)].find((n) => scrolls(n) && sameRect(n.rect, container));
-    const facts =
-      found === undefined
-        ? undefined
-        : {
-            axis: scrollAxis(found, unclipped),
-            nested: [...everyNode(found)]
-              .filter((n) => n !== found && scrolls(n) && !sameRect(n.rect, container))
-              .map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
-          };
-    axes.set(key, facts);
+    const found = [...everyNode(tree)].find((n) => isScrollViewOf(n, container));
+    if (found === undefined) return undefined;
+    const kept = axes.get(found);
+    if (kept !== undefined) return kept;
+    const facts: ScrollAxes = {
+      axis: scrollAxis(found, unclipped),
+      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+    };
+    axes.set(found, facts);
     return facts;
   };
   return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf };

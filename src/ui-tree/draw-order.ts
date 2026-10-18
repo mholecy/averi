@@ -3,7 +3,7 @@ import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCen
 import { FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
-import { clips, scrolls } from './scroll-containers.js';
+import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
 /**
@@ -1520,7 +1520,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
   const outOfDrawnOver = NOT_DRAWN.keyboard.drawnOver;
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
-    const found = order.find((p) => scrolls(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
+    const found = order.find((p) => isScrollViewOf(p.node, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p) ? [p.node] : []));
   };

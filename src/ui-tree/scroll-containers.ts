@@ -1,4 +1,4 @@
-import { rectArea, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
+import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * SCROLL CONTAINERS: the one place that says whether a node is one. Two
@@ -59,6 +59,15 @@ const SCROLLING_ROLES: ReadonlySet<string> = new Set(['scrollable', 'webview']);
 /** This node's content scrolls under its frame: it clips, or its role is one of `SCROLLING_ROLES`. `clips(n) ⇒ scrolls(n)`. */
 export function scrolls(n: UiNode): boolean {
   return clips(n) || SCROLLING_ROLES.has(n.role);
+}
+
+/**
+ * `n` is THE scroll view of rect `container`: it scrolls, with exactly that rect — the one test by which a scroll view
+ * remembered as a rect is found again in a tree, first in tree order (draw-order.ts#DrawOrder.drawnOver, which also
+ * leaves out the keyboard's own nodes, and geometry.ts#Clips.axesOf).
+ */
+export function isScrollViewOf(n: UiNode, container: Rect): boolean {
+  return scrolls(n) && sameRect(n.rect, container);
 }
 
 /**
