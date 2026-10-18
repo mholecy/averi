@@ -498,27 +498,18 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
 
 /**
  * The long-list carry case (ADR 0021 decision 4, lab note LV5; iOS, WDA alone — idb lists no scroll view, so it has no
- * carry): a row far down sheet-long-list's UIKit table, asked `down` from the top. LV5 measured the carry model's
- * window on `lower` (180 pt); its final-approach cut on a full-height list is inferred, and the ADR asks the device
- * check to judge that the cut stroke lands the row in its window without an extra stroke or turn. No target sits far
- * enough (F is row 20: one stroke from the top lands it), so the row is a plain one asked by its text, `Row 30` (the
- * table's `Row n`, its row height 64 pt, Presented.swift#LongListController): the app reports no frame for it, so its
- * frame is the table's clip moved by the row's place and the table's offset (`carryRow`), as F's report (row 20 at
- * 62 + 1280 − offset) bears out. Whole over the offsets 1172–1748 (the table's end: 40 rows, 812 pt shown), past one
- * stroke's carry from the top (≈ 1048 pt, round 5's record). The table ends there, so a full final stroke would come to
- * rest at its end, still in the window: the case cannot fail on a missing cut — no row of the 40 has a window wholly
- * before the end and past one carry (a longer table is the plan's round 7). The turn and the overshoot are what is
- * judged, and the strokes the app logged (the summary's `app:` line) show where the final one came to rest.
+ * carry): target L, row 30 of sheet-long-list's UIKit table (56 rows of 64 pt, Presented.swift#LongListController),
+ * asked `down` from the top by its own identifier, its frame the app's (rectForRow, reported at every layout). LV5
+ * measured the carry model's window on `lower` (180 pt); its final-approach cut on a full-height list is inferred, and
+ * the ADR asks the device check to judge that the cut stroke lands the row in its window without an extra stroke or
+ * turn. L lies at content y 1920: whole over the offsets 1172–1920 (812 pt shown), past one stroke's carry from the top
+ * (≈ 1040 pt under WDA), and wholly before the table's end (offset 2772) — so a full final stroke (≈ 2080 from the
+ * top) carries it past its window, and the case fails on a missing cut (the round-7 table; round 6's 40 rows ended at
+ * 1748, inside the window of its far row, which no full stroke could then overshoot). The turn and the overshoot are
+ * what is judged on top of judgeScroll's stop, and the strokes the app logged (the summary's `app:` line) show where
+ * the final one came to rest.
  */
-export const CARRY = { cell: 'sheet-long-list', view: 'list', row: 30, rowHeight: 64, tag: 'Row30', text: 'Row 30' } as const;
-
-/** The state with `Row 30`'s frame as the table lays it out at its offset (CARRY): undefined offset reads 0, its rest. */
-export function carryRow(state: LabState): LabState {
-  const clip = state.scrollViews?.[CARRY.view];
-  if (clip === undefined) return state;
-  const y = clip.y + CARRY.row * CARRY.rowHeight - (state.offsets?.[CARRY.view] ?? 0);
-  return { ...state, frames: { ...state.frames, [CARRY.tag]: { x: clip.x, y, width: clip.width, height: CARRY.rowHeight } } };
-}
+export const CARRY = { cell: 'sheet-long-list', view: 'list', tag: 'L' } as const;
 
 /**
  * The turns of a scroll's strokes over `clip` by the app's touch log: each touch-down's half of the clip — the lower
@@ -533,14 +524,13 @@ export function touchTurns(state: Pick<LabState, 'events'>, launched: Pick<LabSt
 }
 
 /**
- * The carry case's judge: judgeScroll's stop and R-direction on the row's derived frame, and on top what the ADR asks
- * of the carry — no turn (a stroke of the table back up, a touch-down on the other half of it after one on the first
- * (touchTurns), or averi saying it turned (replies.ts#turnsSaid): the logged strokes alone miss turns merged into a
- * fling), none that carried the row from below its window to above it (the overshoot a full final stroke makes where
+ * The carry case's judge: judgeScroll's stop and R-direction on L's frame as the app lays it out, and on top what the
+ * ADR asks of the carry — no turn (a stroke of the table back up, a touch-down on the other half of it after one on the
+ * first (touchTurns), or averi saying it turned (replies.ts#turnsSaid): the logged strokes alone miss turns merged into
+ * a fling), none that carried the row from below its window to above it (the overshoot a full final stroke makes where
  * the window is narrower than its carry).
  */
-export function judgeCarry(reply: string, final: LabState, launched: LabState): LiveVerdict {
-  const [state, start] = [carryRow(final), carryRow(launched)];
+export function judgeCarry(reply: string, state: LabState, start: LabState): LiveVerdict {
   const verdict = judgeScroll({ tag: CARRY.tag, view: CARRY.view, fully: false, platform: 'ios' }, [reply], state, start);
   const f0 = start.frames[CARRY.tag];
   const region = showRegion(start, 'ios', CARRY.view);
@@ -566,8 +556,8 @@ function carryCase(): VisibilityCase {
     id: `carry:${CARRY.cell}.${CARRY.tag}`,
     cell: CARRY.cell,
     sources: ['wda'],
-    says: `scroll_until "${CARRY.text}" (row ${CARRY.row} of the table, whole over offsets 1172–1748, past one stroke's carry from the top) down: stops on it, every stroke on ${CARRY.view} bringing it closer, none carrying it past its window, no turn (LV5's carry on a long list)`,
-    calls: [{ tool: 'scroll_until', args: { selector: `text:"${CARRY.text}"`, direction: 'down' } }],
+    says: `scroll_until ${CARRY.tag} (row 30 of the table, whole over offsets 1172–1920, past one stroke's carry from the top and before the table's end) down: stops on it, every stroke on ${CARRY.view} bringing it closer, none carrying it past its window, no turn (LV5's carry on a long list)`,
+    calls: [{ tool: 'scroll_until', args: { selector: `id:"lab.${CARRY.cell}.${CARRY.tag}"`, direction: 'down' } }],
     judge: (s, [reply], launched, _source, after) => judgeCarry(reply, after[0] ?? s, launched),
   };
 }

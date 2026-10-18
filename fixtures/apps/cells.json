@@ -66,7 +66,8 @@
       "layer": "sheet-list",
       "targets": [
         { "tag": "R", "color": "#1E88E5", "slot": 1, "in": "layer", "declared": "open", "scrollView": "list" },
-        { "tag": "F", "color": "#FB8C00", "slot": 20, "in": "layer", "declared": "open", "scrollView": "list" }
+        { "tag": "F", "color": "#FB8C00", "slot": 20, "in": "layer", "declared": "open", "scrollView": "list" },
+        { "tag": "L", "color": "#43A047", "slot": 30, "in": "layer", "declared": "open", "scrollView": "list" }
       ]
     },
     {

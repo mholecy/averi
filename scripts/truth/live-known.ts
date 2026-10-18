@@ -38,7 +38,6 @@ const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
 const LV4 = 'bug:2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md';
-const FLING = 'bug:2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md';
 const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
@@ -101,7 +100,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // LV3 under idb only (no scroll view listed: its turned stroke still touches down in the header); fixed under WDA.
   ...each('ios idb', ['scroll:tabbar-floating.R'], LV3, 'R-direction', 'refused'),
   ...each('ios idb', ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G'], NOT_YET_IN_TREE, 'presented-stop', 'visible'),
-  ...each('ios idb', ['scroll:sheet-long-list.F'], FLING, 'R-direction', 'not found'),
+  // sheet-long-list's F and L: idb lists the table's labels without their identifiers (and no row below the fold), so
+  // neither is ever in its tree — an honest not-reached, its strokes unjudged since round 7's recapture records them
+  // unlisted (TargetTruth.listed); until then F read R-direction, filed as
+  // docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md.
+  ...each('ios idb', ['scroll:sheet-long-list.F', 'scroll:sheet-long-list.L'], NO_ID, 'not-reached', 'not found'),
   ...each('ios idb', ['tap:sheet-long-list.R', 'tap:sheet-long-list-short.R'], NO_ID, 'tap-refused', 'not found'),
   ...each('ios idb', ['scroll:sheet-long-list-short.F'], NO_ID, 'not-reached', 'not found'),
   // blur-menu-grouped's C under idb only: WDA lists the menu row W over C's centre and refuses the tap (ok live:
@@ -130,9 +133,12 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // LV5's `ios wda scroll:scroll-bounded.F` struck off by round 6's iOS device check: ok in all four runs at 11683c3
   // (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json: `lower` at rest at 915–981, inside F's 884–1000
   // window), where round 5's src overshot to 1052 in one run of three and to 1006 (F cut, a plain stop) today.
-  // Round 6's long-list carry case (live-visibility.ts#CARRY): the row's parked text read above the screen once the
-  // table has scrolled, turned three times (the touch log and the reply agree) and failed at maxSwipes, in every run.
-  ...each('ios wda', ['carry:sheet-long-list.Row30'], LV6, 'R-direction', 'refused'),
+  // The long-list carry case (live-visibility.ts#CARRY): round 6's Row 30, round 7's target L of the 56-row table — its
+  // parked label read above the screen once the table has scrolled, turned three times (the touch log and the reply
+  // agree) and failed at maxSwipes, in every run (ios-long-list-r7-lab-1.json, -2.json). L's own scroll case the same,
+  // its turns merged into one stroke in one run of two (read not-reached: -2.json).
+  ...each('ios wda', ['carry:sheet-long-list.L'], LV6, 'R-direction', 'refused'),
+  ...each('ios wda', ['scroll:sheet-long-list.L'], LV6, 'R-direction', 'refused', { also: [{ cls: 'not-reached', kind: 'refused', record: 'ios-long-list-r7-lab-2.json' }] }),
   // carousel-in-list's C: one sideways stroke flings the carousel 447–532 pt, C's centre inside over 177–531 only; at
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
   ...each('ios wda', ['scroll:carousel-in-list.C'], CAROUSEL_FLING, 'stop-claim', 'visible', { intermittent: true }),

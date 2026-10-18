@@ -28,6 +28,8 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  * Notes a KNOWN row is filed as that are no open note of calibration.json — each a live-only finding (scroll dynamics,
  * a stroke's reach on the device): no captured tree reproduces it, so the replay has no row to calibrate it on, and
  * calibration.json lists it under `excluded` (checked below, with the reason it gives).
+ * (2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md filed idb's sheet-long-list F until round 7's recapture
+ * recorded F unlisted under idb — no live entry files it since, so it is no exemption.)
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md': 'LV1: a list moving through blank content, live only',
@@ -36,7 +38,6 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md': 'LV4: no turn after strokes that moved nothing, live only (a replayed tree never moves)',
   '2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md': "a carousel card's stop on a read still moving, live only (and intermittent)",
   '2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md': "LV6: a scrolled table's parked rows, live only (the golden captures at rest)",
-  '2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md': 'a fling in a lazy list: scroll dynamics, live only',
 };
 
 /**

@@ -334,7 +334,7 @@ const FORMS: Omit<Case, 'group'>[] = [
   ...(['name', 'country', 'submit'] as const).map((tag, i) => ({
     id: `c${i + 2}`,
     cell: 'form-picker',
-    says: `tap ${tag} beneath the picker sheet, open and fully expanded: nothing fires, the reply says to close the sheet once`,
+    says: `tap ${tag} beneath the picker sheet, open and fully expanded: nothing fires, the reply says to close the sheet once where the tree source marks it (idb: not in its tree)`,
     calls: [{ tool: 'tap' as const, args: { selector: id('form-picker', tag) } }],
     judge: judgeUnderSheet(tag),
   })),
