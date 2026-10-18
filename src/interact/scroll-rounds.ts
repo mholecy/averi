@@ -675,6 +675,15 @@ interface State {
   readonly lastStroke: Direction;
   /** Direction changes — a stroke drawn the other way from the one before — for the shortening and the failure text. */
   readonly turns: number;
+  /** The reach of the last stroke of the course sent (`nextStroke`; a probe's aside) — what a motion it caused is divided by (`motionPerReach`). */
+  readonly lastReach: number;
+  /**
+   * The most the judged match moved, along the way the content went, per unit of reach, on any read right after a
+   * stroke of the course — what a stroke of full reach carries the target, as measured in this scroll (`nextStroke`'s
+   * reach to the window, `stillNeeds`). Undefined until such a read on a tree of unclipped frames
+   * moved it.
+   */
+  readonly motionPerReach: number | undefined;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   readonly inFrameAfter: number | undefined;
   /** The probe in flight (PROBE_REACH): the judged match's rect and edge when it was sent. Cleared by the next read that reads. */
@@ -757,6 +766,8 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     endTurn: undefined,
     lastStroke: rules.direction,
     turns: 0,
+    lastReach: 1,
+    motionPerReach: undefined,
     inFrameAfter: undefined,
     probe: undefined,
     inTreeAfter: undefined,
@@ -1031,6 +1042,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   if (best !== undefined) {
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
+    // What the stroke just sent carried the target (`motionPerReach`): only on a tree that lists it where it lies
+    // (its drawn frame known — WDA's unclipped frames), and only a stroke of the course, not the probe.
+    const carried = current === 'stroke' && s.probe === undefined && s.prevBest !== undefined && s.lastSent !== undefined && best.standing.facts.drawn !== undefined ? motionToward(s.prevBest, best.node.rect, s.lastSent) : 0;
+    if (carried > 0) s.motionPerReach = Math.max(s.motionPerReach ?? 0, carried / s.lastReach);
     s.prevBest = { ...best.node.rect };
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
@@ -1128,6 +1143,11 @@ const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SE
  * shorter strokes (and spends more of `maxSwipes`) if the target then
  * turns out to be further away than one move.
  *
+ * And, on a tree that lists the target where it lies (WDA's), no stroke
+ * reaches further than the target still needs at what a stroke of this
+ * scroll was measured to carry it (`stillNeeds`): a short scroll view's
+ * fling carried a row past its window between two reads (lab note LV5).
+ *
  * A target IN the frame at the far edge turns the strokes too
  * (`observe`'s `atFarEdge`): across that edge, its centre in the status
  * band past it, or under a cover over its far side — on the first read as
@@ -1151,7 +1171,62 @@ function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean
   // a probe dropped the target (`dropped`): no stroke of the scroll's course
   // went the other way.
   const turn = toward !== s.lastStroke && (s.strokesSent > 0 || s.dropped === undefined);
-  return { toward, reach: 0.5 ** (turn ? s.turns + 1 : s.turns), turn };
+  const halved = 0.5 ** (turn ? s.turns + 1 : s.turns);
+  // No further than the target still needs, at what a stroke measurably carries it (`stillNeeds`).
+  const per = s.motionPerReach;
+  const needs = s.lastFound === undefined || per === undefined ? undefined : stillNeeds(s.lastFound, toward);
+  return { toward, reach: needs === undefined || per === undefined ? halved : Math.min(halved, needs / per), turn };
+}
+
+/**
+ * What the target STILL NEEDS — no stroke reaches further (lab note LV5). Measured under WDA, one stroke over the lab
+ * app's 180-pt `lower` (a 108-pt drag, `201 524 → 416`, its 60 %) moved it about 259 pt — momentum carries
+ * a UIScrollView on after the finger lifts, roughly in proportion to the lift speed (adapters/ios.ts#swipe: a 344-pt
+ * stroke carried the SwiftUI form 729–970 pt; both are ≈ 2.4 × the drag at the fixed 300 ms) — while F is whole in
+ * `lower` only over a 116-pt window of its offsets (884–1000). Four full strokes land 906, 929 — or 1052, past the
+ * window, after which the turn came with the sixth and last swipe and the scroll failed at maxSwipes with F 18 % drawn
+ * (one run in three). The strokes' own reach is not the fault (60 % of the scroll view, as anywhere); the fling is,
+ * and its size varies by run.
+ *
+ * So once the target lies in the tree short of its window — past the window's near edge, the side content comes in
+ * through — and a stroke of this scroll has been MEASURED to carry it (`motionPerReach`: the most it moved per unit of
+ * reach on a read right after a stroke), the stroke's reach is scaled to what is left: the distance that brings it to
+ * the window's middle, divided by that motion — never more than the reach the turns left (`nextStroke`), and never
+ * under swipe.ts#shortenStroke's floors. The largest motion measured, not the last: a read taken mid-fling understates
+ * one, and a stroke shorter than needed costs one more stroke where one longer than needed costs a turn. Proportional
+ * because the drag keeps its 300 ms whatever its length: a shorter drag is a slower one, and its fling shrinks with it
+ * (the linear model above; unmeasured for drags under 108 pt). On the measured case: three full strokes leave F ~150 pt
+ * short of the window's middle, and the fourth is drawn at ~0.6 of the reach, landing it within the window's ±58 pt
+ * whatever the ±8 % the runs spread by. The window is what the target's scroll views draw met with the frame
+ * (`FarFacts.drawn`): known on WDA's trees only, where an off-screen row is listed where it lies. Not on Android's —
+ * its strokes drag at `dragSpeed`, no fling (adapters/android.ts), and its rects are cut to the scroll container, so a
+ * row's motion as it comes in reads short — nor on idb's flat list (no scroll view listed).
+ * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md
+ */
+function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direction): number | undefined {
+  if (found.drawn === undefined) return undefined;
+  const window = found.frames.reduce<Rect | undefined>((w, f) => (w === undefined ? undefined : rectIntersection(w, f)), found.drawn);
+  if (window === undefined) return undefined;
+  const { rect } = found;
+  const vertical = toward === 'up' || toward === 'down';
+  // Along the scroll: how far past the window's near edge the target's far end lies, and the room the window leaves it.
+  const [lo, len, wLo, wLen] = vertical ? [rect.y, rect.height, window.y, window.height] : [rect.x, rect.width, window.x, window.width];
+  const need = toward === 'down' || toward === 'right' ? lo + len - (wLo + wLen) : wLo - lo;
+  return need <= 0 ? undefined : need + Math.max(0, wLen - len) / 2;
+}
+
+/** How far `to` lies from `from` the way content moves for a stroke toward `toward` (for `down`, up the screen): negative when the other way. */
+function motionToward(from: Rect, to: Rect, toward: Direction): number {
+  switch (toward) {
+    case 'down':
+      return from.y - to.y;
+    case 'up':
+      return to.y - from.y;
+    case 'right':
+      return from.x - to.x;
+    case 'left':
+      return to.x - from.x;
+  }
 }
 
 /**
@@ -1397,6 +1472,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (!s.strokedToward.includes(toward)) s.strokedToward = [...s.strokedToward, toward];
   s.strokesSent++;
   s.lastStroke = toward;
+  s.lastReach = reach;
   s.lastSent = toward;
   s.confirmReads = 0;
   s.since = 'stroke';
