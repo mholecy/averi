@@ -163,9 +163,11 @@ export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: nu
 /**
  * The way past a node cut by a node drawn after it should it only READ cut (standing.ts#cutByLater's residual: a
  * whole control that thin, laid flush against that node) — as `OWN_CUT_WAY_PAST` is for a container's cut
- * (tap-judgement.ts): no scroll shows more of it, so a coordinate tap.
+ * (tap-judgement.ts): no scroll shows more of it, so a coordinate tap. Conditioned on what a screenshot shows, so the
+ * way past is not read as the remedy: in the owner's own case (the lab's phone under the riding bar) the field is NOT
+ * whole, and a coordinate tap on the strip is the very tap the refusal exists to prevent.
  */
-export const wholeThinWayPast = (by: UiNode): string => `if it is whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
+export const wholeThinWayPast = (by: UiNode): string => `only if a screenshot shows it whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
 
 /** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
 export function cutRemedy(edge: Edge): string {

@@ -1062,6 +1062,10 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * submitted" risk). Not widened on purpose: the gate is the control roles (selectors.ts#isInteractive), and a role-less
  * node is as often a layout wrapper as a clickable — refusing those would refuse wrappers and containers that are no
  * target.
+ * A bar riding on the keyboard whose cutting node (interact/target-text.ts#ridingKeyboard) ends more than the tap
+ * minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is
+ * the scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather
+ * than one that misleads.
  * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
  */
 function cutByLater({ scene, node, cutsAtLater }: Judged, minPiece: number): Cut | undefined {

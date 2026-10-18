@@ -1235,7 +1235,7 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     expect((failure as Error).message).toContain(
       'The rest of it may stay under that container at the end of the content — the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; ' +
         '`dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it, and scroll again — ' +
-        'or it is only that thin, laid flush against it; a tap refuses it so cut (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
+        'or it is only that thin, laid flush against it; a tap refuses it so cut (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
     );
     // Two strokes down, then one back up — the cut edge (its top) turns no stroke: the rest lies under the bar, not past the far edge.
     const down = { from: { x: 540, y: 1034 }, to: { x: 540, y: 424 } };
@@ -1248,7 +1248,7 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
       `element reached the viewport but stayed ${CUT} (last rect {"x":55,"y":1370,"width":970,"height":42}) — a tap refuses it so cut (the soft keyboard is up (its top edge at y 1398): ` +
         'dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it — ' +
-        'or scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates))',
+        'or scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates))',
     );
     expect(fake.swipes).toEqual([]);
   });
@@ -1257,7 +1257,7 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     const fake = await fakeOf('android-lab-form-keyboard-after-back.xml');
     await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.note"', FAST)).rejects.toThrow(
       'The rest of it may stay under that container at the end of the content — a layout defect (no clearance for a pinned bar?) — ' +
-        'or it is only that thin, laid flush against it; a tap refuses it so cut (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
+        'or it is only that thin, laid flush against it; a tap refuses it so cut (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
     );
   });
 

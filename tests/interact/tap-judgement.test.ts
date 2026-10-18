@@ -575,7 +575,7 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
       `ClippedRefusal: lab.form-keyboard.phone is cut at its top edge by ${CUTTER} (55,1238 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
         'so the rest of it may lie under that container; only a 970x28 part of it shows above the soft keyboard, at 55,1370, 42 deep across that edge, under the 65 a tap needs — ' +
         'the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — ' +
-        'a bar riding on it goes down with it — or scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
+        'a bar riding on it goes down with it — or scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
     );
     // The reading is asked once, for the remedy's words.
     expect(kb.asked.cover).toBe(1);
@@ -585,7 +585,7 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
     expect(said(outcome)).toBe(
       `ClippedRefusal: lab.form-keyboard.note is cut at its top edge by ${CUTTER} (55,1994 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
         'so the rest of it may lie under that container; only a 970x14 part of it shows, at 55,2126, 14 deep across that edge, under the 65 a tap needs — ' +
-        'scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
+        'scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
     );
   });
   it('the adapter that cannot hide the keyboard says so, with its advice', async () => {
@@ -620,6 +620,15 @@ describe('judgeTap(…).aim() — a cut by a later node names the keyboard only 
   it('a strip wholly under the keyboard\'s line: nothing of it shows above the soft keyboard, its strip quoted', async () => {
     const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1360) });
     expect(said(outcome)).toContain('so the rest of it may lie under that button; nothing of it shows above the soft keyboard (its strip lies at 55,1370 970x42), 42 deep across that edge');
+  });
+  it('a bar ending 10 px BELOW the line (the keyboard drawn over its bottom): the keyboard unnamed', async () => {
+    const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1360) });
+    expect(said(outcome)).not.toContain('dismiss it first');
+    expect(said(outcome)).toContain('— scroll_until it out from under that button first (');
+  });
+  it('a bar ending 66 px above the line, one past the minimum (a button stacked over another): the scroll alone, the safe direction', async () => {
+    const { outcome } = await judge(cutAt(1332), 'field', { first: PIXEL }, { kb: reading(1398) });
+    expect(said(outcome)).not.toContain('dismiss it first');
   });
   it('a top bar ending at 300, far above the line: the scroll alone, the keyboard unnamed', async () => {
     const { outcome } = await judge(cutAt(300), 'field', { first: PIXEL }, { kb: reading(1398) });
