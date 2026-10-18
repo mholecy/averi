@@ -51,7 +51,10 @@ exclusion from the turn, and the one-stroke stop.
    travel whole, the stroke's travel is cut to what brings it to the window's middle over that carry. Any window one
    stroke can skip, not only a short scroll view's: on a long WDA list the final approach is cut too (a carry of ≈ 2.4
    × a 420-pt stroke, ~1000 pt, is more than a ~650-pt slack); only a window wider than one stroke's carry keeps the
-   full stroke.
+   full stroke. That final-approach cut on a long list is inferred, not measured (LV5 measured `lower`, 180 pt): the
+   device check runs a long-list live case under WDA (a row far down a full-height list — the lab app's
+   `sheet-long-list`, or a cell like it) beside `scroll-bounded`'s, and judges that the cut stroke lands the row in its
+   window without an extra stroke or turn.
 
 ## Where it applies, and where not
 
