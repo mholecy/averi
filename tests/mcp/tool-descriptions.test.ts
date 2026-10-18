@@ -349,9 +349,12 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
-  it('tap and the troubleshooting reference quote the active-window hint every other Android not-found carries', async () => {
+  it('tap and the troubleshooting reference quote the active-window hint the tap\'s, fill\'s and scroll_until\'s not-found carry on Android with no window marked presented — not the asserts\' nor a flow\'s wait: steps', async () => {
     const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
     expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it`);
+    expect(description('tap')).toContain(
+      'and so does a flow\'s tap, fill and scroll_until step (the same waits) and an optional tap\'s presence check (its error carries it, though a skipped step\'s line reads only "(not present)"); a flow\'s wait: steps and the asserts\' "not found" do not.',
+    );
     expect(TROUBLESHOOTING).toContain(`\`element never appeared in the tree\` carries \`(${ACTIVE_WINDOW_HINT})\``);
   });
 

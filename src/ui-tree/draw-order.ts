@@ -309,6 +309,9 @@ export interface PixelCover {
  */
 export const MIN_TAP_PIECE_FRACTION = 0.06;
 
+/** The least piece a tap may be aimed at on `screen`: MIN_TAP_PIECE_FRACTION of its shorter side, rounded (the one formula, `DrawOrder.minPiece`'s). */
+export const minTapPiece = (screen: { readonly width: number; readonly height: number }): number => Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
+
 /** What `exposure` found: the target against what is drawn over it inside the judged box. */
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
@@ -1466,7 +1469,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const seen: Seen = { screenArea };
   const flatList = !listsAncestry(tree);
   const paddedTouchTargets = tree.paddedTouchTargets === true;
-  const minPiece = Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
+  const minPiece = minTapPiece(screen);
   const order = walkOf(tree);
   /** What is presented over what (presentation.ts#presentationOf), over this walk. */
   const presentation = presentationOf(tree, order);
