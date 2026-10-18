@@ -1214,7 +1214,8 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
  * so a scroll may bring it out from under it), and, the strokes moving nothing, fails naming the bar and the way past —
  * with the keyboard up, dismiss it first. Real captures of the lab's `form-keyboard`, served unchanged by every read.
  */
-describe('scrollUntilVisible — a control cut by a node drawn after it is no stop (lab note F2A1)', () => {
+// Lab note F2A1 (the doc above).
+describe('scrollUntilVisible — a control cut by a node drawn after it is no stop', () => {
   const capture = async (name: string): Promise<UiNode> => parseDump(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
   const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
   const CUT =
