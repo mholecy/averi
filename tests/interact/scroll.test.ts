@@ -8,6 +8,7 @@ import { bandNode, el, FakeAdapter, node, resetLayout, screen } from '../helpers
 import { flingCarry, LazyList } from '../helpers/lazy-list.js';
 import { SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { remedyThenEscape } from '../helpers/escape-order.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -1259,6 +1260,23 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
       'The rest of it may stay under that container at the end of the content — a layout defect (no clearance for a pinned bar?) — ' +
         'or it is only that thin, laid flush against it; a tap refuses it so cut (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
     );
+  });
+
+  // The owner's decision of 2026-10-18 on F2A1's wording (escape-order.ts#remedyThenEscape): every remedy the
+  // failure names before the coordinate escape, which closes its sentence.
+  it('the remedy first, the coordinate escape last — phone stuck and at the bound, note stuck', async () => {
+    const failure = async (name: string, selector: string, opts: Parameters<typeof scrollUntilVisible>[2], ime: boolean) => {
+      const fake = await fakeOf(name);
+      if (ime) fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
+      return ((await scrollUntilVisible(fake, selector, opts).catch((e: unknown) => e)) as Error).message;
+    };
+    const phone = await failure('android-lab-form-keyboard.xml', 'id:"lab.form-keyboard.phone"', FAST, true);
+    const bound = await failure('android-lab-form-keyboard.xml', 'id:"lab.form-keyboard.phone"', { ...FAST, maxSwipes: 0 }, true);
+    const note = await failure('android-lab-form-keyboard-after-back.xml', 'id:"lab.form-keyboard.note"', FAST, false);
+    expect(remedyThenEscape(phone)).toEqual({ remedies: 2, escapeLast: true }); // dismiss it first, scroll again
+    expect(remedyThenEscape(bound)).toEqual({ remedies: 2, escapeLast: true }); // dismiss it first, scroll_until it out
+    // At the end of the content with the keyboard down no scroll helps: the layout defect is said, and the escape last.
+    expect(remedyThenEscape(note)).toEqual({ remedies: 0, escapeLast: true });
   });
 
   it('phone after back, whole above the bar: stops with no swipe', async () => {
