@@ -3,7 +3,7 @@ import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Geometry, TargetTruth } from '../../truth/schema.js';
 import { navigationBandTakes, parseGeometry, type AssertElement } from '../../truth/truth.js';
 import { failedClosedUnchecked, readingOf, readSomething } from '../../truth/replies.js';
-import { bandNamed, stringUnlistedBy } from '../../truth/target-contract.js';
+import { askedUnlistedBy, bandNamed } from '../../truth/target-contract.js';
 import { BUDGET_MS, classed, first, passed, passes, said, type Expectation } from './judges.js';
 
 /**
@@ -61,7 +61,8 @@ export function ocrFailsClosed(platform: Platform, element: AssertElement, text:
 export function textRows(platform: Platform, t: TargetTruth, judged: Geometry | undefined, cell: CellTruth | undefined, source?: SourceKind): Expectation[] {
   const text = t.text;
   if (text === undefined) return [];
-  const unseen = source === undefined ? undefined : stringUnlistedBy(t, source);
+  // Asked by its string (`text:"…"`): whether it may be missing as asked is the contract's one rule.
+  const unseen = source === undefined ? undefined : askedUnlistedBy(t, source);
   const covered = (e: Expectation): Expectation => classed(unseen === undefined ? e : { ...e, absent: unseen });
   // By the geometry the target contract judges (`judged`, target-contract.ts#contractOf): iOS's home-indicator band is
   // no band — a string there is judged by what else lies around it.
