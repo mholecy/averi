@@ -35,7 +35,10 @@ Amended again 2026-10-18 (round 6, the lab finding L1): uiautomator's tree carri
 lists the active window only" (`UiNode.activeWindowOnly`), which picks the uiautomator adapter; its parser marks that
 one window presented when the dump shows it is (`dialog`, `screen`), and a target the tree cannot list beneath it gets
 "close it first" from the tap's wait and `scroll_until`'s stop, no gesture sent — residual 6 closed on Android for such a
-window (see "Amendment: Android's presented window" below).
+window (see "Amendment: Android's presented window" below). Amended again 2026-10-18 (owner decision on round 6's open
+points): residuals 18 and 19 accepted, with an honest hint on every uiautomator reply that says a target is not in the
+tree and is not already given the presented window's words — the tree lists only the active window: if a sheet or a
+dialog is open over the screen, close it first (decision 5 of the same amendment).
 
 ## Context
 
@@ -784,8 +787,24 @@ neither mark: its rows stay KNOWN as residual 6 (a target not yet in the tree is
 (stopped before any swipe, "close it first") turned green; no other row changed, on either platform. The colour
 asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait is not this amendment's.
 
-**Residuals** 18 and 19 ("Residuals pending the owner" below — not accepted): a fully expanded sheet is no presented
-window; the shapes are measured on one AVD and Material 3 only.
+5. **Every other not-found on uiautomator carries the active-window hint** (the owner's decision of 2026-10-18, accepting
+   residuals 18 and 19). A window the parser does not mark — a fully expanded sheet whose dump carries no scrim
+   (form-picker), a full-screen dialog, a window against the screen's edge — hides the screen beneath from the tree
+   just the same, and nothing in the dump tells it from no window at all. So a reply that says a target is not in a
+   tree whose root carries `activeWindowOnly`, and that decision 4's words do not already claim, says what the tree is
+   and what to do should a sheet or a dialog be up: `(the tree lists only the active window: if a sheet or a dialog is
+   open over the screen, close it first)` — beneath the tap's, fill's and the presence check's "Timed out … to appear"
+   (interact/resolve.ts#notFound, in the hint's place; a zero-area match's hint, which says the target IS in the
+   tree, takes it first) and after `scroll_until`'s "element never appeared in the tree" (scroll-text.ts, the
+   `absent` shortfall). One constant (ui-tree/standing.ts#ACTIVE_WINDOW_HINT); never under WDA or idb. A possibility,
+   not a cause: it rides on every Android not-found, a plain screen's too, and the wait's class is unchanged (absence).
+   Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
+   name, country, submit and country.ST; scroll-bounded O, F; carousel-in-list B, U; scroll-top-edge(-end) A;
+   tabbar-floating F; text-under-bar P — tap and scroll_until each); form-picker's three taps, which the presented row
+   judges for "close it first", now read it and are refused as vacuous (`not in the tree`) instead; no verdict moved.
+
+**Residuals** 18 and 19 ("Residuals accepted" below — accepted by the owner 2026-10-18, with decision 5's hint): a fully
+expanded sheet is no presented window; the shapes are measured on one AVD and Material 3 only.
 
 ## Residuals accepted
 
@@ -949,20 +968,13 @@ window; the shapes are measured on one AVD and Material 3 only.
    scroll view of that layer's own lets the stroke go. A scroll view of a LATER layer or Window the source did not
    mark, drawn above the marked one, holds the point all the same and is not asked, so the stroke stops there
    (toward refusal). No tree of the corpus lays one so.
-
-## Residuals pending the owner
-
-Written by the implementer of round 6's S3 (`ad9ce13`, the amendment "Android's presented window") and not accepted
-by the owner (round 6's code review, P1): recorded so the code's limits are stated, numbered on from the accepted ones
-so that an acceptance moves each up as it stands. Until then no KNOWN row is filed as one of them
-(tests/truth/lab-notes.test.ts reads "Residuals accepted" only): `form-picker`'s rows stay filed as lab note L1, open,
-and calibration.json calibrates L1 partially.
-
 18. **A fully expanded sheet is no presented window** (2026-10-18, the amendment "Android's presented window"). Its dump
    carries no scrim — `form-picker`'s country picker lists the sheet and its drag handle only — so it is not marked: the
    form beneath times out "to appear" and `scroll_until` strokes (on the sheet's own list, which the rule would let
-   through anyway). Its rows stay KNOWN, filed as lab note L1 (tests/differential/golden/forms.known.ts). The tree has no fact for it but
-   Material's localized "Drag handle".
+   through anyway). The tree has no fact for it but Material's localized "Drag handle". Accepted by the owner
+   2026-10-18 with the active-window hint (the amendment's decision 5), which every such reply now carries: its six
+   rows (tests/differential/golden/forms.known.ts) are filed as this residual, and lab note L1's calibration leaves
+   nothing open (scripts/truth/calibration.json).
 19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). A floating
    window against the screen's top or left edge (a popup at the top-left corner, a bottom-anchored full-width dialog)
    and a full-screen dialog are not marked; an app's own window offset on BOTH axes reads as a `dialog` — a freeform
@@ -971,7 +983,10 @@ and calibration.json calibrates L1 partially.
    not; an app's own clickable, labelled leaf laid from its window's top edge
    at full width, with a full-width sibling under it to the bottom, reads as a scrim; a Views `BottomSheetDialog`'s
    `touch_outside` holds by the rule only if labelled (unmeasured). What a mark changes is asked only for a target the
-   tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped`.
+   tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped`. Accepted by the owner
+   2026-10-18 with the active-window hint (decision 5: a window left unmarked is said as possible on every not-found);
+   the unmeasured shapes — a full-screen dialog, a Views `BottomSheetDialog` — are lab cells to come
+   (docs/plans/2026-10-15-ground-truth-lab-app.md).
 
 ## Bug notes
 

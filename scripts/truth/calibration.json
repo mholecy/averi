@@ -965,15 +965,7 @@
       "before": "b71cbbb",
       "after": "d43df5d",
       "verified": "golden",
-      "partial": "AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) open",
-      "open": [
-        "android-averi_lab-api33/form-picker.xml name tap",
-        "android-averi_lab-api33/form-picker.xml country tap",
-        "android-averi_lab-api33/form-picker.xml submit tap",
-        "android-averi_lab-api33/form-picker.xml name scroll_until",
-        "android-averi_lab-api33/form-picker.xml country scroll_until",
-        "android-averi_lab-api33/form-picker.xml submit scroll_until"
-      ],
+      "partial": "AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) is ADR 0018's residual 18, accepted by the owner 2026-10-18 with the active-window hint — its six rows filed as that residual",
       "defect": "without \"close it first\"|swiped \\d+× beneath a presented layer",
       "checks": [
         "android-averi_lab-api33/alert-dim.xml A tap",
@@ -993,7 +985,7 @@
         "android-averi_lab-api33/sheet-medium.xml D tap",
         "android-averi_lab-api33/sheet-medium.xml D scroll_until"
       ],
-      "remark": "Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment \"Android's presented window\"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out \"to appear\" without \"close it first\", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous). Partial: form-picker's fully expanded sheet dumps no scrim and is not marked — its six tap and scroll_until rows stay KNOWN filed as this note, open (tests/differential/golden/forms.known.ts), not as a residual: ADR 0018's residual 18 awaits the owner."
+      "remark": "Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment \"Android's presented window\"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out \"to appear\" without \"close it first\", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous). Partial: form-picker's fully expanded sheet dumps no scrim and is not marked — its six tap and scroll_until rows stay KNOWN (tests/differential/golden/forms.known.ts), filed as ADR 0018's residual 18 since the owner accepted it (2026-10-18) with the active-window hint every Android not-found now carries (the taps' \"to appear\" then reads \"close it first\", their class `not in the tree`)."
     },
     {
       "n": "L2",

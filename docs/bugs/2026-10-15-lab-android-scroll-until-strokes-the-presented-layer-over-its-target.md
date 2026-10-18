@@ -12,7 +12,7 @@
 > row changed); their colour rows stay KNOWN (the assert's "not found" is vacuous). `form-picker`'s expanded country
 > sheet dumps no scrim, so it is not marked: its rows stay KNOWN, filed as this note, which calibration.json calibrates
 > partially (the AlertDialog and the half-expanded sheet; the fully expanded sheet open) — ADR 0018's residual 18 for
-> it awaits the owner (round 6's code review, P1). Not yet re-measured on the emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
+> it awaited the owner (round 6's code review, P1; decided below). Not yet re-measured on the emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
 > window".
 >
 > **Live (2026-10-18, round 6's Android device check):** confirmed on the emulator for the AlertDialog and the
@@ -29,6 +29,17 @@
 > tree, which lists only the window presented on top … close it first". docs/truth/live-android-2026-10-18-visibility.md,
 > docs/truth/live-records/android-vis.json (and android-vis-b71cbbb.json). `form-picker`'s fully expanded sheet has no
 > live case (no coloured target): unmeasured live, still open.
+>
+> **Decided (2026-10-18, the owner):** ADR 0018's residuals 18 (the fully expanded sheet) and 19 (the shapes measured
+> on one AVD) ACCEPTED, with an honest hint: every uiautomator reply that says a target is not in the tree and is not
+> already given the presented window's words — the tap's, fill's and the presence check's "… to appear", `scroll_until`'s
+> "element never appeared in the tree" — adds `(the tree lists only the active window: if a sheet or a dialog is open
+> over the screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT, arch/r22-hint 9acbf77; ADR 0018's
+> amendment "Android's presented window", decision 5). `form-picker`'s six rows are filed as residual 18 now
+> (tests/differential/golden/forms.known.ts), the taps' class `not in the tree` (the hint says "close it first"; the
+> reply is still a not-found) where it was "refused without close it first"; calibration.json's L1 leaves nothing open.
+> Golden (sandbox, no OCR): 1322 checks / 228 mismatches / 0 broken / 86 skipped, as before — 24 Android rows' wording
+> changed, no verdict.
 
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33`, captured by scripts/truth/capture-android.ts on a dedicated

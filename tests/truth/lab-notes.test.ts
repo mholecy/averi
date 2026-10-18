@@ -61,8 +61,8 @@ const NOT_ON_THIS_BRANCH: readonly string[] = [];
 /**
  * A static KNOWN row (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
  * `partial` saying what of the note its fix covers — only when that note's `open` lists the row: the part `partial`
- * leaves open, red until a fix or a decision of the owner's (L1: its fix marks the AlertDialog and the half-expanded
- * sheet; form-picker's fully expanded sheet stays open, round 6's code review P1). Keyed by ROW, as AWAITING_LIVE is
+ * leaves open, red until a fix or a decision of the owner's (L1's six form-picker rows were so, round 6's code review P1,
+ * until the owner accepted ADR 0018's residual 18 on 2026-10-18; none is listed today). Keyed by ROW, as AWAITING_LIVE is
  * by case: a row filed as a partial note that its `open` does not list is held to the note being open like any other.
  * Round 6 extended the rule for it: an open note expects every row red (OPEN-RED), a calibrated one every row green
  * after its fix, and neither says "calibrated, some rows still open".
@@ -158,7 +158,8 @@ describe('calibration.json ↔ the KNOWN rows', () => {
       ]),
     );
     expect(bad).toEqual([]);
-    expect(table.notes.find((e) => e.n === 'L1')?.open).toHaveLength(6);
+    // L1's six form-picker rows, left open until the owner accepted ADR 0018's residual 18 (2026-10-18): filed as it now.
+    expect(table.notes.find((e) => e.n === 'L1')?.open).toBeUndefined();
   });
 
   it('each live entry a partial calibration leaves open (`openLive`) is a live KNOWN entry filed as that note, on a note with a `partial`', () => {
@@ -186,7 +187,9 @@ describe('calibration.json ↔ the KNOWN rows', () => {
       { where: 'static android-averi_lab-api33/fab.xml K tap', name: `bug:${noteOf('L1')}` },
     ];
     expect(misfiled(refiled)).toHaveLength(2);
-    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }])).toEqual([]);
+    // form-picker's rows, L1's `open` until the owner accepted ADR 0018's residual 18 (2026-10-18): filed as L1 again,
+    // misfiled — they are that residual's now.
+    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }])).toHaveLength(1);
   });
 
   it('the notes calibration.json lists that this branch has not got: exactly NOT_ON_THIS_BRANCH, none open', () => {
