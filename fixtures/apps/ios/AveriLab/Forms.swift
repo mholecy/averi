@@ -68,7 +68,6 @@ struct FormScreen: View {
         .sheet(isPresented: $picker, onDismiss: { lab.event("dismissed", "sheet") }) {
             if let p = form.picker { PickerSheet(cell: cell, picker: p, value: binding(p.field), shown: $picker).environmentObject(lab) }
         }
-        .onChange(of: values) { report() }
         .onChange(of: dirty) { report() }
         .onChange(of: focus) {
             lab.focused(focus)
@@ -91,8 +90,15 @@ struct FormScreen: View {
 
     private func fieldID(_ f: FieldSpec) -> String { f.fieldId ?? "lab.\(cell.id).\(f.tag)" }
 
+    /// A field's value, reported to the oracle by the write itself: `.onChange(of: values)` missed the last keystroke of
+    /// a fast burst (the HID typing of idb and WDA, one key per ~7 ms) — the @State held it, a submit read it, but no
+    /// onChange followed, and the oracle kept the value one key short
+    /// (docs/bugs/2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md).
     private func binding(_ tag: String) -> Binding<String> {
-        Binding(get: { values[tag, default: ""] }, set: { values[tag] = $0 })
+        Binding(get: { values[tag, default: ""] }, set: {
+            values[tag] = $0
+            report()
+        })
     }
 
     @ViewBuilder private func fieldRow(_ f: FieldSpec) -> some View {
