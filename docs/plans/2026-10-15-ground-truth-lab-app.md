@@ -424,6 +424,13 @@ files and their manifest entries (own-parts' L and N trees as before, I added). 
 - **HIGH: lab cell #18 — a React Native text field** (calibration.json #18's `needs`): an RN `TextInput` whose tree
   lists its own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under the field, as mp-native's do) — the
   half of #18 no lab field reproduces (neither SwiftUI's TextField nor UIKit's UITextField lists one). First in round 7.
+  Done 2026-10-19 (`truth/r7-rn`): a third lab app, React Native 0.88.0 (fixtures/apps/rn, its README), the
+  `react-native` family's `rn-field` captured on both platforms (runs `ios-rn-iphone17-ios27`,
+  `android-rn-averi_lab-api33`; the capture and the live golden drive one app per run, `--app react-native`). RN's
+  multiline TextInput lists the indicator over its label's centre under WDA (its single-line one lists none); the bar
+  is excused at HEAD, but the label is refused as under its own field — WDA wraps RN's input in an unnamed view of its
+  rect (lab note LR1), and on Android the label overhangs its EditText by 3 px (LR2). Golden +30 checks, 12 KNOWN;
+  live docs/truth/live-rn-2026-10-19.md.
 - **Android presented windows the parser does not mark** (ADR 0018's residual 19, accepted with the active-window
   hint): a **full-screen dialog** (a `Dialog` with `usePlatformDefaultWidth = false` / a full-screen `DialogFragment`,
   its window at 0,0 the screen's size) and a **Views `BottomSheetDialog`** (its `touch_outside` scrim, labelled or not:
