@@ -343,7 +343,7 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
 const REVEALED_BY: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
 
 /**
- * THE CARRY MODEL (lab note LV5): how far a stroke carries its target, measured in this scroll, so a stroke reaches no
+ * THE CARRY MODEL (lab note LV5; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): how far a stroke carries its target, measured in this scroll, so a stroke reaches no
  * further than the target still needs. Measured under WDA: one stroke over the lab app's 180-pt `lower` (a 108-pt
  * drag, `201 524 → 416`, its 60 %) moved it about 259 pt — momentum carries a UIScrollView on after the finger lifts,
  * roughly in proportion to the lift speed (adapters/ios.ts#swipe: a 344-pt stroke carried the SwiftUI form 729–970 pt;

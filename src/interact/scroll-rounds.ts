@@ -229,7 +229,7 @@ export type ScrollOutcome = (
 ) & { detent?: DetentMove; endTurn?: EndTurn };
 
 /**
- * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below): the strokes went the caller's way first and
+ * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): the strokes went the caller's way first and
  * the read after one of them proved the content exhausted that way — the stroke moved no match, and the tree shows
  * the content of the scroll view it went over ENDING at the edge that way (`Observed.ends`,
  * interact/stroke-plan.ts#strokedEnd) — while the tree places the target wholly past the OPPOSITE (far) edge of that
