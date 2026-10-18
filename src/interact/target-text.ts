@@ -122,12 +122,25 @@ export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string 
 }
 
 /**
- * The remedy for a node cut by a node drawn after it (`Cut.by`), as the tap's refusal and `scroll_until`'s bound
- * failure say it: with the soft keyboard up, dismiss it first, or scroll the list (`dismissKeyboardFirstText`); else
- * scroll the list — `scroll_until it out from under that container first`. Not `cutRemedy`'s scroll toward the edge:
- * the rest lies under the node, not past the edge of anything that scrolls.
+ * The soft keyboard as a cut-by remedy may name it: `keyboard` when the node that cut the target (`Cut.by`) RIDES on
+ * it — its bottom edge at or above the keyboard's top edge and within `minPiece` of it, as a submit bar laid on the
+ * IME's inset is (the lab's Continue ends at 1370, the line at 1398) — else undefined: hiding the keyboard does not move
+ * a top app bar or a sticky header that cut a control, and saying so would send the reader the wrong way.
  */
-export function cutByRemedy(by: UiNode, keyboard: KeyboardUp | undefined): string {
+export function ridingKeyboard(by: UiNode, keyboard: KeyboardUp | undefined, minPiece: number): KeyboardUp | undefined {
+  if (keyboard === undefined) return undefined;
+  const gap = keyboard.lineY - (by.rect.y + by.rect.height);
+  return gap >= 0 && gap <= minPiece ? keyboard : undefined;
+}
+
+/**
+ * The remedy for a node cut by a node drawn after it (`Cut.by`), as the tap's refusal and `scroll_until`'s bound
+ * failure say it: with the soft keyboard up and that node riding on it (`ridingKeyboard`), dismiss it first, or scroll
+ * the list (`dismissKeyboardFirstText`); else scroll the list — `scroll_until it out from under that container first`.
+ * Not `cutRemedy`'s scroll toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
+ */
+export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  const keyboard = ridingKeyboard(by, up, minPiece);
   const scroll = `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
   return keyboard === undefined ? scroll : `${dismissKeyboardFirstText(keyboard)} — or ${scroll}`;
 }

@@ -326,7 +326,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     case 'cut': {
       const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece);
       const by = standing.cut.by;
-      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, () => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard)))}`));
+      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, () => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard, standing.minPiece)))}`));
     }
     case 'reachable': {
       if (standing.moved === undefined) return { point: standing.at };

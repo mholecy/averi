@@ -601,3 +601,25 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
     expect(kb.asked.cover).toBe(0);
   });
 });
+
+describe('judgeTap(…).aim() — a cut by a later node names the keyboard only when that node rides on it', () => {
+  /** A field `55,y 970x42` cut at its top by a bar laid after it, ending at `barBottom` — the keyboard's line at 1398. */
+  const cutAt = (barBottom: number) =>
+    node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 1080, height: 2220 },
+      children: [
+        node({ role: 'textfield', identifier: 'field', rect: { x: 55, y: barBottom, width: 970, height: 42 } }),
+        node({ role: 'button', identifier: 'bar', rect: { x: 0, y: barBottom - 132, width: 1080, height: 132 } }),
+      ],
+    });
+  it('a bar ending 28 px above the line (the lab\'s Continue): dismiss the keyboard first, or scroll', async () => {
+    const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1398) });
+    expect(said(outcome)).toContain('— the soft keyboard is up (its top edge at y 1398): dismiss it first');
+  });
+  it('a top bar ending at 300, far above the line: the scroll alone, the keyboard unnamed', async () => {
+    const { outcome } = await judge(cutAt(300), 'field', { first: PIXEL }, { kb: reading(1398) });
+    expect(said(outcome)).toContain('under the 65 a tap needs — scroll_until it out from under that button first (');
+    expect(said(outcome)).not.toContain('soft keyboard');
+  });
+});

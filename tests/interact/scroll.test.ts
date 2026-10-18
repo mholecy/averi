@@ -1263,3 +1263,22 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     expect(await scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', FAST)).toMatchObject({ swipes: 0, visible: 1, clipped: [] });
   });
 });
+
+describe('scrollUntilVisible — a cut by a later node far above the keyboard: the stuck failure does not name the keyboard', () => {
+  it('a top bar cutting a field, the IME up: the layout-defect wording, not "dismiss it first"', async () => {
+    const tree = node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 1080, height: 2220 },
+      children: [
+        node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 220, width: 1080, height: 2000 }, children: [node({ role: 'textfield', identifier: 'field', rect: { x: 55, y: 300, width: 970, height: 42 } })] }),
+        node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 168, width: 1080, height: 132 } }),
+      ],
+    });
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } }, 'shown');
+    const failure = (await scrollUntilVisible(fake, 'id:field', FAST).catch((e: unknown) => e)) as Error;
+    expect(failure.message).toContain('The rest of it may stay under that button at the end of the content — a layout defect (no clearance for a pinned bar?) — or it is only that thin');
+    expect(failure.message).not.toContain('dismiss it first');
+  });
+});
