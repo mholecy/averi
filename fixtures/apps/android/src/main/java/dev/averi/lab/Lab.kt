@@ -22,8 +22,12 @@ import kotlin.math.roundToInt
 // cell on screen, each target's frame as the app lays it out, whether the screen has settled, and every event a target
 // or a layer received. Units are SCREEN PIXELS, as a uiautomator dump's bounds are: `scale` is 1.
 
-/** The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported. */
-val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert")
+/**
+ * The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported.
+ * `dialog-fullscreen` and `bottom-sheet-dialog` are Android's own (round 7, Presented.kt): the windows ADR 0018's
+ * residual 19 names unmeasured.
+ */
+val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen", "bottom-sheet-dialog")
 
 /**
  * `text`: a text target (B5's own-parts) — this text drawn on its coloured control, the control's box `<tag>.box`;

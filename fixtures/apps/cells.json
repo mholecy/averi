@@ -119,6 +119,32 @@
       ]
     },
     {
+      "id": "dialog-fullscreen",
+      "family": "presented",
+      "layer": "dialog-fullscreen",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "bottom-sheet-dialog",
+      "family": "presented",
+      "layer": "bottom-sheet-dialog",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
       "id": "form-basic",
       "family": "forms",
       "layer": "none",

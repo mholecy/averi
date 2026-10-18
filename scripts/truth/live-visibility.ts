@@ -51,8 +51,8 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * while something fired; `tap-refused` (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N
  * swipes did not change the screen" against the app's strokes; `R-direction` the strokes broke it; `failed-holds` a
  * failure where the app shows the stop; `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`,
- * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `dismissal` the
- * dismissal's judge.
+ * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `presented-pass` a colour
+ * assert beneath a presented layer that passed (it measured the layer); `dismissal` the dismissal's judge.
  */
 export type VerdictClass =
   | 'stop-claim'
@@ -66,6 +66,7 @@ export type VerdictClass =
   | 'presented-stop'
   | 'presented-fired'
   | 'presented-stroke'
+  | 'presented-pass'
   | 'dismissal';
 
 export interface LiveVerdict {
@@ -369,17 +370,53 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   const moved = strokesSince(state, launched).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
   const touched = c.view === undefined ? touchesSince(state, launched) : [];
   const kind = replyKind(scroll);
-  if (kind === 'visible') return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
+  // A stop claimed after a stroke that dismissed the layer (LW1: a Views sheet's scrim stroked) is said so: the target
+  // is visible then, on a screen averi uncovered without being asked.
+  if (kind === 'visible') {
+    const why = fired.length > 0 ? `the app logged ${eventsText(fired)}: averi closed the presented layer and claimed the stop` : 'the target lies beneath the presented layer';
+    return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — ${why}`, app };
+  }
   if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
   if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
   if (touched.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked the presented layer over a target in no scroll view: ${touched.length} touch(es) at ${touchPointsText(touched)} — averi: ${short(scroll)}`, app };
   return { outcome: 'ok', kind, why: `refused, nothing moved or fired: ${short(scroll)}`, app };
 }
 
+/**
+ * A colour assert on a target beneath a presented layer, asked for the target's own colour (the replayed golden's
+ * colour row, golden-spec/presented.ts#presentedOverRows): it must not pass — the screen shows the layer there — and
+ * nothing may fire or be dismissed (an assert touches nothing). A failure of any wording is ok; its kind (`not found`
+ * where the tree lists only the presented window) is the summary's.
+ */
+export function judgePresentedAssert([assert]: readonly string[], state: LabState, launched: LabState): LiveVerdict {
+  const fired = firedSince(state, launched);
+  const kind = replyKind(assert);
+  if (kind === 'PASS') return { outcome: 'MISMATCH', cls: 'presented-pass', kind, why: `averi says ${short(assert)} — the target lies beneath the presented layer` };
+  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(assert)}` };
+  return { outcome: 'ok', kind, why: `failed, nothing fired: ${short(assert)}` };
+}
+
+/**
+ * The colour assert case of a target beneath a presented window the uiautomator parser does not mark (round 7's cells,
+ * ADR 0018's residual 19 — live.ts adds it for PRESENTED_WINDOW_CELLS alone, the cells it was asked of).
+ */
+export function presentedAssertCase(cell: string, t: TargetTruth): VisibilityCase {
+  return {
+    id: `assert:${cell}.${t.tag}`,
+    cell,
+    says: `colour assert ${t.tag} (${t.color}) beneath the presented layer: fails, nothing fires`,
+    calls: [{ tool: 'assert', args: { asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: 3_000 }] } }],
+    judge: (s, replies, launched) => judgePresentedAssert(replies, s, launched),
+  };
+}
+
+/** The cells presentedAssertCase is asked of: round 7's full-screen dialog and Views bottom sheet (Presented.kt). */
+export const PRESENTED_WINDOW_CELLS: readonly string[] = ['dialog-fullscreen', 'bottom-sheet-dialog'];
+
 // --- the cases ---
 
 export interface VisibilityCall {
-  tool: 'tap' | 'scroll_until';
+  tool: 'tap' | 'scroll_until' | 'assert';
   args: Record<string, unknown>;
 }
 

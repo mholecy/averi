@@ -429,6 +429,8 @@ files and their manifest entries (own-parts' L and N trees as before, I added). 
   its window at 0,0 the screen's size) and a **Views `BottomSheetDialog`** (its `touch_outside` scrim, labelled or not:
   does the scrim rule hold?). Each with a target beneath it: the tap's wait and `scroll_until` read with the hint, and
   whether the window could be marked from the dump.
+  Measured 2026-10-19 (presented/dialog-fullscreen, presented/bottom-sheet-dialog): docs/truth/live-android-2026-10-18-visibility.md
+  "Round 7: presented windows the parser does not mark"; lab note LW1.
 - **Eyes: verify a "fully" claim with pixels** (ADR 0013's residual, live case k7): where a node-less sibling's padding
   — a bar riding on the IME, an inset its surface draws but its node does not span — may lie over the target, a
   `fully visible` stop is checked against the screenshot (the target's colour across its whole frame), so the 18 px of
