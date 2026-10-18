@@ -12,12 +12,13 @@ open note on the working tree. See the script for the verdicts.
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 20 rows (recorded) |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 22 rows (recorded) |
 | 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED; live ios: CALIBRATED |
 | 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED; live ios: CALIBRATED-ON-DEFECT |
-| 8 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
+| 8.1 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
+| 8.2 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | 2f98900 → c8c06a8 | CALIBRATED |
 | 9 | 2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header | calibrate | 10fb02b → d2b7744 | CALIBRATED |
-| 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | needs-cell:edges | 10fb02b → d2b7744 | — |
+| 10 | 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights | calibrate | 10fb02b → d2b7744 | DOES-NOT-FAIL (partial: the static rows only, toward the row (`up`); the note's own symptom — the default `down` neither seeing the row past its far edge nor turning — is the live turn-back case `turn:scroll-collapsing.A` (live-visibility.ts#TURN_BACK), not yet run) |
 | 11 | 2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar | calibrate | 188740b → bd06470 | CALIBRATED |
 | 12 | 2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container | calibrate | d043e65 → 9c7885e | CALIBRATED (partial: the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is judged by the note's live calibration (recorded: `needs` says what it found)); live android: CALIBRATED-ON-DEFECT (intermittent), regressed elsewhere: 1 row (recorded) |
 | 13 | 2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing | calibrate | f4ff4be → 29a5c30 | CALIBRATED |
@@ -229,6 +230,8 @@ Regressed elsewhere at 13d68a2 (green at 16ae6bb):
   - RED android-averi_lab-api33/fab.xml K scroll_until — stopped: ERROR scroll_until id:"lab.fab.K" failed after 2 swipes — element is in the viewport but under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it — 0% of it shows — an
   - RED android-averi_lab-api33/own-parts.xml L tap — not tapped: ERROR text:"LOGIN" is under button (127,303 825x176) at its centre (540,392), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED android-averi_lab-api33/own-parts.xml L scroll_until — stopped: ERROR scroll_until text:"LOGIN" failed after 2 swipes — element is in the viewport but under button (127,303 825x176) at its centre (540,392), drawn over it — 0% of it shows — and the content is exhau
+  - RED android-averi_lab-api33/own-parts.xml I tap — not tapped: ERROR label:"Close" is under button (485,1821 110x110) at its centre (540,1876), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED android-averi_lab-api33/own-parts.xml I scroll_until — stopped: ERROR scroll_until label:"Close" failed after 2 swipes — element is in the viewport but under button (485,1821 110x110) at its centre (540,1876), drawn over it — 0% of it shows — and the content is ex
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu-grouped.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows 
   - RED ios-iphone17-ios27/blur-menu.idb.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
@@ -248,6 +251,7 @@ Regressions recorded:
 
 - ios-iphone17-ios27/sheet-medium.wda.json S tap, ios-iphone17-ios27/sheet-medium.wda.json S scroll_until: broke at 13d68a2, fixed at 81a7d62 — the sheet's frames-only background container read as a cover over its own button (#18)
 - android-averi_lab-api33/own-parts.xml L tap, android-averi_lab-api33/own-parts.xml L scroll_until: broke at 13d68a2, fixed at cccf6b8 — a Compose button's own text read as under the unlabelled button listed after it (#8)
+- android-averi_lab-api33/own-parts.xml I tap, android-averi_lab-api33/own-parts.xml I scroll_until: broke at 13d68a2, fixed at c8c06a8 — a Compose icon button's icon read as under the unlabelled button inset round it, listed after it (#8's second fix; own-parts' I, round 6)
 - ios-iphone17-ios27/own-parts.wda.json N tap, ios-iphone17-ios27/own-parts.wda.json N scroll_until, ios-iphone17-ios27/own-parts.idb.json N tap, ios-iphone17-ios27/own-parts.idb.json N scroll_until: broke at 13d68a2, fixed at 81a7d62 — a text field read as a cover over its own label, the label's rect 2 pt past the field's at top and bottom (#18)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: green at 13d68a2, Tapped at b75b8b5 (fix/r5-cr) … dff7381, green again at 8c0fb41 (fix/r6-ios-top)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2
@@ -296,7 +300,7 @@ Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, d928789 → c3ebc62, dismiss:
 
 7.2, the second fix alone (d928789, c3ebc62's first parent → c3ebc62), on toolbar-dismiss-short (round 3): the same form, its scroll view 451 pt tall below the bar — WDA lists it `0,0 402x567` (65 % of the screen, no host by size), its frame over the title, its rows below it — the note's second shape (mp-native's `0,0 402x512`): refused at d928789 `covered by scrollable` (as at 7542021; at 5cff2ad for the toolbar), the title tapped at c3ebc62.
 
-## 8: CALIBRATED
+## 8.1: CALIBRATED
 
 2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md — defect: `^(not tapped|stopped): .*\bunder button \(`
 
@@ -307,9 +311,20 @@ Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, d928789 → c3ebc62, dismiss:
   - ok android-averi_lab-api33/own-parts.xml L tap — Tapped text:"LOGIN"
   - ok android-averi_lab-api33/own-parts.xml L scroll_until — Element text:"LOGIN" fully visible after 0 swipes
 
-Needs: Its second fix, c8c06a8 (fix/r6b-icon: a Compose icon button's control, padded evenly round its label, is the label's own control), is not paired: no lab cell holds a Compose IconButton (own-parts' L is a text button). A pair 2f98900 → c8c06a8 needs an icon-button target in own-parts (Android), e.g. an IconButton with a content description — the note's B-1.7 shape: a 132-px wrapper, the icon, then an unlabelled clickable inset on all sides.
-
 own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes "a layout defect"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.
+
+## 8.2: CALIBRATED
+
+2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md — defect: `^(not tapped|stopped): .*\bunder button \(`
+
+- before 2f98900:
+  - RED android-averi_lab-api33/own-parts.xml I tap — not tapped: ERROR label:"Close" is under button (485,1821 110x110) at its centre (540,1876), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+  - RED android-averi_lab-api33/own-parts.xml I scroll_until — stopped: ERROR scroll_until label:"Close" failed after 2 swipes — element is in the viewport but under button (485,1821 110x110) at its centre (540,1876), drawn over it — 0% of it shows — and the content is ex
+- after c8c06a8:
+  - ok android-averi_lab-api33/own-parts.xml I tap — Tapped label:"Close"
+  - ok android-averi_lab-api33/own-parts.xml I scroll_until — Element label:"Close" fully visible after 0 swipes
+
+8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:"Close"`). Red at 2f98900 (`label:"Close" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). iOS lists the SwiftUI button alone, labelled Close: its own-parts capture predates I (round 6's iOS capture waits on the host's Xcode).
 
 ## 9: CALIBRATED
 
@@ -321,6 +336,23 @@ own-parts' L: a Material button's text LOGIN, which uiautomator lists as the cli
   - ok android-averi_lab-api33/scroll-sticky-view.xml R fully — ERROR scroll_until id:"lab.scroll-sticky-view.R" failed after 3 swipes — element is in the viewport but under text "Sticky header" (400,347 281x66), drawn over it — 63% of it shows — and the content is exhausted: swiping
 
 edges/scroll-sticky-view (round 4): scroll-sticky-cut's list and merged header (`semantics(mergeDescendants = true)`), the row R a testTag container whose content is an Android View (AndroidView: a clickable android.view.View labelled `Target R`) — uiautomator cuts the container at the header's bottom, `[128,457][953,567]`, and lists the View whole, `[128,391][953,567]` (the View system's bounds, which Compose's accessibility does not cut at the header): the note's shape (mp-native's `row_0 66,480 948x84`, its children `66,403 948x143`). R's frame 128,391 825x176, its top 66 px under the header 0,303 1080x154. At 10fb02b `fully: true` calls it `fully visible after 0 swipes`; at d2b7744 the descendants' extent past the cut refuses it. The earlier variants stay as the contrast: scroll-sticky (R listed whole, the header after it: refused on both sides, DOES-NOT-FAIL) and scroll-sticky-cut (the content a Compose node, cut with the container: red before and after — lab finding VA1).
+
+## 10: DOES-NOT-FAIL (partial: the static rows only, toward the row (`up`); the note's own symptom — the default `down` neither seeing the row past its far edge nor turning — is the live turn-back case `turn:scroll-collapsing.A` (live-visibility.ts#TURN_BACK), not yet run)
+
+2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md — defect: `0×0 nodes|"height":-\d`
+
+- before 10fb02b:
+  - ok android-averi_lab-api33/scroll-collapsing.xml A tap — ERROR Timed out after 5000ms waiting for element id:"lab.scroll-collapsing.A" to appear
+  - ok android-averi_lab-api33/scroll-collapsing.xml A colour — FAIL  element id:"lab.scroll-collapsing.A" fill within dE00 8 of #F3EDF7 — element rect is outside the screenshot (off-screen in this capture; scale 1.000) — scroll it on-screen and re-run; failing closed, color unchecke
+  - ok android-averi_lab-api33/scroll-collapsing.xml A scroll_until — ERROR scroll_until id:"lab.scroll-collapsing.A" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":127,"y":220,"width":825,"height":-55})
+- after d2b7744:
+  - ok android-averi_lab-api33/scroll-collapsing.xml A tap — ERROR Timed out after 5000ms waiting for element id:"lab.scroll-collapsing.A" to appear
+  - ok android-averi_lab-api33/scroll-collapsing.xml A colour — FAIL  element id:"lab.scroll-collapsing.A" fill within dE00 8 of #F3EDF7 — element rect is outside the screenshot (off-screen in this capture; scale 1.000) — scroll it on-screen and re-run; failing closed, color unchecke
+  - ok android-averi_lab-api33/scroll-collapsing.xml A scroll_until — ERROR scroll_until id:"lab.scroll-collapsing.A" failed after 6 swipes (maxSwipes) — element in tree but never intersected the 1080x2220 viewport (last rect {"x":127,"y":220,"width":825,"height":0})
+
+Needs: A live run of `turn:scroll-collapsing.A` (scripts/truth/live.ts --serial <averi_lab> --groups visibility --cells scroll-collapsing, at 10fb02b and d2b7744: `--side`) — the note's 4 strokes the wrong way before, the reply's clipped-out-above hint after; the replay cannot show a turn.
+
+edges/scroll-collapsing (round 6, Android only): Settings' shape in Views — a CoordinatorLayout neither it nor its NestedScrollView clipping children (ViewGroup#getChildVisibleRect clips a group to its bounds only when its parent clips children), the list laid below a collapsed CollapsingToolbarLayout app bar drawn over what runs on above the list's top. A, a row scrolled wholly above the list's top (frame 127,-11 825x176, the list 0,220 1080x2000), stays visible to the accessibility framework and is dumped `[127,220][952,165]`: View#getBoundsOnScreen clamps its top to the list's and leaves its bottom where it lies — the note's inverted bounds (Settings' `[66,66][428,44]`); D, cut 11 px by the list's top, reads `[127,220][952,385]`, cut, not inverted. Earlier (2026-10-16) the lab's Compose did not reproduce it: a row cut by the screen's top reads cut, rows off the screen or outside their container are not dumped. Every row green on both sides — DOES-NOT-FAIL: at 10fb02b A's tap waits naming `0×0 nodes … scroll_until it first`, its colour fails closed off the screenshot, scroll_until `up` strokes inside the list (`540 620 → 1820` ×6, `last rect … "height":-55`); at d2b7744 the same verdicts and strokes, the last rect of height 0 (the fix's clipped-out rect); at truth/round-6's src the tap's hint names it `clipped out above its scroll container … scroll_until it with direction: "up" first` and the colour fails closed on `no area`. The fix changes the wording; the stroke's direction is live.
 
 ## 11: CALIBRATED
 
@@ -1082,7 +1114,6 @@ No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under i
 
 ## Not reproducible with the existing cells
 
-- 10 2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md: needs-cell:edges — edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.
 - 24 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md: residual:accepted (round 13: the FAB host layer is a cover)
 - 25 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped.md: residual:ADR 0007 (idb's QuickType bar)
 - 31 2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md: residual:open (the blur overlay has no node in either tree)

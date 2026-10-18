@@ -159,6 +159,15 @@
         },
         {
           "rows": [
+            "android-averi_lab-api33/own-parts.xml I tap",
+            "android-averi_lab-api33/own-parts.xml I scroll_until"
+          ],
+          "broke": "13d68a2",
+          "fixed": "c8c06a8",
+          "why": "a Compose icon button's icon read as under the unlabelled button inset round it, listed after it (#8's second fix; own-parts' I, round 6)"
+        },
+        {
+          "rows": [
             "ios-iphone17-ios27/own-parts.wda.json N tap",
             "ios-iphone17-ios27/own-parts.wda.json N scroll_until",
             "ios-iphone17-ios27/own-parts.idb.json N tap",
