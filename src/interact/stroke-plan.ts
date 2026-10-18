@@ -60,11 +60,12 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * belongs to the view the finger first touches, and a carousel touched down on by a vertical drag hands the outer list
  * part of it at most (~51 pt a stroke on iOS, inferred; unmeasured on iOS) —
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. The lab's
- * `carousel-in-list` (harness task H2) is captured on Android only: there the carousel is a `HorizontalScrollView`,
- * its axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the
- * stretch below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched
- * down on it (y 444, inside `66,380 948x234`); C, the card past the carousel's right clip, is never stroked there,
- * uiautomator dumping it as a strip at the screen's edge that averi stops on at once (lab finding LE1,
+ * `carousel-in-list` (harness task H2) is captured on Android only: there the carousel is a `HorizontalScrollView`, its
+ * axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the stretch
+ * below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched down on it
+ * on the replay before S4 (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
+ * recorded); C, the card past the carousel's right clip, is never stroked there, uiautomator dumping it as a strip at
+ * the screen's edge that averi stops on at once (lab finding LE1,
  * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md).
  * The iOS measurement — C asked `right` under WDA, and what a carousel hands the page — waits on the plan's "Pending
  * captures (round 6)" (docs/plans/2026-10-15-ground-truth-lab-app.md). ADR 0010
