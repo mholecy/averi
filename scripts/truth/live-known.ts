@@ -74,8 +74,9 @@ export interface Alternative {
   record: string;
 }
 
-const each = (prefix: string, ids: readonly string[], note: string, cls: VerdictClass, kind: ReplyKind, intermittent?: 'intermittent', also?: readonly Alternative[]) =>
-  ids.map((id) => [`${prefix} ${id}`, { note, cls, kind, ...(intermittent !== undefined && { intermittent: true as const }), ...(also !== undefined && { also }) }] as const);
+/** The entries `<prefix> <id>` of every id, each known by `note`, `cls` and `kind`, with KnownLive's optional facts as given. */
+const each = (prefix: string, ids: readonly string[], note: string, cls: VerdictClass, kind: ReplyKind, more: Pick<KnownLive, 'intermittent' | 'also'> = {}) =>
+  ids.map((id) => [`${prefix} ${id}`, { note, cls, kind, ...more }] as const);
 
 export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntries([
   // Android
@@ -91,7 +92,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // two-stroke stop, which the record reads.)
   ...each('android uiautomator', ['scroll:scroll-sticky-cut.R.fully'], VA1, 'stop-claim', 'visible'),
   ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1, 'unchanged-claim', 'not found'),
-  ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', 'intermittent'),
+  ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', { intermittent: true }),
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // iOS, idb: no scroll view listed
   ...each('ios idb', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O'], LE2, 'stop-claim', 'visible'),
@@ -125,7 +126,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // ios-wda-bounded-long-list-11683c3-2.json, -3.json), 4 in the other (the budget spent, `refused`: -1.json). Each a
   // second unmoved stroke not turned back: R-direction still. (Round 5's record, ios-vis-2725e76.json, and the
   // b71cbbb run read `refused` too: no turn at all there.)
-  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'visible', undefined, [{ cls: 'R-direction', kind: 'refused', record: R6_SMOKE }]),
+  ...each('ios wda', ['turn:scroll-bounded.F'], LV4, 'R-direction', 'visible', { also: [{ cls: 'R-direction', kind: 'refused', record: R6_SMOKE }] }),
   // LV5's `ios wda scroll:scroll-bounded.F` struck off by round 6's iOS device check: ok in all four runs at 11683c3
   // (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json: `lower` at rest at 915–981, inside F's 884–1000
   // window), where round 5's src overshot to 1052 in one run of three and to 1006 (F cut, a plain stop) today.
@@ -134,7 +135,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios wda', ['carry:sheet-long-list.Row30'], LV6, 'R-direction', 'refused'),
   // carousel-in-list's C: one sideways stroke flings the carousel 447–532 pt, C's centre inside over 177–531 only; at
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
-  ...each('ios wda', ['scroll:carousel-in-list.C'], CAROUSEL_FLING, 'stop-claim', 'visible', 'intermittent'),
+  ...each('ios wda', ['scroll:carousel-in-list.C'], CAROUSEL_FLING, 'stop-claim', 'visible', { intermittent: true }),
   // blur-menu-grouped's C: WDA lists the menu row W over it, so the stop is refused — after three strokes on the blur
   // (no node: residual 9), "content exhausted … a layout defect".
   ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
