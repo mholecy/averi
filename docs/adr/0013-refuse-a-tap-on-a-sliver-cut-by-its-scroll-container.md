@@ -40,8 +40,13 @@ Residuals of the refinement: a whole control thinner than the minimum laid flush
 refused too, because the dump cannot tell it from a cut. It is handled as the container cut's own residual is: the
 sentences say the rest "may" lie under that node, the tap's remedy adds the way past ("if it is whole — a control that
 thin laid flush against that container — no scroll shows more: tap by coordinates"), and `scroll_until`'s stuck failure
-names the alternative ("or it is only that thin, laid flush against it"). A text that is no control (the field's title, cut to 14 px at
-the same bar) is tapped as before.
+names the alternative ("or it is only that thin, laid flush against it"). A text that is no control (the field's title,
+cut to 14 px at the same bar) is tapped as before. The second residual: a clickable with no role — Compose's
+`Modifier.clickable` without one dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is
+still tapped on the strip, and in an app whose bar takes the touch that tap is reported done and reaches nothing (the
+owner's "accidentally submitted" risk). Not widened on purpose: the gate is the control roles
+(selectors.ts#isInteractive), and a role-less node is as often a layout wrapper as a clickable — refusing those would
+refuse wrappers and containers that are no target.
 
 Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
 

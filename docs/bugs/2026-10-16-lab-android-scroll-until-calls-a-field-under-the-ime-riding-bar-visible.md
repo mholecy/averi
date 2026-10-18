@@ -1,8 +1,8 @@
 # BUG: on Android `scroll_until` answers "visible after 0 swipes" for a field the submit bar riding on the soft keyboard is drawn over — the bar's surface is not in the tree, and Compose cuts the field's bounds at the button only
 
-> **Status (2026-10-18):** fixed on `arch/r22-f2a1` at `6d8f8de` (from `arch/round-22` `b71cbbb`), by the owner's decision
-> of 2026-10-17 — a field remnant under the tap minimum is refused. The sliver rule (ADR 0013) takes a second evidence:
-> a control thinner than the minimum across an edge flush with a node drawn after it that spans that edge
+> **Status (2026-10-18):** fixed on `arch/r22-f2a1` at `6d8f8de` (from `arch/round-22` `b71cbbb`), by the owner's
+> decision of 2026-10-17 — a field remnant under the tap minimum is refused. The sliver rule (ADR 0013) takes a second
+> evidence: a control thinner than the minimum across an edge flush with a node drawn after it that spans that edge
 > (`src/ui-tree/standing.ts#cutByLater`, `geometry.ts#Cut.by`), Android's trees only. Both symptoms of the one cause:
 > `tap phone` (IME up) is refused naming `container id:lab.form-keyboard.submit`, the strip `970x42` at `55,1370`, and
 > "the soft keyboard is up (its top edge at y 1398): dismiss it first … — a bar riding on it goes down with it — or
@@ -13,7 +13,14 @@
 > branch, 1137 checks / 241 mismatches (baseline 242) — the KNOWN row `form-keyboard.xml phone scroll_until` turns
 > green; three replies change (phone tap, phone scroll_until, note tap), every other row's reply and calls identical.
 > Not checked on the emulator. iOS cannot show the geometry: WDA lists `phone` whole under the bar (covered at its
-> centre, its rows green), idb's flat list misses the bar (lab note L2, a separate finding).
+> centre, its rows green), idb's flat list misses the bar (lab note L2, a separate finding). Residuals (ADR 0013's
+> refinement): a WHOLE control that thin laid flush against a later node that spans it is refused too ("may lie under",
+> with a coordinate tap as its way past); and a clickable with no role — Compose's `Modifier.clickable` without one
+> dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is still tapped on the strip, and
+> in an app whose bar takes the touch that tap is reported done and reaches nothing (the owner's "accidentally
+> submitted" risk). Not widened on purpose: the gate is the control roles (selectors.ts#isInteractive), and a role-less
+> node is as often a layout wrapper as a clickable — refusing those would refuse wrappers and containers that are no
+> target.
 
 Lab note F2A1. **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's
 ground truth (`tests/fixtures/truth/android-averi_lab-api33/form-keyboard.*`, captured by
