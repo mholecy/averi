@@ -797,25 +797,30 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    open over the screen, close it first)` — beneath the tap's, fill's and the presence check's "Timed out … to appear"
    (interact/resolve.ts#notFound, in the hint's place; a zero-area match's hint, which says the target IS in the
    tree, takes it first) and after `scroll_until`'s "element never appeared in the tree" (scroll-text.ts, the
-   `absent` shortfall). One constant (ui-tree/standing.ts#ACTIVE_WINDOW_HINT); never under WDA or idb. A possibility,
+   `absent` shortfall). One constant (ui-tree/miss.ts#ACTIVE_WINDOW_HINT); never under WDA or idb. A possibility,
    not a cause: it rides on every such wait and `scroll_until` on Android, a plain screen's too, and the wait's class
    is unchanged (absence). ~~The asserts' "not found within …" (verify/poll-verdict.ts) and a flow's `wait:` timeouts
    do not carry it — an assert of absence passes there, and the hint would point the wrong way.~~ Refined in round 7
    (2026-10-18, the orchestrator's decision under the owner's delegation): EVERY reply that says a target is not in
-   such a tree carries it, once — the reason above was the absent assert's, which passes there and says no
-   not-found, so it never applied to "not found". Added: every assert's `not found within …` (verify/poll-verdict.ts
-   #notFound — the element, text, match, error, rect, color and ocr asserts — after the words, where the last read's
-   error would go); a flow's `wait:` on a present element (flow/engine.ts#waitTimeoutHint, beneath its headline, as
-   the tap's wait); and the skip line of an optional step whose target was never found, `(not present) (…)`
-   (flow/engine.ts#runOptionalSteps, read off `ElementNotFoundError.windowHint`, which carries the hint its message
-   carries). One decision — `activeWindowHint` of the LAST tree the miss read (ui-tree/read-tree.ts#pollTree's
-   `lastTree`) — and two shapes by the reply's layout: beneath a thrown poll timeout (pollTimeoutMessage) and after a
-   one-line not-found (`withActiveWindowHint`); dropped when the last read failed, as every hint is. An assert whose
-   element is found with the wrong content, an absent assert, a `wait:` on a state, and a wait whose last tree was
-   bare (its note claims the line) do not carry it. Golden (truth/round-7 e856afc, `--side` this branch): 1344 checks,
-   230 mismatches before and after; wording only — the 15 Android colour rows that end `not found within 1 s`
-   (alert-dim and sheet-medium A–D, carousel-in-list B and U, scroll-bounded F and O, scroll-top-edge(-end) A,
-   tabbar-floating F); no class, kind or device call moved.
+   such a tree says what that miss saw, once — the reason above was the absent assert's, which passes there and says
+   no not-found, so it never applied to "not found". One module decides it and words it (ui-tree/miss.ts): `missOf`,
+   of the LAST read the miss made (ui-tree/read-tree.ts#pollTree's `lastTree`), answers one of `unread` (the read
+   error is the story), `zeroArea` (the caller's 0×0 match, which says the target IS in the tree), `presented` (a
+   window listed alone — decision 4's remedy), `activeWindow` (this hint) or `none` (WDA, idb), in that precedence;
+   `missNote` words it; the replies only pick the layout — beneath a thrown poll timeout's headline (the tap's, fill's
+   and presence check's wait, a flow's `wait:` on a present element), after a one-line not-found in a parenthesis
+   (`withMissNote`: `scroll_until`'s "element never appeared in the tree", its `covered` stop under a keyboard over
+   the whole screen included; every assert's `not found within …`, verify/poll-verdict.ts#notFound; an optional
+   step's skip, `(not present) (…)`, and a skipped `wait:`'s `Timed out … (…)`, read off the `Miss` the error carries,
+   `missCarried`), or — the tap's and fill's wait on a `presented` miss only — in place of the headline
+   (`presentedAloneHeadline`, decision 4's words unchanged). So beneath a dialog or a sheet the tree lists alone the
+   asserts and a `wait:` now say decision 4's remedy, as the tap does, and the hint where the tree marks no window. Not
+   carried: an assert whose element is found with the wrong content, an absent assert, a `wait:` on a state, a wait
+   whose last tree was bare (its note claims the line). Golden (truth/round-7 4130201, `--side` this branch): 1380
+   checks, 251 mismatches before and after; wording only, the 23 Android colour rows that end `not found within 1 s`
+   — alert-dim A–D and sheet-medium A–D the presented remedy, bottom-sheet-dialog A–D, dialog-fullscreen A–D,
+   carousel-in-list B and U, scroll-bounded F and O, scroll-top-edge(-end) A and tabbar-floating F the hint; no class,
+   kind or device call moved, and every tap, fill and `scroll_until` reply is byte-identical.
    Live on averi_lab 2026-10-19 (docs/truth/live-android-2026-10-19-hint-everywhere.md): form-picker c2–c4 ok; under
    its sheet the element, text and color asserts, a flow's `wait:` and an optional tap each said it once, nothing fired.
    Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
