@@ -1,6 +1,8 @@
 import type { DeviceAdapter, Selector, UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import type { Edge } from '../ui-tree/geometry.js';
+import { presentationOf, type MarkedLayer } from '../ui-tree/presentation.js';
+import { presentedRemedy } from '../ui-tree/standing.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive } from '../ui-tree/selectors.js';
 import { SIDES } from './swipe.js';
@@ -235,7 +237,11 @@ export interface ResolvedSettled extends Resolved {
  * stop moving:
  * - no round resolved the target: ElementNotFoundError, "…waiting for element
  *   X to appear" (when the last read succeeded; see ElementNotFoundError for why
- *   a wait whose last read failed is a plain Error with the same wording);
+ *   a wait whose last read failed is a plain Error with the same wording) —
+ *   unless that last read listed a presented window ALONE (`listedAlone`,
+ *   Android's dialog or sheet): then a plain Error, "…: element X is not in
+ *   the tree, which lists only the window presented on top … — close it first"
+ *   (`notFound`), since nobody saw the screen beneath;
  * - some round did, but no two consecutive ones agreed on its rect (it kept
  *   moving, or kept vanishing): a plain Error, "…waiting for element X to
  *   hold still (found, but never at the same position in two consecutive
@@ -271,11 +277,13 @@ export async function resolveSettled(
   let sightings = 0;
   let run = 0; // consecutive rounds that resolved it, up to the last tree read
   let zeroHint: string | undefined;
+  let alone: MarkedLayer | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
       zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
+      alone = resolved === undefined ? listedAlone(tree) : undefined;
       if (resolved === undefined) {
         lastRect = undefined;
         run = 0;
@@ -317,7 +325,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome, zeroHint);
+  throw notFound(target, timeoutMs, outcome, zeroHint, alone);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -354,12 +362,30 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * words it, and names the side when Android dumped them clipped out).
  * docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string): Error {
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string, alone?: MarkedLayer): Error {
+  // Beneath a presented window listed alone the target is not known absent: nobody saw the screen beneath. A plain
+  // Error, as scroll_until's stop there (an optional step is skipped with this headline, never "(not present)").
+  if (alone !== undefined && outcome.readError === undefined && zeroHint === undefined) {
+    return new Error(
+      `Timed out after ${timeoutMs}ms: element ${describeTarget(target)} is not in the tree, which lists only the window presented on top ` +
+        `(the tree source lists the active window alone) — ${presentedRemedy('it', alone)}`,
+    );
+  }
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, zeroHint), {
     sighted: false,
     ...outcome,
   });
 }
+
+/**
+ * The presented layer `tree` lists ALONE (ui-tree/presentation.ts#Presentation.alone): a source that lists the active
+ * window only, that window presented — so a target this read did not find may lie beneath it, unlisted. Asked of a
+ * read that did not resolve the target only, so a found target never pays the walk.
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
+ */
+// The root-mark test is a cost guard only: `alone` is undefined without it anyway, and it spares a tree of any other
+// source the presentation's walk on every read that missed its target.
+const listedAlone = (tree: UiNode): MarkedLayer | undefined => (tree.activeWindowOnly === true ? presentationOf(tree).alone : undefined);
 
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
 const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
@@ -405,17 +431,19 @@ export async function resolvePresent(
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   let zeroHint: string | undefined;
+  let alone: MarkedLayer | undefined;
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
       zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
+      alone = resolved === undefined ? listedAlone(tree) : undefined;
       return resolved;
     },
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome, zeroHint);
+  throw notFound(target, timeoutMs, outcome, zeroHint, alone);
 }
 
 // ─── Refused on a present element ────────────────────────────────────────────

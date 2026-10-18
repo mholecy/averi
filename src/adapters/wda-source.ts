@@ -197,6 +197,9 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
     (el.children ?? []).map((child) => toUiNode(child, marks, { hidden, cell, scroller })),
   );
   if (hidden) node.hidden = true;
+  // A table scrolls vertically only (UITableView); a `ScrollView` or `CollectionView` may scroll either way, and its
+  // type says nothing — its content's extent may (types.ts#UiNode.scrollAxis, ui-tree/scroll-containers.ts#scrollAxis).
+  if (el.type === 'Table') node.scrollAxis = 'vertical';
   const presentation = marks.presented.layers.get(el);
   if (presentation !== undefined) node.presentation = presentation;
   if (marks.presented.elements.has(el)) node.presentationElement = true;

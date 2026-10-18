@@ -1,5 +1,5 @@
-import { clips, scrolls } from './scroll-containers.js';
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { clips, isScrollViewOf, scrollAxis, scrolls } from './scroll-containers.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -667,7 +667,9 @@ export interface Clips {
    * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`)
    * — a sliver a tap is refused on and `scroll_until`'s plain stop does
    * not stop on; undefined otherwise. Asked only by
-   * ui-tree/standing.ts#Scene.standing, which orders it against the rest.
+   * ui-tree/standing.ts#Scene.standing, which orders it against the rest,
+   * and asks the rule's other evidence after it — a cut by a node drawn
+   * after it (standing.ts#cutByLater, `Cut.by`), which needs the draw order.
    *
    * Or INHERITED (the owner's decision, the bug note below): a node flush within a pixel with an
    * edge whose ancestor — below the container of that edge — is itself a
@@ -722,6 +724,54 @@ export interface Clips {
    * (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first ask; the answer is shared along a branch.
    */
   drawnIn(node: UiNode): Drawn | undefined;
+  /**
+   * The axis facts of the scroll view of rect `container` — the first node in tree order that scrolls with exactly
+   * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
+   * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
+   * that scroll, at any depth; one of its own rect left out) with theirs, each as scroll-containers.ts#scrollAxis says
+   * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
+   * view of that rect (the list moved). Found as draw order finds its container (scroll-containers.ts#isScrollViewOf).
+   * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
+   */
+  axesOf(container: Rect): ScrollAxes | undefined;
+  /**
+   * The scroll view of rect `scroller` (within a pixel; the first in tree order that scrolls), when the tree shows its
+   * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
+   * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`drawnIn`'s
+   * dialect, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
+   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container at
+   * 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
+   * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts every rect to its scroll
+   * container, so content past an edge reads flush with it (or is not listed at all), and idb's flat list lists no
+   * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
+   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG
+   * that edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
+   * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
+   * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
+   * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
+   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual, stated as it is: a lazy list (a
+   * table) lists only the rows it has laid out, so one resting EXACTLY on a row boundary with its earlier rows dropped
+   * (a sticky section header pinned at its top reads the same) lists nothing past its top and reads as ending there.
+   * Nothing in the reads rules that out: interact/scroll-rounds.ts asks this only of a read a stroke left unmoved, but
+   * a stroke not taken leaves it unmoved too — so a stroke not taken over a lazy list resting on a boundary is a false
+   * proof (one stroke, then a turn or a failure that calls the content exhausted). What makes it rare, not impossible:
+   * a list at rest lies on a boundary by chance (a flung list stops anywhere along a row), and the stroke must also go
+   * untaken, with nothing drawn over its touch-down (that withholds the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most
+   * once a round, after a stroke).
+   */
+  endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
+}
+
+/** A scroll view's axis and those of the scroll views nested in it (`Clips.axesOf`). */
+export interface ScrollAxes {
+  readonly axis: ScrollAxis | undefined;
+  readonly nested: readonly NestedScrollView[];
+}
+
+/** A scroll view nested in another, as `Clips.axesOf` gives it: its rect and its axis, undefined where the tree cannot tell. */
+export interface NestedScrollView {
+  readonly rect: Rect;
+  readonly axis: ScrollAxis | undefined;
 }
 
 /** What of `rect` the drawn frame `drawn` holds (`Clips.drawnIn`): `rect` itself when nothing cuts it; undefined when nothing of it can be drawn. */
@@ -822,11 +872,40 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     }
     return drawn.get(node);
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn };
+  const axes = new Map<UiNode, ScrollAxes>();
+  const axesOf = (container: Rect): ScrollAxes | undefined => {
+    const found = [...everyNode(tree)].find((n) => isScrollViewOf(n, container));
+    if (found === undefined) return undefined;
+    const kept = axes.get(found);
+    if (kept !== undefined) return kept;
+    const facts: ScrollAxes = {
+      axis: scrollAxis(found, unclipped),
+      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+    };
+    axes.set(found, facts);
+    return facts;
+  };
+    const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
+    if (!ancestry || !unclipped) return undefined;
+    const view = [...everyNode(tree)].find((n) => scrolls(n) && sameRectWithinPixel(n.rect, scroller));
+    if (view === undefined) return undefined;
+    // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
+    if (scrollAxis(view, unclipped) !== (edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal')) return undefined;
+    const r = view.rect;
+    const past: Record<Edge, (d: Rect) => boolean> = {
+      top: (d) => d.y < r.y - 1,
+      bottom: (d) => d.y + d.height > r.y + r.height + 1,
+      left: (d) => d.x < r.x - 1,
+      right: (d) => d.x + d.width > r.x + r.width + 1,
+    };
+    const under = [...everyNode(view)].filter((d) => d !== view && rectArea(d.rect) > 0);
+    return under.some((d) => past[edge](d.rect)) ? undefined : view;
+  };
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, endsAt };
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
-function across(rect: Rect, edge: Edge): number {
+export function across(rect: Rect, edge: Edge): number {
   return edge === 'top' || edge === 'bottom' ? rect.height : rect.width;
 }
 
@@ -873,6 +952,13 @@ export interface Cut {
    * lies in. Absent for a cut the node's own content evidences.
    */
   readonly within?: Rect;
+  /**
+   * The node DRAWN AFTER it whose edge the node's rect was cut at (ui-tree/standing.ts#cutByLater): Compose leaves out
+   * of a node's bounds what a node drawn after it covers, and the rest of the node lies under THAT node, not past a
+   * scroll container's edge — `container` is its rect. Absent for a cut at a clipping container's edge (`cutSliver`'s).
+   * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
+   */
+  readonly by?: UiNode;
 }
 
 /**

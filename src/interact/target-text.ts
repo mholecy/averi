@@ -1,5 +1,6 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { nodeText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 
 /**
@@ -71,15 +72,102 @@ export function untriedSideText(side: Edge): string {
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
  * part…`. Said by the tap's refusal
  * (tap-judgement.ts#judgeTap), by `scroll_until`'s sliver failures
- * (scroll-text.ts) and by the picker's skip line — one wording.
+ * (scroll-text.ts) and by the picker's skip line — one wording. A cut by a
+ * node drawn after it (`Cut.by`) is `cutByText`'s.
  */
-export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
+export function cutSliverText(cut: Cut, shown: Rect, minPiece: number, lineY?: number): string {
+  if (cut.by !== undefined) return cutByText(cut.by, cut, shown, minPiece, lineY);
   const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;
   return (
     `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)})${within}; only a ${shown.width}x${shown.height} part of it shows, ` +
     `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
   );
 }
+
+/**
+ * `cutSliverText`'s sentence for a node cut by a node drawn after it (`Cut.by`): `cut at its top edge by container
+ * id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a
+ * node's bounds what a later node covers, so the rest of it may lie under that container; only a 970x28 part of it
+ * shows above the soft keyboard, at 55,1370, 42 deep across that edge, under the 65 a tap needs` — where the part that
+ * shows lies, the rect it was dumped with, cut above the keyboard's top edge when one is known (`lineY`: the lab's
+ * phone, dumped to 1412, shows 28 of its 42 px above the line at 1398); the depth stays the dump's.
+ * "May": the dump cannot tell a cut from a WHOLE control that thin laid flush against that node (standing.ts
+ * #cutByLater's residual), so the remedy carries that case's way past (`cutByRemedy`, `WHOLE_THIN_WAY_PAST`).
+ */
+function cutByText(by: UiNode, cut: Cut, rect: Rect, minPiece: number, lineY: number | undefined): string {
+  const above = lineY !== undefined && lineY < rect.y + rect.height;
+  const height = above ? Math.max(0, lineY - rect.y) : rect.height;
+  const shows =
+    height === 0
+      ? `nothing of it shows above the soft keyboard (its strip lies at ${rectText(rect)})`
+      : `only a ${rect.width}x${height} part of it shows${above ? ' above the soft keyboard' : ''}, at ${rect.x},${rect.y}`;
+  return (
+    `cut at its ${cut.edge} edge by ${nodeText(by)}, drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
+    `so the rest of it may lie under that ${by.role}; ${shows}, ${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
+  );
+}
+
+/** The soft keyboard a remedy names: up, its top edge (a keyboard line's `y`), and what the adapter can hide it with. */
+export interface KeyboardUp {
+  readonly lineY: number;
+  readonly remedy: KeyboardRemedy;
+}
+
+/**
+ * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
+ * the MCP tools; \`dismissKeyboard: true\` on the fill before this step in a flow`, or `tap a neutral element such as
+ * the screen title — a tap: step in a flow`. The one wording of the clause for `scroll_until`'s whole-screen advice
+ * (scroll-text.ts#hideToJudgeWholeScreen) and the cut-by remedy (`dismissKeyboardFirstText`); each says the adapter's
+ * `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
+ */
+export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
+  dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : 'tap a neutral element such as the screen title — a tap: step in a flow';
+
+/**
+ * The first half of the remedy for a node cut by a node drawn after it while the soft keyboard is up (`Cut.by`, the
+ * owner's decision for lab note F2A1): `the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key
+ * back from the MCP tools; …) — a bar riding on it goes down with it` — a submit bar laid on the IME's inset moves off
+ * the field when the keyboard goes. How to hide it is `hideKeyboardHow`'s. The cut-by rule holds on Android's trees only
+ * (standing.ts#cutByLater), whose adapter hides the keyboard with `back`, so the other branch — `cannotHide` with the
+ * adapter's advice — is unreachable today; kept so a source that one day cuts so on another adapter is said right.
+ */
+export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string {
+  const how = remedy.dismissal === 'back' ? hideKeyboardHow(remedy) : `${hideKeyboardHow(remedy)}; ${cannotHide(remedy.advice)}`;
+  return `the soft keyboard is up (its top edge at y ${lineY}): dismiss it first (${how}) — a bar riding on it goes down with it`;
+}
+
+/**
+ * The soft keyboard as a cut-by remedy may name it: `keyboard` when the node that cut the target (`Cut.by`) RIDES on
+ * it — its bottom edge at or above the keyboard's top edge and within `minPiece` of it, as a submit bar laid on the
+ * IME's inset is (the lab's Continue ends at 1370, the line at 1398) — else undefined: hiding the keyboard does not move
+ * a top app bar or a sticky header that cut a control, and saying so would send the reader the wrong way.
+ */
+export function ridingKeyboard(by: UiNode, keyboard: KeyboardUp | undefined, minPiece: number): KeyboardUp | undefined {
+  if (keyboard === undefined) return undefined;
+  const gap = keyboard.lineY - (by.rect.y + by.rect.height);
+  return gap >= 0 && gap <= minPiece ? keyboard : undefined;
+}
+
+/**
+ * The remedy for a node cut by a node drawn after it (`Cut.by`), as the tap's refusal and `scroll_until`'s bound
+ * failure say it: with the soft keyboard up and that node riding on it (`ridingKeyboard`), dismiss it first, or scroll
+ * the list (`dismissKeyboardFirstText`); else scroll the list — `scroll_until it out from under that container first`.
+ * Not `cutRemedy`'s scroll toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
+ */
+export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  const keyboard = ridingKeyboard(by, up, minPiece);
+  const scroll = `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
+  return keyboard === undefined ? scroll : `${dismissKeyboardFirstText(keyboard)} — or ${scroll}`;
+}
+
+/**
+ * The way past a node cut by a node drawn after it should it only READ cut (standing.ts#cutByLater's residual: a
+ * whole control that thin, laid flush against that node) — as `OWN_CUT_WAY_PAST` is for a container's cut
+ * (tap-judgement.ts): no scroll shows more of it, so a coordinate tap. Conditioned on what a screenshot shows, so the
+ * way past is not read as the remedy: in the owner's own case (the lab's phone under the riding bar) the field is NOT
+ * whole, and a coordinate tap on the strip is the very tap the refusal exists to prevent.
+ */
+export const wholeThinWayPast = (by: UiNode): string => `only if a screenshot shows it whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
 
 /** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
 export function cutRemedy(edge: Edge): string {

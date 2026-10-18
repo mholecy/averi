@@ -102,6 +102,35 @@ was reported done at (201,827), 3 pt below CONTINUE.
   (`draw-order.ts#DrawOrder.drawnOver` finds its container among the nodes that scroll). Lab notes LE4 and LV3
   (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). Still so under idb, which
   lists no scroll view.
+- **A stroke across a scroll view's axis** (LE4's residual) — **refined 2026-10-18** (round 22, `arch/r22-axis`): the
+  stroke's scroll view is taken among the target's scroll views that scroll ALONG the stroke or whose axis the tree
+  cannot tell, nearest first, and inside it the stroke's path keeps off every nested scroll view that scrolls only
+  ACROSS it — the longest stretch of the scroll view clear of it on the stroke's line, when that stretch has room
+  (`interact/stroke-plan.ts#strokeRoom`, `#clearLane`). A card of a horizontal carousel nested in a vertical page,
+  scrolled for `down`, is stroked over the page, not vertically in the carousel; a page's content-down touch-down on
+  such a carousel is moved off it. The cost: the lane shortens the stroke to its stretch's 60 % — on the note's
+  geometry (a carousel `24,700 354x85` in the page `0,180 402x694`) 312 pt of finger travel (596 → 284) for the page's
+  416 (735 → 319), so more rounds against the swipe and time budget for one scroll. The axis per source
+  (`ui-tree/scroll-containers.ts#scrollAxis`): Android by class (`ScrollView`, `ListView`, … vertical;
+  `HorizontalScrollView`, `ViewPager` horizontal — a Compose `verticalScroll` dumps as `ScrollView`,
+  `horizontalScroll` as `HorizontalScrollView`); WDA's `Table` vertical, else a scroll view's content that runs on
+  past its frame on one axis alone — a node straddling the frame's edge by a quarter of its side, or one wholly past
+  it continuing a same-sized sibling inside it, never any node past it (a drawer at x −300, swipe-action buttons, a
+  page beside a fitting page read nothing). False readings left: a node of a fitting page straddling its side by a
+  quarter without scrolling (an overflowing row it clips), and a same-sized sibling beside a fitting page's content (a
+  pager's page the tree lists as no scroll view) — each reads that page horizontal; unknown — today's behaviour — for
+  a Compose lazy list or grid, a RecyclerView, a WDA scroll view whose content fits or runs on past it by less than a
+  quarter of its side with no same-sized sibling past it, and idb — false negatives among them (a chip carousel of
+  mixed widths, a card carousel spaced more than a quarter card apart with none straddling its edge, full-width cells
+  paged exactly with the next cell unlisted) all fall back to today's stroke. Fallbacks: no candidate along the stroke
+  with room — the pick as before (the nearest with room, whatever its axis: mp-native's Account Detail as captured,
+  whose carousel no list holds); no clear stretch with room, or none left with room by the cut for what is drawn over
+  the scroll view — the stroke as before, over the nested scroll view; the `fully: true` probe never goes over a
+  scroll view that scrolls only across it (unchecked, not a probe that moves nothing; a flush chain of such scroll
+  views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty). Still
+  UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
+  the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown
+  axis on Android.
 - **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
   21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
   at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.

@@ -3,7 +3,7 @@ import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCen
 import { FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
-import { clips, scrolls } from './scroll-containers.js';
+import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
 /**
@@ -52,6 +52,8 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * - `coversOf(node, region)` — the uiautomator parser's widening, through
  *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
  *   drawn over the strip a node cut short of its own content would gain?
+ *   And the sliver rule's cut by a later node (standing.ts#cutByLater): what
+ *   is drawn over the pixel row just past a thin control's edge?
  * - `presentedAt(node, point)` — `scroll_until`'s stroke
  *   (standing.ts#Scene.presentedAt): is the touch-down of a
  *   stroke for a target not judged in the viewport on a surface of a screen
@@ -69,8 +71,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * `exposure`, `paintsOver`, `coversOf`, `presentedAt` and `presentedOver` alike; the `drawnOver` column (the stroke
  * box) does not read it. Behind it sit the tree source's marks (a LAYER WDA marks presented: a typed alert, action
  * sheet or popover through its element alone, a `screen` its visibility flags show presented through the whole screen
- * with its own nodes covering where they draw) and, only on a tree whose source did not judge presented layers
- * (`UiNode.presentationsJudged`), the shape fallback (Android's through the uiautomator adapter). A verb learns of a
+ * with its own nodes covering where they draw; the one window uiautomator dumps, when its parser marks it presented)
+ * and, only on a tree whose source did not judge presented layers (`UiNode.presentationsJudged`), the shape fallback
+ * (Android's through the uiautomator adapter). A verb learns of a
  * mark from `presentation.press` (`MarkedLayer`: its kind and label), never from the node.
  *
  * The two columns read the rows differently on purpose — each column of
@@ -196,7 +199,10 @@ export interface DrawOrder {
    * through types.ts#DrawnOverStrip). Rects as the tree gives them — no
    * flat-list reach, no tab-bar item listed before the node: a nested tree's
    * order is its draw order. Empty for a node not in this tree. The parser
-   * asks only whether it is empty; the list is for diagnosis and tests.
+   * asks only whether it is empty; the sliver rule's cut by a later node
+   * (standing.ts#cutByLater) reads the list, in draw order — the first node
+   * in it holding the whole pixel row past a thin control's edge, and not the
+   * control itself, is the node that cut it.
    */
   coversOf(node: UiNode, region: Rect): readonly UiNode[];
   /**
@@ -1520,7 +1526,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
   const outOfDrawnOver = NOT_DRAWN.keyboard.drawnOver;
   const drawnOver = (container: Rect): readonly UiNode[] | undefined => {
-    const found = order.find((p) => scrolls(p.node) && sameRect(p.node.rect, container) && !outOfDrawnOver(p));
+    const found = order.find((p) => isScrollViewOf(p.node, container) && !outOfDrawnOver(p));
     if (found === undefined) return undefined;
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p) ? [p.node] : []));
   };

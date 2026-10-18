@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { snapshotNote } from '../../src/mcp/tool-text.js';
+import { wholeThinWayPast } from '../../src/interact/target-text.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -267,6 +268,14 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
     );
   });
 
+  it('troubleshooting quotes the cut-by-a-later-node refusal and failure with their way past, as the code words it', () => {
+    const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+    const wayPast = wholeThinWayPast(node({ role: '<role>' }));
+    expect(troubleshooting).toContain(`scroll_until it out from under that <role> first (${wayPast}); nothing was tapped\`**`);
+    expect(troubleshooting).toContain('— or it is only that thin, laid flush against it; a tap refuses it so cut (…)`** (Android)');
+    expect(description('tap')).toContain('So is a control Android dumps as a strip thinner than that minimum flush against an element drawn after it that spans it');
+  });
+
   it('scroll_until points at it where it fails naming a cover', () => {
     expect(description('scroll_until')).toContain('it fails naming that element (on Android a floating action button\'s full-width host counts as one — see tap)');
   });
@@ -327,6 +336,17 @@ describe('tool descriptions on a screen presented over the target', () => {
       'Under a screen presented over the target — iOS wda: a layer WebDriverAgent shows presented (see ui_snapshot\'s "presentation"; an alert, an action sheet or a popover is named as ui_snapshot says); elsewhere (Android): a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +
         `'${TAP_SENTINEL}'. Close that screen first. A full-screen host that only carries a bar or other content of its own (a host with children) is no such screen: only what it draws covers.`,
     );
+  });
+
+  it('tap, scroll_until, ui_snapshot and the troubleshooting reference: on Android a presented window is listed alone, and a target not in it gets the presented remedy', async () => {
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    expect(description('tap')).toContain('On Android uiautomator lists the active window only: with a dialog or a bottom sheet up the tree holds that window alone');
+    expect(description('scroll_until')).toContain('The same on Android when the tree is a presented window (ui_snapshot\'s root carries "presentation": "dialog" or "screen")');
+    expect(description('ui_snapshot')).toContain('"activeWindowOnly": true under Android — uiautomator lists the active window only');
+    expect(description('ui_snapshot')).toContain('the screen beneath is not in the tree at all — tap, fill and scroll_until say');
+    expect(description('tap')).toContain('and the wait for it (this tap\'s, and fill\'s) ends');
+    expect(TROUBLESHOOTING).toContain(`is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}\`** (tap, fill; Android)`);
+    expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {

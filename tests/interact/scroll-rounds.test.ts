@@ -904,6 +904,17 @@ describe('round — the flush check across nested clipping containers, and a pro
     }
   });
 
+  it('flush with the bottom of a carousel that scrolls only sideways (a HorizontalScrollView), no list around it: NO probe — none along the edge can move it — and the stop is unchecked for that reason, `axis`, not for want of room', () => {
+    const CAROUSEL: Rect = { x: 0, y: 1000, width: 1080, height: 400 };
+    const cardNode = match({ x: 40, y: 1100, width: 600, height: 300 }, 'card');
+    const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...CAROUSEL }, children: [cardNode] })] });
+    const played = play(FULLY_ANDROID, [{ tree, found: [cardNode] }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    const result = resultOf(played);
+    expect(result.flush).toEqual({ edge: 'bottom', container: CAROUSEL, checked: false, why: 'axis' });
+    expect(describeScrollResult(result)).toMatch(/every scroll container around it from that one outward scrolls only sideways, so no probe swipe can move its bottom edge into view to check it — it may be cut there/);
+  });
+
   // The stroke box judged twice (deep/r3-scroll, 2026-10-09): the round judged room over the screen, the driver over the
   // screen ABOVE the keyboard, and fell back to the whole screen when that had none — a probe touching down off the
   // container moves nothing, and that was reported "nothing of it is cut there".
@@ -2141,11 +2152,13 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
     for (const { from } of sent) expect(containsPoint(LIST, from)).toBe(true);
   });
 
-  // A residual (LE4's note, for the stroke plan): the nearest scroll view is taken whatever its axis. Account Detail's
-  // card carousel (24,138 354x85) under the transactions list (0,180 402x694, listed after it): a card right of the
-  // carousel, scrolled for `down`, is stroked inside the carousel — a vertical 52-pt stroke touching down where the
-  // list is drawn over it — not over the screen (699 → 175, before). Pinned as it is today, not as it should be.
-  it('a card of a horizontal carousel, scrolled for `down`: the vertical stroke goes inside the carousel, and the failure names the list drawn over its touch-down (residual)', () => {
+  // LE4's note, its residual: Account Detail's card carousel (24,138 354x85, read horizontal from its cards past its
+  // frame) under the transactions list (0,180 402x694, listed after it, no ancestor of the carousel): a card right of
+  // the carousel, scrolled for `down`, has no scroll view that scrolls along the stroke, and the stroke plan falls back
+  // to the nearest, the carousel — a vertical 52-pt stroke touching down where the list is drawn over it — as before
+  // the axis rule (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list
+  // (tests/interact/stroke-plan.test.ts, "the axis").
+  it('a card of a horizontal carousel no list holds, scrolled for `down`: no scroll view along the stroke, so the vertical stroke goes inside the carousel (the fallback), and the failure names the list drawn over its touch-down', () => {
     const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
     const card = node({ role: 'other', label: 'My Account', rect: { x: 378, y: 138, width: 354, height: 85 } });
     const tree = node({

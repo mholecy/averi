@@ -7,7 +7,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -141,6 +141,23 @@ const ROLE_MAP: Record<string, string> = {
   ScrollView: 'scrollable',
   HorizontalScrollView: 'scrollable',
   ViewPager: 'scrollable',
+};
+
+/**
+ * The classes whose type fixes the one axis they scroll on (types.ts#UiNode.scrollAxis): the classic views, and a
+ * Compose scroller with no collection info, which the accessibility bridge names `ScrollView` for vertical scroll
+ * semantics and `HorizontalScrollView` for horizontal (the lab app's `verticalScroll` forms and lists, measured: 12
+ * `scrollable="true"` nodes, all `android.widget.ScrollView`). Not here, so unknown: a lazy list or grid
+ * (`LazyColumn` dumps as `android.view.View` — the lab's form picker and sticky list), a RecyclerView (either axis;
+ * the dump names no orientation), a ViewPager2.
+ */
+const AXIS_BY_CLASS: Readonly<Record<string, ScrollAxis>> = {
+  ScrollView: 'vertical',
+  NestedScrollView: 'vertical',
+  ListView: 'vertical',
+  GridView: 'vertical',
+  HorizontalScrollView: 'horizontal',
+  ViewPager: 'horizontal',
 };
 
 export class AndroidAdapter implements DeviceAdapter {
@@ -1217,6 +1234,8 @@ interface RawNode {
   'content-desc'?: string;
   focusable?: string;
   'long-clickable'?: string;
+  /** "true" on a node that takes a click — read only for a sheet's scrim (`presentedWindow`). */
+  clickable?: string;
   /** "true" on a node that scrolls now — its descendants' bounds are clipped to it (types.ts#UiNode.clipsDescendants). */
   scrollable?: string;
   bounds?: string;
@@ -1245,14 +1264,69 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
   // An arrow, not `roots.map(normalizeNode)`: map would hand its index in as `around`.
   const grown = new Map<UiNode, Rect>();
   const children = roots.map((root) => normalizeNode(root, { grown }));
-  // The source's mark (types.ts#UiNode.paddedTouchTargets): Compose lists a control's touch target as its wrapper.
-  // Set before the widening: the draw order judging it reads the mark.
+  // The source's marks: Compose lists a control's touch target as its wrapper (types.ts#UiNode.paddedTouchTargets),
+  // the dump lists the active window only (`activeWindowOnly`), and that window, when the dump shows it presented, is
+  // marked so (`presentation`, `presentedWindow`). Set before the widening: the draw order judging it reads the marks.
+  const presented = children.length === 1 ? presentedWindow(roots[0], children[0].rect) : undefined;
   const tree: UiNode =
     children.length === 1
-      ? { ...children[0], paddedTouchTargets: true }
-      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true };
+      ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, ...(presented !== undefined && { presentation: presented }) }
+      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true };
   widenUnderCovers(tree, grown, drawnOverStrip);
   return tree;
+}
+
+/**
+ * The PRESENTED WINDOW the dump is, when its one window shows it is one (types.ts#UiNode.presentation on the root):
+ * `uiautomator dump` lists the active window only (`UiNode.activeWindowOnly`), so with a dialog or a bottom sheet up
+ * the dump IS that window and the screen beneath is not in it. Read here, where the raw dump is — the scrim's
+ * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags (wda-source.ts
+ * #presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks, #byUiautomator).
+ * - `dialog`: a window of some area that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES — its left edge past x 0 AND its
+ *   top edge past y 0. An app's window lies against at least one of the screen's top and left edges: a phone's
+ *   full-screen window at 0,0 whatever its bars, and also one offset on ONE axis only — a landscape window beside a
+ *   cutout the app does not draw into, a letterboxed or pillarboxed compat-mode app on a tablet or a foldable, the lower
+ *   window of a split screen. A dialog laid in the middle floats off both. Measured: the lab's Compose AlertDialog,
+ *   `[155,851][925,1368]` on 1080x2220 (alert-dim); a touch outside it dismisses it. Why not "smaller than the screen",
+ *   the round-5 plan: the parser has no screen size — the adapter's `wm size` is memoized as a pending read
+ *   (viewport-memo.ts), with no answer to peek at before a tree's first read, and awaiting it would add an adb call
+ *   before the first dump and make the mark depend on which verb read first.
+ * - `screen`: a full-screen window whose content lays a SCRIM above a SHEET — some node's child that is clickable,
+ *   labelled and childless, spanning the window's width from its top edge, followed at once by a sibling spanning
+ *   the width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the lab's half-expanded
+ *   Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"` `[0,0][1080,1110]`, the sheet
+ *   `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height.
+ * Residuals, stated: a fully expanded sheet dumps no scrim (form-picker's country picker: only the sheet and its
+ *   drag handle) and is no presented window here; a floating window against the top or the left edge (a popup at the
+ *   top-left corner, a bottom-anchored full-width dialog) and a full-screen dialog are none either; a window offset on
+ *   both axes that is the app's own — a freeform (desktop-mode) window, a compat-mode app boxed on both axes — reads as
+ *   a `dialog`; an
+ *   app's own clickable, labelled leaf laid from its window's top edge at full width, with a full-width sibling under it
+ *   to the bottom, reads as a scrim. What a mark changes is asked only for a target the tree does not hold
+ *   (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false `Tapped`.
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
+ */
+function presentedWindow(window: RawNode, rect: Rect): 'dialog' | 'screen' | undefined {
+  if (rectArea(rect) === 0) return undefined;
+  if (rect.x > 0 && rect.y > 0) return 'dialog';
+  const childrenOf = (n: RawNode): RawNode[] => (n.node === undefined ? [] : Array.isArray(n.node) ? n.node : [n.node]);
+  const bottom = rect.y + rect.height;
+  const scrimAbove = (scrim: RawNode, sheet: RawNode): boolean => {
+    const s = parseBounds(scrim.bounds);
+    const below = parseBounds(sheet.bounds);
+    return (
+      scrim.clickable === 'true' &&
+      emptyToNull(scrim['content-desc']) !== null &&
+      childrenOf(scrim).length === 0 &&
+      s.x === rect.x && s.width === rect.width && s.y === rect.y && s.height > 0 &&
+      below.x === rect.x && below.width === rect.width && below.y + below.height === bottom && below.y > s.y && below.y <= s.y + s.height
+    );
+  };
+  const holds = (n: RawNode): boolean => {
+    const kids = childrenOf(n);
+    return kids.some((kid, i) => i + 1 < kids.length && scrimAbove(kid, kids[i + 1])) || kids.some(holds);
+  };
+  return holds(window) ? 'screen' : undefined;
 }
 
 /**
@@ -1300,6 +1374,8 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
     ...(clips && { clipsDescendants: true as const }),
     // Dumped inverted: wholly outside its container, on this side (types.ts#UiNode.clippedOut).
     ...(clippedOut !== undefined && { clippedOut }),
+    // The axis its class fixes (AXIS_BY_CLASS) — never a text input's, whose class is a scroll view's too.
+    ...(!isTextInput && AXIS_BY_CLASS[className] !== undefined && { scrollAxis: AXIS_BY_CLASS[className] }),
   };
   // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
   // .getText() returns the hint while isShowingHintText() — and the API 33

@@ -1,5 +1,18 @@
 # BUG (or a decision to record): on iOS, `scroll_until` asked the wrong way for a row of a scroll view already at its end that way strokes three times, moves nothing, and fails with the right direction as advice — it never turns back toward the target the tree places past the far edge
 
+> **Status (2026-10-18):** fixed under WDA at `1a1871f` on `arch/r22-lv4` (rebased onto `arch/round-22` `8b2530c`; review round 1 fixes after it, ADR 0021) (from `arch/round-22` `b71cbbb`), the owner's (b)
+> as decided on 2026-10-17; unmeasured on a device — the live KNOWN `ios wda turn:scroll-bounded.F` is the device
+> check's to judge. The caller's direction is stroked first; the read after the one stroke up finds every match where
+> it was and the tree listing `lower`'s content ending at its top (nothing of it above 380), so the content is PROVEN
+> exhausted up (interact/scroll-rounds.ts#Observed.ends, stroke-plan.ts#strokedEnd, ui-tree/geometry.ts#Clips.endsAt),
+> and F lies past `lower`'s far (bottom) edge inside it: the strokes turn once, down, at full reach, and the reply says
+> so (`; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi
+> turned down, as the tree places the element below it`; scroll-rounds.ts#EndTurn). Replayed over this cell's real WDA
+> capture (tests/interact/scroll-end-turn.test.ts): strokes up, down, down … where three ups failed. Under idb nothing
+> changes (no scroll view listed, LE2: `ios idb turn:scroll-bounded.F` stays KNOWN); nor on Android, whose tree cannot
+> list where a list's content ends. Golden over truth/round-6 unchanged (1137/242/0, every row identical: the replay
+> asks no wrong-way scroll).
+>
 > **Status (2026-10-17):** open; measured live only. The owner's call: averi's rule, or the live case's expectation.
 > averi does what its scroll rounds say on purpose (see Cause): no turn without a sighting, and nothing guessed from a
 > screen no stroke ever changed. The live golden's turn-back case (scripts/truth/live-visibility.ts#TURN_BACK,

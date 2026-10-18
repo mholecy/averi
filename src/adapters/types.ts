@@ -129,6 +129,9 @@ export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
  */
 export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
 
+/** The one axis a scroll view scrolls on (UiNode.scrollAxis, ui-tree/scroll-containers.ts#scrollAxis). */
+export type ScrollAxis = 'vertical' | 'horizontal';
+
 /**
  * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
  * a negative or NaN side. The one spelling of "has this rect an area": the
@@ -257,12 +260,17 @@ export const STRUCTURAL_ROLES: ReadonlySet<string> = new Set(['container', 'othe
 export const SCREEN_SIZED_FRACTION = 0.9;
 
 /**
- * The kinds of PRESENTED LAYER a tree source marks (`UiNode.presentation`) — one closed set: three a source types
- * (`alert`, `actionSheet`, `popover`), and `screen`, a presented screen it shows by its visibility flags.
+ * The kinds of PRESENTED LAYER a tree source marks (`UiNode.presentation`) — one closed set: three WDA types by an
+ * element (`alert`, `actionSheet`, `popover`); `dialog`, the window uiautomator dumps when it floats over what it was
+ * opened from (adapters/android.ts#presentedWindow); and `screen`, a presented screen WDA shows by its visibility
+ * flags, or the uiautomator window whose scrim lies above its sheet.
  */
-export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'screen';
+export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'dialog' | 'screen';
 
-/** A kind a source TYPES by an element the layer holds (`UiNode.presentationElement`) — every kind but `screen`. */
+/**
+ * A kind a source TYPES — every kind but `screen`: by an element the layer holds (`UiNode.presentationElement`) under
+ * WDA, by the window's own shape (`dialog`) under uiautomator, where the layer is its own cover.
+ */
 export type TypedPresentationKind = Exclude<PresentationKind, 'screen'>;
 
 /** `kind` is typed by an element (`TypedPresentationKind`), not a `screen` the source shows by its visibility flags. */
@@ -367,6 +375,21 @@ export interface UiNode {
    */
   clipsDescendants?: true;
   /**
+   * The ONE axis this scroll view scrolls on, when the tree source says it by the node's type alone: Android's class
+   * (adapters/android.ts#AXIS_BY_CLASS — `ScrollView`, `NestedScrollView`, `ListView`, `GridView` vertical;
+   * `HorizontalScrollView`, `ViewPager` horizontal; a Compose `verticalScroll` dumps as `ScrollView` and a
+   * `horizontalScroll` as `HorizontalScrollView`, while a lazy list or grid, which carries collection info, keeps
+   * `android.view.View` and a RecyclerView dumps no orientation — neither says) and WDA's `Table` (vertical:
+   * adapters/wda-source.ts). Absent where the type does not say: a WDA `ScrollView` or `CollectionView` — on a tree of
+   * unclipped frames its content's extent past its frame may say it instead (ui-tree/scroll-containers.ts#scrollAxis,
+   * the one reader) — and every idb node (its flat list lists no scroll view). Never on a text input (a Compose text
+   * field with scroll semantics dumps as a scroll view too). Read by `scroll_until`'s stroke plan
+   * (interact/stroke-plan.ts): a stroke goes over a scroll view that scrolls on its axis, and its path keeps off a
+   * nested one that scrolls only on the other.
+   * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
+   */
+  scrollAxis?: ScrollAxis;
+  /**
    * The bounds the tree source dumped for this node, when they were CUT
    * short of its own descendants by something drawn over it, and `rect` is
    * widened to their extent (the bug note below): Android only, set by the uiautomator parser
@@ -453,16 +476,28 @@ export interface UiNode {
    * `ownControl` row takes a control PADDED evenly in such a wrapper and
    * centred on the label for the label's own (`paddedOn`) only where the
    * shape was measured. A mark of the source, like `flatList`: ui-tree
-   * knows no platform. Read with a SECOND meaning, "this tree is
-   * uiautomator's", by ui-tree/presentation.ts#presentationOf, which picks
-   * the uiautomator adapter (`byUiautomator`) for such a tree — the one
-   * mark that tells it today; L1's fix should bring a dedicated root mark
-   * of its own (the dump lists only the active window). Absent on WDA and
+   * knows no platform. Read for that alone: which presentation adapter a
+   * tree gets is `activeWindowOnly`'s. Absent on WDA and
    * idb trees — no wrapper of that shape was seen there, and an unlabelled
    * button laid with an even margin over a centred text (a card's overlay)
    * stays its cover.
    */
   paddedTouchTargets?: true;
+  /**
+   * Set on the ROOT of a tree whose source lists the ACTIVE WINDOW ONLY: uiautomator's (adapters/android.ts
+   * #parseUiautomatorXml) — `uiautomator dump` lists the window that has focus, so with a dialog or a bottom sheet up
+   * the dump IS that window, and the screen it was opened over is not in the tree at all (measured on the lab app's
+   * AlertDialog and ModalBottomSheet, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md).
+   * So a target missing from such a tree may lie beneath a presented window rather than be absent: when the parser
+   * also marks the root presented (`presentation`), ui-tree/presentation.ts#Presentation.alone names that window, and
+   * the wait for a target "to appear" says close it first instead (interact/resolve.ts). Read by
+   * ui-tree/presentation.ts#presentationOf, which picks the uiautomator adapter (`byUiautomator`) for such a tree, and
+   * through it `Presentation.alone`. A mark of the source, like `flatList`: ui-tree knows no platform. Absent on WDA's
+   * trees (every window of the app, the keyboard's too) and idb's flat list (which lists only a presented layer as
+   * well — measured on the lab's SwiftUI alert and sheet — but is not marked: iOS keeps its behaviour, ADR 0018's
+   * residual 6).
+   */
+  activeWindowOnly?: true;
   /**
    * Set on the ROOT of a tree whose source reports every frame UNCLIPPED: WDA's (adapters/wda-source.ts
    * #parseWdaSourceValue). It lists a scroll view's content at its laid-out rect even past the scroll view's frame,
@@ -508,7 +543,10 @@ export interface UiNode {
   /**
    * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
    * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one
-   * mark per layer:
+   * mark per layer, and by the uiautomator parser on the root, the one window it dumps (adapters/android.ts
+   * #presentedWindow: `dialog` for a window that floats off the screen's top and left edges both, and `screen` for one
+   * whose clickable, labelled scrim lies screen-wide above its sheet; the root also carries `activeWindowOnly`).
+   * WDA's marks:
    * - by the TYPE of an element the layer holds ON THE SCREEN (one parked off it, as WDA keeps a dismissed alert,
    *   types nothing): `alert` (WDA's `Alert`), `actionSheet` (a `Sheet`: UIKit's action sheet, its message the label),
    *   `popover` (a `Popover`) — in that precedence, so a layer holding several is the first's (an action sheet
@@ -534,7 +572,7 @@ export interface UiNode {
    *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
-   * Absent everywhere else — on an idb or Android tree always.
+   * Absent everywhere else — on an idb tree always, on an Android tree but on a presented window's root.
    */
   presentation?: PresentationKind;
   /**
@@ -548,8 +586,9 @@ export interface UiNode {
    * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
    * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
    * (`presentation`), so the presentation module never asks a fallback of it (ui-tree/presentation.ts#byShape,
-   * #byUiautomator). Absent on a tree whose source says nothing of presentation (idb, Android, a flagless WDA payload,
-   * a normalized snapshot without it): there a presented screen is still inferred from shape, through that fallback.
+   * #byUiautomator). Absent on a tree whose source does not judge every layer (idb; Android, whose parser marks the one
+   * window it dumps when that window is presented, but judges no layer inside a window; a flagless WDA payload; a
+   * normalized snapshot without it): there a presented screen is still inferred from shape, through that fallback.
    * Read by ui-tree/presentation.ts#presentationOf, which builds the fallback only without it (so on a judged tree draw
    * order's `hidden` row's shape guard holds of no node); printed by `ui_snapshot`.
    */

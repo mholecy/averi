@@ -1,5 +1,22 @@
 # BUG: under WDA, `scroll_until` for a row far down a short (180-pt) scroll view carries the list past it with momentum, turns once at the last swipe, and fails at maxSwipes with the row 18 % drawn — one run in three
 
+> **Status (2026-10-18):** fixed under WDA at `fe31a3c` on `arch/r22-lv4` (the carry model reworked by review round 1, ADR 0021); unmeasured on a
+> device — the live KNOWN `ios wda scroll:scroll-bounded.F` (intermittent) is the device check's to judge, over several
+> runs. Diagnosis from this note's measurements: the strokes' reach is not the fault (60 % of `lower`, 108 pt), the
+> fling is — ≈ 2.4 × the drag here (259 pt) as on the SwiftUI form (344 → 729–970 pt), roughly in proportion to the
+> lift speed at the fixed 300 ms — against a 116-pt window, and its size varies by run (226–263 pt a stroke). The
+> smallest change those numbers justify, chosen over a slower drag (iOS drag speed unmeasured: adapters/ios.ts#swipe) and
+> an earlier turn (which still overshoots): once F is in the tree short of its window and a stroke of the scroll has
+> been measured to carry it, the next stroke's reach is scaled to what F still needs — to the window's middle — at the
+> largest carry per point of finger travel measured so far (interact/stroke-plan.ts#carried, the carry model, and
+> scroll-rounds.ts#stillNeeds; code review round 1: per point of travel, the same node at the same size, a sample past
+> CARRY_CEILING 4 × the travel dropped, and only where one stroke could skip the window). On the
+> failing run's 263 pt a stroke: 108, 108, 108 (789), then ~0.58 of a stroke (~63 pt drag, ~153 pt) → 942, inside the
+> window (tests/interact/scroll-short-view.test.ts drives the rounds against that model over the cell's real WDA capture,
+> and across the measured spread). WDA's trees only (an off-screen row listed where it lies); Android drags without a
+> fling, and idb lists no scroll view. Residual: the proportionality of the fling to a shorter, slower drag is the
+> linear model's, unmeasured under 108 pt.
+>
 > **Status (2026-10-17):** open, intermittent; measured live only. An honest failure (LOUD: averi says it did not
 > reach the row), filed because the case's KNOWN entry (LE4's, R-direction) no longer explains it. KNOWN as this note,
 > `intermittent` (scripts/truth/live-known.ts, `ios wda scroll:scroll-bounded.F`, not-reached on `refused`).

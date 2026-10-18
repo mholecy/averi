@@ -333,7 +333,11 @@ export class IosAdapter implements DeviceAdapter {
    * Android's spline would still fling here, and idb's own step timing
    * over a long duration is unmeasured. The scroll's turn — every turn
    * halving the reach — was device-checked on that form, and a lazy list's
-   * dropped row now turns the stroke too (interact/scroll-rounds.ts).
+   * dropped row now turns the stroke too (interact/scroll-rounds.ts) —
+   * and, on WDA's trees, no stroke reaches further than the target still
+   * needs at what a stroke of the scroll was seen to carry it, the fling
+   * included (interact/scroll-rounds.ts#stillNeeds: a 108-pt drag flung a
+   * 180-pt scroll view ~259 pt, past a 116-pt window, one run in three).
    * Unmeasured: an iOS List under WDA that drops its rows.
    */
   async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
