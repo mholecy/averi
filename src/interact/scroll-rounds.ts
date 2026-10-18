@@ -70,7 +70,12 @@ import { OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction }
  * BOUND: at most 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes` non-ask steps
  * (25 at the defaults) — a stroke spends one of `maxSwipes` and earns at most
  * SETTLE_CONFIRM_READS confirming reads, the read after it aside — and fewer
- * at the deadline. Cost: no I/O; one copy of the state record a call.
+ * at the deadline; besides those, the reads of a fling still slowing
+ * (SETTLE_CONFIRM_READS), which spend none: each finds the target moving less
+ * than the one before, so on a source of whole-unit rects (WDA's points,
+ * uiautomator's pixels) there are fewer of them than the first one's motion
+ * in units — two on the measured carousel — and the deadline ends them in
+ * any case. Cost: no I/O; one copy of the state record a call.
  */
 
 /** The caller's options, fixed for the scroll (interact/scroll.ts resolves the defaults). */
@@ -419,6 +424,18 @@ export interface PastSide {
  * reached at the deadline is reported unsettled, unconfirmed), not against
  * `maxSwipes`: they send nothing.
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
+ *
+ * A FLING STILL SLOWING spends none of them (`Observed.slowing`): a confirming read that found the target — the
+ * same node — moved less over its settle pause than the read before found it moved over its own is read again
+ * free, until the deadline. A fling slows read for read; an animation moves as much at every read and spends the
+ * budget as before. Measured under WDA (round 7, the lab app's `carousel-in-list`, C a card as wide as its
+ * carousel): one 212-pt stroke flung the carousel 447–532 pt over ~2.5 s, and the reads after it, 0.47 s apart,
+ * found C moving 54, 21, 8 pt (66, 24, 10 in another run) — the third confirming read still 8–10 pt from rest, so
+ * the stop was claimed "still moving"; in the run that flung 532 pt it was claimed on a read with C's centre inside
+ * the carousel, and the fling then carried the centre a point out of it, the next tap refused
+ * (docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md). A
+ * stop is judged on the read the fling comes to rest in. The first confirming read always spends one: a read after
+ * a stroke measures the stroke too, and gives the next nothing to compare with.
  */
 export const SETTLE_CONFIRM_READS = 3;
 
@@ -661,8 +678,10 @@ interface State {
    * question.
    */
   readonly carriedPast: boolean;
-  /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke). */
+  /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke) — a slowing fling's spend none (`Observed.slowing`). */
   readonly confirmReads: number;
+  /** How far the judged match moved over the settle pause before the last read (`motionOf`), the same node at both reads — undefined when that read followed a stroke, or did not read it so. */
+  readonly lastMotion: number | undefined;
   /**
    * The `presented` stop the last read that read would have made — its judged match under a presented screen, or its
    * next stroke touching down on one — held for one more read with no stroke between (`round`): the next read that
@@ -759,6 +778,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     seenShort: false,
     carriedPast: false,
     confirmReads: 0,
+    lastMotion: undefined,
     presentedHold: undefined,
     strokesSent: 0,
     endTurn: undefined,
@@ -960,6 +980,11 @@ interface Observed {
   /** The judged match is where the previous read's judged match was. */
   bestUnmoved: boolean;
   /**
+   * A FLING STILL SLOWING (SETTLE_CONFIRM_READS): a confirming read found the judged match — the same node — moved
+   * less than the read before it found it moved. Such a read spends none of the confirming budget.
+   */
+  slowing: boolean;
+  /**
    * UNMOVED_STROKES_EXHAUST identical strokes in a row left the JUDGED match
    * where it was — the `fully: true` clipped stop's "content exhausted".
    */
@@ -999,6 +1024,11 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   const { fingerprint, loading } = facts;
   const rects = found.map((n) => ({ ...n.rect }));
   const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
+  // The same node's motion over the settle pause before this read (`motionOf`) — a read after a stroke measures the
+  // stroke too, and keeps none — and whether it moved less than over the pause before: a fling slowing.
+  const motion = current === 'settle' && best !== undefined && s.prevBest !== undefined && s.prevKey === identityOf(best.node) ? motionOf(s.prevBest, best.node.rect) : undefined;
+  const slowing = motion !== undefined && s.lastMotion !== undefined && motion < s.lastMotion;
+  s.lastMotion = motion;
   // This read against the one before it, after a stroke: every match where it was, the whole tree as it was.
   let allUnmoved = false;
   let treeUnmoved = false;
@@ -1104,6 +1134,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
         : undefined;
   return {
     bestUnmoved,
+    slowing,
     stuck: current === 'stroke' && s.bestUnmovedStrokes >= UNMOVED_STROKES_EXHAUST,
     exhausted,
     ends: exhausted === undefined ? undefined : ends,
@@ -1215,6 +1246,12 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
 /** A judged match's identity across reads, for the carry model's samples: its role, id and label — a node's rect is what moves. */
 const identityOf = (n: UiNode): string => JSON.stringify([n.role, n.identifier, n.label]);
 
+/**
+ * How far `to` lies from `from`: the largest of the differences in x, y, width and height — what a read finds a node
+ * moved since the read before, for `Observed.slowing`. A fling's motion shrinks read for read; an animation's does not.
+ */
+const motionOf = (from: Rect, to: Rect): number => Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y), Math.abs(to.width - from.width), Math.abs(to.height - from.height));
+
 /** The same size within a pixel each way: a node that grew or shrank (a header collapsing) did not just move. */
 const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 
@@ -1313,6 +1350,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // on, or out of the frame, after the settle read caught it inside. A
       // stop at 0 swipes was not stroked: reported at once.
       const settled = s.swipes === 0 || probeHeld || (current === 'settle' && observed.bestUnmoved);
+      // A fling still slowing is waited out, spending none of the budget (SETTLE_CONFIRM_READS): the stop is judged on
+      // the read it comes to rest in, not on one it is still carrying the target through.
+      if (!settled && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
       if (!settled && mayConfirm(s, seen.elapsedMs)) return confirm(s);
       // `fully: true`, an edge flush with the clipping container: possibly cut there — probe once toward it
       // (`flushCheck`), or say it could not be checked.
@@ -1580,6 +1620,11 @@ function probe(s: Mutable<State>, edge: Edge, rect: Rect, planned: { stroke: Pla
 /** Spend a confirming read: the next read follows a settle, not a stroke. */
 function confirm(s: Mutable<State>): { state: Rounds; step: RoundStep } {
   s.confirmReads++;
+  return waitOut(s);
+}
+
+/** Read again after a settle, spending no confirming read: a fling still slowing (`Observed.slowing`) — and `confirm`'s step. */
+function waitOut(s: Mutable<State>): { state: Rounds; step: RoundStep } {
   s.since = 'settle';
   return { state: s as unknown as Rounds, step: { do: 'confirm' } };
 }
