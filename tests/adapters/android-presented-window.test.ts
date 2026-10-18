@@ -77,6 +77,8 @@ describe('the uiautomator parser marks the one window presented when the dump sh
     expect(host(scrim({ desc: 'Close sheet', clickable: true }, '[0,0][1080,2220]')).presentation).toBe('screen');
     expect(host(scrim({ clickable: true })).presentation).toBeUndefined();
     expect(host(scrim({ desc: 'Banner' })).presentation).toBeUndefined();
+    // A would-be scrim with a child of its own is content (a banner holding its text), no scrim.
+    expect(host(raw('[0,0][1080,1110]', { desc: 'Close sheet', clickable: true }, raw('[40,40][400,100]', { desc: 'x' }))).presentation).toBeUndefined();
     expect(host(scrim({ desc: 'Close sheet', clickable: true }, '[0,66][1080,1110]')).presentation).toBeUndefined();
     expect(host(scrim({ desc: 'Close sheet', clickable: true }, '[40,0][1040,1110]')).presentation).toBeUndefined();
     // The next sibling stops short of the window's bottom, or begins below the scrim: no sheet.
