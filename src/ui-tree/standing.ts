@@ -410,6 +410,7 @@ const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
   alert: { article: 'an', noun: 'alert' },
   actionSheet: { article: 'an', noun: 'action sheet' },
   popover: { article: 'a', noun: 'popover' },
+  dialog: { article: 'a', noun: 'dialog' },
 };
 /** The words for `layer` when the source typed it; undefined for a `screen` layer, or none. */
 const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
@@ -419,7 +420,7 @@ const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (
  * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
  * since no scroll moves the node out from under it. A layer the tree source types (an alert, an action sheet, a
- * popover: `layer`) is named by its kind and label; a `screen` layer, or none, is "a screen … (a modal or a sheet)".
+ * popover; Android's floating window, a dialog: `layer`) is named by its kind and label; a `screen` layer, or none, is "a screen … (a modal or a sheet)".
  * The one clause of a remedy kept here, in the UI-tree layer both verbs and the pixel assert may import, as
  * system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
@@ -433,7 +434,7 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
 /**
  * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no
  * swipe was sent — one on that screen may dismiss it; under a layer the tree source types (an alert, an action sheet,
- * a popover: `layer`) it is named, and a swipe would land on it. With no typed layer, the one sentence the
+ * a popover, a dialog: `layer`) it is named, and a swipe would land on it. With no typed layer, the one sentence the
  * `scroll_until` description quotes (mcp/tools.ts).
  */
 export const presentedStop = (layer?: MarkedLayer): string => {

@@ -15,6 +15,8 @@ import { FlowEngine, FlowError, idbContainerIdHint, runRequestOf, stepSummary, w
 import { EngineSession } from '../../src/flow/launch.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { readFileSync } from 'node:fs';
+import { parseDump } from '../helpers/android-dumps.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -2028,6 +2030,21 @@ flows:
       expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
       return trace.filter((t) => t.action === 'optional').map((t) => t.detail);
     };
+
+    // Android lists the active window only: under a dialog the screen beneath was never seen, so the target is not
+    // known absent — skipped with the presented headline, not "(not present)", and the flow runs on
+    // (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md).
+    it('an Android tap whose target is not in a tree listing a presented dialog alone: skipped with the presented headline, the flow continues', async () => {
+      const raw = readFileSync(new URL('../fixtures/uiautomator-lab-alert-dim.xml', import.meta.url), 'utf8');
+      const fake = new FakeAdapter({ dialog: parseDump(raw.slice(0, raw.lastIndexOf('>') + 1)) }, 'dialog');
+      const trace = await FlowEngine.run(optionalFlow('tap: { id: lab.alert-dim.A }\n      - wait: { element: { text: Keep }, timeout: 200ms }'), fake, FAST, { flow: 'f' });
+      expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
+      const skips = trace.filter((t) => t.action === 'optional').map((t) => t.detail);
+      expect(skips).toHaveLength(1);
+      expect(skips[0]).toMatch(/^skipped id:"lab\.alert-dim\.A" \(Timed out after \d+ms: element id:"lab\.alert-dim\.A" is not in the tree, which lists only the window presented on top .* a dialog is presented over it — close it first\)$/);
+      expect(fake.taps).toEqual([]);
+      expect(trace.some((t) => t.action.startsWith('wait'))).toBe(true);
+    });
 
     it('a fill whose field is ABSENT: skipped step (not present), nothing typed', async () => {
       const fake = formFake();

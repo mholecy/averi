@@ -329,6 +329,17 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
+  it('tap, scroll_until, ui_snapshot and the troubleshooting reference: on Android a presented window is listed alone, and a target not in it gets the presented remedy', async () => {
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    expect(description('tap')).toContain('On Android uiautomator lists the active window only: with a dialog or a bottom sheet up the tree holds that window alone');
+    expect(description('scroll_until')).toContain('The same on Android when the tree is a presented window (ui_snapshot\'s root carries "presentation": "dialog" or "screen")');
+    expect(description('ui_snapshot')).toContain('"activeWindowOnly": true under Android — uiautomator lists the active window only');
+    expect(description('ui_snapshot')).toContain('the screen beneath is not in the tree at all — tap, fill and scroll_until say');
+    expect(description('tap')).toContain('and the wait for it (this tap\'s, and fill\'s) ends');
+    expect(TROUBLESHOOTING).toContain(`is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}\`** (tap, fill; Android)`);
+    expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
+  });
+
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
     expect(description('scroll_until')).toContain(
       'Once a read finds the target in the viewport under a screen presented over it (as for tap: a layer WebDriverAgent shows presented, or elsewhere a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +
