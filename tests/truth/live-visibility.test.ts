@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { carryRow, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { carryRow, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -178,6 +178,10 @@ describe('visibilityCases', () => {
     // in no scroll view too (alert-dim, sheet-medium): the stroke would land on the layer
     const none = visibilityCases(truth('alert-dim', [target({ declared: 'presented-over', geometry: 'whole', scrollView: undefined })]), 'android');
     expect(none.map((c) => c.id)).toEqual(['tap:alert-dim.T', 'scroll:alert-dim.T']);
+    // the colour assert case of a presented window (live.ts asks it of round 7's cells alone)
+    const asked = presentedAssertCase('dialog-fullscreen', target({ tag: 'A', declared: 'presented-over', id: 'lab.dialog-fullscreen.A', color: '#E53935' }));
+    expect(asked.id).toBe('assert:dialog-fullscreen.A');
+    expect(asked.calls).toEqual([{ tool: 'assert', args: { asserts: [{ element: { id: 'lab.dialog-fullscreen.A' }, color: { expected: '#E53935' }, timeout: 3_000 }] } }]);
   });
 });
 
@@ -419,6 +423,10 @@ describe('each rule names its class (what the live KNOWN pins)', () => {
     const none = { tag: 'A', view: undefined, platform: 'android' as const };
     expect(judgePresentedScroll(none, ['ERROR'], touch, state())).toMatchObject({ outcome: 'MISMATCH', cls: 'presented-stroke', why: expect.stringMatching(/: 1 touch\(es\) at \(540,1776\) — averi: ERROR$/) });
     expect(judgePresentedScroll(none, ['ERROR close it first'], state(), state()).outcome).toBe('ok');
+    // a colour assert beneath it: a pass measured the layer; a failure of any wording is ok unless something fired
+    expect(judgePresentedAssert(['All 1 asserts passed'], state(), state())).toMatchObject({ outcome: 'MISMATCH', cls: 'presented-pass', kind: 'PASS' });
+    expect(judgePresentedAssert(['0/1 asserts FAILED'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state()).cls).toBe('presented-fired');
+    expect(judgePresentedAssert(['0/1 asserts FAILED'], state(), state())).toMatchObject({ outcome: 'ok', kind: 'FAIL' });
     expect(judgeDismissal('vs', 'Tapped', 'wda', state({ focus: null }), state({ focus: 'postcode' })).cls).toBe('dismissal');
     const field = (value: string) => ({ value, focused: false, error: null });
     const was = state({ focus: 'postcode', fields: { vs: field('') }, submits: [] });
