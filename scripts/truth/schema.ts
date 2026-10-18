@@ -39,7 +39,9 @@ export interface CatalogTarget {
   /**
    * A label target (calibration.json #8's second fix, an icon button's icon): the target is a control's icon whose
    * accessibility label (Android's content description) is this, drawn on a box of its colour — identified as
-   * lab.<cell>.<tag>, the box's frame reported as `<tag>.box` (the one `drawn` is measured over); the rows ask by the
+   * lab.<cell>.<tag>, the box's frame reported as `<tag>.box` (the one `drawn` is measured over: the coloured box the
+   * button sits on, which no tree lists — not the node identified lab.<cell>.<tag>.box, own-parts' I on Android the
+   * IconButton's 132-px wrapper, FalseCovers.kt); the rows ask by the
    * label (`label:"…"`), as a test names an icon button, and no text row is asked of it (no string is drawn). Never
    * with `text` (truth.ts#elementOf asks by one; scripts/truth/catalog.ts#buildCatalog refuses both).
    */

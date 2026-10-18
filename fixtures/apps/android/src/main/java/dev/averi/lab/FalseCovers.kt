@@ -96,10 +96,12 @@ private fun OwnPart(cell: Cell, t: Target, lab: Lab, modifier: Modifier) {
             Text(t.text ?: "", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag(id).reportFrame(t.tag, lab))
         }
     } else if (t.label != null) {
-        // The icon button centred on a box of its colour (the `<tag>.box` drawn is measured over: the icon the only
-        // other paint on it): the IconButton (its 48-dp touch target, 132 px on averi_lab, identified `<id>.box`)
-        // holds its 40-dp container of the same colour and, in it, the icon — a 24-dp white square carrying the
-        // content description, identified as the target. Its tap fires the button.
+        // The icon button centred on a box of its colour. Two nodes, two names: the FRAME reported as `<tag>.box` is
+        // this outer coloured Box (300×64 dp, no semantics, so no tree lists it) — what `drawn` is measured over, the
+        // icon the only other paint on it; the resource id `<id>.box` is the IconButton's (its 48-dp touch target, the
+        // 132-px wrapper uiautomator lists). The IconButton holds its 40-dp container of the same colour and, in it, the
+        // icon — a 24-dp white square carrying the content description, identified as the target. Its tap fires the
+        // button.
         Box(box.background(Color(t.color)), contentAlignment = Alignment.Center) {
             IconButton(
                 onClick = { lab.event("tap", t.tag) },
