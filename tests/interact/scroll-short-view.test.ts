@@ -101,7 +101,8 @@ describe('a stroke no further than the target still needs — a short scroll vie
     expect(drags[0]).toBe(108);
   });
 
-  it('with the end turn (LV4): F asked `up` — one stroke up proves `lower` at its top, the turn down, three full strokes and one short — within the default six swipes', () => {
+  // The end turn: lab note LV4 (docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md).
+  it('with the end turn: F asked `up` — one stroke up proves `lower` at its top, the turn down, three full strokes and one short — within the default six swipes', () => {
     const { outcome, offset, drags } = drive(() => 263 / 108, { ...RULES, direction: 'up' });
     expect(drags[0]).toBe(-108);
     expect(offset).toBeGreaterThanOrEqual(WINDOW.from);
