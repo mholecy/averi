@@ -515,3 +515,110 @@ field focused. Strokes from the `adb` shim. Round-4 handoff items 1.5 (round-3 g
 
 Reading: every touch-down and lift-off lies above the IME top. The Account Detail stroke is new to the table: the list's box is cut at the
 IME top (825 + 0.8 × 573 = 1283), and the tab bar, in the tree at 1876 but drawn under the IME, did not cut it further.
+
+## Device check (2026-10-09 Android, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47831, cwd mp-native). Strokes and taps from
+the `adb` shim; page placement, bar show/hide and Gboard mode by hand with the real `adb`.
+
+Fixtures: Google Contacts "Create contact" (`First name` focused by an averi `tap`, IME `[0,1398]`, growing to `[0,1285]`); mp-native SWIFT
+form (IBAN typed `AT611904300234573201` by `type_text`, IME `[0,1398][1080,2220]`, `mInputShown=true`).
+
+- **Holds (g) — Contacts editor, IME up.** 15:57:26 `scroll_until { selector: 'text:"Notes"', fully: true }` → `Element text:"Notes" fully
+  visible after 3 swipes; still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not
+  match` (15.3 s): `540 1167 540 473 695` ×2, then `540 1077 540 451 627` — the strokes of 86eb42d exactly (the "still moving" tail is new
+  wording on the same stop). 15:57:56 `text:"First name"` up → `fully visible after 3 swipes` (17.8 s), `540 451 540 1077 627` ×2, `540 473
+  540 1167 695`. Every stroke inside the container and above the IME top of its round.
+- **Fails (round 5, not the IME) — `text~"[Ff]ields"`.** 15:57:41 → `scroll_until text~"[Ff]ields" failed after 3 swipes — element is in
+  the viewport but under button (132,944 312x110) at its centre (288,1000), drawn over it — 0% of it shows — and the content is exhausted …
+  a layout defect …` (14.8 s), strokes `540 1077 540 451 627` ×3 (above the IME). At 86eb42d: `fully visible after 0 swipes`. The "Add fields"
+  text is a Compose button's label under its own clickable — filed as
+  `2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md`.
+- **Holds (h) — nothing typed.** `First name` still its hint after; IBAN `AT611904300234573201` after every SWIFT call. No `input text` /
+  `keyevent` in the shim but the fills'.
+- **Holds (§5) — SWIFT `my_note_input`, IBAN focused, no overlay cut.** 15:48:51 `scroll_until { selector: "id:swift_payment.form.my_note_input",
+  fully: true }` → `scroll_until id:swift_payment.form.my_note_input failed after 15000ms (timeout) — element in tree but never intersected the
+  1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard
+  was up over [0,1398][1080,2220] in 4 of the 4 rounds read: …` (15.1 s), `input swipe 540 1167 540 473 695` ×3 — the round-3 stroke; the
+  CONTINUE bar did not cut the box.
+- **Holds (R-1) — fill under the IME.** 15:49:21 `type_text { selector: "id:swift_payment.form.my_note_input", text: "note" }` → `Filled
+  id:swift_payment.form.my_note_input (4 characters) (the soft keyboard covered id:swift_payment.form.my_note_input; hidden before tapping)`
+  (18.8 s). Shim: `keyevent 4`, `input tap 540 1841`, 4× `input text`, `keyevent 21/22`. Field after `66,1278 948x143`, `val='note'`.
+
+## Device check (2026-10-09 Android, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:33 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47841, cwd mp-native). Strokes and taps from the
+`adb` shim; placement and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's `averi.yaml` untouched.
+
+- **Holds (g) — Contacts editor, IME up.** 18:23:57 `scroll_until { selector: 'text:"Notes"', fully: true }` → `fully visible after 0
+  swipes` (already shown after the B-1.5 scroll); 18:24:00 `text:"First name"` up → `fully visible after 2 swipes` (13.1 s), `input swipe 540
+  473 540 1167 695` ×2 — inside the container, above the IME top 1398. `text~"[Ff]ields"` → `fully visible after 1 swipe` (`540 1167 540 473
+  695`) — the round-5 failure is gone (Compose-button note).
+- **Holds (§5) — SWIFT `my_note_input`, IBAN focused (`AT611904300234573201` typed), no overlay cut.** 18:14:36 `scroll_until { selector:
+  "id:swift_payment.form.my_note_input", fully: true }` → `failed after 5 swipes (the last 2, swiping down, did not move it: content exhausted,
+  or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220]
+  (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up … in 6 of the 6 rounds read: …` (18.0 s), `input swipe 540
+  1167 540 473 695` ×5 — the round-3 stroke; this time the fast fail (as at 347e70d) rather than the 15 s timeout of 86eb42d / dd50327.
+- **Holds (R-1) — fill under the IME.** 18:14:59 `type_text { selector: "id:swift_payment.form.my_note_input", text: "note" }` → `Filled
+  id:swift_payment.form.my_note_input (4 characters) (the soft keyboard covered id:swift_payment.form.my_note_input; hidden before tapping)`
+  (15.3 s). Shim `keyevent 4`, `input tap 540 1841`, 4× `input text`, `keyevent 21/22`; field after `66,1278 948x143`, `val='note'`.
+- **Holds (h):** no `input text` / `keyevent` but the fills'.
+
+## Device check (2026-10-09 Android, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:19 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/`, stdio via the HTTP daemon on port 47851, cwd mp-native). Strokes and taps from the
+`adb` shim (`run9-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only
+(`cfg-opt-bank`, `cfg-opt-contacts`, `cfg-optional`, new `cfg-fill`, `cfg-fill-bank`); mp-native's `averi.yaml` untouched.
+
+- **Holds (g) — Contacts editor, IME up.** 21:04:24 `text:"Notes"` → `fully visible after 0 swipes`; 21:04:27 `text:"First name"`, `direction:
+  "up"`, `fully` → `fully visible after 3 swipes` (17.9 s), `input swipe 540 473 540 1167 695` ×3 — inside the container, above the IME top
+  1398 (one stroke more than round 6: a phone field had been added). `text~"[Ff]ields"` → `fully visible after 1 swipe` (`540 1167 540 473 695`).
+- **Holds (§5) — SWIFT `my_note_input`, IBAN focused (`AT611904300234573201` typed, verified).** 20:56:50 `scroll_until { selector:
+  "id:swift_payment.form.my_note_input", fully: true }` → `failed after 15000ms (timeout) — element in tree but never intersected the
+  1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was
+  up … in 4 of the 4 rounds read …` (15.4 s), `input swipe 540 1167 540 473 695` ×3 — the round-3 stroke; the timeout variant (as at
+  86eb42d / dd50327) this time, not round 6's fast fail.
+- **Holds (R-1) — fill under the IME.** 20:57:10 `type_text { selector: "id:swift_payment.form.my_note_input", text: "note" }` → `Filled
+  id:swift_payment.form.my_note_input (4 characters) (the soft keyboard covered id:swift_payment.form.my_note_input; hidden before tapping)`
+  (20.4 s). Shim `keyevent 4`, `input tap 540 1841`, 4× `input text`, `keyevent 21/22`; field after `66,1278 948x143`, `val='note'`.
+- **Holds (h):** no `input text` / `keyevent` but the fills' and the explicit `press_key back`s.
+- **Observation (not averi):** a slow hand drag (`input swipe 540 1500 540 1440 2500`) on the SWIFT form focused `bank_street_input`
+  and the window panned up (root `0,0 1080x2036`, scroll container `0,58 …`, the top bar off screen). Staging artefact.
+
+
+## Device check (2026-10-13 Android, re-run at 20307d2)
+
+Measured 2026-10-13 17:10–17:58 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, gesture navigation — `settings get secure
+navigation_mode` = 2, `ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true`; Gboard docked unless stated), averi = mobile-verify
+`arch/round-12` @ `20307d2` (detached; `dist/` built 17:07 UTC after the commit; stdio via the HTTP daemon on port 47881, cwd mp-native).
+Strokes, taps and keys from the `adb` shim (`run12-android/adb-input.log`, times UTC); stagings by hand with the real `adb` (slow `input
+swipe` drags, not in the shim log). Every call is in `run12-android/session.log` (`#N` below = call number there; images `img-N-0.png`).
+At start mp-native showed the inactivity "Logged out" screen: LOGIN → Welcome → SIGN IN → `run_flow login_pin_android_here` (approved rung,
+no `requires:`), done at 17:11. Scratch configs only; mp-native's `averi.yaml` untouched. Round 9's §3–4, round 10's §2–3, round 11's §3
+and round 12's §3 were all run at this one hash. **Environment break at 17:33 UTC:** mp-native's backend began answering every GraphQL read
+with `{"data":null,"errors":[{"message":"Received empty response body from subgraph \"gds-business\"","extensions":{"code":
+"SUBGRAPH_RESPONSE_BODY_EMPTY"}}]}` (HTTP 200, `get_logs` #161, #180) — "Mandatory data not loaded / TRY AGAIN" on every tab, also after a
+fresh PIN login (#223, 17:43). Not averi, not the VPN (no 403). The mp-native items not run before 17:33 (SWIFT form: A2, D1.2, smoke 1's
+SWIFT field, D7.3) are Not reached on mp-native; on the owner's instruction (17:51) they were re-run on Google Contacts and on Finportal
+(`sk.finportal.myport`, Expo dev build on Metro; its `~/dev/finportal/app/averi.yaml` passed as `configPath`; never logged in, nothing
+submitted) where an equivalent shape exists — see `## Re-runs on Contacts / Finportal` below. The data also changed since round 8:
+Account Detail now lists `row_0`…`row_36` (37 rows, was 31), so the handoffs' `row_29/30` / `row_30` shapes were measured on the rows that
+now sit there (`row_35/36`).
+
+Round 9 §3.3 ("Add fields" / "Add phone" with the IME up) and round 12 smoke 1 (Contacts part) — **Hold.** Create contact, First name
+focused (Gboard docked, `touchableRegion=SkRegion((0,1332,1080,2022))`; the window is resized, so `Add phone`/`Add fields` drop out of the
+tree):
+- #61 `scroll_until text:"Add phone"` → `fully visible after 1 swipe` (7.8 s), `17:20:06 input swipe 540 1167 540 473 695` — the IME-aware
+  stroke of rounds 6–8; #63 `tap text:"Add phone"` → `Tapped`, `17:20:24 input tap 236 1317` (text `138,1289 195x55`, centre 1317 above the
+  keyboard top 1332) — a second phone field appeared.
+- #65 `scroll_until text~"[Ff]ields" fully: true` → `fully visible after 1 swipe`, the same stroke `540 1167 540 473 695` (round 6: identical);
+  #67 `tap text:"Add fields"` → `Tapped`, `17:20:53 input tap 288 1135`, the "Choose fields to add" sheet opened (closed by Back).
+- Smoke 1 (Contacts analogue of "a tap on a field under the open Gboard"): #201 `tap role:textfield label:"Last name"` (centre 1489 under the
+  docked keyboard) → `Tapped role:textfield label:"Last name" (the soft keyboard covered role:textfield label:"Last name"; hidden before
+  tapping)` (9.5 s), shim `17:39:35 keyevent 4`, `17:39:40 input tap 540 1489` — Back first, then the field. #202 `type_text` into it
+  (`"Probe"`) → `Typed 5 characters into role:textfield label:"Last name" — NOT verified: the field could not be found again (the selector no
+  longer matches it)` — the field's label became `Probe` (`textfield lab='Probe'`), the documented label-selector case; the text landed. The
+  contact was discarded.

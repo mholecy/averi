@@ -49,3 +49,36 @@ In every empty case a plain `xcrun simctl io booted screenshot` a few seconds la
 
 `install_app ios` → `launch_app ios <bundle>` → immediately `ui_snapshot { platform: ios, filter: "role:button" }` on an
 app whose first screen has buttons. Repeat a few times; some runs return `[]`.
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+**Holds.** `launch_app com.finshape.dbosbanking` (after `terminate_app`) → one line, and a `ui_snapshot` sent right after
+it (0.3 s) read the PIN screen (21 nodes), not `[]` and not SpringBoard's launch tree. Details in the dd50327 section of
+`2026-10-08-ios-launch-transition-tree-reads-as-rendered.md`.
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+**Holds.** See the 2f98900 section of `2026-10-08-ios-launch-transition-tree-reads-as-rendered.md`: one-line launch reply, the
+first `ui_snapshot` after it read the PIN screen, never `[]` or SpringBoard's launch tree.
+
+## Device check (2026-10-09 iOS, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/` built 22:41 local, stdio via the HTTP daemon on port 47853, cwd mp-native),
+mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only (`cfg-swift-wda`, `cfg-swift-idb`, `cfg-c-wda`,
+`cfg-contacts-idb`, `cfg-bank-idb`, `cfg-set-wda`, `cfg-optfill-ios`, `cfg-optfill-bank`), `idb` PATH shim logging every
+`idb ui tap|swipe|text`. Comparisons with `2f98900` ran on a scratch worktree build of that hash (port 47855, removed afterwards) on the
+same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags (`run9-ios/manual.log`). Run folder:
+`scratchpad/averi-repo/run9-ios`.
+
+**Holds.** See the 5e5a3d1 section of `2026-10-09-ios-launch-app-reads-previous-apps-tree.md`: every launch (bank ×9, Contacts ×6,
+Settings ×1) returned one line and a populated tree; no `⚠`, no empty `Application`. No launch code changed between `2f98900` and `5e5a3d1`.

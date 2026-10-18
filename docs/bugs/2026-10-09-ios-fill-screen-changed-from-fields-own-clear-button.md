@@ -73,3 +73,37 @@ field does not keep across empty ↔ filled.
    `NOT verified … (the screen changed while typing)`, though `7.25` is in the field.
 3. Fill the IBAN, repeat step 2 → `Filled … (4 characters, cleared 4 characters first)`.
 4. `type_text { selector: 'role:textfield value:"<iban>"', text: "", clear: true }` → `Cleared … (22 deletes sent) — NOT verified`.
+
+
+## Device check (2026-10-13 iOS, re-run at 20307d2)
+
+Measured 2026-10-13 17:10–17:37 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt; booted
+headless, the only booted simulator), averi = mobile-verify `arch/round-12` @ `20307d2` (`dist/`, stdio via the HTTP daemon on port
+47883, cwd mp-native), mp-native's `averi.yaml` untouched (default `treeSource: idb`); scratch configs in `run12-ios`: `cfg-wda.yaml`
+(`treeSource: wda`, otherwise a copy), plus `keyboardDismiss` variants `cfg-wda-title.yaml` (`tap: {id: swift_payment.form.title}`),
+`cfg-wda-payee.yaml` (`label: "Payee’s name"`), `cfg-wda-iban.yaml` (`label: "IBAN*"`), `cfg-wda-iban-title.yaml` (IBAN*, then the
+title), `cfg-wda-contacts.yaml` (`text: "New Contact"`). `idb` PATH shim logging every `idb ui tap|swipe|text|key` (`idb-calls.log`;
+PIN-pad lines 7–10 and 34–37 are the two `login_pin_ios_here` runs, not quoted). Positions set by hand with slow `idb ui swipe …
+--duration 2.5` drags at x 380 (`manual.log`). The software keyboard was raised by setting `com.apple.keyboard.preferences`
+`AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` to false and relaunching mp-native (17:18:37); both restored to 1 at
+17:36:59. mp-native logged in twice by the owner-approved `login_pin_ios_here` (17:12:19 after Account Detail showed "That's an
+error" on every reload; 17:18:49 after the prefs relaunch), never the `login` rung. WDA started by averi on the first `cfg-wda` call
+(17:13:44, port 8100) and stopped at 17:37 (xcodebuild killed, port 8100 closed). Local web pages `www/a.html` (link to B) and
+`www/b.html` (60 links) served on 127.0.0.1:47891, stopped 17:33:05. Note: the SWIFT form's layout differs from round 8 (at rest
+`priority_select 24,681` — clear of CONTINUE — not `24,771`), so the "`priority_select` under CONTINUE" shape was rebuilt with
+`payee_country_select` dragged to `24,775`; the handoff's status-band shape `24,-20` was reached by `priority_select` itself.
+
+**F1 capture (round 10) — reproduced, cause measured: the field's own clear button.** idb, SWIFT form, no keyboard (prefs at 1),
+`Payee’s name` = `Jan Novak` (filled 17:16:20), `Payee’s street` focused. 17:16:34 `type_text { selector: 'value:"Jan Novak"', text:
+"Petr Svoboda", clear: true }` → `Typed 12 characters into value:"Jan Novak" (cleared 9 characters first) — NOT verified: the field
+could not be found again (the screen changed while typing)` (3.5 s; l.26 focus `182 423`, l.27 nine `42`, l.28 nine `76`, l.29 `text
+Petr Svoboda`). `idb ui describe-all` polled every ~0.35 s through the call (`F1poll/*.json`, 60 reads) plus `F1-before.json` /
+`F1-after.json`:
+- `171634-82` (before): 38 nodes, 14 distinct identified `type:id` pairs, `Button 'icon-cross-circle' TextFieldWithComponentStyle
+  340,406 20x20`, field value `Jan Novak`.
+- `171636-311` and `171636-858` (after the clear, before the text): 37 nodes, 13 pairs — the only missing pair is
+  `Button:TextFieldWithComponentStyle` (the clear button vanishes with the field emptied; it is the only Button with that id on the form);
+  no value.
+- `171637-373` on (after typing): 38 nodes, 14 pairs, the clear button back, value `Petr Svoboda`.
+Before and after are identical apart from the value; the set changes only inside the fill, between the clear and the retype — exactly
+this note's mechanism, now caught live with no keyboard on screen.

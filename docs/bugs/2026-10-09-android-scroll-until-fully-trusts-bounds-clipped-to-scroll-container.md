@@ -124,3 +124,87 @@ Measured 12:56–12:59 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, 
   after 1 swipe` (8.0 s). Shim: one probe `input swipe 540 589 540 766 300` — finger DOWN, 177 px ≤ 178, inside the container, the same
   stroke as 347e70d. Row after `66,351 948x143`; screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-52-0.png` shows `Fees*` and its value whole. The overlay cut did not
   fire (the CONTINUE bar is not over the container).
+
+## Device check (2026-10-09 Android, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47831, cwd mp-native). Strokes and taps from
+the `adb` shim; page placement, bar show/hide and Gboard mode by hand with the real `adb`.
+
+- **Holds — carousel `fills`.** List at the top, bar shown, 15:45:32 `scroll_until { selector: "id:accounts.detail.header", fully: true }` →
+  `Element id:accounts.detail.header fully visible after 0 swipes; but it fills its scroll container (0,275 1080x330) exactly — its top and
+  bottom edges lie on the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either,
+  is cut — it may be cut there, a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a
+  screenshot` (2.7 s), verbatim as at 86eb42d; no stroke.
+- **Holds — top-edge probe, bar shown.** 15:45:35 `scroll_until { selector: "id:transactions.list.filter_panel", fully: true }` → `Element
+  id:transactions.list.filter_panel fully visible after 1 swipe; its top edge lies on its scroll container's (0,825 1080x1395), and a probe
+  swipe toward it moved nothing — nothing of it is cut there` (6.2 s). Probe `input swipe 540 1104 540 1281 300` — identical.
+- **Holds — Fees probe on the SWIFT form.** Details expanded, keyboard down, `fees_select` placed by a slow hand drag at `66,242 948x123` (cut
+  by the top bar). 15:47:55 `scroll_until { selector: "id:swift_payment.form.fees_select", fully: true }` → `Element
+  id:swift_payment.form.fees_select fully visible after 1 swipe` (9.0 s). One probe `input swipe 540 589 540 766 300` (177 px ≤ 178) — the
+  same stroke as 347e70d/86eb42d; row after `66,357 948x143`. No overlay cut (the CONTINUE bar `66,1979 948x132` is below the container).
+
+## Device check (2026-10-09 Android, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:33 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47841, cwd mp-native). Strokes and taps from the
+`adb` shim; placement and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's `averi.yaml` untouched.
+
+- **Holds — `fills`.** 18:32:18 `scroll_until { selector: "id:accounts.detail.header", fully: true }` → `Element id:accounts.detail.header
+  fully visible after 0 swipes; but it fills its scroll container (0,275 1080x330) exactly — … check with a screenshot` (2.6 s), verbatim.
+- **Holds — top-edge probe.** 18:32:21 `scroll_until { selector: "id:transactions.list.filter_panel", fully: true }` → `fully visible after
+  1 swipe; its top edge lies on its scroll container's (0,825 1080x1395), and a probe swipe toward it moved nothing — nothing of it is cut
+  there` (5.7 s), probe `input swipe 540 1104 540 1281 300` — identical.
+- **Holds — SWIFT Fees probe.** Details expanded, keyboard down, `fees_select` placed by slow hand drags at `66,242 948x129` (14 px cut by
+  the container top). 18:17:04 `scroll_until { selector: "id:swift_payment.form.fees_select", fully: true }` → `Element
+  id:swift_payment.form.fees_select fully visible after 1 swipe` (7.3 s), one probe `input swipe 540 589 540 734 300` (145 px ≤ 178; the
+  round-5 staging was cut 20 px, so 177); row after `66,380 948x143`. CONTINUE `66,1979 948x132` below the container, no overlay cut.
+
+## Device check (2026-10-09 Android, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:19 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/`, stdio via the HTTP daemon on port 47851, cwd mp-native). Strokes and taps from the
+`adb` shim (`run9-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only
+(`cfg-opt-bank`, `cfg-opt-contacts`, `cfg-optional`, new `cfg-fill`, `cfg-fill-bank`); mp-native's `averi.yaml` untouched.
+
+- **Holds — `fills`.** 21:17:24 `scroll_until { selector: "id:accounts.detail.header", fully: true }` → `… fully visible after 0 swipes; but it
+  fills its scroll container (0,275 1080x330) exactly — … check with a screenshot` (3.0 s), verbatim.
+- **Holds, but the probe is 3.7× shorter — top-edge probe.** List at rest (filter panel `0,825 1080x170`, bar shown). 21:17:27 and 21:17:54
+  `scroll_until { selector: "id:transactions.list.filter_panel", fully: true }` → `fully visible after 1 swipe; its top edge lies on its
+  scroll container's (0,825 1080x1395), and a probe swipe toward it moved nothing — nothing of it is cut there` (6.7 s), **probe `input swipe
+  540 1104 540 1152 300` — 48 px**, where 347e70d … 2f98900 drew `540 1104 540 1281 300` (177 px, the 0.08-screen cap). Twice, same state.
+  48 px is above 2 × TOUCH_SLOP (24) so `checked` is allowed, but after the platform's ~22-px slop only ~26 px of drag is left to reveal a
+  cut. Not traced; the round-6b diff touches `scroll-rounds.ts` (the turn's half reach, 643e81d/b081fed/091c427) and `draw-order.ts`
+  (pinned reach), either of which may now shrink the probe's room. Recorded, not filed.
+- **Holds — SWIFT Fees probe / turn.** Details expanded, keyboard down, `fees_select` at `66,242 948x80` (63 px cut by the container top).
+  20:55:07 `fully: true` → `fully visible after 1 swipe` (9.0 s), one stroke `input swipe 540 589 540 766 300` (177 px); row after `66,310
+  948x143`.
+- **New residual — a row cut by a sticky header reads "fully visible":** Account Detail, `row_0` cut by the sticky `date_header_0 0,401
+  1080x79` reads `66,480 948x84` (then `948x66`) while its own label and button nodes read `66,403 948x143`; `fully: true` on `id:row_0` →
+  `fully visible after 0 swipes` (20:49:29, 20:50:35, 20:59:06; 77 of 143 px hidden, screenshot `run9-android/img-41-0.png`), while the
+  same with its label → `fully visible after 1 swipe` (turned up, `540 765 540 982 300`). **New note:
+  `2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md`.**
+
+## Device check (2026-10-10 Android, re-run at 35d5997)
+
+Measured 2026-10-10 06:16–06:47 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-7` @ `35d5997` (`dist/`, stdio via the HTTP daemon on port 47861, cwd mp-native). Strokes and taps from the
+`adb` shim (`run10-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's
+`averi.yaml` untouched.
+
+**Holds, and one plain-call gap.** Contacts with the app bar collapsed: `scroll_until text:"All contacts" fully: true` → `fully visible after
+1 swipe`, the probe stroke `input swipe 540 396 540 573 300` (177 px, content down), text ends `149,149 213x55`. The PLAIN call on the same
+state → `Element text:"All contacts" fully visible after 0 swipes` with the text at `149,0 213x6` — wholly under the system status bar (new
+note `2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md`). (A plain call's "fully visible" wording for a
+6-px sliver is itself misleading.)
+
+
+## Device check (2026-10-14 Android, re-run at ebe6822)
+
+Round 16 Android device check, 2026-10-14 17:07:57–17:21:08 UTC, emulator-5554 (Pixel_3a AVD, Android 13 / API 33, 1080x2220, gesture navigation, `navigation_mode` = 2 before and after). averi built from `~/dev/mobile-verify` `arch/round-16` at `ebe6822`, checked with `git rev-parse --short HEAD` → `ebe6822` (read-only, detached), daemon on port 47911 via `$R/c`. Apps: mp-native `com.finshape.skeleton.dev` (first, already logged in by the owner, on Account Detail), Google Clock `com.google.android.deskclock`, Settings `com.android.settings`. **No PIN re-login was needed:** mp-native stayed logged in for the whole run. No `ensure_state`/`run_flow`, no `login` rung, no registration, no credentials typed, no `clearState`. **Backend: working.** Account Detail loaded balances (1,121.00 CZK / 2,000.00 CZK, "Account 1 of 4") and a full transaction list. Two transaction details opened with data. The SWIFT form loaded the debit account. No "Mandatory data not loaded" screen appeared. Calls #2–#92 are in `session.log`. The shim log `adb-input.log` has 66 lines, and every line cited below is quoted from it.
+
+**Observation (not on the checklist, existing residual shape).** #39 `scroll_until id:accounts.detail.available_balance direction:"up" fully:true`, used to bring Account Detail back to its top →
+`Element id:accounts.detail.available_balance fully visible after 3 swipes; but its top edge lies on its scroll container's (0,275 1080x330), where Android cuts a node's bounds to the container, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it; still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match` (15.4 s)
+- The shim has three short strokes, all inside the account carousel: `17:12:58 input swipe 540 287 540 335 300`, `17:13:04 … 540 299 540 349 300`, `17:13:09 … 540 331 540 381 300`.
+- The "scroll container" averi names is the horizontal account carousel `[0,275][1080,605]` (`scrollable="true"` in `acct6.xml`), not the vertical page. These are the probe strokes the note's "carousel `fills`" item describes. They moved the page (they still reached the target), and the 15 s budget ran out on the probes.
+- This is the same family as that note's carousel residual. I filed no new note.

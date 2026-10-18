@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture Review averi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+:root{--bg:#fafaf9;--fg:#1c1917;--card:#fff;--muted:#57534e;--line:#e7e5e4}
+@media (prefers-color-scheme:dark){:root{--bg:#0c0a09;--fg:#e7e5e4;--card:#1c1917;--muted:#a8a29e;--line:#292524}}
+body{background:var(--bg);color:var(--fg)}
+.card{background:var(--card);border:1px solid var(--line)}
+.muted{color:var(--muted)}
+.mermaid{background:#fff;border-radius:.5rem;padding:.5rem}
+</style>
+</head>
+<body class="px-4 py-8">
+<main class="max-w-5xl mx-auto space-y-8">
+<header>
+<h1 class="text-3xl font-bold">averi: architecture review after the bugfixes</h1>
+<p class="muted mt-2">Branch <code>fix/android-second-look-decor-2026-10-07</code> vs <code>main</code> (14 commits, +6.8k lines). Two independent reviewers (Opus 5.5, Fable) and a master decision. Baseline: tsc clean, 1506/1506 tests pass.</p>
+</header>
+
+<section class="card rounded-xl p-6 space-y-4">
+<div class="flex items-center gap-3"><h2 class="text-xl font-semibold">K1. The keyboard model is a seam with two adapters, but only its reading half is drawn</h2><span class="px-2 py-0.5 rounded bg-green-600 text-white text-sm">Strong</span><span class="text-sm muted">both reviewers</span></div>
+<p><b>Files:</b> <code>interact/keyboard.ts</code> (resolveClearOfKeyboard 660–903, dismissKeyboard 958–988, pure decisions 395–492), <code>ui-tree/soft-keyboard.ts</code> (readSoftKeyboard), <code>verify/pixel-poll.ts</code>, ARCHITECTURE.md §2</p>
+<p><b>Problem:</b> The window model (Android: oracle, a witness veto, <code>back</code>) and the in-tree model (iOS/WDA: band, a configured dismissal tap, confirming looks) are two real adapters. The choice between them is written in three places: readSoftKeyboard, plus <code>oracle === undefined</code> at keyboard.ts:683 and :960. A 90-line in-tree protocol is spliced into the window model's function, and that splice garbled the doc (603–606). The pure decisions <code>afterBack</code>/<code>inTreeLook</code> are byte-identical pass-throughs, and their tests never reach the callers where the real bugs were.</p>
+<p><b>Solution:</b> Choose the model once from the adapter. Each model answers three questions: is this target covered, what can be done about it, and confirm after acting. The skeleton (resolve → read → act once → delay → resolve again → confirm → refuse) is written once. The pass-throughs are inlined; <code>recheck</code> and <code>dismissal</code> stay.</p>
+<p><b>Benefits:</b> locality (each model's protocol, constants and wording live in one place); leverage (guard, post-fill dismissal and pixel poll all go through one interface); tests go through the model interface, not ternaries.</p>
+<div class="grid md:grid-cols-2 gap-4">
+<div><p class="font-semibold mb-1">Before</p><pre class="mermaid">flowchart TD
+R[readSoftKeyboard] -->|switch 1| W1[window read]
+R --> I1[in-tree read]
+G[resolveClearOfKeyboard] -->|switch 2| IT[in-tree protocol 90 lines]
+G --> WP[window protocol]
+D[dismissKeyboard] -->|switch 3| X[back / tap]
+P[pixel-poll] --> R</pre></div>
+<div><p class="font-semibold mb-1">After</p><pre class="mermaid">flowchart TD
+A[adapter] -->|one choice| M{keyboard model}
+M --> WM[window model: oracle, witness, back]
+M --> TM[in-tree model: band, dismissal tap, looks]
+G[guard skeleton] --> M
+D[dismissKeyboard] --> M
+P[pixel-poll] --> M</pre></div>
+</div>
+</section>
+
+<section class="card rounded-xl p-6 space-y-3">
+<div class="flex items-center gap-3"><h2 class="text-xl font-semibold">K2. Corrections the bugfixes left behind</h2><span class="px-2 py-0.5 rounded bg-green-600 text-white text-sm">Strong</span></div>
+<ul class="list-disc pl-6 space-y-1">
+<li><b>typeText("")</b>: on Android it still sends DPAD_LEFT/RIGHT, contradicting the DeviceAdapter contract (types.ts ~345); on iOS it sends nothing. Fix: Android returns early, the test pin moves. <span class="muted">(both)</span></li>
+<li><b>MAY_HAVE_CHANGED</b> is spelled three ways in keyboard.ts (560 / 754 / 863). <span class="muted">(both)</span></li>
+<li><b>Stale docs</b>: dismissKeyboard says "one re-read" and inTreeLook says "Third look", but the code takes up to KEYBOARD_HIDE_CONFIRM_LOOKS looks; the protocol doc at 603–606 is garbled. <span class="muted">(Fable + Opus)</span></li>
+<li><b>iOS "presses enter"</b>: ARCHITECTURE.md:274 and types.ts:385 describe behaviour that stage B removed; the pixel-poll iOS remedy doesn't mention <code>fill dismissKeyboard</code> + <code>app.ios.keyboardDismiss</code>, the one fix that works. <span class="muted">(Opus)</span></li>
+<li><b>wda-source.ts:241</b> says the rect tests are "not imported", but rectsOverlap is imported from types.ts. <span class="muted">(Opus; minor)</span></li>
+<li><b>ARCHITECTURE.md §2</b>: "readSoftKeyboard is THE one switch" is true only of the reading (resolved by K1). <span class="muted">(Fable)</span></li>
+</ul>
+</section>
+
+<section class="card rounded-xl p-6 space-y-3">
+<div class="flex items-center gap-3"><h2 class="text-xl font-semibold">K3. One "iOS tool settings" lookup instead of two averi.yaml reads per MCP call</h2><span class="px-2 py-0.5 rounded bg-amber-500 text-white text-sm">Worth exploring</span><span class="text-sm muted">Fable</span></div>
+<p><b>Files:</b> <code>flow/load.ts</code> 160–186 (iosTreeSourceFor, keyboardDismissalsFor), <code>mcp/tools.ts</code> (treeOpts, tap, type_text)</p>
+<p><b>Problem:</b> keyboardDismissalsFor copies iosTreeSourceFor's three-part policy, and every tap/type_text reads and parses the same file twice. <b>Solution:</b> one lookup that returns both values and writes the policy once.</p>
+</section>
+
+<section class="card rounded-xl p-6 space-y-2 opacity-80">
+<div class="flex items-center gap-3"><h2 class="text-xl font-semibold">Rejected: a detect-probe module out of engine.ts</h2><span class="px-2 py-0.5 rounded bg-stone-500 text-white text-sm">Speculative</span><span class="text-sm muted">Opus only</span></div>
+<p>The bare/unknown probe answer is cohesive, but it's tested through the engine interface (bare-tree-ladder, unread-tree-ladder), Fable checked it and left it alone, and the concept is still moving. YAGNI: revisit at the next behaviour change to the ladder.</p>
+</section>
+
+<section class="card rounded-xl p-6 border-2 border-green-600">
+<h2 class="text-xl font-semibold">Top recommendation</h2>
+<p class="mt-2">Order: <b>K2</b> first (small, independent corrections) → <b>K1</b> (the deepest friction: 5 of the 14 commits touch keyboard.ts, which is 999 lines; the review rounds found defects in the caller body that the pure tests can't reach) → <b>K3</b>. Each step: implement in a subagent → review-loop in a different model → code-review.</p>
+</section>
+</main>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral'});</script>
+</body>
+</html>
