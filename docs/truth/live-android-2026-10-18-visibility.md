@@ -97,8 +97,8 @@ text` fails on non-ASCII, LOUD).
 
 Decision 5's hint had only been read off replayed trees. Run on the device on 2026-10-18 (averi_lab, emulator-5554,
 booted `-no-snapshot-save`; lab app and src built from truth/r6-cr2 ea070d2 = truth/round-6 9d1aaf8 + arch/r22-cr2),
-a narrow run, record docs/truth/live-records/android-vis-hint-ea070d2.json (not pinned in live-rejudge.test.ts, which
-pins the full-group records):
+a narrow run, record docs/truth/live-records/android-vis-hint-ea070d2.json (pinned in live-rejudge.test.ts, as the other
+partial records are: 24 cases, 21 ok, 1 loud, 2 mismatches):
 
   node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups forms,visibility --cases c2,c3,c4,tap:scroll-bounded.O,scroll:scroll-bounded.O,tap:scroll-bounded.F,scroll:scroll-bounded.F,turn:scroll-bounded.F,<tap: and scroll: of alert-dim and sheet-medium A–D> --record <file>
 
