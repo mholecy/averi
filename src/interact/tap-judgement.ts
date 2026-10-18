@@ -10,7 +10,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutRemedy, cutSliverText, underKeyboardText } from './target-text.js';
+import { cutByRemedy, cutRemedy, cutSliverText, underKeyboardText, type KeyboardUp } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -164,6 +164,11 @@ export class CoveredRefusal extends PresentElementRefusal {}
  * the section did not expand — nor for hand taps on the strip. Nothing is
  * tapped. The covered sliver's sibling (CoveredRefusal): what shows is cut
  * by a clip, not by a node drawn over it, and refused by the same minimum.
+ * Or cut by a node drawn AFTER it (geometry.ts#Cut.by: Compose leaves out of
+ * a node's bounds what a later node covers): the lab's `note` after `back`,
+ * dumped `55,2126 970x14` under Continue, was tapped at y 2133 and reached
+ * only because that bar lets touches through — refused naming that node,
+ * the remedy `cutByRemedy`'s (target-text.ts).
  * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md
  */
 export class ClippedRefusal extends PresentElementRefusal {}
@@ -263,7 +268,10 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
       const { first } = standings;
       // The reading's line only for a covered centre of a target on the screen and not cut.
       const standing = !offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? await standings.full() : first;
-      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(look.tree) }));
+      // A cut by a node drawn after it: whether the soft keyboard is up, which its remedy names (`cutByRemedy`) — the reading's line, asked on that path only.
+      const line = standing.kind === 'cut' && standing.cut.by !== undefined ? await look.keyboard.readingLine() : undefined;
+      const keyboard: KeyboardUp | undefined = line === undefined ? undefined : { lineY: line.y, remedy: look.reading.remedy };
+      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(look.tree) }), keyboard);
     },
   });
   const first = tapStandings(look, node, screen);
@@ -306,17 +314,19 @@ interface JudgedScreen {
  * row is `TapJudge.aim`'s, after it. `judgedScreen` is asked on the first
  * row only — which `aim` never reaches at runtime — its standing passed the
  * on-screen rule, and `full()` changes only the keyboard line — only the
- * type admits it.
+ * type admits it. `keyboard`: the soft keyboard when it is up, asked by
+ * `aim` only for a cut by a node drawn after it, whose remedy names it.
  */
-function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => JudgedScreen): Aim {
+function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => JudgedScreen, keyboard?: KeyboardUp): Aim {
   const { centre } = standing.facts;
   switch (standing.kind) {
     case 'offScreen':
     case 'systemBar':
       throw offScreenRefusal(standing, told, judgedScreen());
     case 'cut': {
-      const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece);
-      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, () => cutAdvice(standing.cut))}`));
+      const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece, keyboard?.lineY);
+      const by = standing.cut.by;
+      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, () => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard, standing.minPiece)))}`));
     }
     case 'reachable': {
       if (standing.moved === undefined) return { point: standing.at };
@@ -439,7 +449,9 @@ const INHERITED_CUT_WAY_PAST =
  * past, when its standing's remedy is the plain `scroll` (beneath a
  * presented screen `advice` says that screen's remedy instead) — the refusal
  * of a node cut to a sliver (ui-tree/standing.ts#Scene.standing's `cut`;
- * geometry.ts#Clips.cutSliver owns what counts as cut, and
+ * what counts as cut is geometry.ts#Clips.cutSliver's at a clipping
+ * container's edge and ui-tree/standing.ts#cutByLater's at a node drawn
+ * after it, whose refusal says `cutByRemedy`'s instead of this advice; and
  * draw-order.ts#MIN_TAP_PIECE_FRACTION the minimum). A sliver also
  * covered is refused for its cut, whose remedy names the edge.
  * docs/adr/0005-cut-before-cover.md
@@ -454,9 +466,11 @@ const INHERITED_CUT_WAY_PAST =
  * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured:
  * the toggle's leaf label "Payment details", tapped as a child, did
  * nothing) — whose own way past names what it lies in:
- * something in THAT clear of the edge. Only nodes under a clipping ancestor
- * (UiNode.clipsDescendants, Android's) are cut: an iOS tree has none, so
- * this never refuses there.
+ * something in THAT clear of the edge. A container's cut needs a clipping
+ * ancestor (UiNode.clipsDescendants, Android's); a cut by a later node needs
+ * none, only a nested tree of clipped frames (standing.ts#cutByLater's
+ * `cutsAtLater`) — an iOS tree is neither (WDA's frames are unclipped, idb's
+ * list flat), so no cut is refused there.
  */
 const cutAdvice = (cut: Cut): string => `${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
 

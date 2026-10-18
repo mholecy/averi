@@ -17,6 +17,43 @@ The tap refuses a target its scroll container cuts to a sliver under the tap min
 `ui-tree/geometry.ts#Clips.cutSliver`'s. The remedy is a plain
 `scroll_until` toward the cut edge, whose plain stop does not stop on such a sliver either (`ui-tree/standing.ts#Scene`).
 
+## Refined 2026-10-17 (owner): a sliver cut by a node drawn after it
+
+Compose leaves out of a node's bounds what a node drawn after it covers. On the lab's `form-keyboard` (Android) the
+submit bar rides on the IME and has no node; `Continue` (`55,1238 970x132`) is drawn after the form, and the `phone`
+field below it — a 132-px touch target from 1280 — is dumped as `55,1370 970x42`. `scroll_until` answered "visible after
+0 swipes" though the user sees only the bar's grey. After `back`, `note` is dumped `55,2126 970x14`, 7 px of it below
+`Continue`; averi tapped that strip and reached the field only because the lab's bar lets touches through (a tap at the
+field's own centre submitted the form).
+
+The same rule now covers that cut: a CONTROL thinner than the tap minimum across an edge that lies flush with a node
+drawn after it, that node spanning the edge (`ui-tree/standing.ts#cutByLater`), is a sliver cut by that node
+(`geometry.ts#Cut.by`). The tap refuses it (`ClippedRefusal`), naming that node, where the strip lies and how much of it
+shows; the remedy is to dismiss the soft keyboard first when it is up (a bar riding on it goes down with it), or to
+scroll it out from under that node. `scroll_until`'s plain stop and its `fully: true` stop do not stop on it. Its strokes
+go on (the node is outside the field's scroll view, so a scroll may bring the field out from under it), and when they
+move nothing the failure names the node and the same remedy. The cut edge never turns a stroke, because the rest of the
+field lies under the node, not past the far edge. Android only: WDA reports frames unclipped (the same lab cell lists
+`phone` whole under the bar, covered at its centre), and idb's flat list has no subtree to say "drawn after".
+
+Residuals of the refinement: a whole control thinner than the minimum laid flush against a later node that spans it is
+refused too, because the dump cannot tell it from a cut. It is handled as the container cut's own residual is: the
+sentences say the rest "may" lie under that node, the tap's remedy adds the way past ("if it is whole — a control that
+thin laid flush against that container — no scroll shows more: tap by coordinates"), and `scroll_until`'s stuck failure
+names the alternative ("or it is only that thin, laid flush against it"). A text that is no control (the field's title,
+cut to 14 px at the same bar) is tapped as before. The second residual: a clickable with no role — Compose's
+`Modifier.clickable` without one dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is
+still tapped on the strip, and in an app whose bar takes the touch that tap is reported done and reaches nothing (the
+owner's "accidentally submitted" risk). Not widened on purpose: the gate is the control roles
+(selectors.ts#isInteractive), and a role-less node is as often a layout wrapper as a clickable — refusing those would
+refuse wrappers and containers that are no target.
+A bar riding on the keyboard whose cutting node (`interact/target-text.ts#ridingKeyboard`) ends more than the tap
+minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is the
+scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather than one
+that misleads.
+
+Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
+
 ## Residuals accepted
 
 - A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;

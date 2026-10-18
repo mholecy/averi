@@ -10,6 +10,7 @@ import type { Scene } from '../../src/ui-tree/standing.js';
 import { judgeTap, OffScreenRefusal, tapStandings, type Aim, type TapReading } from '../../src/interact/tap-judgement.js';
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 // THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look (ui-tree/look.ts#lookAt)
 // and a screen — no settle loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a
@@ -553,5 +554,85 @@ describe('tapStandings — the tap\'s two standings of a node', () => {
     const standings = tapStandings(lookWith(tree, kb), find(tree, 'swift_payment.form.value_date_select'), undefined);
     expect(await standings.full()).toBe(standings.first);
     expect(kb.asked).toEqual({ cover: 1, corroborated: 0 });
+  });
+});
+
+/**
+ * Lab note F2A1 (docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md), the
+ * owner's decision of 2026-10-17: a control Compose dumped as the strip a node drawn after it leaves — the submit bar
+ * riding on the IME — is refused under the tap minimum, naming that node, where the strip lies and how much of it shows,
+ * with the remedy "dismiss the keyboard first, or scroll the list". Measured: averi tapped note's strip after `back` at
+ * y 2133, 7 px below Continue, and reached it only because the lab's bar lets touches through; a tap at the field's own
+ * centre submitted the form. Real captures of the lab's `form-keyboard` (averi_lab, API 33, 1080x2220).
+ */
+describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: ClippedRefusal naming that node', () => {
+  const capture = async (name: string): Promise<UiNode> => parseDump(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
+  const CUTTER = 'container id:lab.form-keyboard.submit';
+  it('phone under the bar riding on the IME, the keyboard up (its line 1398): dismiss it first, or scroll', async () => {
+    const kb = reading(1398);
+    const { outcome } = await judge(await capture('android-lab-form-keyboard.xml'), 'lab.form-keyboard.phone', { first: PIXEL }, { kb });
+    expect(said(outcome)).toBe(
+      `ClippedRefusal: lab.form-keyboard.phone is cut at its top edge by ${CUTTER} (55,1238 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
+        'so the rest of it may lie under that container; only a 970x28 part of it shows above the soft keyboard, at 55,1370, 42 deep across that edge, under the 65 a tap needs — ' +
+        'the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — ' +
+        'a bar riding on it goes down with it — or scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
+    );
+    // The reading is asked once, for the remedy's words.
+    expect(kb.asked.cover).toBe(1);
+  });
+  it('note after back, the keyboard down: scroll it out from under the bar', async () => {
+    const { outcome } = await judge(await capture('android-lab-form-keyboard-after-back.xml'), 'lab.form-keyboard.note', { first: PIXEL });
+    expect(said(outcome)).toBe(
+      `ClippedRefusal: lab.form-keyboard.note is cut at its top edge by ${CUTTER} (55,1994 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
+        'so the rest of it may lie under that container; only a 970x14 part of it shows, at 55,2126, 14 deep across that edge, under the 65 a tap needs — ' +
+        'scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
+    );
+  });
+  it('the adapter that cannot hide the keyboard says so, with its advice', async () => {
+    const { outcome } = await judge(await capture('android-lab-form-keyboard.xml'), 'lab.form-keyboard.phone', { first: PIXEL }, { kb: reading(1398), remedy: NONE });
+    expect(said(outcome)).toContain(
+      'dismiss it first (tap a neutral element such as the screen title — a tap: step in a flow; this adapter cannot hide it on its own (tap the title)) — a bar riding on it goes down with it — or scroll_until',
+    );
+  });
+  it('a field whole above the bar is tapped at its centre, the reading never asked', async () => {
+    const kb = reading(1398);
+    const { outcome } = await judge(await capture('android-lab-form-keyboard.xml'), 'lab.form-keyboard.postcode', { first: PIXEL }, { kb });
+    expect(said(outcome)).toBe('{"point":{"x":540,"y":1164}}');
+    expect(kb.asked.cover).toBe(0);
+  });
+});
+
+describe('judgeTap(…).aim() — a cut by a later node names the keyboard only when that node rides on it', () => {
+  /** A field `55,y 970x42` cut at its top by a bar laid after it, ending at `barBottom` — the keyboard's line at 1398. */
+  const cutAt = (barBottom: number) =>
+    node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 1080, height: 2220 },
+      children: [
+        node({ role: 'textfield', identifier: 'field', rect: { x: 55, y: barBottom, width: 970, height: 42 } }),
+        node({ role: 'button', identifier: 'bar', rect: { x: 0, y: barBottom - 132, width: 1080, height: 132 } }),
+      ],
+    });
+  it('a bar ending 28 px above the line (the lab\'s Continue): dismiss the keyboard first, or scroll', async () => {
+    const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1398) });
+    expect(said(outcome)).toContain('— the soft keyboard is up (its top edge at y 1398): dismiss it first');
+  });
+  it('a strip wholly under the keyboard\'s line: nothing of it shows above the soft keyboard, its strip quoted', async () => {
+    const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1360) });
+    expect(said(outcome)).toContain('so the rest of it may lie under that button; nothing of it shows above the soft keyboard (its strip lies at 55,1370 970x42), 42 deep across that edge');
+  });
+  it('a bar ending 10 px BELOW the line (the keyboard drawn over its bottom): the keyboard unnamed', async () => {
+    const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1360) });
+    expect(said(outcome)).not.toContain('dismiss it first');
+    expect(said(outcome)).toContain('— scroll_until it out from under that button first (');
+  });
+  it('a bar ending 66 px above the line, one past the minimum (a button stacked over another): the scroll alone, the safe direction', async () => {
+    const { outcome } = await judge(cutAt(1332), 'field', { first: PIXEL }, { kb: reading(1398) });
+    expect(said(outcome)).not.toContain('dismiss it first');
+  });
+  it('a top bar ending at 300, far above the line: the scroll alone, the keyboard unnamed', async () => {
+    const { outcome } = await judge(cutAt(300), 'field', { first: PIXEL }, { kb: reading(1398) });
+    expect(said(outcome)).toContain('under the 65 a tap needs — scroll_until it out from under that button first (');
+    expect(said(outcome)).not.toContain('soft keyboard');
   });
 });

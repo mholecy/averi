@@ -9,6 +9,7 @@ import {
 import type { MarkedLayer, PresentedPress } from './presentation.js';
 import {
   aboveNavigationBand,
+  across,
   belowStatusBand,
   clippedEdges,
   clipsOf,
@@ -26,7 +27,7 @@ import {
   type Edge,
 } from './geometry.js';
 import type { KeyboardLine } from './keyboard-position.js';
-import { tapPoint } from './selectors.js';
+import { isInteractive, tapPoint } from './selectors.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
 /**
@@ -87,7 +88,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   before the bottom's (for `fully`, any of the node in a band past the
  *   slack too: the band as a region, `systemBandOver`, with its rect); cut
  *   to a sliver at its scroll container's edge
- *   (`Clips.cutSliver` by the exposure's minimum piece) — `cut`; drawn over
+ *   (`Clips.cutSliver` by the exposure's minimum piece), or by a node drawn
+ *   after it (`cutByLater`, `Cut.by`) — `cut`; drawn over
  *   — `covered`; its centre under a keyboard line no guard acts on
  *   (`witnessed: false`, idb's band) — `underKeyboard`; else `reachable`.
  *   Under a witnessed line (the window's, WDA's) the guard acts, not the
@@ -220,7 +222,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * - A sliver: uiautomator cuts every rect to its scroller, so a cut node's
  *   centre is always on the screen; the stop handed back the very strip the
  *   tap refuses, and a tap on it was reported done and did nothing.
- *   Scrolling on reveals it.
+ *   Scrolling on reveals it. A control cut by a node drawn after it
+ *   (`cutByLater`) is no stop either — the `fully` stop's too, since no flush
+ *   probe sees that cut: `phone` under the bar riding on the IME read
+ *   "visible after 0 swipes" while the user saw only the bar.
+ *   docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
  * The owner's decisions for the centre and the covers:
  * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
  * docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md
@@ -394,7 +400,7 @@ export interface StandingFacts {
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
-  /** The node's cut to a sliver by its scroll container under `minPiece` (geometry.ts#Clips.cutSliver), whatever the kind — never judged for the pixel (D5, ADR 0012). */
+  /** The node's cut to a sliver under `minPiece` — by its scroll container (geometry.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
   /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
@@ -613,6 +619,8 @@ type Unreached<J> = Exclude<J, { readonly kind: 'reachable' }>;
 
 /** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
 export function sceneOf(tree: UiNode): Scene {
+  // Whether the tree's source cuts a node's bounds at a node drawn after it (`cutByLater`): a nested tree of clipped frames.
+  const cutsAtLater = listsAncestry(tree) && !listsUnclippedFrames(tree);
   let order: DrawOrder | undefined;
   let clips: Clips | undefined;
   const scene: Scene = {
@@ -643,7 +651,7 @@ export function sceneOf(tree: UiNode): Scene {
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: TouchPurpose): Standing;
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
-    const judged: Judged = { scene, node, centre: tapPoint(node) };
+    const judged: Judged = { scene, node, centre: tapPoint(node), cutsAtLater };
     if (purpose.of === 'pixel') {
       // The pixel purpose picks its own box of the usable screen, `oriented` (`singleBox`).
       const usable = pixelScreen(screen);
@@ -752,11 +760,12 @@ function remedied(
 const scrollable = (inScroller: boolean | undefined, stuckInPlace: boolean): ScrollableRemedy =>
   inScroller === false ? { of: 'pinned' } : inScroller === undefined || stuckInPlace ? { of: 'stuck' } : { of: 'scroll' };
 
-/** A node being judged, and its centre. */
+/** A node being judged, and its centre — and whether its tree's source cuts a node's bounds at a node drawn after it (`cutByLater`). */
 interface Judged {
   readonly scene: Scene;
   readonly node: UiNode;
   readonly centre: Point;
+  readonly cutsAtLater: boolean;
 }
 
 /**
@@ -1026,10 +1035,64 @@ const underLine = (facts: StandingFacts, line: KeyboardLine | undefined): TapJud
 const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
   line === undefined || line.y >= box.y + box.height ? box : { ...box, height: Math.max(0, line.y - box.y) };
 
+/**
+ * The node's cut to a sliver BY A NODE DRAWN AFTER IT (`Cut.by`) — the sliver rule's second evidence beside a clipping
+ * container's edge (geometry.ts#Clips.cutSliver, asked first): the node is a control (selectors.ts#isInteractive)
+ * thinner than `minPiece` across one of its edges, and a node drawn after it outside its subtree, which draws over it
+ * as a target (draw-order.ts#DrawOrder.coversOf), holds the pixel row just past that edge along the node's whole
+ * extent there without holding the node itself — the edge, of the first such node in draw order (the outermost: the
+ * submit bar, not its button), the first of top, bottom, left, right. Compose leaves out of a node's bounds what a
+ * node drawn after it covers (the pinned-bar note; the parser widens a node whose own descendants still carry the cut
+ * extent, adapters/android.ts#uncut, so this is the leaf's case): the lab's `phone` field, its 132-px touch target
+ * from 1280, dumped `55,1370 970x42` under `Continue` `55,1238 970x132`, and after `back` `note` dumped `55,2126
+ * 970x14`. The rest of it lies under that node: a tap at the strip's centre reached the field only because the lab's
+ * bar lets touches through, and one at the field's own centre submitted the form. Only the shape a cut can leave: a
+ * node narrower than the strip, or one a pixel away, leaves no rect that is a cut of the node, and a node holding the
+ * whole control is a cover (`exposure`'s). Only on a tree whose source cuts bounds so (`cutsAtLater`: nested, frames
+ * clipped — Android's): WDA reports frames unclipped (the same lab cell lists phone whole under the bar, covered at its
+ * centre), and idb's flat list has no subtree to judge "after" by.
+ * Residuals, stated: a WHOLE control thinner than the minimum laid flush against a node drawn after it that spans it (a
+ * dense 20-dp row under the next row's full-width background; on any nested tree of clipped frames, classic Views too)
+ * is refused too — the dump cannot tell it from a cut, and a tap into a strip that thin lands on the neighbour's edge
+ * as often as on it (draw-order.ts#MIN_TAP_PIECE_FRACTION) — its sentences say the rest "may" lie under that node and
+ * give that case its way past, a coordinate tap (interact/target-text.ts#wholeThinWayPast), as the container's cut
+ * gives its own (`OWN_CUT_WAY_PAST`); a text that is no control (a field's title cut to 14 px at the same bar) is
+ * tapped as before; and, the second residual, a clickable with no role — Compose's `Modifier.clickable` without one
+ * dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is still tapped on the strip,
+ * and in an app whose bar takes the touch that tap is reported done and reaches nothing (the owner's "accidentally
+ * submitted" risk). Not widened on purpose: the gate is the control roles (selectors.ts#isInteractive), and a role-less
+ * node is as often a layout wrapper as a clickable — refusing those would refuse wrappers and containers that are no
+ * target.
+ * A bar riding on the keyboard whose cutting node (interact/target-text.ts#ridingKeyboard) ends more than the tap
+ * minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is
+ * the scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather
+ * than one that misleads.
+ * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
+ */
+function cutByLater({ scene, node, cutsAtLater }: Judged, minPiece: number): Cut | undefined {
+  if (!cutsAtLater || !isInteractive(node) || rectArea(node.rect) === 0) return undefined;
+  const r = node.rect;
+  for (const edge of ['top', 'bottom', 'left', 'right'] as const) {
+    const depth = across(r, edge);
+    if (depth >= minPiece) continue;
+    // The pixel row (column) just past that edge, along the node's whole extent there.
+    const strip: Rect = {
+      top: { x: r.x, y: r.y - 1, width: r.width, height: 1 },
+      bottom: { x: r.x, y: r.y + r.height, width: r.width, height: 1 },
+      left: { x: r.x - 1, y: r.y, width: 1, height: r.height },
+      right: { x: r.x + r.width, y: r.y, width: 1, height: r.height },
+    }[edge];
+    const by = scene.order.coversOf(node, strip).find((c) => rectWithin(strip, c.rect) && !rectWithin(r, c.rect));
+    if (by !== undefined) return { edge, container: { ...by.rect }, depth, by };
+  }
+  return undefined;
+}
+
 /** The facts of a node judged in `frame`, from its exposure there. */
-function factsIn({ scene, node, centre }: Judged, frame: Rect, exposed: Rect = frame, { sliver: judgeSliver = true } = {}): { facts: StandingFacts; seen: Exposure } {
+function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: judgeSliver = true } = {}): { facts: StandingFacts; seen: Exposure } {
+  const { scene, node, centre } = judged;
   const seen = scene.order.exposure(node, exposed);
-  const sliver = judgeSliver ? scene.clips.cutSliver(node, seen.minPiece) : undefined;
+  const sliver = judgeSliver ? (scene.clips.cutSliver(node, seen.minPiece) ?? cutByLater(judged, seen.minPiece)) : undefined;
   const drawn = scene.clips.drawnIn(node)?.frame;
   const facts: StandingFacts = {
     centre,
@@ -1103,8 +1166,9 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judge
 /**
  * The `fully` stop's standing (`Scene`'s contract) — the plain stop's frame
  * and order, with its own rules: an edge past the frame first (`clipped`);
- * no sliver (a stop flush with a clipping container is scroll_until's flush
- * probe's, interact/scroll-rounds.ts#PROBE_REACH); any cover covers (the
+ * no container's sliver (a stop flush with a clipping container is scroll_until's flush
+ * probe's, interact/scroll-rounds.ts#PROBE_REACH), a sliver cut by a node
+ * drawn after it all the same (`cutByLater`: no probe sees it); any cover covers (the
  * one over the centre, else the last drawn); and the system bands judged as
  * a REGION past the slack (`systemBandOver`), the band's rect carried —
  * except for content no scroll lifts out of a band (`pinnedSurface`).
@@ -1120,7 +1184,9 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judg
   // docs/adr/0009-android-navigation-band.md
   // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
   const placed = place === 'on' && pinnedSurface(judged.node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(judged.node.rect, box, bands) ?? place) : place;
-  return stopOrdered(facts, placed, undefined, facts.centreCover ?? facts.covers.at(-1), line);
+  // A cut by a node drawn after it, which no flush probe sees: its rest lies under that node (`cutByLater`).
+  const cutBy = facts.sliver?.by === undefined ? undefined : sliverCut(facts, facts.sliver);
+  return stopOrdered(facts, placed, cutBy, facts.centreCover ?? facts.covers.at(-1), line);
 }
 
 /**

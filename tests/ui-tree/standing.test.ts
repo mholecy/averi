@@ -88,7 +88,7 @@ const said = (s: Standing | PixelStanding): unknown => {
     case 'cut':
       // The pixel's own cut: at a bar, in the scroller flush with it.
       if (!('cut' in s)) return { kind: s.kind, bar: s.bar, container: s.container };
-      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }) };
+      return { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, ...(s.cut.within !== undefined && { within: s.cut.within }), ...(s.cut.by !== undefined && { by: s.cut.by.identifier }) };
     case 'covered':
       return {
         kind: s.kind,
@@ -1390,5 +1390,65 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
       for (const purpose of [PLAIN, FULLY]) expect(sceneOf(t).standing(name, IPHONE, purpose).kind).not.toBe('offScreen');
       expect(sceneOf(t).standing(street, IPHONE, COLOUR(street)).kind).toBe(t === flat ? 'covered' : 'reachable');
     }
+  });
+});
+
+/**
+ * Lab note F2A1 (docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md), the
+ * owner's decision of 2026-10-17: Compose leaves out of a node's bounds what a node drawn after it covers, so a field
+ * whose rest lies under the submit bar riding on the IME is dumped as the strip clear of `Continue` — phone as `55,1370
+ * 970x42` (its 132-px touch target from 1280), note after `back` as `55,2126 970x14` (Continue's bottom 2126). A strip
+ * under the tap minimum, flush with a node drawn after it that spans it, is a sliver cut BY that node — the sliver rule's
+ * own `cut`, the cutter named. Real captures of the lab's `form-keyboard` (averi_lab, API 33, 1080x2220).
+ */
+describe('Scene.standing — a sliver cut by a node drawn after it (Compose\'s bounds less what a later node covers)', () => {
+  const keyboardUp = async () => parseDump(await fixture('android-lab-form-keyboard.xml'));
+  const afterBack = async () => parseDump(await fixture('android-lab-form-keyboard-after-back.xml'));
+  const SUBMIT = 'lab.form-keyboard.submit';
+  it.each([
+    ['phone, the IME up: cut at its top by the submit bar, 42 deep — tap', keyboardUp, 'lab.form-keyboard.phone', TAP, { kind: 'cut', edge: 'top', depth: 42, by: SUBMIT }],
+    ['…the plain stop: cut, no stop', keyboardUp, 'lab.form-keyboard.phone', PLAIN, { kind: 'cut', edge: 'top', depth: 42, by: SUBMIT }],
+    ['note after back: cut at its top, 14 deep — tap', afterBack, 'lab.form-keyboard.note', TAP, { kind: 'cut', edge: 'top', depth: 14, by: SUBMIT }],
+    ['…the plain stop', afterBack, 'lab.form-keyboard.note', PLAIN, { kind: 'cut', edge: 'top', depth: 14, by: SUBMIT }],
+    // What the rule leaves alone, on the same trees.
+    ['phone\'s title, cut to 14 px at Continue\'s top, is no control: tapped as before', keyboardUp, 'lab.form-keyboard.phone.title', TAP, { kind: 'reachable', at: { x: 193, y: 1231 } }],
+    ['postcode\'s title, 56 px on its field\'s top, is no control: tapped as before', keyboardUp, 'lab.form-keyboard.postcode.title', TAP, { kind: 'reachable', at: { x: 132, y: 1070 } }],
+    ['postcode, whole above the bar: reachable', keyboardUp, 'lab.form-keyboard.postcode', TAP, { kind: 'reachable', at: { x: 540, y: 1164 } }],
+    ['phone after back, whole: reachable', afterBack, 'lab.form-keyboard.phone', TAP, { kind: 'reachable', at: { x: 540, y: 1346 } }],
+    ['Continue itself, after back: reachable', afterBack, SUBMIT, TAP, { kind: 'reachable', at: { x: 540, y: 2060 } }],
+    // `fully: true` judges no container's sliver (its flush probe does); a cut by a later node no probe can see, so it does.
+    ['…`fully: true`: cut too', afterBack, 'lab.form-keyboard.note', FULLY, { kind: 'cut', edge: 'top', depth: 14, by: SUBMIT }],
+  ] as const)('%s', async (_name, tree, id, purpose, expected) => {
+    const t = await tree();
+    expect(said(sceneOf(t).standing(byId(t, id), PIXEL, purpose))).toEqual(expected);
+  });
+
+  /** A control `0,y 400xh` under a bar `0,100 400x200` laid after it — the shape the lab's dump has, built by hand. */
+  const shaped = ({ y = 300, height = 42, bar = { x: 0, y: 100, width: 400, height: 200 }, unclipped = false } = {}) => {
+    const field = node({ role: 'textfield', identifier: 'field', rect: { x: 0, y, width: 400, height } });
+    const root = node({ role: 'container', rect: box(1080, 2220), children: [field, node({ role: 'button', identifier: 'bar', rect: bar })] });
+    return { t: unclipped ? { ...root, unclippedFrames: true as const } : root, field };
+  };
+  it('the minimum is the tap\'s (65 px on 1080): 64 deep is cut, 65 is not', () => {
+    for (const [height, kind] of [[64, 'cut'], [65, 'reachable']] as const) {
+      const { t, field } = shaped({ height });
+      expect(sceneOf(t).standing(field, PIXEL, TAP).kind).toBe(kind);
+    }
+  });
+  it('only a node that spans the strip along that edge cuts it — a narrower one leaves a rect Compose could not have cut', () => {
+    const { t, field } = shaped({ bar: { x: 10, y: 100, width: 390, height: 200 } });
+    expect(sceneOf(t).standing(field, PIXEL, TAP).kind).toBe('reachable');
+  });
+  it('only flush: a pixel of gap is no cut', () => {
+    const { t, field } = shaped({ y: 301 });
+    expect(sceneOf(t).standing(field, PIXEL, TAP).kind).toBe('reachable');
+  });
+  it('a later node holding the whole control is a cover, not a cutter (the cover rule judges it)', () => {
+    const { t, field } = shaped({ bar: { x: 0, y: 100, width: 400, height: 400 } });
+    expect(said(sceneOf(t).standing(field, PIXEL, TAP))).toMatchObject({ kind: 'covered', cover: 'bar' });
+  });
+  it('iOS cannot show it: a tree of unclipped frames (WDA\'s) lists a thin control whole — no cut', () => {
+    const { t, field } = shaped({ unclipped: true });
+    expect(sceneOf(t).standing(field, PIXEL, TAP).kind).toBe('reachable');
   });
 });

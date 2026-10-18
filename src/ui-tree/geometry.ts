@@ -667,7 +667,9 @@ export interface Clips {
    * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`)
    * — a sliver a tap is refused on and `scroll_until`'s plain stop does
    * not stop on; undefined otherwise. Asked only by
-   * ui-tree/standing.ts#Scene.standing, which orders it against the rest.
+   * ui-tree/standing.ts#Scene.standing, which orders it against the rest,
+   * and asks the rule's other evidence after it — a cut by a node drawn
+   * after it (standing.ts#cutByLater, `Cut.by`), which needs the draw order.
    *
    * Or INHERITED (the owner's decision, the bug note below): a node flush within a pixel with an
    * edge whose ancestor — below the container of that edge — is itself a
@@ -861,7 +863,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
-function across(rect: Rect, edge: Edge): number {
+export function across(rect: Rect, edge: Edge): number {
   return edge === 'top' || edge === 'bottom' ? rect.height : rect.width;
 }
 
@@ -908,6 +910,13 @@ export interface Cut {
    * lies in. Absent for a cut the node's own content evidences.
    */
   readonly within?: Rect;
+  /**
+   * The node DRAWN AFTER it whose edge the node's rect was cut at (ui-tree/standing.ts#cutByLater): Compose leaves out
+   * of a node's bounds what a node drawn after it covers, and the rest of the node lies under THAT node, not past a
+   * scroll container's edge — `container` is its rect. Absent for a cut at a clipping container's edge (`cutSliver`'s).
+   * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
+   */
+  readonly by?: UiNode;
 }
 
 /**

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { snapshotNote } from '../../src/mcp/tool-text.js';
+import { wholeThinWayPast } from '../../src/interact/target-text.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -265,6 +266,14 @@ describe('tool descriptions on a wrapper counted as a cover', () => {
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(
       'When the wrapper holds one child only, a control of at most a quarter of its area, the refusal ends `… — the wrapper may only position its one child, <child>: tap that child when it is the target; otherwise scroll_until this element out of the wrapper\'s band first` instead; a wrapper of several children (a tab bar\'s host) gets no such line.',
     );
+  });
+
+  it('troubleshooting quotes the cut-by-a-later-node refusal and failure with their way past, as the code words it', () => {
+    const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+    const wayPast = wholeThinWayPast(node({ role: '<role>' }));
+    expect(troubleshooting).toContain(`scroll_until it out from under that <role> first (${wayPast}); nothing was tapped\`**`);
+    expect(troubleshooting).toContain('— or it is only that thin, laid flush against it; a tap refuses it so cut (…)`** (Android)');
+    expect(description('tap')).toContain('So is a control Android dumps as a strip thinner than that minimum flush against an element drawn after it that spans it');
   });
 
   it('scroll_until points at it where it fails naming a cover', () => {
