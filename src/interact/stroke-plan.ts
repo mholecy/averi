@@ -1,5 +1,5 @@
 import type { Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { containsPoint, rectIntersection, type ScrollAxes } from '../ui-tree/geometry.js';
+import { containsPoint, quoted, rectIntersection, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -300,7 +300,7 @@ export function probeAcrossOnly({ toward, facts, scrollViews }: Pick<ProbeAsk, '
 export interface TouchedOn {
   at: Point;
   /** What the sentence quotes of the node, not the node (its subtree is no fact of the failure). */
-  on: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
+  on: QuotedNode;
   container: Rect;
 }
 
@@ -326,8 +326,7 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
   if (container === undefined || drawn === undefined) return undefined;
   const on = facts.scene.order.drawnOverAt(container, drawn.from);
   if (on === undefined) return undefined;
-  const { role, label, identifier, rect } = on;
-  return { at: { ...drawn.from }, on: { role, label, identifier, rect: { ...rect } }, container };
+  return { at: { ...drawn.from }, on: quoted(on), container };
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { ClippedSide, DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { flushEdges, rectIntersection, sameRectWithinPixel, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
@@ -234,8 +234,8 @@ export type ScrollOutcome = (
  * the content of the scroll view it went over ENDING at the edge that way (`Observed.ends`,
  * interact/stroke-plan.ts#strokedEnd) — while the tree places the target wholly past the OPPOSITE (far) edge of that
  * same scroll view, inside it. Then the strokes turn ONCE toward the target, at full reach (no fling carried it past:
- * it was never near), and every reply and failure says so (`from`, `to`, the swipes sent `after` which, the scroll
- * view named). Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of `lower`
+ * it was never near), and every reply and failure says so (the proof — the caller's way, the scroll view named, the
+ * strokes that moved nothing — `to`, and the swipes sent `after` which). Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of `lower`
  * (0,380 402x180) at its top stroked up three times, moved nothing and failed advising `down`.
  *
  * Until then a target never sighted short of the far edge was "the caller's direction to honour" (`beyondFarEdgeIn`,
@@ -254,17 +254,25 @@ export type ScrollOutcome = (
  * side as before.
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
  */
-export interface EndTurn {
-  /** The caller's direction, stroked first. */
-  from: Direction;
-  /** The way the strokes went after the turn: `from`'s opposite. */
+export interface EndTurn extends EndProof {
+  /** The way the strokes went after the turn: `way`'s opposite (`way` is the caller's direction, stroked first). */
   to: Direction;
   /** The swipes sent before the turn — the caller's way, the last of them the one that proved the end. */
   after: number;
-  /** How many of the last of them moved nothing (the proof's one, or more when the one before it proved nothing yet: a read still settling, a stroke the tree could not judge). */
+}
+
+/**
+ * THE END PROOF as a stop carries it (`Observed.ends`; the end turn it led to, `EndTurn`, or the bound it ended the
+ * scroll with, `BoundBy`'s `ends`) — one shape, said in one wording (scroll-text.ts#endText): the strokes went `way`,
+ * the tree lists the content of `scrollView` ending that way, and `unmoved` of the last strokes moved nothing.
+ */
+export interface EndProof {
+  /** The way the strokes went, and the content is exhausted. */
+  way: Direction;
+  /** The scroll view whose content the tree lists ending that way, as a sentence names it. */
+  scrollView: QuotedNode;
+  /** How many of the last strokes moved nothing (the proof's one, or more when the one before it proved nothing yet: a read still settling, a stroke the tree could not judge) — counted by `endProof`, never more than the swipes sent. */
   unmoved: number;
-  /** The scroll view whose content ends the caller's way, as a sentence names it. */
-  scrollView: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
 }
 
 /**
@@ -319,11 +327,11 @@ export type Flush =
  * off the frame, or the whole tree of one not in it — and, when the last
  * stroke touched down on a node drawn over its container, that node:
  * `touchedOn`), `maxSwipes`, or the deadline. `ends`: the exhaustion was PROVEN by the tree — the scroll view the
- * last stroke went over lists its content ending that way (`Observed.ends`) — after `strokes` unmoved strokes (one,
- * where UNMOVED_STROKES_EXHAUST's two are the proof otherwise).
+ * last stroke went over lists its content ending that way (`EndProof`, its `way` the `lastStroke`) — after its
+ * `unmoved` strokes (one, where UNMOVED_STROKES_EXHAUST's two are the proof otherwise).
  */
 export type BoundBy =
-  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: { scrollView: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; strokes: number } }
+  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof }
   | { of: 'maxSwipes' }
   | { of: 'timeout'; timeoutMs: number; elapsedMs: number; reads: ReadTime };
 
@@ -1431,7 +1439,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           lastStroke: s.lastStroke,
           unchanged: exhausted,
           ...(touched !== undefined && { touched }),
-          ...(ends !== undefined && { ends: { scrollView: named(ends), strokes: exhausted === 'tree' ? s.treeUnmovedStrokes : s.allUnmovedStrokes } }),
+          ...(ends !== undefined && { ends: endProof(s, s.lastStroke, ends, exhausted) }),
         }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
@@ -1585,8 +1593,14 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
   return { state: s as unknown as Rounds, step: { do: 'stop', outcome: { ...outcome, ...(detent !== undefined && { detent }), ...(endTurn !== undefined && { endTurn }) } } };
 }
 
-/** A node as a sentence quotes it (geometry.ts#nodeText): its role, label, id and rect — not its subtree. */
-const named = ({ role, label, identifier, rect }: UiNode): EndTurn['scrollView'] => ({ role, label, identifier, rect: { ...rect } });
+/**
+ * The end proof over `view` as the stop carries it (`EndProof`): the strokes' `way`, the scroll view quoted, and the
+ * one count of the strokes that moved nothing — every match's (`matches`) or the whole tree's (`tree`, a target not in
+ * it), never more than the swipes sent.
+ */
+function endProof(s: State, way: Direction, view: UiNode, unchanged: 'matches' | 'tree'): EndProof {
+  return { way, scrollView: quoted(view), unmoved: Math.min(unchanged === 'tree' ? s.treeUnmovedStrokes : s.allUnmovedStrokes, s.swipes) };
+}
 
 /**
  * The end turn's second condition (`EndTurn`), the first — the content proven exhausted the course's way over `view`
@@ -1609,7 +1623,7 @@ function turnsAtEnd(s: State, best: Judged, view: UiNode, facts: TreeFacts): boo
  */
 function turnAtEnd(s: Mutable<State>, view: UiNode): void {
   const from = courseOf(s);
-  s.endTurn = { from, to: OPPOSITE[from], after: s.swipes, unmoved: Math.min(s.allUnmovedStrokes, s.swipes), scrollView: named(view) };
+  s.endTurn = { ...endProof(s, from, view, 'matches'), to: OPPOSITE[from], after: s.swipes };
   s.lastStroke = OPPOSITE[from];
   s.seenShort = true;
   s.carriedPast = false;

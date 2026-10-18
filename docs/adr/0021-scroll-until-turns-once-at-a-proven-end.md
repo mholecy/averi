@@ -24,9 +24,10 @@ brief, pending the owner and the device check. Open point for the owner: the uia
       not guessed (below);
    2. the tree places the target past the opposite (far) edge of the SAME scroll view those strokes went over, inside
       it;
-   3. the reply says averi turned: `; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content
-      ending at its top — so averi turned down, as the tree places the element below it` (or `3 swipes up, the last of
-      which did not move …` when the ones before moved it).
+   3. the reply says averi turned: `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380
+      402x180) ending at its top — so averi turned down, as the tree places the element below it` (or `3 swipes up, the
+      last of which did not move it …` when the ones before moved it) — the proof in the words of the one-stroke stop's
+      failure (decision 3; scroll-text.ts#endText, one wording for both since round 6's code review).
    The caller's direction is always stroked first. The turn keeps the full reach — no fling carried the target past;
    it was never near — and is not counted among the fling's turns (`scroll-rounds.ts#EndTurn`).
 2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedEnd`,

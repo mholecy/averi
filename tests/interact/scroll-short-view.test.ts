@@ -107,7 +107,7 @@ describe('a stroke no further than the target still needs — a short scroll vie
     expect(drags[0]).toBe(-108);
     expect(offset).toBeGreaterThanOrEqual(WINDOW.from);
     expect(offset).toBeLessThanOrEqual(WINDOW.to);
-    expect(outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { from: 'up', to: 'down', after: 1 } });
+    expect(outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { way: 'up', to: 'down', after: 1 } });
   });
 });
 

@@ -1120,6 +1120,12 @@ export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;
 }
 
+/** A node as a sentence quotes it (`nodeText`): its role, label, id and rect — not its subtree, which is no fact of a sentence. */
+export type QuotedNode = Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
+
+/** What a sentence keeps of `n` (`QuotedNode`), its rect copied. */
+export const quoted = ({ role, label, identifier, rect }: QuotedNode): QuotedNode => ({ role, label, identifier, rect: { ...rect } });
+
 /**
  * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
  * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
@@ -1128,7 +1134,7 @@ export function rectText(r: Rect): string {
  * miss heads (verify/pixel-poll.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole by the tool
  * description, end with the same words.
  */
-export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, where = 'outside'): string =>
+export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): string =>
   `${where} its scroll view ${nodeText(scroller)}`;
 
 /**
@@ -1139,7 +1145,7 @@ export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 
  * sentences (interact/scroll-text.ts) share it. The dismissal picker's skip
  * line names a cover shorter, on purpose (interact/target-text.ts#coverName).
  */
-export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
+export const nodeText = (n: QuotedNode): string =>
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
 
 /**
@@ -1150,7 +1156,7 @@ export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect
  * chrome refusal and move (interact/tap-judgement.ts#TapJudge.aim) and
  * `scroll_until`'s covered sentences (interact/scroll-text.ts).
  */
-export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point, reach?: Rect): string =>
+export const drawnOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): string =>
   `under ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
 
 /**
@@ -1159,7 +1165,7 @@ export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier
  * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the
  * cover's own rect still lies on what it names. One spelling for the tap, `scroll_until` and the pixel assert.
  */
-export const coverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, reach?: Rect): string =>
+export const coverText = (cover: QuotedNode, reach?: Rect): string =>
   reach === undefined || sameRect(reach, cover.rect) ? nodeText(cover) : `${nodeText(cover).slice(0, -1)}, reaching ${rectText(reach)})`;
 
 /**
