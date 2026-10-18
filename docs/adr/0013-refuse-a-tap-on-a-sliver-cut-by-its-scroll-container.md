@@ -37,7 +37,10 @@ field lies under the node, not past the far edge. Android only: WDA reports fram
 `phone` whole under the bar, covered at its centre), and idb's flat list has no subtree to say "drawn after".
 
 Residuals of the refinement: a whole control thinner than the minimum laid flush against a later node that spans it is
-refused too, because the dump cannot tell it from a cut. A text that is no control (the field's title, cut to 14 px at
+refused too, because the dump cannot tell it from a cut. It is handled as the container cut's own residual is: the
+sentences say the rest "may" lie under that node, the tap's remedy adds the way past ("if it is whole — a control that
+thin laid flush against that container — no scroll shows more: tap by coordinates"), and `scroll_until`'s stuck failure
+names the alternative ("or it is only that thin, laid flush against it"). A text that is no control (the field's title, cut to 14 px at
 the same bar) is tapped as before.
 
 Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md

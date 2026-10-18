@@ -87,13 +87,15 @@ export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
 /**
  * `cutSliverText`'s sentence for a node cut by a node drawn after it (`Cut.by`): `cut at its top edge by container
  * id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later
- * node covers, so the rest of it lies under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across
- * that edge, under the 65 a tap needs` — where the part that shows lies, which the rect it was dumped with is.
+ * node covers, so the rest of it may lie under that container; only a 970x42 part of it shows, at 55,1370, 42 deep
+ * across that edge, under the 65 a tap needs` — where the part that shows lies, which the rect it was dumped with is.
+ * "May": the dump cannot tell a cut from a WHOLE control that thin laid flush against that node (standing.ts
+ * #cutByLater's residual), so the remedy carries that case's way past (`cutByRemedy`, `WHOLE_THIN_WAY_PAST`).
  */
 function cutByText(by: UiNode, cut: Cut, shown: Rect, minPiece: number): string {
   return (
     `cut at its ${cut.edge} edge by ${nodeText(by)}, drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
-    `so the rest of it lies under that ${by.role}; only a ${shown.width}x${shown.height} part of it shows, at ${shown.x},${shown.y}, ` +
+    `so the rest of it may lie under that ${by.role}; only a ${shown.width}x${shown.height} part of it shows, at ${shown.x},${shown.y}, ` +
     `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
   );
 }
@@ -126,9 +128,16 @@ export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string 
  * the rest lies under the node, not past the edge of anything that scrolls.
  */
 export function cutByRemedy(by: UiNode, keyboard: KeyboardUp | undefined): string {
-  const scroll = `scroll_until it out from under that ${by.role} first`;
+  const scroll = `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
   return keyboard === undefined ? scroll : `${dismissKeyboardFirstText(keyboard)} — or ${scroll}`;
 }
+
+/**
+ * The way past a node cut by a node drawn after it should it only READ cut (standing.ts#cutByLater's residual: a
+ * whole control that thin, laid flush against that node) — as `OWN_CUT_WAY_PAST` is for a container's cut
+ * (tap-judgement.ts): no scroll shows more of it, so a coordinate tap.
+ */
+export const wholeThinWayPast = (by: UiNode): string => `if it is whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
 
 /** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
 export function cutRemedy(edge: Edge): string {

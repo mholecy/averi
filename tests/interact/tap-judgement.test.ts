@@ -573,9 +573,9 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
     const { outcome } = await judge(await capture('android-lab-form-keyboard.xml'), 'lab.form-keyboard.phone', { first: PIXEL }, { kb });
     expect(said(outcome)).toBe(
       `ClippedRefusal: lab.form-keyboard.phone is cut at its top edge by ${CUTTER} (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
-        'so the rest of it lies under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs — ' +
+        'so the rest of it may lie under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs — ' +
         'the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — ' +
-        'a bar riding on it goes down with it — or scroll_until it out from under that container first; nothing was tapped',
+        'a bar riding on it goes down with it — or scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
     );
     // The reading is asked once, for the remedy's words.
     expect(kb.asked.cover).toBe(1);
@@ -584,8 +584,8 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
     const { outcome } = await judge(await capture('android-lab-form-keyboard-after-back.xml'), 'lab.form-keyboard.note', { first: PIXEL });
     expect(said(outcome)).toBe(
       `ClippedRefusal: lab.form-keyboard.note is cut at its top edge by ${CUTTER} (55,1994 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
-        'so the rest of it lies under that container; only a 970x14 part of it shows, at 55,2126, 14 deep across that edge, under the 65 a tap needs — ' +
-        'scroll_until it out from under that container first; nothing was tapped',
+        'so the rest of it may lie under that container; only a 970x14 part of it shows, at 55,2126, 14 deep across that edge, under the 65 a tap needs — ' +
+        'scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
     );
   });
   it('the adapter that cannot hide the keyboard says so, with its advice', async () => {

@@ -1051,8 +1051,11 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * clipped — Android's): WDA reports frames unclipped (the same lab cell lists phone whole under the bar, covered at its
  * centre), and idb's flat list has no subtree to judge "after" by.
  * Residuals, stated: a WHOLE control thinner than the minimum laid flush against a node drawn after it that spans it
- * (a dense 20-dp row under the next row's full-width background) is refused too — the dump cannot tell it from a cut,
- * and a tap into a strip that thin lands on the neighbour's edge as often as on it (draw-order.ts#MIN_TAP_PIECE_FRACTION);
+ * (a dense 20-dp row under the next row's full-width background; on any nested tree of clipped frames, classic Views
+ * too) is refused too — the dump cannot tell it from a cut, and a tap into a strip that thin lands on the neighbour's
+ * edge as often as on it (draw-order.ts#MIN_TAP_PIECE_FRACTION) — its sentences say the rest "may" lie under that
+ * node and give that case its way past, a coordinate tap (interact/target-text.ts#wholeThinWayPast), as the
+ * container's cut gives its own (`OWN_CUT_WAY_PAST`);
  * a text that is no control (a field's title cut to 14 px at the same bar) is tapped as before.
  * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
  */

@@ -1219,7 +1219,7 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
   const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
   const CUT =
     "cut at its top edge by container id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, " +
-    'so the rest of it lies under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs';
+    'so the rest of it may lie under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs';
   const fakeOf = async (name: string): Promise<FakeAdapter> => {
     const fake = new FakeAdapter({ s: await capture(name) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
@@ -1232,8 +1232,9 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     const failure = await scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', FAST).catch((e: unknown) => e as Error);
     expect((failure as Error).message).toContain(`element is in the viewport but ${CUT} — and the content is exhausted`);
     expect((failure as Error).message).toContain(
-      'The rest of it stays under that container at the end of the content — the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; ' +
-        '`dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it, and scroll again; a tap refuses it so cut.',
+      'The rest of it may stay under that container at the end of the content — the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; ' +
+        '`dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it, and scroll again — ' +
+        'or it is only that thin, laid flush against it; a tap refuses it so cut (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
     );
     expect(fake.swipes.length).toBeGreaterThan(0);
   });
@@ -1244,7 +1245,7 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
       `element reached the viewport but stayed ${CUT} (last rect {"x":55,"y":1370,"width":970,"height":42}) — a tap refuses it so cut (the soft keyboard is up (its top edge at y 1398): ` +
         'dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it — ' +
-        'or scroll_until it out from under that container first)',
+        'or scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates))',
     );
     expect(fake.swipes).toEqual([]);
   });
@@ -1252,7 +1253,8 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
   it('note after back, the keyboard down: no stop on its 14-px strip, and the stuck sentence says the app leaves it no clearance', async () => {
     const fake = await fakeOf('android-lab-form-keyboard-after-back.xml');
     await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.note"', FAST)).rejects.toThrow(
-      'The rest of it stays under that container at the end of the content — a layout defect (no clearance for a pinned bar?); a tap refuses it so cut.',
+      'The rest of it may stay under that container at the end of the content — a layout defect (no clearance for a pinned bar?) — ' +
+        'or it is only that thin, laid flush against it; a tap refuses it so cut (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
     );
   });
 

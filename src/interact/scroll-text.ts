@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
+import { cutByRemedy, cutRemedy, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
@@ -353,8 +353,9 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays under that ${short.cut.by.role} at the end of the content — ` +
-              `${keyboard === undefined ? 'a layout defect (no clearance for a pinned bar?)' : `${dismissKeyboardFirstText(keyboard)}, and scroll again`}; a tap refuses it so cut. ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it may stay under that ${short.cut.by.role} at the end of the content — ` +
+              `${keyboard === undefined ? 'a layout defect (no clearance for a pinned bar?)' : `${dismissKeyboardFirstText(keyboard)}, and scroll again`} — ` +
+              `or it is only that thin, laid flush against it; a tap refuses it so cut (${wholeThinWayPast(short.cut.by)}). ${last}`,
         };
       }
       if (short.of === 'sliver') {
