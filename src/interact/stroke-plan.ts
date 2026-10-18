@@ -99,6 +99,8 @@ interface Memory {
   readonly within: Rect | undefined;
   /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `within`. */
   readonly chosen: Rect | undefined;
+  /** The carry model's measure (`carried`): the most a stroke of this scroll carried its target per point of finger travel; undefined until one did. */
+  readonly carry: number | undefined;
 }
 
 const open = (m: StrokeMemory): Memory => m as unknown as Memory;
@@ -106,7 +108,7 @@ const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined });
+  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, carry: undefined });
 }
 
 /** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), and the target's node when it judged one. */
@@ -145,6 +147,14 @@ export interface StrokeAsk {
   readonly gesture: Rect | undefined;
   /** This round's read, when its tree read: the facts, and the judged target's node — the presented question is asked on its behalf, or, undefined, on behalf of none. */
   readonly read: { readonly facts: Pick<TreeFacts, 'scene' | 'mainScroller'>; readonly target: UiNode | undefined } | undefined;
+  /** What the target still needs of this stroke, when the round knows (scroll-rounds.ts#stillNeeds) — the carry model's to apply (`carried`). */
+  readonly still?: StillNeeds;
+}
+
+/** What the target still needs of a stroke (scroll-rounds.ts#stillNeeds): the distance to its window's middle, and how far the window lets it travel while whole in it. */
+export interface StillNeeds {
+  readonly needs: number;
+  readonly slack: number;
 }
 
 /**
@@ -201,13 +211,14 @@ export interface StrokePlan {
  * layer the tree marks as presented, off that layer's own scroll views. Only the touch-down is asked: it is where the
  * gesture is recognised. Undefined when this round did not read or the stroke has no box.
  */
-export function planStroke(memory: StrokeMemory, { toward, reach, gesture, read }: StrokeAsk): StrokePlan {
+export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, gesture, read, still }: StrokeAsk): StrokePlan {
   const m = open(memory);
   const candidates = candidatesOf(m, read?.facts);
   const kept = m.line?.y;
   const room = strokeRoom(gesture, candidates, toward, kept, 'any axis');
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
+  const reach = box === undefined ? turnsReach : carryReach(m.carry, still, strokeLength(fullStroke(box, toward, coverTop)), turnsReach);
   const points = box === undefined ? undefined : scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box });
   const stroke: PlannedStroke = { toward, reach, ...(coverTop !== undefined && { coverTop }), ...(box !== undefined && { box: { ...box } }), ...(points !== undefined && { points }) };
   const press = read === undefined || points === undefined ? undefined : read.facts.scene.presentedAt(points.from, read.target);
@@ -330,6 +341,55 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
 
 /** The edge of a scroll view past which lies the content a stroke toward `toward` brings in (swipe.ts#SIDES' `reveals`, inverted). */
 const REVEALED_BY: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
+
+/**
+ * THE CARRY MODEL (lab note LV5): how far a stroke carries its target, measured in this scroll, so a stroke reaches no
+ * further than the target still needs. Measured under WDA: one stroke over the lab app's 180-pt `lower` (a 108-pt
+ * drag, `201 524 → 416`, its 60 %) moved it about 259 pt — momentum carries a UIScrollView on after the finger lifts,
+ * roughly in proportion to the lift speed (adapters/ios.ts#swipe: a 344-pt stroke carried the SwiftUI form 729–970 pt;
+ * both ≈ 2.1–2.8 × the drag at the fixed 300 ms) — while F is whole in `lower` only over a 116-pt window of its offsets
+ * (884–1000). Four full strokes landed 906, 929 — or 1052, past the window, after which the turn came with the sixth
+ * and last swipe and the scroll failed at maxSwipes with F 18 % drawn (one run in three). The strokes' own reach is not
+ * the fault (60 % of the scroll view, as anywhere); the fling is, and its size varies by run (226–263 pt).
+ *
+ * `carried` keeps the sample: what the read right after a stroke of the course found the target moved, the way the
+ * content went, per point of the finger's ACTUAL travel (the stroke as drawn — `shortenStroke`'s floors, a box the
+ * plan cut, another scroll view: the unit stays a point of travel). A sample is the round's to offer only of the same
+ * node at the same size, on a tree that lists it where it lies (scroll-rounds.ts#observe); here it is dropped when it
+ * moved the wrong way, when the stroke was no stroke (under twice TOUCH_SLOP: a tap), or when it lies past
+ * CARRY_CEILING × the travel — no fling carries that far: content inserted above, a nested scroll carried by an outer
+ * one, a match the tree renamed in place. The LARGEST sample is kept, not the last: a read taken mid-fling understates
+ * one, and a stroke shorter than needed costs one more stroke where one longer than needed costs a turn.
+ *
+ * `carryReach` applies it: when a stroke at the reach the turns left would carry the target further than its window
+ * lets it travel whole (`StillNeeds.slack`) — only then can one stroke skip the window, the case the model is for —
+ * the travel is cut to what the target needs to reach the window's middle over the carry, as a reach of the full
+ * stroke over this box; never above the turns' reach, never under `shortenStroke`'s floors. Proportional because the
+ * drag keeps its 300 ms whatever its length: a shorter drag is a slower one, and its fling shrinks with it (the linear
+ * model; unmeasured under 108 pt — a residual). On the measured case: three full strokes leave F ~150 pt short of the
+ * window's middle, and the fourth travels ~63 pt, landing it mid-window whatever the spread of the runs.
+ * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md
+ */
+export function carried(memory: StrokeMemory, { moved, drawn }: { moved: number; drawn: Stroke }): StrokeMemory {
+  const travel = strokeLength(drawn);
+  if (moved <= 0 || travel < 2 * TOUCH_SLOP || moved > CARRY_CEILING * travel) return memory;
+  const m = open(memory);
+  return close({ ...m, carry: Math.max(m.carry ?? 0, moved / travel) });
+}
+
+/**
+ * The most a stroke's fling is taken to carry its target, per point of finger travel: 4. Measured 2.1–2.8 (`lower`:
+ * 226–263 pt for 108; the SwiftUI form: 729–970 for 344) — the ceiling leaves room for a faster fling than those, and a
+ * sample past it is not a stroke's (`carried`).
+ */
+export const CARRY_CEILING = 4;
+
+/** The reach of the full stroke (`full` points of travel) that carries the target what it still needs (the carry model, `carried`), never above `reach`; `reach` itself while nothing is measured, nothing is needed, or one stroke cannot skip the window. */
+function carryReach(carry: number | undefined, still: StillNeeds | undefined, full: number, reach: number): number {
+  if (carry === undefined || still === undefined || full <= 0) return reach;
+  if (carry * full * reach <= still.slack) return reach;
+  return Math.min(reach, still.needs / carry / full);
+}
 
 /** The rects drawn over `rect` in this read, when it holds that scroll view (`TreeFacts.scene`'s draw order). */
 const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined => facts.scene.order.drawnOver(rect)?.map((n) => ({ ...n.rect }));

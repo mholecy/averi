@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
+import { CARRY_CEILING, carried, planStroke, seeRead, startStrokes, type StrokeMemory } from '../../src/interact/stroke-plan.js';
+import { largestScroller } from '../../src/ui-tree/geometry.js';
+import { sceneOf } from '../../src/ui-tree/standing.js';
+import { node } from '../helpers/fake.js';
+import { play, type Row } from '../helpers/rounds.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 
 /**
@@ -102,5 +107,61 @@ describe('a stroke no further than the target still needs — a short scroll vie
     expect(offset).toBeGreaterThanOrEqual(WINDOW.from);
     expect(offset).toBeLessThanOrEqual(WINDOW.to);
     expect(outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { from: 'up', to: 'down', after: 1 } });
+  });
+});
+
+describe('the carry model (interact/stroke-plan.ts#carried): per point of finger travel, the largest sample, bounded', () => {
+  const facts = { scene: sceneOf(CAPTURE), mainScroller: largestScroller(CAPTURE) };
+  const f = [...everyNode(CAPTURE)].find((n) => n.identifier === F);
+  const seen = seeRead(startStrokes(), { facts, line: undefined, target: f });
+  /** A stroke of `travel` points straight up the screen. */
+  const drag = (travel: number) => ({ from: { x: 201, y: 524 }, to: { x: 201, y: 524 - travel } });
+  /** The travel of the stroke the plan draws over `lower` (its full stroke: 108) for what F still needs. */
+  const travelFor = (memory: StrokeMemory, needs: number, slack = 116): number => {
+    const { points } = planStroke(memory, { toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f }, still: { needs, slack } }).stroke;
+    if (points === undefined) throw new Error('no points');
+    return points.from.y - points.to.y;
+  };
+
+  it('nothing measured: the full stroke; measured 2.44 a point, 153 pt needed: ~63 pt of travel', () => {
+    expect(travelFor(seen, 153)).toBe(108);
+    expect(travelFor(carried(seen, { moved: 263, drawn: drag(108) }), 153)).toBeCloseTo(153 / (263 / 108), 0);
+  });
+
+  it('the LARGEST sample, whichever came last — not the last, not the smallest', () => {
+    const high = 263 / 108;
+    const bigFirst = carried(carried(seen, { moved: 263, drawn: drag(108) }), { moved: 194, drawn: drag(108) });
+    const bigLast = carried(carried(seen, { moved: 194, drawn: drag(108) }), { moved: 263, drawn: drag(108) });
+    expect(travelFor(bigFirst, 153)).toBeCloseTo(153 / high, 0);
+    expect(travelFor(bigLast, 153)).toBeCloseTo(153 / high, 0);
+  });
+
+  it('per point of ACTUAL travel: a stroke drawn at the 48-pt floor that carried 115 pt is 2.4 a point, not 115 per reach factor', () => {
+    expect(travelFor(carried(seen, { moved: 115, drawn: drag(48) }), 120)).toBeCloseTo(120 / (115 / 48), 0);
+  });
+
+  it(`a sample past CARRY_CEILING (${CARRY_CEILING}) × the travel, one the wrong way, or one of a tap, is no stroke's: dropped`, () => {
+    expect(travelFor(carried(seen, { moved: 760, drawn: drag(108) }), 153)).toBe(108);
+    expect(travelFor(carried(seen, { moved: -200, drawn: drag(108) }), 153)).toBe(108);
+    expect(travelFor(carried(seen, { moved: 30, drawn: drag(20) }), 153)).toBe(108);
+  });
+
+  it('only where one stroke could skip the window: a window that lets the target travel further than a full stroke carries it keeps the full stroke', () => {
+    const measured = carried(seen, { moved: 263, drawn: drag(108) });
+    expect(travelFor(measured, 153, 300)).toBe(108);
+  });
+
+  it('the rounds offer a sample only of the same node at the same size: a judged match that switched nodes between reads measures nothing', () => {
+    // WDA list 0,300 402x200 (content running on below it); the match read as `a` at y 900, then as `b` at y 600 — 300 pt
+    // "moved" for a 120-pt stroke, under the ceiling — then `b` again. Measured, the next stroke would be cut short.
+    const list: Rect = { x: 0, y: 300, width: 402, height: 200 };
+    const rowOf = (label: string, y: number): Row => {
+      const m = node({ role: 'button', identifier: 't', label, rect: { x: 0, y, width: 402, height: 64 } });
+      const tree = node({ role: 'container', unclippedFrames: true, rect: BOX, children: [node({ role: 'scrollable', rect: list, children: [node({ role: 'other', rect: { x: 0, y: 300, width: 402, height: 1400 } }), m] })] });
+      return { tree, found: [m] };
+    };
+    const played = play({ ...RULES, maxSwipes: 2, screen: { width: 402, height: 874 } }, [rowOf('a', 900), rowOf('b', 600), rowOf('b', 600)]);
+    const reaches = played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []));
+    expect(reaches).toEqual([1, 1]);
   });
 });

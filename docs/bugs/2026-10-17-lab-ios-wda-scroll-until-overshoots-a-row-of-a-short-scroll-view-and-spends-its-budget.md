@@ -8,7 +8,9 @@
 > smallest change those numbers justify, chosen over a slower drag (iOS drag speed unmeasured: adapters/ios.ts#swipe) and
 > an earlier turn (which still overshoots): once F is in the tree short of its window and a stroke of the scroll has
 > been measured to carry it, the next stroke's reach is scaled to what F still needs — to the window's middle — at the
-> largest motion per unit of reach measured so far (interact/scroll-rounds.ts#stillNeeds, `motionPerReach`). On the
+> largest carry per point of finger travel measured so far (interact/stroke-plan.ts#carried, the carry model, and
+> scroll-rounds.ts#stillNeeds; code review round 1: per point of travel, the same node at the same size, a sample past
+> CARRY_CEILING 4 × the travel dropped, and only where one stroke could skip the window). On the
 > failing run's 263 pt a stroke: 108, 108, 108 (789), then ~0.58 of a stroke (~63 pt drag, ~153 pt) → 942, inside the
 > window (tests/interact/scroll-short-view.test.ts drives the rounds against that model over the cell's real WDA capture,
 > and across the measured spread). WDA's trees only (an off-screen row listed where it lies); Android drags without a
