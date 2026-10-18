@@ -167,7 +167,8 @@ submit whose probe tap submitted the form neither tapped nor "reached" without a
 on the sheet. Per field, the `snapshot` verb reads `ui_snapshot`'s error column (`filter: role:textfield`, the
 textfield whose rect holds the field's centre — by place, as an identifier may be every field's;
 `golden-spec/forms.ts#snapshotRow`): on iOS its `error` is the message the rules pair, and none on any other field; on
-Android none (averi sets no `error` there); a field not open that the snapshot does not list claims nothing either
+Android none (averi sets no `error` there: verification.md's contract) or the field's own shown message, never another
+string; a field not open that the snapshot does not list claims nothing either
 way. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error` assert,
 asked with the same-identifier title below it, fails, and its `snapshot` row holds the title read as its error to a
 mismatch; no tap is asked by an identifier fields share.
