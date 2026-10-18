@@ -62,32 +62,32 @@ const NOT_ON_THIS_BRANCH: readonly string[] = [];
 /**
  * A static KNOWN row (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
  * `partial` saying what of the note its fix covers — only when that note's `open` lists the row: the part `partial`
- * leaves open, red until a fix or a decision of the owner's (L1: its fix marks the AlertDialog and the half-expanded
- * sheet; form-picker's fully expanded sheet stays open, round 6's code review P1). Keyed by ROW, as AWAITING_LIVE is
+ * leaves open, red until a fix or a decision of the owner's (L1's six form-picker rows were so, round 6's code review P1,
+ * until the owner accepted ADR 0018's residual 18 on 2026-10-18; none is listed today). Keyed by ROW, as AWAITING_LIVE is
  * by case: a row filed as a partial note that its `open` does not list is held to the note being open like any other.
  * Round 6 extended the rule for it: an open note expects every row red (OPEN-RED), a calibrated one every row green
  * after its fix, and neither says "calibrated, some rows still open".
  */
-const partiallyOpen = (note: string, key: string): boolean =>
-  table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.open ?? []).includes(key));
+const partiallyOpen = (note: string, key: string, tbl: Calibration = table): boolean =>
+  tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.open ?? []).includes(key));
 
 /**
  * The same for a live KNOWN entry (`key`, `<platform> <source> <case id>`): it may stay filed as a note calibrated
- * PARTIALLY only when that note's `openLive` lists it (#10: the replayed rows calibrated, the default direction's turn
- * on uiautomator left to the owner by ADR 0021 — the live case `turn:scroll-collapsing.A`, measured red at the fix's
- * src and at round 6's, docs/truth/live-android-2026-10-18-visibility.md).
+ * PARTIALLY only when that note's `openLive` lists it (#10 listed the live case `turn:scroll-collapsing.A` while ADR
+ * 0021 left the turn on uiautomator to the owner; closed by the owner's decision of 2026-10-18 — no turn there, the
+ * case ok by live-visibility.ts#judgeAndroidTurn — none is listed today).
  */
-const partiallyOpenLive = (note: string, key: string): boolean =>
-  table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.openLive ?? []).includes(key));
+const partiallyOpenLive = (note: string, key: string, tbl: Calibration = table): boolean =>
+  tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.openLive ?? []).includes(key));
 
-/** Rule 3 over `entries` (every place a note is named, `named`): each `bug:` of a KNOWN row that is filed where it may not be. */
-function misfiled(entries: readonly { where: string; name: string }[]): string[] {
-  const open = new Set(table.notes.filter((e) => expected(e) === 'OPEN-RED').map((e) => e.note));
+/** Rule 3 over `entries` (every place a note is named, `named`): each `bug:` of a KNOWN row that is filed where it may not be — against `tbl` (calibration.json, or a test's table). */
+function misfiled(entries: readonly { where: string; name: string }[], tbl: Calibration = table): string[] {
+  const open = new Set(tbl.notes.filter((e) => expected(e) === 'OPEN-RED').map((e) => e.note));
   return entries
     .filter(({ where, name }) => !where.startsWith('calibration.json') && name.startsWith('bug:'))
     .filter(({ where, name }) => !(where.startsWith('live ') && AWAITING_LIVE[where.slice('live '.length)]?.note === name.slice(4)))
-    .filter(({ where, name }) => !(where.startsWith('static ') && partiallyOpen(name.slice(4), where.slice('static '.length))))
-    .filter(({ where, name }) => !(where.startsWith('live ') && partiallyOpenLive(name.slice(4), where.slice('live '.length))))
+    .filter(({ where, name }) => !(where.startsWith('static ') && partiallyOpen(name.slice(4), where.slice('static '.length), tbl)))
+    .filter(({ where, name }) => !(where.startsWith('live ') && partiallyOpenLive(name.slice(4), where.slice('live '.length), tbl)))
     .flatMap(({ where, name }) => (open.has(name.slice(4)) || LIVE_ONLY[name.slice(4)] !== undefined ? [] : [`${where}: ${name} is no open note of calibration.json`]));
 }
 
@@ -159,7 +159,8 @@ describe('calibration.json ↔ the KNOWN rows', () => {
       ]),
     );
     expect(bad).toEqual([]);
-    expect(table.notes.find((e) => e.n === 'L1')?.open).toHaveLength(6);
+    // L1's six form-picker rows, left open until the owner accepted ADR 0018's residual 18 (2026-10-18): filed as it now.
+    expect(table.notes.find((e) => e.n === 'L1')?.open).toBeUndefined();
   });
 
   it('each live entry a partial calibration leaves open (`openLive`) is a live KNOWN entry filed as that note, on a note with a `partial`', () => {
@@ -173,11 +174,22 @@ describe('calibration.json ↔ the KNOWN rows', () => {
   });
 
   it('a live entry filed as a partially calibrated note that its `openLive` does not list is misfiled — keyed by case, not by note', () => {
+    // #10 listed turn:scroll-collapsing.A until the owner's decision of 2026-10-18 (ADR 0021: no turn on uiautomator)
+    // made the case ok and closed it: no note lists a live case today, so it, another case of the note and the case
+    // under another source are all misfiled filed as #10.
     const ten = table.notes.find((e) => e.n === '10')!;
-    expect(misfiled([{ where: 'live android uiautomator turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toEqual([]);
-    // another case of the same note, and the listed case under another source: neither is listed, both misfiled
-    expect(misfiled([{ where: 'live android uiautomator scroll:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
-    expect(misfiled([{ where: 'live ios wda turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
+    expect(ten.openLive).toBeUndefined();
+    for (const where of ['live android uiautomator turn:scroll-collapsing.A', 'live android uiautomator scroll:scroll-collapsing.A', 'live ios wda turn:scroll-collapsing.A'])
+      expect(misfiled([{ where, name: `bug:${ten.note}` }]), where).toHaveLength(1);
+    // The rule itself, over a table where #10 still lists its case: that case is accepted, the others are not.
+    const listing: Calibration = { ...table, notes: table.notes.map((e) => (e.n === '10' ? { ...e, openLive: ['android uiautomator turn:scroll-collapsing.A'] } : e)) };
+    expect(misfiled([{ where: 'live android uiautomator turn:scroll-collapsing.A', name: `bug:${ten.note}` }], listing)).toEqual([]);
+    expect(misfiled([{ where: 'live android uiautomator scroll:scroll-collapsing.A', name: `bug:${ten.note}` }], listing)).toHaveLength(1);
+    expect(misfiled([{ where: 'live ios wda turn:scroll-collapsing.A', name: `bug:${ten.note}` }], listing)).toHaveLength(1);
+    // …and only on a partial calibration: without its `partial` the listing accepts nothing.
+    const { partial: _, ...whole } = listing.notes.find((e) => e.n === '10')!;
+    const unpartial: Calibration = { ...listing, notes: listing.notes.map((e) => (e.n === '10' ? whole : e)) };
+    expect(misfiled([{ where: 'live android uiautomator turn:scroll-collapsing.A', name: `bug:${ten.note}` }], unpartial)).toHaveLength(1);
   });
 
   it('a row filed as a partially calibrated note that its `open` does not list is misfiled — fab.xml\'s L and K refiled as #2 or as L1', () => {
@@ -187,7 +199,13 @@ describe('calibration.json ↔ the KNOWN rows', () => {
       { where: 'static android-averi_lab-api33/fab.xml K tap', name: `bug:${noteOf('L1')}` },
     ];
     expect(misfiled(refiled)).toHaveLength(2);
-    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }])).toEqual([]);
+    // form-picker's rows, L1's `open` until the owner accepted ADR 0018's residual 18 (2026-10-18): filed as L1 again,
+    // misfiled — they are that residual's now.
+    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }])).toHaveLength(1);
+    // The rule itself, over a table where L1 still leaves that row open: accepted there, its other rows not.
+    const leaving: Calibration = { ...table, notes: table.notes.map((e) => (e.n === 'L1' ? { ...e, open: ['android-averi_lab-api33/form-picker.xml name tap'] } : e)) };
+    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }], leaving)).toEqual([]);
+    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml country tap', name: `bug:${noteOf('L1')}` }], leaving)).toHaveLength(1);
   });
 
   it('the notes calibration.json lists that this branch has not got: exactly NOT_ON_THIS_BRANCH, none open', () => {

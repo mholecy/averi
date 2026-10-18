@@ -39,7 +39,6 @@ const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
 const LV4 = 'bug:2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md';
 const FLING = 'bug:2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md';
-const INVERTED = 'bug:2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md';
 const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
@@ -87,10 +86,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // with no stroke.
   ...each('android uiautomator', ['tap:carousel-in-list.C'], LE1, 'tap-claim', 'Tapped'),
   ...each('android uiautomator', ['scroll:carousel-in-list.C'], LE1, 'stop-claim', 'visible'),
-  // #10's own symptom, live: the default direction strokes the list further from A, scrolled above it with inverted
-  // bounds, and never turns (ADR 0021 leaves the turn on uiautomator to the owner) — the reply names `up`. #10 is
-  // calibrated on its replayed rows; this case is the part its calibration leaves open (calibration.json #10 openLive).
-  ...each('android uiautomator', ['turn:scroll-collapsing.A'], INVERTED, 'R-direction', 'refused'),
+  // (#10's turn:scroll-collapsing.A, filed here until 2026-10-18: ok since the owner decided no turn on uiautomator —
+  // ADR 0021 — and its judge became live-visibility.ts#judgeAndroidTurn: a loud failure naming `up` after the
+  // two-stroke stop, which the record reads.)
   ...each('android uiautomator', ['scroll:scroll-sticky-cut.R.fully'], VA1, 'stop-claim', 'visible'),
   ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1, 'unchanged-claim', 'not found'),
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', 'intermittent'),

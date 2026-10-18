@@ -66,26 +66,32 @@ tabbar-floating F: "the last 2 swipes did not change the screen" while the app l
 L, K refused under the FAB host: accepted), turn:scroll-bounded.F (LOUD: F unlisted, honest), F2A2 (b1d, b7: `input
 text` fails on non-ASCII, LOUD).
 
-# Android points for the owner
+# Android points the owner decided (2026-10-18)
 
-1. **ADR 0021's uiautomator turn.** `turn:scroll-collapsing.A` is the live measure: averi strokes the caller's `down`
-   until two unmoved strokes, the reply naming `up`. The note #10 symptom is the turn itself; the case stays KNOWN
-   until the owner decides whether two identical unmoved strokes may prove the end on Android.
-2. **ADR 0021's one-stroke stop.** ADR 0021 cited F2A1's phone as a form that fits ("fails after 3 swipes — 540 1034 →
-   424 twice, then one back up" on the replay). Live it is not: the form scrolls above the IME, ONE stroke at
-   540,1034 brought phone out from under the bar and the scroll stopped on it ("fully visible after 1 swipe"). So
-   F2A1's phone is no example of an unmoved scroll on the device (ADR 0021 now says so, the replay's figure kept as
-   the replay's); the stop question stands on `turn:scroll-collapsing.A` (4 swipes, the last 2 unmoved, no turn) and
-   `turn:scroll-bounded.F` (2 swipes up at 540,424 in `upper` at its top, neither moving anything).
-3. **Open: F2A1's refusal and fills.** k3 (a fill into note after back) is now refused for the strip it used to type
-   through. Honest (LOUD), the field untouched — the owner's 2026-10-17 decision's consequence for `type_text` too: is
-   a fill into a control cut to a sub-minimum strip by a later node to be refused like the tap (as now), or typed
-   through when the strip reaches the field (as this app's padding lets it)? The owner's.
-4. **Open: "fully visible" with 18 px under a surface with no node** (k7). After the stroke the bar's top padding
-   covers phone's bottom 18 px (of 99); averi cannot see it (F2A1's cause: the bar has no node). A plain stop is right
-   (its centre is clear, a tap there focuses phone); the reply's "fully visible" overstates by those 18 px (a
-   `fully: true` call was not run live). Whether that wording is a residual of the tree (accepted, as ADR 0018's
-   residual 9 accepts an overlay with no node) or wants a hedge is the owner's.
+1. **ADR 0021's uiautomator turn — decided: NO turn.** Unmoved strokes on uiautomator are no proof; the tool reports the
+   direction, the agent turns. `turn:scroll-collapsing.A` — averi strokes the caller's `down` until two unmoved strokes,
+   then fails loudly naming `up` — is that rule: its judge on Android became live-visibility.ts#judgeAndroidTurn (ok:
+   no turn, at most `UNMOVED_STROKES_EXHAUST` unmoved strokes, the target's direction named), the case struck off
+   live-known.ts and calibration.json #10's `openLive` closed. Rejudged from android-vis.json (no device): ok;
+   visibility 111 cases / 98 ok / 3 loud / 10 mismatches, 0 not known. `turn:scroll-bounded.F` stays LOUD (not-reached):
+   F unlisted, the reply names no direction — honest. WDA's turn cases keep ADR 0021's turn judge.
+2. **ADR 0021's one-stroke stop — decided: the two-stroke stop KEPT on uiautomator.** ADR 0021 states the rule with
+   this check's live example (4 swipes, the last 2 unmoved, then the loud failure naming `up`), F2A1's phone kept as
+   the replay's figure only.
+3. **F2A1's refusal and fills — decided: k3 is REFUSED BY DESIGN.** A fill into a control a later node cuts to a strip
+   under the tap minimum is refused like the tap; k3's judge reads the refusal with the remedy and the field untouched
+   as ok (live.ts k3; rejudged: forms+visibility 133 cases / 118 ok / 5 loud / 10 mismatches, 0 not known). F2A1's way
+   past ("only if a screenshot shows it whole … tap by coordinates") is kept, every remedy before it (pinned over the
+   real captures, tests/helpers/escape-order.ts; ADR 0013 "Decided 2026-10-18").
+4. **"fully visible" with 18 px under a surface with no node (k7) — decided: a KNOWN residual.** k7's judge reads the
+   stop ok (phone's centre clear of the bar), so no live KNOWN entry; filed as ADR 0013's accepted residual and in
+   F2A1's note, with a future "eyes" item in docs/plans/2026-10-15-ground-truth-lab-app.md (verify a "fully" claim with
+   pixels where a node-less sibling's padding may lie over the target).
+5. **ADR 0018's residuals 18 and 19 — accepted,** with an honest hint on the tap's and fill's wait ("… to appear") and
+   `scroll_until`'s "element never appeared in the tree" on uiautomator, where the presented window's words do not
+   claim them (not the asserts' "not found", nor a flow's `wait:`): `(the tree lists only the active window: if a sheet or a dialog is open over the
+   screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT). `form-picker`'s six rows are filed as residual
+   18; lab cells for a full-screen dialog and a Views `BottomSheetDialog` are planned.
 
 # The run itself
 

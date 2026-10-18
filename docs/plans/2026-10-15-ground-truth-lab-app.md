@@ -419,6 +419,35 @@ files and their manifest entries (own-parts' L and N trees as before, I added). 
   Close, 179,660 44x44), tapped by its label and reached with no swipe — green; calibration.json #8's `needs` (8.2's
   iOS leg) done and dropped.
 
+### Round 7 — the owner's decisions of 2026-10-18 on round 6's open points
+
+- **HIGH: lab cell #18 — a React Native text field** (calibration.json #18's `needs`): an RN `TextInput` whose tree
+  lists its own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under the field, as mp-native's do) — the
+  half of #18 no lab field reproduces (neither SwiftUI's TextField nor UIKit's UITextField lists one). First in round 7.
+- **Android presented windows the parser does not mark** (ADR 0018's residual 19, accepted with the active-window
+  hint): a **full-screen dialog** (a `Dialog` with `usePlatformDefaultWidth = false` / a full-screen `DialogFragment`,
+  its window at 0,0 the screen's size) and a **Views `BottomSheetDialog`** (its `touch_outside` scrim, labelled or not:
+  does the scrim rule hold?). Each with a target beneath it: the tap's wait and `scroll_until` read with the hint, and
+  whether the window could be marked from the dump.
+- **Eyes: verify a "fully" claim with pixels** (ADR 0013's residual, live case k7): where a node-less sibling's padding
+  — a bar riding on the IME, an inset its surface draws but its node does not span — may lie over the target, a
+  `fully visible` stop is checked against the screenshot (the target's colour across its whole frame), so the 18 px of
+  phone under the bar's top padding are seen, not assumed away.
+
+From round 6's iOS device check (docs/truth/live-ios-2026-10-18-visibility.md; its review round 1):
+
+- **A table long enough for ADR 0021 decision 4's long-list half**: lengthen sheet-long-list (its 40 rows end inside
+  every far row's window: Row 30 whole over 1172–1748, the last offset 1748), or a new cell, so a target row's window
+  lies wholly before the content's end and past one stroke's carry (≈ 1040 pt under WDA) — then a full final stroke
+  overshoots it, and the carry case (live-visibility.ts#CARRY, its turns already counted from the touch log and the
+  reply) can fail on a missing cut. Needs lab note LV6 fixed first (a scrolled table's parked rows read above the
+  screen, docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md), or a target with
+  its own identifier far down the list, which WDA parks alike.
+- **Stale src prose to update on the next src branch** (not edited from a truth branch): src/interact/stroke-plan.ts's
+  module doc (its lines 63–70) still says carousel-in-list is captured on Android only and that the iOS measurement
+  waits on "Pending captures (round 6)" — both captured: under WDA C's stroke goes inside the carousel along its axis
+  (the replay `307 181 → 95 181`; live one stroke at (307,181) moving the carousel 447–532 pt).
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { carryRow, touchTurns, classStrokes, directionBreaks, distanceAt, judgeCarry, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { carryRow, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedScroll, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -382,8 +382,10 @@ describe('the turn-back case of a target a source does not list', () => {
   it('is said to ask no turn under that source', () => {
     const t: TargetTruth = { tag: 'F', id: 'lab.scroll-bounded.F', color: '#000000', declared: 'open', frame: { x: 128, y: 3796, width: 825, height: 176 }, reached: false, probe: [], drawn: 0, seen: '#000000', geometry: 'off-screen', scrollView: 'lower', listed: { uiautomator: false } };
     const cell: CellTruth = { cell: 'scroll-bounded', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t] };
-    expect(visibilityCases(cell, 'android').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/under uiautomator F is not in the tree, so no turn is asked there/);
+    expect(visibilityCases({ ...cell, targets: [{ ...t, listed: { idb: false, wda: true } }] }, 'ios').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/under idb F is not in the tree, so no turn is asked there/);
     expect(visibilityCases({ ...cell, targets: [{ ...t, listed: { wda: true } }] }, 'ios').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/^turn back: /);
+    // On Android no turn is asked of any turn-back case (ADR 0021, 2026-10-18): judgeAndroidTurn, below.
+    expect(visibilityCases(cell, 'android').find((c) => c.id === 'turn:scroll-bounded.F')?.says).toMatch(/^no turn on uiautomator \(ADR 0021\): .* fails loudly naming down after at most 2 unmoved strokes; under uiautomator F is not in the tree, so no turn is asked there, only an honest reply$/);
   });
 });
 
@@ -423,5 +425,62 @@ describe('each rule names its class (what the live KNOWN pins)', () => {
     expect(judgeDismissal('vs', 'ERROR', 'wda', state({ focus: 'postcode', fields: { vs: field('x') }, submits: [] }), was).cls).toBe('dismissal');
     expect(judgeDismissal('vs', 'ERROR', 'wda', state({ focus: 'postcode', fields: { vs: field('') }, submits: [{ at, valid: true, values: {} }] }), was).cls).toBe('dismissal');
     expect(judgeDismissal('vs', 'ERROR covered', 'wda', was, was).cls).toBe('dismissal');
+  });
+});
+
+// ADR 0021, the owner's decision of 2026-10-18: on uiautomator no turn — unmoved strokes there are no proof — and the
+// two-stroke stop kept; the tool reports the direction, the agent turns. An Android turn-back case is ok when averi
+// fails loudly naming the target's direction after at most UNMOVED_STROKES_EXHAUST (2) unmoved strokes, with no turn.
+// The figures are the live record's (android-vis.json, turn:scroll-collapsing.A at e98b87e): A scrolled above the list
+// (frame 127,-11, the list 0,220 1080x2000 at offset 715), 4 swipes down at 540,1820, the list 715 → 1984 → 2488.
+describe('judgeAndroidTurn: no turn on uiautomator, a loud failure naming the way after the two-stroke stop', () => {
+  const list = { x: 0, y: 220, width: 1080, height: 2000 };
+  const android = (over: Partial<LabState>): LabState =>
+    state({ screen: { x: 0, y: 0, width: 1080, height: 2220 }, scale: 1, safeArea: { top: 66, left: 0, bottom: 0, right: 0 }, scrollViews: { list }, ...over });
+  const launched = android({ frames: { A: { x: 127, y: -11, width: 825, height: 176 } }, offsets: { list: 715 } });
+  const touches = (n: number) => Array.from({ length: n }, () => ({ kind: 'touch' as const, tag: '540,1820', at }));
+  const after = (strokes: Stroke[], n: number) =>
+    android({ frames: { A: { x: 127, y: -1784, width: 825, height: 176 } }, offsets: { list: strokes.at(-1)?.to ?? 715 }, strokes, events: touches(n) });
+  const away = [stroke(715, 1984, 'list'), stroke(1984, 2488, 'list')];
+  const c = { tag: 'A', view: 'list', fully: false, platform: 'android' as const, turnTo: 'up' as const };
+  const failed = (swipes: number, last: number, way = 'up') =>
+    `ERROR scroll_until id:"lab.scroll-collapsing.A" failed after ${swipes} swipes (the last ${last}, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element was in the tree before the first swipe, clipped out above its scroll container, past the edge the swipes push it out through, never in the viewport, and is no longer in the tree (a lazy list drops what scrolls away) — scroll_until it with direction: "${way}"`;
+  const TAP = 'ERROR Timed out after 5000ms waiting for element id:"lab.scroll-collapsing.A" to appear';
+
+  it('the live measure: 4 swipes, the last 2 unmoved, no turn, `up` named — ok (judgeScroll alone: R-direction)', () => {
+    const s = after(away, 4);
+    expect(judgeScroll(c, [failed(4, 2), TAP], s, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction' });
+    expect(judgeAndroidTurn(c, [failed(4, 2), TAP], s, launched)).toMatchObject({ outcome: 'ok', kind: 'refused', why: expect.stringMatching(/^no turn on uiautomator \(ADR 0021\): 4 swipes, the last 2 unmoved, failed naming direction: "up"/) });
+  });
+
+  it('more unmoved strokes than the two-stroke stop: not ok', () => {
+    expect(judgeAndroidTurn(c, [failed(5, 3), TAP], after(away, 5), launched).outcome).toBe('MISMATCH');
+  });
+
+  it('the wrong direction named, or none: not ok', () => {
+    expect(judgeAndroidTurn(c, [failed(4, 2, 'down'), TAP], after(away, 4), launched).outcome).toBe('MISMATCH');
+    expect(judgeAndroidTurn(c, ['ERROR scroll_until failed after 4 swipes (the last 2, swiping down, did not change the screen) — element never appeared in the tree', TAP], after(away, 4), launched).outcome).not.toBe('ok');
+  });
+
+  it('a turn — a stroke that brought it closer — then a loud failure naming the way: not ok (no turn is the rule on uiautomator)', () => {
+    const turned = [...away, stroke(2488, 1984, 'list')];
+    const v = judgeAndroidTurn(c, [failed(4, 1), TAP], after(turned, 4), launched);
+    expect(v.outcome).not.toBe('ok');
+  });
+
+  it('a claim the app\'s strokes contradict stays its own mismatch', () => {
+    const moved = [...away, stroke(2488, 2600, 'list')];
+    expect(judgeAndroidTurn(c, [failed(3, 2), TAP], after(moved, 3), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'unchanged-claim' });
+  });
+
+  it('the case on Android is judged so; on iOS it keeps the turn judge', () => {
+    const t: TargetTruth = { tag: 'A', id: 'lab.scroll-collapsing.A', color: '#000000', declared: 'open', frame: { x: 127, y: -11, width: 825, height: 176 }, reached: false, probe: [], drawn: 0, seen: '#000000', geometry: 'outside-scroll-view', scrollView: 'list' };
+    const cell: CellTruth = { cell: 'scroll-collapsing', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t] };
+    const turn = visibilityCases(cell, 'android').find((x) => x.id === 'turn:scroll-collapsing.A')!;
+    expect(turn.says).toMatch(/no turn on uiautomator/);
+    expect(turn.judge(after(away, 4), [failed(4, 2), TAP], launched, 'uiautomator', [after(away, 4)])).toMatchObject({ outcome: 'ok' });
+    const ios = visibilityCases(cell, 'ios').find((x) => x.id === 'turn:scroll-collapsing.A')!;
+    expect(ios.says).toMatch(/^turn back: /);
+    expect(ios.judge(after(away, 4), [failed(4, 2), TAP], launched, 'wda', [after(away, 4)])).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction' });
   });
 });
