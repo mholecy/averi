@@ -89,9 +89,11 @@ export function strokesSince(state: Pick<LabState, 'strokes'>, launched: Pick<La
 }
 
 /** Where each touch since the launch began (the app's `touch` events, `x,y`) — a stroke's touch-down, a tap's point. */
+export const touchesSince = (state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>): string[] =>
+  state.events.slice(launched.events.length).filter((e) => e.kind === 'touch').map((e) => e.tag);
 const touchesText = (state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>) => {
-  const ts = state.events.slice(launched.events.length).filter((e) => e.kind === 'touch').map((e) => `(${e.tag})`);
-  return ts.length === 0 ? 'none' : ts.join(' ');
+  const ts = touchesSince(state, launched);
+  return ts.length === 0 ? 'none' : ts.map((t) => `(${t})`).join(' ');
 };
 const eventsText = (es: readonly ProbeEvent[]) => (es.length === 0 ? 'nothing' : es.map((e) => `${e.kind} ${e.tag}`).join(', '));
 const rectText = (r: Rect | undefined | null) => (r === undefined || r === null ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
@@ -322,15 +324,21 @@ export function judgeScroll(
 /**
  * A scroll_until for a target beneath a presented layer (`declared: presented-over`): no stop where it lies covered, no
  * stroke on the screen beneath (it would move the host under the layer or drag the layer), the layer not dismissed.
+ * A target in no scroll view (alert-dim's, sheet-medium's: the layer over a screen that does not scroll) has nothing a
+ * stroke could bring closer: any touch the app logged is a stroke on the layer — on Android it dismissed the dialog or
+ * expanded the sheet (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md, L1),
+ * so it is the row's mismatch even where the layer survived it.
  */
 export function judgePresentedScroll(c: { tag: string; view: string | undefined; platform: Platform }, [scroll]: readonly string[], state: LabState, launched: LabState): LiveVerdict {
   const app = appText(state, c.platform, c.tag, c.view, launched);
   const fired = firedSince(state, launched);
   const moved = strokesSince(state, launched).filter((s) => Math.abs(s.to - s.from) > MOVE_SLACK);
+  const touched = c.view === undefined ? touchesSince(state, launched) : [];
   const kind = replyKind(scroll);
   if (kind === 'visible') return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — the target lies beneath the presented layer`, app };
   if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
   if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };
+  if (touched.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked the presented layer over a target in no scroll view: ${touched.length} touch(es) at ${touched.map((t) => `(${t})`).join(' ')} — averi: ${short(scroll)}`, app };
   return { outcome: 'ok', kind, why: `refused, nothing moved or fired: ${short(scroll)}`, app };
 }
 
@@ -376,8 +384,8 @@ export const TURN_BACK: readonly { cell: string; tag: string; direction: 'up' | 
 /**
  * Every case of a cell's truth on its platform, as the target contract asks it (target-contract.ts): a tap per target
  * the contract asks one of (`fires` where its clause is `fire`), a scroll_until per target in a scroll view not judged
- * whole (toward it; `fully` too where fullyAsked; a refusal case beneath a presented layer), and the cell's turn-back
- * cases. A tap follows each stop, judged with it.
+ * whole (toward it; `fully` too where fullyAsked), a refusal case per target beneath a presented layer (in a scroll
+ * view or not), and the cell's turn-back cases. A tap follows each stop, judged with it.
  */
 export function visibilityCases(truth: CellTruth, platform: Platform): VisibilityCase[] {
   const cases: VisibilityCase[] = [];
@@ -399,7 +407,6 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
       judge: (s, [reply], launched) => judgeTap(t.tag, fires, reply, s, launched),
     });
     if (t.declared === 'presented-over') {
-      if (t.scrollView === undefined) continue;
       cases.push({
         id: `scroll:${truth.cell}.${t.tag}`,
         cell: truth.cell,

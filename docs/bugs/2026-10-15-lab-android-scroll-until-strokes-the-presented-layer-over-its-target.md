@@ -14,6 +14,21 @@
 > partially (the AlertDialog and the half-expanded sheet; the fully expanded sheet open) — ADR 0018's residual 18 for
 > it awaits the owner (round 6's code review, P1). Not yet re-measured on the emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
 > window".
+>
+> **Live (2026-10-18, round 6's Android device check):** confirmed on the emulator for the AlertDialog and the
+> half-expanded sheet. The live golden gained a `scroll_until` case per target beneath a presented layer in no scroll
+> view (live-visibility.ts#judgePresentedScroll: any touch the app logs is a stroke on the layer), run on the
+> `averi_lab` AVD with the lab app of truth/round-6 at round 5's src (`--side` b71cbbb) and at round 6's (e98b87e):
+> before, `alert-dim` A–D and `sheet-medium` A–B stopped "fully visible after 1 swipe" — the one stroke (touch-down
+> `540,444` or `540,1776`) DISMISSED the layer (`dismissed alert`, `dismissed sheet`) and the tap then found the
+> target; `sheet-medium` C–D sent three strokes at `540,1776` that EXPANDED the sheet (S from y 1353 to 243) and failed
+> "never appeared in the tree". After: all eight `stopped before any swipe — element is not in the tree, and the next
+> swipe would touch down at (540,444) on the dim outside container (155,851 770x517) — a dialog is presented over it —
+> close it first` (the sheet: `… on other "Close sheet" (0,0 1080x1110) — a screen is presented over it (a modal or a
+> sheet) — close it first`), the app logging no touch, nothing dismissed; the eight taps refused with "is not in the
+> tree, which lists only the window presented on top … close it first". docs/truth/live-android-2026-10-18-visibility.md,
+> docs/truth/live-records/android-vis.json (and android-vis-b71cbbb.json). `form-picker`'s fully expanded sheet has no
+> live case (no coloured target): unmeasured live, still open.
 
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33`, captured by scripts/truth/capture-android.ts on a dedicated

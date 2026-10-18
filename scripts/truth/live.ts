@@ -12,8 +12,8 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { judgeDismissal, visibilityCases, type LiveVerdict } from './live-visibility.js';
-import { allPassed, claimsDone, claimsTap, isError } from './replies.js';
+import { judgeDismissal, touchesSince, visibilityCases, type LiveVerdict } from './live-visibility.js';
+import { allPassed, claimsDone, claimsTap, isError, replyKind } from './replies.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
 /**
@@ -240,6 +240,51 @@ const FORMS: Omit<Case, 'group'>[] = [
       if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×, focus ${s.focus}); averi: ${short(reply)}` };
       if (s.focus === 'note') return tapped ? { outcome: 'ok', why: short(reply) } : { outcome: 'MISMATCH', why: `the focus is on note, but averi says ${short(reply)}` };
       return tapped ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}, no submit` } : { outcome: 'ok', why: `refused, nothing fired (focus ${s.focus}): ${short(reply)}` };
+    },
+  },
+  // F2A1 (docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md): phone lies
+  // under the bar riding on the IME, its dump a 42-px strip cut at Continue; a tap at its centre submits the form.
+  {
+    id: 'k6',
+    cell: K,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'a tap on phone, under the bar riding on the IME (its dump a strip cut at Continue): never a submit — refused, or tapped where it focuses phone',
+    calls: [{ tool: 'tap', args: { selector: id(K, 'phone') } }],
+    judge: (s, [reply]) => {
+      const submits = (s.submits ?? []).length;
+      if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×, focus ${s.focus}); averi: ${short(reply)}` };
+      if (claimsTap(reply)) return s.focus === 'phone' ? { outcome: 'ok', why: short(reply) } : { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}, no submit` };
+      return { outcome: 'ok', why: `refused, nothing fired (focus ${s.focus}): ${short(reply)}` };
+    },
+  },
+  {
+    id: 'k7',
+    cell: K,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'scroll_until phone, under the bar riding on the IME: no stop while its centre lies under the bar or the IME, never a submit (the strokes counted)',
+    calls: [{ tool: 'scroll_until', args: { selector: id(K, 'phone'), direction: 'down' } }],
+    judge: (s, [reply], _source, launched) => {
+      const submits = (s.submits ?? []).length;
+      const touches = touchesSince(s, launched);
+      const strokes = `${touches.length} stroke(s) the app logged${touches.length === 0 ? '' : ` at ${touches.map((t) => `(${t})`).join(' ')}`}`;
+      if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); ${strokes}; averi: ${short(reply)}` };
+      // Where the app lays phone out when scroll_until returns: its centre under the bar (the surface with no node) or
+      // the IME is no stop; clear of both, a stop is right — the part of it the bar's top padding still covers is said.
+      const phone = s.frames.phone;
+      const bar = s.frames['submit.bar'];
+      const ime = s.keyboard?.visible === true ? s.keyboard.frame : undefined;
+      const cy = phone === undefined ? undefined : phone.y + phone.height / 2;
+      const under = (r: { y: number; height: number } | undefined | null) => r != null && cy !== undefined && cy >= r.y && cy < r.y + r.height;
+      const covered = phone == null || bar == null ? 0 : Math.max(0, Math.min(phone.y + phone.height, bar.y + bar.height) - Math.max(phone.y, bar.y));
+      const where = phone == null ? 'phone not laid out' : `phone ${phone.y}–${phone.y + phone.height} (launched ${launched.frames.phone?.y ?? '?'}), ${covered} px of it under the bar`;
+      if (replyKind(reply) === 'visible') {
+        return under(bar) || under(ime) || phone == null
+          ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — phone's centre lies under the ${under(bar) ? 'bar' : 'IME'}; ${where}; ${strokes}` }
+          : { outcome: 'ok', why: `stopped with phone's centre clear of the bar and the IME (${where}); ${strokes}: ${short(reply)}` };
+      }
+      return { outcome: 'ok', why: `no stop, nothing submitted (${where}); ${strokes}: ${short(reply)}` };
     },
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },

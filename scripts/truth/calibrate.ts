@@ -121,6 +121,12 @@ export interface CalibrationEntry {
    * expanded sheet its fix does not mark).
    */
   open?: string[];
+  /**
+   * With `partial`: the live KNOWN entries (scripts/truth/live-known.ts, keyed `<platform> <source> <case id>`) of the
+   * part the note's fix leaves OPEN, each filed as this note — as `open` is for the static rows. Not judged by
+   * calibrate (#10: the default direction's turn on uiautomator, which ADR 0021 leaves to the owner).
+   */
+  openLive?: string[];
   needs?: string;
   regressions?: Regression[];
   remark?: string;

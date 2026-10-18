@@ -1,5 +1,12 @@
 # BUG: on Android a row whose uiautomator bounds run on past its scroll container's edge is judged on the screen alone — `fully: true` calls a cut row "fully visible", and a 22-px sliver is `Tapped` at a centre below its container, where nothing of it is drawn
 
+> **Status (2026-10-18):** open. Measured live by round 6's Android device check (`averi_lab`, the lab app of
+> truth/round-6, src b71cbbb and e98b87e alike — docs/truth/live-android-2026-10-18-visibility.md): `scroll-bounded`'s
+> P.fully, S, S.fully and tap S as before (KNOWN); and across, `carousel-in-list`'s C: `tap C` → `Tapped` at
+> `1047,497`, the app logging the touch and no tap (the page's background); `scroll_until C right` → "fully visible
+> after 0 swipes", no stroke, the tap after it again firing nothing. Round 6's axis-aware strokes are never asked of
+> the card on Android: averi stops at once. Filed in the live KNOWN (scripts/truth/live-known.ts) as this note.
+
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33/scroll-bounded.*`, captured by scripts/truth/capture-android.ts on the
 dedicated `averi_lab` AVD, Pixel 3a profile, API 33, 1080x2220, gesture navigation). averi = mobile-verify

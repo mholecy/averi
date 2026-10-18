@@ -171,6 +171,9 @@ describe('visibilityCases', () => {
     const cs = visibilityCases(truth('sheet-medium-edges', [target({ declared: 'presented-over', geometry: 'off-screen', scrollView: 'host' })]), 'ios');
     expect(cs.map((c) => c.id)).toEqual(['tap:sheet-medium-edges.T', 'scroll:sheet-medium-edges.T']);
     expect(cs[1].says).toMatch(/beneath the presented layer/);
+    // in no scroll view too (alert-dim, sheet-medium): the stroke would land on the layer
+    const none = visibilityCases(truth('alert-dim', [target({ declared: 'presented-over', geometry: 'whole', scrollView: undefined })]), 'android');
+    expect(none.map((c) => c.id)).toEqual(['tap:alert-dim.T', 'scroll:alert-dim.T']);
   });
 });
 
@@ -328,6 +331,13 @@ describe('each rule names its class (what the live KNOWN pins)', () => {
     expect(judgePresentedScroll(p, ['Element id:"x" visible after 2 swipes'], state(), state()).cls).toBe('presented-stop');
     expect(judgePresentedScroll(p, ['ERROR'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state()).cls).toBe('presented-fired');
     expect(judgePresentedScroll(p, ['ERROR'], state({ strokes: [stroke(200, 0, 'host')] }), state()).cls).toBe('presented-stroke');
+    // a touch on the layer is no evidence against a target in a scroll view (the stroke may move the layer's own list) …
+    const touch = state({ events: [{ kind: 'touch', tag: '540,1776', at }] });
+    expect(judgePresentedScroll(p, ['ERROR'], touch, state()).outcome).toBe('ok');
+    // … but over a target in none (L1's alert, its half sheet) any touch is a stroke on the layer
+    const none = { tag: 'A', view: undefined, platform: 'android' as const };
+    expect(judgePresentedScroll(none, ['ERROR'], touch, state())).toMatchObject({ outcome: 'MISMATCH', cls: 'presented-stroke' });
+    expect(judgePresentedScroll(none, ['ERROR close it first'], state(), state()).outcome).toBe('ok');
     expect(judgeDismissal('vs', 'Tapped', 'wda', state({ focus: null }), state({ focus: 'postcode' })).cls).toBe('dismissal');
     const field = (value: string) => ({ value, focused: false, error: null });
     const was = state({ focus: 'postcode', fields: { vs: field('') }, submits: [] });

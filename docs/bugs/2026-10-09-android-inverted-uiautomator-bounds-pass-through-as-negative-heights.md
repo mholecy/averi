@@ -12,6 +12,17 @@
 > `up`: both 10fb02b and d2b7744 refuse the tap naming scroll_until and stroke inside the list; the fix changes the
 > wording, `0×0 nodes` → clipped out above, `height -55` → 0); the default-direction turn is the live case
 > `turn:scroll-collapsing.A`, not yet run.
+>
+> **Live (2026-10-18, round 6's Android device check):** `turn:scroll-collapsing.A` run on the `averi_lab` AVD at
+> b71cbbb (`--side`, after d2b7744) and at e98b87e (round 6): the same at both — the note's symptom in its lab shape.
+> Four swipes down touching down at `540,1820`: the first two carry the list 715 → 1984 → 2488 (A from y -11 to -1784),
+> the last two move nothing; no turn. The reply is honest and names the way: `failed after 4 swipes (the last 2, swiping
+> down, did not change the screen …) — element was in the tree before the first swipe, clipped out above its scroll
+> container, past the edge the swipes push it out through, never in the viewport, and is no longer in the tree (a lazy
+> list drops what scrolls away) — scroll_until it with direction: "up"`. The turn on uiautomator is ADR 0021's open
+> point for the owner; until decided the case is KNOWN (scripts/truth/live-known.ts) as this note's open part
+> (calibration.json #10 `openLive`). The replayed verdicts hold live: `tap A` refused naming scroll_until, `scroll_until
+> A up` reached it in 1 swipe (the list 715 → 0) and the tap fired. docs/truth/live-android-2026-10-18-visibility.md.
 
 ## Summary
 

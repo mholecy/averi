@@ -39,6 +39,7 @@ const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-a
 const LV4 = 'bug:2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md';
 const LV5 = 'bug:2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md';
 const FLING = 'bug:2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md';
+const INVERTED = 'bug:2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md';
 const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
@@ -65,6 +66,15 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // Android
   ...each('android uiautomator', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully'], LE1, 'stop-claim', 'visible'),
   ...each('android uiautomator', ['tap:scroll-bounded.S'], LE1, 'tap-claim', 'Tapped'),
+  // Round 6's device check (android-vis.json at e98b87e, and at b71cbbb: android-vis-b71cbbb.json): carousel-in-list's
+  // C, cut to the screen's right edge and not to its carousel, is LE1 across — tapped on the page's background, a stop
+  // with no stroke.
+  ...each('android uiautomator', ['tap:carousel-in-list.C'], LE1, 'tap-claim', 'Tapped'),
+  ...each('android uiautomator', ['scroll:carousel-in-list.C'], LE1, 'stop-claim', 'visible'),
+  // #10's own symptom, live: the default direction strokes the list further from A, scrolled above it with inverted
+  // bounds, and never turns (ADR 0021 leaves the turn on uiautomator to the owner) — the reply names `up`. #10 is
+  // calibrated on its replayed rows; this case is the part its calibration leaves open (calibration.json #10 openLive).
+  ...each('android uiautomator', ['turn:scroll-collapsing.A'], INVERTED, 'R-direction', 'refused'),
   ...each('android uiautomator', ['scroll:scroll-sticky-cut.R.fully'], VA1, 'stop-claim', 'visible'),
   ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1, 'unchanged-claim', 'not found'),
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', 'intermittent'),

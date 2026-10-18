@@ -17,7 +17,8 @@ import { KNOWN } from '../differential/golden/files.js';
 //   3. conversely, every note a KNOWN row (static or live) is filed as is an open note of calibration.json — except
 //      the live-only notes below, each excluded from the calibration with its reason, the live cases of a note
 //      calibrated on the replay that still await a live record at its fix (AWAITING_LIVE, below, case by case), and a
-//      static row a note calibrated PARTIALLY lists as left open (its `open`, by row: `partiallyOpen`, below).
+//      static row or live entry a note calibrated PARTIALLY lists as left open (its `open` by row, its `openLive` by
+//      case: `partiallyOpen`, `partiallyOpenLive`, below).
 // Filing a note, or striking one off when it is fixed, therefore touches all three places in one commit or fails here.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -69,6 +70,15 @@ const NOT_ON_THIS_BRANCH: readonly string[] = [];
 const partiallyOpen = (note: string, key: string): boolean =>
   table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.open ?? []).includes(key));
 
+/**
+ * The same for a live KNOWN entry (`key`, `<platform> <source> <case id>`): it may stay filed as a note calibrated
+ * PARTIALLY only when that note's `openLive` lists it (#10: the replayed rows calibrated, the default direction's turn
+ * on uiautomator left to the owner by ADR 0021 — the live case `turn:scroll-collapsing.A`, measured red at the fix's
+ * src and at round 6's, docs/truth/live-android-2026-10-18-visibility.md).
+ */
+const partiallyOpenLive = (note: string, key: string): boolean =>
+  table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.openLive ?? []).includes(key));
+
 /** Rule 3 over `entries` (every place a note is named, `named`): each `bug:` of a KNOWN row that is filed where it may not be. */
 function misfiled(entries: readonly { where: string; name: string }[]): string[] {
   const open = new Set(table.notes.filter((e) => expected(e) === 'OPEN-RED').map((e) => e.note));
@@ -76,6 +86,7 @@ function misfiled(entries: readonly { where: string; name: string }[]): string[]
     .filter(({ where, name }) => !where.startsWith('calibration.json') && name.startsWith('bug:'))
     .filter(({ where, name }) => !(where.startsWith('live ') && AWAITING_LIVE[where.slice('live '.length)]?.note === name.slice(4)))
     .filter(({ where, name }) => !(where.startsWith('static ') && partiallyOpen(name.slice(4), where.slice('static '.length))))
+    .filter(({ where, name }) => !(where.startsWith('live ') && partiallyOpenLive(name.slice(4), where.slice('live '.length))))
     .flatMap(({ where, name }) => (open.has(name.slice(4)) || LIVE_ONLY[name.slice(4)] !== undefined ? [] : [`${where}: ${name} is no open note of calibration.json`]));
 }
 
@@ -150,6 +161,24 @@ describe('calibration.json ↔ the KNOWN rows', () => {
     expect(table.notes.find((e) => e.n === 'L1')?.open).toHaveLength(6);
   });
 
+  it('each live entry a partial calibration leaves open (`openLive`) is a live KNOWN entry filed as that note, on a note with a `partial`', () => {
+    const bad = table.notes.flatMap((e) =>
+      (e.openLive ?? []).flatMap((k) => [
+        ...(e.status === 'calibrate' && e.partial !== undefined ? [] : [`#${e.n}: \`openLive\` without a partial calibration`]),
+        ...(LIVE_KNOWN[k] === undefined ? [`#${e.n}: ${k} is no live KNOWN entry`] : LIVE_KNOWN[k].note === `bug:${e.note}` ? [] : [`#${e.n}: ${k} is filed as ${LIVE_KNOWN[k].note}`]),
+      ]),
+    );
+    expect(bad).toEqual([]);
+  });
+
+  it('a live entry filed as a partially calibrated note that its `openLive` does not list is misfiled — keyed by case, not by note', () => {
+    const ten = table.notes.find((e) => e.n === '10')!;
+    expect(misfiled([{ where: 'live android uiautomator turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toEqual([]);
+    // another case of the same note, and the listed case under another source: neither is listed, both misfiled
+    expect(misfiled([{ where: 'live android uiautomator scroll:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
+    expect(misfiled([{ where: 'live ios wda turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
+  });
+
   it('a row filed as a partially calibrated note that its `open` does not list is misfiled — fab.xml\'s L and K refiled as #2 or as L1', () => {
     const noteOf = (n: string) => table.notes.find((e) => e.n === n)!.note;
     const refiled = [
@@ -180,7 +209,7 @@ describe('calibration.json ↔ the KNOWN rows', () => {
     expect(bad).toEqual([]);
   });
 
-  it('every `bug:` a KNOWN row (static or live) is filed as is an open note of calibration.json, or live-only and excluded there, or a live entry awaiting its live record, or a static row a partial calibration leaves open', () => {
+  it('every `bug:` a KNOWN row (static or live) is filed as is an open note of calibration.json, or live-only and excluded there, or a live entry awaiting its live record, or a static row or live entry a partial calibration leaves open', () => {
     expect(misfiled(named)).toEqual([]);
   });
 
