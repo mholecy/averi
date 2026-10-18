@@ -1,7 +1,8 @@
-import { ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, twice, type KnownFile } from './known.js';
+import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, NOT_IN_TREE_HINTED, twice, type Classed, type KnownFile } from './known.js';
 
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim (phase 1/2);
-// sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS).
+// sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS);
+// bottom-sheet-dialog and dialog-fullscreen (round 7, Android).
 
 // The lab finding L1's tap and scroll_until rows were this KNOWN's until round 6's fix (d43df5d on arch/r22-l1)
 // struck them off; scripts/truth/calibration.json calibrates the note on them.
@@ -13,6 +14,18 @@ const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in th
 /** Review round 4's P4 (calibration.json NI1): idb lists a UIKit table's labels without their identifiers. */
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
+/** Round 7 (T2): Android's presented windows the uiautomator parser does not mark. */
+const SHEET_DIALOG: Classed = 'bug:2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md';
+const FULL_SCREEN_DIALOG: Classed = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
+/**
+ * A target beneath a window uiautomator lists alone and the parser leaves unmarked: the tap's hint, no remedy; the
+ * colour assert's "not found" (no evidence either way — vacuous, no note's, as alert-dim's); two strokes on the window.
+ */
+const unmarkedWindow = (file: string, as: Classed) => [
+  ...keys(file, ['A', 'B', 'C', 'D'], ['tap'], { cls: NOT_IN_TREE_HINTED, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window, unmarked: the tap times out "to appear" with the active-window hint — its conditional "close it first", not the presented remedy', as }),
+  ...keys(file, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
+  ...keys(file, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(ADB_STROKE), note: 'uiautomator lists only the presented window, unmarked: scroll_until strokes it twice, then "never appeared in the tree" with the active-window hint', as }),
+];
 /** The short stroke down after two IDB_UP, the third of blur-menu-grouped C's strokes (and of sheet-medium-edges.wda G's until L3's fix). */
 const IDB_DOWN_SHORT = 'idb ui swipe 201 699 201 568 --duration 0.3';
 /**
@@ -52,6 +65,14 @@ export const presented: KnownFile = {
     ...['alert-dim', 'sheet-medium'].flatMap((cell) =>
       keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
     ),
+    // --- round 7 (T2), Android: the presented windows the parser does not mark (ADR 0018 residual 19) ---
+    // LAB FINDING LW1: a Views BottomSheetDialog's touch_outside scrim is unlabelled (NAF) and laid between the bars, so
+    // the scrim rule does not hold; Material's view ids would mark it (the note's proposal). Live, scroll_until's first
+    // stroke up touches down on the scrim and dismisses the sheet (live-known.ts).
+    ...unmarkedWindow(`${ANDROID}/bottom-sheet-dialog.xml`, SHEET_DIALOG),
+    // A full-screen Compose Dialog: Compose lays its window between the bars at full width ([0,66][1080,2153]), against
+    // the left edge — an app's own window by the parser's rule — and the dump carries no fact that tells it from one.
+    ...unmarkedWindow(`${ANDROID}/dialog-fullscreen.xml`, FULL_SCREEN_DIALOG),
     // --- phase 3 (B3), iOS ---
     // idb lists only the presented layer (as on sheet-medium): beneath the medium sheet over the scrolled host, the large
     // sheet's bare background and the transparent cover, the targets are not in the tree.
@@ -110,6 +131,8 @@ export const presented: KnownFile = {
   counts: {
     [`${ANDROID}/alert-dim.xml`]: 12,
     [`${ANDROID}/sheet-medium.xml`]: 15,
+    [`${ANDROID}/bottom-sheet-dialog.xml`]: 15,
+    [`${ANDROID}/dialog-fullscreen.xml`]: 15,
     [`${IOS}/alert-dim.idb.json`]: 12,
     [`${IOS}/alert-dim.wda.json`]: 12,
     [`${IOS}/sheet-medium.idb.json`]: 15,
