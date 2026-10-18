@@ -49,6 +49,21 @@ describe('the end proof — the tree lists where a scroll view\'s content ends (
     expect(clips.endsAt({ x: 0, y: 0, width: 10, height: 10 }, 'top')).toBeUndefined();
   });
 
+  it('only along the axis the scroll view scrolls on: a horizontal carousel lists nothing below its bottom, and that proves no end for a vertical stroke', () => {
+    const carousel: Rect = { x: 24, y: 138, width: 354, height: 85 };
+    const tree = node({
+      role: 'container',
+      unclippedFrames: true,
+      rect: { x: 0, y: 0, width: 402, height: 874 },
+      children: [node({ role: 'scrollable', rect: carousel, children: [node({ role: 'other', rect: { x: 24, y: 138, width: 1416, height: 85 } })] })],
+    });
+    const { clips } = sceneOf(tree);
+    expect(clips.endsAt(carousel, 'bottom')).toBeUndefined();
+    expect(clips.endsAt(carousel, 'top')).toBeUndefined();
+    // Along its axis it does: nothing of it left of its left edge.
+    expect(clips.endsAt(carousel, 'left')?.rect).toEqual(carousel);
+  });
+
   it('uiautomator\'s dialect (rects cut to their clipping scroll container) never proves an end: content past the edge would read flush with it', () => {
     const list: Rect = { x: 0, y: 303, width: 1080, height: 605 };
     const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'scrollable', rect: list, clipsDescendants: true, children: [node({ role: 'button', rect: { x: 128, y: 303, width: 825, height: 176 } })] })] });
@@ -101,6 +116,18 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(failureOf(played, `id:"${F}"`).message).toMatch(
       /failed after 2 swipes \(the last 2, swiping up, did not move it: content exhausted, or the swipes were not taken\) — .*it lay below the viewport, past the edge the swipes push it out through: scroll_until it with direction: "down"$/,
     );
+  });
+
+  it('a stroke that touched down on a node drawn over its scroll view proves nothing in one: that node may have taken it — two strokes, the failure naming it first, as before', () => {
+    const bar = node({ role: 'other', label: 'bar', rect: { x: 0, y: 400, width: 402, height: 40 } });
+    const covered = (row: Row): Row => {
+      const tree = row.tree as UiNode;
+      return { ...row, tree: { ...tree, children: [...tree.children, bar] } };
+    };
+    const played = play(IPHONE, [covered(at(0)), covered(at(0)), covered(at(0))]);
+    expect(strokesToward(played)).toEqual(['up', 'up']);
+    expect(played.outcome).not.toHaveProperty('endTurn');
+    expect(failureOf(played, `id:"${F}"`).message).toMatch(/the last 2, swiping up, did not move it: they touched down at 201,416 on other "bar"/);
   });
 
   it('no swipe left for the turn: the failure is the proof\'s, after the one stroke, and names the side the tree places it on', () => {

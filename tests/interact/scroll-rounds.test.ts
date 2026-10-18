@@ -2152,14 +2152,13 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
     for (const { from } of sent) expect(containsPoint(LIST, from)).toBe(true);
   });
 
-  // A residual (LE4's note, for the stroke plan): the nearest scroll view is taken whatever its axis. Account Detail's
-  // card carousel (24,138 354x85) under the transactions list (0,180 402x694, listed after it): a card right of the
-  // carousel, scrolled for `down`, is stroked inside the carousel — a vertical 52-pt stroke touching down where the
-  // list is drawn over it — not over the screen (699 → 175, before). Pinned as it is today, not as it should be. Since
-  // the end proof (scroll-rounds.ts#Observed.ends) the one unmoved stroke ends it: the tree lists nothing of the
-  // carousel below its bottom — true of a carousel, which scrolls sideways — where two unmoved strokes ended it before,
-  // naming the list drawn over the touch-down.
-  it('a card of a horizontal carousel, scrolled for `down`: the vertical stroke goes inside the carousel, and the one that moved nothing ends it — the tree lists nothing of the carousel below its bottom (residual)', () => {
+  // LE4's note, its residual: Account Detail's card carousel (24,138 354x85, read horizontal from its cards past its
+  // frame) under the transactions list (0,180 402x694, listed after it, no ancestor of the carousel): a card right of
+  // the carousel, scrolled for `down`, has no scroll view that scrolls along the stroke, and the stroke plan falls back
+  // to the nearest, the carousel — a vertical 52-pt stroke touching down where the list is drawn over it — as before
+  // the axis rule (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list
+  // (tests/interact/stroke-plan.test.ts, "the axis").
+  it('a card of a horizontal carousel no list holds, scrolled for `down`: no scroll view along the stroke, so the vertical stroke goes inside the carousel (the fallback), and the failure names the list drawn over its touch-down', () => {
     const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
     const card = node({ role: 'other', label: 'My Account', rect: { x: 378, y: 138, width: 354, height: 85 } });
     const tree = node({
@@ -2172,11 +2171,11 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
       ],
     });
     const row: Row = { tree, found: [card] };
-    const played = play({ ...IPHONE, maxSwipes: 2 }, [row, row]);
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [row, row, row]);
     const sent = strokes(played);
-    expect(sent.map((s) => s.box)).toEqual([CAROUSEL]);
-    expect(sent.map((s) => s.from)).toEqual([{ x: 201, y: 207 }]); // as the differential replays the captured tree: 201 207 → 155
-    expect(failureOf(played, 'label:"My Account"').message).toMatch(/failed after 1 swipe \(swiping down did not move it: the tree lists the content of scrollable \(24,138 354x85\) ending at its bottom — content exhausted\)/);
+    expect(sent.map((s) => s.box)).toEqual([CAROUSEL, CAROUSEL]);
+    expect(sent.map((s) => s.from)).toEqual([{ x: 201, y: 207 }, { x: 201, y: 207 }]); // as the differential replays the captured tree: 201 207 → 155
+    expect(failureOf(played, 'label:"My Account"').message).toMatch(/they touched down at 201,207 on scrollable \(id transactions\.list\.container\) at 0,180 402x694, drawn over the list 24,138 354x85/);
   });
 
 });

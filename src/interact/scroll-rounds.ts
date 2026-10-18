@@ -978,7 +978,9 @@ interface Observed {
    * otherwise): the scroll view the stroke went over, whose content this read lists ending the way that stroke went
    * (interact/stroke-plan.ts#strokedEnd) — set only with `exhausted`, on the read right after a stroke toward the
    * target (not the flush check's probe) that moved nothing: every match where it was, or, with no target in the tree,
-   * the whole tree unchanged; never while a progress node shows. What counts as proof, stated: the tree's listing of
+   * the whole tree unchanged; never while a progress node shows, nor of a stroke that touched down on a node drawn over
+   * its scroll view (`touchedOn`: that node may have taken it, and the fast fail names it first); and only of a scroll
+   * view that scrolls along the stroke's axis (geometry.ts#Clips.endsAt). What counts as proof, stated: the tree's listing of
    * the content, not the strokes — a stroke not taken moves nothing too, but cannot make a list's content end where
    * the tree shows it ending; and the read unmoved besides, so a list still settling (a bounce at its end, momentum
    * from an earlier stroke) reads moved and proves nothing until a read finds it still.
@@ -1081,7 +1083,12 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved — the probe's
   // stroke asks another question (PROBE_REACH) — and never while a progress node shows (content may yet load there).
   const unmovedNow = (offFrame && allUnmoved && !loading) || (found.length === 0 && treeUnmoved);
-  const ends = current === 'stroke' && s.probe === undefined && unmovedNow && s.lastSent !== undefined ? strokedEnd(s.strokes, facts, s.lastSent) : undefined;
+  // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
+  // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
+  const ends =
+    current === 'stroke' && s.probe === undefined && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, s.lastDrawn) === undefined
+      ? strokedEnd(s.strokes, facts, s.lastSent)
+      : undefined;
   const exhausted =
     offFrame && (s.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
       ? 'matches'

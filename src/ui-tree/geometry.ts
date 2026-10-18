@@ -744,7 +744,12 @@ export interface Clips {
    * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts every rect to its scroll
    * container, so content past an edge reads flush with it (or is not listed at all), and idb's flat list lists no
    * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
-   * asked: any of them says "not provably the end", the safe answer. Residual: a lazy list (a table) lists only the
+   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG
+   * that edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
+   * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
+   * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
+   * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
+   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual: a lazy list (a table) lists only the
    * rows it has laid out, so one resting on a row boundary with its earlier rows dropped reads as ending at its top —
    * interact/scroll-rounds.ts asks this only of a read that a stroke over that scroll view left unmoved, which a list
    * with rows past that edge would not have been. Cost: one walk of that scroll view's subtree, per ask (asked at most
@@ -880,6 +885,8 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     if (!ancestry || !unclipped) return undefined;
     const view = [...everyNode(tree)].find((n) => scrolls(n) && sameRectWithinPixel(n.rect, scroller));
     if (view === undefined) return undefined;
+    // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
+    if (scrollAxis(view, unclipped) !== (edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal')) return undefined;
     const r = view.rect;
     const past: Record<Edge, (d: Rect) => boolean> = {
       top: (d) => d.y < r.y - 1,
