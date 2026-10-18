@@ -647,4 +647,3 @@ describe('judgeTap(…).aim() — a cut by a later node names the keyboard only 
     expect(said(outcome)).not.toContain('soft keyboard');
   });
 });
-
