@@ -87,8 +87,9 @@ text` fails on non-ASCII, LOUD).
    stop ok (phone's centre clear of the bar), so no live KNOWN entry; filed as ADR 0013's accepted residual and in
    F2A1's note, with a future "eyes" item in docs/plans/2026-10-15-ground-truth-lab-app.md (verify a "fully" claim with
    pixels where a node-less sibling's padding may lie over the target).
-5. **ADR 0018's residuals 18 and 19 — accepted,** with an honest hint on every uiautomator not-found the presented
-   window's words do not claim: `(the tree lists only the active window: if a sheet or a dialog is open over the
+5. **ADR 0018's residuals 18 and 19 — accepted,** with an honest hint on the tap's and fill's wait ("… to appear") and
+   `scroll_until`'s "element never appeared in the tree" on uiautomator, where the presented window's words do not
+   claim them (not the asserts' "not found", nor a flow's `wait:`): `(the tree lists only the active window: if a sheet or a dialog is open over the
    screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT). `form-picker`'s six rows are filed as residual
    18; lab cells for a full-screen dialog and a Views `BottomSheetDialog` are planned.
 

@@ -84,7 +84,8 @@ reports the direction, the agent turns (below).
   element never appeared in the tree`: no side was ever read, so no direction is named (the strokes never ran to an
   end the caller's way after one that moved: `Shortfall.absent`'s `unsearched` needs that). The live judge holds
   Android's turn cases to exactly this (scripts/truth/live-visibility.ts, `judgeAndroidTurn`): no turn, at most
-  `UNMOVED_STROKES_EXHAUST` unmoved strokes at the end, and a loud failure naming the target's direction — not
+  `UNMOVED_STROKES_EXHAUST` unmoved swipes in the whole call (its swipes less the strokes the app logged moving the
+  target's scroll view — a swipe that moves nothing may log none, so they are counted, not located), and a loud failure naming the target's direction — not
   R-direction's turn, which WDA's turn cases keep. F2A1's phone was cited here as an unmoved scroll on the replay
   (`form-keyboard.xml`: the replayed tree never moves, 3 swipes — `540 1034 → 424` twice, then one back up); live
   (case k7) ONE stroke at `540,1034` moved the form 167 px and stopped on phone — no unmoved stroke at all.

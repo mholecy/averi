@@ -31,7 +31,7 @@
 > live case (no coloured target): unmeasured live, still open.
 >
 > **Decided (2026-10-18, the owner):** ADR 0018's residuals 18 (the fully expanded sheet) and 19 (the shapes measured
-> on one AVD) ACCEPTED, with an honest hint: every uiautomator reply that says a target is not in the tree and is not
+> on one AVD) ACCEPTED, with an honest hint: the uiautomator replies that say a target is not in the tree and are not
 > already given the presented window's words — the tap's, fill's and the presence check's "… to appear", `scroll_until`'s
 > "element never appeared in the tree" — adds `(the tree lists only the active window: if a sheet or a dialog is open
 > over the screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT, arch/r22-hint 9acbf77; ADR 0018's

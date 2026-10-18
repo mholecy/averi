@@ -36,9 +36,10 @@ lists the active window only" (`UiNode.activeWindowOnly`), which picks the uiaut
 one window presented when the dump shows it is (`dialog`, `screen`), and a target the tree cannot list beneath it gets
 "close it first" from the tap's wait and `scroll_until`'s stop, no gesture sent — residual 6 closed on Android for such a
 window (see "Amendment: Android's presented window" below). Amended again 2026-10-18 (owner decision on round 6's open
-points): residuals 18 and 19 accepted, with an honest hint on every uiautomator reply that says a target is not in the
-tree and is not already given the presented window's words — the tree lists only the active window: if a sheet or a
-dialog is open over the screen, close it first (decision 5 of the same amendment).
+points): residuals 18 and 19 accepted, with an honest hint on the uiautomator not-founds of the tap's and fill's wait
+("… to appear") and of `scroll_until` ("element never appeared in the tree") that the presented window's words do not
+claim — the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first
+(decision 5 of the same amendment). Not the asserts' "not found within …", nor a flow's `wait:` timeouts.
 
 ## Context
 
@@ -797,7 +798,9 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    (interact/resolve.ts#notFound, in the hint's place; a zero-area match's hint, which says the target IS in the
    tree, takes it first) and after `scroll_until`'s "element never appeared in the tree" (scroll-text.ts, the
    `absent` shortfall). One constant (ui-tree/standing.ts#ACTIVE_WINDOW_HINT); never under WDA or idb. A possibility,
-   not a cause: it rides on every Android not-found, a plain screen's too, and the wait's class is unchanged (absence).
+   not a cause: it rides on every such wait and `scroll_until` on Android, a plain screen's too, and the wait's class
+   is unchanged (absence). The asserts' "not found within …" (verify/poll-verdict.ts) and a flow's `wait:` timeouts
+   do not carry it — an assert of absence passes there, and the hint would point the wrong way.
    Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
    name, country, submit and country.ST; scroll-bounded O, F; carousel-in-list B, U; scroll-top-edge(-end) A;
    tabbar-floating F; text-under-bar P — tap and scroll_until each); form-picker's three taps, which the presented row

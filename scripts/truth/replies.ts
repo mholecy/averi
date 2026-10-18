@@ -83,7 +83,12 @@ export const firstLine = (reply: string) => {
 /** The reply without the selectors it echoes: `id:"lab.form-keyboard.vs"` must not read as the word keyboard. */
 export const ownWords = (reply: string) => reply.replace(/\b[a-z]+:"(?:[^"\\]|\\.)*"/gi, '<selector>');
 
-/** The reply's remedy for a target under a presented screen (src/ui-tree/standing.ts:425-426, "— close it first"). */
+/**
+ * The reply's remedy for a target under a presented screen ("— close it first": src/ui-tree/standing.ts#presentedRemedy,
+ * #presentedStop). It also matches the conditional active-window hint on uiautomator (standing.ts#ACTIVE_WINDOW_HINT:
+ * "if a sheet or a dialog is open over the screen, close it first") — which is why form-picker's taps, a not-found
+ * carrying that hint, read as vacuous (`not in the tree`) rather than refused without the remedy.
+ */
 export const closeFirst = (reply: string) => /close it first/.test(reply);
 
 /**
