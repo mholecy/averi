@@ -6,8 +6,10 @@
 > it was and the tree listing `lower`'s content ending at its top (nothing of it above 380), so the content is PROVEN
 > exhausted up (interact/scroll-rounds.ts#Observed.ends, stroke-plan.ts#strokedEnd, ui-tree/geometry.ts#Clips.endsAt),
 > and F lies past `lower`'s far (bottom) edge inside it: the strokes turn once, down, at full reach, and the reply says
-> so (`; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi
-> turned down, as the tree places the element below it`; scroll-rounds.ts#EndTurn). Replayed over this cell's real WDA
+> so (`; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
+> averi turned down, as the tree places the element below it`, the one-stroke stop's wording since round 6's code
+> review, S8; at `1a1871f` it read `did not move scrollable (0,380 402x180) — the tree lists its content ending at its
+> top —`; scroll-rounds.ts#EndTurn). Replayed over this cell's real WDA
 > capture (tests/interact/scroll-end-turn.test.ts): strokes up, down, down … where three ups failed. Under idb nothing
 > changes (no scroll view listed, LE2: `ios idb turn:scroll-bounded.F` stays KNOWN); nor on Android, whose tree cannot
 > list where a list's content ends. Golden over truth/round-6 unchanged (1137/242/0, every row identical: the replay
