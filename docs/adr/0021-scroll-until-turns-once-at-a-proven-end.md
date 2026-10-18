@@ -87,3 +87,11 @@ exclusion from the turn, and the one-stroke stop.
 - The carry model takes the fling as proportional to the drag at the fixed 300 ms (a shorter drag is a slower one) —
   measured at 108 and 344 pt, unmeasured below; a mid-fling read understates a sample, which is why the largest is
   kept. Both are the device check's to confirm (`ios wda turn:scroll-bounded.F`, `ios wda scroll:scroll-bounded.F`).
+- Two tolerances meet across reads, on purpose: whether a stroke moved the match ("unmoved") forgives under a pixel
+  (`sameRectWithinPixel`), while the proof's and the carry's scroll view is found again by its EXACT rect
+  (`Clips.endsAt`, `stroke-plan.ts#carryOver`, as `axesOf` and `drawnOver` find it — round 6's code review, S1/P5).
+  WDA's rects reach the tree rounded (ios-node.ts), so a scroll view at rest keeps its rect; one that moves by a pixel
+  between reads loses the proof (no turn after one stroke: the two-stroke rule decides) or the carry (no shortened
+  final stroke), both the safe side. The live cases are where such a 1-px flip would show:
+  `ios wda turn:scroll-bounded.F` turning only after the second stroke, `ios wda scroll:scroll-bounded.F` overshooting
+  with a full final stroke — the device check reads both for it.
