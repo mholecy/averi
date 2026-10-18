@@ -1,0 +1,30 @@
+{
+  "platform": "ios",
+  "app": "AveriLabRN",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "note": "Ground truth: the iOS react-native lab app (fixtures/apps/rn), captured by scripts/truth/capture.ts",
+  "captures": [
+    {
+      "file": "rn-field.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "rn-field.png",
+      "truth": "rn-field.truth.json"
+    },
+    {
+      "file": "rn-field.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "rn-field.png",
+      "truth": "rn-field.truth.json"
+    }
+  ]
+}

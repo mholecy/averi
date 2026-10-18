@@ -508,7 +508,7 @@
       "before": "d2b7744",
       "after": "81a7d62",
       "verified": "golden",
-      "partial": "the cell-background half and the text field over its own label; not the field's scroll-indicator node",
+      "partial": "the cell-background half and the text field over its own label; the field's scroll-indicator node is captured since round 7 (rn-field) but asks no row of its own: what covers there is LR1's and LR2's",
       "defect": "^(not tapped|stopped): .*\\bunder (container|textfield)\\b",
       "checks": [
         "ios-iphone17-ios27/sheet-medium.wda.json S tap",
@@ -518,7 +518,7 @@
         "ios-iphone17-ios27/own-parts.idb.json N tap",
         "ios-iphone17-ios27/own-parts.idb.json N scroll_until"
       ],
-      "needs": "The text field's own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under an RN text field) needs a field whose tree lists one: neither SwiftUI's TextField nor a UIKit UITextField in the lab lists it (iOS 27.0, empty, unfocused).",
+      "needs": "Round 7 (fixtures/apps/rn, rn-field; RN 0.88.0, iOS 27.0): RN's MULTILINE TextInput (a UITextView) lists the indicator under the field, after its floating label, over the label's centre — WDA `TextView 69,492 264x38` → `Other 'Horizontal scroll bar, 1 page'` value `0 %` `69,508 264x19` with one bare thumb, M's label `69,491 175x23` (tests/fixtures/truth/ios-rn-iphone17-ios27/rn-field.wda.json); RN's single-line TextInput (a UITextField) lists none, as the lab's UIKit field. At HEAD the bar is excused (`scrollIndicator`, its parent a text input): no reply names it. M's rows are red all the same, for the field itself — WDA lists RN's input inside an unnamed wrapper of its own rect, no sibling of its label (LR1) — so they cannot calibrate the indicator half: its fix (81a7d62) and the wrapper both decide those rows. A row isolating the bar needs LR1 fixed first, then rn-field's M under WDA at d2b7744 vs 81a7d62.",
       "regressions": [
         {
           "rows": [
@@ -1227,6 +1227,38 @@
         "ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until"
       ],
       "remark": "No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply says why (review round 4, P4). presented.known.ts owns the ratchet; this entry links the note to its rows. Live: scripts/truth/live-known.ts NO_ID (idb tap:sheet-long-list.R, tap:sheet-long-list-short.R, scroll:sheet-long-list-short.F)."
+    },
+    {
+      "n": "LR1",
+      "note": "2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^(not tapped|stopped|failed): .*\\bunder textfield\\b|textfield .* is drawn over the element",
+      "checks": [
+        "ios-rn-iphone17-ios27/rn-field.wda.json N tap",
+        "ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until",
+        "ios-rn-iphone17-ios27/rn-field.wda.json N ocr",
+        "ios-rn-iphone17-ios27/rn-field.wda.json M tap",
+        "ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until",
+        "ios-rn-iphone17-ios27/rn-field.wda.json M ocr"
+      ],
+      "remark": "No fix yet: red at HEAD, round 7's React Native lab app (fixtures/apps/rn). WDA lists RN's text input inside an unnamed wrapper of its own rect, so ownControl's sibling rule misses its floating label; idb lists the field flat and is green. react-native.known.ts owns the ratchet. Live LOUD under WDA (rn4, tap:rn-field.N, tap:rn-field.M refused, nothing fired: docs/truth/live-rn-2026-10-19.md)."
+    },
+    {
+      "n": "LR2",
+      "note": "2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^(not tapped|stopped|failed): .*\\bunder textfield\\b|textfield .* is drawn over the element",
+      "checks": [
+        "android-rn-averi_lab-api33/rn-field.xml N tap",
+        "android-rn-averi_lab-api33/rn-field.xml N scroll_until",
+        "android-rn-averi_lab-api33/rn-field.xml N ocr",
+        "android-rn-averi_lab-api33/rn-field.xml M tap",
+        "android-rn-averi_lab-api33/rn-field.xml M scroll_until",
+        "android-rn-averi_lab-api33/rn-field.xml M ocr"
+      ],
+      "remark": "No fix yet: red at HEAD, round 7's React Native lab app. The label overhangs its EditText by 3 px (1 dp at 2.75), past LABEL_OVERHANG's 2 px — ADR 0014's allowance stated in the tree's units, stricter on Android. react-native.known.ts owns the ratchet. Live LOUD (rn4, tap:rn-field.N, tap:rn-field.M refused, nothing fired: docs/truth/live-rn-2026-10-19.md)."
     }
   ],
   "excluded": [

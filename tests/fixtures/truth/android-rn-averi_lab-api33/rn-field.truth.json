@@ -1,0 +1,94 @@
+{
+  "cell": "rn-field",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "N",
+      "id": "lab.rn-field.N",
+      "text": "Payee’s name",
+      "color": "#B2EBF2",
+      "declared": "open",
+      "frame": {
+        "x": 177,
+        "y": 360,
+        "width": 255,
+        "height": 61
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "305,391"
+        },
+        {
+          "kind": "focus",
+          "tag": "N"
+        }
+      ],
+      "drawn": 0.98,
+      "seen": "#B2EBF2",
+      "textListed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "I",
+      "id": "lab.rn-field.I",
+      "label": "Clear",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "x": 805,
+        "y": 826,
+        "width": 121,
+        "height": 121
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "866,887"
+        }
+      ],
+      "drawn": 0.997,
+      "seen": "#3949AB"
+    },
+    {
+      "tag": "M",
+      "id": "lab.rn-field.M",
+      "text": "Message for the recipient",
+      "color": "#FFE0B2",
+      "declared": "open",
+      "frame": {
+        "x": 177,
+        "y": 1350,
+        "width": 475,
+        "height": 61
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "415,1381"
+        },
+        {
+          "kind": "focus",
+          "tag": "M"
+        }
+      ],
+      "drawn": 0.962,
+      "seen": "#FFE0B2",
+      "textListed": {
+        "uiautomator": true
+      }
+    }
+  ],
+  "navigation": "gesture",
+  "displays": "rn-field.displays.txt"
+}
