@@ -276,16 +276,12 @@ export async function resolveSettled(
   let sighted = false;
   let sightings = 0;
   let run = 0; // consecutive rounds that resolved it, up to the last tree read
-  let zeroHint: string | undefined;
-  let alone: MarkedLayer | undefined;
-  let windowHint: string | undefined;
+  let miss: Miss | undefined; // the last tree read, when it did not resolve the target
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
-      alone = resolved === undefined ? listedAlone(tree) : undefined;
-      windowHint = resolved === undefined ? activeWindowHint(tree) : undefined;
+      miss = resolved === undefined ? missOf(tree, target) : undefined;
       if (resolved === undefined) {
         lastRect = undefined;
         run = 0;
@@ -327,7 +323,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome, zeroHint, alone, windowHint);
+  throw notFound(target, timeoutMs, outcome, miss);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -353,8 +349,24 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
 }
 
 /**
+ * What the last tree read saw of a target it did not resolve — the evidence `notFound` words beneath its headline.
+ * Built by `missOf` only, once per read that missed; undefined once a later read resolved it.
+ */
+interface Miss {
+  /** It matched only zero-area nodes (`zeroAreaHint`'s words). */
+  readonly zeroHint?: string;
+  /** The tree lists a presented window alone (`listedAlone`). */
+  readonly alone?: MarkedLayer;
+  /** The tree's source lists the active window only (ui-tree/standing.ts#activeWindowHint's words). */
+  readonly windowHint?: string;
+}
+
+/** The one builder of a `Miss`: every fact a missed read can carry, asked of that read. */
+const missOf = (tree: UiNode, target: Target): Miss => ({ zeroHint: zeroAreaHint(tree, target), alone: listedAlone(tree), windowHint: activeWindowHint(tree) });
+
+/**
  * A wait that never resolved its target, worded for what it waited for —
- * nothing about settling. `zeroHint`: the last tree read matched the
+ * nothing about settling. `miss` (`Miss`), what the last tree read that missed saw — `zeroHint`: the last tree read matched the
  * target, but only with zero-area nodes (idb reports a node scrolled above the top of a scroll view as 0×0, and the wait read
  * "to appear" for a node the snapshot showed). The hint says so beneath the
  * headline (pollTimeoutMessage drops it when the last read failed). Still
@@ -367,7 +379,8 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * #ACTIVE_WINDOW_HINT) — beneath the headline in the same place, when no zero-area hint and no presented window
  * (`alone`, whose own sentence says more) claim it: a sheet or dialog the tree does not mark may hide the target.
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, zeroHint?: string, alone?: MarkedLayer, windowHint?: string): Error {
+function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number }, miss: Miss | undefined): Error {
+  const { zeroHint, alone, windowHint } = miss ?? {};
   // Beneath a presented window listed alone the target is not known absent: nobody saw the screen beneath. A plain
   // Error, as scroll_until's stop there (an optional step is skipped with this headline, never "(not present)").
   if (alone !== undefined && outcome.readError === undefined && zeroHint === undefined) {
@@ -435,22 +448,18 @@ export async function resolvePresent(
   opts: SettleOptions,
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
-  let zeroHint: string | undefined;
-  let alone: MarkedLayer | undefined;
-  let windowHint: string | undefined;
+  let miss: Miss | undefined; // the last tree read, when it did not resolve the target
   const outcome = await pollTree(
     adapter,
     (tree) => {
       const resolved = resolveNow(tree, target, opts);
-      zeroHint = resolved === undefined ? zeroAreaHint(tree, target) : undefined;
-      alone = resolved === undefined ? listedAlone(tree) : undefined;
-      windowHint = resolved === undefined ? activeWindowHint(tree) : undefined;
+      miss = resolved === undefined ? missOf(tree, target) : undefined;
       return resolved;
     },
     { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
   );
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome, zeroHint, alone, windowHint);
+  throw notFound(target, timeoutMs, outcome, miss);
 }
 
 // ─── Refused on a present element ────────────────────────────────────────────
