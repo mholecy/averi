@@ -1,4 +1,4 @@
-import { minTapPiece as minPieceOn } from '../../src/ui-tree/draw-order.js';
+import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
 import { claimsDone, claimsTap, isError, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
 import type { LabState, Rect } from './schema.js';
@@ -35,8 +35,6 @@ export const holds =
 export const underBar = (field: Rect | undefined | null, bar: Rect | undefined | null): number =>
   field == null || bar == null ? 0 : Math.max(0, Math.min(field.y + field.height, bar.y + bar.height) - Math.max(field.y, bar.y));
 
-/** The least piece a tap may be aimed at on the app's screen: averi's own formula (src/ui-tree/draw-order.ts#minTapPiece). */
-export const minTapPiece = (s: LabState): number => minPieceOn(s.screen);
 
 /**
  * k3: fill note under the keyboard (Android: no dismissal configured — `back` hides it). idb cannot hide the keyboard:
@@ -52,11 +50,11 @@ export function judgeNoteFill(s: LabState, replies: string[], source: string, la
   if (source !== 'uiautomator' || v.outcome !== 'LOUD') return v;
   const note = s.frames.note;
   const shows = note == null ? undefined : note.height - underBar(note, s.frames['submit.bar']);
-  const strip = shows !== undefined && shows < minTapPiece(s);
+  const strip = shows !== undefined && shows < minTapPiece(s.screen);
   const untouched = Object.entries(s.fields ?? {}).every(([k, f]) => f.value === launched.fields?.[k]?.value);
   const submits = (s.submits ?? []).length;
   if (strip && untouched && submits === 0 && /scroll_until it out from under|dismiss it first/.test(replies[0])) {
-    return { outcome: 'ok', why: `refused by design (F2A1: note shows ${shows} px past the bar, under the ${minTapPiece(s)} a tap needs), every field untouched, no submit: ${short(replies[0])}` };
+    return { outcome: 'ok', why: `refused by design (F2A1: note shows ${shows} px past the bar, under the ${minTapPiece(s.screen)} a tap needs), every field untouched, no submit: ${short(replies[0])}` };
   }
   const why = !strip ? `note shows ${shows ?? '?'} px past the bar — no strip` : !untouched ? 'a field CHANGED' : submits > 0 ? `the form was SUBMITTED (${submits}×)` : 'no remedy named';
   return { ...v, why: `${v.why} (not the refusal by design: ${why})` };

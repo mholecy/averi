@@ -523,8 +523,8 @@ export function carryRow(state: LabState): LabState {
 /**
  * The turns of a scroll's strokes over `clip` by the app's touch log: each touch-down's half of the clip — the lower
  * half a stroke `down` (content up), the upper a stroke `up` — and every change from one to the other a turn. The app
- * merges strokes sent while the table still moves into one (the oracle's caveats in this module's doc, the first), so its strokes undercount
- * the turns; its touch-downs do not.
+ * merges strokes sent while the table still moves into one (the oracle's caveats in this module's doc, the first), so
+ * its strokes undercount the turns; its touch-downs do not.
  */
 export function touchTurns(state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>, clip: Rect): number {
   const mid = clip.y + clip.height / 2;

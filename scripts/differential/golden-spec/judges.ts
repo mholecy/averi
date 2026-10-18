@@ -79,7 +79,10 @@ export const swipes = (o: Outcome) => touchDowns(o).length;
 export const first = (o: Outcome) => firstLine(o.reply);
 export const said = (o: Outcome, what: string) => `${what}: ${first(o)}`;
 
-/** The class of a reply beneath a presented layer that gives only the active-window hint — not in the tree, the remedy offered as a possibility. */
+/**
+ * The class of a reply beneath a presented layer that gives only the active-window hint — not in the tree, the remedy
+ * offered as a possibility (tests/differential/golden/known.ts files its KNOWN rows by this value).
+ */
 export const NOT_IN_TREE_HINTED = 'not in the tree (active-window hint)';
 /**
  * A row beneath a presented layer asks for the presented remedy (replies.ts#presentedRemedySaid): undefined when the

@@ -62,11 +62,12 @@ const NOT_ON_THIS_BRANCH: readonly string[] = [];
 /**
  * A KNOWN row or entry (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
  * `partial` saying what of the note its fix covers — only when that note's list for its ratchet (`field`, OPEN_FIELD:
- * `open` for a static row, `openLive` for a live entry) names it: the part `partial` leaves open, red until a fix or a decision of the owner's (L1's six form-picker rows were so, round 6's code review P1,
- * until the owner accepted ADR 0018's residual 18 on 2026-10-18; none is listed today). Keyed by ROW, as AWAITING_LIVE is
- * by case: a row filed as a partial note that its `open` does not list is held to the note being open like any other.
- * Round 6 extended the rule for it: an open note expects every row red (OPEN-RED), a calibrated one every row green
- * after its fix, and neither says "calibrated, some rows still open".
+ * `open` for a static row, `openLive` for a live entry) names it: the part `partial` leaves open, red until a fix or a
+ * decision of the owner's (L1's six form-picker rows were so, round 6's code review P1, until the owner accepted ADR
+ * 0018's residual 18 on 2026-10-18; none is listed today). Keyed by ROW, as AWAITING_LIVE is by case: a row filed as a
+ * partial note that its `open` does not list is held to the note being open like any other. Round 6 extended the rule
+ * for it: an open note expects every row red (OPEN-RED), a calibrated one every row green after its fix, and neither
+ * says "calibrated, some rows still open".
  */
 const partiallyOpen = (field: 'open' | 'openLive', note: string, key: string, tbl: Calibration = table): boolean =>
   tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e[field] ?? []).includes(key));
