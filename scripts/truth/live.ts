@@ -12,8 +12,8 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { holds, judgeNoteFill, judgePhoneScroll, short, valueOf } from './live-forms.js';
-import { judgeDismissal, visibilityCases, type LiveVerdict } from './live-visibility.js';
+import { holds, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
+import { judgeDismissal, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import type { Catalog, CellTruth, LabState } from './schema.js';
 
@@ -121,7 +121,7 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-interface Case {
+interface Case extends RunsUnder {
   id: string;
   group: 'forms' | 'visibility' | 'dismissal';
   cell: string;
@@ -132,8 +132,6 @@ interface Case {
   keyboard?: true;
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
-  /** The tree sources it runs under (`--sources`' every one when unset): live-visibility.ts's carry case, WDA's alone. */
-  sources?: readonly string[];
   calls: Call[];
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
@@ -320,6 +318,15 @@ const FORMS: Omit<Case, 'group'>[] = [
       return claimsTap(tap) ? { outcome: 'MISMATCH', why: `averi says ${short(tap)} — the app chose ${JSON.stringify(valueOf(s, 'country'))}` } : { outcome: 'LOUD', why: `${short(scroll)} / ${short(tap)}` };
     },
   },
+  // The form beneath the picker sheet (round 6's closing review: the active-window hint run live): each field and the
+  // submit asked by a tap, the sheet open at launch — live-forms.ts#judgeUnderSheet.
+  ...(['name', 'country', 'submit'] as const).map((tag, i) => ({
+    id: `c${i + 2}`,
+    cell: 'form-picker',
+    says: `tap ${tag} beneath the picker sheet, open and fully expanded: nothing fires, the reply says to close the sheet once`,
+    calls: [{ tool: 'tap' as const, args: { selector: id('form-picker', tag) } }],
+    judge: judgeUnderSheet(tag),
+  })),
 ];
 const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
 

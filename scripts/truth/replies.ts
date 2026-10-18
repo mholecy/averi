@@ -1,3 +1,5 @@
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
+
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
  * (scripts/differential/golden-spec, golden.ts) and the live one (live.ts, live-visibility.ts) — reads it through
@@ -84,12 +86,19 @@ export const firstLine = (reply: string) => {
 export const ownWords = (reply: string) => reply.replace(/\b[a-z]+:"(?:[^"\\]|\\.)*"/gi, '<selector>');
 
 /**
- * The reply's remedy for a target under a presented screen ("— close it first": src/ui-tree/standing.ts#presentedRemedy,
- * #presentedStop). It also matches the conditional active-window hint on uiautomator (standing.ts#ACTIVE_WINDOW_HINT:
- * "if a sheet or a dialog is open over the screen, close it first") — which is why form-picker's taps, a not-found
- * carrying that hint, read as vacuous (`not in the tree`) rather than refused without the remedy.
+ * The reply's remedy for a target under a presented screen, in its own words: "<a layer> is presented over it (or the
+ * element) … — close it first" (src/ui-tree/standing.ts#presentedRemedy, and #presentedStop, which ends with it). Not
+ * the conditional active-window hint, whose "close it first" follows "if a sheet or a dialog is open" (`windowHintSaid`):
+ * that one says a window MAY hide the target, this one that one does.
  */
-export const closeFirst = (reply: string) => /close it first/.test(reply);
+export const presentedRemedySaid = (reply: string) => /is presented over (?:it|the element)\b[^\n]*? — close it first/.test(reply);
+
+/**
+ * The reply carries the active-window hint (src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT, imported, not copied):
+ * uiautomator's not-found on a tree that marks no presented window — "the tree lists only the active window: if a sheet
+ * or a dialog is open over the screen, close it first", a possibility, never the presented remedy.
+ */
+export const windowHintSaid = (reply: string) => reply.includes(ACTIVE_WINDOW_HINT);
 
 /**
  * The reply names scroll_until as the remedy (the off-screen, outside-its-scroll-view and sliver refusals do: src/

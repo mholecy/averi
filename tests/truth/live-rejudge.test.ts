@@ -9,8 +9,9 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * ios-vis.json and ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's) judged again by this checkout's
+ * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; ios-vis.json and
+ * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-scroll-bounded-wda-2725e76-*.json, round
+ * 5's) judged again by this checkout's
  * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
  * records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not
  * explain, no known case not intermittent ok), no case not known, and the counts of the summary's header.
@@ -42,6 +43,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // refused by design, the field untouched (live.ts k3); k7's stop ok (18 px of phone under the bar's node-less
     // padding: a known residual, ADR 0013's); b1d and b7 (F2A2) LOUD
     ['android-vis.json', 'forms,visibility', { cases: 133, ok: 118, loud: 5, mismatches: 10 }],
+    // round 6's closing review: the active-window hint run live (src and lab app ea070d2) — form-picker's c2–c4 ok with
+    // the hint beneath the wait, scroll-bounded O and F LV1's, turn F LOUD, L1's 16 presented cases ok without it
+    ['android-vis-hint-ea070d2.json', 'forms,visibility', { cases: 24, ok: 21, loud: 1, mismatches: 2 }],
     // re-recorded by round 6's iOS device check (src 11683c3; the forms group run too, judged apart): the presented
     // refusal cases new (WDA ok, idb residual 6, the blur residual 9), round 6's new cells' cases new (carousel-in-list
     // C under idb LE2), the long-list carry case new (LV6), LV4's turn `visible` (its entry's primary kind)

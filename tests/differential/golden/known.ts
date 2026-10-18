@@ -45,6 +45,8 @@ export const NOT_IN_TREE = 'not in the tree';
 /** The note of an idb row under the keyboard (form-keyboard, the toolbar cells): idb lists nothing there. */
 export const IDB_UNDER_KEYBOARD = 'idb lists nothing under the keyboard';
 export const NO_CLOSE_IT_FIRST = 'refused without "close it first"';
+/** A tap beneath a presented layer whose reply gives only the active-window hint (uiautomator, a window it does not mark): the judge's own class. */
+export { NOT_IN_TREE_HINTED } from '../../../scripts/differential/golden-spec/judges.js';
 export const twice = (swipe: string) => [swipe, swipe];
 /** idb's scroll_until stroke on a 402x874 screen: from 80 % to 20 % of it. */
 export const IDB_STROKE = 'idb ui swipe 201 699 201 175 --duration 0.3';

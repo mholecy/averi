@@ -804,7 +804,9 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
    name, country, submit and country.ST; scroll-bounded O, F; carousel-in-list B, U; scroll-top-edge(-end) A;
    tabbar-floating F; text-under-bar P — tap and scroll_until each); form-picker's three taps, which the presented row
-   judges for "close it first", now read it and are refused as vacuous (`not in the tree`) instead; no verdict moved.
+   judges for the presented remedy, carry only the hint's conditional "close it first" — classed `not in the tree
+   (active-window hint)` (scripts/truth/replies.ts tells the two apart: #presentedRemedySaid, #windowHintSaid; read as
+   vacuous `not in the tree` until round 6's closing review), still red as residual 18; no verdict moved.
 
 **Residuals** 18 and 19 ("Residuals accepted" below — accepted by the owner 2026-10-18, with decision 5's hint): a fully
 expanded sheet is no presented window; the shapes are measured on one AVD and Material 3 only.

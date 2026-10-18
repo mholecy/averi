@@ -85,6 +85,10 @@ L1's fix is Android's.
   so (`typed 1 character but the field shows 1 (masked field …)`), LOUD.
 - k2, k3 (WDA): the configured dismissal (the title "Transfer details") is tapped, the keyboard stays up, averi says so
   and taps nothing else (LOUD) — at both srcs. The dismissal group's 24 cases (the toolbar cells) are all ok.
+- Not in this run: c2–c4 (added by round 6's closing review: a tap on form-picker's name, country, submit beneath the
+  picker sheet, live-forms.ts#judgeUnderSheet). The next iOS forms run will read them LOUD under idb — it lists only the
+  sheet and its wait says neither the presented remedy nor the active-window hint (uiautomator's alone) — and, by the
+  replayed golden's form-picker rows, ok under WDA (a presented refusal). Informational, no KNOWN entry needed for LOUD.
 
 # Still open (as before, KNOWN)
 
