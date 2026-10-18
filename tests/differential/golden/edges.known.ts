@@ -4,8 +4,8 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // round 4's scroll-top-edge-end, its content ending at the screen's bottom: #17's turn-back, live), and round 3's
 // Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
 // scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it), and
-// round 6's carousel-in-list (both platforms; captured on Android only so far: on 2026-10-18 the host's CoreSimulator,
-// older than Xcode 27.1 expects, ran no WebDriverAgent on the lab simulator) and scroll-collapsing (Android only: a View
+// round 6's carousel-in-list (both platforms; iOS captured by round 6's iOS device check, 2026-10-18, once the host's
+// Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
 // list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
 // (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
 // scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE3; LE4 is calibrated since
@@ -47,6 +47,14 @@ export const edges: KnownFile = {
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['colour'], { cls: 'passed on #FFFFFF', kind: 'PASS', calls: [], note: 'lab finding: idb lists no scroll view — the colour measured the background (#29 under idb)', as: LE2 }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view — visible after 0 swipes', as: LE2 }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: idb lists no scroll view — the screen\'s stroke, beside the scroll view holding F', as: LE2 }),
+    // LE2 across, on carousel-in-list's C (the card right of the carousel's clip, 378,138 354x85 against its
+    // scrollable 24,138 354x85): idb lists no carousel, so C is judged on the screen alone — its colour, sampled on the
+    // 7 % of it on the screen, PASSES on the page's background; and scroll_until strokes sideways across the SCREEN's
+    // middle (y 437, below the carousel), twice right, then once back, failing "content exhausted". WDA answers all
+    // three rows as the truth does: its two strokes 307 181 → 95 181 lie inside the carousel, along its axis (round
+    // 6's S4, the measurement this cell was built for).
+    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['colour'], { cls: 'passed on #EEEEEE', kind: 'PASS', calls: [], note: 'lab finding: idb lists no carousel — the colour measured the background on the card\'s 7 % on screen (#29 under idb)', as: LE2 }),
+    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['scroll_until'], { cls: 'touched down outside its scroll view carousel at (322,437) (322,437) (80,437)', kind: 'refused', calls: ['idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 80 437 201 437 --duration 0.3'], note: 'lab finding: idb lists no carousel — the screen\'s sideways stroke, below the carousel holding C', as: LE2 }),
     // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
     // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
     // struck off here, calibrated in scripts/truth/calibration.json.
@@ -82,5 +90,7 @@ export const edges: KnownFile = {
     [`${IOS}/scroll-top-edge.wda.json`]: 7,
     [`${IOS}/scroll-top-edge-end.idb.json`]: 7,
     [`${IOS}/scroll-top-edge-end.wda.json`]: 7,
+    [`${IOS}/carousel-in-list.idb.json`]: 9,
+    [`${IOS}/carousel-in-list.wda.json`]: 9,
   },
 };

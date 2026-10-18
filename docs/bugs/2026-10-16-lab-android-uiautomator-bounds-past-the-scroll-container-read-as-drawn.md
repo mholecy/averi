@@ -101,9 +101,11 @@ So on Android the card's R-stroke — a sideways stroke inside the carousel, wha
 — is never asked of averi: it stops at once. Of the fix directions above only the first covers C: judging the rect by
 its scrolling ancestor (`drawnIn` for uiautomator) finds nothing of it drawn in the carousel. The second does not: C
 lies wholly outside the clip, its strip beginning flush at the carousel's right edge (1014), so it crosses no edge.
-Expected: the iOS capture of the cell measures the stroke (WDA listing C with its unclipped frame, as it lists
-scroll-bounded's rows) — unmeasured: no iOS capture on 2026-10-18 (the host's Xcode 27.1 expects a newer CoreSimulator;
-no WebDriverAgent ran). Pending in docs/plans/2026-10-15-ground-truth-lab-app.md (Pending captures, round 6).
+The iOS capture of the cell measures the stroke (captured 2026-10-18 by round 6's iOS device check): WDA lists C with
+its unclipped frame (378,138 354x85, its carousel 24,138 354x85), the tap is refused ("off screen … scroll_until it
+first"), the colour fails closed, and the replayed scroll_until `right` strokes `307 181 → 95 181` twice — inside the
+carousel, along its axis — green; under idb (no scroll view listed, the iOS LE2) C's colour passes on the background and
+its strokes cross the screen's middle (edges.known.ts).
 
 ## Rows (golden, KNOWN in tests/differential/golden/edges.known.ts)
 

@@ -1,5 +1,11 @@
 # BUG: under idb, a row past its scroll view's clip is judged on the screen alone — a row outside the scroll view is `Tapped` on the background and its colour assert PASSES on the background, a sliver is `Tapped`, and both stops call cut rows "fully visible"
 
+> **Status (2026-10-18, round 6's iOS device check):** open; two more rows. carousel-in-list's iOS capture adds C, a
+> card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85) with 7 % of it on the screen: under
+> idb its colour passes on the page's background (#EEEEEE), and scroll_until strokes sideways across the screen's
+> middle, `322 437 → 80 437` twice and one back, outside the carousel ("content exhausted … a layout defect"); live
+> the same (`ios idb scroll:carousel-in-list.C`, KNOWN). WDA answers all of C's rows as the truth does.
+
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/scroll-bounded.*`, captured by scripts/truth/capture.ts on the dedicated
 `averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `truth/b2-edges` on `arch/round-20`'s
@@ -72,3 +78,5 @@ ADR records that decision, so it is filed here as an open finding with its rows.
 `ios-iphone17-ios27/scroll-bounded.idb.json P fully`, `S tap`, `S scroll_until`, `S fully`, `O tap`, `O colour`,
 `O scroll_until`, and `F scroll_until` (the screen's stroke, `201 699 → 175`, touches down below `lower`, the scroll view
 that holds `F`; under WDA the same stroke is docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md).
+Round 6: `ios-iphone17-ios27/carousel-in-list.idb.json C colour` (passed on #EEEEEE) and `C scroll_until` (touched down
+outside its scroll view carousel at (322,437) (322,437) (80,437)), in calibration.json's LE2 `checks`.

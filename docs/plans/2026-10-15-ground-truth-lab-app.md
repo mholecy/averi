@@ -400,19 +400,24 @@ static pair's before (`pair: 2`).
 - P5 (text inventory) is independent and small — any time.
 - P3 / P4 after phase 3, judged on the golden corpus as well as the 580-tree differential.
 
-### Pending captures (round 6, truth/r6-cells)
+### Pending captures (round 6, truth/r6-cells) — captured 2026-10-18 (truth/r6-device-ios)
 
-Built in both apps, captured on Android only: on 2026-10-18 the host's Xcode 27.1 expected CoreSimulator 1174.9.2 and
-found 1171.7 (`simctl` hangs in `xcodebuild -runFirstLaunch`; xcodebuild runs no WebDriverAgent on the lab
-simulator), so no iOS capture was made. Once the owner has run `sudo xcodebuild -runFirstLaunch`:
-`capture.ts --udid <averi-lab iPhone 17> --out tests/fixtures/truth/ios-iphone17-ios27 --cells
-carousel-in-list,own-parts`, then their rows into edges.known.ts and false-covers.known.ts.
+Built in both apps, captured on Android first: on 2026-10-18 the host's Xcode 27.1 expected CoreSimulator 1174.9.2
+and found 1171.7, so no iOS capture was made until the owner ran `xcodebuild -runFirstLaunch`. Round 6's iOS device
+check then ran `capture.ts --udid <averi-lab iPhone 17> --out tests/fixtures/truth/ios-iphone17-ios27 --cells
+carousel-in-list,own-parts` (iOS 27.0, the lab app built from truth/r6-device-ios): it wrote only those two cells'
+files and their manifest entries (own-parts' L and N trees as before, I added). Golden at round 6's src: 1344 checks,
+230 mismatches (1322/228 before: +22 rows, +2 mismatches, both known).
 
-- `edges/carousel-in-list` — the measurement the axis-aware stroke choice (round 6's S4) is judged on: under WDA, C's
-  R-stroke `right` (expected: today a stroke inside the carousel; along its axis or not is what S4 decides). Android's
-  capture cannot show it: there C is lab finding LE1 (dumped where it is not drawn, the stop at once).
-- `false-covers/own-parts` I — the iOS icon button (expected: SwiftUI lists the button alone, labelled Close, tapped by
-  its label); calibration.json #8's `needs`.
+- `edges/carousel-in-list` — WDA: all 9 rows green. C's R-stroke `right` (S4's measurement): two strokes `307 181 →
+  95 181`, both inside the carousel (scrollable 24,138 354x85), along its axis, at its middle; the replay moves
+  nothing, so the stop fails honestly ("the last 2, swiping right, did not move it … outside its scroll view"). idb
+  (no scroll view listed, LE2 across): C's colour PASSES on the page's background (#EEEEEE, the card's 7 % on screen)
+  and its scroll_until strokes the screen's middle (`322 437 → 80 437` twice, then one back) — both filed in
+  edges.known.ts as LE2; C's tap is refused under both sources.
+- `false-covers/own-parts` I — as expected: both sources list the SwiftUI button alone (`lab.own-parts.I`, labelled
+  Close, 179,660 44x44), tapped by its label and reached with no swipe — green; calibration.json #8's `needs` (8.2's
+  iOS leg) done and dropped.
 
 ### Round 7 — the owner's decisions of 2026-10-18 on round 6's open points
 
@@ -428,6 +433,20 @@ carousel-in-list,own-parts`, then their rows into edges.known.ts and false-cover
   — a bar riding on the IME, an inset its surface draws but its node does not span — may lie over the target, a
   `fully visible` stop is checked against the screenshot (the target's colour across its whole frame), so the 18 px of
   phone under the bar's top padding are seen, not assumed away.
+
+From round 6's iOS device check (docs/truth/live-ios-2026-10-18-visibility.md; its review round 1):
+
+- **A table long enough for ADR 0021 decision 4's long-list half**: lengthen sheet-long-list (its 40 rows end inside
+  every far row's window: Row 30 whole over 1172–1748, the last offset 1748), or a new cell, so a target row's window
+  lies wholly before the content's end and past one stroke's carry (≈ 1040 pt under WDA) — then a full final stroke
+  overshoots it, and the carry case (live-visibility.ts#CARRY, its turns already counted from the touch log and the
+  reply) can fail on a missing cut. Needs lab note LV6 fixed first (a scrolled table's parked rows read above the
+  screen, docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md), or a target with
+  its own identifier far down the list, which WDA parks alike.
+- **Stale src prose to update on the next src branch** (not edited from a truth branch): src/interact/stroke-plan.ts's
+  module doc (its lines 63–70) still says carousel-in-list is captured on Android only and that the iOS measurement
+  waits on "Pending captures (round 6)" — both captured: under WDA C's stroke goes inside the carousel along its axis
+  (the replay `307 181 → 95 181`; live one stroke at (307,181) moving the carousel 447–532 pt).
 
 ## Workflow per bug, once phase 3 is in
 

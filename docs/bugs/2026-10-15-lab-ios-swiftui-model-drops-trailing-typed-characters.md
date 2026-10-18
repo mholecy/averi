@@ -1,5 +1,12 @@
 # TRIAGE: intermittently the lab app's SwiftUI model holds one or two characters fewer than were typed, while the field (tree and screenshot) shows them all — averi replies `Filled`; not yet known whether that is the lab app's binding or a risk on real apps
 
+> **Status (2026-10-18, round 6's iOS device check):** still OPEN, triage; recurred more often. At truth/round-6's
+> src (11683c3, docs/truth/live-records/ios-vis.json, forms group) four of its 40 cases (20 a source) lost their last character in the
+> model, read again 3 s later: `b1` (WDA) "Jan Nova", `b4` (idb) and `p2` (idb) the IBAN's last digit, `b2` (WDA)
+> "Jan & Co" (LOUD: averi said "Typed 6 characters"). The screenshot after `b1` shows the field holding "Jan Novak",
+> the cursor after the k — the note's shape: the field has every character, the model not. Not filed in the live
+> KNOWN (a forms case has no rule to pin); docs/truth/live-ios-2026-10-18-visibility.md lists them.
+
 **Found 2026-10-15** by the live golden (scripts/truth/live.ts) on the lab simulator `averi-lab iPhone 17` (3AB1E82E,
 iOS 27.0), averi = mobile-verify `truth/forms-ios` on `dda435b`'s `src/`. Status: OPEN, triage — not a confirmed averi
 bug, not kept in any KNOWN list (the live golden is not a vitest test).

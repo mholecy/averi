@@ -1,5 +1,19 @@
 # BUG (or a decision to record): on iOS, `scroll_until` asked the wrong way for a row of a scroll view already at its end that way strokes three times, moves nothing, and fails with the right direction as advice — it never turns back toward the target the tree places past the far edge
 
+> **Status (2026-10-18, round 6's iOS device check):** turns live, but not after ONE unmoved stroke — still KNOWN
+> (`ios wda turn:scroll-bounded.F`, R-direction; scripts/truth/live-known.ts). At truth/round-6's src (11683c3) under
+> WDA averi strokes up, turns down once its proof holds and says so (`… 2 swipes up, the last of which did not move it
+> — the tree lists the content of scrollable (0,380 402x180) ending at its top — so averi turned down, as the tree
+> places the element below it`). In four runs the turn came after 2 unmoved strokes three times (F then reached and
+> tapped: `lower 0→0, 0→0, 0→945.7` in docs/truth/live-records/ios-vis.json, 918 and 926.7 in the reruns
+> ios-wda-bounded-long-list-11683c3-2.json, -3.json) and after 4 once (-1.json: two strokes down left, `lower` at 497,
+> `failed after 6 swipes (maxSwipes)`). The app logs every up stroke from rest to rest at 0. Two is the two-stroke
+> rule's count (`UNMOVED_STROKES_EXHAUST`): the read after the first stroke did not prove the end — ADR 0021's own
+> residual names the likely cause (a 1-px flip of WDA's rects between reads loses the proof: F reads 300x64 at launch
+> and 300x65 after a stroke in these runs) or a read still bouncing at the top; inferred, no trace of averi's reads was
+> kept. At b71cbbb (ios-vis-b71cbbb.json) the same case strokes up 3 times and fails advising `down`, as round 5 found.
+> The one-stroke promise is the owner's/next round's.
+>
 > **Status (2026-10-18):** fixed under WDA at `1a1871f` on `arch/r22-lv4` (rebased onto `arch/round-22` `8b2530c`; review round 1 fixes after it, ADR 0021) (from `arch/round-22` `b71cbbb`), the owner's (b)
 > as decided on 2026-10-17; unmeasured on a device — the live KNOWN `ios wda turn:scroll-bounded.F` is the device
 > check's to judge. The caller's direction is stroked first; the read after the one stroke up finds every match where
@@ -24,7 +38,7 @@
 Lab note LV4. **Found 2026-10-17** by round 5's device check: the live golden (`scripts/truth/live.ts --udid
 <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`) on the `averi-lab iPhone 17`
 simulator (iOS 27.0, 402x874), averi = `arch/round-21`'s `src/` (`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port
-8120. Records: docs/truth/live-records/ios-vis.json and ios-scroll-bounded-wda-2725e76-1.json, -2.json (three runs, the
+8120. Records: docs/truth/live-records/ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-1.json, -2.json (three runs, the
 same in each). Summary: docs/truth/live-ios-2026-10-17-visibility.md.
 
 The case was filed under LE4 (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md):

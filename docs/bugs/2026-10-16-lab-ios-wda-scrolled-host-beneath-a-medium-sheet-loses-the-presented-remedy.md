@@ -1,7 +1,7 @@
 # BUG: under WDA, beneath a SwiftUI medium sheet over a SCROLLED host, a target wholly off the screen, wholly under the status bar or a 5-pt sliver at the bottom edge — and even one whole on the screen under its dim — gets scroll or status-bar advice again, and `scroll_until` swipes the sheet — a regression of round 20's presented-layer marks (41c394a) on the shape #30, #32 and #34 fixed
 
 > **Status (2026-10-17):** fixed, and measured so live by round 5's device check (src `b71cbbb`, WDA;
-> docs/truth/live-records/ios-vis.json, summary docs/truth/live-ios-2026-10-17-visibility.md): `scroll_until` H and G
+> docs/truth/live-records/ios-vis-2725e76.json, summary docs/truth/live-ios-2026-10-17-visibility.md): `scroll_until` H and G
 > beneath the sheet stop before any swipe — "a screen is presented over it … close it first" — no touch logged, the
 > host left at its offset 200, nothing dismissed; the taps of G, E (and the cell's others) refused with "close it
 > first". Their live KNOWN entries struck off.

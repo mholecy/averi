@@ -132,6 +132,8 @@ interface Case {
   keyboard?: true;
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
+  /** The tree sources it runs under (`--sources`' every one when unset): live-visibility.ts's carry case, WDA's alone. */
+  sources?: readonly string[];
   calls: Call[];
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
@@ -465,6 +467,7 @@ if (rejudging !== undefined) {
     // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
     for (const c of selected) {
       for (const source of sources) {
+        if (c.sources !== undefined && !c.sources.includes(source)) continue;
         const launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };

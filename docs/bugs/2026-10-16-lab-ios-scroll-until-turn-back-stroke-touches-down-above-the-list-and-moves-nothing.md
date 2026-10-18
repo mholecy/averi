@@ -1,7 +1,7 @@
 # BUG: on iOS, after a fling carries the target past the screen's top, `scroll_until`'s turn-back strokes touch down above the list (in the header) and move nothing — four strokes, then "content exhausted"
 
 > **Status (2026-10-17):** fixed under WDA, measured live by round 5's device check (src `b71cbbb`; records
-> docs/truth/live-records/ios-vis.json, and an earlier run of the cell alone, unrecorded, the same):
+> docs/truth/live-records/ios-vis-2725e76.json, and an earlier run of the cell alone, unrecorded, the same):
 > `scroll:tabbar-floating.R` ok in both — touches (201,645), then the turned stroke at (201,335), inside the list below
 > the header's 200, then the tap (201,550 / 572); list 0→197 / 0→175.7; "fully visible after 2 swipes", Tapped, R fired.
 > Its WDA KNOWN entry struck off. Still open under idb (no scroll view listed, LE2), measured in the same runs: touches

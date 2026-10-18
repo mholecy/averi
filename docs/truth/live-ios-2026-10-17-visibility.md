@@ -1,7 +1,7 @@
 <!-- The live golden on iOS, phase 5 (visibility and dismissal groups), as scripts/truth/live.ts printed it — judged
-again from the run's record (docs/truth/live-records/ios-vis.json, `--rejudge`) after round 5's device check refiled
-what it found — 2026-10-17: the averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 in the lab's
-own derived data, idb's companion on the simulator's domain socket; the iOS lab app built from truth/phase-3 2725e76;
+again from the run's record (docs/truth/live-records/ios-vis-2725e76.json: ios-vis.json as round 5 recorded it, renamed
+when round 6's iOS check re-recorded ios-vis.json; `--rejudge`) after round 5's device check refiled what it found —
+2026-10-17: the averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 in the lab's own derived data, idb's companion on the simulator's domain socket; the iOS lab app built from truth/phase-3 2725e76;
 src = arch/round-21's (b71cbbb), the harness truth/phase-3 2725e76. Reproduce (outside the sandbox):
   node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb,wda --groups visibility,dismissal [--record <file>]
 The cases come from the static truth (tests/fixtures/truth/ios-iphone17-ios27, live-visibility.ts#visibilityCases);
@@ -26,7 +26,7 @@ idb's sheet-medium-edges H/G (ADR 0018 residual 6), the fling in sheet-long-list
 case ok. 248 cases where the previous run had 222: the text family's cells (phase 4: text-sample, text-under-bar —
 13 taps a source), first run live here, every one ok.
 
-<!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
+<!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json, now ios-vis-2725e76.json) -->
 # Live golden: 248 cases, 212 ok, 6 loud, 30 mismatches (0 not known), 0 skipped
 
 ## idb

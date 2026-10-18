@@ -138,6 +138,15 @@ export const refusedAfterDismissal = (reply: string) => /was not tapped: after .
 
 // --- the numbers a reply counts ---
 
+/**
+ * How many times a scroll_until reply says averi turned its strokes round (`It was turned round 3 times`, the fling's
+ * turns; `… so averi turned down`, ADR 0021's end turn, one): 0 when it says neither.
+ */
+export function turnsSaid(reply: string): number {
+  const fling = /It was turned round (\d+) times?\b/.exec(reply);
+  return (fling === null ? 0 : Number(fling[1])) + (/\bso averi turned (?:up|down|left|right)\b/.test(reply) ? 1 : 0);
+}
+
 /** The swipes a scroll_until reply counts (`after N swipes`, `failed after N swipes`), undefined when it names none. */
 export function swipesOf(reply: string): number | undefined {
   const m = /after (\d+) swipes?/.exec(reply);
