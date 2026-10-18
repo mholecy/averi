@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { carryRow, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -185,22 +185,22 @@ describe('visibilityCases', () => {
   });
 });
 
-describe('the long-list carry case (LV5): Row 30 of sheet-long-list under WDA', () => {
-  // The table: 0,62 402x812, 40 rows of 64 pt; Row 30 at content y 1920, whole over offsets 1172–1748.
-  const table = (over: Partial<LabState> = {}) => state({ frames: {}, scrollViews: { list: { x: 0, y: 62, width: 402, height: 812 } }, offsets: undefined, ...over });
+describe('the long-list carry case (LV5): target L, row 30 of sheet-long-list, under WDA', () => {
+  // The table: 0,62 402x812, 56 rows of 64 pt; L at content y 1920, whole over offsets 1172–1920 — its frame the app's,
+  // the clip moved by its place and the table's offset.
+  const table = (over: Partial<LabState> = {}) => {
+    const offset = over.offsets?.list ?? 0;
+    return state({ frames: { L: { x: 0, y: 62 + 1920 - offset, width: 402, height: 64 } }, scrollViews: { list: { x: 0, y: 62, width: 402, height: 812 } }, offsets: undefined, ...over });
+  };
   const launched = table();
-  const reply = 'Element text:"Row 30" visible after 2 swipes';
-  it('the row\'s frame: the clip moved by its place and the table\'s offset (no offset reported: its rest, 0)', () => {
-    expect(carryRow(launched).frames.Row30).toEqual({ x: 0, y: 1982, width: 402, height: 64 });
-    expect(carryRow(table({ offsets: { list: 1460 } })).frames.Row30).toEqual({ x: 0, y: 522, width: 402, height: 64 });
-  });
+  const reply = 'Element id:"lab.sheet-long-list.L" visible after 2 swipes';
   it('a full stroke short of the window, then one cut to it: ok', () => {
     const cut = table({ offsets: { list: 1460 }, strokes: [stroke(0, 1048, 'list'), stroke(1048, 1460, 'list')] });
     expect(judgeCarry(reply, cut, launched)).toMatchObject({ outcome: 'ok', app: expect.stringMatching(/strokes list 0→1048, list 1048→1460/) });
   });
   it('a stroke that carried it past its window, then a turn back to it: MISMATCH on R-direction, both named', () => {
     const overshot = table({ offsets: { list: 1500 }, strokes: [stroke(0, 1000, 'list'), stroke(1000, 1990, 'list'), stroke(1990, 1500, 'list')] });
-    expect(judgeCarry('Element text:"Row 30" visible after 3 swipes', overshot, launched)).toMatchObject({
+    expect(judgeCarry('Element id:"lab.sheet-long-list.L" visible after 3 swipes', overshot, launched)).toMatchObject({
       outcome: 'MISMATCH',
       cls: 'R-direction',
       why: expect.stringMatching(/^R-direction \(carry\): a stroke back up \(1990→1500\): averi turned; a stroke carried it past its window \(1000→1990/),
@@ -224,10 +224,10 @@ describe('the long-list carry case (LV5): Row 30 of sheet-long-list under WDA', 
     expect(turnsSaid('Element … fully visible after 6 swipes; 2 swipes up, the last of which did not move it — … so averi turned down, as the tree places')).toBe(1);
     expect(turnsSaid('Element … visible after 1 swipe')).toBe(0);
   });
-  it('asked on iOS alone, under WDA alone, by its text', () => {
+  it('asked on iOS alone, under WDA alone, by its identifier', () => {
     const t: CellTruth = { cell: 'sheet-long-list', layer: 'sheet-list', device: 'd', screen: { width: 402, height: 874 }, scale: 3, targets: [] };
-    const ios = visibilityCases(t, 'ios').find((c) => c.id === 'carry:sheet-long-list.Row30');
-    expect(ios).toMatchObject({ sources: ['wda'], calls: [{ tool: 'scroll_until', args: { selector: 'text:"Row 30"', direction: 'down' } }] });
+    const ios = visibilityCases(t, 'ios').find((c) => c.id === 'carry:sheet-long-list.L');
+    expect(ios).toMatchObject({ sources: ['wda'], calls: [{ tool: 'scroll_until', args: { selector: 'id:"lab.sheet-long-list.L"', direction: 'down' } }] });
     expect(visibilityCases(t, 'android').some((c) => c.id.startsWith('carry:'))).toBe(false);
   });
 });

@@ -68,14 +68,13 @@ export const presented: KnownFile = {
     // "close it first" and scroll_until stops before any swipe — all 15 rows green, struck off here, calibrated in
     // scripts/truth/calibration.json.
     // sheet-long-list.idb.json — idb lists the UIKit table's labels without their accessibility identifiers (AXUniqueId
-    // null), and none of the rows below the fold: neither target answers to its id. R's rows are NI1's (filed as its
-    // note); F's, a tree source's limit no note files.
+    // null), and none of the rows below the fold: no target answers to its id. R's rows are NI1's (filed as its note).
+    // F's (a tree source's limit no note files) turned green at round 7's recapture (the 56-row table, its L added):
+    // the truth now records F unlisted under idb (TargetTruth.listed), and the contract asks of it what an unlisted
+    // target can meet — L's rows green alike.
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['tap'], { cls: 'refused without scroll_until', kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists no row below the fold' }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['F'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists no row below the fold' }),
     // sheet-long-list-short (round 3): the same table cut short of the sheet's foot. Under idb R answers to no id, as
     // above (F, below the table's clip, is refused or fails as its rows ask: green). Under WDA F's stroke touched down
     // on the footer, beside the table holding it — lab finding LE4 (edges.known.ts), fixed on arch/r21-strokes: the
@@ -119,8 +118,8 @@ export const presented: KnownFile = {
     [`${IOS}/sheet-medium-edges.wda.json`]: 15,
     [`${IOS}/sheet-background.idb.json`]: 15,
     [`${IOS}/sheet-background.wda.json`]: 15,
-    [`${IOS}/sheet-long-list.idb.json`]: 6,
-    [`${IOS}/sheet-long-list.wda.json`]: 6,
+    [`${IOS}/sheet-long-list.idb.json`]: 9,
+    [`${IOS}/sheet-long-list.wda.json`]: 9,
     [`${IOS}/sheet-long-list-short.idb.json`]: 6,
     [`${IOS}/sheet-long-list-short.wda.json`]: 6,
     [`${IOS}/dim-cover.idb.json`]: 15,

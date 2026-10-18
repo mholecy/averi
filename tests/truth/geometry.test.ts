@@ -42,7 +42,8 @@ const CAROUSEL = rect(0, 250, 300, 100);
 const INSET = rect(100, 250, 300, 100);
 const ctx = (over: Partial<GeometryContext> = {}): GeometryContext => ({ screen: SCREEN, safeArea: SAFE, ...over });
 
-describe('geometryOf — in averi\'s judging order (ADR 0005)', () => {
+// averi's judging order: a cut before a cover (docs/adr/0005-cut-before-cover.md).
+describe('geometryOf — in averi\'s judging order: a cut before a cover', () => {
   it.each([
     ['whole: on the screen, in its clip, clear of bands and chrome', rect(51, 200, 300, 64), ctx({ clip: LIST, chrome: { tabBar: TAB } }), 'whole'],
     ['off-screen: below the screen', rect(51, 900, 300, 64), ctx(), 'off-screen'],
@@ -116,7 +117,8 @@ describe('what shows of it, and where a tap can land', () => {
     expect(bandsOf(SCREEN, undefined)).toEqual({});
   });
 
-  it('the tap minimum is 6 % of the shorter side, rounded (ADR 0013): 24 pt on the iPhone 17, 65 px on a 1080-px phone', () => {
+  // The tap minimum: docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md.
+  it('the tap minimum is 6 % of the shorter side, rounded: 24 pt on the iPhone 17, 65 px on a 1080-px phone', () => {
     expect(minPiece(SCREEN)).toBe(24);
     expect(minPiece(rect(0, 0, 1080, 2220))).toBe(65);
   });

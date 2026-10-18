@@ -442,7 +442,8 @@ From round 6's iOS device check (docs/truth/live-ios-2026-10-18-visibility.md; i
   overshoots it, and the carry case (live-visibility.ts#CARRY, its turns already counted from the touch log and the
   reply) can fail on a missing cut. Needs lab note LV6 fixed first (a scrolled table's parked rows read above the
   screen, docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md), or a target with
-  its own identifier far down the list, which WDA parks alike.
+  its own identifier far down the list, which WDA parks alike. Done 2026-10-19 (truth/r7-lab-fixes): 56 rows, target L at row 30
+  (docs/truth/live-ios-2026-10-19-lab-fixes.md); measured once LV6 is fixed.
 - **Stale src prose to update on the next src branch** (not edited from a truth branch): src/interact/stroke-plan.ts's
   module doc (its lines 63–70) still says carousel-in-list is captured on Android only and that the iOS measurement
   waits on "Pending captures (round 6)" — both captured: under WDA C's stroke goes inside the carousel along its axis

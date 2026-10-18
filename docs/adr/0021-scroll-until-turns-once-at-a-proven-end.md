@@ -131,4 +131,8 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
   still could not fail on a missing cut: the table's last offset (1748) lies inside Row 30's window (1172–1748), so a
   full final stroke comes to rest at the end, inside the window; no row of its 40 has a window wholly before the end
   and past one stroke's carry (≈ 1040 pt). The measurement needs a longer table (the plan's round 7).
+  **Round 7 (2026-10-19, docs/truth/live-ios-2026-10-19-lab-fixes.md):** the table is 56 rows and holds a target L at
+  row 30 with its own identifier (whole over the offsets 1172–1920, the table's end at 2772): a full final stroke
+  overshoots its window, so the carry case (`carry:sheet-long-list.L`) can now fail on a missing cut. Live it still
+  reads LV6 (three turns, two runs of two); the long-list half stays unmeasured until LV6's fix.
 

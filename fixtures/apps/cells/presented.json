@@ -1,6 +1,6 @@
 {
   "family": "presented",
-  "note": "A layer presented over the targets: a sheet at the medium detent (with a target inside it), an alert (phase 1; #33, #35). Phase 3 (B3, iOS only — every note it calibrates is iOS's; the Android app builds none of their layers): the medium sheet over a scrolled host whose targets lie at the screen's edges (#30, #32, #34), a large sheet's bare background over the targets (#28), a large sheet holding a UIKit table longer than the screen (#20; round 3, sheet-long-list-short: the table cut short of the sheet's foot, F below its clip but on the screen), an RN-style transparent cover's dim (#27), an in-screen menu over a blurred backdrop no tree lists, its rows listed in reading order or, grouped, before the screen beneath (#31, #15). App files: AveriLab/Presented.swift, Presented.kt. Round 7 (Android only; ADR 0018's residual 19, the presented windows the uiautomator parser does not mark): a full-screen Compose Dialog (usePlatformDefaultWidth = false, its window at 0,0 the screen's size) and a Views BottomSheetDialog (its touch_outside scrim), each over the four slot targets with a target of its own (Presented.kt#FullScreenDialog, #ViewsBottomSheet).",
+  "note": "A layer presented over the targets: a sheet at the medium detent (with a target inside it), an alert (phase 1; #33, #35). Phase 3 (B3, iOS only — every note it calibrates is iOS's; the Android app builds none of their layers): the medium sheet over a scrolled host whose targets lie at the screen's edges (#30, #32, #34), a large sheet's bare background over the targets (#28), a large sheet holding a UIKit table longer than the screen (#20; round 7: 56 rows, its L far enough down for ADR 0021 decision 4's long-list carry; round 3, sheet-long-list-short: the table cut short of the sheet's foot, F below its clip but on the screen), an RN-style transparent cover's dim (#27), an in-screen menu over a blurred backdrop no tree lists, its rows listed in reading order or, grouped, before the screen beneath (#31, #15). App files: AveriLab/Presented.swift, Presented.kt. Round 7 (Android only; ADR 0018's residual 19, the presented windows the uiautomator parser does not mark): a full-screen Compose Dialog (usePlatformDefaultWidth = false; Compose lays its window between the system bars at full width, [0,66][1080,2153] on averi_lab, whatever the window is told) and a Views BottomSheetDialog (its touch_outside scrim), each over the four slot targets with a target of its own (Presented.kt#FullScreenDialog, #ViewsBottomSheet).",
   "cells": [
     {
       "id": "sheet-medium",
@@ -50,7 +50,8 @@
       "layer": "sheet-list",
       "targets": [
         { "tag": "R", "color": "#1E88E5", "slot": 1, "in": "layer", "declared": "open", "scrollView": "list" },
-        { "tag": "F", "color": "#FB8C00", "slot": 20, "in": "layer", "declared": "open", "scrollView": "list" }
+        { "tag": "F", "color": "#FB8C00", "slot": 20, "in": "layer", "declared": "open", "scrollView": "list" },
+        { "tag": "L", "color": "#43A047", "slot": 30, "in": "layer", "declared": "open", "scrollView": "list" }
       ]
     },
     {

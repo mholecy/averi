@@ -41,7 +41,11 @@
         "width": 402,
         "height": 64
       },
-      "scrollView": "list"
+      "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": false
+      }
     },
     {
       "tag": "F",
@@ -62,7 +66,36 @@
       "visible": null,
       "piece": null,
       "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": false
+      },
       "unprobed": "its centre (201,1374) lies off the 402x874 screen"
+    },
+    {
+      "tag": "L",
+      "id": "lab.sheet-long-list.L",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 402,
+        "x": 0,
+        "y": 1982
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": false
+      },
+      "unprobed": "its centre (201,2014) lies off the 402x874 screen"
     }
   ],
   "safeArea": {
