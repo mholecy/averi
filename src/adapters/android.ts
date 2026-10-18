@@ -7,7 +7,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -141,6 +141,23 @@ const ROLE_MAP: Record<string, string> = {
   ScrollView: 'scrollable',
   HorizontalScrollView: 'scrollable',
   ViewPager: 'scrollable',
+};
+
+/**
+ * The classes whose type fixes the one axis they scroll on (types.ts#UiNode.scrollAxis): the classic views, and a
+ * Compose scroller with no collection info, which the accessibility bridge names `ScrollView` for vertical scroll
+ * semantics and `HorizontalScrollView` for horizontal (the lab app's `verticalScroll` forms and lists, measured: 12
+ * `scrollable="true"` nodes, all `android.widget.ScrollView`). Not here, so unknown: a lazy list or grid
+ * (`LazyColumn` dumps as `android.view.View` — the lab's form picker and sticky list), a RecyclerView (either axis;
+ * the dump names no orientation), a ViewPager2.
+ */
+const AXIS_BY_CLASS: Readonly<Record<string, ScrollAxis>> = {
+  ScrollView: 'vertical',
+  NestedScrollView: 'vertical',
+  ListView: 'vertical',
+  GridView: 'vertical',
+  HorizontalScrollView: 'horizontal',
+  ViewPager: 'horizontal',
 };
 
 export class AndroidAdapter implements DeviceAdapter {
@@ -1300,6 +1317,8 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
     ...(clips && { clipsDescendants: true as const }),
     // Dumped inverted: wholly outside its container, on this side (types.ts#UiNode.clippedOut).
     ...(clippedOut !== undefined && { clippedOut }),
+    // The axis its class fixes (AXIS_BY_CLASS) — never a text input's, whose class is a scroll view's too.
+    ...(!isTextInput && AXIS_BY_CLASS[className] !== undefined && { scrollAxis: AXIS_BY_CLASS[className] }),
   };
   // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
   // .getText() returns the hint while isShowingHintText() — and the API 33

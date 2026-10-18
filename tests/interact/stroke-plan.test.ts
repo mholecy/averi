@@ -209,25 +209,146 @@ describe('which scroll view — the target\'s own, nearest first; the screen\'s 
     expect(stroke.points !== undefined && containsPoint(LIST_WDA, stroke.points.from) && !containsPoint(TABS, stroke.points.from)).toBe(true);
   });
 
-  // The residual LE4's note hands to the plan: the nearest scroll view is taken WHATEVER ITS AXIS. Account Detail's card
-  // carousel (24,138 354x85) under the transactions list: a card right of it, stroked for `down`, is stroked vertically
-  // inside the carousel. Pinned as it is today, not as it should be — an axis-aware pick is the plan's to make
-  // (stroke-plan.ts's module doc says where), with its own note and device check.
-  it('a card of a horizontal carousel, stroked for `down`: the nearest scroll view, the carousel, whatever its axis (residual)', () => {
-    const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
-    const card = node({ role: 'other', label: 'My Account', rect: { x: 378, y: 138, width: 354, height: 85 } });
-    const tree = node({
-      role: 'container',
-      unclippedFrames: true,
-      rect: { x: 0, y: 0, width: 402, height: 874 },
-      children: [
-        node({ role: 'scrollable', rect: CAROUSEL, children: [node({ role: 'other', label: 'Card 1', rect: { ...CAROUSEL } }), card] }),
-        node({ role: 'scrollable', identifier: 'transactions.list.container', rect: { x: 0, y: 180, width: 402, height: 694 }, children: [node({ role: 'cell', label: 'Row', rect: { x: 0, y: 300, width: 402, height: 60 } })] }),
-      ],
-    });
-    const { stroke } = planOn(tree, 'down', { target: card, gesture: { x: 0, y: 0, width: 402, height: 874 } });
-    expect(stroke.box).toEqual(CAROUSEL);
-    expect(stroke.points?.from).toEqual({ x: 201, y: 207 });
+});
+
+/** The iPhone 17's screen, the gesture box of the WDA trees below. */
+const PHONE: Rect = { x: 0, y: 0, width: 402, height: 874 };
+/** A WDA scroll view (unclipped frames: its axis read from its content's extent past its frame) at `rect`. */
+const wdaScroll = (rect: Rect, children: UiNode[], identifier: string | null = null): UiNode => node({ role: 'scrollable', identifier, rect: { ...rect }, children });
+/** A WDA tree of `children` on the phone's screen. */
+const wdaScreen = (children: UiNode[]): UiNode => node({ role: 'container', unclippedFrames: true, rect: { ...PHONE }, children });
+/** A card of a carousel at `rect`, the next one laid out past its right edge (the carousel's content reaches past its frame across). */
+const cards = (rect: Rect): UiNode[] => [node({ role: 'button', label: 'Card 1', rect: { ...rect } }), node({ role: 'button', label: 'Card 2', rect: { ...rect, x: rect.x + rect.width } })];
+/** A vertical page holding `children`, its last row laid out below the screen (its content reaches past its frame down). */
+const PAGE: Rect = { x: 0, y: 180, width: 402, height: 694 };
+const ROW = (): UiNode => node({ role: 'button', identifier: 'row', rect: { x: 24, y: 1400, width: 354, height: 52 } });
+/** Is `p` inside `r`, its edges included as the driver's points are whole units. */
+const on = (r: Rect, p: Point | undefined): boolean => p !== undefined && containsPoint(r, p);
+
+// LE4's residual, the cross-axis stroke (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md):
+// the geometry is mp-native Account Detail's — its card carousel 24,138 354x85 (cards 354 wide, the next laid out past
+// its right edge) and its transactions list 0,180 402x694 — the carousel moved into the list, as the note's `down`
+// stroke would meet it on a page that scrolls under the cards (no lab cell holds one yet).
+describe('the axis — a stroke goes over a scroll view that scrolls along it, and its path keeps off a nested one that scrolls only across it', () => {
+  /** The carousel nested in the page, across the page's centre line, its top above the page's content-down touch-down (735). */
+  const CAROUSEL: Rect = { x: 24, y: 700, width: 354, height: 85 };
+
+  it('a row of a page holding a horizontal carousel, stroked for `down`: the page\'s stroke would touch down ON the carousel (201,735); drawn over the longest stretch of the page clear of it, above it — touch-down and lift-off both off the carousel', () => {
+    const row = ROW();
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, cards(CAROUSEL)), row], 'page')]);
+    expect(swipeVector(PAGE, 'down', 'content').from).toEqual({ x: 201, y: 735 });
+    const { stroke } = planOn(tree, 'down', { target: row, gesture: PHONE });
+    expect(stroke.box).toEqual({ ...PAGE, height: 700 - 180 });
+    expect(stroke.points).toEqual({ from: { x: 201, y: 596 }, to: { x: 201, y: 284 } });
+    expect(on(CAROUSEL, stroke.points?.from) || on(CAROUSEL, stroke.points?.to)).toBe(false);
+  });
+
+  it('the LONGEST clear stretch, not the first: a carousel high on the page (300–385) leaves 120 above it and 489 below — the stroke is drawn below', () => {
+    const row = ROW();
+    const high: Rect = { ...CAROUSEL, y: 300 };
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(high, cards(high)), row])]);
+    const { stroke } = planOn(tree, 'down', { target: row, gesture: PHONE });
+    expect(stroke.box).toEqual({ ...PAGE, y: 385, height: 874 - 385 });
+    expect(on(high, stroke.points?.from) || on(high, stroke.points?.to)).toBe(false);
+  });
+
+  it('the stretch ends at the keyboard: a carousel at 400–485 under a keyboard at 700 leaves 220 above it and 215 between it and the keyboard (389 to the page\'s bottom, which the keyboard covers) — the stroke is drawn above it, clear of the keyboard', () => {
+    const row = ROW();
+    const mid: Rect = { ...CAROUSEL, y: 400 };
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(mid, cards(mid)), row])]);
+    const { stroke } = planOn(tree, 'down', { target: row, gesture: PHONE, keyboardTop: 700 });
+    expect(stroke).toMatchObject({ box: { ...PAGE, height: 400 - 180 }, coverTop: 700 });
+    expect(on(mid, stroke.points?.from) || on(mid, stroke.points?.to)).toBe(false);
+    expect(Math.max(stroke.points!.from.y, stroke.points!.to.y)).toBeLessThan(400);
+  });
+
+  it('a nested scroll view whose axis the tree cannot tell (its cards fit its frame: no content past it) is not kept off — the stroke is the page\'s as before', () => {
+    const row = ROW();
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, [node({ role: 'button', rect: { ...CAROUSEL } })]), row])]);
+    expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'down', 'content') });
+  });
+
+  it('a carousel the path does not cross is no cut: one at the page\'s top, above the content-down lift-off (319), leaves the page\'s whole stroke', () => {
+    const row = ROW();
+    const top: Rect = { ...CAROUSEL, y: 190 };
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(top, cards(top)), row])]);
+    expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'down', 'content') });
+  });
+
+  it('no stretch clear of it with room (a full-width carousel across a short page, 50 px either side): the fallback — the stroke as before the rule, over the carousel', () => {
+    const short: Rect = { x: 0, y: 180, width: 402, height: 200 };
+    const wide: Rect = { x: 0, y: 230, width: 402, height: 100 };
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 900, width: 354, height: 52 } });
+    const tree = wdaScreen([wdaScroll(short, [wdaScroll(wide, cards(wide)), row])]);
+    expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: short, points: swipeVector(short, 'down', 'content') });
+  });
+
+  it('a clear stretch the cut for what is drawn over it leaves without room (a bar over the stretch above a carousel filling the page below): judged as before the rule — the page\'s stroke, over the carousel — never the screen box', () => {
+    const row = ROW();
+    const low: Rect = { x: 0, y: 280, width: 402, height: 594 };
+    const bar = node({ role: 'other', label: 'bar', rect: { x: 0, y: 240, width: 402, height: 30 } });
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(low, cards(low)), row]), bar]);
+    const { stroke, memory } = planOn(tree, 'down', { target: row, gesture: PHONE });
+    expect(stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'down', 'content') });
+    // The page is the scroll view the stroke went over: a touch-down on a node drawn over it is named.
+    expect(touchedOn(strokeSent(memory), factsOf(tree), { from: { x: 201, y: 250 }, to: { x: 201, y: 200 } })?.container).toEqual(PAGE);
+  });
+
+  it('a card of that carousel, stroked for `down`: the carousel scrolls only across, so the stroke goes over the page — the outer scroll view — clear of the carousel', () => {
+    const [first, card] = cards(CAROUSEL);
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, [first, card]), ROW()])]);
+    const { stroke } = planOn(tree, 'down', { target: card, gesture: PHONE });
+    expect(stroke.box).toEqual({ ...PAGE, height: 700 - 180 });
+    expect(on(CAROUSEL, stroke.points?.from) || on(CAROUSEL, stroke.points?.to)).toBe(false);
+  });
+
+  it('the same card stroked for `right` (a card off the carousel\'s right edge): over the carousel, its own axis, along its centre row', () => {
+    const [first, card] = cards(CAROUSEL);
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, [first, card]), ROW()])]);
+    expect(planOn(tree, 'right', { target: card, gesture: PHONE }).stroke).toMatchObject({ box: CAROUSEL, points: swipeVector(CAROUSEL, 'right', 'content') });
+  });
+
+  it('a sideways stroke keeps off a nested VERTICAL list its line crosses: a pager\'s page holding a list over its left 250 — drawn over the stretch right of the list', () => {
+    const PAGER: Rect = { x: 0, y: 100, width: 402, height: 700 };
+    const list: Rect = { x: 0, y: 300, width: 250, height: 300 };
+    const next = node({ role: 'other', label: 'Page 2', rect: { ...PAGER, x: 402 } });
+    const tree = wdaScreen([wdaScroll(PAGER, [wdaScroll(list, [node({ role: 'button', rect: { x: 0, y: 300, width: 250, height: 900 } })]), next])]);
+    const { stroke } = planOn(tree, 'right', { target: next, gesture: PHONE });
+    expect(stroke.box).toEqual({ ...PAGER, x: 250, width: 152 });
+    expect(stroke.points).toEqual({ from: { x: 372, y: 450 }, to: { x: 280, y: 450 } });
+  });
+
+  it('mp-native Account Detail as captured: the carousel is no child of the list — a card right of it, stroked for `down`, has no scroll view along the stroke, and the plan falls back to the nearest, the carousel, as before (the stated fallback); for `right`, the carousel', async () => {
+    const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-account-detail-bar-shown.json', import.meta.url), 'utf8'));
+    const card = [...everyNode(tree)].find((x) => x.identifier === 'accounts.detail.header' && x.rect.x === 378)!;
+    const carousel: Rect = { x: 24, y: 138, width: 354, height: 85 };
+    expect(planOn(tree, 'down', { target: card, gesture: PHONE }).stroke).toMatchObject({ box: carousel, points: { from: { x: 201, y: 207 } } });
+    expect(planOn(tree, 'right', { target: card, gesture: PHONE }).stroke).toMatchObject({ box: carousel, points: swipeVector(carousel, 'right', 'content') });
+  });
+
+  it('Android: the class says the axis — a HorizontalScrollView under the list\'s touch-down is kept off; a lazy row (a View with the flag) is not', () => {
+    const r = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 2400, width: 948, height: 73 } });
+    const strip: Rect = { x: 0, y: 1800, width: 1080, height: 300 };
+    const list = (carousel: UiNode) => screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...LIST }, children: [carousel, r] })]);
+    const known = list(node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...strip } }));
+    expect(swipeVector(LIST, 'down', 'content').from.y).toBe(1942);
+    expect(planOn(known, 'down', { target: r }).stroke.box).toEqual({ ...LIST, height: 1800 - 825 });
+    const lazy = list(node({ role: 'container', clipsDescendants: true, rect: { ...strip } }));
+    expect(planOn(lazy, 'down', { target: r }).stroke.box).toEqual(LIST);
+  });
+
+  it('a round whose tree did not read strokes in the lane the last plan judged', () => {
+    const row = ROW();
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, cards(CAROUSEL)), row])]);
+    const first = planOn(tree, 'down', { target: row, gesture: PHONE });
+    expect(planStroke(strokeSent(first.memory), { toward: 'down', reach: 1, gesture: PHONE, read: undefined }).stroke).toEqual(first.stroke);
+  });
+
+  it('the probe never goes over a scroll view that scrolls only across it: flush with a carousel\'s bottom, over the page outward — the carousel alone is no room (unchecked), never a probe that moves nothing', () => {
+    const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, cards(CAROUSEL)), ROW()])]);
+    const probe = (scrollViews: Rect[]) => planProbe(startStrokes(), { toward: 'down', reach: 0.25, maxTravel: 177, gesture: PHONE, facts: factsOf(tree), scrollViews, keyboardTop: undefined });
+    expect(probe([CAROUSEL])).toBeUndefined();
+    expect(probe([CAROUSEL, PAGE])?.stroke.box).toEqual({ ...PAGE, height: 700 - 180 });
   });
 });
 

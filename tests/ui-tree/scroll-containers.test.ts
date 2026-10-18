@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import { clips, scrolls } from '../../src/ui-tree/scroll-containers.js';
+import { clips, scrollAxis, scrolls } from '../../src/ui-tree/scroll-containers.js';
+import { clipsOf } from '../../src/ui-tree/geometry.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
@@ -80,5 +81,83 @@ describe('clips ⇒ scrolls over every node of every fixture', () => {
     // Not vacuous: the sweep holds nodes that clip, and nodes that scroll without clipping (iOS).
     expect(nodes.some(([, n]) => clips(n))).toBe(true);
     expect(nodes.some(([, n]) => scrolls(n) && !clips(n))).toBe(true);
+  });
+});
+
+describe('scrollAxis — the one axis a scroll view scrolls on, as each source can tell it', () => {
+  it('by its type where the source names it: Android\'s class (a Compose verticalScroll is a ScrollView, horizontalScroll a HorizontalScrollView), WDA\'s Table', () => {
+    const axis = (n: UiNode) => scrollAxis(n, false);
+    expect(axis(parsedAndroid('<node class="android.widget.ScrollView" scrollable="true" bounds="[0,200][1080,2000]" />'))).toBe('vertical');
+    expect(axis(parsedAndroid('<node class="android.widget.HorizontalScrollView" scrollable="true" bounds="[0,700][1080,900]" />'))).toBe('horizontal');
+    expect(axis(parsedAndroid('<node class="android.widget.ListView" scrollable="true" bounds="[0,200][1080,2000]" />'))).toBe('vertical');
+    expect(axis(parsedAndroid('<node class="androidx.viewpager.widget.ViewPager" scrollable="true" bounds="[0,200][1080,2000]" />'))).toBe('horizontal');
+    expect(scrollAxis(parsedWda('Table'), true)).toBe('vertical');
+  });
+
+  it('unknown where the tree cannot tell: a lazy list (a View with the flag), a RecyclerView, a text input dumped as a scroll view, idb, a node that does not scroll', () => {
+    expect(scrollAxis(parsedAndroid('<node class="android.view.View" scrollable="true" bounds="[0,200][1080,2000]"><node class="android.widget.TextView" text="Row" bounds="[0,200][1080,300]" /></node>'), false)).toBeUndefined();
+    expect(scrollAxis(parsedAndroid('<node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" bounds="[0,200][1080,2000]" />'), false)).toBeUndefined();
+    const input = parsedAndroid('<node class="android.widget.HorizontalScrollView" focusable="true" long-clickable="true" scrollable="true" text="user" bounds="[40,260][1040,400]" />');
+    expect([input.role, input.scrollAxis, scrollAxis(input, false)]).toEqual(['textfield', undefined, undefined]);
+    expect(scrollAxis(node({ role: 'container', scrollAxis: 'vertical' }), false)).toBeUndefined();
+  });
+
+  it('WDA (unclipped frames): by its content\'s extent past its frame on one axis — mp-native Account Detail\'s card carousel horizontal, its transactions list vertical', async () => {
+    const tree = parseWdaSource(await text('wda-capture-account-detail-bar-shown.json'));
+    const views = [...everyNode(tree)].filter(scrolls).map((n) => [n.identifier ?? '', n.rect, scrollAxis(n, true)]);
+    expect(views).toEqual([
+      ['', { x: 24, y: 138, width: 354, height: 85 }, 'horizontal'],
+      ['transactions.list.container', { x: 0, y: 180, width: 402, height: 694 }, 'vertical'],
+    ]);
+    // On a tree of clipped frames the extent says nothing (Android's: uiautomator cut it already).
+    expect(scrollAxis([...everyNode(tree)].filter(scrolls)[0], false)).toBeUndefined();
+  });
+
+  it('the extent is the scroll view\'s OWN content: a nested scroll view counts by its frame, not by its cards; past both axes, or neither, says nothing', () => {
+    const page = { x: 0, y: 0, width: 402, height: 874 };
+    const carousel = node({ role: 'scrollable', rect: { x: 24, y: 300, width: 354, height: 85 }, children: [node({ role: 'button', rect: { x: 24, y: 300, width: 354, height: 85 } }), node({ role: 'button', rect: { x: 378, y: 300, width: 354, height: 85 } })] });
+    const fits = node({ role: 'scrollable', rect: page, children: [carousel] });
+    expect([scrollAxis(fits, true), scrollAxis(carousel, true)]).toEqual([undefined, 'horizontal']);
+    const long = node({ role: 'scrollable', rect: page, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 1500 }, children: [carousel, node({ role: 'button', rect: { x: 24, y: 1400, width: 354, height: 52 } })] })] });
+    // A row wholly past the frame alone does not say it runs on (it may be laid out off it): unknown.
+    expect(scrollAxis(node({ role: 'scrollable', rect: page, children: [node({ role: 'button', rect: { x: 24, y: 1400, width: 354, height: 52 } })] }), true)).toBeUndefined();
+    expect(scrollAxis(long, true)).toBe('vertical');
+    const twoWay = node({ role: 'scrollable', rect: page, children: [node({ role: 'image', rect: { x: -100, y: -100, width: 800, height: 1200 } })] });
+    expect(scrollAxis(twoWay, true)).toBeUndefined();
+  });
+
+  it('content laid out WHOLLY off the frame\'s side is no horizontal extent — a drawer at x −300, swipe-action buttons past a row\'s end, a page beside it; nor is a bleed a few points past both sides — a page whose content fits reads unknown, not horizontal', () => {
+    const page = { x: 0, y: 0, width: 402, height: 874 };
+    const row = node({ role: 'button', rect: { x: 0, y: 200, width: 402, height: 60 } });
+    const fitting = (...off: UiNode[]) => scrollAxis(node({ role: 'scrollable', rect: page, children: [row, ...off] }), true);
+    const drawer = node({ role: 'other', rect: { x: -300, y: 0, width: 300, height: 874 }, children: [node({ role: 'button', rect: { x: -280, y: 100, width: 260, height: 44 } }), node({ role: 'button', rect: { x: -280, y: 150, width: 260, height: 44 } })] });
+    expect(fitting(drawer)).toBeUndefined();
+    const actions = [node({ role: 'button', label: 'Delete', rect: { x: 402, y: 200, width: 80, height: 60 } }), node({ role: 'button', label: 'More', rect: { x: 482, y: 200, width: 80, height: 60 } })];
+    expect(fitting(...actions)).toBeUndefined();
+    expect(fitting(node({ role: 'other', rect: { x: 402, y: 0, width: 402, height: 874 }, children: [node({ role: 'button', rect: { x: 430, y: 300, width: 100, height: 44 } }), node({ role: 'button', rect: { x: 540, y: 300, width: 100, height: 44 } })] }))).toBeUndefined();
+    expect(fitting(node({ role: 'image', rect: { x: -10, y: 100, width: 422, height: 200 } }))).toBeUndefined();
+    // A drawer beside a page whose content runs on down: vertical, the drawer no veto.
+    expect(scrollAxis(node({ role: 'scrollable', rect: page, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 2000 } }), drawer] }), true)).toBe('vertical');
+  });
+
+  it('Clips.axesOf: the scroll view of a rect, its axis and its nested scroll views\' — undefined for a rect the tree holds none of', async () => {
+    const tree = parseWdaSource(await text('wda-capture-account-detail-bar-shown.json'));
+    const facts = clipsOf(tree, { ancestry: true, unclipped: true });
+    expect(facts.axesOf({ x: 24, y: 138, width: 354, height: 85 })).toEqual({ axis: 'horizontal', nested: [] });
+    expect(facts.axesOf({ x: 0, y: 180, width: 402, height: 694 })).toEqual({ axis: 'vertical', nested: [] });
+    expect(facts.axesOf({ x: 0, y: 181, width: 402, height: 694 })).toBeUndefined();
+    const carousel = node({ role: 'scrollable', rect: { x: 24, y: 600, width: 354, height: 85 }, children: [node({ role: 'button', rect: { x: 24, y: 600, width: 354, height: 85 } }), node({ role: 'button', rect: { x: 378, y: 600, width: 354, height: 85 } })] });
+    const page = node({ role: 'scrollable', scrollAxis: 'vertical', rect: { x: 0, y: 180, width: 402, height: 694 }, children: [carousel] });
+    expect(clipsOf(node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [page] }), { ancestry: true, unclipped: true }).axesOf(page.rect)).toEqual({
+      axis: 'vertical',
+      nested: [{ rect: carousel.rect, axis: 'horizontal' }],
+    });
+  });
+
+  it('over every capture tests/fixtures holds (the truth corpus is not on this branch), no scroll view reads horizontal but Account Detail\'s carousel — no false axis from the extent rule', async () => {
+    const trees = await everyFixtureTree();
+    for (const file of ['wda-capture-account-detail-bar-shown.json', 'wda-capture-contacts-discard-popover.json', 'wda-capture-contacts-new-contact.json', 'wda-capture-swift-form-pushed.json']) trees.push([file, parseWdaSource(await text(file))]);
+    const horizontal = trees.flatMap(([name, tree]) => [...everyNode(tree)].filter((n) => scrollAxis(n, tree.unclippedFrames === true) === 'horizontal').map((n) => `${name} ${JSON.stringify(n.rect)}`));
+    expect(horizontal).toEqual(['wda-capture-account-detail-bar-shown.json {"x":24,"y":138,"width":354,"height":85}']);
   });
 });

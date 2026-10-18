@@ -229,6 +229,7 @@ function flushText(flush: ScrollUntilResult['flush']): string {
   const unchecked = {
     budget: 'no swipe or time was left to check it',
     room: 'no scroll container around it has room for a probe swipe to check it',
+    axis: `every scroll container around it from that one outward scrolls only ${flush.edge === 'top' || flush.edge === 'bottom' ? 'sideways' : 'up and down'}, so no probe swipe can move its ${flush.edge} edge into view to check it`,
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
   return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — ${cut}`;
