@@ -187,7 +187,11 @@ struct LongList: UIViewControllerRepresentable {
 }
 
 final class LongListController: UITableViewController {
-    static let rows = 40
+    /// Long enough for ADR 0021 decision 4's long-list half: sheet-long-list's L (row 30) lies wholly before the
+    /// table's end (offset 56 × 64 − 812 = 2772) and past one stroke's carry from the top — a full final stroke
+    /// overshoots it (scripts/truth/live-visibility.ts#CARRY). 40 rows until round 7 ended inside its window; 80 (tried
+    /// first) made each WDA `/source` ~1.7 s, a 15 s scroll_until timing out after 5 swipes.
+    static let rows = 56
     static let rowHeight: CGFloat = 64
     /// sheet-long-list-short's table: six rows tall (rows 0–5 laid out, row 6 on cut at the clip), its footer's colour
     /// none of a target's.

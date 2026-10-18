@@ -1400,7 +1400,7 @@
     },
     {
       "note": "2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md",
-      "why": "lab finding LV6: WDA parks a below-the-fold row's elements at the sheet's origin moved by the table's offset, above the screen once it has scrolled — live only (live.ts --udid, case carry:sheet-long-list.Row30 under WDA): the golden captures each cell at rest, where the parked frame lies inside the table"
+      "why": "lab finding LV6: WDA parks a below-the-fold row's elements at the sheet's origin moved by the table's offset, above the screen once it has scrolled — live only (live.ts --udid, case carry:sheet-long-list.L under WDA, round 6's Row30): the golden captures each cell at rest, where the parked frame lies inside the table"
     }
   ]
 }

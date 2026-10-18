@@ -48,18 +48,38 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-hint-ea070d2.json', 'forms,visibility', { cases: 24, ok: 21, loud: 1, mismatches: 2 }],
     // re-recorded by round 6's iOS device check (src 11683c3; the forms group run too, judged apart): the presented
     // refusal cases new (WDA ok, idb residual 6, the blur residual 9), round 6's new cells' cases new (carousel-in-list
-    // C under idb LE2), the long-list carry case new (LV6), LV4's turn `visible` (its entry's primary kind)
-    ['ios-vis.json', 'visibility,dismissal', { cases: 311, ok: 242, loud: 5, mismatches: 64 }],
+    // C under idb LE2), LV4's turn `visible` (its entry's primary kind). Its long-list carry case (LV6: Row 30 of the
+    // 40-row table, asked by its text) is no case since round 7 (the table 56 rows, the carry asked of target L), so not
+    // judged: 311 cases and 64 mismatches until then. idb's scroll case of F (R-direction until then) LOUD since: round
+    // 7's recapture records F unlisted under idb, its strokes unjudged.
+    ['ios-vis.json', 'visibility,dismissal', { cases: 310, ok: 242, loud: 6, mismatches: 62 }],
     // round 5's own run (src b71cbbb, harness 2725e76: ios-vis.json until round 6 re-recorded it): LV5's failing run
     // reads LOUD, its entry struck off since (round 6: ok four times at 11683c3)
-    ['ios-vis-2725e76.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 6, mismatches: 30 }],
+    // (idb's scroll case of F LOUD since round 7's recapture, as above: 6 loud, 30 mismatches until then)
+    ['ios-vis-2725e76.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 7, mismatches: 29 }],
     // round 6's WDA smoke run of scroll-bounded and sheet-long-list at the same src: LV4 spent its budget (4 strokes up
-    // before the turn: LV4's also), LV5's case ok, the carry case turned three times (LV6)
-    ['ios-wda-bounded-long-list-11683c3-1.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
+    // before the turn: LV4's also), LV5's case ok; its carry case (Row 30, turned three times: LV6) not judged since
+    // round 7, as above — 16 cases and 2 mismatches until then, in each of the three
+    ['ios-wda-bounded-long-list-11683c3-1.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
     // its two reruns: LV5's case ok in both (struck off: four ok of four at this src), LV4 turning after 2 unmoved
-    // strokes and reaching F, the carry case turning three times in both
-    ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
-    ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 16, ok: 14, loud: 0, mismatches: 2 }],
+    // strokes and reaching F
+    ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
+    ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
+    // round 7's lab fixes (T3, truth/r7-lab-fixes): sheet-long-list at 56 rows, its target L past one carry and before
+    // the end — L's carry and scroll cases under WDA LV6's (turned three times; its scroll case's turns merged into one
+    // stroke in the second run, read not-reached), F and L under idb never in the tree (no identifier): LOUD
+    ['ios-long-list-r7-lab-1.json', 'visibility', { cases: 17, ok: 10, loud: 5, mismatches: 2 }],
+    ['ios-long-list-r7-lab-2.json', 'visibility', { cases: 17, ok: 10, loud: 6, mismatches: 1 }],
+    // …and the forms with the lab model's fix (a field reported from the binding's write): no fill lost one of 30
+    // (b1, b4, p2 five times under each source); c2–c4 ok under both sources (idb: not in its tree, all it can say);
+    // b1d and b7 (idb ui text has no keycode for them), p5 (the secure field iOS clears) and k2/k3 under WDA LOUD; the
+    // run itself read c2–c4 under idb LOUD, by the judge before it was made per source
+    ['ios-forms-r7-lab-1.json', 'forms', { cases: 46, ok: 38, loud: 8, mismatches: 0 }],
+    ['ios-forms-r7-lab-2.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-forms-r7-lab-3.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-forms-r7-lab-4.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-forms-r7-lab-5.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-forms-r7-lab-picker.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     // round 5's two reruns of scroll-bounded under WDA, at ios-vis-2725e76.json's src: LV5's case ok in both, LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
@@ -113,7 +133,9 @@ describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a -
   // 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md): a forms case has no KNOWN, so exit 1.
   it('ios-vis-b71cbbb.json: forms b4 and p2 not known, every visibility case as HEAD knows it', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
-    expect(out).toMatch(/^# Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches \(2 not known\), 0 skipped$/m);
+    // (351 cases, 14 loud, 67 mismatches until round 7: its carry case, Row 30 of the 40-row table, no case since; idb's
+    // scroll case of F LOUD, F recorded unlisted under idb.)
+    expect(out).toMatch(/^# Live golden: 350 cases, 270 ok, 15 loud, 65 mismatches \(2 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([a-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual(['b4', 'p2']);
     expect(code).toBe(1);
