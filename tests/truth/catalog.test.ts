@@ -28,6 +28,8 @@ describe('the cell catalog', () => {
       'presented/dim-cover',
       'presented/blur-menu',
       'presented/blur-menu-grouped',
+      'presented/dialog-fullscreen',
+      'presented/bottom-sheet-dialog',
       'forms/form-basic',
       'forms/form-errors',
       'forms/form-keyboard',
@@ -82,7 +84,7 @@ describe('the cell catalog', () => {
   it('selects by family, by cell, by both; a name that matches nothing is an error', async () => {
     const c = await loadCatalog();
     expect(selectCells(c, {}).length).toBe(c.cells.length);
-    expect(selectCells(c, { families: ['presented'] }).map((x) => x.id)).toEqual(['sheet-medium', 'alert-dim', 'sheet-medium-edges', 'sheet-background', 'sheet-long-list', 'sheet-long-list-short', 'dim-cover', 'blur-menu', 'blur-menu-grouped']);
+    expect(selectCells(c, { families: ['presented'] }).map((x) => x.id)).toEqual(['sheet-medium', 'alert-dim', 'sheet-medium-edges', 'sheet-background', 'sheet-long-list', 'sheet-long-list-short', 'dim-cover', 'blur-menu', 'blur-menu-grouped', 'dialog-fullscreen', 'bottom-sheet-dialog']);
     expect(selectCells(c, { cells: ['open', 'form-picker'] }).map((x) => x.id)).toEqual(['open', 'form-picker']);
     expect(selectCells(c, { families: ['presented', 'base'], cells: ['open', 'form-picker', 'alert-dim'] }).map((x) => x.id)).toEqual(['open', 'alert-dim']);
     expect(() => selectCells(c, { families: ['edgez'] })).toThrow('no family edgez');

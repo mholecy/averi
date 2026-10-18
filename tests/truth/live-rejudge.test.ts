@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; ios-vis.json and
+ * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; android-vis-dialogs*.json, round
+ * 7's presented windows the parser does not mark; ios-vis.json and
  * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-scroll-bounded-wda-2725e76-*.json, round
  * 5's) judged again by this checkout's
  * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
@@ -80,6 +81,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-forms-r7-lab-4.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-5.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-picker.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    // round 7's presented windows the parser does not mark (T2, truth/r7-dialogs' src = arch/round-23's): both cells'
+    // taps, scroll_until and colour asserts, then their eight scroll cases twice more — LW1's four and residual 19's
+    // four, the same in every run
+    ['android-vis-dialogs.json', 'visibility', { cases: 26, ok: 18, loud: 0, mismatches: 8 }],
+    ['android-vis-dialogs-scroll-run2.json', 'visibility', { cases: 8, ok: 0, loud: 0, mismatches: 8 }],
+    ['android-vis-dialogs-scroll-run3.json', 'visibility', { cases: 8, ok: 0, loud: 0, mismatches: 8 }],
     // round 5's two reruns of scroll-bounded under WDA, at ios-vis-2725e76.json's src: LV5's case ok in both, LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],

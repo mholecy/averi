@@ -14,7 +14,7 @@ import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { holds, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
-import { judgeDismissal, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
+import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, LAB_APPS, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
 
@@ -398,7 +398,8 @@ async function truthsOf(p: Platform, a: LabApp): Promise<CellTruth[]> {
 if (groups.includes('visibility')) {
   for (const truth of await truthsOf(platform, app)) {
     if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;
-    for (const v of visibilityCases(truth, platform)) CASES.push({ ...v, group: 'visibility', judge: (s, replies, source, launched, after) => v.judge(s, replies, launched, source, after) });
+    const asserts = PRESENTED_WINDOW_CELLS.includes(truth.cell) ? truth.targets.filter((t) => t.declared === 'presented-over').map((t) => presentedAssertCase(truth.cell, t)) : [];
+    for (const v of [...visibilityCases(truth, platform), ...asserts]) CASES.push({ ...v, group: 'visibility', judge: (s, replies, source, launched, after) => v.judge(s, replies, launched, source, after) });
   }
 }
 

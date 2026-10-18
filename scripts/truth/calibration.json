@@ -1229,6 +1229,24 @@
       "remark": "No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply says why (review round 4, P4). presented.known.ts owns the ratchet; this entry links the note to its rows. Live: scripts/truth/live-known.ts NO_ID (idb tap:sheet-long-list.R, tap:sheet-long-list-short.R, scroll:sheet-long-list-short.F)."
     },
     {
+      "n": "LW1",
+      "note": "2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "to appear$|active-window hint|never appeared in the tree",
+      "checks": [
+        "android-averi_lab-api33/bottom-sheet-dialog.xml A tap",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml A scroll_until",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml B tap",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml B scroll_until",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml C tap",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml C scroll_until",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml D tap",
+        "android-averi_lab-api33/bottom-sheet-dialog.xml D scroll_until"
+      ],
+      "remark": "No fix yet (round 7, T2): red at HEAD — a Views BottomSheetDialog's window is listed alone and left unmarked (its touch_outside scrim unlabelled, NAF, laid between the bars), so the taps time out with the active-window hint and scroll_until strokes it twice. The colour rows are no note's (not in the tree: vacuous, as alert-dim's). presented.known.ts owns the ratchet; the note proposes marking it by Material's view ids (touch_outside, design_bottom_sheet). Live: scripts/truth/live-known.ts SHEET_DIALOG (scroll:bottom-sheet-dialog.A–D — A and B dismiss the sheet and report the target fully visible)."
+    },
+    {
       "n": "LR1",
       "note": "2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md",
       "status": "open",

@@ -266,7 +266,7 @@ export class IosLab implements LabDevice {
  * The cell layers the native Android app builds (Lab.kt#SUPPORTED_LAYERS; its cells routed by family,
  * MainActivity.kt#CellRouter).
  */
-const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert']);
+const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert', 'dialog-fullscreen', 'bottom-sheet-dialog']);
 
 /**
  * averi's keyboard queries (src/adapters/android.ts: INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND), word for word — copied,
