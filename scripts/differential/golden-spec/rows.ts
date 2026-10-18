@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { axisOf, directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
+import { axisOf, directionOf, otherAxis, navigationBandTakes, parseGeometry, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -80,6 +80,9 @@ export interface RowOptions {
   absent?: string;
 }
 
+/** `e` with the caller's `absent` (RowOptions), when it gave one — the one spelling of it for every row type that takes it. */
+const withAbsent = (e: Expectation, { absent }: RowOptions): Expectation => (absent === undefined ? e : { ...e, absent });
+
 /**
  * The tap row that judges `ask`, the target's tap clause (target-contract.ts#contractOf), routed by the clause:
  * `refuse` naming scroll_until — R-off, R-outside-sv, R-sliver (refusedTap); `land-or-refuse` inside what shows — R-band,
@@ -111,8 +114,7 @@ export function tapRow(platform: Platform, t: TargetTruth, c: Pick<TargetContrac
  * `absent` (target-contract.ts#askedUnlistedBy) as refusedTap takes it.
  */
 export function stopRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk, opts: RowOptions = {}): Expectation {
-  const e = ask.holds ? reachedAtOnce(platform, t, cell, row, ask) : notReachedStill(platform, t, cell, row, ask);
-  return opts.absent === undefined ? e : { ...e, absent: opts.absent };
+  return withAbsent(ask.holds ? reachedAtOnce(platform, t, cell, row, ask) : notReachedStill(platform, t, cell, row, ask), opts);
 }
 
 /**
@@ -122,14 +124,16 @@ export function stopRow(platform: Platform, t: TargetTruth, cell: CellTruth, row
  */
 function refusedTap(platform: Platform, t: TargetTruth, row: string, ask: TapAsk, opts: RowOptions = {}): Expectation {
   const { absent } = opts;
-  return {
-    asks: ask,
-    verb: 'tap',
-    says: `${row}: refused naming scroll_until, nothing tapped`,
-    call: tapCall(platform, t),
-    judge: (o) => notTapped(o) ?? (scrollAdvice(o.reply) || (absent !== undefined && notInTree(o.reply)) ? undefined : said(o, 'refused without scroll_until')),
-    ...(absent !== undefined && { absent }),
-  };
+  return withAbsent(
+    {
+      asks: ask,
+      verb: 'tap',
+      says: `${row}: refused naming scroll_until, nothing tapped`,
+      call: tapCall(platform, t),
+      judge: (o) => notTapped(o) ?? (scrollAdvice(o.reply) || (absent !== undefined && notInTree(o.reply)) ? undefined : said(o, 'refused without scroll_until')),
+    },
+    opts,
+  );
 }
 
 /**
@@ -142,11 +146,10 @@ function refusedTap(platform: Platform, t: TargetTruth, row: string, ask: TapAsk
  * own model of the band may refuse it, ADR 0009 N-a on Android; it must not tap elsewhere).
  */
 function bandTap(platform: Platform, t: TargetTruth, ask: TapAsk, opts: RowOptions = {}): Expectation {
-  const absent = opts.absent === undefined ? {} : { absent: opts.absent };
   if (ask.must === 'land-or-refuse') {
-    return { asks: ask, verb: 'tap', says: `R-band: its probe fired (${t.geometry}): Tapped inside what shows of it, or refused with nothing sent`, call: tapCall(platform, t), judge: (o) => landed(o, t.visible ?? t.frame, true, false), ...absent };
+    return withAbsent({ asks: ask, verb: 'tap', says: `R-band: its probe fired (${t.geometry}): Tapped inside what shows of it, or refused with nothing sent`, call: tapCall(platform, t), judge: (o) => landed(o, t.visible ?? t.frame, true, false) }, opts);
   }
-  return { asks: ask, verb: 'tap', says: `R-band: refused (${t.geometry}), nothing tapped`, call: tapCall(platform, t), judge: notTapped, ...absent };
+  return withAbsent({ asks: ask, verb: 'tap', says: `R-band: refused (${t.geometry}), nothing tapped`, call: tapCall(platform, t), judge: notTapped }, opts);
 }
 
 /**
@@ -156,13 +159,15 @@ function bandTap(platform: Platform, t: TargetTruth, ask: TapAsk, opts: RowOptio
  */
 export function colourFails(platform: Platform, t: TargetTruth, why: string, opts: RowOptions & { expected?: string } = {}): Expectation {
   const expected = opts.expected ?? t.color;
-  return {
-    verb: 'colour',
-    says: `fails (${why})${expected === t.color ? '' : `, asked for the colour the screen shows there (${expected})`}`,
-    call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected }, timeout: BUDGET_MS }] } },
-    judge: (o) => (passed(o) ? `passed on ${expected}: ${first(o)}` : undefined),
-    ...(opts.absent !== undefined && { absent: opts.absent }),
-  };
+  return withAbsent(
+    {
+      verb: 'colour',
+      says: `fails (${why})${expected === t.color ? '' : `, asked for the colour the screen shows there (${expected})`}`,
+      call: { tool: 'assert', args: { platform, asserts: [{ element: { id: t.id }, color: { expected }, timeout: BUDGET_MS }] } },
+      judge: (o) => (passed(o) ? `passed on ${expected}: ${first(o)}` : undefined),
+    },
+    opts,
+  );
 }
 
 /**
@@ -209,24 +214,26 @@ export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, r
   const { absent } = opts;
   const direction = directionOf(t, cell);
   const own = absent === undefined && t.scrollView !== undefined ? cell.scrollViews?.[t.scrollView] : undefined;
-  return {
-    verb: 'scroll_until',
-    asks: ask,
-    says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`,
-    call: scrollCall(platform, t, direction),
-    judge: (o) => {
-      if (swipes(o) === 0) return said(o, 'no swipe');
-      const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
-      const axis = axisOf(direction);
-      const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[axis === 'x' ? 'y' : 'x'] - from[axis === 'x' ? 'y' : 'x']));
-      return (
-        strokesOff(o, cell) ??
-        (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
-        (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
-      );
+  return withAbsent(
+    {
+      verb: 'scroll_until',
+      asks: ask,
+      says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`,
+      call: scrollCall(platform, t, direction),
+      judge: (o) => {
+        if (swipes(o) === 0) return said(o, 'no swipe');
+        const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
+        const axis = axisOf(direction);
+        const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[otherAxis(axis)] - from[otherAxis(axis)]));
+        return (
+          strokesOff(o, cell) ??
+          (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
+          (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
+        );
+      },
     },
-    ...(absent !== undefined && { absent }),
-  };
+    opts,
+  );
 }
 
 /**
@@ -303,14 +310,16 @@ function landRow(platform: Platform, t: TargetTruth, ask: TapAsk, opts: RowOptio
   const atCentre = ask.must === 'fire';
   const where = 'inside' in ask && ask.inside === 'visible' ? t.visible : t.piece;
   const fired = ask.must !== 'refuse';
-  return {
-    asks: ask,
-    verb: 'tap',
-    says: atCentre ? 'R-land: Tapped, inside what shows of it' : `R-land: ${fired ? 'refused, or Tapped inside its piece' : 'refused, nothing tapped'}`,
-    call: tapCall(platform, t),
-    judge: (o) => landed(o, where, fired, atCentre),
-    ...(opts.absent !== undefined && { absent: opts.absent }),
-  };
+  return withAbsent(
+    {
+      asks: ask,
+      verb: 'tap',
+      says: atCentre ? 'R-land: Tapped, inside what shows of it' : `R-land: ${fired ? 'refused, or Tapped inside its piece' : 'refused, nothing tapped'}`,
+      call: tapCall(platform, t),
+      judge: (o) => landed(o, where, fired, atCentre),
+    },
+    opts,
+  );
 }
 
 /**

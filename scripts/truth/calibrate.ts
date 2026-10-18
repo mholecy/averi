@@ -114,6 +114,13 @@ export interface CalibrationEntry {
   expect?: Verdict;
   /** What of the note the rows calibrate, when not all of it (the rest is in `needs`). */
   partial?: string;
+  /**
+   * With `partial`: the static KNOWN rows (keyed as `checks`) of the part the note's fix leaves OPEN — still red, each
+   * filed as this note (tests/differential/golden/<family>.known.ts). Keyed by ROW, as lab-notes.test.ts's
+   * AWAITING_LIVE is by case: no other row may stay filed as a calibrated note. Not judged by calibrate (L1: the fully
+   * expanded sheet its fix does not mark).
+   */
+  open?: string[];
   needs?: string;
   regressions?: Regression[];
   remark?: string;

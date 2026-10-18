@@ -7,9 +7,11 @@ import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS
 // exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
 const LAB_IOS = 'bug:2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md';
 // Phase 2b's Android form cells. uiautomator lists only the presented window — here the picker's ModalBottomSheet,
-// fully expanded — so the form beneath is not found and scroll_until strokes the sheet: L1's shape, which round 6's
-// fix (d43df5d) leaves standing for a sheet whose dump carries no scrim (ADR 0018's residual 18).
-const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a fully expanded sheet is no presented window';
+// fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix
+// (d43df5d, round 6) marks the AlertDialog and the half-expanded sheet but not a sheet whose dump carries no scrim.
+// L1 is calibrated on those (calibration.json, `partial`); these rows are the note's still open, filed as it until a
+// fix or the owner's decision (ADR 0018's residuals pending the owner, 18) says otherwise.
+const LAB_ANDROID_PRESENTED = 'bug:2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md';
 const LAB_ANDROID_FLOATING = 'bug:2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md';
 /** The Android picker sheet's scroll_until stroke (the sheet fully expanded, 1080x2220). */
 const ADB_SHEET_STROKE = 'adb shell input swipe 540 1768 540 608 1162';
@@ -47,8 +49,8 @@ export const forms: KnownFile = {
     // strip): the pinned submit between the panel and the strip is drawn and takes its tap, but scroll_until cuts the
     // whole screen at the panel's top (the floating fix's documented full-width cut) and refuses it after two swipes.
     ...keys(`${ANDROID}/form-keyboard-floating.xml`, ['submit'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: twice('adb shell input swipe 540 874 540 218 657'), note: 'lab finding FU1: the panel cut as a full-width band', as: LAB_ANDROID_FLOATING }),
-    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'uiautomator lists only the presented sheet, unmarked (no scrim): the tap times out', as: EXPANDED_SHEET }),
-    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(ADB_SHEET_STROKE), note: 'uiautomator lists only the presented sheet, unmarked (no scrim): scroll_until strokes it twice', as: EXPANDED_SHEET }),
+    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'uiautomator lists only the presented sheet, unmarked (no scrim): the tap times out (L1, open)', as: LAB_ANDROID_PRESENTED }),
+    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(ADB_SHEET_STROKE), note: 'uiautomator lists only the presented sheet, unmarked (no scrim): scroll_until strokes it twice (L1, open)', as: LAB_ANDROID_PRESENTED }),
   ]),
   counts: {
     [`${ANDROID}/form-basic.xml`]: 16,

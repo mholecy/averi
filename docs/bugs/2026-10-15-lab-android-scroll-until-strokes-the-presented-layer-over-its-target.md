@@ -10,8 +10,9 @@
 > first" instead of "to appear". Measured by golden replay from truth/round-6 with `--side` that commit: the 16 rows
 > of `alert-dim.xml` and `sheet-medium.xml` A–D `tap` and `scroll_until` turned green (242 → 226 mismatches, no other
 > row changed); their colour rows stay KNOWN (the assert's "not found" is vacuous). `form-picker`'s expanded country
-> sheet dumps no scrim, so it is not marked: its rows stay KNOWN (ADR 0018's residual 18). Not yet re-measured on the
-> emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
+> sheet dumps no scrim, so it is not marked: its rows stay KNOWN, filed as this note, which calibration.json calibrates
+> partially (the AlertDialog and the half-expanded sheet; the fully expanded sheet open) — ADR 0018's residual 18 for
+> it awaits the owner (round 6's code review, P1). Not yet re-measured on the emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
 > window".
 
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth

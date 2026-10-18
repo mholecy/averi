@@ -784,8 +784,8 @@ neither mark: its rows stay KNOWN as residual 6 (a target not yet in the tree is
 (stopped before any swipe, "close it first") turned green; no other row changed, on either platform. The colour
 asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait is not this amendment's.
 
-**Residuals** 18 and 19 ("Residuals accepted" below): a fully expanded sheet is no presented window; the shapes
-are measured on one AVD and Material 3 only.
+**Residuals** 18 and 19 ("Residuals pending the owner" below — not accepted): a fully expanded sheet is no presented
+window; the shapes are measured on one AVD and Material 3 only.
 
 ## Residuals accepted
 
@@ -949,10 +949,19 @@ are measured on one AVD and Material 3 only.
    scroll view of that layer's own lets the stroke go. A scroll view of a LATER layer or Window the source did not
    mark, drawn above the marked one, holds the point all the same and is not asked, so the stroke stops there
    (toward refusal). No tree of the corpus lays one so.
+
+## Residuals pending the owner
+
+Written by the implementer of round 6's S3 (`ad9ce13`, the amendment "Android's presented window") and not accepted
+by the owner (round 6's code review, P1): recorded so the code's limits are stated, numbered on from the accepted ones
+so that an acceptance moves each up as it stands. Until then no KNOWN row is filed as one of them
+(tests/truth/lab-notes.test.ts reads "Residuals accepted" only): `form-picker`'s rows stay filed as lab note L1, open,
+and calibration.json calibrates L1 partially.
+
 18. **A fully expanded sheet is no presented window** (2026-10-18, the amendment "Android's presented window"). Its dump
    carries no scrim — `form-picker`'s country picker lists the sheet and its drag handle only — so it is not marked: the
    form beneath times out "to appear" and `scroll_until` strokes (on the sheet's own list, which the rule would let
-   through anyway). Its rows stay KNOWN (tests/differential/golden/forms.known.ts). The tree has no fact for it but
+   through anyway). Its rows stay KNOWN, filed as lab note L1 (tests/differential/golden/forms.known.ts). The tree has no fact for it but
    Material's localized "Drag handle".
 19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). A floating
    window against the screen's top or left edge (a popup at the top-left corner, a bottom-anchored full-width dialog)
