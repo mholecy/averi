@@ -1080,13 +1080,16 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
-  // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved — the probe's
-  // stroke asks another question (PROBE_REACH) — and never while a progress node shows (content may yet load there).
+  // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved, and never while a
+  // progress node shows (content may yet load there). The flush probe (PROBE_REACH) never reaches it: it is sent from
+  // a stop in the frame, and a read that finds the target unmoved after it still has it in the frame (not `offFrame`),
+  // while one that lost it changed the tree — so no exhaustion, and no proof, follows a probe; its own answer is the
+  // stop it checks (pinned in tests/interact/scroll-end-turn.test.ts).
   const unmovedNow = (offFrame && allUnmoved && !loading) || (found.length === 0 && treeUnmoved);
   // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
   // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
   const ends =
-    current === 'stroke' && s.probe === undefined && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, s.lastDrawn) === undefined
+    current === 'stroke' && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, s.lastDrawn) === undefined
       ? strokedEnd(s.strokes, facts, s.lastSent)
       : undefined;
   const exhausted =
