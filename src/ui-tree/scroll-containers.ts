@@ -76,18 +76,20 @@ export function isScrollViewOf(n: UiNode, container: Rect): boolean {
  * - else, on a tree of UNCLIPPED frames (`unclipped`: WDA's, adapters/types.ts#UiNode.unclippedFrames), its content's
  *   extent past its frame: WDA lists a scroll view's content at its laid-out rect, so content that RUNS ON past the
  *   frame on one axis alone scrolls on that axis — a node straddling the frame's edge by a quarter of its side, or one
- *   wholly past it continuing a same-sized sibling inside it (`contentAxis`), never any node past it. Measured on mp-native's Account Detail
- *   (tests/fixtures/wda-capture-account-detail-bar-shown.json): the card carousel `ScrollView 24,138 354x85` holds
- *   `Other 24,138 1416x85` (horizontal), the transactions list `ScrollView 0,180 402x694` holds `Other 0,180
- *   402x1925` (vertical). Its content is its descendants down to, not into, a nested scroll view (a carousel's cards
- *   past a page's sides are the carousel's extent, not the page's); a node of no area is not read. Content past both
- *   axes (a zoomed or two-way view) or neither (it fits, or the cells past the frame are not listed yet) says
- *   nothing — a carousel of full-width cells paged exactly, with no content wrapper listed and the next cell not
- *   listed, reads unknown (today's strokes). False readings left, named: a node of a page that fits, straddling its
- *   side by a quarter or more without scrolling (an overflowing row the page clips); a same-sized sibling laid beside
- *   a fitting page's content (a pager's page the tree does not list as a scroll view, a drawer exactly as wide as the
- *   content) — each reads a vertical page horizontal, so its `down` stroke goes over an outer scroll view, or keeps
- *   off it as a nested one;
+ *   wholly past it continuing a same-sized sibling inside it (`contentAxis`), never any node past it. Measured on
+ *   mp-native's Account Detail (tests/fixtures/wda-capture-account-detail-bar-shown.json): the card carousel
+ *   `ScrollView 24,138 354x85` holds `Other 24,138 1416x85` (horizontal), the transactions list `ScrollView 0,180
+ *   402x694` holds `Other 0,180 402x1925` (vertical). Its content is its descendants down to, not into, a nested scroll
+ *   view (a carousel's cards past a page's sides are the carousel's extent, not the page's); a node of no area is not
+ *   read. Content past both axes (a zoomed or two-way view) or neither (it fits, or runs on past it by less than a
+ *   quarter of its side with no same-sized sibling past it, or the cells past the frame are not listed yet) says
+ *   nothing. False negatives, each unknown and so stroked as before the axis: a chip carousel of mixed widths, a card
+ *   carousel spaced more than a quarter card apart with no card straddling its edge, full-width cells paged exactly
+ *   with the next cell unlisted. False readings left, named: a node of a page that fits, straddling its side by a
+ *   quarter or more without scrolling (an overflowing row the page clips); a same-sized sibling laid beside a fitting
+ *   page's content (a pager's page the tree does not list as a scroll view, a drawer exactly as wide as the content) —
+ *   each reads a vertical page horizontal, so its `down` stroke goes over an outer scroll view, or keeps off it as a
+ *   nested one;
  * - nothing on Android's other scrollers (uiautomator cuts every rect to its scroll view: no content shows past it —
  *   a lazy list, a RecyclerView) nor on idb (its flat list lists no scroll view).
  * Undefined for a node that does not scroll (`scrolls`).

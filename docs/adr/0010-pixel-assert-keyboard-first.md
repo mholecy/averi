@@ -119,15 +119,18 @@ was reported done at (201,827), 3 pt below CONTINUE.
   page beside a fitting page read nothing). False readings left: a node of a fitting page straddling its side by a
   quarter without scrolling (an overflowing row it clips), and a same-sized sibling beside a fitting page's content (a
   pager's page the tree lists as no scroll view) — each reads that page horizontal; unknown — today's behaviour — for
-  a Compose lazy list or grid, a RecyclerView, a WDA scroll view whose content fits, and idb. Fallbacks: no candidate
-  along the stroke with room — the pick as before (the nearest with room, whatever its axis: mp-native's Account
-  Detail as captured, whose carousel no list holds); no clear stretch with room, or none left with room by the cut for
-  what is drawn over the scroll view — the stroke as before, over the nested scroll view; the `fully: true` probe
-  never goes over a scroll view that scrolls only across it (unchecked, not a probe that moves nothing; a flush chain
-  of such scroll views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty).
-  Still UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke,
-  inferred); the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of
-  unknown axis on Android.
+  a Compose lazy list or grid, a RecyclerView, a WDA scroll view whose content fits or runs on past it by less than a
+  quarter of its side with no same-sized sibling past it, and idb — false negatives among them (a chip carousel of
+  mixed widths, a card carousel spaced more than a quarter card apart with none straddling its edge, full-width cells
+  paged exactly with the next cell unlisted) all fall back to today's stroke. Fallbacks: no candidate along the stroke
+  with room — the pick as before (the nearest with room, whatever its axis: mp-native's Account Detail as captured,
+  whose carousel no list holds); no clear stretch with room, or none left with room by the cut for what is drawn over
+  the scroll view — the stroke as before, over the nested scroll view; the `fully: true` probe never goes over a
+  scroll view that scrolls only across it (unchecked, not a probe that moves nothing; a flush chain of such scroll
+  views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty). Still
+  UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
+  the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown
+  axis on Android.
 - **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
   21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
   at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.

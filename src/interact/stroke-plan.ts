@@ -40,25 +40,26 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  * window of its own.
  *
  * WHICH SCROLL VIEW, and the axis. The candidates are the target's scroll views, nearest first (`targetScrollers`),
- * once a read has found it; before that the screen's largest scroller; none (the screen box) when the target was
- * found in none. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's
- * tree: ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
- * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on
- * idb, which lists no scroll view). The stroke box (`strokeRoom`) takes the first with room for the stroke as drawn
+ * once a read has found it; before that the screen's largest scroller; none (the screen box) when the target was found
+ * in none. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
+ * ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
+ * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on idb,
+ * which lists no scroll view). The stroke box (`strokeRoom`) takes the first with room for the stroke as drawn
  * (`toward`) above the keyboard and what is drawn over it, among those that scroll ALONG the stroke or whose axis the
  * tree cannot tell — a card of a horizontal carousel nested in a vertical page, scrolled for `down`, is stroked over
  * the page, not vertically inside the carousel; and inside the one taken, the stroke's path keeps off every nested
  * scroll view that scrolls only ACROSS it (`clearLane`: the page's content-down touch-down on a carousel is moved to
- * the longest stretch of the page clear of it — at a cost: the stroke is the stretch's 60 %, not the page's, 312 pt
- * of travel for 416 on the note's geometry, so more rounds against the swipe and time budget). The fallbacks, stated: no candidate along the stroke with room — the
- * pick as before the axis (the nearest with room, whatever its axis: a card of a carousel no vertical list holds,
- * scrolled for `down`, is still stroked inside the carousel, mp-native's Account Detail as captured); no stretch clear
- * of a cross-axis scroll view with room, or none the cut for what is drawn over it leaves room in — the stroke as
- * before, over it (`roomAmong`); the probe (`planProbe`) never goes over a
- * scroll view that scrolls only across it (none sent, rather than a probe that moves nothing and is read as checked;
- * a chain of such scroll views alone is unchecked for its own reason, `probeAcrossOnly`, `flush.why: 'axis'`). Why: a gesture belongs to the view the finger first touches, and a carousel touched down on by a
- * vertical drag hands the outer list part of it at most (~51 pt a stroke on iOS, inferred, UNMEASURED: no lab cell held
- * a carousel at the change; harness task H2's `carousel-in-list` is to measure it) —
+ * the longest stretch of the page clear of it — at a cost: the stroke is the stretch's 60 %, not the page's, 312 pt of
+ * travel for 416 on the note's geometry, so more rounds against the swipe and time budget). The fallbacks, stated: no
+ * candidate along the stroke with room — the pick as before the axis (the nearest with room, whatever its axis: a card
+ * of a carousel no vertical list holds, scrolled for `down`, is still stroked inside the carousel, mp-native's Account
+ * Detail as captured); no stretch clear of a cross-axis scroll view with room, or none the cut for what is drawn over
+ * it leaves room in — the stroke as before, over it (`roomAmong`); the probe (`planProbe`) never goes over a scroll
+ * view that scrolls only across it (none sent, rather than a probe that moves nothing and is read as checked; a chain
+ * of such scroll views alone is unchecked for its own reason, `probeAcrossOnly`, `flush.why: 'axis'`). Why: a gesture
+ * belongs to the view the finger first touches, and a carousel touched down on by a vertical drag hands the outer list
+ * part of it at most (~51 pt a stroke on iOS, inferred, UNMEASURED: no lab cell held a carousel at the change; harness
+ * task H2's `carousel-in-list` is to measure it) —
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. ADR 0010
  * (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke rules: the candidates — the target's own scroll
  * views, nearest first (round 21's step 0a) — and their axis (round 22). What else this module holds is A1's move of
@@ -482,9 +483,10 @@ const acrossOnly = ({ axes }: ScrollView, toward: Direction): boolean => axes?.a
  * The stroke over the stretch keeps the line (its centre across is `met`'s, the box is cut along the stroke only), so
  * its whole path lies in the stretch — and is the STRETCH's 60 %, shorter than `met`'s: a carousel `24,700 354x85` in
  * the page `0,180 402x694` gives 596 → 284 (312 pt of travel) for the page's 735 → 319 (416), more rounds for one
- * scroll — the price of a touch-down the page takes whole rather than one the carousel may keep. When no stretch has room, `met`: the stroke is drawn as before the rule, its
- * touch-down perhaps on the nested scroll view — the fallback, stated (the round still strokes the target's scroll
- * view; what a cross-axis scroll view hands its outer one of such a drag is unmeasured).
+ * scroll — the price of a touch-down the page takes whole rather than one the carousel may keep. When no stretch has
+ * room, `met`: the stroke is drawn as before the rule, its touch-down perhaps on the nested scroll view — the fallback,
+ * stated (the round still strokes the target's scroll view; what a cross-axis scroll view hands its outer one of such a
+ * drag is unmeasured).
  *
  * Why: a gesture belongs to the view the finger first touches (swipe.ts#swipeVectorAbove), and a horizontal carousel
  * touched down on by a vertical drag hands the outer list only part of it, if any — on iOS ~51 pt a stroke inferred,
