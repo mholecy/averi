@@ -1,5 +1,5 @@
-import type { Point, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { containsPoint, rectIntersection } from '../ui-tree/geometry.js';
+import type { Point, Rect, ScrollAxis, Stroke, UiNode } from '../adapters/types.js';
+import { containsPoint, rectIntersection, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -41,30 +41,36 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  *
  * WHICH SCROLL VIEW, and the axis. The candidates are the target's scroll views, nearest first (`targetScrollers`),
  * once a read has found it; before that the screen's largest scroller; none (the screen box) when the target was
- * found in none. The first with room for the stroke as drawn (`toward`) above the keyboard and what is drawn over it
- * is taken — WHATEVER ITS AXIS: a card of a horizontal carousel scrolled for `down` is stroked vertically inside the
- * carousel (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual).
- * The interface makes an axis-aware choice a change inside this module alone: a `ScrollView` is remembered by
- * `seeRead`, which has the tree (the scroller's node: `Clips.drawnIn`'s `scrollers` on WDA, the clipping chain's on
- * Android), so it can record the axis each one scrolls on once the tree can tell it (WDA's scroll view has no axis
- * attribute; its content's extent beyond its frame would have to say) — and the pick (`strokeRoom`) would skip a
- * candidate whose axis is not `toward`'s before judging its room, falling through to the outer one (the page's list).
- * The probe's candidates come in as bare rects (`ProbeAsk.scrollViews`, the clipping chain from the flush ancestor
- * outward), and its axis would be looked up from `ProbeAsk.facts` — the read's scene, which knows each scroller's node
- * — inside `planProbe`, so that question too stays here. Neither `round` nor the driver would change: they hand in
- * `toward` and take the plan. Not done here: it changes
- * where strokes land, a behaviour change for its own note and device check. What this module holds is the plan as it
- * stands: the move of the round's five pieces into one (A1, which changed no stroke), and the candidates' rule — the
- * target's own scroll views, nearest first — that changed where a WDA stroke lands for a target not drawn (round 21's
- * step 0a, docs/adr/0010-pixel-assert-keyboard-first.md records it).
+ * found in none. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's
+ * tree: ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
+ * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on
+ * idb, which lists no scroll view). The stroke box (`strokeRoom`) takes the first with room for the stroke as drawn
+ * (`toward`) above the keyboard and what is drawn over it, among those that scroll ALONG the stroke or whose axis the
+ * tree cannot tell — a card of a horizontal carousel nested in a vertical page, scrolled for `down`, is stroked over
+ * the page, not vertically inside the carousel; and inside the one taken, the stroke's path keeps off every nested
+ * scroll view that scrolls only ACROSS it (`clearLane`: the page's content-down touch-down on a carousel is moved to
+ * the longest stretch of the page clear of it). The fallbacks, stated: no candidate along the stroke with room — the
+ * pick as before the axis (the nearest with room, whatever its axis: a card of a carousel no vertical list holds,
+ * scrolled for `down`, is still stroked inside the carousel, mp-native's Account Detail as captured); no stretch clear
+ * of a cross-axis scroll view with room — the stroke as before, over it; the probe (`planProbe`) never goes over a
+ * scroll view that scrolls only across it (no room, `flush.why: 'room'`, rather than a probe that moves nothing and is
+ * read as checked). Why: a gesture belongs to the view the finger first touches, and a carousel touched down on by a
+ * vertical drag hands the outer list part of it at most (~51 pt a stroke on iOS, inferred, UNMEASURED: no lab cell held
+ * a carousel at the change; harness task H2's `carousel-in-list` is to measure it) —
+ * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. ADR 0010
+ * (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke rules: the candidates — the target's own scroll
+ * views, nearest first (round 21's step 0a) — and their axis (round 22). What else this module holds is A1's move of
+ * the round's five pieces into one, which changed no stroke.
  *
  * Pure: no adapter, no clock, no I/O.
  */
 
-/** A scroll view a stroke may go over, as one value (the two move together): its rect, and the rects drawn over it at the read that chose it — the stroke box's cut (`strokeRoom`). A later read that still holds a scroll view of that rect gives its own; one that does not (the list moved — measured on Account Detail, 0,825 → 0,401) keeps these, so a remembered scroll view is not stroked as if nothing were over it. */
+/** A scroll view a stroke may go over, as one value (they move together): its rect, the rects drawn over it at the read that chose it — the stroke box's cut (`strokeRoom`) — and its axes. A later read that still holds a scroll view of that rect gives its own; one that does not (the list moved — measured on Account Detail, 0,825 → 0,401) keeps these, so a remembered scroll view is not stroked as if nothing were over it. */
 interface ScrollView {
   rect: Rect;
   over: readonly Rect[];
+  /** Its axis and its nested scroll views' (ui-tree/geometry.ts#Clips.axesOf), at the read that chose it — kept and refreshed as `over` is: a later read that lost the rect keeps these. Undefined when no read held it. */
+  axes: ScrollAxes | undefined;
 }
 
 declare const opaque: unique symbol;
@@ -122,7 +128,7 @@ export function seeRead(memory: StrokeMemory, { facts, line, target }: SeenRead)
   return close({
     ...m,
     line,
-    ...(target !== undefined && { target: targetScrollers(facts, target).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [] })) }),
+    ...(target !== undefined && { target: targetScrollers(facts, target).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) })) }),
   });
 }
 
@@ -196,7 +202,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach, gesture, read 
   const m = open(memory);
   const candidates = candidatesOf(m, read?.facts);
   const kept = m.line?.y;
-  const room = strokeRoom(gesture, candidates, toward, kept);
+  const room = strokeRoom(gesture, candidates, toward, kept, 'any axis');
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
   const points = box === undefined ? undefined : scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box });
@@ -243,9 +249,10 @@ export interface ProbeAsk {
 export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gesture, facts, scrollViews, keyboardTop }: ProbeAsk): { stroke: PlannedStroke; memory: StrokeMemory } | undefined {
   const room = strokeRoom(
     gesture,
-    scrollViews.map((rect) => ({ rect, over: overIn(facts, rect) ?? [] })),
+    scrollViews.map((rect) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) })),
     toward,
     keyboardTop,
+    'none',
   );
   if (room === undefined) return undefined;
   const { box, coverTop } = room;
@@ -320,9 +327,9 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  */
 function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined): readonly ScrollView[] {
   if (facts === undefined) return m.last;
-  if (m.target !== undefined) return m.target.map(({ rect, over }) => ({ rect, over: overIn(facts, rect) ?? over }));
+  if (m.target !== undefined) return m.target.map(({ rect, over, axes }) => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes }));
   const main = facts.mainScroller;
-  return main === undefined ? [] : [{ rect: main, over: overIn(facts, main) ?? [] }];
+  return main === undefined ? [] : [{ rect: main, over: overIn(facts, main) ?? [], axes: facts.scene.clips.axesOf(main) }];
 }
 
 /**
@@ -401,6 +408,11 @@ interface StrokeRoom {
  * the target goes over the screen whole. One judgement of room, the keyboard in it. No gesture `box` at all
  * (screenBox threw): no room.
  *
+ * THE AXIS (the module doc's): a candidate that scrolls only ACROSS the stroke (`acrossOnly`) is judged only when no
+ * other has room, and then only for a stroke toward the target (`otherwise: 'any axis'`, the pick as before the axis
+ * — the probe's is `'none'`: no room); in the candidate taken the stroke is drawn in its clear lane (`clearLane`),
+ * off the nested scroll views that scroll only across it, before the cut for what is drawn over it.
+ *
  * Each candidate's `over` are the rects drawn over it (ui-tree/draw-order.ts#drawnOver, or as a remembered scroll
  * view carries them, `ScrollView`) — the floating tab bar of the note below: the list `0,825 1080x1395` ran under the
  * bar's host `66,1840 948x248`, the content-down stroke over it touched down at 0.8 of the list, y 1942, on the bar,
@@ -408,17 +420,76 @@ interface StrokeRoom {
  * judgement for every stroke: the strokes toward the target and the `fully: true` probe both come here.
  * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
  */
-function strokeRoom(box: Rect | undefined, candidates: readonly ScrollView[], toward: Direction, coverTop?: number): StrokeRoom | undefined {
+function strokeRoom(box: Rect | undefined, candidates: readonly ScrollView[], toward: Direction, coverTop: number | undefined, otherwise: 'any axis' | 'none'): StrokeRoom | undefined {
   if (box === undefined) return undefined;
-  for (const { rect: within, over } of candidates) {
+  const along = candidates.filter((c) => !acrossOnly(c, toward));
+  return roomAmong(box, along, toward, coverTop) ?? (otherwise === 'any axis' && along.length < candidates.length ? roomAmong(box, candidates, toward, coverTop) : undefined);
+}
+
+/** `strokeRoom`'s judgement over `candidates`, nearest first: the first with room, in its clear lane (`clearLane`), above the keyboard and what is drawn over it. */
+function roomAmong(box: Rect, candidates: readonly ScrollView[], toward: Direction, coverTop: number | undefined): StrokeRoom | undefined {
+  for (const { rect: within, over, axes } of candidates) {
     const met = rectIntersection(box, within);
     if (met === undefined) continue;
-    const drawn = overlayTop(met, over, toward, coverTop);
+    const lane = clearLane(met, axes, toward, coverTop);
+    const drawn = overlayTop(lane, over, toward, coverTop);
     const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
-    const room = roomIn(met, toward, top);
+    const room = roomIn(lane, toward, top);
     if (room !== undefined) return { within, box: room, ...(top !== undefined && { coverTop: top }) };
   }
   return undefined;
+}
+
+/** The axis a stroke toward `toward` moves the content along. */
+const axisOf = (toward: Direction): ScrollAxis => (toward === 'up' || toward === 'down' ? 'vertical' : 'horizontal');
+
+/** The scroll view scrolls on the other axis than the stroke's ALONE, as its tree says (`ScrollView.axes`): a stroke along it would move nothing of it. Unknown is not across. */
+const acrossOnly = ({ axes }: ScrollView, toward: Direction): boolean => axes?.axis !== undefined && axes.axis !== axisOf(toward);
+
+/**
+ * The part of `met` — a candidate scroll view met with the gesture box — the stroke is drawn in so that its path,
+ * touch-down to lift-off, keeps off every scroll view NESTED in the candidate that scrolls only on the other axis (a
+ * card carousel in a vertical list, for a `down` stroke; a vertical list in a pager, for a `right` one): `met` itself
+ * when the stroke as drawn over it (`fullStroke`, above a keyboard whose top edge is `coverTop`) crosses none, else
+ * the longest stretch of it along the stroke, on the stroke's line (a vertical stroke's x, a sideways stroke's y),
+ * clear of every such scroll view on that line and above the keyboard — when that stretch has room (MIN_STROKE_BOX).
+ * The stroke over the stretch keeps the line (its centre across is `met`'s, the box is cut along the stroke only), so
+ * its whole path lies in the stretch. When no stretch has room, `met`: the stroke is drawn as before the rule, its
+ * touch-down perhaps on the nested scroll view — the fallback, stated (the round still strokes the target's scroll
+ * view; what a cross-axis scroll view hands its outer one of such a drag is unmeasured).
+ *
+ * Why: a gesture belongs to the view the finger first touches (swipe.ts#swipeVectorAbove), and a horizontal carousel
+ * touched down on by a vertical drag hands the outer list only part of it, if any — on iOS ~51 pt a stroke inferred,
+ * UNMEASURED (the note below, its residual). A nested scroll view of unknown axis (`Clips.axesOf`: a Compose lazy
+ * row, a RecyclerView, a WDA scroll view whose content fits its frame) is not kept off, nor one on the stroke's own
+ * axis (a bounded list inside a page: the plan's candidates already hold the target's own).
+ * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
+ */
+function clearLane(met: Rect, axes: ScrollAxes | undefined, toward: Direction, coverTop: number | undefined): Rect {
+  const vertical = axisOf(toward) === 'vertical';
+  const across = vertical ? 'horizontal' : 'vertical';
+  const path = fullStroke(met, toward, coverTop);
+  // The line the stroke runs on, and the stretch of it the stroke may use: `met` along the stroke, above the keyboard.
+  const line = vertical ? path.from.x : path.from.y;
+  const start = vertical ? met.y : met.x;
+  const end = vertical ? Math.min(met.y + met.height, coverTop ?? Number.POSITIVE_INFINITY) : met.x + met.width;
+  const on = (axes?.nested ?? [])
+    .filter((n) => n.axis === across)
+    .flatMap((n) => rectIntersection(n.rect, met) ?? [])
+    .filter((r) => (vertical ? r.x <= line && line < r.x + r.width : r.y <= line && line < r.y + r.height))
+    .map((r) => (vertical ? { from: r.y, to: r.y + r.height } : { from: r.x, to: r.x + r.width }));
+  const [lo, hi] = vertical ? [Math.min(path.from.y, path.to.y), Math.max(path.from.y, path.to.y)] : [Math.min(path.from.x, path.to.x), Math.max(path.from.x, path.to.x)];
+  if (!on.some((r) => r.from <= hi && lo < r.to)) return met;
+  // The stretches of [start, end) between them, the longest first among those with room.
+  let best: { from: number; to: number } | undefined;
+  let at = start;
+  for (const to of [...on.map((r) => r.from).sort((a, b) => a - b), end]) {
+    const stop = Math.min(to, end);
+    if (stop - at > (best === undefined ? 0 : best.to - best.from)) best = { from: at, to: stop };
+    at = Math.max(at, ...on.filter((r) => r.from <= to).map((r) => r.to));
+  }
+  if (best === undefined || best.to - best.from < MIN_STROKE_BOX) return met;
+  return vertical ? { ...met, y: best.from, height: best.to - best.from } : { ...met, x: best.from, width: best.to - best.from };
 }
 
 /**

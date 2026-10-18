@@ -2141,11 +2141,13 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
     for (const { from } of sent) expect(containsPoint(LIST, from)).toBe(true);
   });
 
-  // A residual (LE4's note, for the stroke plan): the nearest scroll view is taken whatever its axis. Account Detail's
-  // card carousel (24,138 354x85) under the transactions list (0,180 402x694, listed after it): a card right of the
-  // carousel, scrolled for `down`, is stroked inside the carousel — a vertical 52-pt stroke touching down where the
-  // list is drawn over it — not over the screen (699 → 175, before). Pinned as it is today, not as it should be.
-  it('a card of a horizontal carousel, scrolled for `down`: the vertical stroke goes inside the carousel, and the failure names the list drawn over its touch-down (residual)', () => {
+  // LE4's note, its residual: Account Detail's card carousel (24,138 354x85, read horizontal from its cards past its
+  // frame) under the transactions list (0,180 402x694, listed after it, no ancestor of the carousel): a card right of
+  // the carousel, scrolled for `down`, has no scroll view that scrolls along the stroke, and the stroke plan falls back
+  // to the nearest, the carousel — a vertical 52-pt stroke touching down where the list is drawn over it — as before
+  // the axis rule (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list
+  // (tests/interact/stroke-plan.test.ts, "the axis").
+  it('a card of a horizontal carousel no list holds, scrolled for `down`: no scroll view along the stroke, so the vertical stroke goes inside the carousel (the fallback), and the failure names the list drawn over its touch-down', () => {
     const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
     const card = node({ role: 'other', label: 'My Account', rect: { x: 378, y: 138, width: 354, height: 85 } });
     const tree = node({

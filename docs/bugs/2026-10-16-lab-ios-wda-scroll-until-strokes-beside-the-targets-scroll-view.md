@@ -27,6 +27,21 @@
 > carousel inside a vertical list, a card off its right edge asked for `down`). Pinned as it is today in
 > tests/interact/scroll-rounds.test.ts ("a card of a horizontal carousel, scrolled for `down`") and
 > tests/interact/stroke-plan.test.ts ("a card of a horizontal carousel, stroked for `down`").
+>
+> **Residual addressed (2026-10-18, round 22, `arch/r22-axis`; unmeasured on a device):** the stroke plan is
+> axis-aware (interact/stroke-plan.ts#strokeRoom, #clearLane; ADR 0010's "A stroke across a scroll view's axis"). A
+> scroll view's axis is read from the tree (ui-tree/scroll-containers.ts#scrollAxis: Android's class, WDA's `Table`,
+> else WDA content past the frame on one axis — Account Detail's carousel reads horizontal from its `Other 24,138
+> 1416x85`, its list vertical from `Other 0,180 402x1925`; unknown for a Compose lazy list, a RecyclerView, idb). A
+> stroke goes over the target's scroll views that scroll along it, and its path keeps off a nested one that scrolls
+> only across it: a card of a carousel NESTED in a vertical page, scrolled for `down`, is stroked over the page, and a
+> page's content-down touch-down on such a carousel (`24,700 354x85` in `0,180 402x694`: 201,735) moves to the page's
+> longest stretch clear of it (`201 596 → 284`). Account Detail AS CAPTURED is unchanged: its carousel is no child of
+> the list (siblings, the list drawn over the carousel's lower part), so for `down` no scroll view along the stroke
+> holds the card and the plan falls back to the pick as before — still `207 → 155` inside the carousel; the two pins
+> above, renamed, now say so (stroke-plan.test.ts "mp-native Account Detail as captured", scroll-rounds.test.ts "a
+> card of a horizontal carousel no list holds"). Still to measure: the ~51 pt a carousel hands the outer scroller, on the
+> lab's `carousel-in-list` (harness task H2).
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/scroll-bounded.*`, captured by scripts/truth/capture.ts on the dedicated
