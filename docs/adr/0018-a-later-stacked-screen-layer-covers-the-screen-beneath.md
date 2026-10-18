@@ -998,6 +998,18 @@ expanded sheet is no presented window; the shapes are measured on one AVD and Ma
    2026-10-18 with the active-window hint (decision 5: a window left unmarked is said as possible on every not-found);
    the unmeasured shapes — a full-screen dialog, a Views `BottomSheetDialog` — are lab cells to come
    (docs/plans/2026-10-15-ground-truth-lab-app.md).
+   **Measured 2026-10-19** (round 7's lab cells `presented/dialog-fullscreen`, `presented/bottom-sheet-dialog`, averi_lab;
+   docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md):
+   a full-screen Compose `Dialog` (`usePlatformDefaultWidth = false`) is laid by Compose between the bars at full width,
+   `[0,66][1080,2153]` — against the left edge, an app's window by decision 2 — and its dump carries no fact that tells
+   it from an app's screen (what differs, the decor's levels and Compose's `DialogLayout` class, is theme- and
+   toolkit-dependent): it stands as this residual, the hint its answer; `scroll_until` strokes it twice (nothing
+   dismissed: it has no outside). A Views `BottomSheetDialog`'s `touch_outside` is UNLABELLED (`NAF="true"`) and both it
+   and the sheet are laid between the bars (`[0,66]…[…,2154]` in a window `[0,0][1080,2220]`), so the scrim rule does not
+   hold, labelled or not; worse than a timeout, `scroll_until` for a target beneath the scrim strokes up from (540,444),
+   on the scrim, DISMISSES the sheet and reports the target "fully visible after 1 swipe" — lab note LW1, open, with a
+   src proposal: mark the window by Material's own view ids (`…:id/touch_outside` followed by `…:id/design_bottom_sheet`),
+   read against the scrim's edges, not the window's.
 
 ## Bug notes
 
