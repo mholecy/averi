@@ -100,3 +100,19 @@ exclusion from the turn, and the one-stroke stop.
   final stroke), both the safe side. The live cases are where such a 1-px flip would show:
   `ios wda turn:scroll-bounded.F` turning only after the second stroke, `ios wda scroll:scroll-bounded.F` overshooting
   with a full final stroke — the device check reads both for it.
+
+## The iOS device check (2026-10-18, round 6; docs/truth/live-ios-2026-10-18-visibility.md)
+
+Under WDA at truth/round-6's src (11683c3), four runs of each case:
+- **The turn (decision 1)** holds in kind: the caller's `up` stroked first, one turn `down`, the reply saying averi
+  turned (`… 2 swipes up, the last of which did not move it — the tree lists the content of scrollable (0,380 402x180)
+  ending at its top — so averi turned down …`). **The one-stroke stop (decision 3) does not hold live**: the proof held
+  after 2 unmoved strokes in three runs (F then reached, tapped, fired) and after 4 in one (the budget spent before F,
+  `failed after 6 swipes`). Two is the two-stroke rule's count, the residual above foretold (a 1-px flip between reads
+  losing the proof — F reads 300x64 at launch and 300x65 after a stroke — or a read still bouncing at the top; no trace
+  of averi's reads was kept to tell which). `ios wda turn:scroll-bounded.F` stays KNOWN (lab note LV4).
+- **The carry model (decision 4)** holds on `lower`: F landed whole in all four runs (`lower` at rest at 915–981 of its
+  884–1000 window; LV5 struck off). Its long-list half is unmeasured: the live case built for it (a far row of
+  `sheet-long-list`, `CARRY` in scripts/truth/live-visibility.ts) is blocked by a WDA reading of scrolled tables (lab note LV6,
+  docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md).
+
