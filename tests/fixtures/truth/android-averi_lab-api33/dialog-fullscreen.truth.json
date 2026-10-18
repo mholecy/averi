@@ -1,0 +1,119 @@
+{
+  "cell": "dialog-fullscreen",
+  "layer": "dialog-fullscreen",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.dialog-fullscreen.A",
+      "color": "#E53935",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 303,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,391"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#ECEFF1"
+    },
+    {
+      "tag": "B",
+      "id": "lab.dialog-fullscreen.B",
+      "color": "#1E88E5",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,886"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#ECEFF1"
+    },
+    {
+      "tag": "C",
+      "id": "lab.dialog-fullscreen.C",
+      "color": "#43A047",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 1293,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1381"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#ECEFF1"
+    },
+    {
+      "tag": "D",
+      "id": "lab.dialog-fullscreen.D",
+      "color": "#FB8C00",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 1788,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1876"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#ECEFF1"
+    },
+    {
+      "tag": "S",
+      "id": "lab.dialog-fullscreen.S",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 528,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,616"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#8E24AA"
+    }
+  ],
+  "navigation": "gesture",
+  "displays": "dialog-fullscreen.displays.txt"
+}

@@ -38,6 +38,28 @@
       "truth": "alert-dim.truth.json"
     },
     {
+      "file": "dialog-fullscreen.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "dialog-fullscreen.png",
+      "truth": "dialog-fullscreen.truth.json"
+    },
+    {
+      "file": "bottom-sheet-dialog.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "bottom-sheet-dialog.png",
+      "truth": "bottom-sheet-dialog.truth.json"
+    },
+    {
       "file": "form-basic.xml",
       "source": "uiautomator",
       "form": "raw",

@@ -1,0 +1,45 @@
+{
+  "cell": "bottom-sheet-dialog",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "A": {
+      "x": 127,
+      "y": 303,
+      "width": 825,
+      "height": 176
+    },
+    "B": {
+      "x": 127,
+      "y": 798,
+      "width": 825,
+      "height": 176
+    },
+    "C": {
+      "x": 127,
+      "y": 1293,
+      "width": 825,
+      "height": 176
+    },
+    "D": {
+      "x": 127,
+      "y": 1788,
+      "width": 825,
+      "height": 176
+    },
+    "S": {
+      "x": 128,
+      "y": 1406,
+      "width": 825,
+      "height": 176
+    }
+  },
+  "events": []
+}
