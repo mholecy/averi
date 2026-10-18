@@ -1,5 +1,5 @@
-import { clips, scrolls } from './scroll-containers.js';
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { clips, scrollAxis, scrolls } from './scroll-containers.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -722,6 +722,27 @@ export interface Clips {
    * (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first ask; the answer is shared along a branch.
    */
   drawnIn(node: UiNode): Drawn | undefined;
+  /**
+   * The axis facts of the scroll view of rect `container` — the first node in tree order that scrolls with exactly
+   * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
+   * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
+   * that scroll, at any depth; one of its own rect left out) with theirs, each as scroll-containers.ts#scrollAxis says
+   * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
+   * view of that rect (the list moved). Cost: one walk of the tree per rect asked, kept for the life of the `Clips`.
+   */
+  axesOf(container: Rect): ScrollAxes | undefined;
+}
+
+/** A scroll view's axis and those of the scroll views nested in it (`Clips.axesOf`). */
+export interface ScrollAxes {
+  readonly axis: ScrollAxis | undefined;
+  readonly nested: readonly NestedScrollView[];
+}
+
+/** A scroll view nested in another, as `Clips.axesOf` gives it: its rect and its axis, undefined where the tree cannot tell. */
+export interface NestedScrollView {
+  readonly rect: Rect;
+  readonly axis: ScrollAxis | undefined;
 }
 
 /** What of `rect` the drawn frame `drawn` holds (`Clips.drawnIn`): `rect` itself when nothing cuts it; undefined when nothing of it can be drawn. */
@@ -822,7 +843,24 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     }
     return drawn.get(node);
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn };
+  const axes = new Map<string, ScrollAxes | undefined>();
+  const axesOf = (container: Rect): ScrollAxes | undefined => {
+    const key = `${container.x},${container.y},${container.width},${container.height}`;
+    if (axes.has(key)) return axes.get(key);
+    const found = [...everyNode(tree)].find((n) => scrolls(n) && sameRect(n.rect, container));
+    const facts =
+      found === undefined
+        ? undefined
+        : {
+            axis: scrollAxis(found, unclipped),
+            nested: [...everyNode(found)]
+              .filter((n) => n !== found && scrolls(n) && !sameRect(n.rect, container))
+              .map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+          };
+    axes.set(key, facts);
+    return facts;
+  };
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf };
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */

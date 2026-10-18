@@ -129,6 +129,9 @@ export const zeroRect = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
  */
 export type ClippedSide = 'top' | 'bottom' | 'left' | 'right';
 
+/** The one axis a scroll view scrolls on (UiNode.scrollAxis, ui-tree/scroll-containers.ts#scrollAxis). */
+export type ScrollAxis = 'vertical' | 'horizontal';
+
 /**
  * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
  * a negative or NaN side. The one spelling of "has this rect an area": the
@@ -366,6 +369,21 @@ export interface UiNode {
    * runs on to the view's edge: not flush, not caught either.
    */
   clipsDescendants?: true;
+  /**
+   * The ONE axis this scroll view scrolls on, when the tree source says it by the node's type alone: Android's class
+   * (adapters/android.ts#AXIS_BY_CLASS — `ScrollView`, `NestedScrollView`, `ListView`, `GridView` vertical;
+   * `HorizontalScrollView`, `ViewPager` horizontal; a Compose `verticalScroll` dumps as `ScrollView` and a
+   * `horizontalScroll` as `HorizontalScrollView`, while a lazy list or grid, which carries collection info, keeps
+   * `android.view.View` and a RecyclerView dumps no orientation — neither says) and WDA's `Table` (vertical:
+   * adapters/wda-source.ts). Absent where the type does not say: a WDA `ScrollView` or `CollectionView` — on a tree of
+   * unclipped frames its content's extent past its frame may say it instead (ui-tree/scroll-containers.ts#scrollAxis,
+   * the one reader) — and every idb node (its flat list lists no scroll view). Never on a text input (a Compose text
+   * field with scroll semantics dumps as a scroll view too). Read by `scroll_until`'s stroke plan
+   * (interact/stroke-plan.ts): a stroke goes over a scroll view that scrolls on its axis, and its path keeps off a
+   * nested one that scrolls only on the other.
+   * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
+   */
+  scrollAxis?: ScrollAxis;
   /**
    * The bounds the tree source dumped for this node, when they were CUT
    * short of its own descendants by something drawn over it, and `rect` is
