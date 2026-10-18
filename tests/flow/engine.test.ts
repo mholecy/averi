@@ -2047,9 +2047,10 @@ flows:
     });
 
     // A window the dump does not mark (form-picker's fully expanded sheet): the presence check's ElementNotFoundError
-    // carries the active-window hint (ui-tree/standing.ts#ACTIVE_WINDOW_HINT), but it is absence, so the skip line
-    // reads "(not present)" only — the hint reaches the error, not the trace.
-    it('an Android tap whose target is not in a tree with no window marked presented: skipped (not present), the hint left in the error', async () => {
+    // carries the active-window hint (ui-tree/standing.ts#ACTIVE_WINDOW_HINT; pinned in
+    // tests/adapters/android-presented-window.test.ts, resolvePresent on form-picker), but it is absence, so the skip
+    // line reads "(not present)" only — the hint never reaches the trace.
+    it('an Android tap whose target is not in a tree with no window marked presented: skipped (not present), nothing tapped', async () => {
       const raw = readFileSync(new URL('../fixtures/uiautomator-lab-form-picker.xml', import.meta.url), 'utf8');
       const fake = new FakeAdapter({ sheet: parseDump(raw.slice(0, raw.lastIndexOf('>') + 1)) }, 'sheet');
       expect(await skipOf(fake, 'tap: { id: lab.form-picker.name }')).toEqual(['skipped id:"lab.form-picker.name" (not present)']);
