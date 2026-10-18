@@ -4,7 +4,8 @@
 > decision of 2026-10-17 — a field remnant under the tap minimum is refused. The sliver rule (ADR 0013) takes a second
 > evidence: a control thinner than the minimum across an edge flush with a node drawn after it that spans that edge
 > (`src/ui-tree/standing.ts#cutByLater`, `geometry.ts#Cut.by`), Android's trees only. Both symptoms of the one cause:
-> `tap phone` (IME up) is refused naming `container id:lab.form-keyboard.submit`, the strip `970x42` at `55,1370`, and
+> `tap phone` (IME up) is refused naming `container id:lab.form-keyboard.submit`, the strip at `55,1370` (`970x28` of
+> its `970x42` above the keyboard's line), and
 > "the soft keyboard is up (its top edge at y 1398): dismiss it first … — a bar riding on it goes down with it — or
 > scroll_until it out from under that container first"; `tap note` after the guard's `back` is refused on its `970x14`
 > strip at `55,2126` with "scroll_until it out from under that container first" (no tap at y 2133); `scroll_until phone`
@@ -12,7 +13,10 @@
 > "dismiss it first …, and scroll again". Measured by replay only: golden from `truth/round-6` with `--side` over this
 > branch, 1137 checks / 241 mismatches (baseline 242) — the KNOWN row `form-keyboard.xml phone scroll_until` turns
 > green; three replies change (phone tap, phone scroll_until, note tap), every other row's reply and calls identical.
-> Not checked on the emulator. iOS cannot show the geometry: WDA lists `phone` whole under the bar (covered at its
+> Not checked on the emulator. Review round 1 (0eb0f10–0bb2704) changed the wording only — the rest "may" lie under
+> the bar, the whole-thin case's way past (a coordinate tap), the keyboard named only for a cutter riding on it, the
+> strip counted above the keyboard's line — golden again 1137 / 241 / 0 / 86, the same three rows, their calls
+> identical. iOS cannot show the geometry: WDA lists `phone` whole under the bar (covered at its
 > centre, its rows green), idb's flat list misses the bar (lab note L2, a separate finding). Residuals (ADR 0013's
 > refinement): a WHOLE control that thin laid flush against a later node that spans it is refused too ("may lie under",
 > with a coordinate tap as its way past); and a clickable with no role — Compose's `Modifier.clickable` without one
