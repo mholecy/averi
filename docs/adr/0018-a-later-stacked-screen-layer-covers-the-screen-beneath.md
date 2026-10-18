@@ -31,6 +31,11 @@ shape, standing for a bare frame and the rest (see "Amendment: a presented layer
 Amended again 2026-10-16 (round 5 of phase 3, architecture step A2): where the rules live — the one reader of the
 marks and the shape fallback are adapters of one presentation module, `ui-tree/presentation.ts`; no decision changes
 (see "Amendment: one presentation module" below; the code pointers of the earlier sections name the new places).
+Amended again 2026-10-18 (round 6, the lab finding L1): uiautomator's tree carries a root mark of its own, "the dump
+lists the active window only" (`UiNode.activeWindowOnly`), which picks the uiautomator adapter; its parser marks that
+one window presented when the dump shows it is (`dialog`, `screen`), and a target the tree cannot list beneath it gets
+"close it first" from the tap's wait and `scroll_until`'s stop, no gesture sent — residual 6 closed on Android for such a
+window (see "Amendment: Android's presented window" below).
 
 ## Context
 
@@ -599,7 +604,7 @@ alert, and a non-modal sheet.
 | 3 a presentation in a later Window | stands for `screen` (the flags rule is per Window; none measured); a typed layer in any Window covers what is drawn before it | stands |
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
-| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands |
+| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window") |
 | 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
@@ -720,6 +725,58 @@ visibility never evidence alone; every residual reads as before. **The harness:*
 `468dc1b`, the differential over corpus-r19 against `468dc1b` 0 diffs. The code pointers of the earlier sections were
 moved to the new places (`presented-by-shape.ts` → `presentation.ts#byShape`, draw order's `markOf` / `markedLayers`
 → `presentation.ts#markOf` / `byMarks`); their text is otherwise unchanged.
+
+## Amendment: Android's presented window (2026-10-18)
+
+The lab finding L1 (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md,
+golden over the Android lab app): `uiautomator dump` lists the ACTIVE window only. With a Compose `AlertDialog` up the
+dump is the dialog's window (`[155,851][925,1368]` of 1080x2220), with a half-expanded `ModalBottomSheet` the sheet's
+full-screen window, its scrim (`content-desc="Close sheet"`, clickable, `[0,0][1080,1110]`) laid before the sheet
+(`[0,1110][1080,2220]`). The targets beneath are not in the tree at all, so nothing was "covered": `scroll_until`
+stroked `540 1776 → 540 444` twice — on the device the first stroke dismissed the dialog (it touched down on its dim)
+or dragged the sheet to full height — and the tap waited 5 s "to appear". The uiautomator adapter of the presentation
+module (`presentation.ts#byUiautomator`) had been chosen by the root's `paddedTouchTargets`, a mark meaning something
+else, and knew no fact of its own.
+
+**Decision.**
+
+1. **A root mark of the source's dialect: `UiNode.activeWindowOnly`** — set by the uiautomator parser on every tree's
+   root (`android.ts#parseUiautomatorXml`), in the dialect of `flatList` and `unclippedFrames`: the tree lists the window
+   that has focus, nothing beneath it. `presentation.ts#presentationOf` picks the uiautomator adapter by it;
+   `paddedTouchTargets` keeps its one meaning (Compose's padded touch targets, draw order's `ownControl` row).
+2. **The parser marks the window presented, as the WDA parser marks WDA's layers** (`android.ts#presentedWindow`,
+   `UiNode.presentation` on the root), since it reads what ui-tree never sees — the scrim's `clickable`:
+   - `dialog` — a new `PresentationKind`, typed by the window's own shape (the window is its own cover, no element):
+     a window of some area NOT ANCHORED AT THE SCREEN'S ORIGIN. An app's full-screen window starts at 0,0 whatever its
+     bars; one floating over what it was opened from does not. Named "a dialog is presented over it — close it first";
+     `scroll_until`'s stop adds "a swipe would land on the dialog".
+   - `screen` — a full-screen window whose content lays a SCRIM above a SHEET: some node's child clickable, labelled
+     and childless, spanning the window's width from its top edge, followed at once by a sibling spanning the width
+     to the window's bottom edge from no lower than the scrim's bottom. Named as a presented screen.
+3. **The marks adapter reads that mark as any other** (`byMarks`): the window is the tree's first layer, so it is over
+   no target in the tree (every node is its own — the dialog's Keep, the sheet's S are judged as before), and for NO
+   target its cover takes every touch-down — outside the dialog's window too, where the touch dismisses it — but on a
+   scroll view of its own (a search inside the sheet's list). `scroll_until` for a target not in the tree stops before
+   any stroke, "close it first", through the same `Scene.presentedAt` / `markedAt` the WDA marks use.
+4. **The uiautomator adapter answers one question of its own, `Presentation.alone`**: the root's mark on a tree that
+   lists the active window only — the presented layer listed ALONE, the screen beneath unlisted. The wait for a target
+   (interact/resolve.ts: the tap's, fill's and the optional tap's) asks it of its last read when the target was never
+   found and ends "Timed out after …: element … is not in the tree, which lists only the window presented on top (the
+   tree source lists the active window alone) — <the presented remedy>" instead of "… to appear" — a plain failure, not
+   absence (nobody saw the screen beneath), as `scroll_until`'s stop. The wait is kept: a dialog that closes itself
+   (a progress dialog) lets the target appear within it. On WDA's tree, which lists every window, a target missing
+   beside a marked alert is missing, and `alone` is undefined.
+
+**iOS unchanged.** idb lists only the presented layer too (the lab's SwiftUI alert and sheets), but its tree carries
+neither mark: its rows stay KNOWN as residual 6 (a target not yet in the tree is stroked for).
+
+**Measured.** Golden over the lab captures (truth/round-6, `--side` this branch): 242 → 226 mismatches, the 16 rows of
+`alert-dim.xml` and `sheet-medium.xml` A–D `tap` (refused, "close it first", nothing tapped) and `scroll_until`
+(stopped before any swipe, "close it first") turned green; no other row changed, on either platform. The colour
+asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait is not this amendment's.
+
+**Residuals** 18 and 19 ("Residuals accepted" below): a fully expanded sheet is no presented window; the shapes
+are measured on one AVD and Material 3 only.
 
 ## Residuals accepted
 
@@ -883,6 +940,17 @@ moved to the new places (`presented-by-shape.ts` → `presentation.ts#byShape`, 
    scroll view of that layer's own lets the stroke go. A scroll view of a LATER layer or Window the source did not
    mark, drawn above the marked one, holds the point all the same and is not asked, so the stroke stops there
    (toward refusal). No tree of the corpus lays one so.
+18. **A fully expanded sheet is no presented window** (2026-10-18, the amendment "Android's presented window"). Its dump
+   carries no scrim — `form-picker`'s country picker lists the sheet and its drag handle only — so it is not marked: the
+   form beneath times out "to appear" and `scroll_until` strokes (on the sheet's own list, which the rule would let
+   through anyway). Its rows stay KNOWN (tests/differential/golden/forms.known.ts). The tree has no fact for it but
+   Material's localized "Drag handle".
+19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). A floating
+   window anchored at the origin (a popup at the top-left corner) and a full-screen dialog are not marked; a window in a
+   split screen's lower half reads as a `dialog`; an app's own clickable, labelled leaf laid from its window's top edge
+   at full width, with a full-width sibling under it to the bottom, reads as a scrim; a Views `BottomSheetDialog`'s
+   `touch_outside` holds by the rule only if labelled (unmeasured). What a mark changes is asked only for a target the
+   tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped`.
 
 ## Bug notes
 
@@ -893,3 +961,4 @@ docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-d
 docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md
 docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
 docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
+docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md

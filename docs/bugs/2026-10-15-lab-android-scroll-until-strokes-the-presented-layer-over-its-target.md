@@ -1,5 +1,19 @@
 # BUG: `scroll_until` on Android, for a target beneath a presented layer (an AlertDialog, a half-expanded ModalBottomSheet), strokes the screen anyway — the first stroke DISMISSES the dialog (it lands on its dim) or EXPANDS the sheet, so the layer the caller did not ask to touch is gone or changed; `tap` waits 5 s for the element "to appear" without naming the layer either
 
+> **Status (2026-10-18):** fixed on `arch/r22-l1` in `d43df5d` for the AlertDialog and the half-expanded sheet; the
+> fully expanded sheet (`form-picker`) stands. The uiautomator root carries `activeWindowOnly` (the dump lists the
+> active window only), and the parser marks that window presented — `dialog` when it is not anchored at the screen's
+> origin, `screen` when its clickable, labelled scrim lies screen-wide above its sheet (adapters/android.ts
+> #presentedWindow). `scroll_until` for a target not in the tree then stops before any stroke ("… — a dialog is
+> presented over it — close it first, and a swipe would land on the dialog, so none was sent"), and the tap's wait ends
+> "Timed out after 5000ms: element … is not in the tree, which lists only the window presented on top … — close it
+> first" instead of "to appear". Measured by golden replay from truth/round-6 with `--side` that commit: the 16 rows
+> of `alert-dim.xml` and `sheet-medium.xml` A–D `tap` and `scroll_until` turned green (242 → 226 mismatches, no other
+> row changed); their colour rows stay KNOWN (the assert's "not found" is vacuous). `form-picker`'s expanded country
+> sheet dumps no scrim, so it is not marked: its rows stay KNOWN (ADR 0018's residual 18). Not yet re-measured on the
+> emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
+> window".
+
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33`, captured by scripts/truth/capture-android.ts on a dedicated
 `averi_lab` AVD, Pixel 3a profile, Android 13 / API 33, 1080x2220, Gboard hidden). averi = mobile-verify
