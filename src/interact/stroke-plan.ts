@@ -49,7 +49,8 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  * tree cannot tell — a card of a horizontal carousel nested in a vertical page, scrolled for `down`, is stroked over
  * the page, not vertically inside the carousel; and inside the one taken, the stroke's path keeps off every nested
  * scroll view that scrolls only ACROSS it (`clearLane`: the page's content-down touch-down on a carousel is moved to
- * the longest stretch of the page clear of it). The fallbacks, stated: no candidate along the stroke with room — the
+ * the longest stretch of the page clear of it — at a cost: the stroke is the stretch's 60 %, not the page's, 312 pt
+ * of travel for 416 on the note's geometry, so more rounds against the swipe and time budget). The fallbacks, stated: no candidate along the stroke with room — the
  * pick as before the axis (the nearest with room, whatever its axis: a card of a carousel no vertical list holds,
  * scrolled for `down`, is still stroked inside the carousel, mp-native's Account Detail as captured); no stretch clear
  * of a cross-axis scroll view with room, or none the cut for what is drawn over it leaves room in — the stroke as
@@ -479,7 +480,9 @@ const acrossOnly = ({ axes }: ScrollView, toward: Direction): boolean => axes?.a
  * the longest stretch of it along the stroke, on the stroke's line (a vertical stroke's x, a sideways stroke's y),
  * clear of every such scroll view on that line and above the keyboard — when that stretch has room (MIN_STROKE_BOX).
  * The stroke over the stretch keeps the line (its centre across is `met`'s, the box is cut along the stroke only), so
- * its whole path lies in the stretch. When no stretch has room, `met`: the stroke is drawn as before the rule, its
+ * its whole path lies in the stretch — and is the STRETCH's 60 %, shorter than `met`'s: a carousel `24,700 354x85` in
+ * the page `0,180 402x694` gives 596 → 284 (312 pt of travel) for the page's 735 → 319 (416), more rounds for one
+ * scroll — the price of a touch-down the page takes whole rather than one the carousel may keep. When no stretch has room, `met`: the stroke is drawn as before the rule, its
  * touch-down perhaps on the nested scroll view — the fallback, stated (the round still strokes the target's scroll
  * view; what a cross-axis scroll view hands its outer one of such a drag is unmeasured).
  *
