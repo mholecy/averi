@@ -9,7 +9,6 @@ package dev.averi.lab
 // for any family; recordTouches a Views dialog's.
 
 import android.view.MotionEvent
-import android.view.ViewGroup
 import android.view.Window
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -63,11 +62,18 @@ import kotlinx.coroutines.delay
 internal fun RecordWindowTouches(lab: Lab) {
     val view = LocalView.current
     DisposableEffect(view) {
-        val window = (view.parent as? DialogWindowProvider)?.window
+        val window = dialogWindow(view)
         val restore = window?.let { recordTouches(it, lab) }
         onDispose { restore?.invoke() }
     }
 }
+
+/**
+ * The window of the Compose dialog a view is composed in: a Dialog's content view is its DialogLayout, itself the
+ * provider; a ModalBottomSheet's or an AlertDialog's content sits one level below it.
+ */
+private fun dialogWindow(view: android.view.View): Window? =
+    ((view as? DialogWindowProvider) ?: (view.parent as? DialogWindowProvider))?.window
 
 /** A window's touch log (TouchLog) installed on it; returns what puts its own callback back. */
 internal fun recordTouches(window: Window, lab: Lab): () -> Unit {
@@ -142,9 +148,12 @@ internal fun PresentedLayer(cell: Cell, lab: Lab) {
 
 /**
  * A full-screen dialog (`dialog-fullscreen`): a Compose Dialog with `usePlatformDefaultWidth = false` and
- * `decorFitsSystemWindows = false`, its window laid MATCH_PARENT both ways — at 0,0 the screen's size, as an app's
- * full-screen DialogFragment is — its opaque surface over every target beneath, its own target on it. No outside to
- * touch: back (or Close) dismisses it.
+ * `decorFitsSystemWindows = false`, its content filling the window — its opaque surface over every target beneath, its
+ * own target on it. No outside to touch: back (or Close) dismisses it. Compose lays the window itself, between the
+ * system bars at full width (measured `[0,66][1080,2153]` on averi_lab, `(1081x2087) gr=CENTER`): FLAG_LAYOUT_NO_LIMITS,
+ * no fitted insets and MATCH_PARENT set on the window after it is shown are overridden by Compose's own size, so a
+ * window at 0,0 the screen's size is not what a Compose app gets (docs/bugs/2026-10-19-lab-android-presented-windows-
+ * the-parser-does-not-mark-full-screen-dialog-and-bottom-sheet-dialog.md).
  */
 @Composable
 private fun FullScreenDialog(cell: Cell, lab: Lab, dismissed: () -> Unit) {
@@ -153,12 +162,9 @@ private fun FullScreenDialog(cell: Cell, lab: Lab, dismissed: () -> Unit) {
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         RecordWindowTouches(lab)
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        DisposableEffect(window) {
-            window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            onDispose {}
-        }
         Box(Modifier.fillMaxSize().background(Color(0xFFECEFF1)).semantics { testTagsAsResourceId = true }) {
+            // Close at the top corner, clear of every slot's centre (a probe there would fire it).
+            TextButton({ dismissed(); lab.event("button", "Close") }, Modifier.align(Alignment.TopEnd).padding(16.dp)) { Text("Close") }
             Column(
                 Modifier.fillMaxWidth().padding(top = 120.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -166,7 +172,6 @@ private fun FullScreenDialog(cell: Cell, lab: Lab, dismissed: () -> Unit) {
             ) {
                 Text("Lab full-screen dialog")
                 for (t in cell.targets.filter { it.onLayer }) TargetBox(cell, t, lab)
-                TextButton({ dismissed(); lab.event("button", "Close") }) { Text("Close") }
             }
         }
     }

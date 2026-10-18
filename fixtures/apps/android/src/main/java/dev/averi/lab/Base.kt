@@ -21,7 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -41,8 +41,10 @@ private fun slotTop(slot: Int): Dp = (142 + 180 * slot).dp - SLOT_HEIGHT / 2
 
 /**
  * One target: a solid rectangle of its own colour, no visible text, no ripple (a screenshot taken during a probe tap
- * must still show its own colour), its tap logged. Its frame is reported in SCREEN pixels: the bounds in its window
- * plus the window's place on the screen — a sheet's content lives in a window of its own.
+ * must still show its own colour), its tap logged. Its frame is reported in SCREEN pixels: the bounds in its composition's
+ * root view plus that view's place on the screen — a sheet's content lives in a window of its own, and a Views
+ * BottomSheetDialog's ComposeView lies inside its window, not at its origin (round 7: the bounds in the window there
+ * read 66 px low).
  */
 @Composable
 internal fun TargetBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modifier) {
@@ -56,7 +58,7 @@ internal fun TargetBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Mod
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { lab.event("tap", t.tag) }
             .onGloballyPositioned { c ->
                 val at = IntArray(2).also(view::getLocationOnScreen)
-                val b = c.boundsInWindow()
+                val b = c.boundsInRoot()
                 lab.frame(t.tag, Rect(at[0] + b.left.roundToInt(), at[1] + b.top.roundToInt(), at[0] + b.right.roundToInt(), at[1] + b.bottom.roundToInt()))
             },
     )
