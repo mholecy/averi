@@ -169,9 +169,14 @@ describe('calibration.json ↔ the KNOWN rows', () => {
       ]),
     );
     expect(bad).toEqual([]);
+  });
+
+  it('a live entry filed as a partially calibrated note that its `openLive` does not list is misfiled — keyed by case, not by note', () => {
     const ten = table.notes.find((e) => e.n === '10')!;
     expect(misfiled([{ where: 'live android uiautomator turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toEqual([]);
+    // another case of the same note, and the listed case under another source: neither is listed, both misfiled
     expect(misfiled([{ where: 'live android uiautomator scroll:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
+    expect(misfiled([{ where: 'live ios wda turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
   });
 
   it('a row filed as a partially calibrated note that its `open` does not list is misfiled — fab.xml\'s L and K refiled as #2 or as L1', () => {
