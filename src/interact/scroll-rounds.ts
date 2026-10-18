@@ -6,7 +6,7 @@ import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { planProbe, planStroke, seeRead, startStrokes, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
+import { planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
@@ -259,7 +259,8 @@ export interface DetentMove {
  * `why`: no swipe or time was left (`budget`); no clipping ancestor from
  * the flush one outward has room for a stroke (`room`: a probe drawn over
  * the screen instead would touch down off the container and move nothing
- * whatever lies beyond, so none is sent); or the
+ * whatever lies beyond, so none is sent); every one of them scrolls only across the edge (`axis`: a probe along it
+ * moves none of them — interact/stroke-plan.ts#probeAcrossOnly); or the
  * probe was drawn under twice TOUCH_SLOP and may have been a tap (`tap`).
  *
  * `fills`: flush with BOTH of its
@@ -269,7 +270,7 @@ export interface DetentMove {
  * if either, is cut), so never checked — and never a plain "fully visible".
  */
 export type Flush =
-  | ({ edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'tap' }))
+  | ({ edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
   | { edges: readonly [Edge, Edge]; container: Rect; checked: false; why: 'fills' };
 
 /**
@@ -1352,6 +1353,7 @@ function flushCheck(s: Mutable<State>, { best, facts, probeHeld, probeStroked, g
   // takes a device reporting 0×0 throughout, and a tree whose window stood in on an earlier round (else the frame is
   // 0×0 and no stop is ever visible) but not on this one.
   const noRoom = { edge, container, checked: false, why: 'room' } as const;
+  if (probeAcrossOnly({ toward: SIDES[edge].reveals, facts, scrollViews: chain.slice(at) })) return { edge, container, checked: false, why: 'axis' };
   const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
   const probeOver = (keyboardTop: number | undefined) =>
     planProbe(s.strokes, { toward: SIDES[edge].reveals, reach: PROBE_REACH, maxTravel, gesture, facts, scrollViews: chain.slice(at), keyboardTop });

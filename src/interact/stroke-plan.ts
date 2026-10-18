@@ -54,8 +54,8 @@ import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVe
  * scrolled for `down`, is still stroked inside the carousel, mp-native's Account Detail as captured); no stretch clear
  * of a cross-axis scroll view with room, or none the cut for what is drawn over it leaves room in — the stroke as
  * before, over it (`roomAmong`); the probe (`planProbe`) never goes over a
- * scroll view that scrolls only across it (no room, `flush.why: 'room'`, rather than a probe that moves nothing and is
- * read as checked). Why: a gesture belongs to the view the finger first touches, and a carousel touched down on by a
+ * scroll view that scrolls only across it (none sent, rather than a probe that moves nothing and is read as checked;
+ * a chain of such scroll views alone is unchecked for its own reason, `probeAcrossOnly`, `flush.why: 'axis'`). Why: a gesture belongs to the view the finger first touches, and a carousel touched down on by a
  * vertical drag hands the outer list part of it at most (~51 pt a stroke on iOS, inferred, UNMEASURED: no lab cell held
  * a carousel at the change; harness task H2's `carousel-in-list` is to measure it) —
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. ADR 0010
@@ -262,6 +262,18 @@ export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gest
     stroke: { toward, reach, ...(coverTop !== undefined && { coverTop }), box: { ...box }, maxTravel, points },
     memory: close({ ...open(memory), chosen: { ...room.within } }),
   };
+}
+
+/**
+ * Every one of the probe's scroll views scrolls only ACROSS a stroke toward `toward`, as `facts`' tree tells
+ * (`acrossOnly`): no probe along the flush edge can move any of them, so none is sent — `planProbe` answers no room
+ * for them — and scroll-rounds.ts reports the stop unchecked for that reason (`flush.why: 'axis'`), not for want of
+ * room. False when there are none. Android only in practice: the probe's scroll views are the CLIPPING chain
+ * (ui-tree/geometry.ts#Clips.scrollersOf), empty on every WDA tree, and of Android's scrollers only a class that fixes
+ * the axis says it (`HorizontalScrollView`, a Compose `horizontalScroll`; a lazy row's axis is unknown).
+ */
+export function probeAcrossOnly({ toward, facts, scrollViews }: Pick<ProbeAsk, 'toward' | 'facts' | 'scrollViews'>): boolean {
+  return scrollViews.length > 0 && scrollViews.every((rect) => acrossOnly({ rect, over: [], axes: facts.scene.clips.axesOf(rect) }, toward));
 }
 
 /** Where a stroke touched down on a node drawn over the scroll view it was drawn in (`touchedOn`): the point, the node, the scroll view. */

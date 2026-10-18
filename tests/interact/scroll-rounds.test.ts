@@ -904,6 +904,17 @@ describe('round — the flush check across nested clipping containers, and a pro
     }
   });
 
+  it('flush with the bottom of a carousel that scrolls only sideways (a HorizontalScrollView), no list around it: NO probe — none along the edge can move it — and the stop is unchecked for that reason, `axis`, not for want of room', () => {
+    const CAROUSEL: Rect = { x: 0, y: 1000, width: 1080, height: 400 };
+    const cardNode = match({ x: 40, y: 1100, width: 600, height: 300 }, 'card');
+    const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...CAROUSEL }, children: [cardNode] })] });
+    const played = play(FULLY_ANDROID, [{ tree, found: [cardNode] }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stop']);
+    const result = resultOf(played);
+    expect(result.flush).toEqual({ edge: 'bottom', container: CAROUSEL, checked: false, why: 'axis' });
+    expect(describeScrollResult(result)).toMatch(/every scroll container around it from that one outward scrolls only sideways, so no probe swipe can move its bottom edge into view to check it — it may be cut there/);
+  });
+
   // The stroke box judged twice (deep/r3-scroll, 2026-10-09): the round judged room over the screen, the driver over the
   // screen ABOVE the keyboard, and fell back to the whole screen when that had none — a probe touching down off the
   // container moves nothing, and that was reported "nothing of it is cut there".
