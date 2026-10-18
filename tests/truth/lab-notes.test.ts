@@ -50,46 +50,11 @@ const AWAITING_LIVE: Readonly<Record<string, { note: string; why: string }>> = {
 
 /**
  * Notes calibration.json lists that are not committed on this branch: fixed notes (calibrated, or a residual, or
- * excluded). 20 of the 31 are committed in 5f1996e (docs/device-check-r5-r12, not merged here); the other 11 — the
- * 2026-10-14/15 notes, ios-color-assert-on-a-row-outside… through ocr-assert-fails-on-a-typographic-apostrophe…, and
- * the excluded android-numeric-character-references… — are in no commit on any ref, only untracked in the main
- * checkout (the owner's to commit). calibrate.ts reads no note's text, only its rows, so they calibrate without it; but
- * none of them may be open or be named by a KNOWN row (checked below), and a note that lands here must be struck off
- * this list.
+ * excluded). Empty since the 31 notes that sat untracked in the main checkout were committed (83059cb,
+ * docs/device-checks-r5-r20, merged here). calibrate.ts reads no note's text, only its rows; a note listed here may not
+ * be open or be named by a KNOWN row (checked below), and a note that lands here must be struck off this list.
  */
-const NOT_ON_THIS_BRANCH: readonly string[] = [
-  '2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md',
-  '2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md',
-  '2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md',
-  '2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md',
-  '2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md',
-  '2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md',
-  '2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md',
-  '2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md',
-  '2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md',
-  '2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md',
-  '2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md',
-  '2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md',
-  '2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md',
-  '2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md',
-  '2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md',
-  '2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab.md',
-  '2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped.md',
-  '2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md',
-  '2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md',
-  '2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md',
-  '2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md',
-  '2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md',
-  '2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field.md',
-  '2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md',
-  '2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md',
-  '2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md',
-  '2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md',
-  '2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md',
-  '2026-10-15-android-numeric-character-references-in-uiautomator-attributes-are-not-decoded.md',
-  '2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md',
-  '2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md',
-];
+const NOT_ON_THIS_BRANCH: readonly string[] = [];
 
 /** Every place a note is named: where, and the name (`bug:<file>`, `residual:<what>`, or anything else, refused). */
 const named: readonly { where: string; name: string }[] = [
