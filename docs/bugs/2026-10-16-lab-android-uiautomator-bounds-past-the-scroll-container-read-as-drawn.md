@@ -91,8 +91,10 @@ scroll_until { … C, direction: "right" }                  → Element … full
 ```
 
 So on Android the card's R-stroke — a sideways stroke inside the carousel, what an axis-aware stroke choice is judged
-on — is never asked of averi: it stops at once. The iOS capture of the cell (WDA lists C with its unclipped frame) is
-the one that measures the stroke.
+on — is never asked of averi: it stops at once. Expected: the iOS capture of the cell measures the stroke (WDA listing
+C with its unclipped frame, as it lists scroll-bounded's rows) — unmeasured: no iOS capture on 2026-10-18 (the host's
+Xcode 27.1 expects a newer CoreSimulator; no WebDriverAgent ran). Pending in docs/plans/2026-10-15-ground-truth-lab-app.md
+(Pending captures, round 6).
 
 ## Rows (golden, KNOWN in tests/differential/golden/edges.known.ts)
 

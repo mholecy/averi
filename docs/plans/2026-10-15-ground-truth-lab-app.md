@@ -400,6 +400,20 @@ static pair's before (`pair: 2`).
 - P5 (text inventory) is independent and small — any time.
 - P3 / P4 after phase 3, judged on the golden corpus as well as the 580-tree differential.
 
+### Pending captures (round 6, truth/r6-cells)
+
+Built in both apps, captured on Android only: on 2026-10-18 the host's Xcode 27.1 expected CoreSimulator 1174.9.2 and
+found 1171.7 (`simctl` hangs in `xcodebuild -runFirstLaunch`; xcodebuild runs no WebDriverAgent on the lab
+simulator), so no iOS capture was made. Once the owner has run `sudo xcodebuild -runFirstLaunch`:
+`capture.ts --udid <averi-lab iPhone 17> --out tests/fixtures/truth/ios-iphone17-ios27 --cells
+carousel-in-list,own-parts`, then their rows into edges.known.ts and false-covers.known.ts.
+
+- `edges/carousel-in-list` — the measurement the axis-aware stroke choice (round 6's S4) is judged on: under WDA, C's
+  R-stroke `right` (expected: today a stroke inside the carousel; along its axis or not is what S4 decides). Android's
+  capture cannot show it: there C is lab finding LE1 (dumped where it is not drawn, the stop at once).
+- `false-covers/own-parts` I — the iOS icon button (expected: SwiftUI lists the button alone, labelled Close, tapped by
+  its label); calibration.json #8's `needs`.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,

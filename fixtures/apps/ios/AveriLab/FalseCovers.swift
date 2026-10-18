@@ -9,8 +9,9 @@ import UIKit
 //   reaching past the field at the top and the bottom (#18's text-field half: the field over its own label). A tap
 //   on either text fires its control: logged as the target's `tap`. `I`, a label target (CatalogTarget.label): an
 //   icon button (44 pt, a white glyph) labelled by its accessibility label on a box of its colour — Android's
-//   IconButton lists its icon, labelled, before an unlabelled clickable inset on all four sides (#8's second fix);
-//   SwiftUI lists the button alone, labelled. A tap on it fires the button.
+//   IconButton lists its icon, labelled, before an unlabelled clickable inset on all four sides (#8's second fix).
+//   Expected: SwiftUI lists the button alone, labelled — unmeasured: no iOS capture on 2026-10-18 (the host's Xcode
+//   27.1 expects a newer CoreSimulator; no WebDriverAgent ran). A tap on it fires the button.
 // - `toolbar-dismiss` (layer `toolbar-screen`) and `toolbar-dismiss-bar` (`toolbar-bar`): a form (Forms.swift's
 //   FormScreen, its principal title the cell's `keyboardDismiss` taps). The principal item makes SwiftUI lay its own
 //   full-screen `Toolbar` host (one empty child) after the content in WDA's tree — #7's shape, on both cells;

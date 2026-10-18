@@ -311,6 +311,8 @@ Live (phase 5, ios wda): **CALIBRATED-ON-DEFECT**, d928789 → c3ebc62, dismiss:
   - ok android-averi_lab-api33/own-parts.xml L tap — Tapped text:"LOGIN"
   - ok android-averi_lab-api33/own-parts.xml L scroll_until — Element text:"LOGIN" fully visible after 0 swipes
 
+Needs: 8.2's iOS leg: own-parts recaptured on the lab simulator (capture.ts --cells own-parts) once the host's Xcode first launch is done — the plan's Pending captures (round 6); expected green throughout (the SwiftUI button labelled Close, as L).
+
 own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes "a layout defect"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.
 
 ## 8.2: CALIBRATED
@@ -324,7 +326,7 @@ own-parts' L: a Material button's text LOGIN, which uiautomator lists as the cli
   - ok android-averi_lab-api33/own-parts.xml I tap — Tapped label:"Close"
   - ok android-averi_lab-api33/own-parts.xml I scroll_until — Element label:"Close" fully visible after 0 swipes
 
-8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:"Close"`). Red at 2f98900 (`label:"Close" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). iOS lists the SwiftUI button alone, labelled Close: its own-parts capture predates I (round 6's iOS capture waits on the host's Xcode).
+8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:"Close"`). Red at 2f98900 (`label:"Close" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). Expected on iOS: SwiftUI lists the button alone, labelled Close — unmeasured: no iOS capture on 2026-10-18 (the host's Xcode 27.1 expects CoreSimulator 1174.9.2, found 1171.7; no WebDriverAgent ran), so the iOS own-parts captures hold L and N only.
 
 ## 9: CALIBRATED
 
