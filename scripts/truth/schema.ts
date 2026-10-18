@@ -40,7 +40,8 @@ export interface CatalogTarget {
    * A label target (calibration.json #8's second fix, an icon button's icon): the target is a control's icon whose
    * accessibility label (Android's content description) is this, drawn on a box of its colour — identified as
    * lab.<cell>.<tag>, the box's frame reported as `<tag>.box` (the one `drawn` is measured over); the rows ask by the
-   * label (`label:"…"`), as a test names an icon button, and no text row is asked of it (no string is drawn).
+   * label (`label:"…"`), as a test names an icon button, and no text row is asked of it (no string is drawn). Never
+   * with `text` (truth.ts#elementOf asks by one; scripts/truth/catalog.ts#buildCatalog refuses both).
    */
   label?: string;
   /** The scroll view the target lies in: an id of LabState.scrollViews, whose clip the measured geometry cuts it by. */
