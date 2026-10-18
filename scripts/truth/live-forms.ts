@@ -1,13 +1,14 @@
 import { minTapPiece as minPieceOn } from '../../src/ui-tree/draw-order.js';
-import { touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { claimsDone, isError, replyKind } from './replies.js';
+import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
+import { claimsDone, claimsTap, isError, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
 import type { LabState, Rect } from './schema.js';
 
 /**
  * The live golden's forms judges that are more than a value held (live.ts runs the cases): pure over the lab app's
  * form model, so they are pinned without a device (tests/truth/live-forms.test.ts). `holds` is every fill case's;
- * the two below are lab note F2A1's form-keyboard cases, whose submit bar riding on the IME has no node — the app's
- * frames (`submit.bar`) say what of a field it covers, which the tree cannot.
+ * the two below it are lab note F2A1's form-keyboard cases, whose submit bar riding on the IME has no node — the app's
+ * frames (`submit.bar`) say what of a field it covers, which the tree cannot; `judgeUnderSheet` is the taps beneath
+ * form-picker's sheet.
  */
 
 export const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
@@ -86,3 +87,27 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
   }
   return { outcome: 'ok', why: `no stop, nothing submitted (${where}); ${strokes}: ${short(reply)}` };
 }
+
+/**
+ * c2–c4: a tap on form-picker's name, country or submit beneath the picker sheet, open at launch and fully expanded —
+ * a sheet uiautomator's dump marks no presented window (no scrim: ADR 0018's residual 18, accepted with the
+ * active-window hint). Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and
+ * no `Tapped`. The reply must then say to close the sheet, once: the presented remedy (a sheet the tree source marks)
+ * or the active-window hint (uiautomator: src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT) — ok; neither, or "close it
+ * first" said twice, is LOUD (idb lists only the sheet and says nothing of it).
+ */
+export const judgeUnderSheet =
+  (tag: string) =>
+  (s: LabState, [reply]: string[], _source: string, launched: LabState): LiveVerdict => {
+    const kind = replyKind(reply);
+    const fired = firedSince(s, launched);
+    const focused = s.focus != null && s.focus !== launched.focus ? s.focus : undefined;
+    const logged = [...fired.map((e) => `${e.kind} ${e.tag}`), ...(focused === undefined ? [] : [`focus ${focused}`])];
+    if (claimsTap(reply)) return { outcome: 'MISMATCH', kind, why: `averi says ${short(reply)} — ${tag} lies beneath the picker sheet; the app logged ${logged.join(', ') || 'nothing'}` };
+    if (logged.length > 0) return { outcome: 'MISMATCH', kind, why: `refused, but the app logged ${logged.join(', ')} — averi: ${short(reply)}` };
+    const by = presentedRemedySaid(reply) ? 'the presented remedy' : windowHintSaid(reply) ? 'the active-window hint' : undefined;
+    const times = reply.split('close it first').length - 1;
+    if (by === undefined) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but no "close it first": ${short(reply)}` };
+    if (times > 1) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but "close it first" said ${times} times: ${short(reply)}` };
+    return { outcome: 'ok', kind, why: `not tapped, nothing fired; ${by}, once: ${short(reply)}` };
+  };

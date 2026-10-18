@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { judgeNoteFill, judgePhoneScroll } from '../../scripts/truth/live-forms.js';
+import { judgeNoteFill, judgePhoneScroll, judgeUnderSheet } from '../../scripts/truth/live-forms.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
 // Lab note F2A1's live form cases (scripts/truth/live-forms.ts), over the committed record of round 6's Android device
@@ -45,5 +46,32 @@ describe('k7: scroll_until phone — the stop ok, "fully" overstating by what th
   });
   it('a submit: MISMATCH', () => {
     expect(judgePhoneScroll({ ...state, submits: [{ at: 1 }] } as LabState, replies, 'uiautomator', launched).outcome).toBe('MISMATCH');
+  });
+});
+
+describe('c2–c4: a tap beneath form-picker\'s expanded sheet — nothing fires, the reply says to close the sheet once', () => {
+  // The launch c1 recorded: form-picker, the sheet open and fully expanded.
+  const { launched } = k('c1');
+  const judge = judgeUnderSheet('name');
+  const hinted = `ERROR Timed out after 5000ms waiting for element id:"lab.form-picker.name" to appear\n  (${ACTIVE_WINDOW_HINT})`;
+  const at = 1;
+
+  it('uiautomator\'s wait with the active-window hint, nothing logged: ok', () => {
+    expect(judge(launched, [hinted], 'uiautomator', launched)).toMatchObject({ outcome: 'ok', kind: 'not found', why: expect.stringMatching(/^not tapped, nothing fired; the active-window hint, once: /) });
+  });
+  it('a presented refusal (a sheet the source marks): ok', () => {
+    const reply = 'ERROR id:"lab.form-picker.name" is under button "Albania" … — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped';
+    expect(judge(launched, [reply], 'wda', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/the presented remedy, once/) });
+  });
+  it('no "close it first" (idb), or it said twice: LOUD', () => {
+    expect(judge(launched, ['ERROR Timed out after 5000ms waiting for element id:"lab.form-picker.name" to appear'], 'idb', launched).outcome).toBe('LOUD');
+    expect(judge(launched, [`${hinted.replace('\n', ' — a dialog is presented over it — close it first\n')}`], 'uiautomator', launched)).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/said 2 times/) });
+  });
+  it('a row selected, the sheet dismissed, a field focused, or a Tapped: MISMATCH', () => {
+    const logged = (e: { kind: 'select' | 'dismissed'; tag: string }) => ({ ...launched, events: [...launched.events, { ...e, at }] }) as LabState;
+    expect(judge(logged({ kind: 'select', tag: 'AL' }), [hinted], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^refused, but the app logged select AL/) });
+    expect(judge(logged({ kind: 'dismissed', tag: 'sheet' }), [hinted], 'uiautomator', launched).outcome).toBe('MISMATCH');
+    expect(judge({ ...launched, focus: 'name' }, [hinted], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/focus name/) });
+    expect(judge(launched, ['Tapped id:"lab.form-picker.name"'], 'uiautomator', launched).outcome).toBe('MISMATCH');
   });
 });
