@@ -1056,13 +1056,13 @@ function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
     }[edge];
     // Dumped wholly past this edge and clamped onto it (UiNode.clippedOut): past-the-edge evidence with no area left to show it.
     if (rectArea(d) === 0) return clippedOut === edge && Math.abs(near) <= 1;
-    const fromInside = (edge === 'top' || edge === 'bottom') && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
+    const fromInside = axisOfEdge(edge) === 'vertical' && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
     return near < -1 || fromInside;
   };
   let shallowest: Cut | undefined;
   for (const container of chain) {
     for (const edge of flushEdges(n, container)) {
-      const depth = edge === 'top' || edge === 'bottom' ? n.height : n.width;
+      const depth = across(n, edge);
       if (shallowest !== undefined && depth >= shallowest.depth) continue;
       for (const d of everyNode(node)) {
         if (d !== node && runsOnPast(d, container, edge)) {

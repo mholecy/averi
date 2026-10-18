@@ -1,5 +1,5 @@
 import type { ClippedSide, DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
@@ -929,7 +929,7 @@ function overFarSide(rect: Rect, direction: Direction, cover: Rect, frame: Rect)
 function showsOnlyPast(rect: Rect, far: Edge, cover: Rect, frame: Rect): boolean {
   const inFrame = rectIntersection(rect, frame);
   if (inFrame === undefined) return false;
-  const vertical = far === 'top' || far === 'bottom';
+  const vertical = axisOfEdge(far) === 'vertical';
   // Along the scroll: [lo, hi) of the target in the frame and of the cover; across it, the target's span must lie in the cover's.
   const [lo, hi] = vertical ? [inFrame.y, inFrame.y + inFrame.height] : [inFrame.x, inFrame.x + inFrame.width];
   const [from, to] = vertical ? [cover.y, cover.y + cover.height] : [cover.x, cover.x + cover.width];
