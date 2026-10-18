@@ -11,6 +11,7 @@ import { judgeTap, OffScreenRefusal, tapStandings, type Aim, type TapReading } f
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { remedyThenEscape } from '../helpers/escape-order.js';
 
 // THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look (ui-tree/look.ts#lookAt)
 // and a screen — no settle loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a
@@ -593,6 +594,16 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
     expect(said(outcome)).toContain(
       'dismiss it first (tap a neutral element such as the screen title — a tap: step in a flow; this adapter cannot hide it on its own (tap the title)) — a bar riding on it goes down with it — or scroll_until',
     );
+  });
+  // The owner's decision of 2026-10-18 on F2A1's wording: the coordinate tap stays, as the way past a control that only
+  // READS cut — but every remedy the refusal names (hide the keyboard, scroll) comes before it, and it is the last clause.
+  it('the remedy first, the coordinate escape last — phone with the IME up, note after back', async () => {
+    const replies = [
+      said((await judge(await capture('android-lab-form-keyboard.xml'), 'lab.form-keyboard.phone', { first: PIXEL }, { kb: reading(1398) })).outcome),
+      said((await judge(await capture('android-lab-form-keyboard-after-back.xml'), 'lab.form-keyboard.note', { first: PIXEL })).outcome),
+    ];
+    for (const reply of replies) expect(remedyThenEscape(reply), reply).toEqual({ remedies: expect.any(Number), escapeLast: true });
+    expect(remedyThenEscape(replies[0]).remedies).toBe(2); // dismiss it first, then scroll_until
   });
   it('a field whole above the bar is tapped at its centre, the reading never asked', async () => {
     const kb = reading(1398);

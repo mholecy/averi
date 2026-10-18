@@ -360,7 +360,9 @@ export interface ReadTime {
  *   been taken) nothing is guessed. Every stroke of a scroll that never
  *   found its target goes the caller's way (a turn needs a sighting; the
  *   end turn, `EndTurn`, needs the target in the tree), so the other side
- *   was never stroked;
+ *   was never stroked. `activeWindowOnly` when the last tree's source lists
+ *   the active window only (ui-tree/standing.ts#ACTIVE_WINDOW_HINT: a sheet
+ *   or dialog it does not mark may hide the target);
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
  *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
@@ -384,7 +386,7 @@ export interface ReadTime {
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
   | InFrameShort
-  | { of: 'absent'; unsearched?: Edge }
+  | { of: 'absent'; unsearched?: Edge; activeWindowOnly?: true }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
@@ -1443,7 +1445,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, { readError, found, best, viewport, cover }, by),
+      short: shortfall(s, { readError, found, best, viewport, cover, activeWindowOnly: read?.tree.activeWindowOnly === true }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1642,6 +1644,8 @@ interface BoundRound {
   readonly viewport: Rect;
   /** The keyboard cover applied to that frame, if any — quoted with it. */
   readonly cover: Cover | undefined;
+  /** This round's tree lists the active window only (`UiNode.activeWindowOnly`) — an `absent` failure says so. */
+  readonly activeWindowOnly: boolean;
 }
 
 /**
@@ -1651,7 +1655,7 @@ interface BoundRound {
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, { readError, found, best, viewport, cover }: BoundRound, by: BoundBy): Shortfall {
+function shortfall(s: State, { readError, found, best, viewport, cover, activeWindowOnly }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.standing.facts.visible > 0) return shortOf(best);
   const left = s.inFrameAfter;
@@ -1661,7 +1665,7 @@ function shortfall(s: State, { readError, found, best, viewport, cover }: BoundR
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
     // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
     const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
-    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }) };
+    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }), ...(activeWindowOnly && { activeWindowOnly: true as const }) };
   }
   // In the tree: scroll-read.ts#judge scores every match, so this read judged one and `past` is this read's.
   return {

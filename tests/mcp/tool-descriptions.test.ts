@@ -349,6 +349,12 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
+  it('tap and the troubleshooting reference quote the active-window hint every other Android not-found carries', async () => {
+    const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it`);
+    expect(TROUBLESHOOTING).toContain(`\`element never appeared in the tree\` carries \`(${ACTIVE_WINDOW_HINT})\``);
+  });
+
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
     expect(description('scroll_until')).toContain(
       'Once a read finds the target in the viewport under a screen presented over it (as for tap: a layer WebDriverAgent shows presented, or elsewhere a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window), scroll_until confirms with one more read when the timeout allows, and fails without swiping further — "stopped before any swipe …" or "stopped after N swipes, without swiping further …", then "' +

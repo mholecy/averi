@@ -8,7 +8,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { cutByRemedy, cutRemedy, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
-import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT, outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
@@ -643,7 +643,7 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':
-      return `element never appeared in the tree${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
+      return `element never appeared in the tree${short.activeWindowOnly === true ? ` (${ACTIVE_WINDOW_HINT})` : ''}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':
