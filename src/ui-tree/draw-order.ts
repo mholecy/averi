@@ -198,7 +198,10 @@ export interface DrawOrder {
    * through types.ts#DrawnOverStrip). Rects as the tree gives them — no
    * flat-list reach, no tab-bar item listed before the node: a nested tree's
    * order is its draw order. Empty for a node not in this tree. The parser
-   * asks only whether it is empty; the list is for diagnosis and tests.
+   * asks only whether it is empty; the sliver rule's cut by a later node
+   * (standing.ts#cutByLater) reads the list, in draw order — the first node
+   * in it holding the whole pixel row past a thin control's edge, and not the
+   * control itself, is the node that cut it.
    */
   coversOf(node: UiNode, region: Rect): readonly UiNode[];
   /**

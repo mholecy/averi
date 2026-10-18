@@ -449,7 +449,9 @@ const INHERITED_CUT_WAY_PAST =
  * past, when its standing's remedy is the plain `scroll` (beneath a
  * presented screen `advice` says that screen's remedy instead) — the refusal
  * of a node cut to a sliver (ui-tree/standing.ts#Scene.standing's `cut`;
- * geometry.ts#Clips.cutSliver owns what counts as cut, and
+ * what counts as cut is geometry.ts#Clips.cutSliver's at a clipping
+ * container's edge and ui-tree/standing.ts#cutByLater's at a node drawn
+ * after it, whose refusal says `cutByRemedy`'s instead of this advice; and
  * draw-order.ts#MIN_TAP_PIECE_FRACTION the minimum). A sliver also
  * covered is refused for its cut, whose remedy names the edge.
  * docs/adr/0005-cut-before-cover.md
@@ -464,9 +466,11 @@ const INHERITED_CUT_WAY_PAST =
  * too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`; measured:
  * the toggle's leaf label "Payment details", tapped as a child, did
  * nothing) — whose own way past names what it lies in:
- * something in THAT clear of the edge. Only nodes under a clipping ancestor
- * (UiNode.clipsDescendants, Android's) are cut: an iOS tree has none, so
- * this never refuses there.
+ * something in THAT clear of the edge. A container's cut needs a clipping
+ * ancestor (UiNode.clipsDescendants, Android's); a cut by a later node needs
+ * none, only a nested tree of clipped frames (standing.ts#cutByLater's
+ * `cutsAtLater`) — an iOS tree is neither (WDA's frames are unclipped, idb's
+ * list flat), so no cut is refused there.
  */
 const cutAdvice = (cut: Cut): string => `${cutRemedy(cut.edge)} (${cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST})`;
 
