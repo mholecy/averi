@@ -444,9 +444,14 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
  * bottom sheet whose dump carries no scrim (form-picker), a full-screen dialog, a window against the screen's edge —
  * still hides the screen beneath from the tree, and nothing in the dump tells it from no window at all (ADR 0018's
  * residuals 18 and 19, accepted by the owner 2026-10-18 with this hint). So every such reply says what the tree is and
- * what to do if a sheet or dialog is up, as a possibility, never as the cause: the tap's and fill's wait "to appear"
- * (interact/resolve.ts#notFound) and `scroll_until`'s "never appeared in the tree" (interact/scroll-text.ts, the
- * `absent` shortfall). Not under WDA or idb, which list every window. Said once, here.
+ * what to do if a sheet or dialog is up, as a possibility, never as the cause. It reaches, through `activeWindowHint`
+ * (the one test of such a tree, interact/resolve.ts#missOf and interact/scroll-rounds.ts's bound): the never-resolved
+ * wait "to appear" (interact/resolve.ts#notFound) of both of its pollers — `resolveSettled`, the tap's and fill's wait,
+ * and `resolvePresent`, the presence check a flow's optional tap runs (flow/engine.ts#runOptionalSteps: its error
+ * carries it, though the skipped step's line, an ElementNotFoundError's, reads only "(not present)") — and
+ * `scroll_until`'s "never appeared in the tree" (interact/scroll-text.ts, the `absent` shortfall); a flow's tap, fill
+ * and scroll_until steps through the same. Not a flow's `wait:` step (flow/engine.ts#waitFor polls conditions, not
+ * these), nor the asserts' "not found". Not under WDA or idb, which list every window. Said once, here.
  */
 export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
 
