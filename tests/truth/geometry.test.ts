@@ -290,6 +290,7 @@ const GREEN = '#43A047';
  */
 class GeometryLab implements LabDevice {
   readonly platform = 'android';
+  readonly app = 'native';
   taps: [number, number][] = [];
   /** What `navigation()` answers (LabDevice.navigation): none unless a test sets it. */
   mode: NavigationMode | undefined = undefined;

@@ -5,10 +5,11 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import type { CatalogCell, ImeCapture, ImeWitness, LabState, NavigationMode } from './schema.js';
+import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode } from './schema.js';
 
 /**
- * The lab app on one device, driven with the raw tools only (simctl, idb, WDA's own `/source`; adb) — what the truth
+ * A lab app on one device — the native one (SwiftUI, Compose) or the React Native one (LAB_APP), each device object
+ * bound to one — driven with the raw tools only (simctl, idb, WDA's own `/source`; adb) — what the truth
  * capture (capture-run.ts) and the live golden (live.ts) share: launching a cell in a fresh process, reading the app's
  * state file, a raw tap, the screenshot and the raw trees. averi's verbs are not used here, so the oracle does not
  * depend on the code it judges. Units are the tree's: points on iOS, pixels on Android.
@@ -18,10 +19,28 @@ const run = promisify(execFile);
 /** How a lab runs a command — injectable, so the device guards are tested without a device. */
 export type Exec = (file: string, args: string[]) => Promise<{ stdout: string }>;
 const exec: Exec = (file, args) => run(file, args, { maxBuffer: 64 << 20 });
-/** The lab app's iOS bundle identifier. */
-export const BUNDLE = 'dev.averi.lab';
-/** The lab app's Android package: the iOS bundle's name, aliased so each platform's code says which one it means. */
-export const LAB_PACKAGE = BUNDLE;
+/**
+ * What the harness knows of a lab app (schema.ts#LabApp): its name — a truth run's manifest `app`, which tells one app's
+ * runs from the other's on the same device — its iOS bundle identifier, its Android package (the same string: each
+ * platform's code says which one it means), and where its source lies per platform.
+ */
+export interface LabAppIdentity {
+  name: string;
+  bundle: string;
+  package: string;
+  source: Record<Platform, string>;
+}
+
+export const LAB_APP: Record<LabApp, LabAppIdentity> = {
+  native: { name: 'AveriLab', bundle: 'dev.averi.lab', package: 'dev.averi.lab', source: { ios: 'fixtures/apps/ios', android: 'fixtures/apps/android' } },
+  'react-native': { name: 'AveriLabRN', bundle: 'dev.averi.lab.rn', package: 'dev.averi.lab.rn', source: { ios: 'fixtures/apps/rn', android: 'fixtures/apps/rn' } },
+};
+
+/** Why `app` does not build `cell` (another app's family: schema.ts#appOf), or undefined when it does. */
+export function otherApp(cell: Pick<CatalogCell, 'family'>, app: LabApp): string | undefined {
+  const builder = appOf(cell.family);
+  return builder === app ? undefined : `a cell of the ${builder} lab app (${LAB_APP[builder].name}), not of ${LAB_APP[app].name}`;
+}
 export const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One raw tree of the screen as it is now: a capture of the run, its file `<cell><suffix>`. */
@@ -33,6 +52,8 @@ export interface RawTree {
 
 export interface LabDevice {
   readonly platform: Platform;
+  /** The lab app it drives (LAB_APP): one per device object, its cells only. */
+  readonly app: LabApp;
   /** The manifest's `device`: model and OS, as the device reports them. */
   describe(): Promise<string>;
   /** Why this app cannot build `cell`, or undefined when it can. */
@@ -103,6 +124,8 @@ export const LAB_WDA_DERIVED_DATA = join(homedir(), 'Library', 'Developer', 'Xco
 
 export class IosLab implements LabDevice {
   readonly platform = 'ios';
+  readonly app: LabApp;
+  private readonly bundle: string;
   private stateFile: string | undefined;
   private wdaServer: WdaServer | undefined;
 
@@ -110,11 +133,16 @@ export class IosLab implements LabDevice {
   /** Set once guard() has resolved: until then close() runs nothing — a refused simulator is left as it was. */
   private cleared = false;
 
-  /** `wdaPort`: never 8100/8101 (the device-check simulator's: refused); capture.ts and live.ts default to 8120. */
+  /**
+   * `wdaPort`: never 8100/8101 (the device-check simulator's: refused); capture.ts and live.ts default to 8120. `app`:
+   * the lab app it drives, the native one unless said.
+   */
   constructor(
     readonly udid: string,
-    private readonly opts: { wdaPort?: number; exec?: Exec } = {},
+    private readonly opts: { wdaPort?: number; exec?: Exec; app?: LabApp } = {},
   ) {
+    this.app = opts.app ?? 'native';
+    this.bundle = LAB_APP[this.app].bundle;
     if (opts.wdaPort !== undefined && DEVICE_CHECK_WDA_PORTS.includes(opts.wdaPort)) {
       throw new Error(`WDA port ${opts.wdaPort} is the device-check simulator's (${DEVICE_CHECK_WDA_PORTS.join(', ')}): the lab runs WDA on a port of its own (8120)`);
     }
@@ -154,12 +182,12 @@ export class IosLab implements LabDevice {
     return this.guard();
   }
 
-  unsupported(): string | undefined {
-    return undefined;
+  unsupported(cell: CatalogCell): string | undefined {
+    return otherApp(cell, this.app);
   }
 
   async state(): Promise<LabState | undefined> {
-    this.stateFile ??= join((await this.simctl('get_app_container', this.udid, BUNDLE, 'data')).stdout.trim(), 'Documents', 'lab-state.json');
+    this.stateFile ??= join((await this.simctl('get_app_container', this.udid, this.bundle, 'data')).stdout.trim(), 'Documents', 'lab-state.json');
     try {
       return JSON.parse(await readFile(this.stateFile, 'utf8')) as LabState;
     } catch {
@@ -173,7 +201,7 @@ export class IosLab implements LabDevice {
    */
   async launch(cell: string): Promise<LabState> {
     await this.guard();
-    await this.simctl('terminate', this.udid, BUNDLE).catch(() => undefined);
+    await this.simctl('terminate', this.udid, this.bundle).catch(() => undefined);
     // As averi's own launch does (src/adapters/ios.ts#enableAccessibilityAutomation): after a WebDriverAgent session
     // on the simulator, an app launched without these reads as an empty idb tree (docs/bugs/2026-10-07-one-wda-session-
     // makes-idb-stick-until-reboot.md) — the capture's WDA would leave every later launch stuck for idb.
@@ -188,7 +216,7 @@ export class IosLab implements LabDevice {
     }
     await this.state();
     await rm(this.stateFile!, { force: true });
-    await this.simctl('launch', this.udid, BUNDLE, '-cell', cell);
+    await this.simctl('launch', this.udid, this.bundle, '-cell', cell);
     return settled(this, cell);
   }
 
@@ -228,14 +256,14 @@ export class IosLab implements LabDevice {
   async close(): Promise<void> {
     if (!this.cleared) return;
     await this.wdaServer?.shutdown();
-    await this.simctl('terminate', this.udid, BUNDLE).catch(() => undefined);
+    await this.simctl('terminate', this.udid, this.bundle).catch(() => undefined);
   }
 }
 
 // --- Android: adb ---
 
 /**
- * The cell layers the Android app builds (Lab.kt#SUPPORTED_LAYERS; its cells routed by family,
+ * The cell layers the native Android app builds (Lab.kt#SUPPORTED_LAYERS; its cells routed by family,
  * MainActivity.kt#CellRouter).
  */
 const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert']);
@@ -249,16 +277,21 @@ export const IME_TOUCHABLE = `${IME_INPUT_SHOWN}; dumpsys window InputMethod | g
 
 export class AndroidLab implements LabDevice {
   readonly platform = 'android';
+  readonly app: LabApp;
+  private readonly package: string;
 
   private guarded: Promise<void> | undefined;
   /** Set once guard() has resolved: until then close() runs nothing (see IosLab). */
   private cleared = false;
 
-  /** Every adb command names the serial; nothing restarts the adb server. */
+  /** Every adb command names the serial; nothing restarts the adb server. `app`: as IosLab's. */
   constructor(
     readonly serial: string,
-    private readonly opts: { exec?: Exec } = {},
-  ) {}
+    private readonly opts: { exec?: Exec; app?: LabApp } = {},
+  ) {
+    this.app = opts.app ?? 'native';
+    this.package = LAB_APP[this.app].package;
+  }
 
   adb(...args: string[]) {
     return (this.opts.exec ?? exec)('adb', ['-s', this.serial, ...args]);
@@ -282,6 +315,10 @@ export class AndroidLab implements LabDevice {
   }
 
   unsupported(cell: CatalogCell): string | undefined {
+    const other = otherApp(cell, this.app);
+    if (other !== undefined) return other;
+    // The React Native app builds its family whatever its layer (App.tsx).
+    if (this.app === 'react-native') return undefined;
     // A form cell builds its own picker sheet (Forms.kt): its `sheet-large` is the form's, not a presented layer's.
     if (cell.form !== undefined && cell.layer === 'sheet-large') return undefined;
     if (!ANDROID_LAYERS.has(cell.layer)) return `layer ${cell.layer} is not one the Android app builds`;
@@ -290,7 +327,7 @@ export class AndroidLab implements LabDevice {
 
   async state(): Promise<LabState | undefined> {
     try {
-      return JSON.parse((await this.adb('exec-out', 'run-as', LAB_PACKAGE, 'cat', 'files/lab-state.json')).stdout) as LabState;
+      return JSON.parse((await this.adb('exec-out', 'run-as', this.package, 'cat', 'files/lab-state.json')).stdout) as LabState;
     } catch {
       return undefined;
     }
@@ -299,9 +336,9 @@ export class AndroidLab implements LabDevice {
   /** A fresh process: `am force-stop`, the last state file removed (see IosLab.launch), `am start … --es cell <id>`. */
   async launch(cell: string): Promise<LabState> {
     await this.guard();
-    await this.adb('shell', 'am', 'force-stop', LAB_PACKAGE);
-    await this.adb('shell', 'run-as', LAB_PACKAGE, 'rm', '-f', 'files/lab-state.json');
-    await this.adb('shell', 'am', 'start', '-W', '-n', `${LAB_PACKAGE}/.MainActivity`, '--es', 'cell', cell);
+    await this.adb('shell', 'am', 'force-stop', this.package);
+    await this.adb('shell', 'run-as', this.package, 'rm', '-f', 'files/lab-state.json');
+    await this.adb('shell', 'am', 'start', '-W', '-n', `${this.package}/.MainActivity`, '--es', 'cell', cell);
     return settled(this, cell);
   }
 
@@ -349,6 +386,6 @@ export class AndroidLab implements LabDevice {
   /** Nothing unless guard() resolved: a refused (or never checked) device is left as it was. */
   async close(): Promise<void> {
     if (!this.cleared) return;
-    await this.adb('shell', 'am', 'force-stop', LAB_PACKAGE);
+    await this.adb('shell', 'am', 'force-stop', this.package);
   }
 }

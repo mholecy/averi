@@ -323,6 +323,7 @@ const FORM_CELL: CatalogCell = { id: 'form-x', layer: 'none', targets: [], form:
 /** A screen 40×40 at scale 1, target A at (10,10 20×20) painted green; a tap at its centre logs what `onTap` says. */
 class FakeLab implements LabDevice {
   readonly platform = 'android';
+  readonly app = 'native';
   taps: [number, number][] = [];
   private events: LabState['events'] = [];
   constructor(
@@ -394,11 +395,11 @@ describe('capture', () => {
   });
 
   it('a run of some cells keeps the others — from the same device only', async () => {
-    await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'android', device: 'fake emulator, Android 13 (API 33)', captures: [{ file: 'form-x.xml', source: 'uiautomator', form: 'raw' }] }));
+    await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'android', app: 'AveriLab', device: 'fake emulator, Android 13 (API 33)', captures: [{ file: 'form-x.xml', source: 'uiautomator', form: 'raw' }] }));
     const { manifest } = await run(new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [OPEN]);
     expect(manifest.captures.map((c) => c.file)).toEqual(['open.xml', 'form-x.xml']);
 
-    await expect(run(new FakeLab(() => [], 'another emulator, Android 14 (API 34)'), [OPEN])).rejects.toThrow(/holds captures of android "fake emulator, Android 13 \(API 33\)", not android "another emulator/);
+    await expect(run(new FakeLab(() => [], 'another emulator, Android 14 (API 34)'), [OPEN])).rejects.toThrow(/holds captures of AveriLab on android "fake emulator, Android 13 \(API 33\)", not AveriLab on android "another emulator/);
   });
 });
 
@@ -483,6 +484,7 @@ const FORM_TAPS: Record<string, (s: { focus: string | null }) => ProbeEvent[]> =
 
 class FakeIosFormLab implements LabDevice {
   readonly platform: 'ios' | 'android' = 'ios';
+  readonly app = 'native';
   taps: string[] = [];
   protected cell = '';
   protected focus: string | null = null;

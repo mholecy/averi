@@ -10,12 +10,13 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
-import { AndroidLab, BUNDLE, IosLab, LAB_AVD, LAB_PACKAGE, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
+import { familyOf } from './catalog.js';
+import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { holds, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
-import type { Catalog, CellTruth, LabState } from './schema.js';
+import { appOf, LAB_APPS, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -64,6 +65,10 @@ import type { Catalog, CellTruth, LabState } from './schema.js';
  * read (the launch state, the state between the calls, after them) as JSON; `--rejudge <file>` judges such a record
  * again with this checkout's judges, no device (tests/truth/live-rejudge.test.ts).
  *
+ * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:
+ * lab-device.ts#LAB_APP; the visibility cases from its own truth runs, the manifests whose `app` is AveriLabRN) — the
+ * native app's (`native`, the default) otherwise: one app per run, its cases only (schema.ts#appOf).
+ *
  * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
  * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
  * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits.
@@ -82,11 +87,14 @@ const { values } = parseArgs({
     side: { type: 'string' },
     record: { type: 'string' },
     rejudge: { type: 'string' },
+    app: { type: 'string' },
   },
 });
 /** What a run read, case by case (`--record`): judged again without a device by `--rejudge`. */
 interface RunRecord {
   platform: 'ios' | 'android';
+  /** The lab app the run drove; absent on records before round 7: the native one. */
+  app?: LabApp;
   side: string;
   results: { source: Source; id: string; skip?: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState | undefined; late?: LabState }[];
 }
@@ -95,6 +103,8 @@ if (rejudging === undefined && (values.udid === undefined) === (values.serial ==
   throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
 }
 const platform: 'ios' | 'android' = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
+const app: LabApp = rejudging?.app ?? ((values.app ?? 'native') as LabApp);
+if (!LAB_APPS.includes(app)) throw new Error(`no lab app ${values.app} (${LAB_APPS.join(', ')})`);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
 const port = Number(values['wda-port'] ?? 8120);
 /** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
@@ -108,8 +118,8 @@ const onlyCells = values.cells?.split(',');
 const shots = values.shots;
 if (shots !== undefined) await mkdir(shots, { recursive: true });
 // The WDA port too: 8100/8101 are refused (lab-device.ts#DEVICE_CHECK_WDA_PORTS). No device at all when rejudging.
-const ios = rejudging === undefined && platform === 'ios' ? new IosLab(device, { wdaPort: port }) : undefined;
-const android = rejudging === undefined && platform === 'android' ? new AndroidLab(device) : undefined;
+const ios = rejudging === undefined && platform === 'ios' ? new IosLab(device, { wdaPort: port, app }) : undefined;
+const android = rejudging === undefined && platform === 'android' ? new AndroidLab(device, { app }) : undefined;
 // The lab simulator or the lab AVD, or nothing (lab-device.ts#IosLab.guard, #AndroidLab.guard): refused before any
 // tool binds it.
 if (rejudging === undefined) console.error(`lab: ${ios !== undefined ? await ios.guard() : (await android!.guard(), `${device}, AVD ${LAB_AVD}`)}`);
@@ -146,6 +156,7 @@ const fill = (cell: string, tag: string, text: string, clear?: boolean): Call =>
   args: { selector: id(cell, tag), text, ...(clear !== undefined && { clear }) },
 });
 const P = 'form-prefilled';
+const RN = 'rn-field';
 const B = 'form-basic';
 const K = 'form-keyboard';
 const TITLE = { tap: { text: 'Transfer details' } };
@@ -327,18 +338,57 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [{ tool: 'tap' as const, args: { selector: id('form-picker', tag) } }],
     judge: judgeUnderSheet(tag),
   })),
+  // The React Native lab app's fields (`--app react-native`; fixtures/apps/rn, src/ReactNative.tsx): rn-field's three
+  // TextInputs, each reporting its value and focus by its target's tag — N a single-line field under its floating label,
+  // I the field with a trailing icon button labelled Clear, M a multiline field.
+  { id: 'rn1', cell: RN, says: 'fill, no clear, the single-line RN field', calls: [fill(RN, 'N.field', 'Jan Novak')], judge: holds('N', 'Jan Novak') },
+  { id: 'rn2', cell: RN, says: 'fill, clear, the multiline RN field', calls: [fill(RN, 'M.field', 'Thanks for the lunch', true)], judge: holds('M', 'Thanks for the lunch') },
+  { id: 'rn3', cell: RN, says: 'fill, no clear, the RN field with an icon', calls: [fill(RN, 'I.field', 'SK31 1200')], judge: holds('I', 'SK31 1200') },
+  {
+    id: 'rn4',
+    cell: RN,
+    says: 'a tap on the floating label (text:"Payee’s name") focuses its field',
+    calls: [{ tool: 'tap', args: { selector: 'text:"Payee’s name"' } }],
+    judge: (s, [reply]) =>
+      claimsTap(reply) !== (s.focus === 'N') ? { outcome: 'MISMATCH', why: `averi says ${short(reply)} — the focus is on ${s.focus}` }
+      : claimsTap(reply) ? { outcome: 'ok', why: short(reply) }
+      : { outcome: 'LOUD', why: `not tapped, the focus on ${s.focus}: ${short(reply)}` },
+  },
+  {
+    id: 'rn5',
+    cell: RN,
+    says: 'fill the single-line RN field, then assert its text reads what the app holds',
+    calls: [fill(RN, 'N.field', 'Jan Novak'), { tool: 'assert', args: { asserts: [{ element: { id: `lab.${RN}.N.field` }, text: 'Jan Novak', timeout: 2_000 }] } }],
+    judge: (s, [filled, asserted]) => {
+      const held = valueOf(s, 'N') === 'Jan Novak';
+      if (held !== allPassed(asserted)) return { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(valueOf(s, 'N'))}, the assert: ${short(asserted)}` };
+      return held ? { outcome: 'ok', why: short(asserted) } : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(valueOf(s, 'N'))}: ${short(filled)} / ${short(asserted)}` };
+    },
+  },
+  {
+    id: 'rn6',
+    cell: RN,
+    says: 'fill the RN field with an icon, then tap its icon (label:"Clear"): the field emptied',
+    calls: [fill(RN, 'I.field', 'abc'), { tool: 'tap', args: { selector: 'label:"Clear"' } }],
+    judge: (s, replies, source, launched) => {
+      const pressed = s.events.some((e) => e.kind === 'tap' && e.tag === 'I');
+      if (claimsTap(replies[1]) !== pressed) return { outcome: 'MISMATCH', why: `averi says ${short(replies[1])} — the icon ${pressed ? 'was' : 'was not'} pressed` };
+      return holds('I', '')(s, replies, source, launched);
+    },
+  },
 ];
 const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
 
 // --- phase 5: the visibility cells, from their static truth ---
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-/** The truth run of this platform (tests/fixtures/truth/<run>, its manifest's `platform`). */
-async function truthsOf(p: Platform): Promise<CellTruth[]> {
+const catalog = JSON.parse(await readFile(join(ROOT, 'fixtures/apps/cells.json'), 'utf8')) as Catalog;
+/** The truth run of this platform and lab app (tests/fixtures/truth/<run>, its manifest's `platform` and `app`). */
+async function truthsOf(p: Platform, a: LabApp): Promise<CellTruth[]> {
   const base = join(ROOT, 'tests/fixtures/truth');
   for (const run of await readdir(base)) {
-    const manifest = JSON.parse(await readFile(join(base, run, 'manifest.json'), 'utf8')) as { platform: Platform; captures: { truth?: string }[] };
-    if (manifest.platform !== p) continue;
+    const manifest = JSON.parse(await readFile(join(base, run, 'manifest.json'), 'utf8')) as { platform: Platform; app?: string; captures: { truth?: string }[] };
+    if (manifest.platform !== p || manifest.app !== LAB_APP[a].name) continue;
     const files = [...new Set(manifest.captures.map((c) => c.truth).filter((t): t is string => t !== undefined))];
     return Promise.all(files.map(async (f) => JSON.parse(await readFile(join(base, run, f), 'utf8')) as CellTruth));
   }
@@ -346,7 +396,7 @@ async function truthsOf(p: Platform): Promise<CellTruth[]> {
 }
 
 if (groups.includes('visibility')) {
-  for (const truth of await truthsOf(platform)) {
+  for (const truth of await truthsOf(platform, app)) {
     if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;
     for (const v of visibilityCases(truth, platform)) CASES.push({ ...v, group: 'visibility', judge: (s, replies, source, launched, after) => v.judge(s, replies, launched, source, after) });
   }
@@ -359,7 +409,6 @@ if (groups.includes('visibility')) {
  * left where it was is its documented answer.
  */
 if (groups.includes('dismissal') && platform === 'ios') {
-  const catalog = JSON.parse(await readFile(join(ROOT, 'fixtures/apps/cells.json'), 'utf8')) as Catalog;
   for (const cell of catalog.cells) {
     const dismiss = cell.config?.ios?.keyboardDismiss as unknown[] | undefined;
     if (cell.form === undefined || dismiss === undefined || (onlyCells !== undefined && !onlyCells.includes(cell.id))) continue;
@@ -423,9 +472,9 @@ const configDir = join(tmpdir(), `averi-live-${process.pid}`);
 await mkdir(configDir, { recursive: true });
 async function configFor(source: Source, dismiss: unknown[] | undefined): Promise<string> {
   const path = join(configDir, `averi-${source}${dismiss === undefined ? '' : '-dismiss'}.yaml`);
-  const ios = source === 'uiautomator' ? {} : { ios: { bundleId: BUNDLE, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } };
+  const ios = source === 'uiautomator' ? {} : { ios: { bundleId: LAB_APP[app].bundle, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } };
   // JSON is YAML.
-  await writeFile(path, JSON.stringify({ app: { android: { package: LAB_PACKAGE }, ...ios } }));
+  await writeFile(path, JSON.stringify({ app: { android: { package: LAB_APP[app].package }, ...ios } }));
   return path;
 }
 
@@ -441,8 +490,9 @@ async function callTool(client: Client, call: Call, configPath: string): Promise
 
 type Result = { source: Source; c: Case; verdict: LiveVerdict; replies: string[] };
 const results: Result[] = [];
-const record: RunRecord = { platform, side: values.side ?? 'this checkout', results: [] };
-const selected = CASES.filter((x) => groups.includes(x.group) && (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)));
+const record: RunRecord = { platform, ...(app !== 'native' && { app }), side: values.side ?? 'this checkout', results: [] };
+// The run's lab app's cells only (schema.ts#appOf).
+const selected = CASES.filter((x) => groups.includes(x.group) && appOf(familyOf(catalog, x.cell)) === app && (only === undefined || only.includes(x.id)) && (x.platforms === undefined || x.platforms.includes(platform)));
 
 /**
  * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that

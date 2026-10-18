@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import type { RunManifest } from '../differential/corpus.js';
-import type { LabDevice } from './lab-device.js';
+import { LAB_APP, type LabDevice } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
@@ -62,11 +62,13 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   await mkdir(opts.out, { recursive: true });
   // A cell already captured and not asked for again keeps its entries — a run of some cells adds to the manifest. Only
   // from the same device: a manifest names one device for all its captures.
+  // And of the same lab app (LabDevice.app): a run holds one app's captures, its manifest's `app` naming it.
+  const app = LAB_APP[lab.app].name;
   const previous = await readFile(join(opts.out, 'manifest.json'), 'utf8').then((t) => JSON.parse(t) as RunManifest).catch(() => undefined);
-  if (previous !== undefined && (previous.platform !== lab.platform || previous.device !== device)) {
-    throw new Error(`${opts.out} holds captures of ${previous.platform} "${previous.device}", not ${lab.platform} "${device}": capture into a run of its own, or recapture every cell`);
+  if (previous !== undefined && (previous.platform !== lab.platform || previous.device !== device || previous.app !== app)) {
+    throw new Error(`${opts.out} holds captures of ${previous.app ?? 'an unnamed app'} on ${previous.platform} "${previous.device}", not ${app} on ${lab.platform} "${device}": capture into a run of its own, or recapture every cell`);
   }
-  const manifest: RunManifest = { platform: lab.platform, app: 'AveriLab', device, note: opts.note, captures: [] };
+  const manifest: RunManifest = { platform: lab.platform, app, device, note: opts.note, captures: [] };
   const broken: string[] = [];
   const skipped: string[] = [];
   // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
