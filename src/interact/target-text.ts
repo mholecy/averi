@@ -75,8 +75,8 @@ export function untriedSideText(side: Edge): string {
  * (scroll-text.ts) and by the picker's skip line — one wording. A cut by a
  * node drawn after it (`Cut.by`) is `cutByText`'s.
  */
-export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
-  if (cut.by !== undefined) return cutByText(cut.by, cut, shown, minPiece);
+export function cutSliverText(cut: Cut, shown: Rect, minPiece: number, lineY?: number): string {
+  if (cut.by !== undefined) return cutByText(cut.by, cut, shown, minPiece, lineY);
   const within = cut.within === undefined ? '' : `, as is the ${rectText(cut.within)} it lies in`;
   return (
     `cut at its scroll container's ${cut.edge} edge (container ${rectText(cut.container)})${within}; only a ${shown.width}x${shown.height} part of it shows, ` +
@@ -86,17 +86,24 @@ export function cutSliverText(cut: Cut, shown: Rect, minPiece: number): string {
 
 /**
  * `cutSliverText`'s sentence for a node cut by a node drawn after it (`Cut.by`): `cut at its top edge by container
- * id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later
- * node covers, so the rest of it may lie under that container; only a 970x42 part of it shows, at 55,1370, 42 deep
- * across that edge, under the 65 a tap needs` — where the part that shows lies, which the rect it was dumped with is.
+ * id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a
+ * node's bounds what a later node covers, so the rest of it may lie under that container; only a 970x28 part of it
+ * shows above the soft keyboard, at 55,1370, 42 deep across that edge, under the 65 a tap needs` — where the part that
+ * shows lies, the rect it was dumped with, cut above the keyboard's top edge when one is known (`lineY`: the lab's
+ * phone, dumped to 1412, shows 28 of its 42 px above the line at 1398); the depth stays the dump's.
  * "May": the dump cannot tell a cut from a WHOLE control that thin laid flush against that node (standing.ts
  * #cutByLater's residual), so the remedy carries that case's way past (`cutByRemedy`, `WHOLE_THIN_WAY_PAST`).
  */
-function cutByText(by: UiNode, cut: Cut, shown: Rect, minPiece: number): string {
+function cutByText(by: UiNode, cut: Cut, rect: Rect, minPiece: number, lineY: number | undefined): string {
+  const above = lineY !== undefined && lineY < rect.y + rect.height;
+  const height = above ? Math.max(0, lineY - rect.y) : rect.height;
+  const shows =
+    height === 0
+      ? `nothing of it shows above the soft keyboard (its strip lies at ${rectText(rect)})`
+      : `only a ${rect.width}x${height} part of it shows${above ? ' above the soft keyboard' : ''}, at ${rect.x},${rect.y}`;
   return (
-    `cut at its ${cut.edge} edge by ${nodeText(by)}, drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
-    `so the rest of it may lie under that ${by.role}; only a ${shown.width}x${shown.height} part of it shows, at ${shown.x},${shown.y}, ` +
-    `${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
+    `cut at its ${cut.edge} edge by ${nodeText(by)}, drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
+    `so the rest of it may lie under that ${by.role}; ${shows}, ${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
   );
 }
 

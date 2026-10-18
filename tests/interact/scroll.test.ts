@@ -1218,8 +1218,8 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
   const capture = async (name: string): Promise<UiNode> => parseDump(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
   const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
   const CUT =
-    "cut at its top edge by container id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, " +
-    'so the rest of it may lie under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs';
+    "cut at its top edge by container id:lab.form-keyboard.submit (55,1238 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, " +
+    'so the rest of it may lie under that container; only a 970x28 part of it shows above the soft keyboard, at 55,1370, 42 deep across that edge, under the 65 a tap needs';
   const fakeOf = async (name: string): Promise<FakeAdapter> => {
     const fake = new FakeAdapter({ s: await capture(name) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };

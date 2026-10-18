@@ -572,8 +572,8 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
     const kb = reading(1398);
     const { outcome } = await judge(await capture('android-lab-form-keyboard.xml'), 'lab.form-keyboard.phone', { first: PIXEL }, { kb });
     expect(said(outcome)).toBe(
-      `ClippedRefusal: lab.form-keyboard.phone is cut at its top edge by ${CUTTER} (55,1238 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
-        'so the rest of it may lie under that container; only a 970x42 part of it shows, at 55,1370, 42 deep across that edge, under the 65 a tap needs — ' +
+      `ClippedRefusal: lab.form-keyboard.phone is cut at its top edge by ${CUTTER} (55,1238 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
+        'so the rest of it may lie under that container; only a 970x28 part of it shows above the soft keyboard, at 55,1370, 42 deep across that edge, under the 65 a tap needs — ' +
         'the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — ' +
         'a bar riding on it goes down with it — or scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
     );
@@ -583,7 +583,7 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
   it('note after back, the keyboard down: scroll it out from under the bar', async () => {
     const { outcome } = await judge(await capture('android-lab-form-keyboard-after-back.xml'), 'lab.form-keyboard.note', { first: PIXEL });
     expect(said(outcome)).toBe(
-      `ClippedRefusal: lab.form-keyboard.note is cut at its top edge by ${CUTTER} (55,1994 970x132), drawn after it — Android leaves out of a node's bounds what a later node covers, ` +
+      `ClippedRefusal: lab.form-keyboard.note is cut at its top edge by ${CUTTER} (55,1994 970x132), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
         'so the rest of it may lie under that container; only a 970x14 part of it shows, at 55,2126, 14 deep across that edge, under the 65 a tap needs — ' +
         'scroll_until it out from under that container first (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates); nothing was tapped',
     );
@@ -616,6 +616,10 @@ describe('judgeTap(…).aim() — a cut by a later node names the keyboard only 
   it('a bar ending 28 px above the line (the lab\'s Continue): dismiss the keyboard first, or scroll', async () => {
     const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1398) });
     expect(said(outcome)).toContain('— the soft keyboard is up (its top edge at y 1398): dismiss it first');
+  });
+  it('a strip wholly under the keyboard\'s line: nothing of it shows above the soft keyboard, its strip quoted', async () => {
+    const { outcome } = await judge(cutAt(1370), 'field', { first: PIXEL }, { kb: reading(1360) });
+    expect(said(outcome)).toContain('so the rest of it may lie under that button; nothing of it shows above the soft keyboard (its strip lies at 55,1370 970x42), 42 deep across that edge');
   });
   it('a top bar ending at 300, far above the line: the scroll alone, the keyboard unnamed', async () => {
     const { outcome } = await judge(cutAt(300), 'field', { first: PIXEL }, { kb: reading(1398) });

@@ -324,7 +324,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     case 'systemBar':
       throw offScreenRefusal(standing, told, judgedScreen());
     case 'cut': {
-      const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece);
+      const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece, keyboard?.lineY);
       const by = standing.cut.by;
       throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, () => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard, standing.minPiece)))}`));
     }

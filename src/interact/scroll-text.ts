@@ -159,7 +159,7 @@ const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === und
 
 /** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (target-text.ts#cutSliverText). */
 function sliverText({ judged, cut, minPiece }: Extract<Shortfall, { of: 'sliver' }>): string {
-  return cutSliverText(cut, judged.node.rect, minPiece);
+  return cutSliverText(cut, judged.node.rect, minPiece, judged.under?.line.y);
 }
 
 /**
