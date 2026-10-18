@@ -114,17 +114,25 @@ export interface KeyboardUp {
 }
 
 /**
+ * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
+ * the MCP tools; \`dismissKeyboard: true\` on the fill before this step in a flow`, or `tap a neutral element such as
+ * the screen title — a tap: step in a flow`. The one wording of the clause for `scroll_until`'s whole-screen advice
+ * (scroll-text.ts#hideToJudgeWholeScreen) and the cut-by remedy (`dismissKeyboardFirstText`); each says the adapter's
+ * `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
+ */
+export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
+  dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : 'tap a neutral element such as the screen title — a tap: step in a flow';
+
+/**
  * The first half of the remedy for a node cut by a node drawn after it while the soft keyboard is up (`Cut.by`, the
  * owner's decision for lab note F2A1): `the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key
  * back from the MCP tools; …) — a bar riding on it goes down with it` — a submit bar laid on the IME's inset moves off
- * the field when the keyboard goes. How to hide it is the adapter's (`KeyboardRemedy`), as `scroll_until`'s own
- * sentence says it (scroll-text.ts#hideToJudgeWholeScreen).
+ * the field when the keyboard goes. How to hide it is `hideKeyboardHow`'s. The cut-by rule holds on Android's trees only
+ * (standing.ts#cutByLater), whose adapter hides the keyboard with `back`, so the other branch — `cannotHide` with the
+ * adapter's advice — is unreachable today; kept so a source that one day cuts so on another adapter is said right.
  */
 export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string {
-  const how =
-    remedy.dismissal === 'back'
-      ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow'
-      : `tap a neutral element such as the screen title — a tap: step in a flow; ${cannotHide(remedy.advice)}`;
+  const how = remedy.dismissal === 'back' ? hideKeyboardHow(remedy) : `${hideKeyboardHow(remedy)}; ${cannotHide(remedy.advice)}`;
   return `the soft keyboard is up (its top edge at y ${lineY}): dismiss it first (${how}) — a bar riding on it goes down with it`;
 }
 

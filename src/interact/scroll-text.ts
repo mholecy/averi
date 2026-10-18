@@ -6,7 +6,7 @@ import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { countOf } from '../util/count.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutByRemedy, cutRemedy, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
+import { cutByRemedy, cutRemedy, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
 import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
@@ -247,11 +247,9 @@ const STILL_MOVING = 'still moving at the last read (a fling not yet over, or an
  * advice is to hide the keyboard and scroll again. Names MCP tools and "a
  * flow", the deliberate exception recorded in keyboard-window.ts.
  */
-function hideToJudgeWholeScreen({ dismissal, advice }: KeyboardRemedy): string {
-  return dismissal === 'back'
-    ? 'to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again'
-    : 'to reach it with the keyboard down, hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and scroll again; ' +
-        cannotHide(advice);
+function hideToJudgeWholeScreen(remedy: KeyboardRemedy): string {
+  const again = `to reach it with the keyboard down, hide it first (${hideKeyboardHow(remedy)}) and scroll again`;
+  return remedy.dismissal === 'back' ? again : `${again}; ${cannotHide(remedy.advice)}`;
 }
 
 /** What the stop judged against, for "never intersected …". */
