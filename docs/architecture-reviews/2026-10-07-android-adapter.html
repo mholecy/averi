@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Android adapter review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+  <style>
+    .seam { stroke-dasharray: 4 4; }
+    .leak { stroke: #dc2626; }
+    .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+    .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+    pre.mermaid { background: transparent; }
+    code { font-size: .85em; }
+  </style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+
+  <header class="space-y-3">
+    <p class="lbl text-slate-500">averi · architecture review · 2026-10-07 · main @ 0e48a63</p>
+    <h1 class="font-serif text-4xl">Android adapter ako celok</h1>
+    <p class="text-sm text-slate-600 font-mono">src/adapters/android.ts · exec.ts · field-errors.ts · types.ts (Android časť) · verify/capture.ts (konzument screenshotu) · mcp/tools.ts (launch_app, open_deep_link) · tests/adapters/android.test.ts · tests/integration/android-keyboard.test.ts · tests/helpers/android-dumps.ts · exec-error.ts · fake.ts</p>
+    <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+      <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border border-slate-500 bg-white"></span>module</span>
+      <span class="flex items-center gap-2"><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="#64748b" stroke-width="2" class="seam"/></svg>seam</span>
+      <span class="flex items-center gap-2"><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke-width="2" class="leak"/></svg>leakage</span>
+      <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep"></span>deep module</span>
+    </div>
+    <p class="text-xs text-slate-500">Mimo rozsahu (už pokryté): C10 split súboru (NO-GO), všetko okolo soft keyboardu (C1, C7, V1, K1–K3), bare-tree second look, C8, C2/C6, V2/V3 a štyri kandidáti iOS reportu z dnešného dňa (listDevices mimo <code>DeviceAdapter</code> vrátane Android adb bez <code>-s</code>, zmazanie <code>setClipboard</code>, idb stuck tree, <code>runIdb</code>). Hot spot: <code>android.ts</code> + jeho test 10 commitov od 2026-09-01, väčšina v keyboard časti — mimo rozsahu; zvyšok súboru je starší a menej skúšaný, preto váži dôkaz z emulátora.</p>
+    <p class="text-xs text-slate-500">Overené na zariadení dnes (emulator-5554, API 33) iba neškodnými príkazmi: <code>sh -c</code> výpis argv, <code>monkey</code>/<code>pm clear</code>/<code>am start</code> na neexistujúci balík alebo schému. Volania išli cez <code>node:child_process.execFile</code> rovnako ako <code>exec.ts</code>.</p>
+  </header>
+
+  <section id="candidates" class="space-y-12">
+
+    <!-- ============ 1 ============ -->
+    <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">1 · Jeden vlastník pre argv, ktoré ide cez <code>adb shell</code></h2>
+        <span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-xs font-semibold">Strong</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">local-substitutable</span>
+      </div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/android.ts:106-109 — <code>adb(args)</code> posiela argv bez úprav</li>
+        <li>src/adapters/android.ts:177-182 — <code>-d intent.data</code>, <code>--es key value</code> surovo</li>
+        <li>src/adapters/android.ts:282-284 — <code>openDeepLink(url)</code>: <code>-d url</code> surovo</li>
+        <li>src/adapters/android.ts:433-435 — <code>typeText</code>: vlastný escape regex pre shell metaznaky</li>
+        <li>src/adapters/android.ts:586-587 — <code>isAppRunning</code>: validácia mena balíka „could escape the shell“ + skript <code>pidof … || true</code></li>
+        <li>src/adapters/android.ts:607-612 — <code>INPUT_SHOWN_COMMAND</code>: komentár „adb hands the string to the device's sh“</li>
+        <li>src/adapters/android.ts:142, 148, 279 — <code>pm clear</code>, <code>monkey -p</code>, <code>force-stop</code> s nevalidovaným <code>packageName</code></li>
+        <li>src/flow/config.ts:176-185 · src/mcp/tools.ts:132-140, 274-282 — <code>data</code>, <code>extras</code>, <code>url</code> sú ľubovoľné <code>z.string()</code></li>
+        <li>tests/adapters/android.test.ts:10-22 — <code>fakeExec</code> spája argv medzerou, rovnako stratovo ako adb; :316-331 pinuje <code>--es qr payload</code></li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">Before — tri schémy, žiadna pri launch/deep link</p>
+          <pre class="mermaid">
+flowchart TB
+  T[typeText<br/>escape regex] --> A[adb args]
+  P[isAppRunning<br/>validácia mena] --> A
+  K[INPUT_SHOWN_COMMAND<br/>skript s pipe] --> A
+  L[launch -d / --es] --> A
+  D[openDeepLink -d url] --> A
+  A -->|"join medzerou"| S[device sh -c]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class L,D leak
+          </pre>
+          <p class="text-xs text-red-700 mt-2">Namerané: <code>app://login?a=1&amp;b=2</code> → zariadenie dostane <code>[app://login?a=1]</code>, <code>b=2</code> beží na pozadí · <code>"hello world"</code> → <code>[hello] [world]</code> · <code>app://x/$HOME;id</code> → <code>$HOME</code> sa rozvinie, <code>id</code> sa vykoná. Exit 0 vo všetkých troch.</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">After — shell slová na jednom mieste</p>
+          <div class="space-y-2 text-sm">
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <div class="border border-slate-300 rounded p-2 text-center">typeText<br/><span class="text-slate-500">iba <code>%s</code> (slovník <code>input</code>)</span></div>
+              <div class="border border-slate-300 rounded p-2 text-center">launch / openDeepLink<br/><span class="text-slate-500">čisté argv</span></div>
+              <div class="border border-slate-300 rounded p-2 text-center">isAppRunning<br/><span class="text-slate-500">bez validácie</span></div>
+            </div>
+            <svg viewBox="0 0 300 18" class="w-full h-4"><line x1="0" y1="9" x2="300" y2="9" stroke="#64748b" stroke-width="2" class="seam"/></svg>
+            <div class="deep text-white rounded-lg p-4 border-4 border-slate-900">
+              <p class="lbl text-slate-300">adb · shell(argv) · script(text)</p>
+              <p class="text-xs text-slate-300 mt-1">každé slovo v jednoduchých úvodzovkách pre device sh; skript s pipe je pomenovaná výnimka (<code>INPUT_SHOWN_COMMAND</code>, <code>pidof || true</code>)</p>
+            </div>
+            <p class="text-xs text-slate-500">fake na ExecFn seame vidí argv, ktoré zariadenie naozaj dostane</p>
+          </div>
+        </div>
+      </div>
+
+      <p><span class="font-semibold">Problem.</span> Modul vie, že adb spája argv do jedného riadku pre device <code>sh</code> (komentáre pri :434, :586, :608), no túto znalosť uplatňujú tri volania, každé po svojom. <code>launch</code> s intent <code>data</code>/<code>extras</code> a <code>openDeepLink</code> ju nemajú vôbec, takže deep link s druhým query parametrom sa ticho otvorí bez neho a extra s medzerou sa rozpadne. Testy to neodhalia, lebo fake spája argv tým istým stratovým spôsobom.</p>
+      <p><span class="font-semibold">Solution.</span> Súkromná funkcia <code>adb</code> sa prehĺbi na <code>shell(argv)</code>, ktorá citáciu robí sama, a výslovné <code>script(text)</code> pre dve miesta, kde je pipe alebo <code>||</code> zámer. Kódovanie medzery cez <code>%s</code> v <code>typeText</code> patrí príkazu <code>input</code>, nie shellu, a zostáva tam.</p>
+      <ul class="list-disc pl-6 text-sm space-y-0.5">
+        <li>locality: citovanie na jednom mieste namiesto troch</li>
+        <li>deep link s <code>&amp;</code> príde celý</li>
+        <li>escape regex aj validácia mena balíka zmiznú</li>
+        <li>test: <code>&amp;</code>/medzera/<code>$</code> v jednej tabuľke</li>
+        <li>leverage: všetkých ~20 volaní <code>shell</code> naraz</li>
+      </ul>
+      <p class="text-xs text-slate-500">Deletion test: zmazanie <code>typeText</code> escape a validácie v <code>isAppRunning</code> nič nepresunie, len ich zlúči do jednej citácie. Komplexita sa sústredí a nevráti sa k volajúcim. Na zariadení treba overiť jedno: <code>input text</code> s citovaným jedným znakom vrátane <code>'</code> a <code>\</code> (nedávno opravené per-char písanie, e594a21/00db84c/2070647).</p>
+    </article>
+
+    <!-- ============ 2 ============ -->
+    <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">2 · „Spustilo zariadenie niečo?“ má jedného vlastníka pre všetky štyri štarty</h2>
+        <span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-xs font-semibold">Strong</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">in-process</span>
+      </div>
+      <div class="rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm px-3 py-2">C10 je NO-GO s podmienkou „revisit when openDeepLink shares amStart“. Táto karta je tá podmienka, nie split súboru. Nový dôkaz z emulátora: <code>openDeepLink</code> na nevyriešiteľný intent skončí exit 0 a hlási úspech, <code>monkey</code> dôvod zlyhania vypíše na stdout, ktorý chybová hláška zahodí.</div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/android.ts:143-151 — <code>monkey</code> launch, bez klasifikácie</li>
+        <li>src/adapters/android.ts:213-216 — doc <code>amStart</code>: „monkey and openDeepLink … are a follow-up“</li>
+        <li>src/adapters/android.ts:232-276 — <code>amStart</code>: klasifikácia + text, parameter <code>launch</code> tvarovaný iba pre <code>launch</code></li>
+        <li>src/adapters/android.ts:282-284 — <code>openDeepLink</code>: <code>am start</code> bez <code>amStart</code>, bez <code>-p</code></li>
+        <li>src/adapters/android.ts:160-169 — rozhodnutie 2026-10-03: implicitný intent bez balíka „may hand to ANOTHER app“</li>
+        <li>src/adapters/exec.ts:33-35, 62 — správa <code>ExecError</code> nesie iba stderr</li>
+        <li>src/mcp/tools.ts:274-282 — <code>open_deep_link</code> vráti „Opened … on android“ · src/adapters/types.ts:311 — <code>openDeepLink(url)</code> bez appId</li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">Before — štyri štarty, jeden klasifikovaný</p>
+          <table class="w-full text-xs">
+            <thead><tr class="text-left text-slate-500"><th class="py-1">štart</th><th>namerané (API 33)</th><th>averi</th></tr></thead>
+            <tbody class="font-mono">
+              <tr class="border-t"><td class="py-1">am start -n / -p</td><td>exit 0 + <code>Error:</code></td><td class="text-emerald-700">amStart hádže</td></tr>
+              <tr class="border-t"><td class="py-1">am start -a VIEW -d</td><td>exit 0 + <code>Error: Activity not started</code></td><td class="text-red-700">„Opened …“</td></tr>
+              <tr class="border-t"><td class="py-1">monkey -p</td><td>exit 252, dôvod na <b>stdout</b></td><td class="text-red-700">ExecError bez dôvodu</td></tr>
+              <tr class="border-t"><td class="py-1">pm clear</td><td>exit 1, <code>Failed</code></td><td class="text-slate-600">ExecError, OK</td></tr>
+            </tbody>
+          </table>
+          <pre class="mermaid">
+flowchart LR
+  L[launch] --> M[monkey]
+  L --> AS[amStart<br/>launch-shaped]
+  DL[openDeepLink] --> X[adb am start]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class M,X leak
+          </pre>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">After — jeden modul štartu</p>
+          <pre class="mermaid">
+flowchart LR
+  L[launch] --> S
+  DL[openDeepLink] --> S
+  subgraph S[startActivity]
+    direction TB
+    s1[monkey alebo am start argv]
+    s2[výsledok: started / refused s riadkami / transport]
+  end
+  S --> W[text podľa volajúceho<br/>v adaptéri]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a,stroke-width:3px;
+  class S deep
+          </pre>
+          <p class="text-xs text-slate-500 mt-2">Text chyby zostáva v adaptéri. Zamietnutý <code>AmStartError</code> (doc :225-229) mal dve prekladové miesta v run/ a flow/. Tu sú obidve v tom istom module.</p>
+        </div>
+      </div>
+
+      <p><span class="font-semibold">Problem.</span> Znalosť „adb shell exit 0 neznamená, že sa niečo spustilo“ žije v <code>amStart</code>. Jeho interface je však šitý na správu pre <code>launch</code> (<code>packageName/component/intent</code>), takže ho <code>openDeepLink</code> nemôže použiť a deep link na neexistujúcu schému hlási úspech. Zlyhanie sa potom ukáže až pri čakaní o krok neskôr, čo je presne prípad, kvôli ktorému <code>amStart</code> vznikol (:196-201).</p>
+      <p><span class="font-semibold">Solution.</span> Jeden modul štartu v adaptéri, ktorý vráti klasifikovaný výsledok (started / refused s riadkami am alebo monkey / transport). <code>launch</code> a <code>openDeepLink</code> si z neho skladajú vlastnú vetu. Či má <code>openDeepLink</code> dostať <code>-p</code> (rovnaký argument ako 2026-10-03), je otvorené rozhodnutie, ktoré mení interface (<code>types.ts:311</code> nemá appId).</p>
+      <ul class="list-disc pl-6 text-sm space-y-0.5">
+        <li>locality: jedna klasifikácia, štyri štarty</li>
+        <li>deep link prestane hlásiť falošný úspech</li>
+        <li>dôvod monkey sa dostane do správy</li>
+        <li>interface <code>amStart</code> sa zúži na argv</li>
+        <li>test: tabuľka výstup → výsledok</li>
+      </ul>
+    </article>
+
+    <!-- ============ 3 ============ -->
+    <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">3 · Diagnóza stavu zariadenia patrí adb seamu, nie <code>uiTree</code></h2>
+        <span class="px-2 py-0.5 rounded bg-amber-500 text-white text-xs font-semibold">Worth exploring</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">local-substitutable</span>
+      </div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/android.ts:291-324 — <code>uiTree</code>: jediný volajúci <code>diagnoseDumpFailure</code></li>
+        <li>src/adapters/android.ts:338-384 — <code>diagnoseDumpFailure</code>: <code>adb get-state</code> → offline / SLOW / settling / guest died; vetvy <code>timeout</code> a <code>exec-error</code> nemajú s dumpom nič spoločné</li>
+        <li>src/adapters/android.ts:286-289 — <code>screenshot</code>: prázdny stdout sa vráti ako PNG</li>
+        <li>src/adapters/android.ts:766 — <code>parseUiautomatorXml</code> „contained no nodes“ obíde diagnózu</li>
+        <li>src/adapters/android.ts:577-589 — <code>isAppRunning</code>: vlastné uvažovanie „transport, nie app“</li>
+        <li>src/verify/capture.ts:643-652 — <code>current.equals(previous)</code>: dva prázdne buffery = <code>'settled'</code></li>
+        <li>src/verify/capture.ts:514-525 — verify/ radí „check <code>adb exec-out screencap -p</code> / <code>xcrun simctl io</code>“</li>
+        <li>docs/bugs/2026-09-18-handoff-run5-and-finportal-login-findings.md:12 (a1/a4) — <code>adb exec-out</code> exit 0 s <code>Killed</code>/prázdne</li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">Before — cross-section jedného zlyhania transportu</p>
+          <div class="space-y-1 text-xs">
+            <div class="h-10 border-l-4 border-emerald-600 bg-emerald-50 px-3 flex items-center">uiTree → get-state → „device X is not reachable …“</div>
+            <div class="h-10 border-l-4 border-red-600 bg-red-50 px-3 flex items-center">screenshot → prázdny Buffer → stability „settled“ → verify/: „PNG decode failed, check adb…“</div>
+            <div class="h-10 border-l-4 border-red-600 bg-red-50 px-3 flex items-center">tap / typeText / launch → „Command failed (exit 1): adb -s … input tap …“</div>
+            <div class="h-10 border-l-4 border-slate-400 bg-slate-50 px-3 flex items-center">isAppRunning → vlastná výhrada v komentári</div>
+            <div class="h-10 border-l-4 border-slate-400 bg-slate-50 px-3 flex items-center">keyboard.state / witness → fail-open <code>unknown</code> (zámer)</div>
+          </div>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">After — jedna hrubá vrstva</p>
+          <div class="space-y-1 text-xs">
+            <div class="h-8 border border-slate-300 rounded px-3 flex items-center text-slate-500">uiTree: len no-XML / null root</div>
+            <div class="h-8 border border-slate-300 rounded px-3 flex items-center text-slate-500">screenshot: prázdne bajty = zlyhanie transportu</div>
+            <div class="h-8 border border-slate-300 rounded px-3 flex items-center text-slate-500">input, launch: nič navyše</div>
+            <svg viewBox="0 0 300 14" class="w-full h-3"><line x1="0" y1="7" x2="300" y2="7" stroke="#64748b" stroke-width="2" class="seam"/></svg>
+            <div class="deep text-white rounded-lg px-4 py-6 border-4 border-slate-900">
+              <p class="lbl text-slate-300">adb · transport</p>
+              <p class="text-slate-300 mt-1">ExecError (exit 255, offline, not found) alebo timeout → raz <code>get-state</code> → veta o stave zariadenia, pôvodná chyba ako <code>cause</code></p>
+              <p class="text-slate-400 mt-1">opt-out pre fail-open otázky s 2 s rozpočtom</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p><span class="font-semibold">Problem.</span> Diagnóza „zariadenie je offline / pomalé / nie je vybrané“ je súkromná metóda <code>uiTree</code>, hoci tri z jej štyroch vetiev opisujú adb a nie dump. Mŕtvy emulátor tak cez <code>screenshot</code> vyprodukuje „stabilnú“ prázdnu snímku a chybu dekódovania, ktorú formuluje verify/ s adb a simctl príkazmi, čiže znalosť platformy uniká cez seam nahor.</p>
+      <p><span class="font-semibold">Solution.</span> Klasifikáciu zlyhania transportu presunúť do toho istého adb modulu ako v kandidátovi 1. <code>screenshot</code> bude prázdne bajty považovať za zlyhanie transportu a <code>uiTree</code> si nechá iba to, čo vie len uiautomator.</p>
+      <ul class="list-disc pl-6 text-sm space-y-0.5">
+        <li>locality: jedna diagnóza, každé adb volanie</li>
+        <li>verify/ prestane hovoriť po adb</li>
+        <li>prázdna snímka prestane byť „settled“</li>
+        <li>test: jeden fake transport, všetky metódy</li>
+        <li>paralela s iOS <code>runIdb</code> (iný kód)</li>
+      </ul>
+      <p class="text-xs text-slate-500">Prečo nie Strong: prázdny <code>screencap</code> na umierajúcom emulátore nie je namerané, je to len ten istý transport ako nameraný dump (a1/a4). <code>get-state</code> stojí až 5 s na každé zlyhanie, a keyboard otázky (fail-open, 2 s) ani poll miss v <code>readTreeOrError</code> ho nesmú platiť opakovane. Arch review z 2026-09-18 (handoff :90) ocenil get-state na desiatky ms, čo treba overiť pod záťažou.</p>
+    </article>
+
+  </section>
+
+  <section id="ok" class="rounded-xl border border-slate-200 bg-white p-6 space-y-3">
+    <h2 class="font-serif text-2xl">Preskúmané a v poriadku</h2>
+    <ul class="list-disc pl-6 text-sm space-y-2">
+      <li><b>ExecFn seam</b> (exec.ts:17): dva reálne adaptery (execFile, fakes) a každá Android metóda je testovaná cez ňu. <code>execErrorLikeExec</code> (tests/helpers/exec-error.ts) drží fakes v tvare, ktorý produkcia vie vyrobiť. Jediná výhrada je v kandidátovi 1 (spájanie argv).</li>
+      <li><b>Parsery</b> <code>parseUiautomatorXml</code>/<code>normalizeNode</code>/<code>parseBounds</code> (:759-810): čisté, s reálnymi fixture. Compose text input heuristika (:785-789) je zdokumentovaná a pinovaná (test :90). <code>BOUNDS_PATTERN</code> má jedného vlastníka.</li>
+      <li><b>isAppRunning</b> (:577-589): rozlišuje „neide“ a „nedalo sa opýtať“, pinované testami :226-258. Po kandidátovi 1 odpadne iba validácia mena.</li>
+      <li><b>uiTree({settle})</b>: jedna ohraničená retry iba pre one-shot tooly. Rozhodnutie o troch read policies je zapísané v ui-tree/read-tree.ts:20-43, nespochybňujem ho.</li>
+      <li><b>typeText / clearText pacing</b> (:419-448, :561-570): namerané konštanty, testované cez <code>sleep-recorder</code>. Knowledge IME composition je v adaptéri, kam patrí. Fill (interact/fill.ts:149, 186) overuje výsledok.</li>
+      <li><b>viewport memo</b> (:390-403): memo aj pre zlyhanie je výslovne súčasťou kontraktu (types.ts:328-335) aj s dôvodom. Zvyšné riziko, ktoré nenavrhujem riešiť: prechodné zlyhanie <code>wm size</code> platí, kým registry adapter nevyradí, a <code>wm size</code> nesleduje rotáciu, zatiaľ čo bounds z uiautomatora áno (landscape nie je v rozsahu finportalu).</li>
+      <li><b>Chybové texty amStart v slovníku configu</b> (:220-231): vedomé rozhodnutie, ktoré nespochybňujem. Kandidát 2 ho zachováva.</li>
+      <li><b>field-errors.ts</b>: používa ho iba iOS (ios-tree-source.ts:102, wda-source.ts:103). Android dump nemá pár „label pod poľom s rovnakým id“, takže to nie je chýbajúca parita v adapteri.</li>
+      <li><b>logs()</b> (:591-595): tenké a správne. <code>run/verify.ts:133</code> zlyhanie logcatu ticho mení na <code>[]</code>, ale to je run/, nie adapter.</li>
+      <li><b>Keyboard časť</b> (:454-559, :598-746): mimo rozsahu, nečítaná ako kandidát.</li>
+    </ul>
+  </section>
+
+  <section id="top-recommendation" class="rounded-xl deep text-white p-8 space-y-3">
+    <p class="lbl text-slate-300">Top recommendation</p>
+    <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-slate-500">1 · Jeden vlastník pre argv cez adb shell</a></h2>
+    <p class="text-slate-200">Je to jediná nameraná tichá chyba v dátach používateľa (deep link s <code>&amp;</code> príde skrátený, extra s medzerou sa rozpadne, <code>$</code>/<code>;</code> sa vykoná) a oprava je malá. Zároveň vytvorí adb modul, na ktorom stoja kandidáti 2 a 3, preto je druhý v poradí <a href="#c2" class="underline">kandidát 2</a> (rovnaký <code>openDeepLink</code>, podmienka C10 je splnená).</p>
+  </section>
+
+  <p class="text-xs text-slate-500">Slovník z codebase-design: module · interface · implementation · depth · seam · adapter · leverage · locality. Interface zatiaľ nenavrhujem, najprv treba vybrať kandidáta.</p>
+</main>
+</body>
+</html>
