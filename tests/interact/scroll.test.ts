@@ -1236,7 +1236,9 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
         '`dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it, and scroll again — ' +
         'or it is only that thin, laid flush against it; a tap refuses it so cut (if it is whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates).',
     );
-    expect(fake.swipes.length).toBeGreaterThan(0);
+    // Two strokes down, then one back up — the cut edge (its top) turns no stroke: the rest lies under the bar, not past the far edge.
+    const down = { from: { x: 540, y: 1034 }, to: { x: 540, y: 424 } };
+    expect(fake.swipes).toEqual([down, down, { from: { x: 540, y: 620 }, to: { x: 540, y: 891 } }]);
   });
 
   it('…at the bound (maxSwipes: 0): what it was short of, and both ways past', async () => {
