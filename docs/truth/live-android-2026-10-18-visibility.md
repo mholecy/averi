@@ -117,6 +117,47 @@ partial records are: 24 cases, 21 ok, 1 loud, 2 mismatches):
   A–D, all ok) carries the hint — their presented remedy alone, once each (`… — a dialog is presented over it — close it
   first`, `… — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it …`).
 
+# Round 7: presented windows the parser does not mark (2026-10-19)
+
+Round 7's T2 (ADR 0018's residual 19): two new lab cells, Android only, each over the four slot targets A–D with a
+target S of its own — `presented/dialog-fullscreen` (a Compose `Dialog`, `usePlatformDefaultWidth = false`) and
+`presented/bottom-sheet-dialog` (Material's Views `BottomSheetDialog`). averi_lab as above (booted `-no-window`), the
+lab app built from truth/r7-dialogs, averi = its src (arch/round-23's, unchanged). New case kind: a colour assert on
+each target beneath (`assert:<cell>.<tag>`, live-visibility.ts#presentedAssertCase, asked of these two cells alone).
+Records: docs/truth/live-records/android-vis-dialogs.json (both cells, 26 cases), android-vis-dialogs-scroll-run2.json
+and -run3.json (the 8 scroll cases twice more). Reproduce:
+`node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups visibility --cells dialog-fullscreen,bottom-sheet-dialog`.
+
+| run | cases | ok | loud | mismatches | not known |
+|---|---|---|---|---|---|
+| android-vis-dialogs.json | 26 | 18 | 0 | 8 | 0 (KNOWN since: LW1 4, residual 19 4) |
+| -scroll-run2, -run3 | 8 each | 0 | 0 | 8 | 0 — the same cases, the same rules, every run |
+
+What the dumps are (the captures, tests/fixtures/truth/android-averi_lab-api33):
+
+- **dialog-fullscreen**: the dialog's window alone, `[0,66][1080,2153]` — Compose sizes it between the bars whatever the
+  window is told (`FLAG_LAYOUT_NO_LIMITS`, no fitted insets, `MATCH_PARENT`: each measured overridden), so it lies
+  against the left edge, an app's own window by the parser's rule. Unmarked; nothing in the dump tells it from a screen.
+- **bottom-sheet-dialog**: the dialog's window alone, `[0,0][1080,2220]`; `…:id/coordinator` `[0,66][1080,2154]` holding
+  `…:id/touch_outside` (clickable, childless, `content-desc=""`, `NAF="true"`) over its whole extent, then
+  `…:id/design_bottom_sheet` `[0,1164][1080,2154]`. Unmarked: the scrim is unlabelled AND neither it nor the sheet
+  reaches the window's top or bottom edge — the scrim rule fails on all three.
+
+What averi does, per verb (every run alike):
+
+| verb | dialog-fullscreen A–D | bottom-sheet-dialog A–D | S (each) |
+|---|---|---|---|
+| tap | times out "to appear" + the hint `(the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)`; nothing fired — ok | the same — ok | Tapped, fired — ok |
+| colour assert | `FAIL … not found within 3 s` (no hint: asserts carry none) — ok | the same — ok | (not asked) |
+| scroll_until | two strokes on the dialog (touch-downs (540,444) up for A, B; (540,1776) down for C, D), nothing moves or is dismissed, then "never appeared in the tree" + the hint — MISMATCH `presented-stroke`, residual 19 | A, B: ONE stroke from (540,444) — on `touch_outside` — `dismissed sheet`, then "fully visible after 1 swipe" on the uncovered screen — MISMATCH `presented-stop`, **lab note LW1**; C, D: two strokes on the sheet, then the hint — `presented-stroke`, LW1 | — |
+
+Answers to the round's questions: the tap's wait and `scroll_until`'s shortfall DO read with the active-window hint;
+the scrim rule does NOT hold for the Views sheet (unlabelled, and laid between the bars); the full-screen dialog can
+NOT be marked from the dump, the Views sheet CAN — by Material's view ids, `touch_outside` followed by
+`design_bottom_sheet` (the note's src proposal: docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md).
+The one harmful reply is LW1's: a dialog averi closed on its own, reported as a plain "fully visible" (L1's failure,
+on a window L1's fix does not mark).
+
 # The run itself
 
 The first run at e98b87e (docs/truth/live-records/android-vis-e98b87e-run1.json) had three tool calls hang past the

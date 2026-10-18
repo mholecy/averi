@@ -44,6 +44,8 @@ const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in th
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const CAROUSEL_FLING = 'bug:2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md';
 const LV6 = 'bug:2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md';
+const SHEET_DIALOG = 'bug:2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md';
+const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** Round 6's iOS device check's WDA smoke run at round 6's src (truth/round-6 11683c3). */
 const R6_SMOKE = 'ios-wda-bounded-long-list-11683c3-1.json';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
@@ -93,6 +95,14 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1, 'unchanged-claim', 'not found'),
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', { intermittent: true }),
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
+  // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the
+  // same in all three runs). LW1: beneath the Views BottomSheetDialog, A's and B's stroke up touches down on the
+  // touch_outside scrim, dismisses the sheet, and the stop is claimed on the screen it uncovered; C's and D's two strokes
+  // land on the sheet. Beneath the full-screen Compose Dialog every target's two strokes land on the dialog (nothing
+  // dismissed: it has no outside) — residual 19, accepted with the hint every reply carries.
+  ...each('android uiautomator', ['scroll:bottom-sheet-dialog.A', 'scroll:bottom-sheet-dialog.B'], SHEET_DIALOG, 'presented-stop', 'visible'),
+  ...each('android uiautomator', ['scroll:bottom-sheet-dialog.C', 'scroll:bottom-sheet-dialog.D'], SHEET_DIALOG, 'presented-stroke', 'not found'),
+  ...each('android uiautomator', ['A', 'B', 'C', 'D'].map((t) => `scroll:dialog-fullscreen.${t}`), UNMARKED_WINDOW, 'presented-stroke', 'not found'),
   // iOS, idb: no scroll view listed
   ...each('ios idb', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O'], LE2, 'stop-claim', 'visible'),
   ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O'], LE2, 'tap-claim', 'Tapped'),
