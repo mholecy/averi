@@ -123,7 +123,10 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * Rejected: hiding the keyboard before every tap (a `back` per tap, and a
  * navigation whenever the adapter is wrong); scrolling the target into view
  * instead (scrolls a screen the author did not ask to scroll, and a
- * non-scrolling login form has nowhere to go); tapping anyway and reporting
+ * non-scrolling login form has nowhere to go) — still rejected as the
+ * FIRST move; since 2026-10-18 the in-tree model's last fallback is a drag
+ * that lifts the target, once the configured dismissals the author opted
+ * into have left the keyboard up (ADR 0022); tapping anyway and reporting
  * it (the stray character is already in the field) — which is also why a
  * tap is not sent on ONE sample in which the input method contradicts the
  * window state: the input method can be the

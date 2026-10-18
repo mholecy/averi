@@ -30,7 +30,8 @@ import { coverName, cutSliverText } from './target-text.js';
  *    - `a blank point`: a tap on a point of the target's own scroll view, above the keyboard, where the tree lists
  *      nothing but bare wrappers in a square around it (`blankPoint`) — an app that ends the editing on a tap outside
  *      the field (the common `hideKeyboardWhenTappedAround`) hides it there; one that does not is left as it was.
- *    - `a drag`: the target's scroll view dragged UP by DRAG_LENGTH, from the blank point nearest the keyboard
+ *    - `a drag`: the target's scroll view dragged UP by DRAG_LENGTH (or what lifts the target clear of the
+ *      keyboard), from the blank point nearest the keyboard
  *      (`BLANK_DRAG`) — a scroll view whose `keyboardDismissMode` is `onDrag`/`interactive` (SwiftUI's
  *      `scrollDismissesKeyboard`) hides the keyboard on it: measured on the Contacts "New Contact" sheet, 3 of 3
  *      (docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md); one that does not is scrolled toward its end by up to
@@ -257,7 +258,14 @@ export const SCREEN_EDGE = 24;
 /** How long the fallback's drag takes: slow enough not to fling (interact/scroll-rounds.ts measured a 300-ms stroke flinging a SwiftUI form 729–970 pt), the drag's length read as a scroll. */
 export const DRAG_MS = 500;
 
-/** How far the fallback's drag moves, in points: the 120-pt drag measured to hide the keyboard on the Contacts form (ADR 0022), far past a tap's slop and a fraction of a screen of scroll. */
+/**
+ * How far the fallback's drag moves at least, in points: the 120-pt drag measured to hide the keyboard on the Contacts
+ * form (ADR 0022), far past a tap's slop and a fraction of a screen of scroll. Further when the target's centre lies
+ * deeper under the keyboard: the drag then also LIFTS it — its centre to BLANK_MARGIN above the keyboard's top, as far
+ * as the area above the keyboard reaches — so a scroll view that does not hide the keyboard on a drag still brings the
+ * target out from under it (measured: the lab's form-keyboard, k2 — the 120-pt drag lifted `vs` clear and it was
+ * tapped, the keyboard still up).
+ */
 export const DRAG_LENGTH = 120;
 
 /** A tap on a blank point of the target's scroll view (`blankPoint`). */
@@ -270,7 +278,7 @@ const BLANK_TAP: DismissalStrategy = {
   },
 };
 
-/** The target's scroll view dragged up DRAG_LENGTH from its blank point nearest the keyboard, kept inside the area the point was sought in (never past the status band). */
+/** The target's scroll view dragged up — DRAG_LENGTH, or what lifts the target's centre clear of the keyboard — from its blank point nearest the keyboard, kept inside the area the point was sought in (never past the status band). */
 const BLANK_DRAG: DismissalStrategy = {
   name: 'a drag',
   origin: 'fallback',
@@ -278,17 +286,21 @@ const BLANK_DRAG: DismissalStrategy = {
     const found = await blankPoint(ground, 'bottom');
     if ('skipped' in found) return { skipped: 'no blank point to drag from' };
     if (scrollAxis(found.scroller, ground.look.tree.unclippedFrames === true) === 'horizontal') return { skipped: 'the target\'s scroll view scrolls sideways' };
-    const to = { x: found.at.x, y: Math.max(found.at.y - DRAG_LENGTH, found.top) };
+    const lift = Math.max(DRAG_LENGTH, found.centre.y - (found.bottom - BLANK_MARGIN));
+    const to = { x: found.at.x, y: Math.max(found.at.y - lift, found.top) };
     if (found.at.y - to.y < 2 * BLANK_MARGIN) return { skipped: 'no room to drag above the keyboard' };
     return { kind: 'drag', what: "the target's scroll view", from: found.at, to };
   },
 };
 
-/** A blank point found: where, in which scroll view, and the top of the area it was sought in (the status band's bottom, or the scroll view's top below it). */
+/** A blank point found: where, in which scroll view, the top and bottom of the area it was sought in (below the status band, above the keyboard's top), and the target's centre. */
 interface BlankPoint {
   readonly at: Point;
   readonly scroller: UiNode;
   readonly top: number;
+  readonly bottom: number;
+  /** The guarded target's centre on this look. */
+  readonly centre: Point;
 }
 
 /**
@@ -357,7 +369,7 @@ async function blankPoint({ look, screen, target }: DismissalGround, from: 'top'
   const rows: number[] = [];
   for (let y = area.y + BLANK_MARGIN; y <= bottom - BLANK_MARGIN; y += BLANK_MARGIN) rows.push(y);
   if (from === 'bottom') rows.reverse();
-  for (const y of rows) for (const x of columns) if (clear({ x, y })) return { at: { x, y }, scroller, top: area.y };
+  for (const y of rows) for (const x of columns) if (clear({ x, y })) return { at: { x, y }, scroller, top: area.y, bottom, centre: tapPoint(target) };
   return { skipped: 'none in the target\'s scroll view above the keyboard' };
 }
 

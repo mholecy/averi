@@ -35,12 +35,17 @@ look that found it still up, never the one before the move. The list:
      outward; and only when the target's own tap standing is `reachable` (nothing but the keyboard over it — so the
      scroll view is the top layer's, never a scrim or a sheet's backdrop beneath one). An app that ends editing on a
      tap outside the field hides the keyboard there; one that does not is left as it was.
-   - **a drag** — the target's scroll view dragged UP by `DRAG_LENGTH` (120 pt) over `DRAG_MS` (500 ms, slow enough
-     not to fling), from its blank point nearest the keyboard (the same rule, rows from the bottom), never past the
-     status band: a scroll view whose `keyboardDismissMode` is `onDrag` or `interactive` (SwiftUI
-     `scrollDismissesKeyboard`) hides the keyboard on it; one that does not is scrolled toward its end by up to the
-     drag's length, or does not move, and the guard resolves the target again where it now is. **Never down**: at the
-     top of a sheet's scroll view a downward drag pulls the sheet itself down — the swipe that dismisses a sheet.
+   - **a drag** — the target's scroll view dragged UP by `DRAG_LENGTH` (120 pt) — or, when the target's centre lies
+     deeper under the keyboard, by what lifts that centre to `BLANK_MARGIN` above the keyboard's top — over `DRAG_MS`
+     (500 ms, slow enough not to fling), from its blank point nearest the keyboard (the same rule, rows from the
+     bottom), never past the status band. Two ways it gets the target clear: a scroll view whose
+     `keyboardDismissMode` is `onDrag` or `interactive` (SwiftUI `scrollDismissesKeyboard`) hides the keyboard on
+     it; one that does not is scrolled toward its end, the target with it, out from under the keyboard (the note
+     then says the keyboard is still up but no longer over it) — or it does not move. The guard resolves the target
+     again where it now is, as after every move. This is the one place averi scrolls a screen to clear the keyboard
+     — rejected as a FIRST move (interact/keyboard.ts), kept as the last, after the dismissals the author opted
+     into. **Never down**: at the top of a sheet's scroll view a downward drag pulls the sheet itself down — the
+     swipe that dismisses a sheet.
 
    Both keep `SCREEN_EDGE` (24 pt) from the screen's sides, clear of where iOS starts its edge gestures.
 

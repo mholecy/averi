@@ -84,6 +84,12 @@ describe('the guard: when the configured dismissal leaves the keyboard up, averi
     );
   });
 
+  it('a target deeper under the keyboard (note, centre 843): the drag is long enough to lift its centre above the keyboard\'s top, not only DRAG_LENGTH — so a scroll view that keeps its keyboard still brings the target out (k3)', async () => {
+    const fake = labFake();
+    await tapElement(fake, 'id:lab.form-keyboard.note', { ...FAST, dismissals: [TITLE] }).catch(() => undefined);
+    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,224) 500ms'); // 843 − (573 − 8) = 278 pt
+  });
+
   it('nothing hides it: AfterDismissalTap naming every move, in order — the target never tapped, no move repeated', async () => {
     const fake = labFake();
     const error = (await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] }).catch((e: unknown) => e)) as AfterDismissalTap;
