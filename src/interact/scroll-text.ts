@@ -222,9 +222,10 @@ const endText = ({ way, scrollView }: EndProof): string => `the tree lists the c
  * The end turn's clause (scroll-rounds.ts#EndTurn), before the detent's in every reply and failure that made one —
  * `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
  * averi turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end
- * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made.
+ * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made. Exported for the
+ * troubleshooting reference, which quotes one rendering (tests/mcp/tool-descriptions.test.ts pins it).
  */
-const endTurnText = (turn: EndTurn | undefined): string =>
+export const endTurnText = (turn: EndTurn | undefined): string =>
   turn === undefined ? '' : `; ${unmovedText(turn)} — ${endText(turn)} — so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
 
 /**
@@ -237,9 +238,11 @@ const detentText = (detent: DetentMove | undefined): string => (detent === undef
 /**
  * The flush clause (scroll-rounds.ts#PROBE_REACH): what the stop's edge on
  * its scroll container means — checked by a probe, or not checked. The
- * container is quoted as a node's rect (`rectText`): it is one.
+ * container is quoted as a node's rect (`rectText`): it is one. Exported for
+ * the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins
+ * its `axis` rendering).
  */
-function flushText(flush: ScrollUntilResult['flush']): string {
+export function flushText(flush: ScrollUntilResult['flush']): string {
   if (flush === undefined) return '';
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
   if ('edges' in flush) {
@@ -323,9 +326,10 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  * would have landed (`next`); empty when it was judged in the frame. A touch-down outside where the surface reaches is
  * said to land on the dim outside it: Android's dialog window, listed alone, reaches only its own rect, and a touch
  * beside it lands on the dim the dialog lays around it (which dismisses it) —
- * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md.
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md. Exported for the
+ * troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the dim's rendering).
  */
-const touchDownText = (next: PresentedTouchDown | undefined): string =>
+export const touchDownText = (next: PresentedTouchDown | undefined): string =>
   next === undefined
     ? ''
     : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${containsPoint(next.reach, next.touchDown) ? '' : 'the dim outside '}${coverText(next.surface, next.reach)}`;
@@ -573,8 +577,8 @@ function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
   return undefined;
 }
 
-/** Which bound ended it, as the failure's cause. */
-function boundText(by: BoundBy, swipes: number): string {
+/** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */
+export function boundText(by: BoundBy, swipes: number): string {
   switch (by.of) {
     case 'exhausted': {
       // `tree`: there is no match to watch, so the sentence
