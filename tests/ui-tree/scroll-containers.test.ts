@@ -154,7 +154,7 @@ describe('scrollAxis — the one axis a scroll view scrolls on, as each source c
     });
   });
 
-  it('over every real capture the suite holds, no scroll view reads horizontal but the one carousel (no false axis from the extent rule)', async () => {
+  it('over every capture tests/fixtures holds (the truth corpus is not on this branch), no scroll view reads horizontal but Account Detail\'s carousel — no false axis from the extent rule', async () => {
     const trees = await everyFixtureTree();
     for (const file of ['wda-capture-account-detail-bar-shown.json', 'wda-capture-contacts-discard-popover.json', 'wda-capture-contacts-new-contact.json', 'wda-capture-swift-form-pushed.json']) trees.push([file, parseWdaSource(await text(file))]);
     const horizontal = trees.flatMap(([name, tree]) => [...everyNode(tree)].filter((n) => scrollAxis(n, tree.unclippedFrames === true) === 'horizontal').map((n) => `${name} ${JSON.stringify(n.rect)}`));
