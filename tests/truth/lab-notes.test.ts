@@ -28,9 +28,9 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  * Notes a KNOWN row is filed as that are no open note of calibration.json — each a live-only finding (scroll dynamics,
  * a stroke's reach on the device): no captured tree reproduces it, so the replay has no row to calibrate it on, and
  * calibration.json lists it under `excluded` (checked below, with the reason it gives).
+ * (2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md filed idb's sheet-long-list F until round 7's recapture
+ * recorded F unlisted under idb — no live entry files it since, so it is no exemption.)
  */
-// (2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md filed idb's sheet-long-list F until round 7's recapture
-// recorded F unlisted under idb — no live entry files it since, so it is no exemption.)
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md': 'LV1: a list moving through blank content, live only',
   '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",

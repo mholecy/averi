@@ -49,7 +49,7 @@ describe('k7: scroll_until phone — the stop ok, "fully" overstating by what th
   });
 });
 
-describe('c2–c4: a tap beneath form-picker\'s expanded sheet — nothing fires, the reply says to close the sheet once', () => {
+describe('c2–c4: a tap beneath form-picker\'s expanded sheet — nothing fires, the reply says to close the sheet once where the tree source marks it (idb: not in its tree)', () => {
   // The launch c1 recorded: form-picker, the sheet open and fully expanded.
   const { launched } = k('c1');
   const judge = judgeUnderSheet('name');

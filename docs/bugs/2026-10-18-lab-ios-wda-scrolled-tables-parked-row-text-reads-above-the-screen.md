@@ -1,7 +1,7 @@
 # BUG: under WDA, once a UIKit table has scrolled, the text of a row below the fold is parked ABOVE the screen — averi reads the row there, strokes away from it and turns until the budget runs out
 
 > **Status (2026-10-18):** open; measured live only (round 6's iOS device check). KNOWN as this note
-> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30`, R-direction: three turns in every run). Not a carry-model fault (ADR 0021 decision 4):
+> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30` (since round 7 `carry:sheet-long-list.L`), R-direction: three turns in every run). Not a carry-model fault (ADR 0021 decision 4):
 > the carry case was built to measure that model, and this defect comes first — averi never sees where the row is.
 
 Lab note LV6. **Found 2026-10-18** by round 6's iOS device check: the live golden's new long-list carry case
