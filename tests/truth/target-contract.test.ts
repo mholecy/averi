@@ -137,7 +137,7 @@ function captures(): Capture[] {
 
 const outcome = (reply: string, device: string[] = []): Outcome => ({ reply, device }) as unknown as Outcome;
 /** A refusal that sent nothing, naming the clause's remedy where it has one (as averi's refusals word them). */
-const refusal = (ask: TapAsk) => `ERROR id:"x" was not tapped${ask.must === 'refuse' && ask.remedy !== undefined ? ` — ${ask.remedy === 'scroll_until' ? 'scroll_until it first' : 'close it first'}` : ''}; nothing was tapped`;
+const refusal = (ask: TapAsk) => `ERROR id:"x" was not tapped${ask.must === 'refuse' && ask.remedy !== undefined ? ` — ${ask.remedy === 'scroll_until' ? 'scroll_until it first' : 'a screen is presented over it (a modal or a sheet) — close it first'}` : ''}; nothing was tapped`;
 /** The app as its capture laid it out (the live judge's state), the target's own tap logged or not. */
 const appAt = (truth: CellTruth, t: TargetTruth, fired: boolean): LabState => ({
   cell: truth.cell,

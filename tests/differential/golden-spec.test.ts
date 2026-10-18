@@ -90,7 +90,7 @@ describe('a target beneath a presented layer', () => {
     expect(colour.judge(out('1/1 asserts FAILED\nFAIL  element id:"lab.alert-dim.A" fill within dE00 8 of #B72E2A — not found within 1 s'))).toBe(
       'not in the tree: FAIL  element id:"lab.alert-dim.A" fill within dE00 8 of #B72E2A — not found within 1 s',
     );
-    expect(colour.judge(out('1/1 asserts FAILED\nFAIL  element … — container (57,463 288x48) is drawn over the element … close it first'))).toBeUndefined();
+    expect(colour.judge(out('1/1 asserts FAILED\nFAIL  element … — container (57,463 288x48) is drawn over the element … — a dialog is presented over the element — close it first'))).toBeUndefined();
   });
 
   it('colour: a target measured wholly off the screen is asked for its own colour (nothing there shows another)', () => {
@@ -109,7 +109,7 @@ describe('a target beneath a presented layer', () => {
 
   it('scroll_until: an Android stroke beneath the layer is a swipe', () => {
     const scroll = row(rows, 'scroll_until');
-    expect(scroll.judge(out('ERROR scroll_until … stopped before any swipe … close it first'))).toBeUndefined();
+    expect(scroll.judge(out('ERROR scroll_until … stopped before any swipe — … — a dialog is presented over it — close it first, and a swipe would land on the dialog, so none was sent'))).toBeUndefined();
     expect(scroll.judge(out('ERROR scroll_until … never appeared in the tree', ['adb shell input swipe 540 1776 540 444 1334', 'adb shell input swipe 540 1776 540 444 1334']))).toMatch(
       /^swiped 2× beneath a presented layer/,
     );

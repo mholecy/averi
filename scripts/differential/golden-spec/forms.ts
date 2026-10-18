@@ -1,10 +1,10 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
-import { claimsTap, closeFirst, isError, namesKeyboard, snapshotNodes, type SnapshotNode } from '../../truth/replies.js';
+import { claimsTap, isError, namesKeyboard, snapshotNodes, type SnapshotNode } from '../../truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
-import { BUDGET_MS, classed, failed, first, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, failed, first, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -373,14 +373,14 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
           verb: 'tap',
           says: 'refused: close it first, nothing tapped',
           call: tap,
-          judge: (o) => notTapped(o) ?? (closeFirst(o.reply) ? undefined : said(o, 'refused without "close it first"')),
+          judge: (o) => notTapped(o) ?? presentedRemedyMissing(o, 'refused without "close it first"'),
         },
         {
           target,
           verb: 'scroll_until',
           says: 'stops before any swipe: close it first',
           call: scroll,
-          judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath the sheet`) : !closeFirst(o.reply) ? said(o, 'no "close it first"') : undefined),
+          judge: (o) => (swipes(o) > 0 ? said(o, `swiped ${swipes(o)}× beneath the sheet`) : presentedRemedyMissing(o, 'no "close it first"')),
         },
       ];
     case 'off-screen':

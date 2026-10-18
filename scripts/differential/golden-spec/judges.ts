@@ -1,5 +1,5 @@
 import type { Call, Outcome } from '../differential.js';
-import { allPassed, claimsTap, firstLine, isError, notInTree } from '../../truth/replies.js';
+import { allPassed, claimsTap, firstLine, isError, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
 import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
@@ -78,6 +78,16 @@ export const swipes = (o: Outcome) => touchDowns(o).length;
 /** The reply's first line (replies.ts#firstLine) — an assert's first verdict line, under its `N/N asserts …` summary. */
 export const first = (o: Outcome) => firstLine(o.reply);
 export const said = (o: Outcome, what: string) => `${what}: ${first(o)}`;
+
+/** The class of a reply beneath a presented layer that gives only the active-window hint — not in the tree, the remedy offered as a possibility. */
+export const NOT_IN_TREE_HINTED = 'not in the tree (active-window hint)';
+/**
+ * A row beneath a presented layer asks for the presented remedy (replies.ts#presentedRemedySaid): undefined when the
+ * reply says it; else why not, by what it says instead — only the active-window hint (uiautomator, a window it does not
+ * mark: NOT_IN_TREE_HINTED), or neither (`missing`, the row's own words).
+ */
+export const presentedRemedyMissing = (o: Outcome, missing: string): string | undefined =>
+  presentedRemedySaid(o.reply) ? undefined : windowHintSaid(o.reply) ? said(o, NOT_IN_TREE_HINTED) : said(o, missing);
 
 const NOT_IN_TREE = 'not in the tree: ';
 /**
