@@ -18,7 +18,7 @@ import { KNOWN } from '../differential/golden/files.js';
 //      the live-only notes below, each excluded from the calibration with its reason, the live cases of a note
 //      calibrated on the replay that still await a live record at its fix (AWAITING_LIVE, below, case by case), and a
 //      static row or live entry a note calibrated PARTIALLY lists as left open (its `open` by row, its `openLive` by
-//      case: `partiallyOpen`, `partiallyOpenLive`, below).
+//      case: `partiallyOpen`, below).
 // Filing a note, or striking one off when it is fixed, therefore touches all three places in one commit or fails here.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -60,25 +60,24 @@ const AWAITING_LIVE: Readonly<Record<string, { note: string; why: string }>> = {
 const NOT_ON_THIS_BRANCH: readonly string[] = [];
 
 /**
- * A static KNOWN row (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
- * `partial` saying what of the note its fix covers — only when that note's `open` lists the row: the part `partial`
- * leaves open, red until a fix or a decision of the owner's (L1's six form-picker rows were so, round 6's code review P1,
+ * A KNOWN row or entry (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
+ * `partial` saying what of the note its fix covers — only when that note's list for its ratchet (`field`, OPEN_FIELD:
+ * `open` for a static row, `openLive` for a live entry) names it: the part `partial` leaves open, red until a fix or a decision of the owner's (L1's six form-picker rows were so, round 6's code review P1,
  * until the owner accepted ADR 0018's residual 18 on 2026-10-18; none is listed today). Keyed by ROW, as AWAITING_LIVE is
  * by case: a row filed as a partial note that its `open` does not list is held to the note being open like any other.
  * Round 6 extended the rule for it: an open note expects every row red (OPEN-RED), a calibrated one every row green
  * after its fix, and neither says "calibrated, some rows still open".
  */
-const partiallyOpen = (note: string, key: string, tbl: Calibration = table): boolean =>
-  tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.open ?? []).includes(key));
+const partiallyOpen = (field: 'open' | 'openLive', note: string, key: string, tbl: Calibration = table): boolean =>
+  tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e[field] ?? []).includes(key));
 
 /**
- * The same for a live KNOWN entry (`key`, `<platform> <source> <case id>`): it may stay filed as a note calibrated
- * PARTIALLY only when that note's `openLive` lists it (#10 listed the live case `turn:scroll-collapsing.A` while ADR
- * 0021 left the turn on uiautomator to the owner; closed by the owner's decision of 2026-10-18 — no turn there, the
- * case ok by live-visibility.ts#judgeAndroidTurn — none is listed today).
+ * Which list of a partial note names a KNOWN place, by its ratchet: a static row its `open`, a live entry (`<platform>
+ * <source> <case id>`) its `openLive` (#10 listed the live case `turn:scroll-collapsing.A` while ADR 0021 left the turn
+ * on uiautomator to the owner; closed by the owner's decision of 2026-10-18 — no turn there, the case ok by
+ * live-visibility.ts#judgeAndroidTurn — none is listed today).
  */
-const partiallyOpenLive = (note: string, key: string, tbl: Calibration = table): boolean =>
-  tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.openLive ?? []).includes(key));
+const OPEN_FIELD = { static: 'open', live: 'openLive' } as const;
 
 /** Rule 3 over `entries` (every place a note is named, `named`): each `bug:` of a KNOWN row that is filed where it may not be — against `tbl` (calibration.json, or a test's table). */
 function misfiled(entries: readonly { where: string; name: string }[], tbl: Calibration = table): string[] {
@@ -86,8 +85,10 @@ function misfiled(entries: readonly { where: string; name: string }[], tbl: Cali
   return entries
     .filter(({ where, name }) => !where.startsWith('calibration.json') && name.startsWith('bug:'))
     .filter(({ where, name }) => !(where.startsWith('live ') && AWAITING_LIVE[where.slice('live '.length)]?.note === name.slice(4)))
-    .filter(({ where, name }) => !(where.startsWith('static ') && partiallyOpen(name.slice(4), where.slice('static '.length), tbl)))
-    .filter(({ where, name }) => !(where.startsWith('live ') && partiallyOpenLive(name.slice(4), where.slice('live '.length), tbl)))
+    .filter(({ where, name }) => {
+      const [ratchet, ...key] = where.split(' ');
+      return !(ratchet in OPEN_FIELD && partiallyOpen(OPEN_FIELD[ratchet as keyof typeof OPEN_FIELD], name.slice(4), key.join(' '), tbl));
+    })
     .flatMap(({ where, name }) => (open.has(name.slice(4)) || LIVE_ONLY[name.slice(4)] !== undefined ? [] : [`${where}: ${name} is no open note of calibration.json`]));
 }
 
@@ -206,6 +207,9 @@ describe('calibration.json ↔ the KNOWN rows', () => {
     const leaving: Calibration = { ...table, notes: table.notes.map((e) => (e.n === 'L1' ? { ...e, open: ['android-averi_lab-api33/form-picker.xml name tap'] } : e)) };
     expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }], leaving)).toEqual([]);
     expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml country tap', name: `bug:${noteOf('L1')}` }], leaving)).toHaveLength(1);
+    // Each ratchet reads its own list: the row listed under `openLive` instead leaves it misfiled.
+    const crossed: Calibration = { ...table, notes: table.notes.map((e) => (e.n === 'L1' ? { ...e, openLive: ['android-averi_lab-api33/form-picker.xml name tap'] } : e)) };
+    expect(misfiled([{ where: 'static android-averi_lab-api33/form-picker.xml name tap', name: `bug:${noteOf('L1')}` }], crossed)).toHaveLength(1);
   });
 
   it('the notes calibration.json lists that this branch has not got: exactly NOT_ON_THIS_BRANCH, none open', () => {
