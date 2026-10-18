@@ -383,6 +383,8 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
  * read that did not resolve the target only, so a found target never pays the walk.
  * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
  */
+// The root-mark test is a cost guard only: `alone` is undefined without it anyway, and it spares a tree of any other
+// source the presentation's walk on every read that missed its target.
 const listedAlone = (tree: UiNode): MarkedLayer | undefined => (tree.activeWindowOnly === true ? presentationOf(tree).alone : undefined);
 
 /** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
