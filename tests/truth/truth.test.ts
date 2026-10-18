@@ -103,9 +103,9 @@ describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'LOGIN' })).toEqual([rect(10, 20, 100, 40)]);
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'A & B' })).toEqual([rect(0, 0, 5, 5)]);
   });
-  it('a label target by its accessibility label exactly (WDA label, idb AXLabel, uiautomator content-desc — never its text)', async () => {
-    const xml = '<hierarchy><node text="Close" content-desc="" bounds="[0,0][9,9]" /><node text="" content-desc="Close" bounds="[507,1843][573,1909]" /></hierarchy>';
-    expect(nodeFramesIn(xml, 'uiautomator', { label: 'Close' })).toEqual([rect(507, 1843, 66, 66)]);
+  it('a label target by its accessibility label exactly, as averi reads it (WDA label, idb AXLabel, uiautomator content-desc, else its text)', async () => {
+    const xml = '<hierarchy><node text="Close" content-desc="" bounds="[0,0][9,9]" /><node text="" content-desc="Close" bounds="[507,1843][573,1909]" /><node text="Close" content-desc="Dismiss" bounds="[1,1][2,2]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { label: 'Close' })).toEqual([rect(0, 0, 9, 9), rect(507, 1843, 66, 66)]);
     expect(nodeFramesIn(await read('android-averi_lab-api33/own-parts.xml'), 'uiautomator', { label: 'Close' })).toEqual([rect(507, 1843, 66, 66)]);
     const wda = JSON.stringify({ value: { children: [{ label: 'Close', rect: rect(179, 660, 44, 44) }, { label: 'Close menu', rect: rect(0, 0, 1, 1) }] } });
     expect(nodeFramesIn(wda, 'wda', { label: 'Close' })).toEqual([rect(179, 660, 44, 44)]);

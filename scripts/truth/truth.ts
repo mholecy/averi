@@ -109,12 +109,13 @@ function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[
  * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`) exactly — `lab.x.A.box` is not `lab.x.A`; or, for a text
  * target, labelled `text` (WDA's `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) compared as
  * textListedIn compares a string: whitespace collapsed (spaced), so a string the app wraps onto lines is one node in
- * both readings; or, for a label target, its accessibility label exactly (WDA's `label`, idb's `AXLabel`,
- * uiautomator's `content-desc` — never its `text`: an icon draws none).
+ * both readings; or, for a label target, its accessibility label exactly as averi reads it (WDA's `label`, idb's
+ * `AXLabel`; uiautomator's `content-desc`, or its `text` where that is empty — src/adapters/android.ts#normalizeNode's
+ * `label: contentDesc ?? text`).
  */
 function isTarget(o: Record<string, unknown>, source: SourceKind, by: AssertElement): boolean {
   if ('id' in by) return (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]).some((v) => v === by.id);
-  if ('label' in by) return (source === 'uiautomator' ? o['content-desc'] : source === 'idb' ? o.AXLabel : o.label) === by.label;
+  if ('label' in by) return (source === 'uiautomator' ? o['content-desc'] || o.text : source === 'idb' ? o.AXLabel : o.label) === by.label;
   const values = source === 'uiautomator' ? [o.text, o['content-desc']] : source === 'idb' ? [o.AXLabel] : [o.label];
   return values.some((v) => typeof v === 'string' && spaced(v) === spaced(by.text));
 }
