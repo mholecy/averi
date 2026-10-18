@@ -32,11 +32,12 @@ import { geometryOf, isOverlap, parseGeometry, type GeometryContext } from './tr
  * no remedy's wording (the replay does: `scroll_until`, `close it first`). `fire` is the same in both: a refusal is
  * wrong.
  *
- * Residual, recorded: how a target is ADDRESSED is not the contract's yet. The open rows (golden-spec/base.ts) and every
- * live case ask a text target by its text (truth.ts#selectorOf); the edge, band and chrome rows (golden-spec/rows.ts)
- * ask by its identifier, so a text target with such a geometry (text-under-bar's S in the status band, text-nav-cut's T)
- * is tapped `id:"…"` in the replay and `text:"…"` live. Moving the replay to selectorOf changes those rows' calls, and is
- * left to a round that re-measures them.
+ * How a target is ADDRESSED is one rule both goldens share, truth.ts#selectorOf: a text target (CatalogTarget.text) by
+ * its string, as an agent would ask it, any other by its identifier — every tap and scroll_until of the replayed rows
+ * (golden-spec/base.ts, golden-spec/rows.ts) and of the live cases. So whether the target AS ASKED may be missing from a
+ * tree is the string's for a text target (askedUnlistedBy): text-under-bar's P on Android, its node listed by the
+ * uncovered strip above the pinned button, its string by no node, is not found by `text:"…"` — an honest answer. The
+ * colour assert still names its element by the identifier (its rows read unlistedBy).
  */
 
 // --- which bands are bands: the geometry the contract judges by ---
@@ -141,6 +142,16 @@ export function unlistedBy(t: Pick<TargetTruth, 'listed'>, source: string): stri
  */
 export function stringUnlistedBy(t: Pick<TargetTruth, 'textListed'>, source: string): string | undefined {
   return t.textListed?.[source as SourceKind] === false ? `the ${source} capture lists no node carrying the string (TargetTruth.textListed): it is wholly under what is drawn over it` : undefined;
+}
+
+/**
+ * Why the target may be missing from the tree of `source` AS A TAP OR A STOP ASKS IT (truth.ts#selectorOf): a text
+ * target by its string (stringUnlistedBy), any other — or a text target whose capture recorded no string listing — by
+ * its node (unlistedBy). What the replayed rows' `absent` and the live stops' `unlisted` read for a selector-asked call.
+ */
+export function askedUnlistedBy(t: Pick<TargetTruth, 'text' | 'listed' | 'textListed'>, source: string): string | undefined {
+  if (t.text !== undefined && t.textListed?.[source as SourceKind] !== undefined) return stringUnlistedBy(t, source);
+  return unlistedBy(t, source);
 }
 
 // --- the tap ---

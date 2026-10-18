@@ -1,8 +1,8 @@
-import type { Platform } from '../corpus.js';
+import type { Platform, SourceKind } from '../corpus.js';
 import type { CellTruth, TargetTruth } from '../../truth/schema.js';
 import { classed, type Expectation } from './judges.js';
 import { isOverlap, parseGeometry } from '../../truth/truth.js';
-import { isBand, type TargetContract } from '../../truth/target-contract.js';
+import { askedUnlistedBy, isBand, type TargetContract } from '../../truth/target-contract.js';
 import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } from './rows.js';
 
 /**
@@ -33,20 +33,23 @@ import { bandColour, colourFails, fullyRow, overlapColour, stopRow, tapRow } fro
  * (ui-tree/standing.ts#fullyStanding), so it never stops on it where it is. A band's R-fully is asked only of a target
  * in a scroll view (fullyAsked, above).
  */
-export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, c: TargetContract): Expectation[] {
+export function barRows(platform: Platform, t: TargetTruth, cell: CellTruth, source: SourceKind, c: TargetContract): Expectation[] {
   const g = c.geometry;
   if (g === undefined) return [];
+  // The tap and the stop ask by truth.ts#selectorOf: where the replayed tree does not list the target as asked (a text
+  // target's string under the chrome, askedUnlistedBy), a reply that never found it is honest, judged by what it did.
+  const absent = askedUnlistedBy(t, source);
   const { kind, name } = parseGeometry(g);
   const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   if (isBand(g)) {
-    return [tapRow(platform, t, c, 'R-band'), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop), ...fully].map(classed);
+    return [tapRow(platform, t, c, 'R-band', { absent }), bandColour(platform, t, cell), stopRow(platform, t, cell, 'R-band', c.stop, { absent }), ...fully].map(classed);
   }
   if (kind === 'under-chrome') {
     const chrome = name;
-    return [tapRow(platform, t, c, 'R-under-chrome'), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`, c.stop)].map(classed);
+    return [tapRow(platform, t, c, 'R-under-chrome', { absent }), colourFails(platform, t, `R-under-chrome: ${chrome} over it`), stopRow(platform, t, cell, `R-under-chrome (${chrome})`, c.stop, { absent })].map(classed);
   }
   if (isOverlap(g)) {
-    return [tapRow(platform, t, c, 'R-overlap'), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`, c.stop), ...fully].map(classed);
+    return [tapRow(platform, t, c, 'R-overlap', { absent }), overlapColour(platform, t, cell), stopRow(platform, t, cell, `R-overlap (${g})`, c.stop, { absent }), ...fully].map(classed);
   }
   return [];
 }

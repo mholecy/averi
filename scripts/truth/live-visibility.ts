@@ -1,7 +1,7 @@
 import type { Platform } from '../differential/corpus.js';
 import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
-import { contractOf, judgedContext, stopHolds, unlistedBy, type StopAsk, type TapAsk } from './target-contract.js';
+import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { bandsOf, directionOf, geometryOf, intersect, selectorOf, type GeometryContext } from './truth.js';
 
 /**
@@ -415,7 +415,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     if (t?.scrollView === undefined) continue;
     // A target its capture's tree of a source does not list: averi cannot see where it lies, so there is nothing to turn
     // back toward — the case is said so, and its strokes are not held to R-direction under that source.
-    const unlisted = Object.keys(t.listed ?? {}).filter((src) => unlistedBy(t, src) !== undefined);
+    const unlisted = [...new Set([...Object.keys(t.listed ?? {}), ...Object.keys(t.textListed ?? {})])].filter((src) => askedUnlistedBy(t, src) !== undefined);
     const says = unlisted.length === 0 ? `turn back: ${b.says}` : `the wrong direction: ${b.says} — under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
     cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
   }
@@ -431,6 +431,6 @@ function scrollCase(cell: string, t: TargetTruth, view: string, direction: 'up' 
       { tool: 'scroll_until', args: { selector: selectorOf(t), direction, ...(fully && { fully: true }) } },
       { tool: 'tap', args: { selector: selectorOf(t) } },
     ],
-    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: unlistedBy(t, source) !== undefined }, replies, s, launched, after[0] ?? s),
+    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: askedUnlistedBy(t, source) !== undefined }, replies, s, launched, after[0] ?? s),
   };
 }

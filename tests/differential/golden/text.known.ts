@@ -28,9 +28,11 @@ export const text: KnownFile = {
     [`${ANDROID}/text-sample.xml B ocr`, READ("L'ubomír Sťastný", "lab finding OC1: Ľ read as L'", OC1)],
     [`${ANDROID}/text-sample.xml C ocr`, READ('Mäkčeň, dížeň a vokáň', 'lab finding OC1: ĺ read as í', OC1)],
     // The pinned-button shape of bars' pinned-bar P (bars.known.ts, the same lab finding): Compose lists P by its
-    // uncovered strip above the button, so the colour assert samples only that and passes, and scroll_until stops on it.
+    // uncovered strip above the button, so the colour assert — naming P by its identifier — samples only that and
+    // passes. Its tap and scroll_until ask P by its string, as an agent and the live golden do (rows.ts#tapCall), and the
+    // dump lists no node carrying it (TargetTruth.textListed): not found, an honest answer — the stop that read P whole
+    // by its strip, asked `id:"…"`, stays pinned by bars' pinned-bar P (its `fully` row).
     [`${ANDROID}/text-under-bar.xml P colour`, { cls: 'passed on #FCE4EC', kind: 'PASS', calls: [], note: 'lab finding: the colour sampled on P\'s uncovered strip only (Compose\'s uncovered bounds)', as: LAB_FULLY }],
-    [`${ANDROID}/text-under-bar.xml P scroll_until`, { cls: 'reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the stop reads P whole by its uncovered strip (Compose\'s uncovered bounds)', as: LAB_FULLY }],
   ]),
   counts: {
     [`${ANDROID}/text-sample.xml`]: 40,

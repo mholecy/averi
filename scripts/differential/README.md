@@ -104,7 +104,10 @@ or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — cla
 file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars, false-covers, text), the judges
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
-asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
+asks a row marked `live`). Every tap and scroll_until row asks its target as an agent and the live golden do
+(truth.ts#selectorOf: a text target by its string, any other by its identifier; the colour assert by the identifier),
+and accepts a reply that never found it where the replayed tree does not list it as asked
+(target-contract.ts#askedUnlistedBy: a text target's string, TargetTruth.textListed). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
 it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
 rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
 its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies

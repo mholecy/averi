@@ -6,7 +6,7 @@ import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, type Expectation } from '../../scripts/differential/golden-spec.js';
 import { liveGeometry, visibilityCases, type VisibilityCase } from '../../scripts/truth/live-visibility.js';
 import type { CellTruth, Geometry, LabState, TargetTruth } from '../../scripts/truth/schema.js';
-import { bandNamed, contractOf, fullyAsked, isBand, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
+import { askedUnlistedBy, bandNamed, contractOf, fullyAsked, isBand, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
 import { geometryOf, probePoint } from '../../scripts/truth/truth.js';
 import { probeDelivered } from '../../scripts/differential/golden-spec/base.js';
 
@@ -101,6 +101,16 @@ describe('the contract\'s rules', () => {
     expect(unlistedBy({}, 'idb')).toBeUndefined();
     expect(stringUnlistedBy({ textListed: { uiautomator: false } }, 'uiautomator')).toMatch(/lists no node carrying the string/);
     expect(stringUnlistedBy({ textListed: { uiautomator: true } }, 'uiautomator')).toBeUndefined();
+  });
+  it('as asked (truth.ts#selectorOf): a text target by its string, any other by its node', () => {
+    // text-under-bar's P on Android: its node listed by its uncovered strip, its string not at all.
+    const p = { text: 'Pokračovať na súhrn', listed: { uiautomator: true }, textListed: { uiautomator: false } };
+    expect(askedUnlistedBy(p, 'uiautomator')).toMatch(/lists no node carrying the string/);
+    expect(askedUnlistedBy({ ...p, textListed: { uiautomator: true } }, 'uiautomator')).toBeUndefined();
+    // No string recorded: its node decides, as for a target asked by its identifier.
+    expect(askedUnlistedBy({ text: 'x', listed: { uiautomator: false } }, 'uiautomator')).toBe("the capture's uiautomator tree does not list it");
+    expect(askedUnlistedBy({ listed: { uiautomator: false }, textListed: { uiautomator: true } }, 'uiautomator')).toBe("the capture's uiautomator tree does not list it");
+    expect(askedUnlistedBy({ textListed: { uiautomator: false } }, 'uiautomator')).toBeUndefined();
   });
 });
 
