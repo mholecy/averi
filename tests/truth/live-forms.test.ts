@@ -63,8 +63,15 @@ describe('c2–c4: a tap beneath form-picker\'s expanded sheet — nothing fires
     const reply = 'ERROR id:"lab.form-picker.name" is under button "Albania" … — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped';
     expect(judge(launched, [reply], 'wda', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/the presented remedy, once/) });
   });
-  it('no "close it first" (idb), or it said twice: LOUD', () => {
-    expect(judge(launched, ['ERROR Timed out after 5000ms waiting for element id:"lab.form-picker.name" to appear'], 'idb', launched).outcome).toBe('LOUD');
+  it('idb\'s wait, nothing logged: ok — idb lists the sheet alone and marks nothing, so not in the tree is all it can say', () => {
+    const plain = 'ERROR Timed out after 5000ms waiting for element id:"lab.form-picker.name" to appear';
+    expect(judge(launched, [plain], 'idb', launched)).toMatchObject({ outcome: 'ok', kind: 'not found', why: expect.stringMatching(/^not tapped, nothing fired; not in idb's tree \(it lists the presented sheet alone\)/) });
+    // the same wait under a source that can say more is not enough
+    expect(judge(launched, [plain], 'uiautomator', launched).outcome).toBe('LOUD');
+    expect(judge(launched, [plain], 'wda', launched).outcome).toBe('LOUD');
+  });
+  it('no "close it first" where the source can say it, or it said twice: LOUD', () => {
+    expect(judge(launched, ['ERROR id:"lab.form-picker.name" is covered by button "Albania"; nothing was tapped'], 'idb', launched).outcome).toBe('LOUD');
     expect(judge(launched, [`${hinted.replace('\n', ' — a dialog is presented over it — close it first\n')}`], 'uiautomator', launched)).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/said 2 times/) });
   });
   it('a row selected, the sheet dismissed, a field focused, or a Tapped: MISMATCH', () => {

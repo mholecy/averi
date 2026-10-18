@@ -87,25 +87,31 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
 }
 
 /**
- * c2–c4: a tap on form-picker's name, country or submit beneath the picker sheet, open at launch and fully expanded —
- * a sheet uiautomator's dump marks no presented window (no scrim: ADR 0018's residual 18, accepted with the
- * active-window hint). Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and
- * no `Tapped`. The reply must then say to close the sheet, once: the presented remedy (a sheet the tree source marks)
- * or the active-window hint (uiautomator: src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT) — ok; neither, or "close it
- * first" said twice, is LOUD (idb lists only the sheet and says nothing of it).
+ * c2–c4: a tap on form-picker's name, country or submit beneath the picker sheet, open at launch and fully expanded.
+ * Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and no `Tapped`. What the
+ * reply must say then is per tree source, as much as the source can know: WDA marks the sheet, so the presented remedy
+ * ("close it first", once); uiautomator's dump marks no presented window here (no scrim: ADR 0018's residual 18,
+ * accepted with the active-window hint), so the hint (src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT), once; idb lists the
+ * presented sheet alone and carries no mark (ADR 0018, "iOS unchanged"; measured live 2026-10-19,
+ * docs/truth/live-ios-2026-10-19-lab-fixes.md), so the target not in its tree — "Timed out … to appear" — is all it
+ * can say, and is ok. Anything else, or "close it first" said twice, is LOUD.
  */
 export const judgeUnderSheet =
   (tag: string) =>
-  (s: LabState, [reply]: string[], _source: string, launched: LabState): LiveVerdict => {
+  (s: LabState, [reply]: string[], source: string, launched: LabState): LiveVerdict => {
     const kind = replyKind(reply);
     const fired = firedSince(s, launched);
     const focused = s.focus != null && s.focus !== launched.focus ? s.focus : undefined;
     const logged = [...fired.map((e) => `${e.kind} ${e.tag}`), ...(focused === undefined ? [] : [`focus ${focused}`])];
     if (claimsTap(reply)) return { outcome: 'MISMATCH', kind, why: `averi says ${short(reply)} — ${tag} lies beneath the picker sheet; the app logged ${logged.join(', ') || 'nothing'}` };
     if (logged.length > 0) return { outcome: 'MISMATCH', kind, why: `refused, but the app logged ${logged.join(', ')} — averi: ${short(reply)}` };
-    const by = presentedRemedySaid(reply) ? 'the presented remedy' : windowHintSaid(reply) ? 'the active-window hint' : undefined;
+    const by =
+      presentedRemedySaid(reply) ? 'the presented remedy, once'
+      : windowHintSaid(reply) ? 'the active-window hint, once'
+      : source === 'idb' && kind === 'not found' ? "not in idb's tree (it lists the presented sheet alone)"
+      : undefined;
     const times = reply.split('close it first').length - 1;
     if (by === undefined) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but no "close it first": ${short(reply)}` };
     if (times > 1) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but "close it first" said ${times} times: ${short(reply)}` };
-    return { outcome: 'ok', kind, why: `not tapped, nothing fired; ${by}, once: ${short(reply)}` };
+    return { outcome: 'ok', kind, why: `not tapped, nothing fired; ${by}: ${short(reply)}` };
   };
