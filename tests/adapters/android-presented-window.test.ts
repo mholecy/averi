@@ -53,7 +53,7 @@ describe('the uiautomator parser marks its root: the dump lists the active windo
 });
 
 describe('the uiautomator parser marks the one window presented when the dump shows it is', () => {
-  it('measured, the AlertDialog (alert-dim): a window not anchored at the screen\'s origin floats over what it was opened from — `dialog`', () => {
+  it('measured, the AlertDialog (alert-dim): a window off the screen\'s top and left edges floats over what it was opened from — `dialog`', () => {
     const tree = capture('alert-dim');
     expect(tree.rect).toEqual({ x: 155, y: 851, width: 770, height: 517 });
     expect(tree.presentation).toBe('dialog');
@@ -86,8 +86,15 @@ describe('the uiautomator parser marks the one window presented when the dump sh
     expect(dump('[0,0][1080,2220]', raw('[0,0][1080,2220]', {}, sheet + scrim({ desc: 'Close sheet', clickable: true }))).presentation).toBeUndefined();
   });
 
-  it('a window anchored at the origin is no dialog, however small; one of no area is none', () => {
+  it('a window against the screen\'s top or left edge is no dialog, however small or offset on the other axis; one of no area is none', () => {
     expect(dump('[0,0][600,900]', raw('[0,0][600,900]', { desc: 'x' })).presentation).toBeUndefined();
+    // A full-height window offset sideways: landscape beside a cutout, a pillarboxed compat-mode app.
+    expect(dump('[120,0][1200,2220]', raw('[120,0][1200,2220]', { desc: 'x' })).presentation).toBeUndefined();
+    // A full-width window offset down: a split screen's lower window.
+    expect(dump('[0,1110][1080,2220]', raw('[0,1110][1080,2220]', { desc: 'x' })).presentation).toBeUndefined();
+    // The plain screen shifted 120 px right reads as no dialog either.
+    const shifted = readFileSync(new URL('../fixtures/uiautomator-lab-open.xml', import.meta.url), 'utf8').replace(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g, (_m, l, t, r, b) => `bounds="[${+l + 120},${t}][${+r + 120},${b}]"`);
+    expect(parseDump(shifted.slice(0, shifted.lastIndexOf('>') + 1)).presentation).toBeUndefined();
     expect(dump('[200,300][200,300]', '').presentation).toBeUndefined();
   });
 });

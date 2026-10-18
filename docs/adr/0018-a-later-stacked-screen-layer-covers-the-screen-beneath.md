@@ -747,9 +747,11 @@ else, and knew no fact of its own.
 2. **The parser marks the window presented, as the WDA parser marks WDA's layers** (`android.ts#presentedWindow`,
    `UiNode.presentation` on the root), since it reads what ui-tree never sees — the scrim's `clickable`:
    - `dialog` — a new `PresentationKind`, typed by the window's own shape (the window is its own cover, no element):
-     a window of some area NOT ANCHORED AT THE SCREEN'S ORIGIN. An app's full-screen window starts at 0,0 whatever its
-     bars; one floating over what it was opened from does not. Named "a dialog is presented over it — close it first";
-     `scroll_until`'s stop adds "a swipe would land on the dialog".
+     a window of some area that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES (its left edge past x 0 and its top edge
+     past y 0). An app's window lies against the screen's top or left edge — at 0,0 on a phone, and offset on one axis
+     only beside a landscape cutout, letterboxed or pillarboxed in compat mode, or as a split screen's lower window; a
+     dialog laid in the middle floats off both. Named "a dialog is presented over it — close it first"; `scroll_until`'s
+     stop adds "a swipe would land on the dialog".
    - `screen` — a full-screen window whose content lays a SCRIM above a SHEET: some node's child clickable, labelled
      and childless, spanning the window's width from its top edge, followed at once by a sibling spanning the width
      to the window's bottom edge from no lower than the scrim's bottom. Named as a presented screen.
@@ -946,8 +948,11 @@ are measured on one AVD and Material 3 only.
    through anyway). Its rows stay KNOWN (tests/differential/golden/forms.known.ts). The tree has no fact for it but
    Material's localized "Drag handle".
 19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). A floating
-   window anchored at the origin (a popup at the top-left corner) and a full-screen dialog are not marked; a window in a
-   split screen's lower half reads as a `dialog`; an app's own clickable, labelled leaf laid from its window's top edge
+   window against the screen's top or left edge (a popup at the top-left corner, a bottom-anchored full-width dialog)
+   and a full-screen dialog are not marked; an app's own window offset on BOTH axes reads as a `dialog` — a freeform
+   (desktop-mode) window, a compat-mode app letterboxed and pillarboxed at once — while one offset on one axis only (a
+   landscape window beside a cutout, a letterboxed or pillarboxed compat-mode app, a split screen's lower window) is
+   not; an app's own clickable, labelled leaf laid from its window's top edge
    at full width, with a full-width sibling under it to the bottom, reads as a scrim; a Views `BottomSheetDialog`'s
    `touch_outside` holds by the rule only if labelled (unmeasured). What a mark changes is asked only for a target the
    tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped`.

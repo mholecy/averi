@@ -1265,18 +1265,25 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  * the dump IS that window and the screen beneath is not in it. Read here, where the raw dump is — the scrim's
  * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags (wda-source.ts
  * #presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks, #byUiautomator).
- * - `dialog`: a window of some area NOT ANCHORED AT THE SCREEN'S ORIGIN. An app's full-screen window starts at 0,0
- *   whatever its bars; one that floats over what it was opened from — a dialog laid in the middle, a popup beside its
- *   anchor — does not. Measured: the lab's Compose AlertDialog, `[155,851][925,1368]` on 1080x2220 (alert-dim); a touch
- *   outside it dismisses it.
+ * - `dialog`: a window of some area that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES — its left edge past x 0 AND its
+ *   top edge past y 0. An app's window lies against at least one of the screen's top and left edges: a phone's
+ *   full-screen window at 0,0 whatever its bars, and also one offset on ONE axis only — a landscape window beside a
+ *   cutout the app does not draw into, a letterboxed or pillarboxed compat-mode app on a tablet or a foldable, the lower
+ *   window of a split screen. A dialog laid in the middle floats off both. Measured: the lab's Compose AlertDialog,
+ *   `[155,851][925,1368]` on 1080x2220 (alert-dim); a touch outside it dismisses it. Why not "smaller than the screen",
+ *   the round-5 plan: the parser has no screen size — the adapter's `wm size` is memoized as a pending read
+ *   (viewport-memo.ts), with no answer to peek at before a tree's first read, and awaiting it would add an adb call
+ *   before the first dump and make the mark depend on which verb read first.
  * - `screen`: a full-screen window whose content lays a SCRIM above a SHEET — some node's child that is clickable,
  *   labelled and childless, spanning the window's width from its top edge, followed at once by a sibling spanning
  *   the width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the lab's half-expanded
  *   Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"` `[0,0][1080,1110]`, the sheet
  *   `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height.
  * Residuals, stated: a fully expanded sheet dumps no scrim (form-picker's country picker: only the sheet and its
- *   drag handle) and is no presented window here; a floating window anchored at the origin (a popup at the top-left
- *   corner) and a full-screen dialog are none either; a window of a split screen's lower half reads as a `dialog`; an
+ *   drag handle) and is no presented window here; a floating window against the top or the left edge (a popup at the
+ *   top-left corner, a bottom-anchored full-width dialog) and a full-screen dialog are none either; a window offset on
+ *   both axes that is the app's own — a freeform (desktop-mode) window, a compat-mode app boxed on both axes — reads as
+ *   a `dialog`; an
  *   app's own clickable, labelled leaf laid from its window's top edge at full width, with a full-width sibling under it
  *   to the bottom, reads as a scrim. What a mark changes is asked only for a target the tree does not hold
  *   (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false `Tapped`.
@@ -1284,7 +1291,7 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  */
 function presentedWindow(window: RawNode, rect: Rect): 'dialog' | 'screen' | undefined {
   if (rectArea(rect) === 0) return undefined;
-  if (rect.x > 0 || rect.y > 0) return 'dialog';
+  if (rect.x > 0 && rect.y > 0) return 'dialog';
   const childrenOf = (n: RawNode): RawNode[] => (n.node === undefined ? [] : Array.isArray(n.node) ? n.node : [n.node]);
   const bottom = rect.y + rect.height;
   const scrimAbove = (scrim: RawNode, sheet: RawNode): boolean => {

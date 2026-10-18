@@ -526,7 +526,7 @@ export interface UiNode {
    * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
    * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one
    * mark per layer, and by the uiautomator parser on the root, the one window it dumps (adapters/android.ts
-   * #presentedWindow: `dialog` for a window that floats — not anchored at the screen's origin — and `screen` for one
+   * #presentedWindow: `dialog` for a window that floats off the screen's top and left edges both, and `screen` for one
    * whose clickable, labelled scrim lies screen-wide above its sheet; the root also carries `activeWindowOnly`).
    * WDA's marks:
    * - by the TYPE of an element the layer holds ON THE SCREEN (one parked off it, as WDA keeps a dismissed alert,

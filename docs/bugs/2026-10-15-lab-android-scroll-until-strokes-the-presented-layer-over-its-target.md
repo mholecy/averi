@@ -2,8 +2,8 @@
 
 > **Status (2026-10-18):** fixed on `arch/r22-l1` in `d43df5d` for the AlertDialog and the half-expanded sheet; the
 > fully expanded sheet (`form-picker`) stands. The uiautomator root carries `activeWindowOnly` (the dump lists the
-> active window only), and the parser marks that window presented — `dialog` when it is not anchored at the screen's
-> origin, `screen` when its clickable, labelled scrim lies screen-wide above its sheet (adapters/android.ts
+> active window only), and the parser marks that window presented — `dialog` when it floats off the screen's top and
+> left edges, `screen` when its clickable, labelled scrim lies screen-wide above its sheet (adapters/android.ts
 > #presentedWindow). `scroll_until` for a target not in the tree then stops before any stroke ("… — a dialog is
 > presented over it — close it first, and a swipe would land on the dialog, so none was sent"), and the tap's wait ends
 > "Timed out after 5000ms: element … is not in the tree, which lists only the window presented on top … — close it
