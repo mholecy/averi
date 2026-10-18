@@ -1,6 +1,6 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
-import { claimsTap, closeFirst, isError, namesKeyboard, snapshotNodes } from '../../truth/replies.js';
+import { claimsTap, closeFirst, isError, namesKeyboard, snapshotNodes, type SnapshotNode } from '../../truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
@@ -145,6 +145,13 @@ export function snapshotErrorOf(platform: Platform, fields: readonly FieldTruth[
   return { error: PAIRS.has(pairingOf(fields, field, field.error.id, field.errorFrame)) ? field.error.text : undefined };
 }
 
+/**
+ * The textfield of a snapshot that is the field at `centre`: of those whose rect holds it, the smallest — a textfield
+ * nested in a larger one (a wrapper some trees list with the field's role) is the field itself.
+ */
+const textfieldAt = (nodes: readonly SnapshotNode[], centre: { x: number; y: number }): SnapshotNode | undefined =>
+  nodes.filter((n) => within(centre, n.rect)).reduce<SnapshotNode | undefined>((a, n) => (a === undefined || n.rect.width * n.rect.height < a.rect.width * a.rect.height ? n : a), undefined);
+
 /** Whitespace as averi's text compare reads it (src/verify/text-parity.ts#normalizeText: every space one, trimmed). */
 const spaced = (v: string) => v.replace(/\s+/g, ' ').trim();
 
@@ -170,7 +177,7 @@ function snapshotRow(platform: Platform, fields: readonly FieldTruth[], f: Field
     judge: (o) => {
       const nodes = snapshotNodes(o.reply);
       if (nodes === undefined) return `no snapshot: ${first(o)}`;
-      const node = nodes.find((n) => within(centre, n.rect));
+      const node = textfieldAt(nodes, centre);
       if (node === undefined) return listedOrNot ? undefined : `no textfield at its centre (${Math.round(centre.x)},${Math.round(centre.y)}) in the snapshot`;
       const got = node.error === undefined || node.error === null ? undefined : node.error;
       if (got === undefined) return expected === undefined ? undefined : `no error, where it shows ${JSON.stringify(expected)}`;

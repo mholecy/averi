@@ -288,6 +288,9 @@ describe('the form rows', () => {
       [SNAP({ error: 'Bad' }), [], /^its error "Bad", not "Required"/],
       [SNAP({ y: 400 }), [], /^no textfield at its centre \(201,177\) in the snapshot/],
       ['[]', [], /^no textfield at its centre/],
+      // Two textfields hold its centre: the smallest is the field (a wrapper listed with the role is not).
+      [JSON.stringify([{ role: 'textfield', identifier: 'w', rect: rect(0, 100, 402, 200) }, { role: 'textfield', identifier: 'lab.f.name', rect: rect(20, 160, 362, 34), error: 'Required' }], null, 2), [], 'ok'],
+      [JSON.stringify([{ role: 'textfield', identifier: 'lab.f.name', rect: rect(20, 160, 362, 34), error: 'Required' }, { role: 'textfield', identifier: 'w', rect: rect(0, 100, 402, 200), error: 'Wrapper' }], null, 2), [], 'ok'],
       ['ERROR no tree', [], /^no snapshot: ERROR no tree/],
     ]],
     ['ui_snapshot: an error named neither way is no field\'s', 'iban snapshot', [
