@@ -5,7 +5,8 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
 // scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it), and
 // round 6's carousel-in-list (both platforms; captured on Android only so far: on 2026-10-18 the host's CoreSimulator,
-// older than Xcode 27.1 expects, ran no WebDriverAgent on the lab simulator) — its rows by geometry
+// older than Xcode 27.1 expects, ran no WebDriverAgent on the lab simulator) and scroll-collapsing (Android only: a View
+// list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
 // (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
 // scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE3; LE4 is calibrated since
 // round 5's 0a); this KNOWN owns the ratchet, as presented.known.ts does for L1.
@@ -72,6 +73,7 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-top-edge.xml`]: 7,
     [`${ANDROID}/scroll-top-edge-end.xml`]: 7,
     [`${ANDROID}/carousel-in-list.xml`]: 9,
+    [`${ANDROID}/scroll-collapsing.xml`]: 5,
     [`${IOS}/scroll-bounded.idb.json`]: 14,
     [`${IOS}/scroll-bounded.wda.json`]: 14,
     [`${IOS}/scroll-sticky.idb.json`]: 4,

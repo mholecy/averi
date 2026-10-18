@@ -203,6 +203,17 @@
       "truth": "carousel-in-list.truth.json"
     },
     {
+      "file": "scroll-collapsing.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-collapsing.png",
+      "truth": "scroll-collapsing.truth.json"
+    },
+    {
       "file": "bands.xml",
       "source": "uiautomator",
       "form": "raw",

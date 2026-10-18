@@ -1,0 +1,95 @@
+{
+  "cell": "scroll-collapsing",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.scroll-collapsing.A",
+      "color": "#5E35B1",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": -11,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,77"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#F3EDF7",
+      "geometry": "outside-scroll-view",
+      "visible": null,
+      "piece": null,
+      "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "D",
+      "id": "lab.scroll-collapsing.D",
+      "color": "#F4511E",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 209,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,297"
+        }
+      ],
+      "drawn": 0.938,
+      "seen": "#F4511E",
+      "geometry": "partly-centre-in",
+      "visible": {
+        "x": 127,
+        "y": 220,
+        "width": 825,
+        "height": 165
+      },
+      "piece": {
+        "x": 127,
+        "y": 220,
+        "width": 825,
+        "height": 165
+      },
+      "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "list": {
+      "x": 0,
+      "y": 220,
+      "width": 1080,
+      "height": 2000
+    }
+  },
+  "navigation": "gesture",
+  "displays": "scroll-collapsing.displays.txt"
+}

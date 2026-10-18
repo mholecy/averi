@@ -43,6 +43,7 @@ describe('the cell catalog', () => {
       'edges/scroll-top-edge',
       'edges/scroll-top-edge-end',
       'edges/carousel-in-list',
+      'edges/scroll-collapsing',
       'bars/bands',
       'bars/bands-three-button',
       'bars/pinned-bar',

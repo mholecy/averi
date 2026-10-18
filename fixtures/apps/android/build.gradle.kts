@@ -38,4 +38,7 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.7.8")
     implementation("androidx.compose.foundation:foundation:1.7.8")
     implementation("androidx.compose.material3:material3:1.3.1")
+    // Views, for edges/scroll-collapsing alone (Edges.kt#CollapsingList): Settings' CoordinatorLayout + AppBarLayout +
+    // CollapsingToolbarLayout, whose rows uiautomator dumps with inverted bounds (calibration.json #10).
+    implementation("com.google.android.material:material:1.13.0")
 }

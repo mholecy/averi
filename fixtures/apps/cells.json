@@ -381,6 +381,16 @@
       ]
     },
     {
+      "id": "scroll-collapsing",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#5E35B1", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "D", "color": "#F4511E", "slot": 1, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
       "id": "bands",
       "family": "bars",
       "layer": "none",

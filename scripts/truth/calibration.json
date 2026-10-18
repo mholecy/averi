@@ -324,12 +324,21 @@
     {
       "n": "10",
       "note": "2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["d2b7744"],
       "before": "10fb02b",
-      "verified": "merge-subject",
-      "needs": "edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.",
-      "remark": "The merge subject names it ('inverted bounds read as clipped out'). Not reproduced by the lab's Compose (2026-10-16, the edges cells on API 33): a row cut by the screen's top reads `[128,0][953,121]` (scroll-top-edge's T), cut, not inverted; rows off the screen or outside their container are not dumped at all. A recorded-tree unit test stays its only check."
+      "after": "d2b7744",
+      "verified": "golden",
+      "partial": "the static rows only, toward the row (`up`); the note's own symptom — the default `down` neither seeing the row past its far edge nor turning — is the live turn-back case `turn:scroll-collapsing.A` (live-visibility.ts#TURN_BACK), not yet run",
+      "defect": "0×0 nodes|\"height\":-\\d",
+      "checks": [
+        "android-averi_lab-api33/scroll-collapsing.xml A tap",
+        "android-averi_lab-api33/scroll-collapsing.xml A colour",
+        "android-averi_lab-api33/scroll-collapsing.xml A scroll_until"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "needs": "A live run of `turn:scroll-collapsing.A` (scripts/truth/live.ts --serial <averi_lab> --groups visibility --cells scroll-collapsing, at 10fb02b and d2b7744: `--side`) — the note's 4 strokes the wrong way before, the reply's clipped-out-above hint after; the replay cannot show a turn.",
+      "remark": "edges/scroll-collapsing (round 6, Android only): Settings' shape in Views — a CoordinatorLayout neither it nor its NestedScrollView clipping children (ViewGroup#getChildVisibleRect clips a group to its bounds only when its parent clips children), the list laid below a collapsed CollapsingToolbarLayout app bar drawn over what runs on above the list's top. A, a row scrolled wholly above the list's top (frame 127,-11 825x176, the list 0,220 1080x2000), stays visible to the accessibility framework and is dumped `[127,220][952,165]`: View#getBoundsOnScreen clamps its top to the list's and leaves its bottom where it lies — the note's inverted bounds (Settings' `[66,66][428,44]`); D, cut 11 px by the list's top, reads `[127,220][952,385]`, cut, not inverted. Earlier (2026-10-16) the lab's Compose did not reproduce it: a row cut by the screen's top reads cut, rows off the screen or outside their container are not dumped. Every row green on both sides — DOES-NOT-FAIL: at 10fb02b A's tap waits naming `0×0 nodes … scroll_until it first`, its colour fails closed off the screenshot, scroll_until `up` strokes inside the list (`540 620 → 1820` ×6, `last rect … \"height\":-55`); at d2b7744 the same verdicts and strokes, the last rect of height 0 (the fix's clipped-out rect); at truth/round-6's src the tap's hint names it `clipped out above its scroll container … scroll_until it with direction: \"up\" first` and the colour fails closed on `no area`. The fix changes the wording; the stroke's direction is live."
     },
     {
       "n": "11",

@@ -181,6 +181,9 @@ describe('a field partly hidden whose probe fired another control (the phone fie
 describe('replyKind: what kind of reply it is, pinned on every known mismatch (golden.test.ts)', () => {
   it.each([
     ['ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear', 'not found'],
+    // the wait that MATCHED nodes, none usable (clipped out, 0×0): the target is in the tree — a refusal (#10's A)
+    ['ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear\n  (it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first)', 'refused'],
+    ['ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear\n  (it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first)', 'refused'],
     ['ERROR scroll_until id:"lab.x" failed after 2 swipes (…) — element never appeared in the tree', 'not found'],
     ['1/1 asserts FAILED\nFAIL  element id:"lab.x" fill … — not found within 1 s', 'not found'],
     ['Tapped id:"lab.x"', 'Tapped'],

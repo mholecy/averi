@@ -370,6 +370,7 @@ export const TURN_BACK: readonly { cell: string; tag: string; direction: 'up' | 
   { cell: 'scroll-top-edge-end', tag: 'T', direction: 'down', fully: true, says: 'as the plain one, fully: turn back up (#17)' },
   { cell: 'scroll-top-edge', tag: 'T', direction: 'down', says: 'T in the status band, more content below: a stroke down carries it off the top — turn back' },
   { cell: 'scroll-bounded', tag: 'F', direction: 'up', says: 'lower at its top, F below: a stroke up moves nothing — turn back down' },
+  { cell: 'scroll-collapsing', tag: 'A', direction: 'down', says: 'A scrolled above the list, its uiautomator bounds inverted: a stroke down carries it further — turn back up (#10)' },
 ];
 
 /**
