@@ -11,7 +11,7 @@ import { shortOf, type Cover, type Judged } from './scroll-read.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
-import { OPPOSITE, SIDES, type Direction } from './swipe.js';
+import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -205,8 +205,6 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
 }
 
-/** The edge of a scroll view past which lies the content a scroll toward `direction` brings in: its top for `up`. */
-const edgeToward = (direction: Direction): Edge => (direction === 'up' ? 'top' : direction === 'down' ? 'bottom' : direction);
 
 /** `1 swipe up did not move`, `2 swipes up did not move`, or — some of them moved it — `3 swipes up, the last of which did not move` / `…, the last 2 of which did not move`. */
 function unmovedText({ after, unmoved, from }: EndTurn): string {
@@ -223,8 +221,8 @@ function unmovedText({ after, unmoved, from }: EndTurn): string {
 const endTurnText = (turn: EndTurn | undefined): string =>
   turn === undefined
     ? ''
-    : `; ${unmovedText(turn)} ${nodeText(turn.scrollView)} — the tree lists its content ending at its ${edgeToward(turn.from)} — ` +
-      `so averi turned ${turn.to}, as the tree places the element ${SIDES[edgeToward(turn.to)].past} it`;
+    : `; ${unmovedText(turn)} ${nodeText(turn.scrollView)} — the tree lists its content ending at its ${EDGE_TOWARD[turn.from]} — ` +
+      `so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
 
 /**
  * The detent clause, last in every reply and failure (scroll-rounds.ts#DetentMove): a sheet moved during the call —
@@ -586,7 +584,7 @@ function boundText(by: BoundBy, swipes: number): string {
       // Proven by the tree (scroll-rounds.ts#BoundBy's `ends`): where the content ends is listed — no other cause to keep.
       if (by.ends !== undefined) {
         const which = by.ends.strokes === 1 ? `swiping ${by.lastStroke}` : `the last ${by.ends.strokes}, swiping ${by.lastStroke},`;
-        return `after ${swipesText(swipes)} (${which} ${verb}: the tree lists the content of ${nodeText(by.ends.scrollView)} ending at its ${edgeToward(by.lastStroke)} — content exhausted)`;
+        return `after ${swipesText(swipes)} (${which} ${verb}: the tree lists the content of ${nodeText(by.ends.scrollView)} ending at its ${EDGE_TOWARD[by.lastStroke]} — content exhausted)`;
       }
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
       const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken`;

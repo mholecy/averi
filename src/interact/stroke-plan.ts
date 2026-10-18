@@ -1,9 +1,9 @@
 import type { Point, Rect, ScrollAxis, Stroke, UiNode } from '../adapters/types.js';
-import { containsPoint, rectIntersection, type Edge, type ScrollAxes } from '../ui-tree/geometry.js';
+import { containsPoint, rectIntersection, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
-import { shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
+import { EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
  * `scroll_until`'s STROKE PLAN: of one round, which scroll view the stroke goes over, the box it is drawn in, the
@@ -336,11 +336,8 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
  */
 export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, toward: Direction): UiNode | undefined {
   const { within } = open(memory);
-  return within === undefined ? undefined : facts.scene.clips.endsAt(within, REVEALED_BY[toward]);
+  return within === undefined ? undefined : facts.scene.clips.endsAt(within, EDGE_TOWARD[toward]);
 }
-
-/** The edge of a scroll view past which lies the content a stroke toward `toward` brings in (swipe.ts#SIDES' `reveals`, inverted). */
-const REVEALED_BY: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
 
 /**
  * THE CARRY MODEL (lab note LV5; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): how far a stroke carries its target, measured in this scroll, so a stroke reaches no
