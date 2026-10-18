@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { dragMs, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { dragMs, EDGE_TOWARD, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, SIDES, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -265,5 +265,11 @@ describe('dragMs — a stroke\'s duration at the adapter\'s drag speed (2026-10-
   });
   it(`never under MIN_DRAG_MS (${MIN_DRAG_MS}, Android's own default): a probe or a halved stroke is not sent faster than before`, () => {
     expect(dragMs({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } }, 0.45, PIXEL_3A)).toBe(300);
+  });
+});
+
+describe('EDGE_TOWARD — SIDES[…].reveals read the other way', () => {
+  it('each direction\'s edge is the one whose `reveals` is that direction', () => {
+    for (const [direction, edge] of Object.entries(EDGE_TOWARD)) expect(SIDES[edge].reveals).toBe(direction);
   });
 });
