@@ -47,6 +47,7 @@ const FAILED = '1/1 asserts FAILED\n✗ colour: covered';
 const PASSED = 'All 1 asserts passed';
 const VISIBLE = 'Element id:"lab.edges.A" visible after 0 swipes';
 const IDB_STROKE = 'idb ui swipe 201 699 201 175 --duration 0.3';
+const ADB_SWIPE = 'adb shell input swipe 201 600 201 300 300';
 
 describe('the rows ask nothing of a capture with no measured geometry', () => {
   it('an open target with no geometry or a whole one: the open rows, as before; one cut but unmeasured: none', () => {
@@ -144,6 +145,41 @@ describe('a target off the screen or outside its scroll view that its capture\'s
       expect(verdict(rs, 'tap', out(NOT_FOUND))).toBe(`refused without scroll_until: ${NOT_FOUND}`);
       expect(verdict(rs, 'colour', out('1/1 asserts FAILED\nFAIL  element id:"lab.edges.A" … — not found within 1 s'))).toMatch(/^not in the tree: /);
     }
+  });
+});
+
+describe('a text target is asked by its string, as the live golden and an agent ask it (truth.ts#selectorOf)', () => {
+  const text = 'Pokračovať na súhrn';
+  const cell: CellTruth = { ...CELL, chrome: { pinned: rect(0, 740, 402, 134) } };
+  const p = (over: Partial<TargetTruth> = {}) => target('under-chrome:pinned', { text, frame: rect(51, 720, 300, 64), reached: false, piece: rect(51, 720, 300, 20), reachedAtPiece: true, ...over });
+  const NOT_FOUND = `ERROR Timed out after 5000ms waiting for element text:"${text}" to appear`;
+  const NEVER = `ERROR scroll_until text:"${text}" failed after 2 swipes — element never appeared in the tree`;
+  it('the tap and the stops by text:"…", the colour by its identifier', () => {
+    const rs = expectations('android', p(), cell, 'uiautomator');
+    expect(rs.find((r) => r.verb === 'tap')!.call.args).toMatchObject({ selector: `text:"${text}"` });
+    expect(rs.find((r) => r.verb === 'scroll_until')!.call.args).toMatchObject({ selector: `text:"${text}"` });
+    expect(rs.find((r) => r.verb === 'colour')!.call.args).toMatchObject({ asserts: [{ element: { id: 'lab.edges.A' } }] });
+  });
+  it('its string unlisted by the replayed tree (TargetTruth.textListed): a tap or a stop that never found it is an honest answer', () => {
+    const rs = expectations('android', p({ listed: { uiautomator: true }, textListed: { uiautomator: false } }), cell, 'uiautomator');
+    expect(verdict(rs, 'tap', out(NOT_FOUND))).toBeUndefined();
+    expect(verdict(rs, 'scroll_until', out(NEVER, [ADB_SWIPE, ADB_SWIPE]))).toBeUndefined();
+  });
+  it('under the chrome, its identifier listed: the plain stop asked by that identifier too, keyed `<tag>.id`', () => {
+    const rs = expectations('android', p({ listed: { uiautomator: true }, textListed: { uiautomator: false } }), cell, 'uiautomator');
+    const byId = rs.filter((r) => r.target === 'A.id');
+    expect(byId.map((r) => `${r.verb} ${String(r.call.args.selector)}`)).toEqual(['scroll_until id:"lab.edges.A"']);
+    // Read whole by its uncovered strip: the row is red (lab note B4-L1's plain-stop form).
+    expect(byId[0].judge(out('Element id:"lab.edges.A" fully visible after 0 swipes'))).toMatch(/^reached where it is under-chrome:pinned/);
+    expect(byId[0].judge(out('ERROR scroll_until id:"lab.edges.A" … failed', [ADB_SWIPE]))).toBeUndefined();
+    // Its node unlisted, or no text: no such row.
+    expect(expectations('android', p({ listed: { uiautomator: false } }), cell, 'uiautomator').filter((r) => r.target !== undefined)).toEqual([]);
+    expect(expectations('android', p({ text: undefined }), cell, 'uiautomator').filter((r) => r.target !== undefined)).toEqual([]);
+  });
+  it('its string listed: the same replies are no answer', () => {
+    const rs = expectations('android', p({ listed: { uiautomator: true }, textListed: { uiautomator: true } }), cell, 'uiautomator');
+    expect(verdict(rs, 'tap', out(NOT_FOUND))).toMatch(/^not in the tree: /);
+    expect(verdict(rs, 'scroll_until', out(NEVER, [ADB_SWIPE, ADB_SWIPE]))).toMatch(/^not in the tree: /);
   });
 });
 

@@ -157,22 +157,37 @@ describe('a pristine form whose fields and titles share one identifier (form-sha
     },
   };
   const rows = formExpectations('ios', truth, 'wda');
+  const errors = rows.filter((r) => r.verb === 'error');
 
   it('each field with a same-identifier title below it: its error assert, asked with that title, must fail; no tap by the shared id', () => {
-    expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual(['amount error', 'iban error', 'submit tap']);
-    expect(rows[0].call.args.asserts).toEqual([{ element: { id: C, role: 'textfield' }, error: 'iban*', timeout: 1000 }]);
-    expect(rows[1].call.args.asserts).toMatchObject([{ error: 'bic*' }]);
+    expect(rows.filter((r) => r.verb !== 'snapshot').map((r) => `${r.target} ${r.verb}`)).toEqual(['amount error', 'iban error', 'submit tap']);
+    expect(errors[0].call.args.asserts).toEqual([{ element: { id: C, role: 'textfield' }, error: 'iban*', timeout: 1000 }]);
+    expect(errors[1].call.args.asserts).toMatchObject([{ error: 'bic*' }]);
   });
   it('a pass is the mismatch: the next field\'s title read as this one\'s error', () => {
-    expect(rows[0].judge(out('All 1 asserts passed'))).toBe('passed: All 1 asserts passed');
-    expect(rows[0].judge(out('0/1 asserts FAILED\nFAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "iban*" exists — element found but error was: null, null, null'))).toBeUndefined();
+    expect(errors[0].judge(out('All 1 asserts passed'))).toBe('passed: All 1 asserts passed');
+    expect(errors[0].judge(out('0/1 asserts FAILED\nFAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "iban*" exists — element found but error was: null, null, null'))).toBeUndefined();
   });
   it('a same-identifier title below the field but in another column (no horizontal overlap) asks no such row', () => {
     const side = [shared('amount', 150), { ...shared('iban', 220), titleFrame: rect(390, 210, 10, 16) }];
-    expect(formExpectations('ios', { ...truth, form: { ...truth.form!, fields: side, controls: [] } }, 'wda')).toEqual([]);
+    expect(formExpectations('ios', { ...truth, form: { ...truth.form!, fields: side, controls: [] } }, 'wda').filter((r) => r.verb === 'error')).toEqual([]);
   });
   it('a field showing an error, or a title below it with another identifier, asks no such row', () => {
     const named = formExpectations('ios', { ...truth, form: { ...truth.form!, fields: [field('a', 150, { titleFrame: rect(28, 140, 60, 16) }), field('b', 220, { titleFrame: rect(28, 210, 60, 16) })], controls: [] } }, 'wda');
-    expect(named).toEqual([]);
+    expect(named.filter((r) => r.verb === 'error')).toEqual([]);
+  });
+  it('ui_snapshot: every field, matched by place (the identifier names them all) — the next field\'s title read as its error is the mismatch (the note\'s ui_snapshot half)', () => {
+    const snap = rows.filter((r) => r.verb === 'snapshot');
+    expect(snap.map((r) => `${r.target} ${r.says}`)).toEqual(['amount no error (none shown)', 'iban no error (none shown)', 'bic no error (none shown)']);
+    expect(snap[0].call).toEqual({ tool: 'ui_snapshot', args: { platform: 'ios', filter: 'role:textfield' } });
+    // As d407256 listed them: each field's error the title of the field below it.
+    const before = JSON.stringify(fields.map((f, i) => ({ role: 'textfield', identifier: C, rect: f.frame, ...(i < 2 && { error: fields[i + 1].title }) })), null, 2);
+    expect(snap.map((r) => r.judge(out(before)))).toEqual(['reads "iban*" as its error, where none is paired', 'reads "bic*" as its error, where none is paired', undefined]);
+    const after = JSON.stringify(fields.map((f) => ({ role: 'textfield', identifier: C, rect: f.frame })), null, 2);
+    expect(snap.map((r) => r.judge(out(after)))).toEqual([undefined, undefined, undefined]);
+  });
+  it('ui_snapshot: a field not open that the snapshot does not list claims nothing either way', () => {
+    const hidden = formExpectations('ios', { ...truth, form: { ...truth.form!, controls: truth.form!.controls.map((c) => (c.tag === 'bic' ? { ...c, situation: 'under-keyboard' } : c)) } }, 'wda').filter((r) => r.verb === 'snapshot');
+    expect(hidden.map((r) => r.judge(out('[]')))).toEqual(['no textfield at its centre (201,167) in the snapshot', 'no textfield at its centre (201,237) in the snapshot', undefined]);
   });
 });

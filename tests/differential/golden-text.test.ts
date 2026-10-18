@@ -110,7 +110,7 @@ describe('a field under the keyboard: the ocr half of #3', () => {
   const rows = formExpectations('android', truth, 'uiautomator');
 
   it('asks the ocr assert by its identifier, for its own copy (its title, its value empty), beside the colour row', () => {
-    expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual(['vs colour', 'vs ocr', 'vs scroll_until']);
+    expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual(['vs snapshot', 'vs colour', 'vs ocr', 'vs scroll_until']);
     expect(by(rows, 'ocr').call.args).toMatchObject({ asserts: [{ element: { id: 'lab.form-keyboard.vs' }, ocr: { text: 'Variable symbol' } }] });
   });
   it('a reading measured the keyboard (the note: `read "123"`); failing closed naming it is right', () => {

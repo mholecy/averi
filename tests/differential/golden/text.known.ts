@@ -28,17 +28,22 @@ export const text: KnownFile = {
     [`${ANDROID}/text-sample.xml B ocr`, READ("L'ubomír Sťastný", "lab finding OC1: Ľ read as L'", OC1)],
     [`${ANDROID}/text-sample.xml C ocr`, READ('Mäkčeň, dížeň a vokáň', 'lab finding OC1: ĺ read as í', OC1)],
     // The pinned-button shape of bars' pinned-bar P (bars.known.ts, the same lab finding): Compose lists P by its
-    // uncovered strip above the button, so the colour assert samples only that and passes, and scroll_until stops on it.
+    // uncovered strip above the button, so the colour assert — naming P by its identifier — samples only that and
+    // passes. Its tap and scroll_until ask P by its string, as an agent and the live golden do (rows.ts#tapCall), and the
+    // dump lists no node carrying it (TargetTruth.textListed): not found, an honest answer. Asked by its identifier
+    // (`P.id`, bars.ts: the plain stop's by-id variant), the stop reads P whole by its strip — the only row where a
+    // PLAIN stop on a target whose centre a later clickable pinned sibling covers reads it reached (pinned-bar P's centre
+    // is clear: only its `fully` row is red, another path).
     [`${ANDROID}/text-under-bar.xml P colour`, { cls: 'passed on #FCE4EC', kind: 'PASS', calls: [], note: 'lab finding: the colour sampled on P\'s uncovered strip only (Compose\'s uncovered bounds)', as: LAB_FULLY }],
-    [`${ANDROID}/text-under-bar.xml P scroll_until`, { cls: 'reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the stop reads P whole by its uncovered strip (Compose\'s uncovered bounds)', as: LAB_FULLY }],
+    [`${ANDROID}/text-under-bar.xml P.id scroll_until`, { cls: 'reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the plain stop, asked by P\'s identifier, reads P whole by its uncovered strip (Compose\'s uncovered bounds)', as: LAB_FULLY }],
   ]),
   counts: {
     [`${ANDROID}/text-sample.xml`]: 40,
-    [`${ANDROID}/text-under-bar.xml`]: 12,
+    [`${ANDROID}/text-under-bar.xml`]: 13,
     [`${ANDROID}/text-nav-cut.xml`]: 4,
     [`${IOS}/text-sample.idb.json`]: 40,
     [`${IOS}/text-sample.wda.json`]: 40,
-    [`${IOS}/text-under-bar.idb.json`]: 12,
-    [`${IOS}/text-under-bar.wda.json`]: 12,
+    [`${IOS}/text-under-bar.idb.json`]: 13,
+    [`${IOS}/text-under-bar.wda.json`]: 13,
   },
 };

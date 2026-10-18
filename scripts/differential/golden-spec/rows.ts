@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf } from '../../truth/truth.js';
+import { directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf, selectorOf } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -47,16 +47,34 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * | R-direction | below / above what shows | scroll_until | each stroke brings it closer (LIVE ONLY: a replayed tree never moves) | docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md |
  */
 
-const tapCall = (platform: Platform, t: Pick<TargetTruth, 'id'>): Call => ({ tool: 'tap', args: { platform, selector: `id:"${t.id}"` } });
-const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id'>, direction: 'up' | 'down', fully = false): Call => ({
+/**
+ * The tap and the stop ask a target as an agent would, and as the live golden does: by truth.ts#selectorOf — a text
+ * target (CatalogTarget.text) by its string, any other by its identifier. A text-asked target is resolved by averi's
+ * text match, so where the string's node is not the identifier's (a label inside its button), the row judges the node
+ * the agent's call finds.
+ */
+const tapCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text'>): Call => ({ tool: 'tap', args: { platform, selector: selectorOf(t) } });
+const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text'>, direction: 'up' | 'down', fully = false): Call => ({
   tool: 'scroll_until',
-  args: { platform, selector: `id:"${t.id}"`, direction, ...(fully && { fully: true }) },
+  args: { platform, selector: selectorOf(t), direction, ...(fully && { fully: true }) },
 });
 
 /**
+ * A text target as a row asked BY ITS IDENTIFIER sees it (selectorOf then spells `id:"…"`): the second question a text
+ * target's identifier keeps open beside the agent's — what averi reads of the node the identifier names, which may be
+ * listed where the string is not (text-under-bar's P on Android: its node by the uncovered strip above the pinned
+ * button). A row asked so is keyed `<tag>.id` (Expectation.target).
+ */
+export function byIdentifier(t: TargetTruth): TargetTruth {
+  const { text: _text, textListed: _listed, ...rest } = t;
+  return rest;
+}
+
+/**
  * The options of a row type whose truth may allow the target missing from the tree: `absent`, why it may (the caller's,
- * target-contract.ts#unlistedBy) — the row then accepts a reply that never found the target, judged by what it did. One shape for
- * every row that takes it: refusedTap, strokeRow, and colourFails, which adds its `expected`.
+ * target-contract.ts#askedUnlistedBy for a selector-asked row, #unlistedBy for the colour's identifier) — the row then
+ * accepts a reply that never found the target, judged by what it did. One shape for every row that takes it: the tap
+ * rows (tapRow), stopRow, strokeRow, and colourFails, which adds its `expected`.
  */
 export interface RowOptions {
   absent?: string;
@@ -68,7 +86,7 @@ export interface RowOptions {
  * a band whose probe fired (bandTap); `fire` inside what shows or `land-or-refuse` inside its piece — R-land (landRow);
  * `refuse` with no remedy — the judged geometry says which wording judges it (a system band: bandTap, else landRow):
  * the same clause, two mismatch texts the KNOWN files pin. The open target's tap (`fire` at its node) is base.ts#openRows', a
- * presented one's (`refuse`, close it first) presented.ts'. `c`: the target's contract (its tap clause, its judged geometry); `absent` (unlistedBy) as refusedTap takes it.
+ * presented one's (`refuse`, close it first) presented.ts'. `c`: the target's contract (its tap clause, its judged geometry); `absent` (askedUnlistedBy: the target as the tap asks it) as every tap row takes it.
  */
 export function tapRow(platform: Platform, t: TargetTruth, c: Pick<TargetContract, 'tap' | 'geometry'>, row: string, opts: RowOptions = {}): Expectation {
   const ask = c.tap;
@@ -77,22 +95,24 @@ export function tapRow(platform: Platform, t: TargetTruth, c: Pick<TargetContrac
     case 'refuse':
       if (ask.remedy === 'scroll_until') return refusedTap(platform, t, row, ask, opts);
       if (ask.remedy === 'close it first') throw new Error(`${t.id}: a presented target's tap is presented.ts's`);
-      return isBand(c.geometry) ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+      return isBand(c.geometry) ? bandTap(platform, t, ask, opts) : landRow(platform, t, ask, opts);
     case 'land-or-refuse':
-      return ask.inside === 'visible' ? bandTap(platform, t, ask) : landRow(platform, t, ask);
+      return ask.inside === 'visible' ? bandTap(platform, t, ask, opts) : landRow(platform, t, ask, opts);
     case 'fire':
       if (ask.inside === 'node') throw new Error(`${t.id}: an open target's tap is base.ts#openRows'`);
-      return landRow(platform, t, ask);
+      return landRow(platform, t, ask, opts);
   }
 }
 
 /**
  * The plain stop's row that judges `ask`, the stop clause where the capture lays the target out
  * (target-contract.ts#contractOf): reached with no swipe where the stop holds there (R-overlap: its centre clear —
- * reachedAtOnce), else not reached where it is (R-sliver, R-band, R-under-chrome — notReachedStill). `row` names it.
+ * reachedAtOnce), else not reached where it is (R-sliver, R-band, R-under-chrome — notReachedStill). `row` names it;
+ * `absent` (target-contract.ts#askedUnlistedBy) as refusedTap takes it.
  */
-export function stopRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk): Expectation {
-  return ask.holds ? reachedAtOnce(platform, t, cell, row, ask) : notReachedStill(platform, t, cell, row, ask);
+export function stopRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk, opts: RowOptions = {}): Expectation {
+  const e = ask.holds ? reachedAtOnce(platform, t, cell, row, ask) : notReachedStill(platform, t, cell, row, ask);
+  return opts.absent === undefined ? e : { ...e, absent: opts.absent };
 }
 
 /**
@@ -121,11 +141,12 @@ function refusedTap(platform: Platform, t: TargetTruth, row: string, ask: TapAsk
  * the truth: the tap is not expected refused — `Tapped` inside what shows of it, or refused with nothing sent (averi's
  * own model of the band may refuse it, ADR 0009 N-a on Android; it must not tap elsewhere).
  */
-function bandTap(platform: Platform, t: TargetTruth, ask: TapAsk): Expectation {
+function bandTap(platform: Platform, t: TargetTruth, ask: TapAsk, opts: RowOptions = {}): Expectation {
+  const absent = opts.absent === undefined ? {} : { absent: opts.absent };
   if (ask.must === 'land-or-refuse') {
-    return { asks: ask, verb: 'tap', says: `R-band: its probe fired (${t.geometry}): Tapped inside what shows of it, or refused with nothing sent`, call: tapCall(platform, t), judge: (o) => landed(o, t.visible ?? t.frame, true, false) };
+    return { asks: ask, verb: 'tap', says: `R-band: its probe fired (${t.geometry}): Tapped inside what shows of it, or refused with nothing sent`, call: tapCall(platform, t), judge: (o) => landed(o, t.visible ?? t.frame, true, false), ...absent };
   }
-  return { asks: ask, verb: 'tap', says: `R-band: refused (${t.geometry}), nothing tapped`, call: tapCall(platform, t), judge: notTapped };
+  return { asks: ask, verb: 'tap', says: `R-band: refused (${t.geometry}), nothing tapped`, call: tapCall(platform, t), judge: notTapped, ...absent };
 }
 
 /**
@@ -269,7 +290,7 @@ export function flushProbe(o: Outcome, t: Pick<TargetTruth, 'visible' | 'scrollV
  * `Tapped`, inside `visible`. Else (`centre-out`, `under-chrome:<name>`): refused with nothing sent, or `Tapped` inside
  * its piece where the second probe fired (`reachedAtPiece` — tapAsk `land-or-refuse` inside its piece).
  */
-function landRow(platform: Platform, t: TargetTruth, ask: TapAsk): Expectation {
+function landRow(platform: Platform, t: TargetTruth, ask: TapAsk, opts: RowOptions = {}): Expectation {
   const atCentre = ask.must === 'fire';
   const where = 'inside' in ask && ask.inside === 'visible' ? t.visible : t.piece;
   const fired = ask.must !== 'refuse';
@@ -279,6 +300,7 @@ function landRow(platform: Platform, t: TargetTruth, ask: TapAsk): Expectation {
     says: atCentre ? 'R-land: Tapped, inside what shows of it' : `R-land: ${fired ? 'refused, or Tapped inside its piece' : 'refused, nothing tapped'}`,
     call: tapCall(platform, t),
     judge: (o) => landed(o, where, fired, atCentre),
+    ...(opts.absent !== undefined && { absent: opts.absent }),
   };
 }
 

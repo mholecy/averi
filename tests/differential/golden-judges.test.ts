@@ -41,6 +41,9 @@ const target = (over: Partial<TargetTruth>): TargetTruth => ({
   ...over,
 });
 
+/** A filtered ui_snapshot reply: one textfield at (20, y) 362x34, with `error` where given. */
+const SNAP = ({ y = 160, error }: { y?: number; error?: string }) =>
+  JSON.stringify([{ role: 'textfield', identifier: 'lab.f.x', label: null, value: null, rect: rect(20, y, 362, 34), ...(error !== undefined && { error }) }], null, 2);
 const pick = <E extends Expectation>(rows: readonly E[], verb: string, tag?: string): E => {
   const r = rows.find((x) => x.verb === verb && (tag === undefined || (x as Partial<FormExpectation>).target === tag));
   if (r === undefined) throw new Error(`no ${tag ?? ''} ${verb} row`);
@@ -247,13 +250,35 @@ const form: CellTruth = {
 describe('the form rows', () => {
   const rows = formExpectations('ios', form, 'wda');
 
+  it('ui_snapshot: what the row read — the matched textfield\'s error, not the reply\'s first line', () => {
+    const r = pick(rows, 'snapshot', 'name');
+    const o = (reply: string): Outcome => ({ reply, device: [] });
+    expect(r.read!(o(SNAP({ error: 'Required' })))).toBe('textfield lab.f.x 20,160 362x34: error "Required"');
+    expect(r.read!(o(SNAP({})))).toBe('textfield lab.f.x 20,160 362x34: no error');
+    expect(r.read!(o('[]'))).toBe('no textfield at its centre (201,177)');
+    expect(r.read!(o('ERROR no tree'))).toBe('ERROR no tree');
+  });
+  it('ui_snapshot: an error whose frame the capture did not record is judged by no rule — none, or its own message', () => {
+    const frameless = formExpectations('ios', { ...form, form: { ...form.form!, fields: [field('name', 160, { error: { id: 'lab.f.name', text: 'Required' } })] } }, 'wda');
+    const r = pick(frameless, 'snapshot', 'name');
+    expect(r.says).toBe('no error (lab.f.name: no frame of it captured, no pairing judged), or its own "Required"');
+    check(r.judge, [
+      [SNAP({}), [], 'ok'],
+      [SNAP({ error: 'Required' }), [], 'ok'],
+      [SNAP({ error: 'Other' }), [], /^reads "Other" as its error, where none is paired/],
+    ]);
+  });
+
   it('every kind of row is asked', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual([
       'name error',
+      'name snapshot',
       'name.title text',
       'name text',
       'iban error',
+      'iban snapshot',
       'iban.title text',
+      'pin snapshot',
       'pin.title text',
       'pin text',
       'screenError error',
@@ -274,6 +299,23 @@ describe('the form rows', () => {
   });
 
   it.each<[string, string, readonly Case[]]>([
+    ['ui_snapshot: the paired error on the textfield at its centre', 'name snapshot', [
+      [SNAP({ error: 'Required' }), [], 'ok'],
+      [SNAP({ error: '  Required ' }), [], 'ok'],
+      [`${SNAP({ error: 'Required' })}\n⏎\nnote`, [], 'ok'],
+      [SNAP({}), [], /^no error, where it shows "Required"/],
+      [SNAP({ error: 'Bad' }), [], /^its error "Bad", not "Required"/],
+      [SNAP({ y: 400 }), [], /^no textfield at its centre \(201,177\) in the snapshot/],
+      ['[]', [], /^no textfield at its centre/],
+      // Two textfields hold its centre: the smallest is the field (a wrapper listed with the role is not).
+      [JSON.stringify([{ role: 'textfield', identifier: 'w', rect: rect(0, 100, 402, 200) }, { role: 'textfield', identifier: 'lab.f.name', rect: rect(20, 160, 362, 34), error: 'Required' }], null, 2), [], 'ok'],
+      [JSON.stringify([{ role: 'textfield', identifier: 'lab.f.name', rect: rect(20, 160, 362, 34), error: 'Required' }, { role: 'textfield', identifier: 'w', rect: rect(0, 100, 402, 200), error: 'Wrapper' }], null, 2), [], 'ok'],
+      ['ERROR no tree', [], /^no snapshot: ERROR no tree/],
+    ]],
+    ['ui_snapshot: an error named neither way is no field\'s', 'iban snapshot', [
+      [SNAP({ y: 256 }), [], 'ok'],
+      [SNAP({ y: 256, error: 'Bad IBAN' }), [], /^reads "Bad IBAN" as its error, where none is paired/],
+    ]],
     ['a paired field error passes', 'name error', [[PASS, [], 'ok'], [FAIL, [], /^failed/], [NOT_FOUND, [], /^failed: .*not found within/]]],
     ['an error named neither way fails', 'iban error', [[FAIL, [], 'ok'], [PASS, [], /^passed/], [NOT_FOUND, [], NOT_IN_TREE]]],
     ['a screen-level error pairs with no field', 'screenError error', [[FAIL, [], 'ok'], [PASS, [], /^passed/], [NOT_FOUND, [], NOT_IN_TREE]]],
@@ -416,6 +458,7 @@ describe('the Android form rows (phase 2b)', () => {
   it('every kind of row is asked', () => {
     expect(rows.map((r) => `${r.target} ${r.verb}`)).toEqual([
       'name error',
+      'name snapshot',
       'screenError error',
       'vs tap',
       'vs colour',
@@ -425,6 +468,17 @@ describe('the Android form rows (phase 2b)', () => {
       'note scroll_until',
       'phone tap',
       'phone scroll_until',
+    ]);
+  });
+
+  it('ui_snapshot on Android: none, or the field\'s own message; never another string', () => {
+    const snap = (error?: string) => JSON.stringify([{ role: 'textfield', identifier: 'lab.f.name', rect: rect(55, 330, 970, 99), ...(error !== undefined && { error }) }], null, 2);
+    // That averi sets none is verification.md's contract; the truth is the message the field shows: either is right.
+    expect(row('name snapshot').says).toBe('no error (Android sets none), or its own "Enter the recipient’s name"');
+    check(row('name snapshot').judge, [
+      [snap(), [], 'ok'],
+      [snap('Enter the recipient’s name'), [], 'ok'],
+      [snap('Payment wasn’t sent'), [], /^reads "Payment wasn’t sent" as its error, where none is paired/],
     ]);
   });
 

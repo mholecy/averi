@@ -16,8 +16,10 @@ import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
  * (a sliver, an overlapped row: the plain stop and the `fully` one) keys two rows (`<file> <tag> scroll_until`,
  * `<file> <tag> fully`), not one. `ocr` is the `ocr` assert, judged against the real pixels (phase 4: the host's
  * recognizer reading the captured screenshot) — skipped, and said so, where the host has none (golden.ts#ocrAvailability).
+ * `snapshot` is ui_snapshot read for what it says of one field (golden-spec/forms.ts#snapshotRow: its `error` column).
  */
-export type Verb = 'tap' | 'colour' | 'scroll_until' | 'fully' | 'error' | 'text' | 'ocr';
+export const VERBS = ['tap', 'colour', 'scroll_until', 'fully', 'error', 'text', 'ocr', 'snapshot'] as const;
+export type Verb = (typeof VERBS)[number];
 
 export interface Expectation {
   verb: Verb;
@@ -44,6 +46,17 @@ export interface Expectation {
    * forms' rows).
    */
   asks?: TapAsk | StopAsk;
+  /**
+   * The row's target key where it is not the target's tag (golden.ts keys a row `<file> <target> <verb>`): a second row
+   * of the same verb asked another way — `<tag>.id`, a text target asked by its identifier (rows.ts#byIdentifier).
+   */
+  target?: string;
+  /**
+   * What the row read of the reply, in one line, where the reply's first line says nothing of it (a `snapshot` row: the
+   * matched textfield's error, not the `[` a pretty-printed array opens with) — golden's check carries it
+   * (GoldenCheck.read) and the calibration report shows it for a green row.
+   */
+  read?(outcome: Outcome): string;
 }
 
 export const BUDGET_MS = 1_000;

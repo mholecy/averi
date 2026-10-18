@@ -91,7 +91,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   // By the geometry the contract judges (judgedGeometry: iOS's home-indicator band is no band).
   const g = c.geometry;
   if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : openRows(platform, t, c, nodes);
-  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, c)]);
+  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, source, c)]);
 }
 
 /**

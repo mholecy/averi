@@ -44,6 +44,8 @@ export interface GoldenCheck {
    * The taps and swipes the device was sent (golden-spec/judges.ts#sent): the ratchet pins them for a known mismatch.
    */
   calls: string[];
+  /** What the row read of the reply where its first line says nothing of it (Expectation.read): absent elsewhere. */
+  read?: string;
   /** What says the HARNESS failed, not the tool (`faultsOf`): absent when none. */
   faults?: string[];
   /**
@@ -71,9 +73,9 @@ export function faultsOf(o: { reply: string; device: readonly string[] }): strin
 }
 
 /** One golden row: the call's verdict, its reply, kind and device calls, and its faults (faultsOf) when it has any. */
-export const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: Outcome): GoldenCheck => {
+export const checkOf = (recording: string, target: string, verb: Verb, says: string, mismatch: string | undefined, outcome: Outcome, read?: string): GoldenCheck => {
   const faults = faultsOf(outcome);
-  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome.reply), calls: sent(outcome), ...(faults.length > 0 && { faults }) };
+  return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome.reply), calls: sent(outcome), ...(read !== undefined && { read }), ...(faults.length > 0 && { faults }) };
 };
 
 /** The image the probe reads (any committed screenshot: only whether Vision runs at all is asked of it). */
@@ -154,11 +156,11 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       for (const e of expectations(recording.platform, t, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
         const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
         if (why !== undefined) {
-          result.checks.push(skippedCheck(recording.id, t.tag, e.verb, e.says, why));
+          result.checks.push(skippedCheck(recording.id, e.target ?? t.tag, e.verb, e.says, why));
           continue;
         }
         const outcome = await c.call(e.call, config);
-        result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));
+        result.checks.push(checkOf(recording.id, e.target ?? t.tag, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
       }
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
@@ -176,7 +178,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
           continue;
         }
         const outcome = await c.call(e.call, config);
-        result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome));
+        result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
       }
     }
   } finally {

@@ -163,3 +163,32 @@ export function readingOf(reply: string): string | undefined {
 
 /** An `ocr` reply reports a reading (`read "…"`) without failing closed. */
 export const readSomething = (reply: string) => !failedClosedUnchecked(reply) && READ.test(reply);
+
+// --- ui_snapshot ---
+
+/** A node of a filtered `ui_snapshot` reply (src/mcp/tools.ts ui_snapshot: the matched nodes, children stripped). */
+export interface SnapshotNode {
+  role: string;
+  identifier: string | null;
+  rect: { x: number; y: number; width: number; height: number };
+  /** The field error averi paired with an input (src/adapters/field-errors.ts#attachFieldErrors); absent: none. */
+  error?: string;
+}
+
+/**
+ * The nodes a filtered `ui_snapshot` reply lists — its first block, the JSON array (a note, when there is one, follows
+ * as a second block: tools.ts keeps "a parser of the first block sees what it always saw"); undefined for an error or a
+ * reply whose first block is no array. The array is pretty-printed, so it ends at the first line that is `]` alone (or
+ * is `[]`).
+ */
+export function snapshotNodes(reply: string): SnapshotNode[] | undefined {
+  if (isError(reply) || !reply.startsWith('[')) return undefined;
+  const end = reply.startsWith('[]') ? 2 : reply.indexOf('\n]') + 2;
+  if (end < 2) return undefined;
+  try {
+    const nodes = JSON.parse(reply.slice(0, end)) as unknown;
+    return Array.isArray(nodes) ? (nodes as SnapshotNode[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}

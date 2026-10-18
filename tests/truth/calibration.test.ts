@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { GoldenCheck, GoldenJson } from '../../scripts/differential/golden.js';
+import { VERBS as GOLDEN_VERBS } from '../../scripts/differential/golden-spec/judges.js';
 import { failureOf, runSide, sideLine, sideRunFromOutput, type ProcessError, type SideDeps } from '../../scripts/truth/calibrate-run.js';
 import { calibrationReport, verdictCell } from '../../scripts/truth/calibration-report.js';
 import {
@@ -34,7 +35,7 @@ import {
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, 'utf8')) as Calibration;
 const SHA = /^[0-9a-f]{7}$/;
-const VERBS = new Set(['tap', 'colour', 'scroll_until', 'fully', 'error', 'text', 'ocr']);
+const VERBS = new Set<string>(GOLDEN_VERBS);
 const captures = new Set(
   readdirSync(`${ROOT}${table.corpus}`).flatMap((run) => {
     const manifest = JSON.parse(readFileSync(`${ROOT}${table.corpus}/${run}/manifest.json`, 'utf8')) as { captures: { file: string; truth?: string }[] };
@@ -249,6 +250,14 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
     const partial = results([entry({ partial: 'stage A only' })], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]]))[0];
     expect(verdictCell(partial)).toBe('CALIBRATED (partial: stage A only)');
     expect(calibrationReport([partial])).toContain('| x | x | calibrate | aaaaaaa → bbbbbbb | CALIBRATED (partial: stage A only) |');
+  });
+
+  it('a green row shows what the row read where golden carries it (GoldenCheck.read), else its reply\'s first line', () => {
+    const KS = 'ios-iphone17-ios27/form-shared-id.wda.json amount snapshot';
+    const after: SideRun = { checks: new Map([[KS, check(KS, undefined, { reply: '[\n  {', read: 'textfield c 20,146 362x34: no error' })]]) };
+    const r = results([entry({ checks: [KS] })], new Map([['aaaaaaa', side({ [KS]: 'reads "IBAN*" as its error, where none is paired' })], ['bbbbbbb', after]]))[0];
+    expect(calibrationReport([r])).toContain(`  - ok ${KS} — textfield c 20,146 362x34: no error`);
+    expect(calibrationReport(results([entry()], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]])))).toContain(`  - ok ${K1} — reply of ${K1}`);
   });
 
   it('an after side that is not the note\'s fix (afterNotFix) is said so in the table and the section', () => {

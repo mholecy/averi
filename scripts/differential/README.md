@@ -104,7 +104,12 @@ or fail, scroll_until reached or stopped, a tap or a stroke sent or not) — cla
 file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, bars, false-covers, text), the judges
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
-asks a row marked `live`). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
+asks a row marked `live`). Every tap and scroll_until row asks its target as an agent and the live golden do
+(truth.ts#selectorOf: a text target by its string, any other by its identifier; the colour assert by the identifier),
+and accepts a reply that never found it where the replayed tree does not list it as asked
+(target-contract.ts#askedUnlistedBy: a text target's string, TargetTruth.textListed); a text target under the chrome
+whose identifier the tree lists is asked the plain stop by that identifier too, keyed `<tag>.id` (golden-spec/bars.ts:
+the node the identifier names may read whole where the string is not listed — lab note B4-L1). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
 it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
 rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
 its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies
@@ -159,8 +164,15 @@ read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a 
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the
 keyboard tapped and reached with no swipe, `scroll_until` touching down above the keyboard, a field under the pinned
 submit whose probe tap submitted the form neither tapped nor "reached" without a swipe, and a lazy picker row swiped for
-on the sheet. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error`
-assert, asked with the same-identifier title below it, fails; no tap is asked by an identifier fields share.
+on the sheet. Per field, the `snapshot` verb reads `ui_snapshot`'s error column (`filter: role:textfield`, the
+textfield whose rect holds the field's centre — by place, as an identifier may be every field's;
+`golden-spec/forms.ts#snapshotRow`): on iOS its `error` is the message the rules pair, and none on any other field —
+but a field whose error frame the capture did not record accepts none or its own message (no pairing judged:
+`golden-spec/forms.ts#snapshotErrorOf`); on Android none (averi sets no `error` there: verification.md's contract) or the field's own shown message, never another
+string; a field not open that the snapshot does not list claims nothing either
+way. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error` assert,
+asked with the same-identifier title below it, fails, and its `snapshot` row holds the title read as its error to a
+mismatch; no tap is asked by an identifier fields share.
 `golden-spec/false-covers.ts` asks a text target (`own-parts`) by its text — Tapped, reached with no swipe — and, under
 WDA, R-dismiss of a form whose config taps its principal title (`toolbar-dismiss`, `toolbar-dismiss-bar`: a toolbar
 over the title in the tree) in place of the form's under-keyboard tap row; the façade's `formExpectations` takes the

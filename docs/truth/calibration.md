@@ -46,7 +46,7 @@ open note on the working tree. See the script for the verdicts.
 | 35 | 2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done | calibrate | 173023f → 92f2a46 | CALIBRATED |
 | 36 | 2026-08-26-ios-ocr-crop-scale | needs-ocr | — | — |
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
-| FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED (partial: the `error` assert half) |
+| FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
 | TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | open | working tree | OPEN-RED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
@@ -800,9 +800,9 @@ The green tip of the fix branch, e10219e, is the merge's second parent.
 
 A text field error, not visibility; in the table because the form-errors cell reproduces it.
 
-## FE2: CALIBRATED (partial: the `error` assert half)
+## FE2: CALIBRATED
 
-2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md — defect: `^passed: `
+2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md — defect: `^passed: |^reads .* as its error, where none is paired`
 
 - before d407256:
   - RED ios-iphone17-ios27/form-shared-id.wda.json amount error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "IBAN*" exists
@@ -813,6 +813,14 @@ A text field error, not visibility; in the table because the form-errors cell re
   - RED ios-iphone17-ios27/form-shared-id.idb.json iban error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists
   - RED ios-iphone17-ios27/form-shared-id.idb.json bic error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists
   - RED ios-iphone17-ios27/form-shared-id.idb.json bank error — passed: PASS  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists
+  - RED ios-iphone17-ios27/form-shared-id.wda.json amount snapshot — reads "IBAN*" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.wda.json iban snapshot — reads "BIC*" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.wda.json bic snapshot — reads "Payee’s bank name*" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.wda.json bank snapshot — reads "Payee’s name" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.idb.json amount snapshot — reads "IBAN*" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.idb.json iban snapshot — reads "BIC*" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.idb.json bic snapshot — reads "Payee’s bank name*" as its error, where none is paired
+  - RED ios-iphone17-ios27/form-shared-id.idb.json bank snapshot — reads "Payee’s name" as its error, where none is paired
 - after dfe63da:
   - ok ios-iphone17-ios27/form-shared-id.wda.json amount error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "IBAN*" exists — element found but error was: null, null, null
   - ok ios-iphone17-ios27/form-shared-id.wda.json iban error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists — element found but error was: null, null, null
@@ -822,10 +830,16 @@ A text field error, not visibility; in the table because the form-errors cell re
   - ok ios-iphone17-ios27/form-shared-id.idb.json iban error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "BIC*" exists — element found but error was: null, null, null
   - ok ios-iphone17-ios27/form-shared-id.idb.json bic error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s bank name*" exists — element found but error was: null, null, null
   - ok ios-iphone17-ios27/form-shared-id.idb.json bank error — FAIL  element id:"lab.form-shared-id.component" role:"textfield" with error "Payee’s name" exists — element found but error was: null, null, null
+  - ok ios-iphone17-ios27/form-shared-id.wda.json amount snapshot — textfield lab.form-shared-id.component 20,146 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.wda.json iban snapshot — textfield lab.form-shared-id.component 20,206 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.wda.json bic snapshot — textfield lab.form-shared-id.component 20,266 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.wda.json bank snapshot — textfield lab.form-shared-id.component 20,326 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.idb.json amount snapshot — textfield lab.form-shared-id.component 20,146 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.idb.json iban snapshot — textfield lab.form-shared-id.component 20,206 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.idb.json bic snapshot — textfield lab.form-shared-id.component 20,266 362x34: no error
+  - ok ios-iphone17-ios27/form-shared-id.idb.json bank snapshot — textfield lab.form-shared-id.component 20,326 362x34: no error
 
-Needs: The ui_snapshot half (the note: every field's `error` = the next field's title in ui_snapshot) needs a golden verb for ui_snapshot's error column — none yet.
-
-form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The last field has no title below it: no row. Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL).
+form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The ui_snapshot half (golden-spec/forms.ts#snapshotRow, the `snapshot` verb: the textfield at each field's centre in `ui_snapshot` filtered to the textfields): at d407256 each of those fields reads the next field's title as its `error`, at dfe63da none does. The last field has no title below it: no error row, and its snapshot row is green on both sides (not named). Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL).
 
 ## TX1: CALIBRATED
 
@@ -1014,13 +1028,14 @@ No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and 
 
 ## B4-L1: OPEN-RED
 
-2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md — defect: `fully visible where it is|^passed on`
+2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md — defect: `fully visible where it is|^passed on|^reached where it is under-chrome`
 
 - working tree:
   - RED android-averi_lab-api33/pinned-bar.xml P fully — fully visible where it is chrome-overlap:pinned, after 0 swipe(s) that move nothing: Element id:"lab.pinned-bar.P" fully visible after 0 swipes
   - RED android-averi_lab-api33/pinned-bar.xml P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 100% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/text-under-bar.xml P.id scroll_until — reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing: Element id:"lab.text-under-bar.P" fully visible after 0 swipes
 
-No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part).
+No fix yet: red at HEAD. bars.known.ts and text.known.ts own the ratchet; this entry only links the note to its rows (the `fully` stop, the colour assert passing on P's uncovered part, and the plain stop on text-under-bar's P — its centre under the pinned button — asked by its identifier, which reads it reached: the same uncovered-bounds form on the plain-stop path, not fullyStanding's).
 
 ## F2A1: OPEN-RED
 
