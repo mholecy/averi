@@ -72,9 +72,9 @@ const partiallyOpen = (note: string, key: string): boolean =>
 
 /**
  * The same for a live KNOWN entry (`key`, `<platform> <source> <case id>`): it may stay filed as a note calibrated
- * PARTIALLY only when that note's `openLive` lists it (#10: the replayed rows calibrated, the default direction's turn
- * on uiautomator left to the owner by ADR 0021 — the live case `turn:scroll-collapsing.A`, measured red at the fix's
- * src and at round 6's, docs/truth/live-android-2026-10-18-visibility.md).
+ * PARTIALLY only when that note's `openLive` lists it (#10 listed the live case `turn:scroll-collapsing.A` while ADR
+ * 0021 left the turn on uiautomator to the owner; closed by the owner's decision of 2026-10-18 — no turn there, the
+ * case ok by live-visibility.ts#judgeAndroidTurn — none is listed today).
  */
 const partiallyOpenLive = (note: string, key: string): boolean =>
   table.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e.openLive ?? []).includes(key));
@@ -173,11 +173,14 @@ describe('calibration.json ↔ the KNOWN rows', () => {
   });
 
   it('a live entry filed as a partially calibrated note that its `openLive` does not list is misfiled — keyed by case, not by note', () => {
+    // #10 listed turn:scroll-collapsing.A until the owner's decision of 2026-10-18 (ADR 0021: no turn on uiautomator)
+    // made the case ok and closed it: no note lists a live case today, so it, another case of the note and the case
+    // under another source are all misfiled filed as #10.
     const ten = table.notes.find((e) => e.n === '10')!;
-    expect(misfiled([{ where: 'live android uiautomator turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toEqual([]);
-    // another case of the same note, and the listed case under another source: neither is listed, both misfiled
-    expect(misfiled([{ where: 'live android uiautomator scroll:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
-    expect(misfiled([{ where: 'live ios wda turn:scroll-collapsing.A', name: `bug:${ten.note}` }])).toHaveLength(1);
+    expect(ten.openLive).toBeUndefined();
+    expect(table.notes.filter((e) => (e.openLive ?? []).length > 0)).toEqual([]);
+    for (const where of ['live android uiautomator turn:scroll-collapsing.A', 'live android uiautomator scroll:scroll-collapsing.A', 'live ios wda turn:scroll-collapsing.A'])
+      expect(misfiled([{ where, name: `bug:${ten.note}` }]), where).toHaveLength(1);
   });
 
   it('a row filed as a partially calibrated note that its `open` does not list is misfiled — fab.xml\'s L and K refiled as #2 or as L1', () => {

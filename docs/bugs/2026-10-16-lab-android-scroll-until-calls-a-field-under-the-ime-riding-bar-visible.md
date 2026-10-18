@@ -42,6 +42,17 @@
 > case k3 (fill note under the IME, back hides it) was ok before — the fill tapped the 14-px strip and typed — and is now
 > LOUD, refused for the same strip, the field untouched: an honest refusal the owner's 2026-10-17 decision implies.
 > docs/truth/live-android-2026-10-18-visibility.md.
+>
+> **Decided (2026-10-18, the owner; ADR 0013 "Decided 2026-10-18"):** (1) the way past — "only if a screenshot shows it
+> whole … tap by coordinates" — is KEPT, every remedy before it: pinned over this note's captures
+> (tests/helpers/escape-order.ts: the phone tap with the IME up, the note tap after back, `scroll_until phone` stuck
+> and at its bound, `scroll_until note` stuck — every reply already so ordered, no wording changed); (2) k3, the fill
+> into note's 14-px strip, is REFUSED BY DESIGN — its live judge reads the refusal with the remedy and the field
+> untouched as ok (`live.ts --rejudge docs/truth/live-records/android-vis.json --groups forms,visibility`: k3 ok,
+> 133 cases / 118 ok / 5 loud / 10 mismatches, 0 not known); (3) k7's "fully visible" with 18 px of phone under the
+> bar's node-less padding is a KNOWN residual (ADR 0013's residuals accepted; k7's judge reads the stop ok, its centre
+> clear), with a future "eyes" item in the lab plan: verify a "fully" claim with pixels where a node-less sibling's
+> padding may lie over the target.
 
 Lab note F2A1. **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's
 ground truth (`tests/fixtures/truth/android-averi_lab-api33/form-keyboard.*`, captured by

@@ -219,12 +219,21 @@ const FORMS: Omit<Case, 'group'>[] = [
     cell: K,
     keyboard: true,
     dismiss: [TITLE],
-    says: 'a fill under the keyboard with a dismissal (Android: none configured — back hides it)',
+    says: 'a fill under the keyboard with a dismissal (Android: none configured — back hides it; then note is a strip under the bar, refused by design)',
     calls: [fill(K, 'note', 'Thanks - ok')],
     judge: (s, replies, source, launched) => {
       const v = holds('note', 'Thanks - ok')(s, replies, source, launched);
       // idb cannot hide the keyboard: a refusal with the field untouched is the documented answer there.
-      return source === 'idb' && v.outcome === 'LOUD' && valueOf(s, 'note') === '' ? { outcome: 'ok', why: `refused (idb): ${short(replies[0])}` } : v;
+      if (source === 'idb' && v.outcome === 'LOUD' && valueOf(s, 'note') === '') return { outcome: 'ok', why: `refused (idb): ${short(replies[0])}` };
+      // Android: once back hid the IME, note lies under the bar dropped to the bottom, its dump a 14-px strip cut by
+      // Continue (F2A1). A fill is REFUSED BY DESIGN there, as the tap (the owner's decision of 2026-10-18): ok when
+      // refused naming the remedy (scroll it out from under the bar, or dismiss the keyboard first), every field as the
+      // launch left it, nothing submitted.
+      const untouched = Object.entries(s.fields ?? {}).every(([k, f]) => f.value === launched.fields?.[k]?.value);
+      if (source === 'uiautomator' && v.outcome === 'LOUD' && untouched && (s.submits ?? []).length === 0 && /scroll_until it out from under|dismiss it first/.test(replies[0])) {
+        return { outcome: 'ok', why: `refused by design (F2A1: a fill into a strip under the tap minimum), every field untouched, no submit: ${short(replies[0])}` };
+      }
+      return v;
     },
   },
   {
