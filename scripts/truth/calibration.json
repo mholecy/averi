@@ -159,6 +159,15 @@
         },
         {
           "rows": [
+            "android-averi_lab-api33/own-parts.xml I tap",
+            "android-averi_lab-api33/own-parts.xml I scroll_until"
+          ],
+          "broke": "13d68a2",
+          "fixed": "c8c06a8",
+          "why": "a Compose icon button's icon read as under the unlabelled button inset round it, listed after it (#8's second fix; own-parts' I, round 6)"
+        },
+        {
+          "rows": [
             "ios-iphone17-ios27/own-parts.wda.json N tap",
             "ios-iphone17-ios27/own-parts.wda.json N scroll_until",
             "ios-iphone17-ios27/own-parts.idb.json N tap",
@@ -296,7 +305,19 @@
         "android-averi_lab-api33/own-parts.xml L scroll_until"
       ],
       "remark": "own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes \"a layout defect\"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.",
-      "needs": "Its second fix, c8c06a8 (fix/r6b-icon: a Compose icon button's control, padded evenly round its label, is the label's own control), is not paired: no lab cell holds a Compose IconButton (own-parts' L is a text button). A pair 2f98900 → c8c06a8 needs an icon-button target in own-parts (Android), e.g. an IconButton with a content description — the note's B-1.7 shape: a 132-px wrapper, the icon, then an unlabelled clickable inset on all sides."
+      "pairs": [
+        {
+          "before": "2f98900",
+          "after": "c8c06a8",
+          "defect": "^(not tapped|stopped): .*\\bunder button \\(",
+          "checks": [
+            "android-averi_lab-api33/own-parts.xml I tap",
+            "android-averi_lab-api33/own-parts.xml I scroll_until"
+          ],
+          "remark": "8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:\"Close\"`). Red at 2f98900 (`label:\"Close\" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). Expected on iOS: SwiftUI lists the button alone, labelled Close — unmeasured: no iOS capture on 2026-10-18 (the host's Xcode 27.1 expects CoreSimulator 1174.9.2, found 1171.7; no WebDriverAgent ran), so the iOS own-parts captures hold L and N only."
+        }
+      ],
+      "needs": "8.2's iOS leg: own-parts recaptured on the lab simulator (capture.ts --cells own-parts) once the host's Xcode first launch is done — the plan's Pending captures (round 6); expected green throughout (the SwiftUI button labelled Close, as L)."
     },
     {
       "n": "9",
@@ -313,12 +334,21 @@
     {
       "n": "10",
       "note": "2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md",
-      "status": "needs-cell:edges",
+      "status": "calibrate",
       "fix": ["d2b7744"],
       "before": "10fb02b",
-      "verified": "merge-subject",
-      "needs": "edges (Android) — only a View-based screen (a CollapsingToolbarLayout, as Settings') reproduces the inverted bounds; the Compose lab app does not.",
-      "remark": "The merge subject names it ('inverted bounds read as clipped out'). Not reproduced by the lab's Compose (2026-10-16, the edges cells on API 33): a row cut by the screen's top reads `[128,0][953,121]` (scroll-top-edge's T), cut, not inverted; rows off the screen or outside their container are not dumped at all. A recorded-tree unit test stays its only check."
+      "after": "d2b7744",
+      "verified": "golden",
+      "partial": "the static rows only, toward the row (`up`); the note's own symptom — the default `down` neither seeing the row past its far edge nor turning — is the live turn-back case `turn:scroll-collapsing.A` (live-visibility.ts#TURN_BACK), not yet run",
+      "defect": "0×0 nodes|\"height\":-\\d",
+      "checks": [
+        "android-averi_lab-api33/scroll-collapsing.xml A tap",
+        "android-averi_lab-api33/scroll-collapsing.xml A colour",
+        "android-averi_lab-api33/scroll-collapsing.xml A scroll_until"
+      ],
+      "expect": "DOES-NOT-FAIL",
+      "needs": "A live run of `turn:scroll-collapsing.A` (scripts/truth/live.ts --serial <averi_lab> --groups visibility --cells scroll-collapsing, at 10fb02b and d2b7744: `--side`) — the note's 4 strokes the wrong way before, the reply's clipped-out-above hint after; the replay cannot show a turn.",
+      "remark": "edges/scroll-collapsing (round 6, Android only): Settings' shape in Views — a CoordinatorLayout neither it nor its NestedScrollView clipping children (ViewGroup#getChildVisibleRect clips a group to its bounds only when its parent clips children), the list laid below a collapsed CollapsingToolbarLayout app bar drawn over what runs on above the list's top. A, a row scrolled wholly above the list's top (frame 127,-11 825x176, the list 0,220 1080x2000), stays visible to the accessibility framework and is dumped `[127,220][952,165]`: View#getBoundsOnScreen clamps its top to the list's and leaves its bottom where it lies — the note's inverted bounds (Settings' `[66,66][428,44]`); D, cut 11 px by the list's top, reads `[127,220][952,385]`, cut, not inverted. Earlier (2026-10-16) the lab's Compose did not reproduce it: a row cut by the screen's top reads cut, rows off the screen or outside their container are not dumped. Every row green on both sides — DOES-NOT-FAIL: at 10fb02b A's tap waits naming `0×0 nodes … scroll_until it first`, its colour fails closed off the screenshot, scroll_until `up` strokes inside the list (`540 620 → 1820` ×6, `last rect … \"height\":-55`); at d2b7744 the same verdicts and strokes, the last rect of height 0 (the fix's clipped-out rect); at truth/round-6's src the tap's hint names it `clipped out above its scroll container … scroll_until it with direction: \"up\" first` and the colour fails closed on `no area`. The fix changes the wording; the stroke's direction is live."
     },
     {
       "n": "11",
@@ -1033,14 +1063,17 @@
       "note": "2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md",
       "status": "open",
       "verified": "golden",
-      "defect": "fully visible|^Tapped|reached where it is",
+      "defect": "fully visible|^Tapped|reached where it is|^passed on",
       "checks": [
         "android-averi_lab-api33/scroll-bounded.xml P fully",
         "android-averi_lab-api33/scroll-bounded.xml S tap",
         "android-averi_lab-api33/scroll-bounded.xml S scroll_until",
-        "android-averi_lab-api33/scroll-bounded.xml S fully"
+        "android-averi_lab-api33/scroll-bounded.xml S fully",
+        "android-averi_lab-api33/carousel-in-list.xml C tap",
+        "android-averi_lab-api33/carousel-in-list.xml C colour",
+        "android-averi_lab-api33/carousel-in-list.xml C scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30)."
+      "remark": "No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes."
     },
     {
       "n": "LE2",

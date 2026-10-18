@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf, selectorOf } from '../../truth/truth.js';
+import { axisOf, directionOf, navigationBandTakes, parseGeometry, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -26,7 +26,7 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * | R-off | off-screen | colour | fails: nothing of it is on the screen to measure | ADR 0010 (amendment: the off-screen case — nothing of what it reads on the screen, judged off the screen first), ADR 0002 (the thin sliver: judged off the screen, never measured) |
  * | R-outside-sv | outside-scroll-view | tap | refused naming scroll_until, nothing tapped | ADR 0005 |
  * | R-outside-sv | outside-scroll-view | colour | fails closed: it would measure the background | docs/bugs/2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md |
- * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it | swipes, every touch-down on the screen clear of the system bands and the chrome, and inside the target's own scroll view where the truth names it (not when the tree does not list it) | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md |
+ * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it (truth.ts#directionOf: sideways toward a card beside a carousel's clip) | swipes, every touch-down on the screen clear of the system bands and the chrome, and inside the target's own scroll view where the truth names it (not when the tree does not list it); every swipe along the axis of its direction | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md; the axis: docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md (its residual: a card of a carousel stroked across its axis) |
  * | R-sliver | sliver | tap | refused naming scroll_until, nothing tapped | ADR 0013; docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md |
  * | R-sliver | sliver | scroll_until | not reached where it is — the stop fails, whatever it swiped (the plain stop does not stop on a sliver; a replayed tree never moves) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
@@ -49,24 +49,24 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
 
 /**
  * The tap and the stop ask a target as an agent would, and as the live golden does: by truth.ts#selectorOf — a text
- * target (CatalogTarget.text) by its string, any other by its identifier. A text-asked target is resolved by averi's
- * text match, so where the string's node is not the identifier's (a label inside its button), the row judges the node
- * the agent's call finds.
+ * target (CatalogTarget.text) by its string, a label target (CatalogTarget.label) by its label, any other by its
+ * identifier. A text-asked target is resolved by averi's text match, so where the string's node is not the
+ * identifier's (a label inside its button), the row judges the node the agent's call finds.
  */
-const tapCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text'>): Call => ({ tool: 'tap', args: { platform, selector: selectorOf(t) } });
-const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text'>, direction: 'up' | 'down', fully = false): Call => ({
+const tapCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text' | 'label'>): Call => ({ tool: 'tap', args: { platform, selector: selectorOf(t) } });
+const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text' | 'label'>, direction: Direction, fully = false): Call => ({
   tool: 'scroll_until',
   args: { platform, selector: selectorOf(t), direction, ...(fully && { fully: true }) },
 });
 
 /**
- * A text target as a row asked BY ITS IDENTIFIER sees it (selectorOf then spells `id:"…"`): the second question a text
- * target's identifier keeps open beside the agent's — what averi reads of the node the identifier names, which may be
- * listed where the string is not (text-under-bar's P on Android: its node by the uncovered strip above the pinned
- * button). A row asked so is keyed `<tag>.id` (Expectation.target).
+ * A text (or label) target as a row asked BY ITS IDENTIFIER sees it (selectorOf then spells `id:"…"`): the second
+ * question a text target's identifier keeps open beside the agent's — what averi reads of the node the identifier
+ * names, which may be listed where the string is not (text-under-bar's P on Android: its node by the uncovered strip
+ * above the pinned button). A row asked so is keyed `<tag>.id` (Expectation.target).
  */
 export function byIdentifier(t: TargetTruth): TargetTruth {
-  const { text: _text, textListed: _listed, ...rest } = t;
+  const { text: _text, textListed: _listed, label: _label, ...rest } = t;
   return rest;
 }
 
@@ -200,7 +200,10 @@ export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth):
  * `absent`, given by the caller where the tree may not list the target (target-contract.ts#unlistedBy: the capture's tree of that
  * source did not — uiautomator dumps only what is visible to the user), lets a "never appeared in the tree" reply be
  * judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is then not
- * asked: averi cannot know which scroll view holds a node it never saw.
+ * asked: averi cannot know which scroll view holds a node it never saw. Every swipe runs along the axis of its
+ * direction (its larger leg on that axis, whichever way — a turn back is a stroke along it too): a scroll view moves
+ * along its own axis, and a stroke across a carousel's moves it not (the residual of
+ * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md).
  */
 export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk, opts: RowOptions = {}): Expectation {
   const { absent } = opts;
@@ -214,7 +217,13 @@ export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, r
     judge: (o) => {
       if (swipes(o) === 0) return said(o, 'no swipe');
       const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
-      return strokesOff(o, cell) ?? (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`);
+      const axis = axisOf(direction);
+      const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[axis === 'x' ? 'y' : 'x'] - from[axis === 'x' ? 'y' : 'x']));
+      return (
+        strokesOff(o, cell) ??
+        (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
+        (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
+      );
     },
     ...(absent !== undefined && { absent }),
   };

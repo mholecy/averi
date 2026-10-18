@@ -2,7 +2,7 @@ import type { Platform } from '../differential/corpus.js';
 import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
-import { bandsOf, directionOf, geometryOf, intersect, selectorOf, type GeometryContext } from './truth.js';
+import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
 
 /**
  * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5; run by live.ts): averi's
@@ -173,13 +173,15 @@ export function judgeDismissal(tag: string, reply: string, source: string, s: La
 
 /**
  * How far the target lies from showing whole, at a scroll offset `o` of its scroll view: the target's frame at launch
- * (`f0`, the view at offset `o0`) moved by the offset's change, against `region` — its scroll view's clip on the screen
+ * (`f0`, the view at offset `o0`) moved by the offset's change along the view's `axis` (`y` down its content, `x`
+ * across a horizontal one's — a carousel's, LabState.offsets), against `region` — its scroll view's clip on the screen
  * below the status band, less a full-width chrome at its top or bottom edge (a sticky header, a tab bar, a pinned
  * bar). 0 when it shows whole there.
  */
-export function distanceAt(o: number, f0: Rect, o0: number, region: Rect): number {
-  const top = f0.y - (o - o0);
-  return Math.max(0, region.y - top) + Math.max(0, top + f0.height - (region.y + region.height));
+export function distanceAt(o: number, f0: Rect, o0: number, region: Rect, axis: 'x' | 'y' = 'y'): number {
+  const [start, size, from, extent] = axis === 'y' ? [f0.y, f0.height, region.y, region.height] : [f0.x, f0.width, region.x, region.width];
+  const lead = start - (o - o0);
+  return Math.max(0, from - lead) + Math.max(0, lead + size - (from + extent));
 }
 
 /** The region a target of `view` must lie in to show whole (distanceAt), from the launch state; undefined without a clip. */
@@ -209,8 +211,11 @@ export interface ClassedStroke extends Stroke {
 /** A unit of slack: a stroke must change the distance by more to count as moving it. */
 const MOVE_SLACK = 1;
 
-/** The strokes of the target's own scroll view since the launch, each classed by what it did to the target's distance. */
-export function classStrokes(state: LabState, launched: LabState, platform: Platform, tag: string, view: string): ClassedStroke[] | undefined {
+/**
+ * The strokes of the target's own scroll view since the launch, each classed by what it did to the target's distance
+ * (along `axis`, the view's: distanceAt).
+ */
+export function classStrokes(state: LabState, launched: LabState, platform: Platform, tag: string, view: string, axis: 'x' | 'y' = 'y'): ClassedStroke[] | undefined {
   const f0 = launched.frames[tag];
   const region = showRegion(launched, platform, view);
   if (f0 === undefined || region === undefined) return undefined;
@@ -218,8 +223,8 @@ export function classStrokes(state: LabState, launched: LabState, platform: Plat
   return strokesSince(state, launched)
     .filter((s) => s.view === view)
     .map((s) => {
-      const d0 = distanceAt(s.from, f0, o0, region);
-      const d1 = distanceAt(s.to, f0, o0, region);
+      const d0 = distanceAt(s.from, f0, o0, region, axis);
+      const d1 = distanceAt(s.to, f0, o0, region, axis);
       return { ...s, d0, d1, cls: d1 < d0 - MOVE_SLACK ? 'closer' : d1 > d0 + MOVE_SLACK ? 'away' : 'still' };
     });
 }
@@ -272,10 +277,11 @@ export function directionBreaks(strokes: readonly Stroke[], classed: readonly Cl
 /**
  * A scroll_until toward (or, `turnBack`, away from) `tag`, then a tap on it: the stop must hold where the app lays the
  * target out (stopHolds), every stroke on its own scroll view and R-direction kept (directionBreaks); a failure where the
- * app shows it as the stop needs it failed what happened. The tap after a stop must fire it alone (judgeTap).
+ * app shows it as the stop needs it failed what happened. The tap after a stop must fire it alone (judgeTap). `axis`:
+ * the one the target's scroll view scrolls along — `x` for a carousel's card asked `right` or `left` (truth.ts#axisOf).
  */
 export function judgeScroll(
-  c: { tag: string; view: string; fully: boolean; platform: Platform; unlisted?: boolean },
+  c: { tag: string; view: string; fully: boolean; platform: Platform; unlisted?: boolean; axis?: 'x' | 'y' },
   [scroll, tap]: readonly string[],
   final: LabState,
   launched: LabState,
@@ -286,10 +292,10 @@ export function judgeScroll(
   const app = appText(final, c.platform, c.tag, c.view, launched);
   const g = liveGeometry(state, c.platform, c.tag, c.view);
   const holds = g !== undefined && stopHolds(g, c.fully);
-  const classed = classStrokes(state, launched, c.platform, c.tag, c.view) ?? [];
+  const classed = classStrokes(state, launched, c.platform, c.tag, c.view, c.axis) ?? [];
   const f0 = launched.frames[c.tag];
   const region = showRegion(launched, c.platform, c.view);
-  const end = f0 === undefined || region === undefined ? 0 : distanceAt(state.offsets?.[c.view] ?? launched.offsets?.[c.view] ?? 0, f0, launched.offsets?.[c.view] ?? 0, region);
+  const end = f0 === undefined || region === undefined ? 0 : distanceAt(state.offsets?.[c.view] ?? launched.offsets?.[c.view] ?? 0, f0, launched.offsets?.[c.view] ?? 0, region, c.axis);
   const breaks = directionBreaks(strokesSince(state, launched), classed, c.view, swipesOf(scroll), end);
   const stop = c.fully ? 'fully visible' : 'visible';
   const tapped = tap === undefined ? undefined : judgeTap(c.tag, holds, tap, final, launched);
@@ -364,6 +370,7 @@ export const TURN_BACK: readonly { cell: string; tag: string; direction: 'up' | 
   { cell: 'scroll-top-edge-end', tag: 'T', direction: 'down', fully: true, says: 'as the plain one, fully: turn back up (#17)' },
   { cell: 'scroll-top-edge', tag: 'T', direction: 'down', says: 'T in the status band, more content below: a stroke down carries it off the top — turn back' },
   { cell: 'scroll-bounded', tag: 'F', direction: 'up', says: 'lower at its top, F below: a stroke up moves nothing — turn back down' },
+  { cell: 'scroll-collapsing', tag: 'A', direction: 'down', says: 'A scrolled above the list, its uiautomator bounds inverted: a stroke down carries it further — turn back up (#10)' },
 ];
 
 /**
@@ -422,7 +429,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
   return cases;
 }
 
-function scrollCase(cell: string, t: TargetTruth, view: string, direction: 'up' | 'down', fully: boolean, platform: Platform, says: string): VisibilityCase {
+function scrollCase(cell: string, t: TargetTruth, view: string, direction: Direction, fully: boolean, platform: Platform, says: string): VisibilityCase {
   return {
     id: `scroll:${cell}.${t.tag}${fully ? '.fully' : ''}`,
     cell,
@@ -431,6 +438,6 @@ function scrollCase(cell: string, t: TargetTruth, view: string, direction: 'up' 
       { tool: 'scroll_until', args: { selector: selectorOf(t), direction, ...(fully && { fully: true }) } },
       { tool: 'tap', args: { selector: selectorOf(t) } },
     ],
-    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: askedUnlistedBy(t, source) !== undefined }, replies, s, launched, after[0] ?? s),
+    judge: (s, replies, launched, source, after) => judgeScroll({ tag: t.tag, view, fully, platform, unlisted: askedUnlistedBy(t, source) !== undefined, axis: axisOf(direction) }, replies, s, launched, after[0] ?? s),
   };
 }

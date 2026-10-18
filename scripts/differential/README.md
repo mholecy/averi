@@ -105,29 +105,37 @@ file per cell family (`golden-spec/<family>.ts`: base, presented, forms, edges, 
 they share (`golden-spec/judges.ts`) and phase 3's row types (`golden-spec/rows.ts`: R-off, R-outside-sv, R-sliver,
 R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direction declared live only — golden never
 asks a row marked `live`). Every tap and scroll_until row asks its target as an agent and the live golden do
-(truth.ts#selectorOf: a text target by its string, any other by its identifier; the colour assert by the identifier),
-and accepts a reply that never found it where the replayed tree does not list it as asked
+(truth.ts#selectorOf: a text target by its string, a label target by its label, any other by its identifier; the colour
+assert by the identifier), and accepts a reply that never found it where the replayed tree does not list it as asked
 (target-contract.ts#askedUnlistedBy: a text target's string, TargetTruth.textListed); a text target under the chrome
 whose identifier the tree lists is asked the plain stop by that identifier too, keyed `<tag>.id` (golden-spec/bars.ts:
-the node the identifier names may read whole where the string is not listed — lab note B4-L1). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
-it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
-rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
-its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies
+the node the identifier names may read whole where the string is not listed — lab note B4-L1). The open tap
+(`golden-spec/base.ts`, every family's open, uncovered whole target) asks where it lands: `Tapped`, every tap sent at
+the centre of one of the target's nodes in the replayed tree, ±1 for the tools' rounding (`base.ts#atProbe`,
+`NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks — its identifier, a text
+target's text, or a label target's label — from the capture golden replays; a node counts only where its centre lies
 within the reach below of the probe's touch, the device's word over the tree's: base.ts#nodeCentres), or, where that
 tree lists none so (idb lists no row of a long sheet past its first screen), at the target's probe point — the touch its
 app logged for the probe that fired it — within the middle third of its extent (`OPEN_TAP_REACH`, a chosen value between
 the measured 0.081 of own-parts' N, a whole target its tree draws narrower, and #26's 0.313), and not saying it moved
 the tap off a cover over the centre (`tapped the uncovered part`); a tap moved off is averi steering around a cover that
 is not there (calibration.json #26).
-A row type is asked only of a target whose truth carries a measured `geometry` other than
-`whole` (scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views'
-clips or its chrome — no capture before phase 3 does). A reply that says the target is not in the tree (a tap "waiting
-for element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within") is judged by its
+A row type is asked only of a target whose truth carries a measured `geometry` other than `whole`
+(scripts/truth/truth.ts#geometryOf: measured when the app's state reports the system bands, its scroll views' clips or
+its chrome — no capture before phase 3 does). A reply that says the target is not in the tree (a tap "waiting for
+element … to appear", scroll_until's "never appeared in the tree", an assert's "not found within") is judged by its
 effect first — a tap refused without its remedy, a stroke beneath the presented layer is the row's own mismatch; only
 where the row would accept it is it no evidence either way, its mismatch said to be of that class first (`not in the
 tree: …`). Except where the capture's tree really did not list the target: an edge row's `Expectation.absent`, set from
-the truth's `TargetTruth.listed` for the replayed source (`scripts/truth/target-contract.ts#unlistedBy` — uiautomator dumps no node
-the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent for it).
+the truth's `TargetTruth.listed` for the replayed source (`scripts/truth/target-contract.ts#unlistedBy` — uiautomator
+dumps no node the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent
+for it). A wait whose hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out
+above its scroll container …"), is no such reply: the target is in the tree, refused for where it lies
+(replies.ts#notInTree; edges/scroll-collapsing's A, #10). A scroll is asked toward the target (truth.ts#directionOf):
+`right` or `left` for one wholly beside its scroll view's clip and level with it (a carousel's card,
+edges/carousel-in-list), else `down` or `up` by its centre; R-stroke holds every swipe along that direction's axis (its
+larger leg on it, either way — a turn back too): a stroke across a carousel's axis moves the page, not the carousel
+(rows.ts#strokeRow).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
@@ -164,16 +172,17 @@ read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a 
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the
 keyboard tapped and reached with no swipe, `scroll_until` touching down above the keyboard, a field under the pinned
 submit whose probe tap submitted the form neither tapped nor "reached" without a swipe, and a lazy picker row swiped for
-on the sheet. Per field, the `snapshot` verb reads `ui_snapshot`'s error column (`filter: role:textfield`, the
-textfield whose rect holds the field's centre — by place, as an identifier may be every field's;
-`golden-spec/forms.ts#snapshotRow`): on iOS its `error` is the message the rules pair, and none on any other field —
-but a field whose error frame the capture did not record accepts none or its own message (no pairing judged:
-`golden-spec/forms.ts#snapshotErrorOf`); on Android none (averi sets no `error` there: verification.md's contract) or the field's own shown message, never another
-string; a field not open that the snapshot does not list claims nothing either
-way. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error` assert,
-asked with the same-identifier title below it, fails, and its `snapshot` row holds the title read as its error to a
-mismatch; no tap is asked by an identifier fields share.
-`golden-spec/false-covers.ts` asks a text target (`own-parts`) by its text — Tapped, reached with no swipe — and, under
+on the sheet. Per field, the `snapshot` verb reads `ui_snapshot`'s error column (`filter: role:textfield`, the textfield
+whose rect holds the field's centre — by place, as an identifier may be every field's;
+`golden-spec/forms.ts#snapshotRow`): on iOS its `error` is the message the rules pair, and none on any other field — but
+a field whose error frame the capture did not record accepts none or its own message (no pairing judged:
+`golden-spec/forms.ts#snapshotErrorOf`); on Android none (averi sets no `error` there: verification.md's contract) or
+the field's own shown message, never another string; a field not open that the snapshot does not list claims nothing
+either way. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error`
+assert, asked with the same-identifier title below it, fails, and its `snapshot` row holds the title read as its error
+to a mismatch; no tap is asked by an identifier fields share.
+`golden-spec/false-covers.ts` asks a text target (`own-parts` L, N) by its text and a label target (`own-parts` I, an
+icon button's icon: CatalogTarget.label) by its label, `label:"…"` — Tapped, reached with no swipe — and, under
 WDA, R-dismiss of a form whose config taps its principal title (`toolbar-dismiss`, `toolbar-dismiss-bar`: a toolbar
 over the title in the tree) in place of the form's under-keyboard tap row; the façade's `formExpectations` takes the
 capture's source for it (the keyboardDismiss list is inert under idb). A replayed tree shows the dismissal sent, not the
@@ -211,18 +220,20 @@ node --import tsx scripts/truth/live.ts --udid <lab udid> --groups visibility,di
 
 Phase 5 (`--groups forms,visibility,dismissal`, any of them; `forms` alone by default, so the reproduce lines of the
 earlier summaries stay true): the visibility cases are built from each coloured-target cell's static truth by
-`scripts/truth/live-visibility.ts` — taps judged by the app's tap log, scroll_until by the target's live geometry and by R-direction over the strokes the app logs (LabState.offsets,
-.strokes: both apps report them); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's
-own keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
-calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs of
-one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
+`scripts/truth/live-visibility.ts` — taps judged by the app's tap log, scroll_until by the target's live geometry and by
+R-direction over the strokes the app logs (LabState.offsets, .strokes: both apps report them), judged along the scroll
+view's axis — across a carousel, whose offset the apps report from its leading edge, for a card asked `right` or `left`
+(live-visibility.ts#distanceAt); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's own
+keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
+calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs
+of one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
 with its verdict class and the kind of reply it rests on — a weaker contract than ADR 0020 §4's, no strokes and an
-`intermittent` case allowed ok, its header says why and what the committed records measured); the exit code is 1 on an unknown
-MISMATCH and, in a run of this checkout (not `--side`), on a known case not marked `intermittent` that comes out ok —
-fixed, to be struck off. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
+`intermittent` case allowed ok, its header says why and what the committed records measured); the exit code is 1 on an
+unknown MISMATCH and, in a run of this checkout (not `--side`), on a known case not marked `intermittent` that comes out
+ok — fixed, to be struck off. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
 1's Android run, round 5's device check's iOS runs and the live calibrations'), and `--rejudge <file>` judges it again
-with this checkout's judges, no device (tests/truth/live-rejudge.test.ts does so for the visibility records). Under iOS, idb's companion
-must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
+with this checkout's judges, no device (tests/truth/live-rejudge.test.ts does so for the visibility records). Under iOS,
+idb's companion must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
 /tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,

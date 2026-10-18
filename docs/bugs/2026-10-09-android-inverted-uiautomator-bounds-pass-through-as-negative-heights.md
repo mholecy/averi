@@ -2,6 +2,17 @@
 
 > **Status (2026-10-09):** open. Found by the round-6b device check (Android), averi `fix/round-6b` @ `5e5a3d1`.
 
+> **Lab (2026-10-18):** reproduced on the lab's `averi_lab` AVD by `edges/scroll-collapsing` (Edges.kt#CollapsingList,
+> truth/r6-cells): Settings' shape in Views, a NestedScrollView laid below a collapsed CollapsingToolbarLayout app bar,
+> neither it nor its CoordinatorLayout clipping children. Row A, scrolled wholly above the list's top (frame
+> `127,-11 825x176`, the list `0,220 1080x2000`), is dumped `[127,220][952,165]`: View#getBoundsOnScreen clamps each
+> side to each parent apart (its top to the list's, its bottom where it lies), and a group's bounds clip a child's
+> visibility only where the group's parent clips children — so the row stays visible to the accessibility framework,
+> and is dumped. Calibrated in scripts/truth/calibration.json #10: DOES-NOT-FAIL on the replayed rows (toward A,
+> `up`: both 10fb02b and d2b7744 refuse the tap naming scroll_until and stroke inside the list; the fix changes the
+> wording, `0×0 nodes` → clipped out above, `height -55` → 0); the default-direction turn is the live case
+> `turn:scroll-collapsing.A`, not yet run.
+
 ## Summary
 
 Android Settings homepage, scrolled so the first rows pass under the collapsing app bar. uiautomator itself emits inverted bounds for

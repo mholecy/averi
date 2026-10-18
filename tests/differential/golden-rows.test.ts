@@ -198,6 +198,36 @@ describe('R-stroke inside the target\'s own scroll view (where the truth names i
   });
 });
 
+describe('R-stroke along the axis it scrolls: a card right of its carousel is asked `right`, and stroked across the carousel', () => {
+  // carousel-in-list's C on the iPhone 17: the carousel 24,138 354x85, the card next to the first at 378 — beside the
+  // clip, on the screen, nothing of it in the carousel (outside-scroll-view). The residual of
+  // docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md: a vertical stroke inside
+  // the carousel moves the page, not the carousel.
+  const cell: CellTruth = { ...CELL, chrome: {}, scrollViews: { carousel: rect(24, 138, 354, 85), page: rect(0, 0, 402, 874) } };
+  const card = target('outside-scroll-view', { frame: rect(378, 138, 354, 85), reached: false, probe: [], visible: null, scrollView: 'carousel' });
+  const rs = expectations('ios', card, cell, 'wda');
+  it('the scroll is asked `right`, toward the card', () => {
+    expect(says(rs).filter((s) => s.startsWith('scroll_until'))).toEqual([
+      'scroll_until: R-outside-sv, R-stroke: swipes right for it, every touch-down clear of the bands and the chrome and inside its scroll view carousel',
+      'scroll_until: R-direction: each stroke right brings it closer, and a stroke that does not turns back',
+    ]);
+    expect(rs.find((r) => r.verb === 'scroll_until')?.call.args).toMatchObject({ direction: 'right' });
+  });
+  it.each([
+    ['across the carousel, the finger moving left', ['idb ui swipe 336 180 66 180 --duration 0.3'], undefined],
+    ['a turn back across it is along the axis too', ['idb ui swipe 66 180 336 180 --duration 0.3'], undefined],
+    ['vertical, inside the carousel (today\'s stroke for `down`: 201 207 → 155)', ['idb ui swipe 201 207 201 155 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (201,207): x'],
+    ['diagonal, its larger leg vertical', ['idb ui swipe 300 200 260 150 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (300,200): x'],
+  ])('%s', (_n, device, expected) => {
+    expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
+  });
+  it('a row below the fold is stroked vertically, as before: a sideways stroke for it is across its axis', () => {
+    const below = expectations('ios', target('off-screen', { frame: rect(51, 1100, 300, 64), reached: false, probe: [], visible: null, scrollView: 'page' }), cell, 'wda');
+    expect(verdict(below, 'scroll_until', out('x', [IDB_STROKE]))).toBeUndefined();
+    expect(verdict(below, 'scroll_until', out('x', ['idb ui swipe 336 180 66 180 --duration 0.3']))).toBe('swiped across the y axis it scrolls down along, from (336,180): x');
+  });
+});
+
 describe('R-stroke: every touch-down on the screen, clear of the bands and the chrome', () => {
   const rs = rows(target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null }));
   it.each([

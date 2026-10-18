@@ -42,6 +42,8 @@ describe('the cell catalog', () => {
       'edges/scroll-sticky-view',
       'edges/scroll-top-edge',
       'edges/scroll-top-edge-end',
+      'edges/carousel-in-list',
+      'edges/scroll-collapsing',
       'bars/bands',
       'bars/bands-three-button',
       'bars/pinned-bar',
@@ -66,6 +68,8 @@ describe('the cell catalog', () => {
     expect(() => buildCatalog(all([{ family: 'bars', note: '', cells: [{ id: 'y', family: 'bars', layer: 'none', targets: [] }] }]))).toThrow('names a family');
     expect(() => buildCatalog(all().filter((f) => f.family !== 'bars'))).toThrow('no file for family bars');
     expect(() => buildCatalog([...all(), { family: 'nope' as never, note: '', cells: [] }])).toThrow('no family nope');
+    const both = { tag: 'I', color: '#000000', slot: 0, declared: 'open' as const, text: 'Close', label: 'Close' };
+    expect(() => buildCatalog(all([{ family: 'false-covers', note: '', cells: [{ id: 'z', layer: 'none', targets: [both] }] }]))).toThrow("cell z's I names both a text and a label");
   });
 
   it('lays out an array-free object and a plain array on one line, the rest one member per line', () => {

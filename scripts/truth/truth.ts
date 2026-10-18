@@ -54,15 +54,17 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
 
 /**
  * What a row asks a target by — as an assert's `element` names it: a text target (CatalogTarget.text) by its string, as
- * a test names a label; any other by its identifier. The one rule the replayed golden (golden-spec.ts#expectations,
- * base.ts#openRows) and the live one (live-visibility.ts) share; selectorOf spells it as a tool's selector.
+ * a test names a label; a label target (CatalogTarget.label) by its accessibility label, as a test names an icon
+ * button; any other by its identifier. The one rule the replayed golden (golden-spec.ts#expectations, base.ts#openRows)
+ * and the live one (live-visibility.ts) share; selectorOf spells it as a tool's selector.
  */
-export type AssertElement = { id: string } | { text: string };
-export const elementOf = (t: Pick<TargetTruth, 'id' | 'text'>): AssertElement => (t.text !== undefined ? { text: t.text } : { id: t.id });
-/** elementOf as a tap's or a scroll_until's selector: `text:"…"` or `id:"…"`. */
-export const selectorOf = (t: Pick<TargetTruth, 'id' | 'text'>) => {
+export type AssertElement = { id: string } | { text: string } | { label: string };
+export const elementOf = (t: Pick<TargetTruth, 'id' | 'text' | 'label'>): AssertElement =>
+  t.text !== undefined ? { text: t.text } : t.label !== undefined ? { label: t.label } : { id: t.id };
+/** elementOf as a tap's or a scroll_until's selector: `text:"…"`, `label:"…"` or `id:"…"`. */
+export const selectorOf = (t: Pick<TargetTruth, 'id' | 'text' | 'label'>) => {
   const e = elementOf(t);
-  return 'text' in e ? `text:"${e.text}"` : `id:"${e.id}"`;
+  return 'text' in e ? `text:"${e.text}"` : 'label' in e ? `label:"${e.label}"` : `id:"${e.id}"`;
 };
 
 /** XML's character references and the five named entities, decoded. */
@@ -107,11 +109,15 @@ function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[
  * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`) exactly — `lab.x.A.box` is not `lab.x.A`; or, for a text
  * target, labelled `text` (WDA's `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) compared as
  * textListedIn compares a string: whitespace collapsed (spaced), so a string the app wraps onto lines is one node in
- * both readings.
+ * both readings; or, for a label target, its accessibility label exactly as averi reads it (WDA's `label`, idb's
+ * `AXLabel`; uiautomator's `content-desc`, or its `text` where that is empty — src/adapters/android.ts#normalizeNode's
+ * `label: contentDesc ?? text`).
  */
 function isTarget(o: Record<string, unknown>, source: SourceKind, by: AssertElement): boolean {
-  const values = 'id' in by ? (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]) : source === 'uiautomator' ? [o.text, o['content-desc']] : source === 'idb' ? [o.AXLabel] : [o.label];
-  return 'id' in by ? values.some((v) => v === by.id) : values.some((v) => typeof v === 'string' && spaced(v) === spaced(by.text));
+  if ('id' in by) return (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]).some((v) => v === by.id);
+  if ('label' in by) return (source === 'uiautomator' ? o['content-desc'] || o.text : source === 'idb' ? o.AXLabel : o.label) === by.label;
+  const values = source === 'uiautomator' ? [o.text, o['content-desc']] : source === 'idb' ? [o.AXLabel] : [o.label];
+  return values.some((v) => typeof v === 'string' && spaced(v) === spaced(by.text));
 }
 
 /**
@@ -654,11 +660,24 @@ export function controlConsistency(c: ControlTruth, outOfProcess: readonly Rect[
   return undefined;
 }
 
+/** Where content lies, as scroll_until's `direction` names it (`down`: below the current view). */
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
 /**
- * Toward the target: `down` when its frame's centre lies at or below the centre of what shows of it (else of the
- * screen), else `up`.
+ * Toward the target: across, along a horizontal scroll view's axis, where the target lies wholly right (`right`) or
+ * left (`left`) of its scroll view's clip (CellTruth.scrollViews) with its rows overlapping the clip's — a card of a
+ * carousel (edges/carousel-in-list), which only a sideways scroll brings into view; else `down` when its frame's centre
+ * lies at or below the centre of what shows of it (else of the screen), else `up`.
  */
-export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible'>, cell: Pick<CellTruth, 'screen'>): 'up' | 'down' {
+export function directionOf(t: Pick<TargetTruth, 'frame' | 'visible' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews'>): Direction {
+  const clip = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
+  if (clip !== undefined && t.frame.y < clip.y + clip.height && clip.y < t.frame.y + t.frame.height) {
+    if (t.frame.x >= clip.x + clip.width) return 'right';
+    if (t.frame.x + t.frame.width <= clip.x) return 'left';
+  }
   const shown = t.visible ?? { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
   return t.frame.y + t.frame.height / 2 >= shown.y + shown.height / 2 ? 'down' : 'up';
 }
+
+/** The axis a `direction` scrolls along: `y` for up and down, `x` for left and right. */
+export const axisOf = (d: Direction): 'x' | 'y' => (d === 'left' || d === 'right' ? 'x' : 'y');

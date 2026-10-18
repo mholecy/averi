@@ -35,9 +35,13 @@ export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
 /**
  * The reply says the element is not in the tree — no evidence of what covers it: the resolver's timeout (src/interact/
  * resolve.ts:358, "…waiting for element X to appear"), scroll_until's give-up (src/interact/scroll-text.ts:593,
- * "element never appeared in the tree"), the assert poll's (src/verify/poll-verdict.ts:78, "not found within N s").
+ * "element never appeared in the tree"), the assert poll's (src/verify/poll-verdict.ts:78, "not found within N s"). Not
+ * a timeout whose hint says the selector MATCHED nodes, none of them usable (src/interact/resolve.ts#ZERO_AREA_HINT and
+ * the clipped-out hint: "it matched only 0×0 nodes …", "it matched only nodes clipped out above its scroll container …")
+ * — the target is in the tree, refused for where it lies (edges/scroll-collapsing's A, its uiautomator bounds inverted:
+ * calibration.json #10).
  */
-export const notInTree = (reply: string) => /waiting for element .* to appear|never appeared in the tree|not found within/.test(reply);
+export const notInTree = (reply: string) => /waiting for element .* to appear(?![\s\S]*\(it matched only )|never appeared in the tree|not found within/.test(reply);
 
 /**
  * What kind of reply it is, from a closed set — recorded on every golden check (golden.ts), so a known mismatch whose

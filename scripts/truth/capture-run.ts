@@ -103,9 +103,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
-      // A text target is drawn on its control: how much of the control's box shows its colour (the text on it).
-      const box = t.text === undefined ? frame : s.frames[`${t.tag}.box`];
-      if (box === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for text target ${t.tag}'s box (${t.tag}.box)`);
+      // A text or label target is drawn on its control: how much of the control's box shows its colour (the text or
+      // the icon on it).
+      const box = t.text === undefined && t.label === undefined ? frame : s.frames[`${t.tag}.box`];
+      if (box === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${t.text === undefined ? 'label' : 'text'} target ${t.tag}'s box (${t.tag}.box)`);
       const { drawn, seen } = measure(png, box, s.scale, t.color);
       const geometry = measuredGeometry(frame, s, t.scrollView);
       // The centre is never tapped where it lies off the screen (truth.ts#unprobedReason, the rule consistency holds
@@ -119,6 +120,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         tag: t.tag,
         id,
         ...(t.text !== undefined && { text: t.text }),
+        ...(t.label !== undefined && { label: t.label }),
         color: t.color,
         declared: t.declared,
         frame,

@@ -1,13 +1,14 @@
 {
   "family": "false-covers",
-  "note": "What is no cover: a target's own parts (a button's text, a text field's floating label and its scroll bar: own-parts), a toolbar over the keyboard dismissal the cell's config taps (toolbar-dismiss: a screen-sized one, layer toolbar-screen; toolbar-dismiss-bar: an itemless bar-sized one, layer toolbar-bar; toolbar-dismiss-short: the screen-sized one over a form whose scroll view is shorter than the screen, its frame over the title, layer toolbar-screen-short — #7's second fix) — phase 3 B5 (calibration.json: #7, #8, #18, #19). App files: AveriLab/FalseCovers.swift, FalseCovers.kt (own-parts only: the toolbar cells are form cells, phase 2b on Android).",
+  "note": "What is no cover: a target's own parts (a button's text, a text field's floating label and its scroll bar, an icon button's icon — `I`, a label target asked by its accessibility label, round 6: #8's second fix — own-parts), a toolbar over the keyboard dismissal the cell's config taps (toolbar-dismiss: a screen-sized one, layer toolbar-screen; toolbar-dismiss-bar: an itemless bar-sized one, layer toolbar-bar; toolbar-dismiss-short: the screen-sized one over a form whose scroll view is shorter than the screen, its frame over the title, layer toolbar-screen-short — #7's second fix) — phase 3 B5 (calibration.json: #7, #8, #18, #19). App files: AveriLab/FalseCovers.swift, FalseCovers.kt (own-parts only: the toolbar cells are form cells, phase 2b on Android).",
   "cells": [
     {
       "id": "own-parts",
       "layer": "none",
       "targets": [
         { "tag": "L", "color": "#3949AB", "slot": 0, "declared": "open", "text": "LOGIN" },
-        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" }
+        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" },
+        { "tag": "I", "color": "#3949AB", "slot": 3, "declared": "open", "label": "Close" }
       ]
     },
     {

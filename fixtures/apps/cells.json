@@ -371,6 +371,26 @@
       ]
     },
     {
+      "id": "carousel-in-list",
+      "family": "edges",
+      "layer": "none",
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "scroll-collapsing",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#5E35B1", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "D", "color": "#F4511E", "slot": 1, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
       "id": "bands",
       "family": "bars",
       "layer": "none",
@@ -442,7 +462,8 @@
       "layer": "none",
       "targets": [
         { "tag": "L", "color": "#3949AB", "slot": 0, "declared": "open", "text": "LOGIN" },
-        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" }
+        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" },
+        { "tag": "I", "color": "#3949AB", "slot": 3, "declared": "open", "label": "Close" }
       ]
     },
     {

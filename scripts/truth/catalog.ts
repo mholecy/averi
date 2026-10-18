@@ -46,6 +46,9 @@ export function buildCatalog(files: readonly FamilyFile[]): Catalog {
   for (const family of FAMILIES) {
     for (const c of byFamily.get(family)!.cells) {
       if (c.family !== undefined) throw new Error(`catalog: cell ${c.id} in ${family}.json names a family — the file says it`);
+      // A target is asked by one thing (truth.ts#elementOf): its text, its label, or its identifier — never two.
+      const both = c.targets.filter((t) => t.text !== undefined && t.label !== undefined).map((t) => t.tag);
+      if (both.length > 0) throw new Error(`catalog: cell ${c.id}'s ${both.join(', ')} names both a text and a label — a target is asked by one`);
       const other = seen.get(c.id);
       if (other !== undefined) throw new Error(`catalog: cell ${c.id} is in ${other}.json and ${family}.json`);
       seen.set(c.id, family);

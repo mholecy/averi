@@ -36,6 +36,16 @@ export interface CatalogTarget {
    * rows ask by the text (`text:"…"`), as a test names a label (golden-spec/false-covers.ts#ownPartsRows).
    */
   text?: string;
+  /**
+   * A label target (calibration.json #8's second fix, an icon button's icon): the target is a control's icon whose
+   * accessibility label (Android's content description) is this, drawn on a box of its colour — identified as
+   * lab.<cell>.<tag>, the box's frame reported as `<tag>.box` (the one `drawn` is measured over: the coloured box the
+   * button sits on, which no tree lists — not the node identified lab.<cell>.<tag>.box, own-parts' I on Android the
+   * IconButton's 132-px wrapper, FalseCovers.kt); the rows ask by the
+   * label (`label:"…"`), as a test names an icon button, and no text row is asked of it (no string is drawn). Never
+   * with `text` (truth.ts#elementOf asks by one; scripts/truth/catalog.ts#buildCatalog refuses both).
+   */
+  label?: string;
   /** The scroll view the target lies in: an id of LabState.scrollViews, whose clip the measured geometry cuts it by. */
   scrollView?: string;
 }
@@ -227,7 +237,11 @@ export interface LabState {
   chrome?: Record<string, Rect>;
   // Phase 5's live oracle (scripts/truth/live.ts, live-visibility.ts) — optional: written by the scroll views of the
   // coloured-target cells from the round-4 apps on; no capture reads them.
-  /** Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top. */
+  /**
+   * Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top — across it
+   * from its leading edge for a horizontal one (carousel-in-list's `carousel`), which live-visibility.ts#judgeScroll
+   * judges along that axis.
+   */
   offsets?: Record<string, number>;
   /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */
   strokes?: Stroke[];
@@ -283,6 +297,8 @@ export interface TargetTruth {
    * box (`<tag>.box`), the text drawn on it.
    */
   text?: string;
+  /** A label target's label (CatalogTarget.label): its rows ask by it; `drawn` and `seen` are measured over `<tag>.box`. */
+  label?: string;
   color: string;
   declared: Declared;
   /** The app's frame, in the tree's units (points on iOS, pixels on Android). */

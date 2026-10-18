@@ -7,8 +7,10 @@ import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
+  axisOf,
   consistency,
   controlPiece,
+  directionOf,
   controlConsistency,
   elementOf,
   imePanels,
@@ -55,11 +57,30 @@ const UNPINNED: CatalogForm = { ...FORM, submit: { tag: 'submit', title: 'Contin
 const field = { tag: 'phone', inSheet: false };
 
 describe('elementOf / selectorOf — what a row asks a target by, replayed and live alike', () => {
-  it('a text target by its text, any other by its identifier', () => {
+  it('a text target by its text, a label target by its label, any other by its identifier', () => {
     expect(elementOf({ id: 'lab.c.N', text: 'Payee’s name' })).toEqual({ text: 'Payee’s name' });
+    expect(elementOf({ id: 'lab.c.I', label: 'Close' })).toEqual({ label: 'Close' });
     expect(elementOf({ id: 'lab.c.A' })).toEqual({ id: 'lab.c.A' });
     expect(selectorOf({ id: 'lab.c.N', text: 'Payee’s name' })).toBe('text:"Payee’s name"');
+    expect(selectorOf({ id: 'lab.c.I', label: 'Close' })).toBe('label:"Close"');
     expect(selectorOf({ id: 'lab.c.A' })).toBe('id:"lab.c.A"');
+  });
+});
+
+describe('directionOf — toward the target, along its scroll view\'s axis', () => {
+  const screen = { width: 402, height: 874 };
+  const carousel = rect(24, 138, 354, 85);
+  const at = (frame: Rect, scrollView?: string) => directionOf({ frame, visible: null, ...(scrollView !== undefined && { scrollView }) }, { screen, scrollViews: { carousel } });
+  it('a card wholly right (left) of its carousel\'s clip, on its rows: `right` (`left`) — along x', () => {
+    expect(at(rect(378, 138, 354, 85), 'carousel')).toBe('right');
+    expect(at(rect(-330, 138, 354, 85), 'carousel')).toBe('left');
+    expect(axisOf('right')).toBe('x');
+    expect(axisOf('down')).toBe('y');
+  });
+  it('anything else up or down by its centre, as before: in no scroll view, or one the state does not report, or beside the clip but off its rows', () => {
+    expect(at(rect(378, 138, 354, 85))).toBe('up');
+    expect(at(rect(378, 138, 354, 85), 'other')).toBe('up');
+    expect(at(rect(378, 900, 354, 85), 'carousel')).toBe('down');
   });
 });
 
@@ -81,6 +102,14 @@ describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own
     const xml = '<hierarchy><node text="LOGIN" bounds="[10,20][110,60]" /><node text="" content-desc="A &amp; B" bounds="[0,0][5,5]" /></hierarchy>';
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'LOGIN' })).toEqual([rect(10, 20, 100, 40)]);
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'A & B' })).toEqual([rect(0, 0, 5, 5)]);
+  });
+  it('a label target by its accessibility label exactly, as averi reads it (WDA label, idb AXLabel, uiautomator content-desc, else its text)', async () => {
+    const xml = '<hierarchy><node text="Close" content-desc="" bounds="[0,0][9,9]" /><node text="" content-desc="Close" bounds="[507,1843][573,1909]" /><node text="Close" content-desc="Dismiss" bounds="[1,1][2,2]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { label: 'Close' })).toEqual([rect(0, 0, 9, 9), rect(507, 1843, 66, 66)]);
+    expect(nodeFramesIn(await read('android-averi_lab-api33/own-parts.xml'), 'uiautomator', { label: 'Close' })).toEqual([rect(507, 1843, 66, 66)]);
+    const wda = JSON.stringify({ value: { children: [{ label: 'Close', rect: rect(179, 660, 44, 44) }, { label: 'Close menu', rect: rect(0, 0, 1, 1) }] } });
+    expect(nodeFramesIn(wda, 'wda', { label: 'Close' })).toEqual([rect(179, 660, 44, 44)]);
+    expect(nodeFramesIn(JSON.stringify([{ AXLabel: 'Close', frame: rect(179, 660, 44, 44) }]), 'idb', { label: 'Close' })).toEqual([rect(179, 660, 44, 44)]);
   });
   it('a text target found as textListedIn finds it: whitespace collapsed, a wrapped string one node', () => {
     const wda = JSON.stringify({ value: { children: [{ label: 'Payee’s\nname', rect: rect(10, 20, 100, 40) }] } });
