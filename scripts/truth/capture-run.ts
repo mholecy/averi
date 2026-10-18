@@ -88,6 +88,11 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     await writeFile(join(opts.out, `${cell.id}.png`), shot);
     for (const t of trees) await writeFile(join(opts.out, `${cell.id}${t.suffix}`), t.payload);
     await writeFile(join(opts.out, `${cell.id}.state.json`), JSON.stringify(s, null, 2) + '\n');
+    // Android: the device's own system bands with the IME down (CellTruth.displays) — read here, before the probes, when
+    // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M,
+    // round 7: its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
+    // the IME up is read after ime()'s back hid it, below.
+    let displays = lab.displays !== undefined && s.keyboard?.visible !== true ? await lab.displays() : undefined;
 
     const truth: CellTruth = {
       cell: cell.id,
@@ -168,7 +173,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     // hidden by ime()'s back by now) — the navigation bar's top depends on the navigation mode, which the fake device's
     // stock dump (gesture navigation) does not follow.
     if (lab.displays !== undefined) {
-      await writeFile(join(opts.out, `${cell.id}.displays.txt`), await lab.displays());
+      displays ??= await lab.displays();
+      await writeFile(join(opts.out, `${cell.id}.displays.txt`), displays);
       truth.displays = `${cell.id}.displays.txt`;
     }
     if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);

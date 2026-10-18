@@ -389,6 +389,24 @@ describe('capture', () => {
     });
   });
 
+  it("the IME-down system bands are read before the probes: a probe that focuses a field leaves the IME up (rn-field's M)", async () => {
+    // Its probe tap focuses a field: the IME comes up, and stays up through the relaunch-free end of the capture.
+    class FocusingLab extends FakeLab {
+      ime = false;
+      override async tap(x: number, y: number) {
+        await super.tap(x, y);
+        this.ime = true;
+      }
+      async displays() {
+        return `displays ime ${this.ime}`;
+      }
+    }
+    const lab = new FocusingLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
+    await run(lab, [OPEN]);
+    expect(lab.taps).toEqual([[20, 20]]);
+    expect(await readFile(join(out, 'open.displays.txt'), 'utf8')).toBe('displays ime false');
+  });
+
   it('a probe tap that reached nothing of the app is a broken cell, not "not reached"', async () => {
     const { broken } = await run(new FakeLab(() => []), [OPEN]);
     expect(broken).toEqual([expect.stringMatching(/^open\/A: the probe tap left no touch/)]);
