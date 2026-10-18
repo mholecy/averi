@@ -816,6 +816,8 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    230 mismatches before and after; wording only — the 15 Android colour rows that end `not found within 1 s`
    (alert-dim and sheet-medium A–D, carousel-in-list B and U, scroll-bounded F and O, scroll-top-edge(-end) A,
    tabbar-floating F); no class, kind or device call moved.
+   Live on averi_lab 2026-10-19 (docs/truth/live-android-2026-10-19-hint-everywhere.md): form-picker c2–c4 ok; under
+   its sheet the element, text and color asserts, a flow's `wait:` and an optional tap each said it once, nothing fired.
    Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
    name, country, submit and country.ST; scroll-bounded O, F; carousel-in-list B, U; scroll-top-edge(-end) A;
    tabbar-floating F; text-under-bar P — tap and scroll_until each); form-picker's three taps, which the presented row
