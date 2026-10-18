@@ -361,6 +361,8 @@ export interface VisibilityCase {
    * the scroll beneath a presented layer.
    */
   asks?: TapAsk | StopAsk;
+  /** The tree sources the case runs under (all of the platform's when unset): the carry case is WDA's alone. */
+  sources?: readonly string[];
   /**
    * `source`: the tree source the case ran under — a target its static capture's tree of that source did not list
    * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (live.ts reads one
@@ -433,7 +435,65 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     const says = unlisted.length === 0 ? `turn back: ${b.says}` : `the wrong direction: ${b.says} — under ${unlisted.join(', ')} ${t.tag} is not in the tree, so no turn is asked there, only an honest reply`;
     cases.push({ ...scrollCase(truth.cell, t, t.scrollView, b.direction, b.fully === true, platform, says), id: `turn:${truth.cell}.${t.tag}${b.fully ? '.fully' : ''}` });
   }
+  if (platform === 'ios' && truth.cell === CARRY.cell) cases.push(carryCase());
   return cases;
+}
+
+/**
+ * The long-list carry case (ADR 0021 decision 4, lab note LV5; iOS, WDA alone — idb lists no scroll view, so it has no
+ * carry): a row far down sheet-long-list's UIKit table, asked `down` from the top. LV5 measured the carry model's
+ * window on `lower` (180 pt); its final-approach cut on a full-height list is inferred, and the ADR asks the device
+ * check to judge that the cut stroke lands the row in its window without an extra stroke or turn. No target sits far
+ * enough (F is row 20: one stroke from the top lands it), so the row is a plain one asked by its text, `Row 30` (the
+ * table's `Row n`, its row height 64 pt, Presented.swift#LongListController): the app reports no frame for it, so its
+ * frame is the table's clip moved by the row's place and the table's offset (`carryRow`), as F's report (row 20 at
+ * 62 + 1280 − offset) bears out. Whole over the offsets 1172–1748 (the table's end: 40 rows, 812 pt shown), past one
+ * stroke's carry from the top (≈ 1048 pt, round 5's record). The table ends there, so a full final stroke would come to
+ * rest at its end, still in the window: the turn and the overshoot are what is judged, and the strokes the app logged
+ * (the summary's `app:` line) show whether the final one was cut — at rest short of the end, or at it.
+ */
+export const CARRY = { cell: 'sheet-long-list', view: 'list', row: 30, rowHeight: 64, tag: 'Row30', text: 'Row 30' } as const;
+
+/** The state with `Row 30`'s frame as the table lays it out at its offset (CARRY): undefined offset reads 0, its rest. */
+export function carryRow(state: LabState): LabState {
+  const clip = state.scrollViews?.[CARRY.view];
+  if (clip === undefined) return state;
+  const y = clip.y + CARRY.row * CARRY.rowHeight - (state.offsets?.[CARRY.view] ?? 0);
+  return { ...state, frames: { ...state.frames, [CARRY.tag]: { x: clip.x, y, width: clip.width, height: CARRY.rowHeight } } };
+}
+
+/**
+ * The carry case's judge: judgeScroll's stop and R-direction on the row's derived frame, and on top what the ADR asks
+ * of the carry — no stroke of the table back up (a turn), none that carried the row from below its window to above it
+ * (the overshoot a full final stroke makes where the window is narrower than its carry).
+ */
+export function judgeCarry(reply: string, final: LabState, launched: LabState): LiveVerdict {
+  const [state, start] = [carryRow(final), carryRow(launched)];
+  const verdict = judgeScroll({ tag: CARRY.tag, view: CARRY.view, fully: false, platform: 'ios' }, [reply], state, start);
+  const f0 = start.frames[CARRY.tag];
+  const region = showRegion(start, 'ios', CARRY.view);
+  if (verdict.outcome === 'MISMATCH' || f0 === undefined || region === undefined) return verdict;
+  const o0 = start.offsets?.[CARRY.view] ?? 0;
+  const top = (o: number) => f0.y - (o - o0);
+  const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
+  const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
+  const past = strokes.filter((s) => top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
+  const breaks = [
+    ...turned.map((s) => `a stroke back up (${round(s.from)}→${round(s.to)}): averi turned`),
+    ...past.map((s) => `a stroke carried it past its window (${round(s.from)}→${round(s.to)}: from below to above it)`),
+  ];
+  return breaks.length === 0 ? verdict : { outcome: 'MISMATCH', cls: 'R-direction', kind: verdict.kind, why: `R-direction (carry): ${breaks.join('; ')} — averi: ${short(reply)}`, app: verdict.app };
+}
+
+function carryCase(): VisibilityCase {
+  return {
+    id: `carry:${CARRY.cell}.${CARRY.tag}`,
+    cell: CARRY.cell,
+    sources: ['wda'],
+    says: `scroll_until "${CARRY.text}" (row ${CARRY.row} of the table, whole over offsets 1172–1748, past one stroke's carry from the top) down: stops on it, every stroke on ${CARRY.view} bringing it closer, none carrying it past its window, no turn (LV5's carry on a long list)`,
+    calls: [{ tool: 'scroll_until', args: { selector: `text:"${CARRY.text}"`, direction: 'down' } }],
+    judge: (s, [reply], launched, _source, after) => judgeCarry(reply, after[0] ?? s, launched),
+  };
 }
 
 function scrollCase(cell: string, t: TargetTruth, view: string, direction: Direction, fully: boolean, platform: Platform, says: string): VisibilityCase {
