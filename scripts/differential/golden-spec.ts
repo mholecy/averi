@@ -54,7 +54,8 @@ import type { Expectation } from './golden-spec/judges.js';
  * R-dismiss (rows.ts#dismissRow, a form cell's row under its `config.ios.keyboardDismiss`) through formExpectations,
  * in place of the form's own under-keyboard tap. So a B5 (false covers) author edits golden-spec/false-covers.ts (its
  * rows), this module (to ask them), rows.ts only for a new row type — and the family's catalog file, app views and
- * tests/differential/golden/false-covers.known.ts, as every batch does. A text target (CatalogTarget.text) of any family
+ * tests/differential/golden/false-covers.known.ts, as every batch does — a label target (CatalogTarget.label, an icon
+ * button's icon) through ownPartsRows too, asked by its label. A text target (CatalogTarget.text) of any family
  * adds golden-spec/text.ts's rows (phase 4: its string read back from the tree and, `ocr`, by the host's recognizer
  * from the screenshot) to those its geometry asks.
  */
@@ -90,7 +91,8 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   const text = (rows: Expectation[]) => (t.text === undefined || rows.length === 0 ? rows : [...rows, ...textRows(platform, t, c.geometry, cell, source)]);
   // By the geometry the contract judges (judgedGeometry: iOS's home-indicator band is no band).
   const g = c.geometry;
-  if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : openRows(platform, t, c, nodes);
+  // A text or label target is drawn on its own control: its colour is not asked (false-covers.ts#ownPartsRows).
+  if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : t.label !== undefined ? ownPartsRows(platform, t, c, nodes) : openRows(platform, t, c, nodes);
   return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, c)]);
 }
 

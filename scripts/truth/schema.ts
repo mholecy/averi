@@ -36,6 +36,13 @@ export interface CatalogTarget {
    * rows ask by the text (`text:"…"`), as a test names a label (golden-spec/false-covers.ts#ownPartsRows).
    */
   text?: string;
+  /**
+   * A label target (calibration.json #8's second fix, an icon button's icon): the target is a control's icon whose
+   * accessibility label (Android's content description) is this, drawn on a box of its colour — identified as
+   * lab.<cell>.<tag>, the box's frame reported as `<tag>.box` (the one `drawn` is measured over); the rows ask by the
+   * label (`label:"…"`), as a test names an icon button, and no text row is asked of it (no string is drawn).
+   */
+  label?: string;
   /** The scroll view the target lies in: an id of LabState.scrollViews, whose clip the measured geometry cuts it by. */
   scrollView?: string;
 }
@@ -287,6 +294,8 @@ export interface TargetTruth {
    * box (`<tag>.box`), the text drawn on it.
    */
   text?: string;
+  /** A label target's label (CatalogTarget.label): its rows ask by it; `drawn` and `seen` are measured over `<tag>.box`. */
+  label?: string;
   color: string;
   declared: Declared;
   /** The app's frame, in the tree's units (points on iOS, pixels on Android). */

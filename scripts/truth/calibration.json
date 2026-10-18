@@ -296,7 +296,18 @@
         "android-averi_lab-api33/own-parts.xml L scroll_until"
       ],
       "remark": "own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes \"a layout defect\"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.",
-      "needs": "Its second fix, c8c06a8 (fix/r6b-icon: a Compose icon button's control, padded evenly round its label, is the label's own control), is not paired: no lab cell holds a Compose IconButton (own-parts' L is a text button). A pair 2f98900 → c8c06a8 needs an icon-button target in own-parts (Android), e.g. an IconButton with a content description — the note's B-1.7 shape: a 132-px wrapper, the icon, then an unlabelled clickable inset on all sides."
+      "pairs": [
+        {
+          "before": "2f98900",
+          "after": "c8c06a8",
+          "defect": "^(not tapped|stopped): .*\\bunder button \\(",
+          "checks": [
+            "android-averi_lab-api33/own-parts.xml I tap",
+            "android-averi_lab-api33/own-parts.xml I scroll_until"
+          ],
+          "remark": "8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:\"Close\"`). Red at 2f98900 (`label:\"Close\" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). iOS lists the SwiftUI button alone, labelled Close: its own-parts capture predates I (round 6's iOS capture waits on the host's Xcode)."
+        }
+      ]
     },
     {
       "n": "9",

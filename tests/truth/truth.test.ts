@@ -57,10 +57,12 @@ const UNPINNED: CatalogForm = { ...FORM, submit: { tag: 'submit', title: 'Contin
 const field = { tag: 'phone', inSheet: false };
 
 describe('elementOf / selectorOf — what a row asks a target by, replayed and live alike', () => {
-  it('a text target by its text, any other by its identifier', () => {
+  it('a text target by its text, a label target by its label, any other by its identifier', () => {
     expect(elementOf({ id: 'lab.c.N', text: 'Payee’s name' })).toEqual({ text: 'Payee’s name' });
+    expect(elementOf({ id: 'lab.c.I', label: 'Close' })).toEqual({ label: 'Close' });
     expect(elementOf({ id: 'lab.c.A' })).toEqual({ id: 'lab.c.A' });
     expect(selectorOf({ id: 'lab.c.N', text: 'Payee’s name' })).toBe('text:"Payee’s name"');
+    expect(selectorOf({ id: 'lab.c.I', label: 'Close' })).toBe('label:"Close"');
     expect(selectorOf({ id: 'lab.c.A' })).toBe('id:"lab.c.A"');
   });
 });
@@ -100,6 +102,14 @@ describe('nodeFramesIn — the target\'s nodes in a raw tree, the harness\'s own
     const xml = '<hierarchy><node text="LOGIN" bounds="[10,20][110,60]" /><node text="" content-desc="A &amp; B" bounds="[0,0][5,5]" /></hierarchy>';
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'LOGIN' })).toEqual([rect(10, 20, 100, 40)]);
     expect(nodeFramesIn(xml, 'uiautomator', { text: 'A & B' })).toEqual([rect(0, 0, 5, 5)]);
+  });
+  it('a label target by its accessibility label exactly (WDA label, idb AXLabel, uiautomator content-desc — never its text)', async () => {
+    const xml = '<hierarchy><node text="Close" content-desc="" bounds="[0,0][9,9]" /><node text="" content-desc="Close" bounds="[507,1843][573,1909]" /></hierarchy>';
+    expect(nodeFramesIn(xml, 'uiautomator', { label: 'Close' })).toEqual([rect(507, 1843, 66, 66)]);
+    expect(nodeFramesIn(await read('android-averi_lab-api33/own-parts.xml'), 'uiautomator', { label: 'Close' })).toEqual([rect(507, 1843, 66, 66)]);
+    const wda = JSON.stringify({ value: { children: [{ label: 'Close', rect: rect(179, 660, 44, 44) }, { label: 'Close menu', rect: rect(0, 0, 1, 1) }] } });
+    expect(nodeFramesIn(wda, 'wda', { label: 'Close' })).toEqual([rect(179, 660, 44, 44)]);
+    expect(nodeFramesIn(JSON.stringify([{ AXLabel: 'Close', frame: rect(179, 660, 44, 44) }]), 'idb', { label: 'Close' })).toEqual([rect(179, 660, 44, 44)]);
   });
   it('a text target found as textListedIn finds it: whitespace collapsed, a wrapped string one node', () => {
     const wda = JSON.stringify({ value: { children: [{ label: 'Payee’s\nname', rect: rect(10, 20, 100, 40) }] } });

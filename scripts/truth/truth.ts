@@ -54,15 +54,17 @@ export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogF
 
 /**
  * What a row asks a target by — as an assert's `element` names it: a text target (CatalogTarget.text) by its string, as
- * a test names a label; any other by its identifier. The one rule the replayed golden (golden-spec.ts#expectations,
- * base.ts#openRows) and the live one (live-visibility.ts) share; selectorOf spells it as a tool's selector.
+ * a test names a label; a label target (CatalogTarget.label) by its accessibility label, as a test names an icon
+ * button; any other by its identifier. The one rule the replayed golden (golden-spec.ts#expectations, base.ts#openRows)
+ * and the live one (live-visibility.ts) share; selectorOf spells it as a tool's selector.
  */
-export type AssertElement = { id: string } | { text: string };
-export const elementOf = (t: Pick<TargetTruth, 'id' | 'text'>): AssertElement => (t.text !== undefined ? { text: t.text } : { id: t.id });
-/** elementOf as a tap's or a scroll_until's selector: `text:"…"` or `id:"…"`. */
-export const selectorOf = (t: Pick<TargetTruth, 'id' | 'text'>) => {
+export type AssertElement = { id: string } | { text: string } | { label: string };
+export const elementOf = (t: Pick<TargetTruth, 'id' | 'text' | 'label'>): AssertElement =>
+  t.text !== undefined ? { text: t.text } : t.label !== undefined ? { label: t.label } : { id: t.id };
+/** elementOf as a tap's or a scroll_until's selector: `text:"…"`, `label:"…"` or `id:"…"`. */
+export const selectorOf = (t: Pick<TargetTruth, 'id' | 'text' | 'label'>) => {
   const e = elementOf(t);
-  return 'text' in e ? `text:"${e.text}"` : `id:"${e.id}"`;
+  return 'text' in e ? `text:"${e.text}"` : 'label' in e ? `label:"${e.label}"` : `id:"${e.id}"`;
 };
 
 /** XML's character references and the five named entities, decoded. */
@@ -107,11 +109,14 @@ function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[
  * `name`, idb's `AXUniqueId`, uiautomator's `resource-id`) exactly — `lab.x.A.box` is not `lab.x.A`; or, for a text
  * target, labelled `text` (WDA's `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) compared as
  * textListedIn compares a string: whitespace collapsed (spaced), so a string the app wraps onto lines is one node in
- * both readings.
+ * both readings; or, for a label target, its accessibility label exactly (WDA's `label`, idb's `AXLabel`,
+ * uiautomator's `content-desc` — never its `text`: an icon draws none).
  */
 function isTarget(o: Record<string, unknown>, source: SourceKind, by: AssertElement): boolean {
-  const values = 'id' in by ? (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]) : source === 'uiautomator' ? [o.text, o['content-desc']] : source === 'idb' ? [o.AXLabel] : [o.label];
-  return 'id' in by ? values.some((v) => v === by.id) : values.some((v) => typeof v === 'string' && spaced(v) === spaced(by.text));
+  if ('id' in by) return (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]).some((v) => v === by.id);
+  if ('label' in by) return (source === 'uiautomator' ? o['content-desc'] : source === 'idb' ? o.AXLabel : o.label) === by.label;
+  const values = source === 'uiautomator' ? [o.text, o['content-desc']] : source === 'idb' ? [o.AXLabel] : [o.label];
+  return values.some((v) => typeof v === 'string' && spaced(v) === spaced(by.text));
 }
 
 /**

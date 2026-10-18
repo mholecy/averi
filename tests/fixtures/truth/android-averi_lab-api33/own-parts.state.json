@@ -8,6 +8,7 @@
     "height": 2220
   },
   "scale": 1,
+  "density": 2.75,
   "frames": {
     "L.box": {
       "x": 127,
@@ -32,6 +33,18 @@
       "y": 1351,
       "width": 266,
       "height": 61
+    },
+    "I.box": {
+      "x": 127,
+      "y": 1788,
+      "width": 825,
+      "height": 176
+    },
+    "I": {
+      "x": 507,
+      "y": 1843,
+      "width": 66,
+      "height": 66
     }
   },
   "events": []

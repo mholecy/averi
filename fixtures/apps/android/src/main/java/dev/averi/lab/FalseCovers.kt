@@ -5,8 +5,10 @@ package dev.averi.lab
 // The false-covers family (fixtures/apps/cells/false-covers.json): what lies over a target in a tree yet is no cover.
 // Android builds `own-parts` — text targets (CatalogTarget.text) drawn on their own control: `L` a Material button's
 // own label (a Compose button lists its text before an unlabelled clickable of its size: calibration.json #8), `N` a
-// text field's own label drawn over the empty field, as a placeholder is (on iOS the field lies over the label: #18).
-// A tap on either text fires its control, logged as the target's `tap`. The toolbar cells are form cells: phase 2b on Android (the capture skips them).
+// text field's own label drawn over the empty field, as a placeholder is (on iOS the field lies over the label: #18);
+// and a label target (CatalogTarget.label), `I` a Material IconButton's icon, its content description the label (#8's
+// second fix: the button lists the 48-dp wrapper, the icon, then an unlabelled clickable inset on all four sides — the
+// note's B-1.7 shape). A tap on any of them fires its control, logged as the target's `tap`. The toolbar cells are form cells: phase 2b on Android (the capture skips them).
 
 import android.graphics.Rect
 import androidx.compose.foundation.background
@@ -22,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +43,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
@@ -89,6 +94,20 @@ private fun OwnPart(cell: Cell, t: Target, lab: Lab, modifier: Modifier) {
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(t.text ?: "", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag(id).reportFrame(t.tag, lab))
+        }
+    } else if (t.label != null) {
+        // The icon button centred on a box of its colour (the `<tag>.box` drawn is measured over: the icon the only
+        // other paint on it): the IconButton (its 48-dp touch target, 132 px on averi_lab, identified `<id>.box`)
+        // holds its 40-dp container of the same colour and, in it, the icon — a 24-dp white square carrying the
+        // content description, identified as the target. Its tap fires the button.
+        Box(box.background(Color(t.color)), contentAlignment = Alignment.Center) {
+            IconButton(
+                onClick = { lab.event("tap", t.tag) },
+                modifier = Modifier.testTag("$id.box"),
+                colors = IconButtonDefaults.iconButtonColors(containerColor = Color(t.color), contentColor = Color.White),
+            ) {
+                Box(Modifier.size(24.dp).background(Color.White).semantics { contentDescription = t.label ?: "" }.testTag(id).reportFrame(t.tag, lab))
+            }
         }
     } else {
         var value by remember { mutableStateOf("") }

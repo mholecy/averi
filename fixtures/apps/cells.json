@@ -452,7 +452,8 @@
       "layer": "none",
       "targets": [
         { "tag": "L", "color": "#3949AB", "slot": 0, "declared": "open", "text": "LOGIN" },
-        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" }
+        { "tag": "N", "color": "#B2EBF2", "slot": 2, "declared": "open", "text": "Payee’s name" },
+        { "tag": "I", "color": "#3949AB", "slot": 3, "declared": "open", "label": "Close" }
       ]
     },
     {

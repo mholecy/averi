@@ -92,6 +92,8 @@ struct Target: Decodable {
     let declared: String
     /// A text target (B5's own-parts): this text drawn on its coloured control, the control's box `<tag>.box`.
     let text: String?
+    /// A label target (own-parts' `I`): an icon button whose accessibility label this is, on its box `<tag>.box`.
+    let label: String?
 
     var onLayer: Bool { self.in == "layer" }
 }

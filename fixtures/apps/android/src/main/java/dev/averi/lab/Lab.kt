@@ -25,8 +25,11 @@ import kotlin.math.roundToInt
 /** The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported. */
 val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert")
 
-/** `text`: a text target (B5's own-parts) — this text drawn on its coloured control, the control's box `<tag>.box`. */
-data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null)
+/**
+ * `text`: a text target (B5's own-parts) — this text drawn on its coloured control, the control's box `<tag>.box`;
+ * `label`: a label target (an icon button's icon, its content description this label), the same box.
+ */
+data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null, val label: String? = null)
 
 /**
  * `family`: base, presented, forms, edges, bars, false-covers — MainActivity's CellRouter routes by it. `form`: a form
@@ -58,6 +61,7 @@ object Catalog {
                     slot = t.optInt("slot", 0),
                     onLayer = t.optString("in") == "layer",
                     text = t.optString("text").ifEmpty { null },
+                    label = t.optString("label").ifEmpty { null },
                 )
             }
             Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null }, c.optJSONObject("form"))
