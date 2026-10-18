@@ -160,6 +160,29 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(describeScrollResult(resultOf(played))).toMatch(/; 3 swipes up, the last of which did not move scrollable \(0,380 402x180\) — the tree lists its content ending at its top — so averi turned down/);
   });
 
+  it('a read a whole point off, as WDA rounds a list resting a third of a point off its top, is a read that did not move: the end proven after ONE stroke (measured live, round 7)', () => {
+    // Measured on the lab simulator, one stroke up at `lower`'s top each: F 51,1381 300x64 over content 0,381 402x1300
+    // (the origin rounded up), or F 51,1380 300x65 over 0,380 402x1301 (the size rounded up) — never more than a point.
+    const grown = (offset: number): Row => {
+      const tree = scrolled(offset);
+      const grow = (n: UiNode): UiNode => {
+        const taller = n.identifier === F || (n.rect.y === LOWER.y - offset && n.rect.height === 1300);
+        return { ...n, rect: taller ? { ...n.rect, height: n.rect.height + 1 } : n.rect, children: n.children.map(grow) };
+      };
+      const t = grow(tree);
+      return { tree: t, found: [...everyNode(t)].filter((n) => n.identifier === F) };
+    };
+    expect(grown(0).found?.[0]?.rect).toEqual({ x: 51, y: 1380, width: 300, height: 65 });
+    for (const unmoved of [at(-1), grown(0)]) {
+      const played = play(IPHONE, [at(0), unmoved, at(260), at(520), at(780), at(930), at(930)]);
+      expect(strokesToward(played)).toEqual(['up', 'down', 'down', 'down', 'down']);
+      expect(played.outcome).toMatchObject({ kind: 'visible', endTurn: { from: 'up', to: 'down', after: 1, unmoved: 1 } });
+      expect(describeScrollResult(resultOf(played))).toMatch(/; 1 swipe up did not move scrollable \(0,380 402x180\) — the tree lists its content ending at its top — so averi turned down/);
+    }
+    // Two points off is motion: no proof on that read.
+    expect(strokesToward(play(IPHONE, [at(0), at(-2), at(-2), at(260)])).slice(0, 3)).toEqual(['up', 'up', 'down']);
+  });
+
   it('uiautomator (Android): a target dumped clipped out past the far edge of a list the strokes do not move — no turn, the tree cannot list where the content ends; the strokes go the caller\'s way to the bound and the failure names the side, as before', () => {
     const list: Rect = { x: 0, y: 297, width: 1080, height: 1923 };
     const out: Row = { found: [{ ...node({ role: 'button', identifier: 'apps', rect: { x: 198, y: 2220, width: 126, height: 0 } }), clippedOut: 'bottom' }], scroller: list };
