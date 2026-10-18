@@ -117,8 +117,8 @@ export interface KeyboardUp {
  * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
  * the MCP tools; \`dismissKeyboard: true\` on the fill before this step in a flow`, or `tap a neutral element such as
  * the screen title — a tap: step in a flow`. The one wording of the clause for `scroll_until`'s whole-screen advice
- * (scroll-text.ts#hideToJudgeWholeScreen) and the cut-by remedy (`dismissKeyboardFirstText`); each says the adapter's
- * `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
+ * (scroll-text.ts#hideToJudgeWholeScreen), the cut-by remedy (`dismissKeyboardFirstText`) and the tap's refusal of a
+ * centre under idb's band (tap-judgement.ts#hideIt); each says the adapter's `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
  */
 export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
   dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : 'tap a neutral element such as the screen title — a tap: step in a flow';

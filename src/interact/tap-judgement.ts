@@ -10,7 +10,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutByRemedy, cutRemedy, cutSliverText, underKeyboardText, type KeyboardUp } from './target-text.js';
+import { cutByRemedy, cutRemedy, cutSliverText, hideKeyboardHow, underKeyboardText, type KeyboardUp } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -478,6 +478,7 @@ const cutAdvice = (cut: Cut): string => `${cutRemedy(cut.edge)} (${cut.within ==
  * How to hide a keyboard a tap refused a centre under: only a line no guard
  * acts on is refused (`underKeyboard`), idb's band, whose adapter has no
  * key that hides it (`KeyboardRemedy.dismissal` is `none`) — so the way is a
- * tap the author adds, and the adapter's `advice`.
+ * tap the author adds, worded as every remedy words it
+ * (target-text.ts#hideKeyboardHow), and the adapter's `advice`.
  */
-const hideIt = ({ advice }: KeyboardRemedy): string => `hide the keyboard (tap a neutral element such as the screen title — a tap: step in a flow); ${cannotHide(advice)}`;
+const hideIt = (remedy: KeyboardRemedy): string => `hide the keyboard (${hideKeyboardHow(remedy)}); ${cannotHide(remedy.advice)}`;
