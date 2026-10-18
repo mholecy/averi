@@ -471,7 +471,7 @@ describe('the Android form rows (phase 2b)', () => {
     ]);
   });
 
-  it('ui_snapshot: no field carries an error on Android, whatever it shows', () => {
+  it('ui_snapshot on Android: none, or the field\'s own message; never another string', () => {
     const snap = (error?: string) => JSON.stringify([{ role: 'textfield', identifier: 'lab.f.name', rect: rect(55, 330, 970, 99), ...(error !== undefined && { error }) }], null, 2);
     // That averi sets none is verification.md's contract; the truth is the message the field shows: either is right.
     expect(row('name snapshot').says).toBe('no error (Android sets none), or its own "Enter the recipient’s name"');
