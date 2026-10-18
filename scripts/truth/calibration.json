@@ -314,10 +314,9 @@
             "android-averi_lab-api33/own-parts.xml I tap",
             "android-averi_lab-api33/own-parts.xml I scroll_until"
           ],
-          "remark": "8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:\"Close\"`). Red at 2f98900 (`label:\"Close\" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). Expected on iOS: SwiftUI lists the button alone, labelled Close — unmeasured: no iOS capture on 2026-10-18 (the host's Xcode 27.1 expects CoreSimulator 1174.9.2, found 1171.7; no WebDriverAgent ran), so the iOS own-parts captures hold L and N only."
+          "remark": "8.2: own-parts' I (round 6), a Material3 IconButton whose icon carries the content description Close — uiautomator lists the 132-px wrapper (lab.own-parts.I.box, [474,1810][606,1942]), the icon (lab.own-parts.I, 66x66, labelled) and after it an unlabelled android.widget.Button [485,1821][595,1931], inset 11 px on all four sides: the note's B-1.7 shape. Asked by its label (`label:\"Close\"`). Red at 2f98900 (`label:\"Close\" is under button (485,1821 110x110) at its centre (540,1876)`, the stop after 2 swipes), green at c8c06a8 (`paddedOn`: the control padded evenly round the icon and centred on it). On iOS (captured 2026-10-18 by round 6's iOS device check, iOS 27.0): both sources list the SwiftUI button alone — one Button, `lab.own-parts.I`, labelled Close, 179,660 44x44, nothing over it — tapped by its label at its centre (201,682) and reached with no swipe: green, as L (no calibration row: neither side of the fix differs there)."
         }
-      ],
-      "needs": "8.2's iOS leg: own-parts recaptured on the lab simulator (capture.ts --cells own-parts) once the host's Xcode first launch is done — the plan's Pending captures (round 6); expected green throughout (the SwiftUI button labelled Close, as L)."
+      ]
     },
     {
       "n": "9",

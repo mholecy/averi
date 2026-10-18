@@ -1,9 +1,9 @@
 import { ANDROID, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS, keys, NOT_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The false-covers family's ratchet (fixtures/apps/cells/false-covers.json, phase 3 B5): own-parts (both platforms;
-// round 6's icon-button target I captured on Android only so far — 10 rows there, 8 on iOS, whose capture waits on
-// the host's simulator, see edges.known.ts), toolbar-dismiss, toolbar-dismiss-bar and toolbar-dismiss-short (iOS:
-// form cells).
+// round 6's icon-button target I — 10 rows each; on iOS, captured by round 6's iOS device check, both sources list the
+// button alone, labelled Close, and tap it by its label: green), toolbar-dismiss, toolbar-dismiss-bar and
+// toolbar-dismiss-short (iOS: form cells).
 
 const UNDER_KEYBOARD = ['vs', 'ks', 'ss', 'note'];
 
@@ -25,8 +25,8 @@ export const falseCovers: KnownFile = {
   ),
   counts: {
     [`${ANDROID}/own-parts.xml`]: 10,
-    [`${IOS}/own-parts.idb.json`]: 8,
-    [`${IOS}/own-parts.wda.json`]: 8,
+    [`${IOS}/own-parts.idb.json`]: 10,
+    [`${IOS}/own-parts.wda.json`]: 10,
     [`${IOS}/toolbar-dismiss.idb.json`]: 34,
     [`${IOS}/toolbar-dismiss.wda.json`]: 34,
     [`${IOS}/toolbar-dismiss-bar.idb.json`]: 34,

@@ -445,6 +445,28 @@
       "truth": "scroll-top-edge-end.truth.json"
     },
     {
+      "file": "carousel-in-list.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "carousel-in-list.png",
+      "truth": "carousel-in-list.truth.json"
+    },
+    {
+      "file": "carousel-in-list.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "carousel-in-list.png",
+      "truth": "carousel-in-list.truth.json"
+    },
+    {
       "file": "bands.wda.json",
       "source": "wda",
       "form": "raw",

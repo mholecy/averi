@@ -161,6 +161,28 @@
                "width": 300,
                "height": 64
               }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{179, 660}, {44, 44}}",
+              "label": "Close",
+              "rawIdentifier": "lab.own-parts.I",
+              "traits": "Button",
+              "frame": "{{179, 660}, {44, 44}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.own-parts.I",
+              "rect": {
+               "y": 660,
+               "x": 179,
+               "width": 44,
+               "height": 44
+              }
              }
             ],
             "isAccessible": "0",

@@ -59,6 +59,28 @@
         "wda": true,
         "idb": true
       }
+    },
+    {
+      "tag": "I",
+      "id": "lab.own-parts.I",
+      "label": "Close",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "height": 44,
+        "width": 44,
+        "x": 179,
+        "y": 660
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,682.0"
+        }
+      ],
+      "drawn": 0.996,
+      "seen": "#3949AB"
     }
   ]
 }
