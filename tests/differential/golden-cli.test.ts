@@ -140,6 +140,9 @@ describe('golden --json: a fault reaches the check and the exit code (checkOf, e
     expect(c.mismatch).toBeUndefined();
     expect(c.calls).toEqual(['idb ui tap 1 2']);
     expect('faults' in checkOf('r/a.json', 'A', 'tap', 'Tapped', undefined, { reply: 'Tapped id:"a"', device: ['idb ui tap 1 2'] })).toBe(false);
+    // What the row read, carried only where the row gives it (Expectation.read).
+    expect(checkOf('r/a.json', 'A', 'snapshot', 's', undefined, { reply: '[', device: [] }, 'no error').read).toBe('no error');
+    expect('read' in checkOf('r/a.json', 'A', 'tap', 'Tapped', undefined, { reply: 'Tapped id:"a"', device: [] })).toBe(false);
   });
 
   it('exit code 1 on a fault alone, as on a mismatch or a broken target; 0 when every check holds', () => {

@@ -175,6 +175,14 @@ function snapshotRow(platform: Platform, fields: readonly FieldTruth[], f: Field
           ? `no error (${why}), or its own ${JSON.stringify(or)}`
           : `no error${platform === 'android' ? ' (Android sets none)' : f.error === null ? ' (none shown)' : ` (${f.error.id}: the rules pair it with none)`}`,
     call: { tool: 'ui_snapshot', args: { platform, filter: 'role:textfield' } },
+    read: (o) => {
+      const nodes = snapshotNodes(o.reply);
+      if (nodes === undefined) return first(o);
+      const node = textfieldAt(nodes, centre);
+      if (node === undefined) return `no textfield at its centre (${Math.round(centre.x)},${Math.round(centre.y)})`;
+      const r = node.rect;
+      return `textfield ${node.identifier ?? '(no id)'} ${r.x},${r.y} ${r.width}x${r.height}: ${node.error === undefined || node.error === null ? 'no error' : `error ${JSON.stringify(node.error)}`}`;
+    },
     judge: (o) => {
       const nodes = snapshotNodes(o.reply);
       if (nodes === undefined) return `no snapshot: ${first(o)}`;

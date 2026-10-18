@@ -250,6 +250,14 @@ const form: CellTruth = {
 describe('the form rows', () => {
   const rows = formExpectations('ios', form, 'wda');
 
+  it('ui_snapshot: what the row read — the matched textfield\'s error, not the reply\'s first line', () => {
+    const r = pick(rows, 'snapshot', 'name');
+    const o = (reply: string): Outcome => ({ reply, device: [] });
+    expect(r.read!(o(SNAP({ error: 'Required' })))).toBe('textfield lab.f.x 20,160 362x34: error "Required"');
+    expect(r.read!(o(SNAP({})))).toBe('textfield lab.f.x 20,160 362x34: no error');
+    expect(r.read!(o('[]'))).toBe('no textfield at its centre (201,177)');
+    expect(r.read!(o('ERROR no tree'))).toBe('ERROR no tree');
+  });
   it('ui_snapshot: an error whose frame the capture did not record is judged by no rule — none, or its own message', () => {
     const frameless = formExpectations('ios', { ...form, form: { ...form.form!, fields: [field('name', 160, { error: { id: 'lab.f.name', text: 'Required' } })] } }, 'wda');
     const r = pick(frameless, 'snapshot', 'name');

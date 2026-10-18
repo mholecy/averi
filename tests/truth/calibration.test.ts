@@ -252,6 +252,14 @@ describe('calibrate.ts — the wiring of runs to notes (results)', () => {
     expect(calibrationReport([partial])).toContain('| x | x | calibrate | aaaaaaa → bbbbbbb | CALIBRATED (partial: stage A only) |');
   });
 
+  it('a green row shows what the row read where golden carries it (GoldenCheck.read), else its reply\'s first line', () => {
+    const KS = 'ios-iphone17-ios27/form-shared-id.wda.json amount snapshot';
+    const after: SideRun = { checks: new Map([[KS, check(KS, undefined, { reply: '[\n  {', read: 'textfield c 20,146 362x34: no error' })]]) };
+    const r = results([entry({ checks: [KS] })], new Map([['aaaaaaa', side({ [KS]: 'reads "IBAN*" as its error, where none is paired' })], ['bbbbbbb', after]]))[0];
+    expect(calibrationReport([r])).toContain(`  - ok ${KS} — textfield c 20,146 362x34: no error`);
+    expect(calibrationReport(results([entry()], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]])))).toContain(`  - ok ${K1} — reply of ${K1}`);
+  });
+
   it('an after side that is not the note\'s fix (afterNotFix) is said so in the table and the section', () => {
     const cured = results([entry({ fix: ['ccccccc'], afterNotFix: 'ccccccc fixed the device tree only' })], new Map([['aaaaaaa', side({ [K1]: 'Tapped' })], ['bbbbbbb', side({ [K1]: undefined })]]))[0];
     const report = calibrationReport([cured]);

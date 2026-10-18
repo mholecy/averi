@@ -51,6 +51,12 @@ export interface Expectation {
    * of the same verb asked another way — `<tag>.id`, a text target asked by its identifier (rows.ts#byIdentifier).
    */
   target?: string;
+  /**
+   * What the row read of the reply, in one line, where the reply's first line says nothing of it (a `snapshot` row: the
+   * matched textfield's error, not the `[` a pretty-printed array opens with) — golden's check carries it
+   * (GoldenCheck.read) and the calibration report shows it for a green row.
+   */
+  read?(outcome: Outcome): string;
 }
 
 export const BUDGET_MS = 1_000;

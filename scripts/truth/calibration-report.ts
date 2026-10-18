@@ -9,7 +9,7 @@ import { expected, unrecorded, WORKING_TREE, type NoteResult } from './calibrate
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim() !== '' && !/^\d+\/\d+ asserts|^All \d+ asserts/.test(l))?.slice(0, 220) ?? '';
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const rowLine = (k: string, c: GoldenCheck | undefined) =>
-  c === undefined ? `  - ${k}: not asked` : c.mismatch === undefined ? `  - ok ${k} — ${cell(firstLine(c.reply))}` : `  - RED ${k} — ${cell(c.mismatch.slice(0, 260))}`;
+  c === undefined ? `  - ${k}: not asked` : c.mismatch === undefined ? `  - ok ${k} — ${cell(c.read ?? firstLine(c.reply))}` : `  - RED ${k} — ${cell(c.mismatch.slice(0, 260))}`;
 
 /** The summary table's verdict: the verdict, what part of the note it covers, and what the fix regressed elsewhere. */
 export function verdictCell(r: NoteResult): string {
