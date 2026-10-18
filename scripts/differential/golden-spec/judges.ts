@@ -16,8 +16,10 @@ import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
  * (a sliver, an overlapped row: the plain stop and the `fully` one) keys two rows (`<file> <tag> scroll_until`,
  * `<file> <tag> fully`), not one. `ocr` is the `ocr` assert, judged against the real pixels (phase 4: the host's
  * recognizer reading the captured screenshot) — skipped, and said so, where the host has none (golden.ts#ocrAvailability).
+ * `snapshot` is ui_snapshot read for what it says of one field (golden-spec/forms.ts#snapshotRow: its `error` column).
  */
-export type Verb = 'tap' | 'colour' | 'scroll_until' | 'fully' | 'error' | 'text' | 'ocr';
+export const VERBS = ['tap', 'colour', 'scroll_until', 'fully', 'error', 'text', 'ocr', 'snapshot'] as const;
+export type Verb = (typeof VERBS)[number];
 
 export interface Expectation {
   verb: Verb;

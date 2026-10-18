@@ -162,8 +162,13 @@ read back as text (the P5 sample: ’ “ ” – — … NBSP & diacritics), a 
 keyboard refused naming it (in the reply's own words — the selector it echoes is left out), the submit pinned above the
 keyboard tapped and reached with no swipe, `scroll_until` touching down above the keyboard, a field under the pinned
 submit whose probe tap submitted the form neither tapped nor "reached" without a swipe, and a lazy picker row swiped for
-on the sheet. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error`
-assert, asked with the same-identifier title below it, fails; no tap is asked by an identifier fields share.
+on the sheet. Per field, the `snapshot` verb reads `ui_snapshot`'s error column (`filter: role:textfield`, the
+textfield whose rect holds the field's centre — by place, as an identifier may be every field's;
+`golden-spec/forms.ts#snapshotRow`): on iOS its `error` is the message the rules pair, and none on any other field; on
+Android none (averi sets no `error` there); a field not open that the snapshot does not list claims nothing either
+way. On `form-shared-id` (every field and its floating title one identifier, FE2) a pristine field's `error` assert,
+asked with the same-identifier title below it, fails, and its `snapshot` row holds the title read as its error to a
+mismatch; no tap is asked by an identifier fields share.
 `golden-spec/false-covers.ts` asks a text target (`own-parts`) by its text — Tapped, reached with no swipe — and, under
 WDA, R-dismiss of a form whose config taps its principal title (`toolbar-dismiss`, `toolbar-dismiss-bar`: a toolbar
 over the title in the tree) in place of the form's under-keyboard tap row; the façade's `formExpectations` takes the

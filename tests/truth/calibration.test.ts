@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { GoldenCheck, GoldenJson } from '../../scripts/differential/golden.js';
+import { VERBS as GOLDEN_VERBS } from '../../scripts/differential/golden-spec/judges.js';
 import { failureOf, runSide, sideLine, sideRunFromOutput, type ProcessError, type SideDeps } from '../../scripts/truth/calibrate-run.js';
 import { calibrationReport, verdictCell } from '../../scripts/truth/calibration-report.js';
 import {
@@ -34,7 +35,7 @@ import {
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, 'utf8')) as Calibration;
 const SHA = /^[0-9a-f]{7}$/;
-const VERBS = new Set(['tap', 'colour', 'scroll_until', 'fully', 'error', 'text', 'ocr']);
+const VERBS = new Set<string>(GOLDEN_VERBS);
 const captures = new Set(
   readdirSync(`${ROOT}${table.corpus}`).flatMap((run) => {
     const manifest = JSON.parse(readFileSync(`${ROOT}${table.corpus}/${run}/manifest.json`, 'utf8')) as { captures: { file: string; truth?: string }[] };
