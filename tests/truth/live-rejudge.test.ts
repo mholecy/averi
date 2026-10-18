@@ -9,8 +9,9 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; ios-vis.json and ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's) judged again by this checkout's
+ * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; ios-vis.json and
+ * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-scroll-bounded-wda-2725e76-*.json, round
+ * 5's) judged again by this checkout's
  * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
  * records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not
  * explain, no known case not intermittent ok), no case not known, and the counts of the summary's header.
