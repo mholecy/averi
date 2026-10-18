@@ -71,3 +71,8 @@ view's top moved up by any amount, its x and size the cell's.
   mid-fling) — is what this note breaks: every run reads three turns.
 - Records: docs/truth/live-records/ios-vis.json, ios-vis-b71cbbb.json (the same at round 5's src),
   ios-wda-bounded-long-list-11683c3-1…3.json.
+- Round 7 (2026-10-19, truth/r7-lab-fixes): the longer table is in — sheet-long-list 56 rows, target L at row 30 with
+  its own identifier, whole over 1172–1920, before the table's end (2772). The carry case is `carry:sheet-long-list.L`
+  (asked by id; round 6's `Row30` case gone), KNOWN as this note, with L's own scroll case: two live runs, each turned
+  three times, L's label parked above the screen as Target F's was (docs/truth/live-ios-2026-10-19-lab-fixes.md,
+  docs/truth/live-records/ios-long-list-r7-lab-1.json, -2.json).

@@ -1,5 +1,13 @@
 # TRIAGE: intermittently the lab app's SwiftUI model holds one or two characters fewer than were typed, while the field (tree and screenshot) shows them all — averi replies `Filled`; not yet known whether that is the lab app's binding or a risk on real apps
 
+> **Status (2026-10-19, round 7):** FIXED at d6e728e (truth/r7-lab-fixes) — the lab app's oracle, not averi, not the app's state.
+> `.onChange(of: values)` (the one path that reported the dictionary to the oracle) missed the last change of a burst
+> of HID keystrokes; the `@State` held every character (a submit after a loss read the full value: 5 losses of 25 raw
+> `idb ui text` runs, all five so). Forms.swift#binding now reports the field from the write itself. Measured: 25 of
+> 25 raw runs whole after the fix; live forms b1, b4, p2 ×5 under idb and WDA, 30 fills, 0 lost
+> (docs/truth/live-ios-2026-10-19-lab-fixes.md, docs/truth/live-records/ios-forms-r7-lab-1…5.json). The note's "What
+> is not known" is answered: a real app's SwiftUI form submits what the field shows; nothing for averi to settle.
+>
 > **Status (2026-10-18, round 6's iOS device check):** still OPEN, triage; recurred more often. At truth/round-6's
 > src (11683c3, docs/truth/live-records/ios-vis.json, forms group) four of its 40 cases (20 a source) lost their last character in the
 > model, read again 3 s later: `b1` (WDA) "Jan Nova", `b4` (idb) and `p2` (idb) the IBAN's last digit, `b2` (WDA)
