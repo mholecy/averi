@@ -154,11 +154,11 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       for (const e of expectations(recording.platform, t, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
         const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
         if (why !== undefined) {
-          result.checks.push(skippedCheck(recording.id, t.tag, e.verb, e.says, why));
+          result.checks.push(skippedCheck(recording.id, e.target ?? t.tag, e.verb, e.says, why));
           continue;
         }
         const outcome = await c.call(e.call, config);
-        result.checks.push(checkOf(recording.id, t.tag, e.verb, e.says, e.judge(outcome), outcome));
+        result.checks.push(checkOf(recording.id, e.target ?? t.tag, e.verb, e.says, e.judge(outcome), outcome));
       }
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.

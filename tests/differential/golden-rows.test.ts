@@ -165,6 +165,17 @@ describe('a text target is asked by its string, as the live golden and an agent 
     expect(verdict(rs, 'tap', out(NOT_FOUND))).toBeUndefined();
     expect(verdict(rs, 'scroll_until', out(NEVER, [ADB_SWIPE, ADB_SWIPE]))).toBeUndefined();
   });
+  it('under the chrome, its identifier listed: the plain stop asked by that identifier too, keyed `<tag>.id`', () => {
+    const rs = expectations('android', p({ listed: { uiautomator: true }, textListed: { uiautomator: false } }), cell, 'uiautomator');
+    const byId = rs.filter((r) => r.target === 'A.id');
+    expect(byId.map((r) => `${r.verb} ${String(r.call.args.selector)}`)).toEqual(['scroll_until id:"lab.edges.A"']);
+    // Read whole by its uncovered strip: the row is red (lab note B4-L1's plain-stop form).
+    expect(byId[0].judge(out('Element id:"lab.edges.A" fully visible after 0 swipes'))).toMatch(/^reached where it is under-chrome:pinned/);
+    expect(byId[0].judge(out('ERROR scroll_until id:"lab.edges.A" … failed', [ADB_SWIPE]))).toBeUndefined();
+    // Its node unlisted, or no text: no such row.
+    expect(expectations('android', p({ listed: { uiautomator: false } }), cell, 'uiautomator').filter((r) => r.target !== undefined)).toEqual([]);
+    expect(expectations('android', p({ text: undefined }), cell, 'uiautomator').filter((r) => r.target !== undefined)).toEqual([]);
+  });
   it('its string listed: the same replies are no answer', () => {
     const rs = expectations('android', p({ listed: { uiautomator: true }, textListed: { uiautomator: true } }), cell, 'uiautomator');
     expect(verdict(rs, 'tap', out(NOT_FOUND))).toMatch(/^not in the tree: /);

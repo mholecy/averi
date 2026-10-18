@@ -63,6 +63,12 @@ stop does: an assert that should have failed closed passes on what shows.
 
 - Kept in the bars family's KNOWN list (tests/differential/golden/bars.known.ts), the `fully` row and the colour row
   `as: bug:` this note; scripts/truth/calibration.json `B4-L1` (open) links the note to both rows.
+- The plain stop has the same form where the button covers the target's CENTRE: text-under-bar's P on Android
+  (under-chrome:pinned, its string listed by no node, its node by the strip above the button), asked by its identifier,
+  `scroll_until` stops on it with no swipe ("fully visible after 0 swipes"). Asked by its string, as an agent would, it
+  is not found — an honest answer — so the replay asks the plain stop by its identifier too (golden-spec/bars.ts, the
+  row `P.id scroll_until`, tests/differential/golden/text.known.ts `as: bug:` this note; `B4-L1` names it). A fix of
+  the `fully` path alone (ui-tree/standing.ts#fullyStanding) leaves that row red.
 - Related: docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md (a Compose row's bounds cut
   by a sticky header, fixed in d2b7744 for a header inside the row's scroll view); here the cutter is a sibling outside
   any scroll view.

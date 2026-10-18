@@ -46,6 +46,11 @@ export interface Expectation {
    * forms' rows).
    */
   asks?: TapAsk | StopAsk;
+  /**
+   * The row's target key where it is not the target's tag (golden.ts keys a row `<file> <target> <verb>`): a second row
+   * of the same verb asked another way — `<tag>.id`, a text target asked by its identifier (rows.ts#byIdentifier).
+   */
+  target?: string;
 }
 
 export const BUDGET_MS = 1_000;

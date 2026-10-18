@@ -60,6 +60,17 @@ const scrollCall = (platform: Platform, t: Pick<TargetTruth, 'id' | 'text'>, dir
 });
 
 /**
+ * A text target as a row asked BY ITS IDENTIFIER sees it (selectorOf then spells `id:"…"`): the second question a text
+ * target's identifier keeps open beside the agent's — what averi reads of the node the identifier names, which may be
+ * listed where the string is not (text-under-bar's P on Android: its node by the uncovered strip above the pinned
+ * button). A row asked so is keyed `<tag>.id` (Expectation.target).
+ */
+export function byIdentifier(t: TargetTruth): TargetTruth {
+  const { text: _text, textListed: _listed, ...rest } = t;
+  return rest;
+}
+
+/**
  * The options of a row type whose truth may allow the target missing from the tree: `absent`, why it may (the caller's,
  * target-contract.ts#askedUnlistedBy for a selector-asked row, #unlistedBy for the colour's identifier) — the row then
  * accepts a reply that never found the target, judged by what it did. One shape for every row that takes it: the tap

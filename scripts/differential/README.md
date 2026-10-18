@@ -107,7 +107,9 @@ R-stroke, R-land, R-fully, R-band, R-under-chrome, R-overlap, R-dismiss; R-direc
 asks a row marked `live`). Every tap and scroll_until row asks its target as an agent and the live golden do
 (truth.ts#selectorOf: a text target by its string, any other by its identifier; the colour assert by the identifier),
 and accepts a reply that never found it where the replayed tree does not list it as asked
-(target-contract.ts#askedUnlistedBy: a text target's string, TargetTruth.textListed). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
+(target-contract.ts#askedUnlistedBy: a text target's string, TargetTruth.textListed); a text target under the chrome
+whose identifier the tree lists is asked the plain stop by that identifier too, keyed `<tag>.id` (golden-spec/bars.ts:
+the node the identifier names may read whole where the string is not listed — lab note B4-L1). The open tap (`golden-spec/base.ts`, every family's open, uncovered whole target) asks where
 it lands: `Tapped`, every tap sent at the centre of one of the target's nodes in the replayed tree, ±1 for the tools'
 rounding (`base.ts#atProbe`, `NODE_CENTRE_SLACK`; truth.ts#nodeFramesIn reads the nodes by the selector the row asks —
 its identifier, or a text target's text — from the capture golden replays; a node counts only where its centre lies

@@ -1107,12 +1107,13 @@
       "note": "2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md",
       "status": "open",
       "verified": "golden",
-      "defect": "fully visible where it is|^passed on",
+      "defect": "fully visible where it is|^passed on|^reached where it is under-chrome",
       "checks": [
         "android-averi_lab-api33/pinned-bar.xml P fully",
-        "android-averi_lab-api33/pinned-bar.xml P colour"
+        "android-averi_lab-api33/pinned-bar.xml P colour",
+        "android-averi_lab-api33/text-under-bar.xml P.id scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD. bars.known.ts owns the ratchet; this entry only links the note to its rows (the `fully` stop, and the colour assert passing on P's uncovered part)."
+      "remark": "No fix yet: red at HEAD. bars.known.ts and text.known.ts own the ratchet; this entry only links the note to its rows (the `fully` stop, the colour assert passing on P's uncovered part, and the plain stop on text-under-bar's P — its centre under the pinned button — asked by its identifier, which reads it reached: the same uncovered-bounds form on the plain-stop path, not fullyStanding's)."
     },
     {
       "n": "F2A1",
