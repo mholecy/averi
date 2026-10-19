@@ -422,6 +422,16 @@ const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
 const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
 
 /**
+ * A presented layer named in one phrase, no parenthesis inside it — for a sentence that already sits in one (a
+ * not-found's note, ui-tree/miss.ts#missNote): a layer the source types by its kind and its label (`a dialog`,
+ * `an alert "Delete?"`), a `screen` layer, or none, `a sheet or modal`.
+ */
+export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
+  const typed = typedWords(layer);
+  return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${JSON.stringify(layer.label)}` : ''}`;
+};
+
+/**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
  * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,

@@ -1,6 +1,6 @@
 import type { UiNode } from '../adapters/types.js';
 import { presentationOf, type MarkedLayer } from './presentation.js';
-import { presentedRemedy } from './standing.js';
+import { presentedLayerName, presentedRemedy } from './standing.js';
 
 /**
  * WHAT A MISS SAW: the one decision behind every reply that says a target is not in the tree — the tap's and fill's
@@ -21,7 +21,8 @@ import { presentedRemedy } from './standing.js';
  *   has it (interact's, which words it: resolve.ts#zeroAreaHint); a tree assert or a `wait:` finds such a node;
  * - `presented`: the tree's source lists the active window only and that window is presented — listed ALONE
  *   (ui-tree/presentation.ts#Presentation.alone: Android's dialog, a sheet whose scrim the dump carries), the screen
- *   beneath unlisted: `presentedRemedy`'s words, with the layer named;
+ *   beneath unlisted: the layer named (`presentedLayerName`) and the remedy, close it first — in one phrase with no
+ *   parenthesis inside, since a one-line reply says it in one; the tap's headline keeps `presentedRemedy`'s words;
  * - `activeWindow`: the source lists the active window only (`UiNode.activeWindowOnly`, uiautomator) and marks no
  *   presented window — a sheet or a dialog it does not mark (a fully expanded bottom sheet with no scrim, form-picker;
  *   a full-screen dialog; a window against the screen's edge: ADR 0018's residuals 18 and 19) still hides the screen
@@ -38,7 +39,7 @@ export type Miss =
 /** THE hint of a miss on a tree whose source lists the active window only and marks no window presented (`Miss`'s `activeWindow`). */
 export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
 
-/** What the tree lists when it lists a presented window alone — the words both layouts of a `presented` miss share. */
+/** What the tree lists when it lists a presented window alone, as the tap's headline says it (`presentedAloneHeadline`). */
 const PRESENTED_ALONE = 'lists only the window presented on top (the tree source lists the active window alone)';
 
 /**
@@ -62,7 +63,7 @@ export function missNote(miss: Miss): string | undefined {
     case 'zeroArea':
       return miss.hint;
     case 'presented':
-      return `the tree ${PRESENTED_ALONE} — ${presentedRemedy('it', miss.layer)}`;
+      return `${presentedLayerName(miss.layer)} is presented over it, and the tree lists only that window — close it first`;
     case 'activeWindow':
       return ACTIVE_WINDOW_HINT;
     case 'unread':
@@ -85,11 +86,18 @@ export const withMissNote = (what: string, miss: Miss | undefined): string => {
   return note === undefined ? what : `${what} (${note})`;
 };
 
-/** An error whose message says a target was not in the tree, carrying what that miss saw for a one-line reader. */
-export interface CarriesMiss {
-  readonly miss: Miss;
+/**
+ * An error whose message says a target was not in the tree, carrying what that miss saw for a one-line reader (the
+ * optional step's skip, flow/engine.ts): interact's ElementNotFoundError and the engine's `wait:` timeout extend it.
+ */
+export class MissedError extends Error {
+  constructor(
+    message: string,
+    readonly miss: Miss,
+  ) {
+    super(message);
+  }
 }
 
-/** The `Miss` an error carries (`CarriesMiss`), if it carries one. */
-export const missCarried = (e: unknown): Miss | undefined =>
-  e instanceof Error && 'miss' in e && typeof (e as { miss: unknown }).miss === 'object' ? (e as Error & CarriesMiss).miss : undefined;
+/** The `Miss` an error carries (a `MissedError`), if it carries one. */
+export const missCarried = (e: unknown): Miss | undefined => (e instanceof MissedError ? e.miss : undefined);

@@ -18,7 +18,6 @@ import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, n
 import { readFileSync } from 'node:fs';
 import { parseDump } from '../helpers/android-dumps.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
-import { presentedRemedy } from '../../src/ui-tree/standing.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -2069,6 +2068,17 @@ flows:
       expect(await skipOf(formPicker(), 'scroll_until: { element: { id: lab.form-picker.nope }, maxSwipes: 1 }')).toEqual([`skipped step (not present) (${ACTIVE_WINDOW_HINT})`]);
     });
 
+    // A target matched only at 0×0 is absence too ("(not present)"), and the skip says what the wait's message says
+    // beneath it (ui-tree/miss.ts's zero-area note): it may be scrolled off — scroll_until it first.
+    it('an optional tap whose target matched only 0×0 nodes: skipped (not present) with the zero-area note after it', async () => {
+      resetLayout();
+      const fake = new FakeAdapter({ s: screen(node({ identifier: 'ghost', rect: { x: 0, y: 0, width: 0, height: 0 } })) }, 's');
+      expect(await skipOf(fake, 'tap: { id: ghost }')).toEqual([
+        'skipped id:"ghost" (not present) (it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first)',
+      ]);
+      expect(fake.taps).toEqual([]);
+    });
+
     it('…not on a tree listing every window', async () => {
       const { activeWindowOnly: _, ...everyWindow } = formPickerTree();
       expect(await skipOf(new FakeAdapter({ sheet: everyWindow }, 'sheet'), 'tap: { id: lab.form-picker.name }')).toEqual(['skipped id:"lab.form-picker.name" (not present)']);
@@ -2093,7 +2103,7 @@ flows:
       const error = (await FlowEngine.run(flow, fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
       expect(error.message.split('\n').slice(0, 2)).toEqual([
         'Timed out after 20ms waiting for element id:"lab.alert-dim.A"',
-        `  (the tree lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })})`,
+        '  (a dialog is presented over it, and the tree lists only that window — close it first)',
       ]);
     });
 

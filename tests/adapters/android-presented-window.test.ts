@@ -317,9 +317,9 @@ describe('what a miss saw (ui-tree/miss.ts): one decision, one wording', () => {
   });
 
   it('the words: the presented remedy for a window listed alone, the hint for an unmarked one, nothing for unread or none', () => {
-    expect(missNote({ of: 'presented', layer: { kind: 'dialog' } })).toBe(
-      `the tree lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}`,
-    );
+    expect(missNote({ of: 'presented', layer: { kind: 'dialog' } })).toBe('a dialog is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'screen' } })).toBe('a sheet or modal is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'dialog', label: 'Delete?' } })).toBe('a dialog "Delete?" is presented over it, and the tree lists only that window — close it first');
     expect(missNote({ of: 'activeWindow' })).toBe(ACTIVE_WINDOW_HINT);
     expect(missNote({ of: 'zeroArea', hint: 'h' })).toBe('h');
     expect(missNote({ of: 'unread' })).toBeUndefined();
@@ -332,7 +332,7 @@ describe('what a miss saw (ui-tree/miss.ts): one decision, one wording', () => {
 describe('a not-found on a tree listing a presented window alone says the presented remedy, wherever it is said', () => {
   const verifier = (tree: UiNode) => new Verifier(new FakeAdapter({ s: tree }, 's'), { pollMs: 2, timeoutMs: 30 });
   const NOT_FOUND = `not found within ${formatSeconds(30)}`;
-  const presentedNote = (layer: { kind: 'dialog' | 'screen' }) => `the tree lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', layer)}`;
+  const presentedNote = (layer: { kind: 'dialog' | 'screen' }) => (layer.kind === 'dialog' ? 'a dialog is presented over it, and the tree lists only that window — close it first' : 'a sheet or modal is presented over it, and the tree lists only that window — close it first');
 
   it('alert-dim: the element and color asserts on a target beneath the dialog say a dialog is presented over it — not the generic hint', async () => {
     const v = verifier(capture('alert-dim'));

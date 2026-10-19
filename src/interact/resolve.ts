@@ -1,7 +1,7 @@
 import type { DeviceAdapter, Selector, UiNode } from '../adapters/types.js';
 import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
 import type { Edge } from '../ui-tree/geometry.js';
-import { missNote, missOf, presentedAloneHeadline, type CarriesMiss, type Miss } from '../ui-tree/miss.js';
+import { MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findAll, findBySpec, preferInteractive } from '../ui-tree/selectors.js';
 import { SIDES } from './swipe.js';
@@ -162,14 +162,7 @@ export class AmbiguityRefusal extends Error {}
  * one-line skip, "(not present)", which says it after the words
  * (`absenceError` sets it from the wait's evidence).
  */
-export class ElementNotFoundError extends Error implements CarriesMiss {
-  constructor(
-    message: string,
-    readonly miss: Miss,
-  ) {
-    super(message);
-  }
-}
+export class ElementNotFoundError extends MissedError {}
 
 export interface ResolveOptions {
   ambiguous: Ambiguity;

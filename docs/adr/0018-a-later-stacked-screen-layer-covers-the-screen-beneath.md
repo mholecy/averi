@@ -814,13 +814,18 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    step's skip, `(not present) (…)`, and a skipped `wait:`'s `Timed out … (…)`, read off the `Miss` the error carries,
    `missCarried`), or — the tap's and fill's wait on a `presented` miss only — in place of the headline
    (`presentedAloneHeadline`, decision 4's words unchanged). So beneath a dialog or a sheet the tree lists alone the
-   asserts and a `wait:` now say decision 4's remedy, as the tap does, and the hint where the tree marks no window. Not
+   asserts and a `wait:` now say decision 4's remedy, as the tap does, in one phrase with no parenthesis inside (it sits
+   in one): `(a dialog is presented over it, and the tree lists only that window — close it first)`, a sheet `a sheet
+   or modal is presented over it, …` (round 2, the orchestrator's MINOR-B); and the hint where the tree marks no
+   window. An optional step skipped on a zero-area match says that note too, `(not present) (it matched only 0×0
+   nodes … — if it is in a scroll view, scroll_until it first)` — kept on purpose: the agent learns to scroll first. Not
    carried: an assert whose element is found with the wrong content, an absent assert, a `wait:` on a state, a wait
    whose last tree was bare (its note claims the line). Golden (truth/round-7 4130201, `--side` this branch): 1380
    checks, 251 mismatches before and after; wording only, the 23 Android colour rows that end `not found within 1 s`
-   — alert-dim A–D and sheet-medium A–D the presented remedy, bottom-sheet-dialog A–D, dialog-fullscreen A–D,
+   — alert-dim A–D and sheet-medium A–D the presented remedy (golden rerun after the rewording: below), bottom-sheet-dialog A–D, dialog-fullscreen A–D,
    carousel-in-list B and U, scroll-bounded F and O, scroll-top-edge(-end) A and tabbar-floating F the hint; no class,
-   kind or device call moved, and every tap, fill and `scroll_until` reply is byte-identical.
+   kind or device call moved, and every tap, fill and `scroll_until` reply is byte-identical. Rerun after the rewording
+   (truth/round-7 5c71158): 1410 checks, 259 mismatches before and after, the same 23 rows, wording only.
    Live on averi_lab 2026-10-19 (docs/truth/live-android-2026-10-19-hint-everywhere.md): form-picker c2–c4 ok; under
    its sheet the element, text and color asserts, a flow's `wait:` and an optional tap each said it once, nothing fired;
    again at e726c77 with the module, plus an optional `wait:` (the hint after its headline) and alert-dim's A (the

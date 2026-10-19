@@ -64,3 +64,11 @@ averi_lab (same boot flags, same installed lab app), src e726c77 through `--side
   - `wait:` on A: `Timed out after 3000ms waiting for element id:"lab.alert-dim.A"` with that parenthesis beneath;
   - the tap, unchanged: `Timed out after 5000ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first`.
   Each says "close it first" once; no reply on alert-dim carries the generic hint.
+
+**Reworded since (round 2 review, MINOR-B), after these records:** the note on a window listed alone is now one phrase
+with no parenthesis inside — `(a dialog is presented over it, and the tree lists only that window — close it first)`,
+a sheet `(a sheet or modal is presented over it, and the tree lists only that window — close it first)` — in place of
+the `(the tree lists only the window presented on top (the tree source lists the active window alone) — a dialog is
+presented over it — close it first)` the alert-dim replies above (and the e726c77 record) quote. The tap's headline,
+the form-picker replies and the active-window hint are unchanged; the records predate the rewording and were not
+re-run (golden carries the new words: alert-dim and sheet-medium A–D colour).

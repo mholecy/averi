@@ -361,13 +361,11 @@ describe('tool descriptions on a screen presented over the target', () => {
     );
   });
 
-  it('tap, assert and the troubleshooting reference: an assert and a flow\'s wait: beneath a window listed alone say the presented remedy, as the tap does', async () => {
-    const { presentedRemedy } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
-    const note = `the tree lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}`;
-    // The descriptions quote the remedy through standing.ts (mocked above to its placeholder); the reference spells it.
-    const quoted = '<the presented remedy, as ui-tree/standing.ts renders it of "it" under an dialog titled undefined>';
-    expect(description('assert')).toContain(`the parenthesis names it instead: "(the tree lists only the window presented on top (the tree source lists the active window alone) — ${quoted})"`);
-    expect(description('tap')).toContain(`(a flow's wait: on an element says "(the tree lists only the window presented on top … — ${quoted})" beneath its "Timed out …", every assert's "not found within …" after it)`);
+  it('tap, assert and the troubleshooting reference: an assert and a flow\'s wait: beneath a window listed alone say the presented remedy, as the tap does', () => {
+    // The note is miss.ts's (missNote, quoted by the descriptions from its owner), one phrase with no parenthesis inside.
+    const note = 'a dialog is presented over it, and the tree lists only that window — close it first';
+    expect(description('assert')).toContain(`the parenthesis names it instead: "(${note})"`);
+    expect(description('tap')).toContain(`(a flow's wait: on an element says "(${note})" beneath its "Timed out …", every assert's "not found within …" after it)`);
     expect(TROUBLESHOOTING).toContain(`An assert's \`not found within …\` and a flow's \`wait:\` on an element say the same remedy, in their parenthesis: \`(${note})\``);
   });
 

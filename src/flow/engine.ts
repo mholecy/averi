@@ -12,7 +12,7 @@ import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
-import { missCarried, missNote, missOf, withMissNote, type CarriesMiss, type Miss } from '../ui-tree/miss.js';
+import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
@@ -378,14 +378,7 @@ type TimeoutHint = (lastTree: UiNode | undefined) => { hint?: string; miss?: Mis
  * A `wait:` on an element that timed out with what its last read saw said beneath its headline (ui-tree/miss.ts):
  * it carries that miss, so an optional step's one-line skip says it too (`skipReason`).
  */
-class WaitMissedError extends Error implements CarriesMiss {
-  constructor(
-    message: string,
-    readonly miss: Miss,
-  ) {
-    super(message);
-  }
-}
+class WaitMissedError extends MissedError {}
 
 /**
  * An optional step's skip reason when it is not "(not present)": the
