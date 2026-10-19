@@ -1075,9 +1075,10 @@ and laid so read as the sheet dialog.
    dismissed: it has no outside). A Views `BottomSheetDialog`'s `touch_outside` is UNLABELLED (`NAF="true"`) and both it
    and the sheet are laid between the bars (`[0,66]…[…,2154]` in a window `[0,0][1080,2220]`), so the scrim rule does not
    hold, labelled or not; worse than a timeout, `scroll_until` for a target beneath the scrim strokes up from (540,444),
-   on the scrim, DISMISSES the sheet and reports the target "fully visible after 1 swipe" — lab note LW1, open, with a
-   src proposal: mark the window by Material's own view ids (`…:id/touch_outside` followed by `…:id/design_bottom_sheet`),
-   read against the scrim's edges, not the window's.
+   on the scrim, DISMISSES the sheet and reports the target "fully visible after 1 swipe" — lab note LW1, fixed at
+   25da22d4 (the amendment "a Views BottomSheetDialog by Material's ids": the window marked by Material's own view ids,
+   `…:id/touch_outside` followed by `…:id/design_bottom_sheet`, read against the scrim's edges, not the window's; live
+   13/13 ok in three runs, docs/truth/live-records/android-vis-sheet-dialog-run1…3.json).
 
 ## Bug notes
 

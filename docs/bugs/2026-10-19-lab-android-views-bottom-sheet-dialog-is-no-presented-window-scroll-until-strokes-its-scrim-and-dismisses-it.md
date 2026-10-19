@@ -1,12 +1,16 @@
 # BUG: a Views `BottomSheetDialog` is no presented window on uiautomator — `scroll_until` for a target beneath it strokes its `touch_outside` scrim, dismisses the sheet and reports the target "fully visible"
 
-> **Status (2026-10-19):** open; measured on the lab (round 7, T2). KNOWN as this note: its 8 replayed rows
-> (tests/differential/golden/presented.known.ts, `bottom-sheet-dialog.xml` A–D tap and scroll_until; the four colour
-> rows are KNOWN as no note's, `not in the tree`, as alert-dim's) and its four
-> live scroll cases (scripts/truth/live-known.ts, `android uiautomator scroll:bottom-sheet-dialog.A`–`D`). A src
-> proposal below (the window CAN be marked from the dump, by Material's own view ids); not scheduled from the truth
-> branch. The full-screen Compose dialog measured beside it has no such signal: ADR 0018's residual 19 stands for it
-> (below, "The full-screen dialog").
+> **Status (2026-10-19):** fixed at 25da22d4 (arch/r23-sheet-dialog; f924893e the fix) — the uiautomator parser marks
+> the window a `screen` by Material's ids (src/adapters/android.ts#materialSheetDialog: `…:id/touch_outside` followed by
+> `…:id/design_bottom_sheet` under `…:id/coordinator`, read against the scrim's edges; ADR 0018's amendment "a Views
+> BottomSheetDialog by Material's ids"). Measured: golden 8 rows green, every other row byte-identical; live on
+> averi_lab ×3 (docs/truth/live-records/android-vis-sheet-dialog-run{1,2,3}.json), 13/13 ok each — taps refused with
+> the presented remedy, scroll_until stopped before any swipe, the sheet not dismissed. The colour 4 stay KNOWN `not in
+> the tree` as no note's. The full-screen dialog stays residual 19 (below, "The full-screen dialog").
+> Was: open, measured on the lab (round 7, T2), KNOWN as this note — its 8 replayed rows
+> (tests/differential/golden/presented.known.ts, `bottom-sheet-dialog.xml` A–D tap and scroll_until) and its four live
+> scroll cases (scripts/truth/live-known.ts, `android uiautomator scroll:bottom-sheet-dialog.A`–`D`), struck off at
+> the merge into truth/round-7; calibrated in scripts/truth/calibration.json.
 
 Lab note LW1. **Found 2026-10-19** by round 7's lab cells for ADR 0018's residual 19 (docs/plans/2026-10-15-ground-truth-lab-app.md,
 "Round 7"): `presented/bottom-sheet-dialog` and `presented/dialog-fullscreen` (fixtures/apps/android/…/Presented.kt

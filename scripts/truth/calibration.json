@@ -1231,7 +1231,12 @@
     {
       "n": "LW1",
       "note": "2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": [
+        "f924893"
+      ],
+      "before": "054a59f",
+      "after": "f924893",
       "verified": "golden",
       "defect": "to appear$|active-window hint|never appeared in the tree",
       "checks": [
@@ -1244,7 +1249,7 @@
         "android-averi_lab-api33/bottom-sheet-dialog.xml D tap",
         "android-averi_lab-api33/bottom-sheet-dialog.xml D scroll_until"
       ],
-      "remark": "No fix yet (round 7, T2): red at HEAD — a Views BottomSheetDialog's window is listed alone and left unmarked (its touch_outside scrim unlabelled, NAF, laid between the bars), so the taps time out with the active-window hint and scroll_until strokes it twice. The colour rows are no note's (not in the tree: vacuous, as alert-dim's). presented.known.ts owns the ratchet; the note proposes marking it by Material's view ids (touch_outside, design_bottom_sheet). Live: scripts/truth/live-known.ts SHEET_DIALOG (scroll:bottom-sheet-dialog.A–D — A and B dismiss the sheet and report the target fully visible)."
+      "remark": "Fixed by round 7's A7, f924893 on arch/r23-sheet-dialog (adapters/android.ts#presentedWindow asks the window of an ordered list of named recognizers, and #materialSheetDialog — Material's touch_outside followed by design_bottom_sheet under a coordinator, read by the ids' entries against the scrim's edges — is one; ADR 0018's amendment \"a Views BottomSheetDialog by Material's ids\"), its ADR amended at 25da22d4, merged into arch/round-23 as 3ec1f26: the pair is f924893 itself and its parent 054a59f (a docs commit over round 6's src 565bcb9, LW1's note carried). Before: the taps time out \"to appear\" with the active-window hint, scroll_until strokes the window twice and says it never appeared in the tree with the hint; after: each tap's wait says the presented remedy, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous; with ui-tree/miss.ts its miss now says the presented remedy). Live: the four scroll cases struck off scripts/truth/live-known.ts — round 7's A7 run three times (docs/truth/live-records/android-vis-sheet-dialog-run1…3.json), 13/13 ok each, the sheet never dismissed."
     },
     {
       "n": "LR1",
