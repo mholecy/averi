@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-vis-parked.json, round 7's A2; ios-wda-stop-carousel-r23-*.json, ios-vis-r23-ios-stop-e687fe83.json,
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
+ * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's;
  * ios-scroll-bounded-wda-2725e76-*.json, round 5's) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
@@ -45,10 +46,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // the turn of scroll-collapsing's A (#10's, known until then) ok since the owner's decision of 2026-10-18 (ADR 0021:
     // no turn on uiautomator, a loud failure naming `up` after the two-stroke stop — live-visibility.ts#judgeAndroidTurn)
     ['android-vis.json', 'visibility', { cases: 111, ok: 98, loud: 3, mismatches: 10 }],
-    // …with the forms cases: k3 (a fill into note's 14-px strip under the bar) ok since the same day's decision —
-    // refused by design, the field untouched (live.ts k3); k7's stop ok (18 px of phone under the bar's node-less
-    // padding: a known residual, ADR 0013's); b1d and b7 (F2A2) LOUD
-    ['android-vis.json', 'forms,visibility', { cases: 133, ok: 118, loud: 5, mismatches: 10 }],
     // round 6's closing review: the active-window hint run live (src and lab app ea070d2) — form-picker's c2–c4 ok with
     // the hint beneath the wait, scroll-bounded O and F LV1's, turn F LOUD, L1's 16 presented cases ok without it
     ['android-vis-hint-ea070d2.json', 'forms,visibility', { cases: 24, ok: 21, loud: 1, mismatches: 2 }],
@@ -123,6 +120,15 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-sheet-a5-2.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
     // …and the whole visibility group under idb once: sheet-medium-edges' H and G ok too
     ['ios-idb-vis-a5.json', 'visibility', { cases: 145, ok: 100, loud: 8, mismatches: 37 }],
+    // round 7's A6 (src arch/r23-eyes through --side; docs/truth/live-android-2026-10-18-visibility.md): k7 with the
+    // eyes — "visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px …", the band
+    // named, ok — three runs, once more after its review round 1; and the forms group once (b1d, b7 LOUD: adb's input
+    // text has no non-ASCII)
+    ['android-k7-eyes-1.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
+    ['android-k7-eyes-2.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
+    ['android-k7-eyes-3.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
+    ['android-k7-eyes-r1.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
+    ['android-forms-eyes.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -196,6 +202,28 @@ describe('live.ts --rejudge over the committed iOS records of the src before A5\
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknownIds.length} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual([...unknownIds].sort());
+    expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the committed Android records of the src before A6\'s fix (round 7\'s eyes on a "fully" claim)', () => {
+  // k7: scroll_until phone under the bar riding on the IME. Its stop said "fully visible" with 18 px of phone under the
+  // bar's node-less padding — ok by an allowance (ADR 0013's residual) until round 7's A6 made averi name the band
+  // ("PARTLY UNDER a surface …") and live-forms.ts#judgePhoneScroll ask it. A forms case has no KNOWN: in these records,
+  // each an older src's, k7 reads a MISMATCH not known — a calibration of that src now: exit 1, as recorded.
+  it.each([
+    // round 6's device check (src e98b87e) with the forms cases: k3 (a fill into note's 14-px strip under the bar) ok
+    // since the owner's decision of 2026-10-18 — refused by design, the field untouched (live.ts k3); b1d and b7
+    // (F2A2) LOUD. (Its visibility group alone is pinned above.)
+    ['android-vis.json', 'forms,visibility', { cases: 133, ok: 117, loud: 5, mismatches: 11 }],
+    // A6's own run of k7 at its base, arch/round-23 bd43fc66, before the eyes
+    ['android-k7-eyes-before-bd43fc66.json', 'forms', { cases: 1, ok: 0, loud: 0, mismatches: 1 }],
+  ] as const)('%s (--groups %s): k7 not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
+    const { code, out } = await rejudge(record, groups);
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(1 not known\\), 0 skipped$`, 'm'));
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown).toEqual(['k7']);
+    expect(out).toMatch(/^- MISMATCH k7 .*fully visible after 1 swipe — 18 px of phone under the bar, unsaid/m);
     expect(code).toBe(1);
   });
 });

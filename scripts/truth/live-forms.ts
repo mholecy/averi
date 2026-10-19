@@ -62,10 +62,15 @@ export function judgeNoteFill(s: LabState, replies: string[], source: string, la
 
 /**
  * k7: scroll_until phone, under the bar riding on the IME. Where the app lays phone out when scroll_until returns: its
- * centre under the bar (the surface with no node) or the IME is no stop; clear of both, a stop is right — and what of
- * it the bar's top padding still covers is said: a `fully visible` there overstates by those px, ADR 0013's accepted
- * residual (the tree has no node for the padding).
+ * centre under the bar (the surface with no node) or the IME is no stop; clear of both, a stop is right — and where the
+ * bar's top padding still covers part of it, by the app's frames, the reply must say so: "PARTLY UNDER a surface the
+ * tree does not list" (src/ui-tree/eyes.ts's band, read from one screenshot: round 7's A6, ADR 0013 refined). A stop
+ * that leaves the band unsaid — "fully visible", or a plain "visible" — is a MISMATCH: the tree has no node for the
+ * padding, so the claim overstates by what it covers (ADR 0013's residual until the eyes, no allowance since).
  */
+/** The eyes' band over a stop's target, in the reply's words (src/ui-tree/eyes.ts): "PARTLY UNDER a surface …". */
+const BAND_SAID = /\bPARTLY UNDER a surface\b/;
+
 export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string, launched: LabState): LiveVerdict {
   const submits = (s.submits ?? []).length;
   const touches = touchesSince(s, launched);
@@ -80,8 +85,8 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
   const where = phone == null ? 'phone not laid out' : `phone ${phone.y}–${phone.y + phone.height} (launched ${launched.frames.phone?.y ?? '?'}), ${covered} px of it under the bar`;
   if (replyKind(reply) === 'visible') {
     if (under(bar) || under(ime) || phone == null) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — phone's centre lies under the ${under(bar) ? 'bar' : 'IME'}; ${where}; ${strokes}` };
-    const overstates = covered > 0 && /fully visible/.test(reply) ? ` — "fully" overstates by ${covered} px (ADR 0013 residual)` : '';
-    return { outcome: 'ok', why: `stopped with phone's centre clear of the bar and the IME (${where}); ${strokes}: ${short(reply)}${overstates}` };
+    if (covered > 0 && !BAND_SAID.test(reply)) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — ${covered} px of phone under the bar, unsaid (no PARTLY UNDER a surface); ${where}; ${strokes}` };
+    return { outcome: 'ok', why: `stopped with phone's centre clear of the bar and the IME (${where}); ${strokes}: ${short(reply)}` };
   }
   return { outcome: 'ok', why: `no stop, nothing submitted (${where}); ${strokes}: ${short(reply)}` };
 }

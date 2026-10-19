@@ -6,7 +6,8 @@ import type { LabState } from '../../scripts/truth/schema.js';
 
 // Lab note F2A1's live form cases (scripts/truth/live-forms.ts), over the committed record of round 6's Android device
 // check (docs/truth/live-records/android-vis.json, src e98b87e): k3, a fill into note once back hid the IME — refused
-// by design (the owner's decision of 2026-10-18, ADR 0013) — and k7, scroll_until phone under the bar riding on the IME.
+// by design (the owner's decision of 2026-10-18, ADR 0013) — and k7, scroll_until phone under the bar riding on the IME
+// (with round 7's A6 record of it, android-k7-eyes-1.json).
 
 type Rec = { results: { id: string; source: string; replies: string[]; launched: LabState; state: LabState }[] };
 const record = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-vis.json', import.meta.url), 'utf8')) as Rec;
@@ -38,14 +39,26 @@ describe('k3: a fill into note, a strip under the bar — refused by design', ()
   });
 });
 
-describe('k7: scroll_until phone — the stop ok, "fully" overstating by what the bar\'s padding covers', () => {
+describe('k7: scroll_until phone — a stop with phone partly under the bar\'s padding must say so', () => {
+  // Round 7's A6 (the eyes on a "fully" claim): averi names the band the bar's node-less padding draws over phone's
+  // bottom (docs/truth/live-records/android-k7-eyes-1.json, its src's); before it, "fully visible" overstated by the
+  // 18 px the app's frames put under the bar — an accepted residual (ADR 0013) until the eyes, a MISMATCH since.
+  const eyes = (JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-k7-eyes-1.json', import.meta.url), 'utf8')) as Rec).results.find((r) => r.id === 'k7')!;
   const { replies, launched, state } = k('k7');
-  it('the record: ok, the 18 px under the bar said', () => {
-    expect(judgePhoneScroll(state, replies, 'uiautomator', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/18 px of it under the bar.*— "fully" overstates by 18 px \(ADR 0013 residual\)$/) });
-    expect(judgePhoneScroll(state, replies, 'uiautomator', launched).why).toContain('; 1 stroke(s) the app logged at (540,1034): ');
+  it('the eyes\' record: the band named, phone\'s centre clear — ok', () => {
+    expect(judgePhoneScroll(eyes.state, eyes.replies, 'uiautomator', eyes.launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/18 px of it under the bar.*: Element id:"lab\.form-keyboard\.phone" visible after 1 swipe — PARTLY UNDER a surface the tree does not list: /) });
+    expect(judgePhoneScroll(eyes.state, eyes.replies, 'uiautomator', eyes.launched).why).toContain('; 1 stroke(s) the app logged at (540,1034): ');
+  });
+  it('round 6\'s record: "fully visible" with 18 px under the bar — MISMATCH, the band unsaid', () => {
+    expect(judgePhoneScroll(state, replies, 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi says Element id:"lab\.form-keyboard\.phone" fully visible after 1 swipe — 18 px of phone under the bar, unsaid \(no PARTLY UNDER a surface\); /) });
+  });
+  it('a plain "visible" with phone under the bar is no answer either; clear of the bar no band is asked', () => {
+    expect(judgePhoneScroll(eyes.state, ['Element id:"lab.form-keyboard.phone" visible after 1 swipe'], 'uiautomator', eyes.launched).outcome).toBe('MISMATCH');
+    const clear = { ...eyes.state, frames: { ...eyes.state.frames, phone: { ...eyes.state.frames.phone!, y: 1100 } } };
+    expect(judgePhoneScroll(clear, replies, 'uiautomator', eyes.launched).outcome).toBe('ok');
   });
   it('a submit: MISMATCH', () => {
-    expect(judgePhoneScroll({ ...state, submits: [{ at: 1 }] } as LabState, replies, 'uiautomator', launched).outcome).toBe('MISMATCH');
+    expect(judgePhoneScroll({ ...eyes.state, submits: [{ at: 1 }] } as LabState, eyes.replies, 'uiautomator', eyes.launched).outcome).toBe('MISMATCH');
   });
 });
 
