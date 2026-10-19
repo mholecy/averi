@@ -6,6 +6,7 @@ import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, resolvePresent, type Ambiguity, type RefusedOnPresentElement } from '../interact/resolve.js';
 import { movedTapText } from '../interact/tap-judgement.js';
 import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
@@ -1181,6 +1182,8 @@ export class FlowEngine {
     // next device run should look at `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
+      // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
+      eyes: eyesOn(this.adapter),
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),
     });
     // ⚠ for a clipped stop, and (2026-10-08) for one the `unlocated`

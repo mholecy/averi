@@ -1,12 +1,14 @@
-import type { ClippedSide, DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
+import type { ClippedSide, DeviceScreen, Point, Rect, Stroke, UiNode } from '../adapters/types.js';
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
+import { eyesQuestion, type EyesAnswer, type EyesFinding, type EyesQuestion, type SurfaceFinding } from '../ui-tree/eyes.js';
+import { tapPoint } from '../ui-tree/selectors.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
-import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
+import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedEnd, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
@@ -38,8 +40,9 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  * - Each round the driver reads the tree once and calls `round` with what it
  *   saw. A step `ask` changes nothing — `state` comes back as it went in —
  *   and the driver calls `round` again with the SAME seen plus the answer
- *   (`corroborated` for `witness`, `unlocated` for `unlocated`); a round asks
- *   at most once of each, the witness first. That re-entry is what keeps the
+ *   (`corroborated` for `witness`, `unlocated` for `unlocated`, `eyes` for
+ *   `eyes` — its question carried by the step, ui-tree/eyes.ts); a round asks
+ *   at most once of each, the witness first, the eyes last. That re-entry is what keeps the
  *   reducer free of async: the two questions cost a device query each on
  *   Android. Which read asks the witness is
  *   interact/scroll-read.ts#judgeRead's rule; the probe's late witness and
@@ -58,7 +61,9 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead);
  * motion observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
- * PROBE_REACH; then `ask unlocated` on a `fully: true` stop with no cover under it); stuck; the confirming read, or the
+ * PROBE_REACH; then `ask unlocated` on a `fully: true` stop with no cover under it; then `ask eyes` on a stop that would
+ * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
+ * stuck; the confirming read, or the
  * read after a probe, that did not read; covered (nothing above the band); the end turn (`EndTurn`), which takes an
  * exhaustion it applies to out of the bound; the bound (exhausted, maxSwipes, deadline — and `ask unlocated` of a round
  * that read); the stroke. The witness comes before the deadline is consulted, so a witness that waits out its 2 s
@@ -111,6 +116,8 @@ export interface RoundSeen {
   corroborated?: boolean;
   /** The answer to `ask unlocated`: the round's keyboard reading's `unlocated()`. */
   unlocated?: boolean;
+  /** The answer to `ask eyes`: what the eyes saw of the step's question (ui-tree/eyes.ts). */
+  eyes?: EyesAnswer;
   /** ms since the scroll began (after the device's screen was read), stamped on every call — re-entry included. */
   elapsedMs: number;
   /**
@@ -136,6 +143,8 @@ type ThisRead = Pick<ReadJudgement, 'facts' | 'frames' | 'uncutFrames'> & { read
 export type RoundStep =
   /** Answer, then call `round` again with the same seen and the answer; the state is unchanged. */
   | { do: 'ask'; what: 'witness' | 'unlocated' }
+  /** Look (ui-tree/eyes.ts): ask the eyes `question` — one screenshot — and call `round` again with the same seen and the answer (`eyes`); the state is unchanged. */
+  | { do: 'ask'; what: 'eyes'; question: EyesQuestion }
   /** Settle, read again, send nothing — a confirming read (SETTLE_CONFIRM_READS), or a confirming read that did not read, read again. */
   | { do: 'confirm' }
   /**
@@ -194,7 +203,7 @@ export type RoundStep =
  * first (`DetentMove`).
  */
 export type ScrollOutcome = (
-  | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush }
+  | { kind: 'visible'; swipes: number; judged: Judged; settled: boolean; unlocated: boolean; flush?: Flush; eyes?: EyesFinding }
   | {
       kind: 'stuck';
       swipes: number;
@@ -626,6 +635,13 @@ interface State {
   readonly swipes: number;
   /** A `stop` was returned: no further round. */
   readonly done: boolean;
+  /**
+   * The last `fully: true` claim the eyes refused (THE EYES, `round`): the question's region and neighbour, and the
+   * shortfall it left. A read after the next stroke that finds both where they were is refused again at once — no
+   * confirming read, no second screenshot: nothing moved, so the pixels did not — and is that stroke's read, which
+   * the stuck test counts. Undefined until a refusal.
+   */
+  readonly eyesRefused: EyesRefusal | undefined;
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
   readonly owesDrawn: boolean;
   /**
@@ -789,6 +805,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     prevKey: undefined,
     inFrameAfter: undefined,
     probe: undefined,
+    eyesRefused: undefined,
     inTreeAfter: undefined,
     lastPast: undefined,
     lastSent: undefined,
@@ -1257,6 +1274,35 @@ const motionOf = (from: Rect, to: Rect): number => Math.max(Math.abs(to.x - from
 /** The same size within a pixel each way: a node that grew or shrank (a header collapsing) did not just move. */
 const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 
+/** A claim the eyes refused (`State.eyesRefused`): the question's region and its neighbours' rects, and the shortfall it left. */
+interface EyesRefusal {
+  readonly region: Rect;
+  readonly neighbours: readonly Rect[];
+  readonly short: Extract<InFrameShort, { of: 'unlisted' }>;
+}
+
+/** The question asks of the target and neighbours the refusal was made of, each within a pixel: nothing moved, so the pixels did not. */
+const sameAsked = (refused: EyesRefusal, q: EyesQuestion): boolean =>
+  sameRectWithinPixel(refused.region, q.region) && refused.neighbours.length === q.flush.length && q.flush.every((f, i) => sameRectWithinPixel(refused.neighbours[i]!, f.by.rect));
+
+/**
+ * The band reaches the centre the next tap presses (selectors.ts#tapPoint) along its edge's axis — measured from the
+ * edge of `region` (the question's) inward by its depth: the bar's padding over a 42-px label 23 px deep from its bottom
+ * (1971–1993 of 1952–1993) reaches its centre at 1973.
+ */
+function bandOverCentre({ edge, depth }: SurfaceFinding, region: Rect, centre: Point): boolean {
+  switch (edge) {
+    case 'bottom':
+      return region.y + region.height - depth <= centre.y;
+    case 'top':
+      return region.y + depth > centre.y;
+    case 'right':
+      return region.x + region.width - depth <= centre.x;
+    case 'left':
+      return region.x + depth > centre.x;
+  }
+}
+
 /** How far `to` lies from `from` the way content moves for a stroke toward `toward` (for `down`, up the screen): negative when the other way. */
 function motionToward(from: Rect, to: Rect, toward: Direction): number {
   switch (toward) {
@@ -1338,8 +1384,18 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (now !== undefined) s.presentedHold = undefined;
   const answersBack = now !== undefined && current === 'stroke' && s.backPending;
   if (answersBack) s.backPending = false;
+  // A band the eyes saw that refuses the stop (THE EYES, below): no stop, the shortfall the stuck and bound failures name.
+  let unlisted: Extract<InFrameShort, { of: 'unlisted' }> | undefined;
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
-    if (stops(best)) {
+    // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
+    const { facts } = best.standing;
+    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.length > 0 }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
+    // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
+    // last refused them — no confirm, no screenshot; this stroke's read, short as before.
+    const refused = s.eyesRefused;
+    const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameAsked(refused, question);
+    if (refusedAgain) unlisted = { ...refused.short, judged: best };
+    if (stops(best) && !refusedAgain) {
       // The probe moved nothing: the match is where it was sent from — the
       // stop holds (it held still through a stroke), and nothing lies
       // beyond its flush edge.
@@ -1369,7 +1425,22 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         if (seen.unlocated === undefined) return ask('unlocated');
         unlocated = seen.unlocated;
       }
-      return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }) });
+      // THE EYES CONFIRM A FULLY CLAIM (ui-tree/eyes.ts), last: a stop that would say "fully visible" — nothing of it
+      // clipped, nothing listed over it — on a target with a flush neighbour narrower than the screen
+      // (ui-tree/eyes.ts#eyesQuestion) is looked at once, one screenshot, before it is claimed; every other stop asks
+      // nothing. A band of a surface the tree does not list is no stop under `fully: true`, nor — as a cover over its
+      // centre is not (ui-tree/standing.ts#Scene.standing) — for the plain stop when it reaches the centre the next tap
+      // presses: the strokes go on as for a cover (bounded as every round is), and the stuck or bound failure names it
+      // (`unlisted`). A band short of the centre: the plain stop stops and says what lies over it. What the eyes could
+      // not judge is said with the tree's claim.
+      const eyes = question === undefined ? undefined : seen.eyes;
+      if (question !== undefined && eyes === undefined) return { state, step: { do: 'ask', what: 'eyes', question } };
+      const finding: EyesFinding | undefined = eyes === undefined || eyes.sees === 'own' ? undefined : eyes;
+      if (finding?.sees !== 'surface' || !(fully || bandOverCentre(finding, question?.region ?? best.node.rect, tapPoint(best.node)))) {
+        return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }), ...(finding !== undefined && { eyes: finding }) });
+      }
+      unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
+      if (question !== undefined) s.eyesRefused = { region: { ...question.region }, neighbours: question.flush.map((f) => ({ ...f.by.rect })), short: unlisted };
     }
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
@@ -1408,10 +1479,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const stuckOn = backUnmoved ? s.stuckOn : observed.stuck ? s.lastStroke : undefined;
     if (stuckOn !== undefined) {
       const { sliver } = best.standing.facts;
-      const outward = !fully && sliver !== undefined && SIDES[sliver.edge].reveals === stuckOn;
+      // Nor for a band of a surface the eyes saw (THE EYES) stuck on strokes that lift it out from under that surface:
+      // the other way only pushes it further under — measured live on k7 with `fully: true`, the stroke back up laid
+      // phone under the bar again, a 42-px strip.
+      const outward = (!fully && sliver !== undefined && SIDES[sliver.edge].reveals === stuckOn) || (unlisted !== undefined && SIDES[unlisted.finding.edge].reveals === stuckOn);
       const otherWay = backUnmoved ? 'unmoved' : outward ? 'outward' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
       const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
-      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: shortOf(best), lastStroke: stuckOn, viewport, otherWay });
+      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: unlisted ?? shortOf(best), lastStroke: stuckOn, viewport, otherWay });
       s.stuckOn = stuckOn;
       s.backPending = true;
     }
@@ -1492,7 +1566,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, { readError, found, best, viewport, cover, miss }, by),
+      short: shortfall(s, { readError, found, best, viewport, cover, miss, unlisted }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1704,6 +1778,8 @@ interface BoundRound {
   readonly cover: Cover | undefined;
   /** What this round's read saw of a target no round matched (ui-tree/miss.ts#missOf) — an `absent` failure carries it. */
   readonly miss: Miss | undefined;
+  /** What the eyes saw over the best match this round, when that alone kept a `fully: true` stop from being claimed. */
+  readonly unlisted: Extract<InFrameShort, { of: 'unlisted' }> | undefined;
 }
 
 /**
@@ -1713,8 +1789,9 @@ interface BoundRound {
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, { readError, found, best, viewport, cover, miss }: BoundRound, by: BoundBy): Shortfall {
+function shortfall(s: State, { readError, found, best, viewport, cover, miss, unlisted }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
+  if (unlisted !== undefined) return unlisted;
   if (best !== undefined && best.standing.facts.visible > 0) return shortOf(best);
   const left = s.inFrameAfter;
   const past = s.lastPast !== undefined && !s.strokedToward.includes(SIDES[s.lastPast.side].reveals) ? s.lastPast : undefined;

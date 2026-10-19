@@ -12,6 +12,7 @@ import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import type { GuardOptions } from '../interact/keyboard.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { eyesOn } from '../verify/eyes.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
 import { launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
@@ -521,6 +522,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'On Android each swipe is drawn over the target\'s scroll container (the screen\'s largest before the target is found), touching down above anything drawn over the container\'s lower half (a floating tab bar) when the content lies below, and slowly enough to drag, not fling, the list — about 1 s for a full-screen stroke, ≈ 0.45 screen heights a second — so one swipe moves the content about its own length and no row is skipped between reads; fewer swipes fit in the timeout than before. ' +
         'On Android a node\'s bounds are cut to its scroll container (and the display), so a fully: true stop whose top or bottom edge (left/right for a sideways scroll) lies exactly on its scroll container\'s is checked with one short probe swipe toward that edge (well under a pull-to-refresh), drawn inside a scroll container with room for it: if nothing moves the stop stands and the reply says it was checked; if the element moves it is judged again. The probe counts as a swipe (a list\'s first row at rest costs one); with none left the reply says the edge may be cut. With no scroll container around it that has room for the probe, or when every one from that edge outward scrolls only across it (a horizontal carousel for a top or bottom edge, no vertical list around it), no probe is sent and the reply says the edge may be cut and why. An element whose two edges along the scroll both lie on its scroll container\'s (it fills it exactly) is not probed — one probe cannot tell which side is cut — and the reply says it may be cut (usual for a card as tall as its carousel; check with a screenshot). ' +
         'With the soft keyboard up (Android; iOS with treeSource: wda, or idb\'s band read by its shape) the viewport is the screen ABOVE it: the part of an element under the keyboard does not count as visible, the swipes touch down clear of it (and never higher than without a keyboard), and a reply clipped at the top edge of the keyboard, or a failure, names it (a keyboard that covers the whole screen fails at once). Nothing is pressed to hide it — press_key back first (Android) to judge the whole screen. ' +
+        'On Android, a stop that would say "fully visible" while the element lies flush with a node drawn after it outside its scroll view (a bar pinned over the list or riding on the keyboard, whose surface may draw past its node) is first checked with one screenshot per claimed stop (a fully: true call refused so may claim again after a swipe that moved it: at most one per swipe, plus one): if a band of the colour around that node lies over the element\'s edge, the reply says how many px and which colours — the stop stands only when the band leaves its centre clear; with fully: true, or a band over its centre, the swipes go on; if the screenshot cannot tell, the reply says "fully visible by the tree" and why. A node as wide as the screen beside it is not checked. No other stop takes a screenshot. ' +
         'On Android, when the input method reports a keyboard the window state gives no area (one still coming up?), a failure or a fully: true reply says so: that keyboard was not judged; with a floating keyboard, everything below its panel\'s top edge, full width, counts as covered. With treeSource: idb nothing in the tree is marked as the keyboard; averi reads where its background starts by its shape and judges against that line as above: the swipes touch down above it, no stop has the element\'s centre below it, and with fully: true none of the element may lie below it.',
       inputSchema: {
         platform,
@@ -538,7 +540,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, configPath: cp }) => {
       const { cfg } = await loadForCall(TOOL_CONFIG.scroll_until(p), cp);
       const adapter = await registry.get(p, treeOpts(iosToolSettings(cfg, p)));
-      const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs });
+      // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
+      const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, eyes: eyesOn(adapter) });
       return text(`Element ${selector} ${describeScrollResult(result)}`);
     },
   );
