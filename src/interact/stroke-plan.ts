@@ -63,7 +63,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * `carousel-in-list`: on Android the carousel is a `HorizontalScrollView`, its
  * axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the stretch
  * below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched down on it
- * on the replay before S4 (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
+ * on an earlier replay (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
  * recorded); C, the card past the carousel's right clip, is never stroked there, uiautomator dumping it as a strip at
  * the screen's edge that averi stops on at once (lab finding LE1,
  * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md). Captured on iOS

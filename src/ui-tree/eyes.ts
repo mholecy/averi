@@ -30,6 +30,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * region a pixel measurement reads (ui-tree/standing.ts#Scene.pixelRegion). One capture, unsettled by design: the stop
  * it checks was settled by its tree reads, and a settled pair would double the cost (ADR 0013, "Refined 2026-10-19",
  * states the residual: a bar or an IME still animating could be misread).
+ *
+ * WHAT A REFUSAL KEEPS, and what a finding reaches — the module's too, so the round (interact/scroll-rounds.ts#round)
+ * spells none of it: `EyesAsked` (`askedOf`), a question as asked, in rects; `sameQuestion`, a later question of the
+ * same region and neighbours within a pixel — refused again with no second screenshot, nothing having moved; and
+ * `reachesPoint`, whether a band the eyes saw reaches the point the next tap presses.
  */
 
 /** What the eyes are asked: the target, its region a pixel measurement reads, and its flush neighbours — every edge judged, one screenshot. */

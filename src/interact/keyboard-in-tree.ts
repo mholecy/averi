@@ -146,11 +146,22 @@ const mayHaveChanged = (moves: readonly DismissalMove[]): string =>
     : 'Those moves may have changed the screen (the keyboard was raised again, an element tapped did something of its own, or a drag scrolled the content) — look at it (ui_snapshot / screenshot)';
 
 /** `tapping id:"login_title" at (201,303)`, `…, then dragging the target's scroll view up from (201,502) to (201,382)` — what was done, as the failed-look sentences say it. */
-const movesDoing = (moves: readonly DismissalMove[]): string => moves.map((m) => `${wordsOf(m).moving} ${wordsOf(m).at}`).join(', then ');
+const movesDoing = (moves: readonly DismissalMove[]): string =>
+  moves
+    .map((m) => {
+      const w = wordsOf(m);
+      return `${w.moving} ${w.at}`;
+    })
+    .join(', then ');
 
 /** `Tapped id:"login_title" at (201,303)`, `…, then dragged the target's scroll view up from (201,502) to (201,382)` — a still-up refusal's opening. */
 const movesDone = (moves: readonly DismissalMove[]): string => {
-  const text = moves.map((m) => `${wordsOf(m).moved} ${wordsOf(m).at}`).join(', then ');
+  const text = moves
+    .map((m) => {
+      const w = wordsOf(m);
+      return `${w.moved} ${w.at}`;
+    })
+    .join(', then ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 

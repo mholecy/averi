@@ -12,7 +12,7 @@ import type { Verdict } from './verdict.js';
  * a failure as a value, and `pollTree`, the deadline loop over it that the
  * flow engine's waits and detect probe, the verifier's asserts and the
  * interaction module's settle wait are built on. Two loops are deliberately
- * NOT built on it: the fill's value poll (interact/fill.ts, pollValue) is
+ * NOT built on it: the fill's value poll (interact/fill-type.ts#pollValue) is
  * bounded by a round count rather than a deadline and lets a read failure
  * throw, because by then the field has been tapped and an unreadable tree is
  * a dead device, not a screen settling; and the scroll loop
@@ -394,32 +394,33 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
  * ANOTHER SCREEN than that read — by identity, none of its identified nodes is listed any more (`anotherScreen`) — and
  * no stroke among them touched down on a node of that read that the read after STILL LISTS (`touchedPersists`: a
  * labelled node by role and label, a scroll view by its rect; the root and a screen-sized frame aside). Then what the
- * strokes moved was not content but the screen itself: a sheet or a
- * modal they touched down on dismissed, the app gone elsewhere — and a target found now is found on that other
- * screen, not brought into view. Measured under idb: beneath the lab's large sheet (sheet-background), whose tree
- * lists the sheet's button alone and no sign of the sheet, `scroll_until` for A stroked from (201,175) on the sheet's
- * bare surface, the stroke DISMISSED it, and the next read listed the host's A–D: "fully visible after 1 swipe". Now
- * it stops there, saying so, and sends nothing more onto the new screen. averi never claims a stop after its own
- * stroke changed the presented layer; where the tree shows the layer, no stroke is sent at all (the marks: an idb
- * list holding UIKit's dismiss region, adapters/ios-tree-source.ts#listsPresentedLayer).
+ * strokes moved was not content but the screen itself: a sheet or a modal they touched down on dismissed, the app gone
+ * elsewhere — and a target found now is found on that other screen, not brought into view. Measured under idb: beneath
+ * the lab's large sheet (sheet-background), whose tree lists the sheet's button alone and no sign of the sheet,
+ * `scroll_until` for A stroked from (201,175) on the sheet's bare surface, the stroke DISMISSED it, and the next read
+ * listed the host's A–D: "fully visible after 1 swipe". Now it stops there, saying so, and sends nothing more onto the
+ * new screen. averi never claims a stop after its own stroke changed the presented layer; where the tree shows the
+ * layer, no stroke is sent at all (the marks: an idb list holding UIKit's dismiss region,
+ * adapters/ios-tree-source.ts#listsPresentedLayer).
  *
  * Why both conditions: ids alone are not enough — a fling through a list whose rows carry ids of their own (row_1 …
- * row_40) can carry every listed row off a list that lists only what shows (a Compose LazyColumn, a UIKit table, an
- * RN FlatList). What tells such a fling from a dismissal is what the stroke TOUCHED: a list keeps its frame through the
+ * row_40) can carry every listed row off a list that lists only what shows (a Compose LazyColumn, a UIKit table, an RN
+ * FlatList). What tells such a fling from a dismissal is what the stroke TOUCHED: a list keeps its frame through the
  * fling (uiautomator's `scrollable` list, WDA's scroll view, at the very same rect after), a section header it touched
  * keeps its label; a dismissed sheet's own row, list or labelled surface is not listed after at all. So the excuse is
  * persistence, not being named: "the touched node names itself" would excuse exactly the sheet whose rows carry ids
- * (sheet-long-list's rows given ids, stroked from (201,175) and dismissed — read visible). Never excused: the root, and a structural frame the size of the screen that does not scroll
- * (ui-tree/placed.ts#fillsScreen: idb's `Application`, a window, a dim) — every screen of the app has it, so it persists
- * across any change; sheet-background's (201,175) lies on idb's `Application 'AveriLab'` alone. Residuals, stated:
+ * (sheet-long-list's rows given ids, stroked from (201,175) and dismissed — read visible). Never excused: the root, and
+ * a structural frame the size of the screen that does not scroll (ui-tree/placed.ts#fillsScreen: idb's `Application`, a
+ * window, a dim) — every screen of the app has it, so it persists across any change; sheet-background's (201,175) lies
+ * on idb's `Application 'AveriLab'` alone. Residuals, stated:
  * - a screen whose reads list no id at all (idb's UIKit table rows, NI1) is never told changed;
  * - RECYCLED ROWS give a loud stop: under idb, which lists no scroll view, a fling that replaces every identified row
  *   it lists — touching down on a row or a gap — reads `changed` (the stop where the scroll could have gone on: the
  *   failure the decision prefers to a claimed stop); a list that also lists a node the read after keeps under the
  *   touch-down (a labelled header, a scroll view) is a scroll;
  * - a stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by role and label (a
- *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists —
- *   keeps it unchanged, the stop claimed as before;
+ *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists — keeps
+ *   it unchanged, the stop claimed as before;
  * - a presented layer that shares an id with the screen beneath, or a keyboard's ids listed at both reads, keeps it
  *   unchanged.
  * Source-agnostic: on WDA and uiautomator trees a fling keeps its scroll view's rect, so it is excused; a dismissal
@@ -439,10 +440,10 @@ export interface IdentifiedRead {
 }
 
 /**
- * The screen changed under the strokes (`ScreenChange`): `touchDowns` is not empty, the read after is another screen
- * by identity (`anotherScreen`), and no touch-down lies on a node of the read before that the read
- * after still lists (`touchedPersists`). Undefined otherwise — no stroke between the two reads, an id kept, or a
- * stroke that dragged what is still there.
+ * The screen changed under the strokes (`ScreenChange`): `touchDowns` is not empty, the read after is another screen by
+ * identity (`anotherScreen`), and no touch-down lies on a node of the read before that the read after still lists
+ * (`touchedPersists`). Undefined otherwise — no stroke between the two reads, an id kept, or a stroke that dragged what
+ * is still there.
  */
 export function screenChangedUnder(before: IdentifiedRead, after: IdentifiedRead, touchDowns: readonly Point[]): ScreenChange | undefined {
   if (touchDowns.length === 0 || !anotherScreen(before.identity, after.identity) || touchDowns.some((p) => touchedPersists(before.tree, after, p))) return undefined;
@@ -458,9 +459,8 @@ export function screenChangedUnder(before: IdentifiedRead, after: IdentifiedRead
  * - for a node with a label and no identifier, a node of the same role and label, unidentified too;
  * - for a node that SCROLLS (scroll-containers.ts#scrolls), a scroll view of the very same rect
  *   (scroll-containers.ts#isScrollViewOf) — a list keeps its frame through a fling that recycles every row.
- * Not by its identifier: this is asked only of two reads that share none (`anotherScreen`), so an identified node
- * never persists. A sheet's own row, its list, its labelled surface are gone once the stroke dismissed the sheet: no
- * excuse.
+ * Not by its identifier: this is asked only of two reads that share none (`anotherScreen`), so an identified node never
+ * persists. A sheet's own row, its list, its labelled surface are gone once the stroke dismissed the sheet: no excuse.
  */
 function touchedPersists(tree: UiNode, after: IdentifiedRead, point: Point): boolean {
   const screenArea = rectArea(screenOf(tree));
