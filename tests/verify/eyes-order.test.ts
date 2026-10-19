@@ -42,8 +42,8 @@ describe('the order question — asked of a standing covered by a cover the list
         overlap: { x: 51, y: 470, width: 300, height: 42 },
         nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
         peerBands: [{ x: 51, y: 512, width: 300, height: 22 }],
-        nodeAround: [{ x: 51, y: 426, width: 300, height: 22 }],
-        peerAround: [{ x: 51, y: 534, width: 300, height: 22 }],
+        nodeAround: [{ x: 51, y: 426, width: 300, height: 22 }, { x: 29, y: 448, width: 22, height: 22 }, { x: 351, y: 448, width: 22, height: 22 }],
+        peerAround: [{ x: 51, y: 534, width: 300, height: 22 }, { x: 29, y: 512, width: 22, height: 22 }, { x: 351, y: 512, width: 22, height: 22 }],
         beside: [
           { x: 0, y: 470, width: 51, height: 42 },
           { x: 351, y: 470, width: 51, height: 42 },
@@ -61,9 +61,10 @@ describe('the order question — asked of a standing covered by a cover the list
       {
         nodeBands: [{ x: 51, y: 512, width: 300, height: 22 }],
         peerBands: [{ x: 51, y: 428, width: 300, height: 42 }],
-        // Around each control past its own edge, as deep as its band: below the row, above the card's top.
-        nodeAround: [{ x: 51, y: 534, width: 300, height: 22 }],
-        peerAround: [{ x: 51, y: 258, width: 300, height: 42 }],
+        // Around each control, as deep as its band: past the edge the band faces (below the row, above the card's top),
+        // and sideways on the band's rows past its left and right edges.
+        nodeAround: [{ x: 51, y: 534, width: 300, height: 22 }, { x: 29, y: 512, width: 22, height: 22 }, { x: 351, y: 512, width: 22, height: 22 }],
+        peerAround: [{ x: 51, y: 258, width: 300, height: 42 }, { x: 9, y: 428, width: 42, height: 42 }, { x: 351, y: 428, width: 42, height: 42 }],
       },
     ]);
   });
@@ -165,8 +166,8 @@ const PAIR: OrderPair = {
   overlap: { x: 51, y: 470, width: 300, height: 42 },
   nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
   peerBands: [{ x: 51, y: 512, width: 300, height: 22 }],
-  nodeAround: [{ x: 51, y: 426, width: 300, height: 22 }],
-  peerAround: [{ x: 51, y: 534, width: 300, height: 22 }],
+  nodeAround: [{ x: 51, y: 426, width: 300, height: 22 }, { x: 29, y: 448, width: 22, height: 22 }, { x: 351, y: 448, width: 22, height: 22 }],
+  peerAround: [{ x: 51, y: 534, width: 300, height: 22 }, { x: 29, y: 512, width: 22, height: 22 }, { x: 351, y: 512, width: 22, height: 22 }],
   beside: [
     { x: 0, y: 470, width: 51, height: 42 },
     { x: 351, y: 470, width: 51, height: 42 },
@@ -200,6 +201,10 @@ describe('the judge — each rule answers untold where its evidence is missing',
     expect(seenOf(paint([card, [W, TEAL]]))).toEqual({ untold: 'the other shows the colour around it #FFFFFF beside the overlap: it may draw nothing there' });
     // A card that ends 6 pt past C's edge: a quarter of the strip around C is enough.
     expect(seenOf(paint([[{ x: 40, y: 500, width: 322, height: 40 }, [255, 255, 255]], [W, TEAL]]))).toEqual({ untold: 'the other shows the colour around it #FFFFFF beside the overlap: it may draw nothing there' });
+    // A card flush with C's far edge that runs on 11 pt sideways past C, both sides or one: the strips beside C's band.
+    for (const card of [{ x: 40, y: 500, width: 322, height: 34 }, { x: 51, y: 500, width: 311, height: 34 }]) {
+      expect(seenOf(paint([[card, [255, 255, 255]], [W, TEAL]]))).toEqual({ untold: 'the other shows the colour around it #FFFFFF beside the overlap: it may draw nothing there' });
+    }
     // The same card under an opaque C of its own colour: told, C's band its own green, the card around it white.
     expect(seenOf(paint([card, [C, GREEN], [W, TEAL]]))).toEqual({ seen: 'over' });
   });
@@ -216,6 +221,10 @@ describe('the judge — each rule answers untold where its evidence is missing',
 
   it('RESIDUAL (ADR 0024): a peer on top drawn in two tones split exactly at the target\'s edge, its part over the overlap the target\'s own colour, reads as the target on top — pixel for pixel the same frame', () => {
     expect(seenOf(paint([[W, TEAL], [C, GREEN], [PAIR.overlap, TEAL]]))).toEqual({ seen: 'over' });
+  });
+
+  it('RESIDUAL (ADR 0024): a text-only peer over a surface exactly its own frame reads as the target on top — its band, the strips around it and the screen beside are what an opaque peer would show', () => {
+    expect(seenOf(paint([[C, [255, 255, 255]], [W, TEAL]]))).toEqual({ seen: 'over' });
   });
 
   it('a band half one colour, half text (no dominant of half of it): untold', () => {
@@ -272,7 +281,7 @@ describe('the colour assert — the order seen on the frame it measures, no capt
     img.data[(y * base.width + x) * 4] = k;
     return PNG.sync.write(img);
   };
-  const assertOn = async (id: string, { shots, trees, timeoutMs = 2_000 }: { shots?: (n: number, base: PNG) => Buffer; trees?: (n: number, t: UiNode) => UiNode; timeoutMs?: number } = {}) => {
+  const assertOn = async (id: string, { shots, trees, timeoutMs = 2_000, expected = '#00897B' }: { shots?: (n: number, base: PNG) => Buffer; trees?: (n: number, t: UiNode) => UiNode; timeoutMs?: number; expected?: string } = {}) => {
     const t = parseIdbDescribeAll((await file('blur-menu.idb.json')).toString('utf8'));
     const fake = new FakeAdapter({ menu: t }, 'menu');
     fake.viewportSize = { width: 402, height: 874 };
@@ -288,7 +297,7 @@ describe('the colour assert — the order seen on the frame it measures, no capt
         return shot;
       };
     }
-    const result = await new Verifier(fake, { pollMs: 5, timeoutMs }).assert({ element: { id }, color: { expected: '#00897B' } });
+    const result = await new Verifier(fake, { pollMs: 5, timeoutMs }).assert({ element: { id }, color: { expected } });
     return { result, captures: fake.screenshots.length, reads };
   };
 
@@ -318,6 +327,33 @@ describe('the colour assert — the order seen on the frame it measures, no capt
     expect(c.reads).toBeGreaterThan(1);
     // Every round that found C captured its settled pair (a round the deadline cut may have read and taken none).
     expect(c.captures).toBeGreaterThanOrEqual(2 * (c.reads - 1));
+  });
+
+  it('an answer that unlocks is never kept: W seen on top in round 1 (measured, the colour off), C on top from round 2 — looked at again, W a covered miss', async () => {
+    // From the third capture on, C's blurred green fills the overlap: C drawn over W.
+    let cOnTop: Buffer | undefined;
+    const w = await assertOn('lab.blur-menu.W', {
+      timeoutMs: 1_200,
+      expected: '#FF0000',
+      shots: (n, base) => {
+        if (n < 2) return PNG.sync.write(base);
+        if (cOnTop === undefined) {
+          const img = new PNG({ width: base.width, height: base.height });
+          base.data.copy(img.data);
+          for (let y = 470 * 3; y < 512 * 3; y++)
+            for (let x = 51 * 3; x < 351 * 3; x++) {
+              const o = (y * base.width + x) * 4;
+              img.data[o] = 0x34;
+              img.data[o + 1] = 0x79;
+              img.data[o + 2] = 0x37;
+            }
+          cOnTop = PNG.sync.write(img);
+        }
+        return cOnTop;
+      },
+    });
+    expect(w.reads).toBeGreaterThan(1);
+    expect(w.result).toMatchObject({ pass: false, detail: expect.stringContaining('button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) as a screenshot shows') });
   });
 
   it('W on frames that never settle: the order untold, W refused as overlapped — never measured on a blend', async () => {

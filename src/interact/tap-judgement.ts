@@ -280,7 +280,9 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
       // The reading's line only for a covered centre of a target on the screen and not cut.
       const judged = async ({ first, full }: TapStandings): Promise<TapStanding> => (!offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? full() : first);
       // Covered by a control the listing does not order: the eyes, once, then judged again on the order they saw (ADR 0024).
-      const standing = await judgedWithOrder(look, node, eyes, (seen) => judged(seen === look ? standings : tapStandings(seen, node, on)));
+      // judgedWithOrder judges `look` itself first — the untold look, whose standings are already built — and then, only
+      // if it asked the eyes, a told look of the same tree, whose standings are built here.
+      const standing = await judgedWithOrder(look, node, eyes, (onLook) => judged(onLook === look ? standings : tapStandings(onLook, node, on)));
       // A cut by a node drawn after it: whether the soft keyboard is up, which its remedy names (`cutByRemedy`) — the reading's line, asked on that path only.
       const line = standing.kind === 'cut' && standing.cut.by !== undefined ? await look.keyboard.readingLine() : undefined;
       const keyboard: KeyboardUp | undefined = line === undefined ? undefined : { lineY: line.y, remedy: look.reading.remedy };

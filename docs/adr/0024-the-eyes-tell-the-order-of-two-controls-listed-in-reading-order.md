@@ -64,9 +64,9 @@ dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
 
 WHAT is asked, per `unordered` cover (a peer): where the two overlap (in the standing's frame), each one's CLEAR BANDS
 along the overlap's edges (the strips of it beside the overlap, outside the other by construction, each no deeper than
-the overlap on that axis, none meeting another cover of the target), what lies AROUND each control past its edge
-beyond each band (the strip just outside it, across the band, as deep as the band: `nodeAround`, `peerAround`), and the
-screen beside the two on the overlap's rows. Bands, not each control's largest clear rect: mp-native's chooser row's largest clear rect is the 4-pt gap
+the overlap on that axis, none meeting another cover of the target), what lies AROUND each control beside each band
+(the strips just outside it past the edge the band faces and sideways past its side edges on the band's rows, each as
+deep as the band: `nodeAround`, `peerAround`), and the screen beside the two on the overlap's rows. Bands, not each control's largest clear rect: mp-native's chooser row's largest clear rect is the 4-pt gap
 between the card's rows — a surface of the other layer.
 
 THE JUDGE — asymmetric on purpose: telling the PEER on top only confirms a refusal; telling the TARGET on top unlocks a
@@ -76,13 +76,14 @@ one frame cannot tell apart at all is listed under Residuals (7.):
    none — untold;
 2. each side ONE colour: every band's dominant at least half of it, all of a side within ΔE00 1.0 (`EYES_SAME_DE`) —
    else untold (a side showing two surfaces, the chooser's shape, is not read);
-3. THE OPACITY GUARD: what lies around each control — the strips just outside it past its edge beyond its bands, and
-   the screen beside the two (`beside`). No screen beside (two rows as wide as the screen), or nothing around a side on
+3. THE OPACITY GUARD: what lies around each control — the strips just outside it beside each band (past the edge the
+   band faces, and sideways past its two side edges on the band's rows, each as deep as the band), and the screen
+   beside the two (`beside`). No screen beside (two rows as wide as the screen), or nothing around a side on
    the screen, untold; a side's colour on a quarter or more of any such strip (`AROUND_SHARE`, within ΔE00 2.0,
    `EYES_APART_DE`), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
-   there hits the button; over an inset card the card runs on past the button's edge though the screen beside the two
-   is grey (review round 1's MAJOR-1, tests/verify/eyes-order.test.ts). The lab: 0.00 of every strip (W's teal against
+   there hits the button; over an inset card the card runs on past the button's edge, ahead or sideways, though the
+   screen beside the two is grey (review rounds 1 and 2, tests/verify/eyes-order.test.ts). The lab: 0.00 of every strip (W's teal against
    the grey gap and K above W, C's blurred green against the blurred backdrop below C, both against the screen);
 4. the two sides farther apart than the colour assert's tolerance, ΔE00 8 (`DEFAULT_TOLERANCE_DE`) — else untold, the
    two look alike (the lab: 17.69);
@@ -112,9 +113,10 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
     screenshot shows (the two are listed in reading order)` with the `seenOver` remedy — still red as ADR 0018's
     residual 9 (#31: the backdrop has no node, so no "close it first" of a presented layer).
 - Unit and table tests: tests/verify/eyes-order.test.ts (the judge over both lab pngs and synthetic pngs for every
-  untold rule — the inset card, a band of no one colour, sides only just apart, residual 7 pinned; the question's bands
+  untold rule — the inset card ahead of and sideways past the peer, a band of no one colour, sides only just apart,
+  residuals 2 and 7 pinned; the question's bands
   and the strips around them on the lab trees and on mp-native's chooser; the colour assert's capture count, its
-  answer kept per distinct tree, and its frames unsettled, settled over the region only or failing — untold, the poll
+  answer kept per distinct tree and an unlocking answer never kept (W on top, then C), and its frames unsettled, settled over the region only or failing — untold, the poll
   going on),
   tests/ui-tree/draw-order-reading-order.test.ts (the seen order into the draw order, both ways, and untold = no
   screenshot), tests/interact/remedy-agreement.test.ts (one remedy for C, W reached, by the tap, the colour assert and
@@ -127,11 +129,15 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 
 1. **Alike looks** (two white rows, no dim, no shadow): untold, today's refusal — the safe direction. Such menus' rows
    stay refused; the lab's blur and mp-native's dim are what give the signal.
-2. **A transparent top control over a surface that ends at its edge**: the opacity guard compares a band with what
-   lies around its control past its edge and with the screen beside the two (review round 1 widened it from the
-   screen alone, which an inset card under a text-only button passed — a `Tapped` that would have hit the button). A
-   text-only button whose band lies over a surface that stops within a pixel of the button's own edge, in a colour
-   neither the screen beside nor the strip past that edge shows, still passes. Narrow; not measured by a lab cell (a
+2. **A transparent top control over a surface exactly its own frame**: the opacity guard reads a band against what
+   lies around its control — past the edge the band faces and sideways past its side edges, on the band's rows — and
+   against the screen beside the two (review round 1 widened it from the screen alone, which an inset card under a
+   text-only button passed; round 2 added the sideways strips, which a card flush with the button's far edge and
+   running on 11 pt past its sides passed). A text-only button over a surface that is exactly its own frame (or that
+   frame and a pixel, under the antialiasing margin), in a colour neither the screen beside nor any strip around shows,
+   still passes: its band, the strips around it and the screen beside are pixel for pixel what an opaque control of
+   that colour would show — the class of residual 7, no rule of one frame can tell it, and it reads `over`, a `Tapped`
+   that may hit the button. Pinned as told (`RESIDUAL`, tests/verify/eyes-order.test.ts). Not measured by a lab cell (a
    cell `presented/plain-button-over-row` would measure the common shape).
 3. **One unsettled capture** for the tap and `scroll_until` (the pixel assert's is settled): a frame mid-transition
    reads a blend — untold; a frame of another screen than the tree's (read before a navigation, shot after) could in

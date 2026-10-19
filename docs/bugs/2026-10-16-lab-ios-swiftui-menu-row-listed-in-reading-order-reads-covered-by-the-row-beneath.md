@@ -21,7 +21,10 @@
 > whole screen, keeps a covered answer per distinct tree and never ends its poll on the order question's capture, and
 > one cycle (`ui-tree/eyes.ts#judgedWithOrder`) asks the eyes; the golden unchanged (1410 checks, 217 mismatches, every
 > reply identical), so the live records and calibration stand. A two-tone peer split exactly at the target's edge stays
-> a named residual (ADR 0024, 7.).
+> a named residual (ADR 0024, 7.). Review round 2 (APPROVED; its minors fixed after `8c738ecc`): the strips around each
+> control also run sideways past its side edges on each band's rows (a card flush with a text-only peer's far edge and
+> running on past its sides is untold); a transparent peer over a surface exactly its own frame is residual 2, of 7's
+> class; the golden again unchanged.
 
 > **Status (2026-10-19, round 8):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
 > (its review's fixes; from `fix/round-8` `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual, now

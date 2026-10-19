@@ -228,21 +228,23 @@ const AROUND_SHARE = 0.25;
  * THE ORDER JUDGE, pure over a decoded png at `scale` px per tree unit — each pair of the question on its own
  * (ui-tree/eyes.ts#OrderPair), one png. Asymmetric on purpose: telling the PEER on top only confirms a refusal; telling
  * the TARGET on top unlocks a tap, so each rule below answers `untold` (the listing's untold order, the refusal kept)
- * wherever its evidence is missing — what one frame cannot tell apart at all is ADR 0024's residuals (a peer on top
- * drawn in two tones split exactly at the target's edge, its part over the overlap the target's own colour, is pixel
- * for pixel the target on top):
+ * wherever its evidence is missing — what one frame cannot tell apart at all is ADR 0024's residuals 2 and 7 (a
+ * text-only peer over a surface exactly its own frame; a peer on top drawn in two tones split exactly at the target's
+ * edge, its part over the overlap the target's own colour — each pixel for pixel the target on top):
  * 1. Each side's bands, landed in the png (`pngRegion`, one pixel in from each edge against antialiasing), each at least
  *    FLANK_MIN_PX on both sides; none on a side — untold.
  * 2. Each side one colour: every band's dominant (`sampleDominant`) at least DOMINANT_SHARE of it, all of a side within
  *    EYES_SAME_DE of each other — else untold: a side showing two surfaces (mp-native's chooser row, whose band above
  *    its overlap is the card's gap and whose side bands are its own dimmed row) is not read.
- * 3. THE OPACITY GUARD: what lies around each control — the strips just outside it past its own edge beyond its bands
- *    (`OrderPair.nodeAround`, `peerAround`), and the screen beside the two on the overlap's rows (`beside`). No screen
+ * 3. THE OPACITY GUARD: what lies around each control — the strips just outside it beside each band, past the edge the
+ *    band faces and sideways past its two side edges on the band's rows (`OrderPair.nodeAround`, `peerAround`), and the
+ *    screen beside the two on the overlap's rows (`beside`). No screen
  *    beside, or nothing around a side, untold; a side's colour on AROUND_SHARE of any such strip (within
  *    EYES_APART_DE), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
  *    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
- *    there hits the button; over an inset card, the card runs on past the button's edge where the screen beside the
- *    two is another colour.
+ *    there hits the button; over an inset card, the card runs on past the button's edge — ahead or sideways — where
+ *    the screen beside the two is another colour. A surface that is exactly the transparent control's frame (or that
+ *    frame and a pixel) runs on nowhere: one frame cannot tell it (ADR 0024's residual 2).
  * 4. The two sides farther apart than the colour assert's tolerance (color-parity.ts#DEFAULT_TOLERANCE_DE, 8) — else
  *    untold, the two look alike. The lab's menu: 17.69 (W's teal against C's blurred green).
  * 5. The overlap's dominant (of DOMINANT_SHARE) within EYES_APART_DE of exactly one side and farther than that
