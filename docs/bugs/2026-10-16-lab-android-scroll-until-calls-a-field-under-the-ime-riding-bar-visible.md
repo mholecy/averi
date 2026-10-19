@@ -53,6 +53,17 @@
 > bar's node-less padding is a KNOWN residual (ADR 0013's residuals accepted; k7's judge reads the stop ok, its centre
 > clear), with a future "eyes" item in the lab plan: verify a "fully" claim with pixels where a node-less sibling's
 > padding may lie over the target.
+>
+> **Status (2026-10-19): k7's residual fixed** on `arch/r23-eyes` at `e142728b` (+ `33605fdd`, from `arch/round-23`
+> `bd43fc66`) — the eyes (ADR 0013, "Refined 2026-10-19"; src/ui-tree/eyes.ts, src/verify/eyes.ts): a stop about to
+> say "fully visible" on a target flush with a node drawn after it outside its scroll view takes one screenshot; k7's
+> reply is now `visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px show #F2F2F7,
+> the colour beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own #FFFFFF (a
+> screenshot), its centre clear …`. Measured live on averi_lab, k7 ×3 ok (docs/truth/live-records/android-k7-eyes-1…3.json,
+> before: android-k7-eyes-before-bd43fc66.json), the forms group once 23 ok / 2 loud (b1d, b7: non-ASCII typing) / 0
+> mismatches (android-forms-eyes.json); unit-pinned over the k7 stop's real capture
+> (tests/fixtures/android-lab-form-keyboard-k7-stop.{xml,png}, tests/verify/eyes.test.ts,
+> tests/interact/scroll-eyes.test.ts).
 
 Lab note F2A1. **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's
 ground truth (`tests/fixtures/truth/android-averi_lab-api33/form-keyboard.*`, captured by

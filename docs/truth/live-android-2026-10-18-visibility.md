@@ -117,6 +117,37 @@ partial records are: 24 cases, 21 ok, 1 loud, 2 mismatches):
   A–D, all ok) carries the hint — their presented remedy alone, once each (`… — a dialog is presented over it — close it
   first`, `… — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it …`).
 
+# The eyes on a "fully" claim, run live (2026-10-19, round 7 A6)
+
+ADR 0013's residual (decision point 4 above; the owner's 2026-10-18 point 5): k7's "fully visible after 1 swipe" with
+18 px of phone under the bar's node-less padding. arch/r23-eyes (from arch/round-23 `bd43fc66`) checks such a claim
+with one screenshot (src/ui-tree/eyes.ts, src/verify/eyes.ts): a stop about to say "fully visible" on a target laid
+flush with a node drawn after it outside its scroll view (`Scene.flushNeighbour`) reads the target's rows from that
+edge inward against the colour beside that node and its own. Run on averi_lab (emulator-5554, API 33, the lab app as
+installed for round 7), harness truth/round-7 `b191055d`, `--side` the branch:
+
+  node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups forms --cases k7 --side <r23-eyes> --record docs/truth/live-records/android-k7-eyes-{1,2,3}.json
+  node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups forms --side <r23-eyes> --record docs/truth/live-records/android-forms-eyes.json
+
+- **k7 ×3: ok 3 of 3**, the app's frames as before (phone 1129–1228, 18 px under the bar `0,1210 1080x188`; one stroke
+  at 540,1034), the reply now: `visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px
+  show #F2F2F7, the colour beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own
+  #FFFFFF (a screenshot), its centre clear. A rect assert or screenshot on this element will measure what is drawn over
+  it too`. 28 = the dumped node's part under the bar (1210–1237 of `55,1113 970x125`, its touch target); the drawn field's
+  is the judge's 18. Before (`bd43fc66`, android-k7-eyes-before-bd43fc66.json): `fully visible after 1 swipe` — "fully" overstated by 18 px.
+- **forms once: 25 cases, 23 ok, 2 loud, 0 mismatches** — the 2 LOUD are b1d and b7, `adb shell input text` refusing
+  non-ASCII (unchanged, not this task's).
+- **`fully: true` on k7** (no live case; averi driven directly, android-k7-fully-eyes-direct.jsonl): one screenshot, three
+  strokes, and `failed after 3 swipes — element is in the viewport but its bottom 28 px show #F2F2F7 … — and the content
+  is exhausted: swiping down no longer moves it, and swiping up would only push it further under that surface. That
+  surface stays over it at the end of the content — if the soft keyboard is still up (… y 1398, that node riding on it),
+  dismiss it first (press_key back …) … and scroll again; else a layout defect` (13.8 s, the emulator's tree reads
+  ~1.9 s each). Before the turn-back fix (`33605fdd`) the stroke back up laid phone under the bar again (a 42-px strip)
+  and the scroll ran to its 15-s timeout. After `back` the same call fails on the touch target's overlap with
+  "Variable symbol"'s title below it (a cover the tree lists; unchanged, not the eyes').
+- **Cost:** one screenshot only on a claim the trigger applies to; an unmoved read after a refused `fully` claim is
+  refused again with no second screenshot. Ordinary stops take none (pinned: tests/interact/scroll-eyes.test.ts).
+
 # The run itself
 
 The first run at e98b87e (docs/truth/live-records/android-vis-e98b87e-run1.json) had three tool calls hang past the
