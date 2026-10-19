@@ -237,7 +237,7 @@ idb's companion must be up for the lab simulator on its domain socket (`idb_comp
 /tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
-false-covers, text — scripts/truth/schema.ts#FAMILIES); both apps bundle `fixtures/apps/cells.json`, which
+false-covers, text, react-native — scripts/truth/schema.ts#FAMILIES); every lab app bundles `fixtures/apps/cells.json`, which
 `node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1 when it is stale;
 tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app routes it to its
 family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged into the averi.yaml
@@ -245,7 +245,11 @@ golden replays it under (`differential.ts#configFor`, through the truth's `confi
 build it (`platforms`) and, on Android, the navigation mode it is captured under (`navigation`): capture-run skips it
 elsewhere and says why (`catalog.ts#captureRefusal`, asked before the device's own `LabDevice.unsupported`), so `bands`
 (gesture) and `bands-three-button` sit in one run and neither replaces the other. How to add a cell:
-docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3, B1.
+docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3, B1. The react-native family is built by the third lab app
+alone, the React Native one (`fixtures/apps/rn`, its README; schema.ts#LabApp, #appOf): the capture and the live golden
+drive one app per run (`--app react-native`, lab-device.ts#LAB_APP: its own bundle and package), a cell of the other
+app skipped and said (lab-device.ts#otherApp), and its captures sit in runs of their own (`ios-rn-iphone17-ios27`,
+`android-rn-averi_lab-api33`, the manifest's `app` AveriLabRN).
 
 The capture is one module, `scripts/truth/capture-run.ts#capture(lab, cells, opts)`, over a `LabDevice`
 (`scripts/truth/lab-device.ts`: launch a cell in a fresh process and wait for its `ready`, read the app's state file,

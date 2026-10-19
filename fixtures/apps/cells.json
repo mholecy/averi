@@ -623,6 +623,16 @@
       "targets": [
         { "tag": "T", "color": "#F3E5F5", "slot": 0, "declared": "open", "text": "Zvuk a vibrácie" }
       ]
+    },
+    {
+      "id": "rn-field",
+      "family": "react-native",
+      "layer": "none",
+      "targets": [
+        { "tag": "N", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "Payee’s name" },
+        { "tag": "I", "color": "#3949AB", "slot": 1, "declared": "open", "label": "Clear" },
+        { "tag": "M", "color": "#FFE0B2", "slot": 2, "declared": "open", "text": "Message for the recipient" }
+      ]
     }
   ]
 }

@@ -59,6 +59,7 @@ describe('the cell catalog', () => {
       'text/text-sample',
       'text/text-under-bar',
       'text/text-nav-cut',
+      'react-native/rn-field',
     ]);
   });
 

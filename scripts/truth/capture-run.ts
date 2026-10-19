@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import type { RunManifest } from '../differential/corpus.js';
-import type { LabDevice } from './lab-device.js';
+import { LAB_APP, type LabDevice } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
@@ -62,11 +62,13 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   await mkdir(opts.out, { recursive: true });
   // A cell already captured and not asked for again keeps its entries — a run of some cells adds to the manifest. Only
   // from the same device: a manifest names one device for all its captures.
+  // And of the same lab app (LabDevice.app): a run holds one app's captures, its manifest's `app` naming it.
+  const app = LAB_APP[lab.app].name;
   const previous = await readFile(join(opts.out, 'manifest.json'), 'utf8').then((t) => JSON.parse(t) as RunManifest).catch(() => undefined);
-  if (previous !== undefined && (previous.platform !== lab.platform || previous.device !== device)) {
-    throw new Error(`${opts.out} holds captures of ${previous.platform} "${previous.device}", not ${lab.platform} "${device}": capture into a run of its own, or recapture every cell`);
+  if (previous !== undefined && (previous.platform !== lab.platform || previous.device !== device || previous.app !== app)) {
+    throw new Error(`${opts.out} holds captures of ${previous.app ?? 'an unnamed app'} on ${previous.platform} "${previous.device}", not ${app} on ${lab.platform} "${device}": capture into a run of its own, or recapture every cell`);
   }
-  const manifest: RunManifest = { platform: lab.platform, app: 'AveriLab', device, note: opts.note, captures: [] };
+  const manifest: RunManifest = { platform: lab.platform, app, device, note: opts.note, captures: [] };
   const broken: string[] = [];
   const skipped: string[] = [];
   // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
@@ -86,6 +88,11 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     await writeFile(join(opts.out, `${cell.id}.png`), shot);
     for (const t of trees) await writeFile(join(opts.out, `${cell.id}${t.suffix}`), t.payload);
     await writeFile(join(opts.out, `${cell.id}.state.json`), JSON.stringify(s, null, 2) + '\n');
+    // Android: the device's own system bands with the IME down (CellTruth.displays) — read here, before the probes, when
+    // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M,
+    // round 7: its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
+    // the IME up is read after ime()'s back hid it, below.
+    let displays = lab.displays !== undefined && s.keyboard?.visible !== true ? await lab.displays() : undefined;
 
     const truth: CellTruth = {
       cell: cell.id,
@@ -166,7 +173,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     // hidden by ime()'s back by now) — the navigation bar's top depends on the navigation mode, which the fake device's
     // stock dump (gesture navigation) does not follow.
     if (lab.displays !== undefined) {
-      await writeFile(join(opts.out, `${cell.id}.displays.txt`), await lab.displays());
+      displays ??= await lab.displays();
+      await writeFile(join(opts.out, `${cell.id}.displays.txt`), displays);
       truth.displays = `${cell.id}.displays.txt`;
     }
     if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);

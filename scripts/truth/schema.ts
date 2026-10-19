@@ -57,10 +57,29 @@ export interface CatalogTarget {
  * targets (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the
  * screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar
  * that is no cover; `text` text targets carrying P5's sample strings, open and under the bands and chrome (phase 4: the
- * tree's text and OCR on the real pixels). In this order in the generated catalog (scripts/truth/catalog.ts).
+ * tree's text and OCR on the real pixels); `react-native` React Native's own controls (round 7: its text fields), which
+ * only the React Native lab app builds (appOf). In this order in the generated catalog (scripts/truth/catalog.ts).
  */
-export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text'] as const;
+export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text', 'react-native'] as const;
 export type Family = (typeof FAMILIES)[number];
+
+/**
+ * The lab apps: `native` the SwiftUI and Compose apps (fixtures/apps/ios, fixtures/apps/android), `react-native` the
+ * React Native one (fixtures/apps/rn, both platforms from one source) — each with its own bundle (package) and its own
+ * truth runs (tests/fixtures/truth/<run>, the manifest's `app`), the same contract (this file) for both.
+ */
+export const LAB_APPS = ['native', 'react-native'] as const;
+export type LabApp = (typeof LAB_APPS)[number];
+
+/** A command line's `--app` (capture.ts, live.ts): the native app when not given; anything else not a LabApp refused. */
+export function parseLabApp(value: string | undefined): LabApp {
+  const app = value ?? 'native';
+  if (!(LAB_APPS as readonly string[]).includes(app)) throw new Error(`no lab app ${app} (${LAB_APPS.join(', ')})`);
+  return app as LabApp;
+}
+
+/** The app that builds a family's cells: the react-native family the React Native app's alone, every other the native apps'. */
+export const appOf = (family: Family | undefined): LabApp => (family === 'react-native' ? 'react-native' : 'native');
 
 export interface CatalogCell {
   id: string;

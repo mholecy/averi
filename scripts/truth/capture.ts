@@ -3,16 +3,17 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { capture } from './capture-run.js';
 import { loadCatalog, selectCells } from './catalog.js';
-import { AndroidLab, IosLab, type LabDevice } from './lab-device.js';
+import { AndroidLab, IosLab, LAB_APP, type LabDevice } from './lab-device.js';
+import { parseLabApp } from './schema.js';
 
 /**
  * The truth capture's command lines (capture-run.ts does the work; README.md beside scripts/differential, "Golden
  * mode"):
  *
  *   node --import tsx scripts/truth/capture.ts --udid <lab simulator> --out tests/fixtures/truth/<run>
- *        [--wda-port 8120] [--family presented,edges] [--cells open,alert-dim]
+ *        [--wda-port 8120] [--app native|react-native] [--family presented,edges] [--cells open,alert-dim]
  *   node --import tsx scripts/truth/capture-android.ts --serial <lab emulator> --out tests/fixtures/truth/<run>
- *        [--family presented] [--cells open,alert-dim]
+ *        [--app native|react-native] [--family presented] [--cells open,alert-dim]
  *
  * iOS: the raw WDA `/source?format=json` body (averi's own WdaServer, only its process lifecycle, on a port of its own
  * — never 8100/8101, the device-check simulator's — and a derived-data directory of its own) and the raw idb `ui
@@ -24,8 +25,11 @@ import { AndroidLab, IosLab, type LabDevice } from './lab-device.js';
  * named cells of those families; catalog.ts#selectCells — a name that matches nothing is an error, never an empty run).
  * A run of some cells adds to (or replaces those cells in) the run's manifest, from the same device only —
  * the description the guard reports equal to the manifest's. A cell built for another platform, or (Android) captured
- * under another navigation mode than the device's, is skipped and said (catalog.ts#captureRefusal). Exit code 1 when a
- * cell is broken (its truth's sources disagree).
+ * under another navigation mode than the device's, is skipped and said (catalog.ts#captureRefusal). `--app` names the
+ * lab app the run captures (schema.ts#LabApp; the native one unless said): a cell another app builds is skipped and
+ * said (lab-device.ts#otherApp), and a run holds one app's captures — the React Native app's go to a run of their own
+ * (tests/fixtures/truth/ios-rn-…, android-rn-…), its manifest's `app` AveriLabRN. Exit code 1 when a cell is broken
+ * (its truth's sources disagree).
  */
 
 export async function main(platform: 'ios' | 'android', argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -38,21 +42,23 @@ export async function main(platform: 'ios' | 'android', argv: string[] = process
       'wda-port': { type: 'string' },
       family: { type: 'string' },
       cells: { type: 'string' },
+      app: { type: 'string' },
     },
   });
   const id = platform === 'ios' ? values.udid : values.serial;
   if (id === undefined || values.out === undefined) {
-    throw new Error(platform === 'ios' ? 'usage: capture.ts --udid <udid> --out <dir> [--wda-port N] [--family f,g] [--cells a,b]' : 'usage: capture-android.ts --serial <serial> --out <dir> [--family f,g] [--cells a,b]');
+    throw new Error(platform === 'ios' ? 'usage: capture.ts --udid <udid> --out <dir> [--wda-port N] [--app native|react-native] [--family f,g] [--cells a,b]' : 'usage: capture-android.ts --serial <serial> --out <dir> [--app native|react-native] [--family f,g] [--cells a,b]');
   }
+  const app = parseLabApp(values.app);
   // The selection before the device: a name that matches nothing is refused without touching it.
   const catalog = await loadCatalog();
   const cells = selectCells(catalog, { families: values.family?.split(','), cells: values.cells?.split(',') });
-  const lab: LabDevice = platform === 'ios' ? new IosLab(id, { wdaPort: Number(values['wda-port'] ?? 8120) }) : new AndroidLab(id);
+  const lab: LabDevice = platform === 'ios' ? new IosLab(id, { wdaPort: Number(values['wda-port'] ?? 8120), app }) : new AndroidLab(id, { app });
   const script = platform === 'ios' ? 'capture.ts' : 'capture-android.ts';
-  const app = platform === 'ios' ? 'fixtures/apps/ios' : 'fixtures/apps/android';
+  const source = LAB_APP[app].source[platform];
   let result;
   try {
-    result = await capture(lab, cells, { out: resolve(values.out), note: `Ground truth: the ${platform === 'ios' ? 'iOS' : 'Android'} lab app (${app}), captured by scripts/truth/${script}`, catalog: catalog.cells });
+    result = await capture(lab, cells, { out: resolve(values.out), note: `Ground truth: the ${platform === 'ios' ? 'iOS' : 'Android'} ${app === 'native' ? '' : `${app} `}lab app (${source}), captured by scripts/truth/${script}`, catalog: catalog.cells });
   } finally {
     await lab.close();
   }

@@ -1,9 +1,10 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, type Exec } from '../../scripts/truth/lab-device.js';
+import { parseLabApp, type CatalogCell } from '../../scripts/truth/schema.js';
 
 // The lab devices' guards (scripts/truth/lab-device.ts): a capture or a live run touches the lab's own simulator or
 // AVD, or nothing — checked against what simctl and adb report, through a fake exec (no device).
@@ -97,7 +98,7 @@ describe('IosLab: the lab simulator or nothing', () => {
       expect(await new IosLab(OLD_LAB_UDID, { exec }).describe()).toBe('averi-lab iPhone 16 simulator, iOS 26.2');
       await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'ios', app: 'AveriLab', device: 'averi-lab iPhone 16 simulator, iOS 26.2', note: 'x', captures: [] }));
       await expect(capture(new IosLab(LAB_UDID, { exec }), [], { out, note: 'x', catalog: [], log: () => undefined })).rejects.toThrow(
-        /holds captures of ios "averi-lab iPhone 16 simulator, iOS 26\.2", not ios "averi-lab iPhone 17 simulator, iOS 27\.0"/,
+        /holds captures of AveriLab on ios "averi-lab iPhone 16 simulator, iOS 26\.2", not AveriLab on ios "averi-lab iPhone 17 simulator, iOS 27\.0"/,
       );
     } finally {
       await rm(out, { recursive: true, force: true });
@@ -151,5 +152,97 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     }
     const refused = fakeExec('Pixel_7_API_34\r\nOK');
     await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).navigation()).rejects.toThrow(/refused/);
+  });
+});
+
+describe('the lab apps: each device object drives one app, its cells only', () => {
+  const NATIVE_CELL = { id: 'own-parts', family: 'false-covers', layer: 'none', targets: [] } satisfies CatalogCell;
+  const RN_CELL = { id: 'rn-field', family: 'react-native', layer: 'none', targets: [] } satisfies CatalogCell;
+
+  it("the native app refuses the React Native app's cells, and the React Native app every other family's, on both platforms", () => {
+    for (const lab of [new IosLab(LAB_UDID), new AndroidLab('emulator-5554')]) {
+      expect(lab.unsupported(NATIVE_CELL)).toBeUndefined();
+      expect(lab.unsupported(RN_CELL)).toBe('a cell of the react-native lab app (AveriLabRN), not of AveriLab');
+    }
+    for (const lab of [new IosLab(LAB_UDID, { app: 'react-native' }), new AndroidLab('emulator-5554', { app: 'react-native' })]) {
+      expect(lab.unsupported(RN_CELL)).toBeUndefined();
+      expect(lab.unsupported(NATIVE_CELL)).toBe('a cell of the native lab app (AveriLab), not of AveriLabRN');
+    }
+  });
+
+  it("the Android layers each app builds are its own: the native app's set, the React Native app's any", () => {
+    const own = { id: 'rn-sheet', family: 'react-native', layer: 'rn-sheet', targets: [] } satisfies CatalogCell;
+    expect(new AndroidLab('emulator-5554', { app: 'react-native' }).unsupported(own)).toBeUndefined();
+    const native = { id: 'x', family: 'presented', layer: 'rn-sheet', targets: [] } satisfies CatalogCell;
+    expect(new AndroidLab('emulator-5554').unsupported(native)).toBe('layer rn-sheet is not one the Android app builds');
+  });
+
+  it('--app: the native app when not given, a lab app by its name, anything else refused', () => {
+    expect(parseLabApp(undefined)).toBe('native');
+    expect(parseLabApp('react-native')).toBe('react-native');
+    expect(() => parseLabApp('rn')).toThrow('no lab app rn (native, react-native)');
+  });
+
+  it('the React Native app launches its own bundle on iOS and reads its own container', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-rn-container-'));
+    try {
+      const { exec: base, calls } = fakeExec();
+      const exec: Exec = async (file, args) => {
+        const line = `${file} ${args.join(' ')}`;
+        if (/simctl (terminate|spawn) /.test(line)) return (calls.push(line), { stdout: '' });
+        if (/simctl get_app_container /.test(line)) return (calls.push(line), { stdout: `${dir}\n` });
+        if (/simctl launch /.test(line)) {
+          calls.push(line);
+          await mkdir(join(dir, 'Documents'), { recursive: true });
+          await writeFile(join(dir, 'Documents', 'lab-state.json'), JSON.stringify({ cell: 'rn-field', ready: true }));
+          return { stdout: '' };
+        }
+        return base(file, args);
+      };
+      expect((await new IosLab(LAB_UDID, { exec, app: 'react-native' }).launch('rn-field')).cell).toBe('rn-field');
+      expect(calls.filter((c) => /terminate|get_app_container|simctl launch/.test(c))).toEqual([
+        `xcrun simctl terminate ${LAB_UDID} dev.averi.lab.rn`,
+        `xcrun simctl get_app_container ${LAB_UDID} dev.averi.lab.rn data`,
+        `xcrun simctl launch ${LAB_UDID} dev.averi.lab.rn -cell rn-field`,
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('the React Native app starts its own package on Android and reads its own state file', async () => {
+    const { exec: base, calls } = fakeExec();
+    let started = false;
+    const exec: Exec = async (file, args) => {
+      const line = `${file} ${args.join(' ')}`;
+      if (/ am start | run-as .* rm /.test(line)) return (calls.push(line), (started ||= / am start /.test(line)), { stdout: '' });
+      if (/ run-as .* cat /.test(line)) return (calls.push(line), { stdout: started ? JSON.stringify({ cell: 'rn-field', ready: true }) : '' });
+      return base(file, args);
+    };
+    expect((await new AndroidLab('emulator-5554', { exec, app: 'react-native' }).launch('rn-field')).cell).toBe('rn-field');
+    expect(calls.filter((c) => /force-stop|run-as|am start/.test(c))).toEqual(
+      expect.arrayContaining([
+        'adb -s emulator-5554 shell am force-stop dev.averi.lab.rn',
+        'adb -s emulator-5554 shell run-as dev.averi.lab.rn rm -f files/lab-state.json',
+        'adb -s emulator-5554 shell am start -W -n dev.averi.lab.rn/.MainActivity --es cell rn-field',
+        'adb -s emulator-5554 exec-out run-as dev.averi.lab.rn cat files/lab-state.json',
+      ]),
+    );
+    expect(calls.filter((c) => /dev\.averi\.lab( |\/|$)/.test(c))).toEqual([]);
+  });
+
+  it("a run of one app's captures refuses the other app's: the manifest names its app", async () => {
+    const out = await mkdtemp(join(tmpdir(), 'averi-lab-device-'));
+    try {
+      const { exec } = fakeExec();
+      await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'ios', app: 'AveriLab', device: 'averi-lab iPhone 17 simulator, iOS 27.0', note: 'x', captures: [] }));
+      await expect(capture(new IosLab(LAB_UDID, { exec, app: 'react-native' }), [], { out, note: 'x', catalog: [], log: () => undefined })).rejects.toThrow(
+        /holds captures of AveriLab on ios "averi-lab iPhone 17 simulator, iOS 27\.0", not AveriLabRN on ios "averi-lab iPhone 17 simulator, iOS 27\.0"/,
+      );
+      const { manifest } = await capture(new IosLab(LAB_UDID, { exec }), [], { out, note: 'x', catalog: [], log: () => undefined });
+      expect(manifest.app).toBe('AveriLab');
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
   });
 });

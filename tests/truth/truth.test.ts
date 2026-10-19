@@ -323,6 +323,7 @@ const FORM_CELL: CatalogCell = { id: 'form-x', layer: 'none', targets: [], form:
 /** A screen 40×40 at scale 1, target A at (10,10 20×20) painted green; a tap at its centre logs what `onTap` says. */
 class FakeLab implements LabDevice {
   readonly platform = 'android';
+  readonly app = 'native';
   taps: [number, number][] = [];
   private events: LabState['events'] = [];
   constructor(
@@ -388,17 +389,35 @@ describe('capture', () => {
     });
   });
 
+  it("the IME-down system bands are read before the probes: a probe that focuses a field leaves the IME up (rn-field's M)", async () => {
+    // Its probe tap focuses a field: the IME comes up, and stays up through the relaunch-free end of the capture.
+    class FocusingLab extends FakeLab {
+      imeUp = false;
+      override async tap(x: number, y: number) {
+        await super.tap(x, y);
+        this.imeUp = true;
+      }
+      async displays() {
+        return `displays ime ${this.imeUp}`;
+      }
+    }
+    const lab = new FocusingLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
+    await run(lab, [OPEN]);
+    expect(lab.taps).toEqual([[20, 20]]);
+    expect(await readFile(join(out, 'open.displays.txt'), 'utf8')).toBe('displays ime false');
+  });
+
   it('a probe tap that reached nothing of the app is a broken cell, not "not reached"', async () => {
     const { broken } = await run(new FakeLab(() => []), [OPEN]);
     expect(broken).toEqual([expect.stringMatching(/^open\/A: the probe tap left no touch/)]);
   });
 
   it('a run of some cells keeps the others — from the same device only', async () => {
-    await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'android', device: 'fake emulator, Android 13 (API 33)', captures: [{ file: 'form-x.xml', source: 'uiautomator', form: 'raw' }] }));
+    await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'android', app: 'AveriLab', device: 'fake emulator, Android 13 (API 33)', captures: [{ file: 'form-x.xml', source: 'uiautomator', form: 'raw' }] }));
     const { manifest } = await run(new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [OPEN]);
     expect(manifest.captures.map((c) => c.file)).toEqual(['open.xml', 'form-x.xml']);
 
-    await expect(run(new FakeLab(() => [], 'another emulator, Android 14 (API 34)'), [OPEN])).rejects.toThrow(/holds captures of android "fake emulator, Android 13 \(API 33\)", not android "another emulator/);
+    await expect(run(new FakeLab(() => [], 'another emulator, Android 14 (API 34)'), [OPEN])).rejects.toThrow(/holds captures of AveriLab on android "fake emulator, Android 13 \(API 33\)", not AveriLab on android "another emulator/);
   });
 });
 
@@ -483,6 +502,7 @@ const FORM_TAPS: Record<string, (s: { focus: string | null }) => ProbeEvent[]> =
 
 class FakeIosFormLab implements LabDevice {
   readonly platform: 'ios' | 'android' = 'ios';
+  readonly app = 'native';
   taps: string[] = [];
   protected cell = '';
   protected focus: string | null = null;

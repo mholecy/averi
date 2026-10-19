@@ -7,6 +7,9 @@ import type { Family } from '../../../scripts/truth/schema.js';
 
 export const IOS = 'ios-iphone17-ios27';
 export const ANDROID = 'android-averi_lab-api33';
+/** The React Native lab app's runs (fixtures/apps/rn): the same devices, a run of their own per app. */
+export const IOS_RN = 'ios-rn-iphone17-ios27';
+export const ANDROID_RN = 'android-rn-averi_lab-api33';
 
 export interface Known {
   /** What the mismatch says first, up to its `: ` — the judge's reason, or `not in the tree` (vacuous). */

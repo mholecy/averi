@@ -1,0 +1,19 @@
+{
+  "platform": "android",
+  "app": "AveriLabRN",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "note": "Ground truth: the Android react-native lab app (fixtures/apps/rn), captured by scripts/truth/capture-android.ts",
+  "captures": [
+    {
+      "file": "rn-field.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "rn-field.png",
+      "truth": "rn-field.truth.json"
+    }
+  ]
+}

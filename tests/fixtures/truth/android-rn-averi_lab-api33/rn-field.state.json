@@ -1,0 +1,70 @@
+{
+  "cell": "rn-field",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "N.box": {
+      "x": 128,
+      "y": 303,
+      "width": 825,
+      "height": 176
+    },
+    "N": {
+      "x": 177,
+      "y": 360,
+      "width": 255,
+      "height": 61
+    },
+    "I.box": {
+      "x": 128,
+      "y": 798,
+      "width": 825,
+      "height": 176
+    },
+    "I": {
+      "x": 805,
+      "y": 826,
+      "width": 121,
+      "height": 121
+    },
+    "M.box": {
+      "x": 128,
+      "y": 1293,
+      "width": 825,
+      "height": 176
+    },
+    "M": {
+      "x": 177,
+      "y": 1350,
+      "width": 475,
+      "height": 61
+    }
+  },
+  "events": [],
+  "fields": {
+    "N": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "I": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "M": {
+      "value": "",
+      "focused": false,
+      "error": null
+    }
+  },
+  "focus": null,
+  "keyboard": null
+}
