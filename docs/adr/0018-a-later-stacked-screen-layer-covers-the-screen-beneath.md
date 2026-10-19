@@ -40,6 +40,10 @@ points): residuals 18 and 19 accepted, with an honest hint on the uiautomator no
 ("… to appear") and of `scroll_until` ("element never appeared in the tree") that the presented window's words do not
 claim — the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first
 (decision 5 of the same amendment). Not the asserts' "not found within …", nor a flow's `wait:` timeouts.
+Amended again 2026-10-19 (round 7, A5; iOS point 4 of the round-6 device check): idb's flat list holding UIKit's
+dismiss region over the whole screen is a presented layer listed alone, and a stroke that changed the screen stops
+`scroll_until` — residual 6 closed on idb for the medium sheet, and its cost elsewhere turned from a claimed stop into
+a loud one (see "Amendment: idb's presented layer" below).
 
 ## Context
 
@@ -608,7 +612,7 @@ alert, and a non-modal sheet.
 | 3 a presentation in a later Window | stands for `screen` (the flags rule is per Window; none measured); a typed layer in any Window covers what is drawn before it | stands |
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
-| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window") |
+| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window"), and **on idb** (2026-10-19) for a list holding UIKit's dismiss region; a stroke that changed the screen is a loud stop, never a claimed one (the amendment "idb's presented layer") |
 | 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
@@ -877,6 +881,56 @@ Compose `ModalBottomSheet` fully expanded — residual 18) stays unmarked, as do
 layout, `m3_side_sheet_dialog.xml`, other ids; unmeasured); an app's own views given Material's three ids
 and laid so read as the sheet dialog.
 
+## Amendment: idb's presented layer (2026-10-19)
+
+iOS point 4 of the round-6 device check (docs/truth/live-ios-2026-10-18-visibility.md; residual 6's idb paragraph):
+idb lists only what a presentation leaves to accessibility, so a target beneath the lab's sheets is never in its tree,
+and `scroll_until` stroked for it — in sheet-medium and sheet-background, A and B, the first stroke (touching down at
+(201,175)) DISMISSED the sheet and the next read found the target: "fully visible after 1 swipe". WDA refuses all of
+them. The orchestrator's decision: averi never claims success after its own stroke changed the presented layer — avoid
+the stroke where the tree shows the layer, and detect the change always.
+
+**Decision 1 — the mark (avoid).** The idb parser marks its flat list's ROOT `screen` when the list holds UIKit's
+dismiss region — the element `PopoverDismissRegion` (`Group 'dismiss popup'`, "Activate to dismiss pop-up window.") —
+whose frame covers the `Application` element's frame whole (adapters/ios-tree-source.ts#listsPresentedLayer): the
+list is then the presented layer, listed alone, as uiautomator's one presented window is. Measured specific: of every
+committed idb list (the lab's 31 captures, the device dumps under tests/fixtures) only sheet-medium's (the region twice,
+`-402,-874 1206x2622`, and the sheet's S) and sheet-medium-edges' (the regions alone) hold it. The presentation module
+reads the mark as Android's: `alone` is now the marks adapter's answer of ANY marked root (the uiautomator adapter,
+whose one addition it was, folded into `byMarks`; `fallback` is `shape` on every unjudged tree), and a mark on idb's
+rectless root lies on the screen by its listing. So the tap's wait ends "is not in the tree, which lists only the
+layer presented on top (the tree source lists nothing beneath a presented layer) — a screen is presented over it (a
+modal or a sheet) — close it first …" (a miss names what the tree lists alone, `ListedAs`: the window on uiautomator,
+the layer on idb), `scroll_until` for a target not in the tree stops before any swipe, and the sheet's own S is
+reached as before (the whole list is the layer's own; nothing listed is covered by it).
+
+**Decision 2 — the stop (detect).** `scroll_until` stops when THE SCREEN CHANGED UNDER THE STROKE
+(interact/scroll-rounds.ts#ScreenChange): the first read that reads after the strokes since the last one lists none of
+the ids that read listed (ui-tree/read-tree.ts#ScreenIdentity, `anotherScreen` — the concept fill's read-back already
+asked as `sameScreen`, now one owner), and none of those strokes touched down on content that read listed (a node of no
+structural role holding the touch-down). A plain failure, never absence, whether the target is on the new screen or
+not: "stopped after 1 swipe — the swipe CHANGED THE SCREEN: none of the 1 element the read before it listed by id
+(button:lab.sheet-background.S) is in the tree after it, and it touched down at (201,175) on nothing that read listed
+— it most likely dismissed a sheet or a modal presented over the screen (nothing was found beneath it), or the app left
+the screen. The element is in the tree only after that change, on the new screen: not judged, not claimed visible, and
+no further swipe was sent. If a sheet or a modal was open, it is gone: reopen it …". The touch-down condition keeps a
+fling through a list of identified rows (every row replaced, the stroke on one of them) a scroll.
+
+**Measured.** Golden over truth/round-7's captures (`--side` arch/r23-idb-sheet): 243 → 225 mismatches — the 18 `tap`
+and `scroll_until` rows of sheet-medium.idb (A–D) and sheet-medium-edges.idb (H, G, E, F, M) green, every other reply
+byte-identical but the 9 colour asserts there, which still fail "not found" (vacuous) and now say the layer
+("… (a sheet or modal is presented over it, and the tree lists only that layer — close it first)"). Golden reads one
+tree per case, so Decision 2 shows only live (below).
+
+**Residuals.** A presentation UIKit lays with no dimming view — a large-detent or full-screen sheet (sheet-background:
+the sheet's button alone), an alert, a transparent cover — is no presented layer on idb: its targets are still stroked
+for (residual 6 stands there), and where a stroke dismisses it Decision 2 says so, the stroke already sent. A sheet
+whose reads list no id (label-only content, idb's UIKit rows, NI1) is never told changed. A stroke on a bare gap of a
+list that lists only what shows, flung past every listed row, reads as changed — a loud stop where the scroll could go
+on. A dismiss region short of the whole screen (a popover's on an iPad?) is unmeasured, as is idb listing the screen
+beneath the region too (it would read as the layer's own). WDA and uiautomator trees list a scroll view or a window
+under every touch-down, so Decision 2 rarely holds there: their presented layers are their marks' to stop for.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -931,7 +985,11 @@ and laid so read as the sheet dialog.
      target beneath it is never in the tree — in sheet-medium and sheet-background, A and B, the first stroke (touching
      down at (201,175)) DISMISSED the sheet and the next read found the target: "fully visible after 1 swipe" claimed;
      beneath alert-dim and dim-cover (A–D) and the two sheets (C, D), two strokes on the layer, nothing dismissed,
-     "never appeared in the tree". WDA, whose tree marks those layers, stops before any swipe on every one;
+     "never appeared in the tree". WDA, whose tree marks those layers, stops before any swipe on every one.
+     **Closed on idb for a list holding UIKit's dismiss region** (2026-10-19, "Amendment: idb's presented layer"): the
+     medium sheet's targets are not stroked for. Beneath a layer idb shows no sign of (the large sheet, the alert, the
+     cover) they still are, but a stroke that dismisses the layer is no longer a claimed stop: `scroll_until` stops,
+     saying the swipe changed the screen;
    - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
      target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
      hidden twin `PopoverDismissRegion` of the sheet's dim in the form's own layer; scroll_until to it, judged either
