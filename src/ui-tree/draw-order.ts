@@ -345,6 +345,12 @@ export interface Exposure {
   readonly reaches: readonly Rect[];
   /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals) that a tap may be aimed at — clear, too, of the controls listed before it in reading order that overlap it (`readingOrderPeers`' `listedBefore`); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
+  /**
+   * The controls listed before it in reading order that overlap it (`readingOrderPeers`' `listedBefore`) which `largest`
+   * is cut clear of — in the list's order; empty when none cut what shows of it. Covers or not: one that is no cover
+   * (it holds no part of its centre) still counts in `shows`, so a sentence quoting `largest` names these.
+   */
+  readonly aimedClearOf: readonly UiNode[];
   /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — `coverAt` of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
   readonly centreCover?: UiNode;
   /**
@@ -1581,7 +1587,7 @@ function listsInReadingOrder(parent: UiNode): boolean {
  *   `To my account` and `SWIFT payment` rows it lies under (SWIFT payment over its centre). Only when one holds the
  *   centre: siblings that only overlap the target's edges by a few points (a card's shadow, an avatar stack, a badge)
  *   would else fail its colour assert and every `fully` stop on a cover that may lie beneath it.
- * - `untold`: those, and the ones listed AFTER it that hold its centre (which the draw order already gives as covers):
+ * - `unordered`: those, and the ones listed AFTER it that hold its centre (which the draw order already gives as covers):
  *   W, under C listed after it, is refused naming C as overlapping it, its order not told — not as drawn over it, with
  *   a scroll advised. Only over the centre: a floating control listed after a row that only pokes over its edge (a FAB
  *   in idb's flat list, not pinned by shape) keeps its draw order's remedy, a scroll.
@@ -1594,13 +1600,20 @@ function listsInReadingOrder(parent: UiNode): boolean {
  * listed before it or not (the pinned-bar cell's Continue, idb and WDA).
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  */
+/** What `readingOrderPeers` finds of a control target's siblings in a listing given in reading order (its doc says each). */
+interface ReadingOrderPeers {
+  readonly before: readonly Placed[];
+  readonly unordered: ReadonlySet<Placed>;
+  readonly listedBefore: readonly Placed[];
+}
+
 function readingOrderPeers(
   order: readonly Placed[],
   about: SeenFor,
   pinnedTargets: () => ReadonlyMap<Placed, number>,
-): { readonly before: readonly Placed[]; readonly untold: ReadonlySet<Placed>; readonly listedBefore: readonly Placed[] } {
+): ReadingOrderPeers {
   const { target, flatList, contentFrom, bottomChrome } = about;
-  const none = { before: [], untold: new Set<Placed>(), listedBefore: [] };
+  const none: ReadingOrderPeers = { before: [], unordered: new Set<Placed>(), listedBefore: [] };
   const t = target.node;
   const parent = target.parent;
   if (parent === undefined || !listsInReadingOrder(parent.node) || !isInteractive(t) || (flatList && target.at < contentFrom)) return none;
@@ -1620,7 +1633,7 @@ function readingOrderPeers(
   const holdsCentre = (p: Placed): boolean => containsPoint(p.node.rect, centre);
   const listedBefore = peers.filter((p) => p.at < target.at);
   const before = listedBefore.some(holdsCentre) ? listedBefore : [];
-  return { before, untold: new Set([...before, ...peers.filter((p) => p.at > target.at && holdsCentre(p))]), listedBefore };
+  return { before, unordered: new Set([...before, ...peers.filter((p) => p.at > target.at && holdsCentre(p))]), listedBefore };
 }
 
 export function drawOrder(tree: UiNode): DrawOrder {
@@ -1816,7 +1829,8 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
       // A moved tap never lands on a control listed before it in reading order that overlaps it, cover or not: which is on top is not told.
-      const aimable = (peers?.listedBefore ?? []).reduce<Rect[]>((left, p) => left.flatMap((piece) => subtract(piece, p.node.rect)), pieces);
+      const aimedClearOf = (peers?.listedBefore ?? []).filter((p) => pieces.some((piece) => rectIntersection(piece, p.node.rect) !== undefined));
+      const aimable = aimedClearOf.reduce<Rect[]>((left, p) => left.flatMap((piece) => subtract(piece, p.node.rect)), pieces);
       const largest = largestRect(aimable);
       const coverAt = (point: Point): UiNode | undefined => over.filter((c) => containsPoint(c.reach, point)).at(-1)?.node;
       const centre = tapPoint(node);
@@ -1835,9 +1849,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
         covers,
         reaches: over.map((c) => ({ ...c.reach })),
         ...(largest !== undefined && { largest: { ...largest } }),
+        aimedClearOf: aimedClearOf.map((p) => p.node),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        unordered: over.filter((c) => peers?.untold.has(c.placed) === true).map((c) => c.node),
+        unordered: over.filter((c) => peers?.unordered.has(c.placed) === true).map((c) => c.node),
         presented: over.filter((c) => c.wholeScreen || about?.over.surface(c.placed) !== undefined).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,

@@ -21,6 +21,10 @@
 > idb and WDA at `e0c2587e` —, and `ios-vis-r8-l4-1.json`, `-2.json`: C's tap refused, nothing fired, under both
 > sources and on the grouped variant under idb; C's `scroll_until` then still stroked three times on the blur, which
 > did not close the menu). The review's `scroll_until` stop and W's new wording are not yet measured live.
+> Left out, on purpose: the grouped variant's WDA tree, where the card and the screen beneath are two containers — W and
+> C children of different parents, W listed after C — so no run lists them in reading order: C stays refused under W by
+> draw order with "scroll_until it first", and its `scroll_until` still strokes three times beneath the blur
+> (presented.known.ts, #31's residual — the backdrop has no node — not this note's).
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/blur-menu.*`, captured by scripts/truth/capture.ts on the dedicated

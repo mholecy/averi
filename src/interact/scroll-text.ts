@@ -163,10 +163,13 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  * the standing names (ui-tree/standing.ts#Scene.standing), at the centre
  * when it is the one over it (the point the next tap presses).
  */
-function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): string {
+function underText({ judged, cover }: { readonly judged: Judged; readonly cover: UiNode }): string {
   const { centreCover, shows } = judged.standing.facts;
   return `${coverClause(judged.standing.facts, cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
 }
+
+/** When a stop that sends no swipe came: `before any swipe`, or `after N swipes, without swiping further`. */
+const stoppedWhen = (swipes: number): string => (swipes === 0 ? 'before any swipe' : `after ${swipesText(swipes)}, without swiping further`);
 
 /** The soft keyboard a match was judged under (`Judged.under`), as a cut-by remedy names it (target-text.ts#cutByRemedy). */
 const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : { lineY: under.line.y, remedy: under.remedy });
@@ -529,7 +532,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // and where the next swipe would have landed — on that screen (`notInViewportText`). "The next swipe", not
       // "the swipe toward it": a turn, or a caller's direction away from the target, strokes the other way.
       const { judged, viewport, next } = o;
-      const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
+      const when = stoppedWhen(o.swipes);
       const layer = next === undefined ? o.layer : next.layer;
       if (judged === undefined) {
         // No target in the tree: the next swipe would have landed on a layer the tree marks as presented
@@ -538,7 +541,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       const where =
         next === undefined
-          ? `element is in the viewport but ${coverClause(judged.standing.facts, o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
+          ? `element is in the viewport but ${underText({ judged, cover: o.cover })}`
           : `${notInViewportText(judged, viewport)}${touchDownText(next)}`;
       return {
         message:
@@ -550,11 +553,10 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // Under a cover whose order the tree does not tell (ui-tree/standing.ts#Remedy's `unordered`): stopped without a
       // swipe, as under a presented screen. A plain Error, as `stuck`: the element was there and seen.
       const { judged, viewport } = o;
-      const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
       return {
         message:
-          `scroll_until ${describe} stopped ${when} — element is in the viewport but ${coverClause(judged.standing.facts, o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ` +
-            `${percent(judged.standing.facts.shows)}% of it shows; ${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${unorderedRemedy('touch')}. ` +
+          `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${underText({ judged, cover: o.cover })}; ` +
+            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${unorderedRemedy('touch')}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

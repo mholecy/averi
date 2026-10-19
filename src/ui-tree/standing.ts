@@ -507,7 +507,14 @@ export const unorderedRemedy = (purpose: 'touch' | 'pixel'): string =>
  * covered sentences.
  */
 export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered'>, cover: UiNode, centre?: Point): string =>
-  (facts.unordered?.includes(cover) === true ? orderUntoldText : drawnOverText)(cover, centre, reachOf(facts, cover));
+  (orderUntold(facts, cover) ? orderUntoldText : drawnOverText)(cover, centre, reachOf(facts, cover));
+
+/**
+ * Whether `cover`, one of `facts.covers`, is one whose ORDER against the node the tree does not tell
+ * (draw-order.ts#Exposure.unordered: the two listed in reading order) — the one question every reader of
+ * `facts.unordered` asks: `Remedy`'s `unordered`, `coverClause`, the pixel assert's covered sentence.
+ */
+export const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
@@ -622,8 +629,11 @@ type TouchKind =
   /** `byScrollView`: the edges its scroll view's edge clips, inside the box, not the screen's (`ScrollViewCut`). */
   | { readonly kind: 'clipped'; readonly edges: readonly Edge[]; readonly byScrollView?: ScrollViewCut }
   | { readonly kind: 'cut'; readonly cut: Cut; readonly minPiece: number }
-  /** `largest` (the tap's): the largest piece nothing is drawn over, under the minimum; `aboveKeyboard`: judged above a keyboard line. */
-  | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly aboveKeyboard: boolean }
+  /**
+   * `largest` (the tap's): the largest piece nothing is drawn over, under the minimum — cut clear, too, of `clearOf`, the
+   * controls listed before it in reading order a tap is never aimed at (draw-order.ts#Exposure.aimedClearOf; absent when none cuts it); `aboveKeyboard`: judged above a keyboard line.
+   */
+  | { readonly kind: 'covered'; readonly cover: UiNode; readonly largest?: Rect; readonly clearOf?: readonly UiNode[]; readonly aboveKeyboard: boolean }
   /** `line`: the keyboard line its centre lies under (`Scene`'s contract says when a verb is stopped by it). */
   | { readonly kind: 'underKeyboard'; readonly line: KeyboardLine };
 
@@ -776,7 +786,7 @@ function remedied(
       case 'covered':
         // 2. Under a cover whose order the tree does not tell: no scroll tells it. 7. Else a touch's cover over the
         // centre: scroll it clear (the stop's stuck sentence names a cover no scroll clears).
-        return { ...touch, remedy: touch.facts.unordered?.includes(touch.cover) === true ? { of: 'unordered' } : { of: 'scroll' } };
+        return { ...touch, remedy: orderUntold(touch.facts, touch.cover) ? { of: 'unordered' } : { of: 'scroll' } };
       // 7. What a scroll brings within reach whatever lies around it.
       case 'offScreen':
       case 'clipped':
@@ -808,7 +818,7 @@ function remedied(
     }
     case 'covered':
       // 2. Under a cover whose order the tree does not tell: no scroll tells it.
-      if (pixel.facts.unordered?.includes(pixel.cover) === true) return { ...pixel, remedy: { of: 'unordered' } };
+      if (orderUntold(pixel.facts, pixel.cover)) return { ...pixel, remedy: { of: 'unordered' } };
       // 4. No scroll ever moves the screen itself out from under anything — idb's flat-list root, a screen-sized
       // element — nor an element laid from the screen's top edge at full width (a full-bleed header: iOS's, or
       // Android 15+'s edge-to-edge app bar).
@@ -1348,7 +1358,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
     const over = seen.centreCover;
     if (over === undefined) return undefined;
     const piece = within === frame ? seen : scene.order.exposure(node, within);
-    if (piece.tapAt === undefined) return { facts, kind: 'covered', cover: over, ...(piece.largest !== undefined && { largest: piece.largest }), aboveKeyboard };
+    if (piece.tapAt === undefined) return { facts, kind: 'covered', cover: over, ...(piece.largest !== undefined && { largest: piece.largest }), ...(piece.aimedClearOf.length > 0 && { clearOf: piece.aimedClearOf }), aboveKeyboard };
     if (!piece.tapAt.moved) return { facts, kind: 'reachable', at: piece.tapAt.point };
     return { facts, kind: 'reachable', at: piece.tapAt.point, moved: { piece: piece.tapAt.piece, cover: over, aboveKeyboard } };
   };

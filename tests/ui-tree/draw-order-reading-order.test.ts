@@ -36,6 +36,8 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     expect(seen.centreCover).toBe(w);
     expect(seen.unordered).toEqual([w]);
     expect(seen.tapAt).toBeUndefined();
+    // W is a cover, so what shows is already clear of it: nothing more to say of the part a tap may be aimed at.
+    expect(seen.aimedClearOf).toEqual([]);
   });
 
   it.each([
@@ -76,6 +78,10 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     expect(seen.centreCover).toBe(toast);
     // The only piece of C clear of the toast, 400–440, lies on W down to 430: 10 pt left, under the 24 a tap needs.
     expect(seen.tapAt).toBeUndefined();
+    // …and says so: the part a sentence quotes (`largest`) is cut clear of W, which `shows` still counts.
+    expect(seen.aimedClearOf).toEqual([w]);
+    expect(seen.largest).toEqual({ x: 51, y: 430, width: 300, height: 10 });
+    expect(seen.shows).toBeCloseTo(40 / 120);
   });
 
   it("a control listed AFTER the target that only pokes over its edge, clear of its centre, is a cover by draw order, its order told: a FAB over a row's corner in idb's flat list (not pinned: a tab bar's items listed after it)", () => {

@@ -722,3 +722,25 @@ describe('one remedy for a target under a cover whose order is not told — the 
     }
   });
 });
+
+// The part of a target a moved tap may be aimed at is clear, too, of the controls listed before it in reading order
+// that overlap it (draw-order.ts#Exposure.largest) — which are no covers of it when they hold no part of its centre, so
+// what shows of it (`shows`, scroll_until's "N% of it shows") counts what lies under them. The refusal says the part
+// it quotes is clear of them, so its WxH and scroll_until's percentage agree.
+// docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+describe('a refused tap on a target its moved tap keeps clear of a control listed before it, in reading order — the part it quotes says so', () => {
+  const w = node({ role: 'button', label: 'W', rect: { x: 51, y: 390, width: 300, height: 40 } });
+  const c = node({ role: 'button', label: 'C', identifier: 't', rect: { x: 51, y: 400, width: 300, height: 120 } });
+  const banner = node({ role: 'image', label: 'Banner', rect: { x: 0, y: 440, width: 402, height: 100 } });
+  const tree = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [w, c, banner] })] });
+
+  it('the tap names the control the 300x10 part is clear of; scroll_until counts the 300x40 showing', async () => {
+    expect(await tapSaid(tree, c)).toBe(
+      'id:t is under image "Banner" (0,440 402x100) at its centre (201,460), drawn over it; ' +
+        'only a 300x10 part of it shows clear of button "W" (51,390 300x40), listed before it in reading order, under the 24x24 a tap may be moved to — scroll_until it first; nothing was tapped',
+    );
+    const row: Row = { tree, found: [c], screen: USABLE };
+    const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: IPHONE }, [row, row]), 'id:t').message;
+    expect(failure).toContain('33% of it shows');
+  });
+});

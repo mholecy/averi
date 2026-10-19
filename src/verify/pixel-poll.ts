@@ -1,12 +1,12 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { coverText, nodeText, ORDER_UNTOLD, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, nodeText, overlapsUntoldText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { outsideItsScrollView, presentedRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { orderUntold, outsideItsScrollView, presentedRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -537,7 +537,7 @@ async function judgeOver(
     case 'covered': {
       const named = coverText(standing.cover, standing.reach);
       // A cover whose order against the element the tree does not tell (listed in reading order) is said as such.
-      const over = standing.facts.unordered?.includes(standing.cover) === true ? `overlaps the element ${at}), ${ORDER_UNTOLD}` : `is drawn over the element ${at})`;
+      const over = orderUntold(standing.facts, standing.cover) ? overlapsUntoldText(`the element ${at})`) : `is drawn over the element ${at})`;
       return `${named} ${over} — ${coverRemedy(standing.remedy)}`;
     }
     default: {
