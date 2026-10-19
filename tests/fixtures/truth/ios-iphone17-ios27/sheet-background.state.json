@@ -1,0 +1,44 @@
+{
+  "cell": "sheet-background",
+  "events": [],
+  "frames": {
+    "A": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 110
+    },
+    "B": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 290
+    },
+    "C": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 470
+    },
+    "D": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 650
+    },
+    "S": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 102
+    }
+  },
+  "ready": true,
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  }
+}

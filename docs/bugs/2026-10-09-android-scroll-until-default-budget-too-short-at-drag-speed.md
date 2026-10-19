@@ -60,3 +60,55 @@ screen at the timeout. The same call continued with `timeoutMs: 60000, maxSwipes
 2. `scroll_until { selector: "id:transactions.list.row_36", fully: true }` with the default budget → `failed after 15000ms (timeout)
    — element never appeared in the tree`; the shim shows 4 drag strokes and the list moved on each.
 3. The same with `timeoutMs: 60000, maxSwipes: 20` → `fully visible`.
+
+## Device check (2026-10-09 Android, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47831, cwd mp-native). Strokes and taps from
+the `adb` shim; page placement, bar show/hide and Gboard mode by hand with the real `adb`.
+
+Not fixed in round 5; recorded per the round-5 handoff R-1.
+
+- **Still so.** List at the top, bar shown, 15:37:57 `scroll_until { selector: "id:transactions.list.row_36", fully: true }` (default 15 s /
+  6 swipes) → `scroll_until id:transactions.list.row_36 failed after 15000ms (timeout) — element never appeared in the tree` (15.3 s) after
+  3 strokes (`540 1638 540 1028 611`, `540 1804 540 752 1054` ×2); the list moved on every stroke (row_17 reached). With `timeoutMs: 60000,
+  maxSwipes: 20` → `fully visible after 5 swipes` (27.6 s). The reply still does not say the list was moving.
+- Also measured: SWIFT `my_note_input` with IBAN focused (15:48:51) → `failed after 15000ms (timeout) — element in tree but never
+  intersected …` after 3 strokes (15.1 s); at 86eb42d after 4 (15.9 s), at 347e70d a fast fail after 5 (17.9 s). Bar-shown `row_40` at the
+  list end ran out at 15 s after 3 strokes, where at 86eb42d it fast-failed after 2 (see the tab-bar note).
+
+## Device check (2026-10-09 Android, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:33 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47841, cwd mp-native). Strokes and taps from the
+`adb` shim; placement and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's `averi.yaml` untouched.
+
+Not fixed (out of scope of round 6). **Still so:** 18:18:01 `row_36`, `fully: true`, default budget → `failed after 15000ms (timeout) —
+element never appeared in the tree` after 4 strokes (`540 1638 540 1028 611`, `540 1553 540 689 865` ×3), the list moving on each; with
+`timeoutMs: 60000, maxSwipes: 20` → `fully visible after 5 swipes`. SWIFT `my_note_input` with IBAN focused this time fast-failed (`failed
+after 5 swipes (the last 2 … did not move it …)`, 18.0 s) instead of the dd50327 timeout — see the soft-keyboard note.
+
+## Device check (2026-10-09 Android, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:19 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/`, stdio via the HTTP daemon on port 47851, cwd mp-native). Strokes and taps from the
+`adb` shim (`run9-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only
+(`cfg-opt-bank`, `cfg-opt-contacts`, `cfg-optional`, new `cfg-fill`, `cfg-fill-bank`); mp-native's `averi.yaml` untouched.
+
+Not fixed (out of scope). **Still so:** 20:45:31 `row_36`, `fully: true`, default budget → `failed after 15000ms (timeout)` after 3 strokes
+(each moved the list); with `timeoutMs: 60000, maxSwipes: 20` → `fully visible after 6 swipes`. SWIFT `my_note_input` with IBAN focused
+timed out again (`failed after 15000ms (timeout) …`, 3 strokes) — see the soft-keyboard note. Every call ran slower this run: a bare
+`uiautomator dump` took 2.4–2.7 s by hand (ui_snapshot 2.5–2.8 s against round 6's 2.0 s; every `tap` 5.7–6.1 s against 4.5 s on the same
+selectors) — the emulator, not averi (host load average 0.9–2.1; the iOS agent ran in parallel).
+
+## Device check (2026-10-10 Android, re-run at 35d5997)
+
+Measured 2026-10-10 06:16–06:47 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-7` @ `35d5997` (`dist/`, stdio via the HTTP daemon on port 47861, cwd mp-native). Strokes and taps from the
+`adb` shim (`run10-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's
+`averi.yaml` untouched.
+
+Not fixed (out of scope). **Still so:** 06:30:17 `row_36`, `fully: true`, default budget → `failed after 15000ms (timeout) — element never
+appeared in the tree` after 4 strokes (`540 1553 540 689 865` ×4; round 6b: 3); `timeoutMs: 60000, maxSwipes: 20` → `fully visible after 4
+swipes` from there (8 in all), row `66,1697 948x143`. Back: `row_0 fully, direction: up, timeoutMs 60000, maxSwipes 20` → `fully visible
+after 7 swipes` (`540 765 540 1857 1094` ×7, 29.4 s).

@@ -1,0 +1,31 @@
+name: AveriLab
+options:
+  bundleIdPrefix: dev.averi
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGNING_ALLOWED: "NO"
+targets:
+  AveriLab:
+    type: application
+    platform: iOS
+    sources:
+      - path: AveriLab
+      - path: ../cells.json
+        buildPhase: resources
+    info:
+      path: AveriLab/Info.plist
+      properties:
+        CFBundleDisplayName: AveriLab
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.averi.lab
+            CFBundleURLSchemes: [averilab]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.averi.lab
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: "NO"

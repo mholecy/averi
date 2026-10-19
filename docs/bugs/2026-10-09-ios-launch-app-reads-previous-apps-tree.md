@@ -266,3 +266,84 @@ appAlive: true
 
 The new text reaches the flow trace verbatim (the line elided above is identical to the `launch_app` reply). The PASS is right:
 Contacts showed its list.
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+**a3 previous app's tree never read — Holds, 3/3 + 2/2.** 15:59:19–15:59:38, each launch with the other app in front, one-line
+replies, no `⚠`:
+- `launch_app com.apple.MobileAddressBook` (2.0 s) + `assert [{ element: { text: "John Appleseed" }, absent: true, timeout: 500 }]`
+  → `1/1 asserts FAILED / FAIL  element text:"John Appleseed" is absent — still visible after 0.5 s` ×3 (1.2–1.3 s);
+- `launch_app com.finshape.dbosbanking` (1.0 s) + absent `id:"accounts.detail.search_field"` → `FAIL … still visible after 0.5 s` ×2.
+
+**Flow `launch:` (C1, one launch shared) — Holds.** English, no stale window: `run_flow launch_contacts` (`cfg-contacts-idb`,
+15:59:45) → `flow launch_contacts: start / launch: com.apple.MobileAddressBook / assert PASS: element id:"New Contact" is absent /
+… done`; `run_flow launch_bank` → `launch: com.finshape.dbosbanking / assert FAIL … still visible after 0.5 s` (the bank was on Account
+Detail, as it must).
+
+**a5 localized display name — Holds, identical to 86eb42d.** Originals saved (`run7-ios/lang-before.txt`: `AppleLanguages ("en-US",
+"sk-US")`, `AppleLocale en_US@rg=skzzzz`; `global-before.plist`). `AppleLanguages (de-DE, en-US, sk-US)`, bank in front through
+averi, Contacts terminated:
+
+```
+16:00:04 launch_app { platform: ios, appId: com.apple.MobileAddressBook }                                           (3.8 s)
+→ Launched com.apple.MobileAddressBook on ios
+  ⚠ 3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Kontakte" — iOS can hand
+  idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app (an absent check
+  passes on it). Treat the tree as the previous app's until a read is labelled "Contacts": after an app switch idb was measured
+  serving the previous app's tree for 4.5 s and more. Only if a read 20 s or more after the launch is still labelled "Kontakte"
+  while the screenshot shows com.apple.MobileAddressBook is that label its on-screen name (a localized display name its Info.plist
+  does not carry), and this note can be ignored. The screenshot alone cannot tell them apart: it shows the launched app before
+  idb's tree does
+```
+
+And through a flow (bank in front, Contacts terminated, `run_flow launch_contacts`, 16:00:15, 4.1 s): `launch: com.apple.MobileAddressBook`
+then `⚠ launch: 3 s after launching …` — the same text verbatim, then `assert PASS …`, `done`. So `launch_app` and the flow `launch:`
+give the one note (C1). The launch did not fail. Restored `AppleLanguages (en-US, sk-US)`; the exported global domain compared
+**identical** (`cmp`) to the one before; Contacts terminate + launch (16:00:26, 3.1 s, no `⚠`) → `other 'Contacts'`.
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+**a3 — Holds, 3/3 + 2/2.** 18:37:xx, each launch with the other app in front, one-line replies, no `⚠`:
+`launch_app com.apple.MobileAddressBook` (1.9–2.3 s) + `assert [{ element: { text: "John Appleseed" }, absent: true, timeout: 500 }]` →
+`1/1 asserts FAILED / FAIL element text:"John Appleseed" is absent — still visible after 0.5 s` ×3; `launch_app com.finshape.dbosbanking`
+(1.0–1.1 s) + absent `id:"accounts.detail.search_field"` → `FAIL … still visible after 0.5 s` ×2.
+
+**Flow `launch:` (C1) — Holds.** `run_flow launch_bank` (`cfg-bank-idb`) → `launch: com.finshape.dbosbanking / assert FAIL: element
+id:"accounts.detail.search_field" is absent — still visible after 0.5 s` (the bank on Account Detail, as it must); `run_flow
+launch_contacts` (`cfg-contacts-idb`) → `launch: com.apple.MobileAddressBook / assert PASS: element id:"New Contact" is absent / done`.
+
+**a5 localized display name — Holds, identical to 86eb42d/dd50327.** Originals saved (`AppleLanguages ("en-US","sk-US")`, `AppleLocale
+en_US@rg=skzzzz`, `global-before.plist`). `AppleLanguages (de-DE, en-US, sk-US)`, the bank in front through averi, Contacts terminated:
+`launch_app com.apple.MobileAddressBook` (4.1 s) → `Launched …` + `⚠ 3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI
+tree was still the app labelled "Kontakte" — … Treat the tree as the previous app's until a read is labelled "Contacts": … Only if a read
+20 s or more after the launch is still labelled "Kontakte" while the screenshot shows com.apple.MobileAddressBook is that label its
+on-screen name …` (the third branch, verbatim). Through a flow (`run_flow launch_contacts`, 4.3 s): `launch: com.apple.MobileAddressBook`,
+`⚠ launch: 3 s after launching …` (the same text), `assert PASS`, `done`. Restored `AppleLanguages (en-US, sk-US)`; the exported global
+domain compared **identical** (`cmp`) to the one before; Contacts terminate + launch → `other 'Contacts'`.
+
+## Device check (2026-10-09 iOS, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/` built 22:41 local, stdio via the HTTP daemon on port 47853, cwd mp-native),
+mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only (`cfg-swift-wda`, `cfg-swift-idb`, `cfg-c-wda`,
+`cfg-contacts-idb`, `cfg-bank-idb`, `cfg-set-wda`, `cfg-optfill-ios`, `cfg-optfill-bank`), `idb` PATH shim logging every
+`idb ui tap|swipe|text`. Comparisons with `2f98900` ran on a scratch worktree build of that hash (port 47855, removed afterwards) on the
+same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags (`run9-ios/manual.log`). Run folder:
+`scratchpad/averi-repo/run9-ios`.
+
+**a3 — Holds, 3/3 + 3/3.** Each launch with the other app in front, one-line replies: `launch_app com.finshape.dbosbanking` + absent
+`id:"swift_payment.form.title"` → `FAIL … still visible after 0.5 s` ×3; `launch_app com.apple.MobileAddressBook` + absent `text:"John
+Appleseed"` → `FAIL … still visible after 0.5 s` ×3. Flow `launch:` — `launch_bank` → `assert PASS: … search_field is absent` (the bank was on
+the SWIFT form, correctly), `launch_contacts` → `assert PASS … "New Contact" is absent` / `done`. Every launch (bank ×9, Contacts ×6,
+Settings ×1) returned one line and a populated tree; no `⚠`, no empty `Application`. 3.2 did not fire this time (cold Contacts after the
+bank, 21:06:14: 3.5 s, tree already Contacts'). a5 (German display name) not re-run: no launch code changed between 2f98900 and 5e5a3d1
+(`git diff --stat 2f98900 5e5a3d1 -- src`).

@@ -1,0 +1,193 @@
+{
+  "cell": "bands",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "S",
+      "id": "lab.bands.S",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "height": 20,
+        "width": 300,
+        "x": 51,
+        "y": 21
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0.901,
+      "seen": "#E53935",
+      "geometry": "status-band",
+      "visible": {
+        "x": 51,
+        "y": 21,
+        "width": 300,
+        "height": 20
+      },
+      "piece": null,
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "O",
+      "id": "lab.bands.O",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 58
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,90.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5",
+      "geometry": "band-overlap:status",
+      "visible": {
+        "x": 51,
+        "y": 58,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 62,
+        "width": 300,
+        "height": 60
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "W",
+      "id": "lab.bands.W",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 405
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,437.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#43A047",
+      "geometry": "whole",
+      "visible": {
+        "x": 51,
+        "y": 405,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 405,
+        "width": 300,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "Q",
+      "id": "lab.bands.Q",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 780
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,812.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#FB8C00",
+      "geometry": "band-overlap:nav",
+      "visible": {
+        "x": 51,
+        "y": 780,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 780,
+        "width": 300,
+        "height": 60
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "N",
+      "id": "lab.bands.N",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "height": 20,
+        "width": 300,
+        "x": 51,
+        "y": 847
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,857.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#8E24AA",
+      "geometry": "nav-band",
+      "visible": {
+        "x": 51,
+        "y": 847,
+        "width": 300,
+        "height": 20
+      },
+      "piece": null,
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  }
+}

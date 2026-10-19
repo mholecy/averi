@@ -1,17 +1,18 @@
 import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge } from '../ui-tree/geometry.js';
+import { axisOfEdge, containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { countOf } from '../util/count.js';
-import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
-import { absenceError, type WaitEvidence } from './resolve.js';
-import { cutByRemedy, cutRemedy, hideKeyboardHow, ridingKeyboard, wholeThinWayPast, cutSliverText, dismissKeyboardFirstText, pastSideText, revealText, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
-import { shortOf, type Cover, type Judged } from './scroll-read.js';
+import { withMissNote } from '../ui-tree/miss.js';
+import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
+import { countOf } from '../util/count.js';
+import { absenceError, type WaitEvidence } from './resolve.js';
+import { shortOf, type Cover, type Judged } from './scroll-read.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
+import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, revealText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -93,7 +94,7 @@ export interface ScrollUntilResult {
    * says a clip.
    * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    */
-  covered?: { by: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>; shows: number };
+  covered?: { by: QuotedNode; shows: number };
   /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
   /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (scroll-rounds.ts#EndTurn); the reply says so. */
@@ -205,24 +206,27 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
 }
 
-
-/** `1 swipe up did not move`, `2 swipes up did not move`, or — some of them moved it — `3 swipes up, the last of which did not move` / `…, the last 2 of which did not move`. */
-function unmovedText({ after, unmoved, from }: EndTurn): string {
-  if (unmoved >= after) return `${swipesText(after)} ${from} did not move`;
-  return `${swipesText(after)} ${from}, the last ${unmoved === 1 ? '' : `${unmoved} `}of which did not move`;
+/** `1 swipe up did not move it`, `2 swipes up did not move it`, or — some of them moved it — `3 swipes up, the last of which did not move it` / `…, the last 2 of which did not move it`. */
+function unmovedText({ after, unmoved, way }: EndTurn): string {
+  if (unmoved >= after) return `${swipesText(after)} ${way} did not move it`;
+  return `${swipesText(after)} ${way}, the last ${unmoved === 1 ? '' : `${unmoved} `}of which did not move it`;
 }
 
 /**
- * The end turn's clause (scroll-rounds.ts#EndTurn), before the detent's in every reply and failure that made one —
- * `; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi
- * turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end, and
- * that averi, not the caller, chose the way after. Empty when no end turn was made.
+ * The end proof's one wording (scroll-rounds.ts#EndProof), in the end turn's clause and the bound's failure:
+ * `the tree lists the content of scrollable (0,380 402x180) ending at its top`.
  */
-const endTurnText = (turn: EndTurn | undefined): string =>
-  turn === undefined
-    ? ''
-    : `; ${unmovedText(turn)} ${nodeText(turn.scrollView)} — the tree lists its content ending at its ${EDGE_TOWARD[turn.from]} — ` +
-      `so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
+const endText = ({ way, scrollView }: EndProof): string => `the tree lists the content of ${nodeText(scrollView)} ending at its ${EDGE_TOWARD[way]}`;
+
+/**
+ * The end turn's clause (scroll-rounds.ts#EndTurn), before the detent's in every reply and failure that made one —
+ * `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
+ * averi turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end
+ * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made. Exported for the
+ * troubleshooting reference, which quotes one rendering (tests/mcp/tool-descriptions.test.ts pins it).
+ */
+export const endTurnText = (turn: EndTurn | undefined): string =>
+  turn === undefined ? '' : `; ${unmovedText(turn)} — ${endText(turn)} — so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
 
 /**
  * The detent clause, last in every reply and failure (scroll-rounds.ts#DetentMove): a sheet moved during the call —
@@ -234,9 +238,11 @@ const detentText = (detent: DetentMove | undefined): string => (detent === undef
 /**
  * The flush clause (scroll-rounds.ts#PROBE_REACH): what the stop's edge on
  * its scroll container means — checked by a probe, or not checked. The
- * container is quoted as a node's rect (`rectText`): it is one.
+ * container is quoted as a node's rect (`rectText`): it is one. Exported for
+ * the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins
+ * its `axis` rendering).
  */
-function flushText(flush: ScrollUntilResult['flush']): string {
+export function flushText(flush: ScrollUntilResult['flush']): string {
   if (flush === undefined) return '';
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
   if ('edges' in flush) {
@@ -254,7 +260,7 @@ function flushText(flush: ScrollUntilResult['flush']): string {
   const unchecked = {
     budget: 'no swipe or time was left to check it',
     room: 'no scroll container around it has room for a probe swipe to check it',
-    axis: `every scroll container around it from that one outward scrolls only ${flush.edge === 'top' || flush.edge === 'bottom' ? 'sideways' : 'up and down'}, so no probe swipe can move its ${flush.edge} edge into view to check it`,
+    axis: `every scroll container around it from that one outward scrolls only ${axisOfEdge(flush.edge) === 'vertical' ? 'sideways' : 'up and down'}, so no probe swipe can move its ${flush.edge} edge into view to check it`,
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
   return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — ${cut}`;
@@ -271,8 +277,7 @@ const STILL_MOVING = 'still moving at the last read (a fling not yet over, or an
  * flow", the deliberate exception recorded in keyboard-window.ts.
  */
 function hideToJudgeWholeScreen(remedy: KeyboardRemedy): string {
-  const again = `to reach it with the keyboard down, hide it first (${hideKeyboardHow(remedy)}) and scroll again`;
-  return remedy.dismissal === 'back' ? again : `${again}; ${cannotHide(remedy.advice)}`;
+  return hideClause(remedy, `to reach it with the keyboard down, hide it first (${hideKeyboardHow(remedy)}) and scroll again`);
 }
 
 /** What the stop judged against, for "never intersected …". */
@@ -320,9 +325,10 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  * would have landed (`next`); empty when it was judged in the frame. A touch-down outside where the surface reaches is
  * said to land on the dim outside it: Android's dialog window, listed alone, reaches only its own rect, and a touch
  * beside it lands on the dim the dialog lays around it (which dismisses it) —
- * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md.
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md. Exported for the
+ * troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the dim's rendering).
  */
-const touchDownText = (next: PresentedTouchDown | undefined): string =>
+export const touchDownText = (next: PresentedTouchDown | undefined): string =>
   next === undefined
     ? ''
     : `, and the next swipe would touch down at ${pointText(next.touchDown)} on ${containsPoint(next.reach, next.touchDown) ? '' : 'the dim outside '}${coverText(next.surface, next.reach)}`;
@@ -460,7 +466,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // skipped "(not present)" — with the keyboard named, since no swipe
       // could look further.
       const { cover, viewport } = o;
-      const seenAs = o.evidence.sighted ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
+      const seenAs = o.evidence.sighted ? 'the element is in the tree but under the soft keyboard' : withMissNote('element never appeared in the tree', o.evidence.miss);
       return {
         message:
           `scroll_until ${describe} failed after ${swipesText(o.swipes)} — ${seenAs}; the soft keyboard over ` +
@@ -570,8 +576,8 @@ function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
   return undefined;
 }
 
-/** Which bound ended it, as the failure's cause. */
-function boundText(by: BoundBy, swipes: number): string {
+/** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */
+export function boundText(by: BoundBy, swipes: number): string {
   switch (by.of) {
     case 'exhausted': {
       // `tree`: there is no match to watch, so the sentence
@@ -583,8 +589,8 @@ function boundText(by: BoundBy, swipes: number): string {
       const verb = by.unchanged === 'tree' ? 'did not change the screen' : 'did not move it';
       // Proven by the tree (scroll-rounds.ts#BoundBy's `ends`): where the content ends is listed — no other cause to keep.
       if (by.ends !== undefined) {
-        const which = by.ends.strokes === 1 ? `swiping ${by.lastStroke}` : `the last ${by.ends.strokes}, swiping ${by.lastStroke},`;
-        return `after ${swipesText(swipes)} (${which} ${verb}: the tree lists the content of ${nodeText(by.ends.scrollView)} ending at its ${EDGE_TOWARD[by.lastStroke]} — content exhausted)`;
+        const which = by.ends.unmoved === 1 ? `swiping ${by.ends.way}` : `the last ${by.ends.unmoved}, swiping ${by.ends.way},`;
+        return `after ${swipesText(swipes)} (${which} ${verb}: ${endText(by.ends)} — content exhausted)`;
       }
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
       const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken`;
@@ -643,7 +649,7 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':
-      return `element never appeared in the tree${short.windowHint !== undefined ? ` (${short.windowHint})` : ''}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
+      return `${withMissNote('element never appeared in the tree', short.miss)}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':

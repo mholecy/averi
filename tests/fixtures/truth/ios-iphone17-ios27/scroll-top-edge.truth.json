@@ -1,0 +1,80 @@
+{
+  "cell": "scroll-top-edge",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.scroll-top-edge.A",
+      "color": "#6D4C41",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": -282
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "unprobed": "its centre (201,-250) lies off the 402x874 screen"
+    },
+    {
+      "tag": "T",
+      "id": "lab.scroll-top-edge.T",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": -2
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0.735,
+      "seen": "#3949AB",
+      "geometry": "status-band",
+      "visible": {
+        "x": 51,
+        "y": 0,
+        "width": 300,
+        "height": 62
+      },
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "page": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    }
+  }
+}

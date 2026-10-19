@@ -1,0 +1,50 @@
+{
+  "cell": "bands",
+  "events": [],
+  "frames": {
+    "N": {
+      "height": 20,
+      "width": 300,
+      "x": 51,
+      "y": 847
+    },
+    "O": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 58
+    },
+    "Q": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 780
+    },
+    "S": {
+      "height": 20,
+      "width": 300,
+      "x": 51,
+      "y": 21
+    },
+    "W": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 405
+    }
+  },
+  "ready": true,
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  }
+}

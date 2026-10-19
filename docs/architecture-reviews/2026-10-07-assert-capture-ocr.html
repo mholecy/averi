@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Assert, capture a OCR</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+</script>
+<style>
+  .seam { stroke-dasharray: 4 4; }
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+  .schem { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  code { font-size: .9em; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+<header class="space-y-3">
+  <h1 class="font-serif text-4xl">averi: assert pipeline, capture a OCR</h1>
+  <p class="text-sm text-slate-500">branch <code>main</code> (HEAD <code>0e48a63</code>) · 2026-10-07 · read-only review · referenčné rozhodnutia: <code>ARCHITECTURE.md</code> §Verification Engine a „Waits, not sleeps“, <code>docs/architecture-review-2026-08-14.md</code>, <code>docs/bugs/2026-10-06-*</code></p>
+  <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+    <span><span class="inline-block w-3 h-3 border border-slate-500 align-middle"></span> module</span>
+    <span><span class="inline-block w-6 border-t-2 border-dashed border-slate-500 align-middle"></span> seam</span>
+    <span><span class="inline-block w-6 border-t-2 border-red-600 align-middle"></span> leak / drift</span>
+    <span><span class="inline-block w-3 h-3 deep align-middle"></span> deep module</span>
+  </div>
+  <p class="text-sm text-slate-600">Hot spot: <code>verify/assert.ts</code> (24 commitov, 10 od 1. 10.), <code>capture.ts</code> (9/9), <code>pixel-poll.ts</code> (7/7), <code>text-parity.ts</code> (14/6). Neopakujem C9, C8c, C5, V2+V3, V5, pixel-poll sériu, nálezy 1–3 z device runu, ani dnešné návrhy parity reviewu (window-width trust, test-only tolerancie, fill sampler, párovanie) a MCP reviewu (jedno čítanie averi.yaml, defaulty citované z kódu). Dva nálezy som overil throwaway skriptom (C1, C4).</p>
+</header>
+
+<section id="candidates" class="space-y-14">
+
+<!-- ============================ C1 ============================ -->
+<article id="c1" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+  <h2 class="font-serif text-2xl">C1 · Jedna voľba OCR na beh — verify run ju podá aj svojim <code>ocr</code> assertom</h2>
+  <div class="flex flex-wrap gap-2 text-xs">
+    <span class="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 font-semibold">Strong</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">ports &amp; adapters</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/run/verify.ts:60-61, :459, :522</li>
+    <li>src/verify/assert.ts:201-202, :377-382</li>
+    <li>src/verify/text-parity.ts:437-448</li>
+    <li>src/verify/ocr.ts:105-109, :242-256</li>
+    <li>tests/run/verify.test.ts:860-890</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4">
+      <p class="schem text-slate-500 mb-2">Before</p>
+      <pre class="mermaid">
+flowchart TB
+  R["runVerification<br/>req.ocrEngine"] -->|override| TM["textMeasurement<br/>ocrEngineFor(override)"]
+  R -.->|"nič"| V1["Verifier leg android<br/>ocrEngineFor(undefined)"]
+  R -.->|"nič"| V2["Verifier leg ios<br/>ocrEngineFor(undefined)"]
+  TM --> E1["VisionOcr #1"]
+  V1 --> E2["VisionOcr #2"]
+  V2 --> E3["VisionOcr #3"]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class V1,V2 leak
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4">
+      <p class="schem text-slate-500 mb-2">After</p>
+      <pre class="mermaid">
+flowchart TB
+  R["runVerification"] --> C["ocrEngineFor(req.ocrEngine)<br/>raz na beh"]
+  C --> TM["textMeasurement"]
+  C --> V1["Verifier leg android"]
+  C --> V2["Verifier leg ios"]
+  C --> E["jeden OCR adapter<br/>VisionOcr | fake"]
+  classDef deep fill:#0f172a,color:#fff;
+  class C deep
+      </pre>
+    </div>
+  </div>
+  <p><strong>Problém:</strong> OCR seam má dva adaptery (VisionOcr, fake v testoch), ale verify run ho prekročí len pre text tabuľku — <code>req.ocrEngine</code> ide do <code>textMeasurement</code> (verify.ts:522), no Verifier legu sa vytvára bez neho (verify.ts:459), takže <code>ocr</code> assert v <code>specs</code> si volí engine sám.</p>
+  <p class="text-sm text-slate-600">Overené skriptom (fake engine v requeste, <code>process.platform = 'linux'</code>): výsledok <code>FAIL … OCR needs the macOS Vision framework (this host is linux); failing closed, rendered text unchecked</code>, fake engine volaný <strong>0×</strong>. Test „one reason, quoted by both callers“ (verify.test.ts:876) preto musí assert polovicu skúšať cez ručne postavený <code>new Verifier</code> mimo behu. Vedľajší náklad: každý Verifier si memoizuje vlastný VisionOcr (assert.ts:382) a každá inštancia spustí <code>swiftc --version</code> pred kontrolou cache (ocr.ts:245 vs :256) — 0,1–0,5 s na inštanciu, v dvojplatformovom behu až trikrát.</p>
+  <p><strong>Riešenie:</strong> verify run rozhodne OCR raz (<code>ocrEngineFor</code>) a tú istú voľbu podá text tabuľke aj Verifieru každého legu; doc poľa <code>ocrEngine</code> hovorí „každé OCR čítanie behu“, nie „text table“.</p>
+  <ul class="list-disc pl-6 text-sm space-y-1">
+    <li>leverage: jedno prekročenie seamu, všetci konzumenti</li>
+    <li>run-level testy fakujú aj <code>ocr</code> assert</li>
+    <li>locality: voľba enginu na jednom mieste behu</li>
+    <li>jeden VisionOcr, jeden swiftc probe na beh</li>
+  </ul>
+</article>
+
+<!-- ============================ C2 ============================ -->
+<article id="c2" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+  <h2 class="font-serif text-2xl">C2 · Meranie <code>ocr</code> assertu má jedného vlastníka, ako ho má <code>color</code></h2>
+  <div class="flex flex-wrap gap-2 text-xs">
+    <span class="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 font-semibold">Strong</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">in-process</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/verify/assert.ts:386-407 (measure closure)</li>
+    <li>src/verify/text-parity.ts:388-399 (ocrRegionForRect), :991-1039 (evaluateOcrAssert)</li>
+    <li>src/verify/color-parity.ts:682-724 (evaluateColorAssert — vzor)</li>
+    <li>src/verify/fail-closed.ts:1-15</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4 space-y-2">
+      <p class="schem text-slate-500">Before — ocr measure poskladaný v assert.ts</p>
+      <div class="border border-slate-400 rounded p-2 text-xs space-y-1">
+        <p class="schem">Verifier.assertOcr · measure</p>
+        <div class="grid grid-cols-2 gap-1">
+          <div class="border border-slate-300 rounded p-1">ocrRegionForRect → <span class="text-emerald-700">failClosed</span></div>
+          <div class="border border-red-500 rounded p-1 text-red-700">read.error → raw detail</div>
+          <div class="border border-slate-300 rounded p-1">evaluateOcrAssert (pure)</div>
+          <div class="border border-red-500 rounded p-1 text-red-700">catch → „OCR failed: …“, poll pokračuje</div>
+        </div>
+      </div>
+      <div class="border border-slate-400 rounded p-2 text-xs">
+        <p class="schem">text-parity.ts · evaluateOcrAssert</p>
+        <p class="text-red-700">„…; failing closed. Causes…“ (:1001) · „…; failing closed“ (:1026) — ručne, bez <code>failClosed</code></p>
+      </div>
+      <div class="border border-slate-400 rounded p-2 text-xs bg-slate-50">
+        <p class="schem">color: jedno volanie</p>
+        <p>measure = evaluateColorAssert(rect, exp, frame) — všetky fail-closed vety vo vnútri</p>
+      </div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4 space-y-2">
+      <p class="schem text-slate-500">After</p>
+      <div class="border border-slate-400 rounded p-2 text-xs">
+        <p class="schem">Verifier.assertOcr</p>
+        <p>measure = measureOcrAssert(engine, rect, shot, frame, exp)</p>
+      </div>
+      <div class="deep text-white rounded p-3 text-xs space-y-1">
+        <p class="schem text-slate-300">text-parity · ocr assert (deep)</p>
+        <p class="text-slate-400">crop → recognize → region error → verdict</p>
+        <p class="text-slate-400">každé „nečítané“ cez <code>failClosed(…, 'rendered text')</code></p>
+        <p class="text-slate-400">engine throw = miss s dôvodom; vlastná chyba nie je OCR chyba</p>
+      </div>
+      <div class="border border-slate-400 rounded p-2 text-xs bg-slate-50">
+        <p class="schem">color: bez zmeny</p>
+      </div>
+    </div>
+  </div>
+  <p><strong>Problém:</strong> <code>evaluateOcrAssert</code> bol vytiahnutý ako pure funkcia pre testovateľnosť (text-parity.ts:985-988), no politika „nečítané = fail closed“ žije v jeho volajúcom v assert.ts — a tam sa rozišla: <code>read.error</code> ide von bez „failing closed, rendered text unchecked“ (assert.ts:398), výnimka ako „OCR failed: …“ (:404), a dve vety v text-parity.ts:1001/:1026 sú ručne písané. <code>fail-closed.ts</code> výslovne hovorí, že táto veta „must always read the same way“ a bola zjednotená na ôsmich miestach.</p>
+  <p><strong>Riešenie:</strong> crop, rozpoznanie, chyba regiónu a verdikt idú do jednej funkcie vedľa <code>evaluateOcrAssert</code>, ktorej <code>pollPixels</code> podá frame tak, ako podáva color assertu; assert.ts drží len popis a výber enginu.</p>
+  <ul class="list-disc pl-6 text-sm space-y-1">
+    <li>locality: ocr fail-closed vety v jednom module</li>
+    <li>testy cez <code>measuredFrameFor</code> fixture, bez pollu</li>
+    <li>color a ocr assert majú rovnaký tvar</li>
+    <li>interface Verifiera sa zúži o closure</li>
+  </ul>
+</article>
+
+<!-- ============================ C3 ============================ -->
+<article id="c3" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+  <h2 class="font-serif text-2xl">C3 · Regex sa overí tam, kde sa parsuje — nie v poll slučke</h2>
+  <div class="flex flex-wrap gap-2 text-xs">
+    <span class="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 font-semibold">Strong</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">in-process</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/verify/element-assert.ts:31 (match: z.string())</li>
+    <li>src/verify/assert.ts:133 (ocr.match: z.string()), :275 (new RegExp v evaluate), :401-405 (catch)</li>
+    <li>src/verify/text-parity.ts:1015 (new RegExp)</li>
+    <li>src/ui-tree/read-tree.ts pollTree („the predicate's own errors propagate“)</li>
+    <li>src/mcp/tools.ts:157 · src/flow/config.ts:261</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4">
+      <p class="schem text-slate-500 mb-2">Before — <code>match: "("</code></p>
+      <pre class="mermaid">
+sequenceDiagram
+  participant S as zod schema
+  participant V as Verifier
+  participant P as poll
+  S->>V: parse OK
+  alt element match
+    V->>P: evaluate → new RegExp throws
+    P--xV: throw z assertAll (ostatné výsledky stratené)
+  else ocr match
+    V->>P: measure → throw, catch
+    P->>P: miss, poll do 12 s
+    P-->>V: "OCR failed: Invalid regular expression"
+  end
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4">
+      <p class="schem text-slate-500 mb-2">After</p>
+      <pre class="mermaid">
+sequenceDiagram
+  participant S as zod schema (refine: platný regex)
+  participant V as Verifier
+  S--xS: "match is not a valid regex: Unterminated group"
+  Note over S,V: chyba pri parse — MCP tool aj averi.yaml load,<br/>pred zariadením; Verifier dostane len platné specs
+      </pre>
+    </div>
+  </div>
+  <p><strong>Problém:</strong> jedna chyba autora má dva rôzne error módy podľa kindu. Overené skriptom: <code>{element, match: "("}</code> prejde schémou a <code>assertAll</code> <em>hodí</em> za 3 ms (výsledok druhého, platného assertu sa stratí); <code>{element, ocr: {match: "("}}</code> prejde schémou, každé kolo ju chytí catch v assert.ts:401 ako „OCR failed: …“ a poll beží celý timeout (default 12 s). Interface (schéma) tento error mód nehovorí.</p>
+  <p><strong>Riešenie:</strong> <code>match</code> v element aj ocr asserte dostane jeden refine „platný RegExp“ (jeden helper), takže chyba vznikne pri parse — v MCP <code>assert</code> aj pri načítaní <code>averi.yaml</code> — ako to 441f0c5 urobil pre polia layout kontraktu.</p>
+  <ul class="list-disc pl-6 text-sm space-y-1">
+    <li>jeden error mód, pri parse</li>
+    <li>žiadny 12 s poll pre preklep</li>
+    <li>assertAll nehádže uprostred dávky</li>
+    <li>schéma = test surface pre túto chybu</li>
+  </ul>
+  <p class="text-xs text-slate-500">Mimo môjho rozsahu, rovnaký tvar: selektor <code>field~"regex"</code> sa kompiluje až v <code>selectors.ts:100</code>, nie v gramatike (:24-43).</p>
+</article>
+
+<!-- ============================ C4 ============================ -->
+<article id="c4" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+  <h2 class="font-serif text-2xl">C4 · Screenshot baseline ako vlastný module</h2>
+  <div class="flex flex-wrap gap-2 text-xs">
+    <span class="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 font-semibold">Worth exploring</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">local-substitutable</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/verify/assert.ts:170 (DEFAULT_BASELINE_DIR), :532-611 (assertScreenshot), :623-632 (baselineRefusal)</li>
+    <li>src/verify/capture.ts:290-384 (BASELINE_CONFIRMATION_DELAYS_MS, BaselineFrame, unconfirmedReason), :558-572 (captureBaselineFrame)</li>
+    <li>src/run/commands.ts:51-52 (baselineDirFor)</li>
+    <li>tests/verify/assert-baseline-fail-closed.test.ts (vi.mock capture.js)</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4 space-y-2 text-xs">
+      <p class="schem text-slate-500">Before — baseline v troch moduloch</p>
+      <div class="border border-slate-400 rounded p-2">
+        <p class="schem">assert.ts · Verifier</p>
+        <p>tree poll kindy · pixel kindy · <span class="text-red-700">path · readFile/mkdir/writeFile · pixelmatch · refusal wording</span></p>
+      </div>
+      <div class="border border-slate-400 rounded p-2">
+        <p class="schem">capture.ts</p>
+        <p>settled pair · scale · crop · <span class="text-red-700">confirmation window · BaselineFrame · unconfirmedReason</span></p>
+      </div>
+      <div class="border border-slate-400 rounded p-2">
+        <p class="schem">run/commands.ts</p>
+        <p><span class="text-red-700">baselineDirFor</span></p>
+      </div>
+      <div class="border border-dashed border-red-500 rounded p-2 text-red-700">test: vi.mock('capture.js') v samostatnom súbore, aby sa dostal k verdiktu nad <code>unjudged</code> frame</div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4 space-y-2 text-xs">
+      <p class="schem text-slate-500">After</p>
+      <div class="border border-slate-400 rounded p-2">
+        <p class="schem">Verifier</p>
+        <p>screenshot kind → baseline.check(name, threshold)</p>
+      </div>
+      <div class="deep text-white rounded p-3 space-y-1">
+        <p class="schem text-slate-300">verify/baseline (deep)</p>
+        <p class="text-slate-400">kde baseline leží · create alebo diff · refusal vety · pixelmatch</p>
+        <p class="text-slate-400">verdikt nad frame je vnútorný seam testovaný priamo</p>
+      </div>
+      <div class="border border-slate-400 rounded p-2">
+        <p class="schem">capture.ts</p>
+        <p>settledness vrátane confirmation window (ARCHITECTURE.md ju tam drží)</p>
+      </div>
+    </div>
+  </div>
+  <p><strong>Problém:</strong> screenshot je jediný kind bez pollu a bez timeoutu, s file IO — 80 riadkov v Verifieri (assert.ts:532-611) plus 40 riadkov komentára o poradí read/capture. Rozhodnutie „vytvoriť / odmietnuť / porovnať“ je súkromné, takže jeho fail-closed vetvu (<code>unjudged</code>) test dosiahne len cez <code>vi.mock</code> celého capture.ts. Umiestnenie baseline je rozdelené: <code>DEFAULT_BASELINE_DIR</code> v assert.ts, <code>baselineDirFor</code> v run/commands.ts, <code>&lt;dir&gt;/&lt;platform&gt;/&lt;name&gt;.png</code> v assert.ts:534.</p>
+  <p><strong>Riešenie:</strong> baseline module vlastní umiestnenie, vytvorenie, odmietnutie a diff; Verifier ho len zavolá. Confirmation window ostáva v capture.ts (je to otázka settledness, ARCHITECTURE.md §Waits).</p>
+  <ul class="list-disc pl-6 text-sm space-y-1">
+    <li>locality: baseline koncept v jednom module</li>
+    <li>refusal vetvy testovateľné bez vi.mock</li>
+    <li>Verifier: len poll kindy + dispatch</li>
+    <li>jedno pravidlo cesty pre tool aj run</li>
+  </ul>
+  <p class="rounded bg-amber-50 border border-amber-200 px-3 py-2 text-sm">Pozor: nehýbať <code>captureBaselineFrame</code> von z capture.ts — ARCHITECTURE.md (§Verification Engine) robí capture.ts jediným vlastníkom „frame je settled“; filesystem je jediný adapter, takže žiadny nový externý seam, len interný.</p>
+</article>
+
+</section>
+
+<!-- ============================ OK ============================ -->
+<section id="ok" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+  <h2 class="font-serif text-2xl">Preskúmané a v poriadku</h2>
+  <ul class="list-disc pl-6 text-sm space-y-2">
+    <li><strong>OCR seam samotný.</strong> <code>OcrEngine.recognize(png, regions)</code> (ocr.ts:67-69) má dva adaptery — <code>VisionOcr</code> a inline fake v assert.test.ts, text-parity.test.ts, run/verify.test.ts — a jedno pravidlo voľby <code>ocrEngineFor</code> (ocr.ts:105). Reálny seam; problém je len, kto ho prekračuje (C1).</li>
+    <li><strong><code>poll-verdict.ts</code> a <code>fail-closed.ts</code> ako listy.</strong> Deletion test: obsah by sa vrátil do assert.ts aj pixel-poll.ts; zaslúžia si existenciu. (C2 len žiada, aby ocr vety <code>failClosed</code> naozaj používali.)</li>
+    <li><strong><code>element-assert.ts</code> oddelene od assert.ts.</strong> flow/config.ts:261 validuje <code>assert:</code> krok bez Verifiera a device kódu — opodstatnené.</li>
+    <li><strong>Dva poll vlastníci (<code>Verifier.poll</code> vs <code>pollPixels</code>)</strong> — vedome po BLOCKERi, pokryté pixel-poll sériou; nenavrhujem.</li>
+    <li><strong>Dispatch kindov cez <code>'x' in spec</code> + poradie zod unionu</strong> (assert.ts:150-156, :244-257). Kind tabuľka (schema + default budget + popis + run) by pridanie kindu sústredila, ale posledný kind (ocr, 32d4bb7) pribudol v auguste — YAGNI, Speculative, nenavrhujem.</li>
+    <li><strong><code>captureFrame</code> s tromi armami</strong> (capture.ts:419-445). Typ <code>TreeRequestedFrame</code> pripúšťa treeless aj pre dodaný strom, pixel-poll.ts:418 to dopĺňa komentárom. Drobnosť; žiadny konzument sa nemýli.</li>
+    <li><strong>Drobná doc drift, nie kandidát:</strong> <code>EngineOptions.assertTimeoutMs</code> (engine.ts:223-228) varuje, že hodnota pod ~8 s vyhladuje color/ocr — no flow <code>assert:</code> prijme len element asserty (flow/config.ts:261), a <code>assertTimeoutMs</code> nastavujú iba testy. <code>VerifierOptions.timeoutMs</code> „for EVERY assert“ (assert.ts:195-200) tak v produkcii nikdy nestretne pixel kind.</li>
+    <li><strong><code>scanForCrashes</code> v assert.ts</strong> (:634-657) — jediný konzument je run/verify.ts:134; patrí skôr k health/logs, ale je to 20 riadkov bez trenia.</li>
+    <li><strong>Crop mapping <code>pngRegion</code></strong> (capture.ts:796) — jeden vlastník pre color, text tabuľku, ocr assert aj region settle. OK.</li>
+  </ul>
+</section>
+
+<!-- ============================ TOP ============================ -->
+<section id="top-recommendation" class="rounded-xl border-2 border-emerald-600 bg-white p-8 space-y-3">
+  <p class="schem text-emerald-700">Top recommendation</p>
+  <h2 class="font-serif text-3xl"><a href="#c2" class="underline decoration-emerald-500">C2 · Meranie ocr assertu má jedného vlastníka</a> (spolu s <a href="#c1" class="underline decoration-emerald-500">C1</a>)</h2>
+  <p>Je to presne vzor „pure funkcia vytiahnutá pre testy, chyby sa skrývajú vo volajúcom“: štyri ocr vety už ušli z <code>failClosed</code>, ktorý mal byť jediným vlastníkom. C1 je jednoriadková zmena v tom istom priechode — verify run podá jednu voľbu OCR aj assertom — a spolu dajú ocr assertu rovnaký tvar a rovnaký test surface ako má color. C3 je najmenšia samostatná oprava a dá sa urobiť hneď.</p>
+</section>
+
+</main>
+</body>
+</html>

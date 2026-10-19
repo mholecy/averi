@@ -349,13 +349,24 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
-  it('tap and the troubleshooting reference quote the active-window hint the tap\'s, fill\'s and scroll_until\'s not-found carry on Android with no window marked presented — not the asserts\' nor a flow\'s wait: steps', async () => {
-    const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+  it('tap, assert and the troubleshooting reference quote the active-window hint every not-found carries on Android with no window marked presented — the waits\', scroll_until\'s, the asserts\', a flow\'s wait: and an optional step\'s skip', async () => {
+    const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/miss.js')>('../../src/ui-tree/miss.js');
     expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it (on every such tap or fill wait on Android, unless the target matched only 0×0 nodes, whose hint takes its place:`);
     expect(description('tap')).toContain(
-      'and so does a flow\'s tap, fill and scroll_until step (the same waits); a skipped optional tap\'s line reads "(not present)", without the hint; a flow\'s wait: steps and the asserts\' "not found" do not.',
+      'as scroll_until\'s "element never appeared in the tree" carries it (its stop under a keyboard over the whole screen too), and so do a flow\'s tap, fill and scroll_until steps (the same waits), a flow\'s wait: on an element (beneath its "Timed out …"), every assert\'s "not found within …" (after it) and a skipped optional step\'s line ("(not present) (…)", or a skipped wait:\'s "Timed out … (…)"): every reply that says a target is not in such a tree, once.',
     );
-    expect(TROUBLESHOOTING).toContain(`\`element never appeared in the tree\` carries \`(${ACTIVE_WINDOW_HINT})\``);
+    expect(description('assert')).toContain(`On Android an assert whose element is not in the tree fails "not found within … (${ACTIVE_WINDOW_HINT})"`);
+    expect(TROUBLESHOOTING).toContain(
+      `\`element never appeared in the tree\` (its stop under a keyboard over the whole screen too), every assert's \`not found within …\`, a flow's \`wait:\` on an element and an optional step's \`(not present)\` (a skipped \`wait:\`'s headline too) carry \`(${ACTIVE_WINDOW_HINT})\``,
+    );
+  });
+
+  it('tap, assert and the troubleshooting reference: an assert and a flow\'s wait: beneath a window listed alone say the presented remedy, as the tap does', () => {
+    // The note is miss.ts's (missNote, quoted by the descriptions from its owner), one phrase with no parenthesis inside.
+    const note = 'a dialog is presented over it, and the tree lists only that window — close it first';
+    expect(description('assert')).toContain(`the parenthesis names it instead: "(${note})"`);
+    expect(description('tap')).toContain(`(a flow's wait: on an element says "(${note})" beneath its "Timed out …", every assert's "not found within …" after it)`);
+    expect(TROUBLESHOOTING).toContain(`An assert's \`not found within …\` and a flow's \`wait:\` on an element say the same remedy, in their parenthesis: \`(${note})\``);
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {
@@ -467,5 +478,35 @@ describe('troubleshooting on a scroll_until timeout', () => {
     const { timeoutText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
     const rendered = timeoutText({ of: 'timeout', timeoutMs: 15_000, elapsedMs: 38_204, reads: { count: 1, totalMs: 38_204, lastMs: 38_204 } }, 0);
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(`\`scroll_until … failed ${rendered} — …\``);
+  });
+});
+
+/**
+ * scroll_until's end proof, the fully probe's `axis` clause and the presented touch-down on a dialog's dim
+ * (interact/scroll-text.ts#endTurnText, #boundText, #flushText, #touchDownText): the troubleshooting reference quotes
+ * one rendering of each, derived here from the owner — the scroll view or container elided where the entry says
+ * `<scroll view>` — so an entry cannot drift from the reply.
+ */
+describe('troubleshooting on scroll_until\'s end proof, unchecked axis and the dim outside a dialog', () => {
+  const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+  const lower = node({ role: 'scrollable', rect: { x: 0, y: 380, width: 402, height: 180 } });
+
+  it('the end turn\'s clause and the one-stroke stop\'s failure, as the code words them', async () => {
+    const { endTurnText, boundText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const { nodeText } = await vi.importActual<typeof import('../../src/ui-tree/geometry.js')>('../../src/ui-tree/geometry.js');
+    const elide = (text: string): string => text.replace(nodeText(lower), '<scroll view>');
+    expect(TROUBLESHOOTING).toContain(`- **\`scroll_until\` reply or failure has \`${elide(endTurnText({ way: 'up', to: 'down', after: 1, unmoved: 1, scrollView: lower }))}\`**`);
+    expect(TROUBLESHOOTING).toContain(`\`${elide(endTurnText({ way: 'up', to: 'down', after: 3, unmoved: 1, scrollView: lower })).split(' — ')[0].slice(2)}\` means`);
+    const proven = boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'matches', ends: { way: 'up', unmoved: 1, scrollView: lower } }, 1);
+    expect(TROUBLESHOOTING).toContain(`- **\`scroll_until … failed ${elide(proven)} — …\`**`);
+  });
+
+  it('the fully probe unchecked for its axis, and the swipe that would touch down on the dim outside a dialog', async () => {
+    const { flushText, touchDownText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const axis = flushText({ edge: 'top', container: { x: 66, y: 380, width: 948, height: 234 }, checked: false, why: 'axis' });
+    expect(TROUBLESHOOTING).toContain(`\`… ${axis.slice(axis.indexOf('and every scroll container'))}\`**`);
+    const dialog = { x: 155, y: 851, width: 770, height: 517 };
+    const dim = touchDownText({ touchDown: { x: 540, y: 1776 }, surface: node({ role: 'container', rect: dialog }), reach: dialog });
+    expect(TROUBLESHOOTING).toContain(`\`…${dim} — a dialog is presented over it …\``);
   });
 });

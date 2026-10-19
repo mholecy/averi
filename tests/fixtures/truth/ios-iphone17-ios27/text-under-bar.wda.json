@@ -1,0 +1,235 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 21}, {402, 20}}",
+              "label": "Zostatok 1 234,56 €",
+              "rawIdentifier": "lab.text-under-bar.S",
+              "traits": "Button",
+              "frame": "{{0, 21}, {402, 20}}",
+              "isVisible": "0",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-under-bar.S",
+              "rect": {
+               "y": 21,
+               "x": 0,
+               "width": 402,
+               "height": 20
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 285}, {300, 64}}",
+              "label": "Šťastný účet",
+              "rawIdentifier": "lab.text-under-bar.W",
+              "traits": "Button",
+              "frame": "{{51, 285}, {300, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-under-bar.W",
+              "rect": {
+               "y": 285,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 760}, {300, 64}}",
+              "label": "Pokračovať na súhrn",
+              "rawIdentifier": "lab.text-under-bar.P",
+              "traits": "Button",
+              "frame": "{{51, 760}, {300, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-under-bar.P",
+              "rect": {
+               "y": 760,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{24, 768}, {354, 56}}",
+              "label": "Continue",
+              "rawIdentifier": "lab.text-under-bar.continue",
+              "traits": "Button",
+              "frame": "{{24, 768}, {354, 56}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-under-bar.continue",
+              "rect": {
+               "y": 768,
+               "x": 24,
+               "width": 354,
+               "height": 56
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

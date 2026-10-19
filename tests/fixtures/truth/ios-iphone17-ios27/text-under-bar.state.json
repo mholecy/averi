@@ -1,0 +1,64 @@
+{
+  "cell": "text-under-bar",
+  "chrome": {
+    "pinned": {
+      "height": 56,
+      "width": 354,
+      "x": 24,
+      "y": 768
+    }
+  },
+  "events": [],
+  "frames": {
+    "P": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 760
+    },
+    "P.box": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 760
+    },
+    "S": {
+      "height": 20,
+      "width": 402,
+      "x": 0,
+      "y": 21
+    },
+    "S.box": {
+      "height": 20,
+      "width": 402,
+      "x": 0,
+      "y": 21
+    },
+    "W": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 285
+    },
+    "W.box": {
+      "height": 64,
+      "width": 300,
+      "x": 51,
+      "y": 285
+    }
+  },
+  "ready": true,
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  }
+}

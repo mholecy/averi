@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Averi MCP surface review</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+</script>
+<style>
+  .seam { stroke-dasharray: 4 4; }
+  .leak { stroke: #dc2626; }
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+  .mermaid { min-height: 260px; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+
+<header class="space-y-3">
+  <p class="text-xs uppercase tracking-wider text-slate-500">averi · branch architecture/keyboard-model-2026-10-07 · 2026-10-07</p>
+  <h1 class="font-serif text-4xl">MCP tool surface a ne-klávesnicová interakcia</h1>
+  <p class="text-sm text-slate-600">Rozsah: <code>src/mcp/*</code>, <code>src/run/commands.ts</code>, <code>src/interact/{fill,resolve,scroll,swipe,tap}.ts</code>, <code>src/ui-tree/{selectors,element-spec,read-tree}.ts</code>. Hot spot: <code>mcp/tools.ts</code> 17 commitov od 2026-09-01, <code>tool-text.ts</code> 7, <code>run/commands.ts</code> a <code>interact/fill.ts</code> po 6. Klávesnica (C1, C7, V1, K1–K3) je mimo rozsahu.</p>
+  <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 border border-slate-500 bg-white"></span>module</span>
+    <span class="flex items-center gap-2"><svg width="28" height="8"><line x1="0" y1="4" x2="28" y2="4" stroke="#475569" class="seam" stroke-width="2"/></svg>seam</span>
+    <span class="flex items-center gap-2"><svg width="28" height="8"><line x1="0" y1="4" x2="28" y2="4" class="leak" stroke-width="2"/></svg>leakage</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 deep"></span>deep module</span>
+  </div>
+  <p class="text-xs text-slate-500">Poznámka k zadaniu: v repe nie je samostatné CLI (<code>package.json</code> <code>bin</code> → <code>dist/mcp/server.js</code>). <code>run/commands.ts</code> je dolná polovica MCP nástrojov, nie druhý vstup — duplikácia „MCP vs CLI" preto neexistuje; skúmal som namiesto nej MCP nástroj vs. flow krok.</p>
+</header>
+
+<section id="candidates" class="space-y-14">
+
+<!-- ============ 1 ============ -->
+<article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="font-serif text-2xl mr-2">1 · Jedno čítanie averi.yaml na volanie, pod deklarovanou politikou nástroja</h2>
+    <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs px-3 py-1 font-semibold">Strong</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-3 py-1">local-substitutable</span>
+  </div>
+  <p class="font-mono text-sm text-slate-600">src/mcp/tools.ts :102–117, :224, :255, :314, :348, :397, :430, :463, :483, :504–505, :536 · src/run/commands.ts :106–127, :161–166 · src/flow/load.ts :103, :193–197, :205</p>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — každý handler si vyberá loader sám</p>
+      <pre class="mermaid">
+flowchart LR
+  A[assert handler] -->|lookupTreeOpts| L1[iosToolSettingsFor<br/>lenient, ios-only]
+  A -->|runAsserts| R[run/commands]
+  R -->|loadProjectConfig<br/>catch-all| L2[strict loader<br/>+ .env.averi]
+  T[tap / type_text] --> L1
+  S[ui_snapshot / scroll_until] --> L1
+  LA[launch_app] -->|launchActivityFor<br/>catch-all| L2
+  I[install_app] -->|strict| L2
+  E[ensure_state / run_flow / verify] -->|strict| L2
+  L1 --> F[(averi.yaml)]
+  L2 --> F
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class A,R leak
+  linkStyle 1,2 stroke:#dc2626,stroke-width:2px;
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — politika je údaj nástroja, čítanie má jedného vlastníka</p>
+      <pre class="mermaid">
+flowchart LR
+  H[tool handler<br/>policy: none · optional · required] --> C
+  subgraph C[tool-call config module]
+    direction TB
+    P[policy table<br/>missing / invalid / valid × platform]
+    O[one read per call]
+    P --- O
+  end
+  C -->|cfg?, env?, settings| H2[run/commands · interact]
+  C --> F[(averi.yaml)]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a,stroke-width:3px;
+  class C deep
+      </pre>
+    </div>
+  </div>
+
+  <div class="space-y-2 text-sm">
+    <p><span class="font-semibold">Problem:</span> Štyri politiky načítania configu (žiadna, lenient ios-only, strict, catch-all) volí každý handler ručne, a <code>assert</code> na iOS číta averi.yaml <em>dvakrát</em> dvomi politikami — <code>lookupTreeOpts</code> (tools.ts:504) a potom <code>loadProjectConfig</code> v <code>runAsserts</code> (commands.ts:110), ktorý navyše číta <code>.env.averi</code> pre health riadok, ktorý credentials nepotrebuje.</p>
+    <p><span class="font-semibold">Solution:</span> Jeden module (v <code>flow/load.ts</code> alebo pri ňom) dostane platformu, <code>configPath</code> a deklarovanú politiku nástroja a vráti raz načítané <code>{cfg?, env?, settings}</code>; <code>runAsserts</code> a <code>launchActivityFor</code> berú už načítaný config namiesto <code>configPath</code>.</p>
+  </div>
+
+  <div class="rounded-lg bg-stone-50 border border-stone-200 p-4 text-sm space-y-1">
+    <p class="font-semibold text-slate-700">Dôkazy</p>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Rovnaký súbor, rovnaký nástroj, dva verdikty podľa platformy: neplatný averi.yaml → iOS <code>assert</code> padne v <code>iosToolSettingsFor</code> (load.ts:195), Android <code>assert</code> ticho zahodí health riadok (commands.ts:109–125, komentár to sám priznáva).</li>
+      <li>Dve odložené „narrowing" úlohy, ktoré podľa vlastných komentárov patria spolu: commands.ts:120–124 (runAsserts) a :154–159 (launchActivityFor: „belongs with the same narrowing in runAsserts above"). Dnes nemajú spoločné miesto, kam by sa zapísali.</li>
+      <li><code>launch_app</code> s pokazeným averi.yaml ticho stratí <code>activity</code> (commands.ts:163 <code>.catch(() =&gt; undefined)</code>) — presne LeakCanary prípad, pred ktorým varuje popis nástroja (tools.ts:235–237); <code>install_app</code> bez path s tým istým súborom padne nahlas (tools.ts:224).</li>
+      <li>K3 pripol „jedno čítanie" iba pre <code>tap</code>/<code>type_text</code> (tests/mcp/tools.test.ts:652–663); <code>assert</code> pin nemá. <span class="text-amber-700">Nový dôkaz voči K3 a voči C2 z 2026-10-04 („four MCP policies") — tie riešili dve čítania v jednom loaderi, nie dva loadery v jednom volaní.</span></li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="text-sm font-semibold mb-1">Wins</p>
+    <ul class="text-sm list-disc pl-5 space-y-0.5">
+      <li>locality: politika configu na jednom mieste</li>
+      <li>leverage: 10 handlerov, jedno rozhranie</li>
+      <li>jedna tabuľková sada testov politiky</li>
+      <li>odložené narrowings dostanú jeden riadok</li>
+      <li>handler = schema + jedna delegácia</li>
+    </ul>
+  </div>
+  <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-2">Narrowing catch-all vetiev je user-visible zmena (commands.ts:120–124) — refaktor môže najprv zachovať správanie a len ho presunúť pod jeden module; zmena verdiktu je samostatné rozhodnutie.</div>
+</article>
+
+<!-- ============ 2 ============ -->
+<article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="font-serif text-2xl mr-2">2 · Gesto „swipe po obrazovke" vlastní svoj screen box</h2>
+    <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-3 py-1 font-semibold">Worth exploring</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-3 py-1">in-process</span>
+  </div>
+  <p class="font-mono text-sm text-slate-600">src/interact/swipe.ts :64–72 · src/interact/scroll.ts :105–112 · src/ui-tree/geometry.ts :99–101 · src/adapters/types.ts :321–337 · src/mcp/tools.ts :362–377 · ARCHITECTURE.md :94</p>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — dve odpovede na „aká veľká je obrazovka"</p>
+      <pre class="mermaid">
+flowchart TB
+  FS[flow swipe: step] --> SS[swipeScreen]
+  SS -->|uiTree + inferScreenSize| G[tree-derived box]
+  SC[scrollUntilVisible] -->|adapter.viewport| V[device box]
+  SS --> SV[swipeVector]
+  SC --> SV
+  MS[MCP swipe tool<br/>coords only] -->|adapter.swipe| A[(adapter)]
+  SV --> A
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class G,MS leak
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — jeden gesture module, jeden box</p>
+      <pre class="mermaid">
+flowchart TB
+  FS[flow swipe: step] --> GM
+  SC[scrollUntilVisible] --> GM
+  MS[MCP swipe tool<br/>direction alebo coords] --> GM
+  subgraph GM[gesture module]
+    direction TB
+    V[viewport box] --> SV[swipeVector<br/>finger / content]
+  end
+  GM --> A[(adapter.swipe)]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a,stroke-width:3px;
+  class GM deep
+      </pre>
+    </div>
+  </div>
+
+  <div class="space-y-2 text-sm">
+    <p><span class="font-semibold">Problem:</span> <code>swipeScreen</code> berie screen box zo stromu (<code>inferScreenSize</code>, swipe.ts:68), hoci geometry.ts:99–101 hovorí, že volajúci, ktorý vie veľkosť zo zariadenia, má strom použiť len ako cross-check; <code>scrollUntilVisible</code> pre ten istý <code>swipeVector</code> berie <code>adapter.viewport()</code> (scroll.ts:105). MCP <code>swipe</code> berie len súradnice, no popis sľubuje smery (tools.ts:365) a ARCHITECTURE.md:94 uvádza <code>swipe(direction|coords)</code>.</p>
+    <p><span class="font-semibold">Solution:</span> „Swipe po obrazovke v smere" sa stane jedným module v <code>interact/swipe.ts</code> nad memoizovaným <code>viewport()</code>; flow krok, scroll loop aj MCP nástroj (voliteľný <code>direction</code>) ho volajú.</p>
+  </div>
+
+  <div class="rounded-lg bg-stone-50 border border-stone-200 p-4 text-sm space-y-1">
+    <p class="font-semibold text-slate-700">Dôkazy</p>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>swipe.ts:52–62 dokumentuje, že tree-derived box sa už raz pomýlil (union detí → 804×1748 na WDA sheete); oprava preň zvolila iný tree pravidlo, nie zariadenie. <code>viewport()</code> je podľa types.ts:321–336 „the only measurement of the screen that does not come from the tree" a je memoizovaný — gesto by neplatilo ani jedno čítanie stromu (dnes platí jedno, swipe.ts:68).</li>
+      <li>tests/interact/swipe.test.ts:46–71 pinujú dva tree tvary (0×0 root, scrim), ktoré by s viewport boxom prestali byť otázkou swipe.</li>
+      <li>Agent cez MCP nemá smerový swipe, ktorý flow má (engine.ts:850); musí hádať súradnice, ktoré interact/ vie spočítať.</li>
+    </ul>
+  </div>
+  <div>
+    <p class="text-sm font-semibold mb-1">Wins</p>
+    <ul class="text-sm list-disc pl-5 space-y-0.5">
+      <li>jeden screen box pre všetky gestá</li>
+      <li>leverage: smerový swipe aj pre MCP</li>
+      <li>tree-shape testy swipe odpadnú</li>
+      <li>popis nástroja = jeho rozhranie</li>
+    </ul>
+  </div>
+  <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-2">Na zariadení overiť: Android <code>viewport()</code> vs. root dumpu v non-edge-to-edge okne (geometry.ts:80–83 spomína dump, ktorého okno začína pod status barom) — box by sa posunul o status bar; pri 30 % od stredu je to bezpečné, ale je to zmena produkčných súradníc.</div>
+</article>
+
+<!-- ============ 3 ============ -->
+<article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="font-serif text-2xl mr-2">3 · Defaulty operácie má jeden vlastník — popis nástroja ich cituje, nepíše</h2>
+    <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-3 py-1 font-semibold">Worth exploring</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-3 py-1">in-process</span>
+  </div>
+  <p class="font-mono text-sm text-slate-600">src/mcp/tools.ts :142–143, :305, :420, :452, :497 · src/mcp/tool-text.ts :91 · src/interact/scroll.ts :100, :103 · src/verify/assert.ts :173, :190 · src/flow/engine.ts :305 · src/flow/config.ts :240–246</p>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — čísla v rozhraní nástroja</p>
+      <div class="space-y-2 text-xs font-mono">
+        <div class="flex items-center gap-2"><span class="w-40 border border-emerald-600 px-2 py-1">SETTLE_BUDGET</span><span class="text-emerald-700">← DEFAULT_SETTLE_TIMEOUT_MS (odvodené)</span></div>
+        <div class="flex items-center gap-2"><span class="w-40 border border-emerald-600 px-2 py-1">scroll timeoutMs</span><span class="text-emerald-700">← DEFAULT_SCROLL_TIMEOUT_MS (odvodené)</span></div>
+        <div class="flex items-center gap-2"><span class="w-40 border border-red-600 px-2 py-1">"Default 6"</span><span class="text-red-700">⇢ scroll.ts:100 literál, neexportovaný</span></div>
+        <div class="flex items-center gap-2"><span class="w-40 border border-red-600 px-2 py-1">"3 s" ×3, "12 s"</span><span class="text-red-700">⇢ assert.ts:173/190 privátne</span></div>
+        <div class="flex items-center gap-2"><span class="w-40 border border-red-600 px-2 py-1">"~20 s second look"</span><span class="text-red-700">⇢ engine.ts:305 <code>?? 20_000</code></span></div>
+        <div class="flex items-center gap-2"><span class="w-40 border border-red-600 px-2 py-1">scroll_until schema ×2</span><span class="text-red-700">⇢ config.ts:240 a tools.ts:417</span></div>
+      </div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — module exportuje default, popis ho cituje</p>
+      <div class="space-y-2">
+        <div class="deep text-white rounded p-3 text-xs"><p class="uppercase tracking-wider mb-1">interact/scroll · verify/assert · flow/engine</p><p class="opacity-80">DEFAULT_MAX_SWIPES · ASSERT_TIMEOUT_MS · PIXEL_ASSERT_TIMEOUT_MS · DEFAULT_ENSURE_TIMEOUT_MS</p></div>
+        <div class="text-center text-slate-400">↓ citované (ako SETTLE_BUDGET)</div>
+        <div class="border border-slate-400 rounded p-2 text-xs font-mono">tools.ts descriptions · tool-text.ts snapshotNote</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-2 text-sm">
+    <p><span class="font-semibold">Problem:</span> Popis MCP nástroja je jeho rozhranie pre agenta, a polovica čísiel v ňom je odvodená (tools.ts:142 „derived, so the number has one owner"), druhá polovica je literál, ktorý sa pri zmene defaultu v interact/ alebo verify/ ticho rozíde — „3 s" je napísané na troch miestach (tools.ts:305, :497, tool-text.ts:91).</p>
+    <p><span class="font-semibold">Solution:</span> Moduly, ktoré default vlastnia, ho exportujú; tools.ts a tool-text.ts ho citujú tak, ako už cituje <code>SETTLE_BUDGET</code> a <code>DEFAULT_SCROLL_TIMEOUT_MS</code>.</p>
+  </div>
+  <div>
+    <p class="text-sm font-semibold mb-1">Wins</p>
+    <ul class="text-sm list-disc pl-5 space-y-0.5">
+      <li>locality: default sa mení raz</li>
+      <li>existujúce pravidlo dotiahnuté do konca</li>
+      <li>žiadna zmena správania</li>
+    </ul>
+  </div>
+  <div class="rounded-md bg-slate-50 border border-slate-200 text-slate-700 text-sm px-4 py-2">Zdieľanie zod schémy scroll_until medzi flow a MCP neodporúčam: slovníky sa líšia zámerne (ElementSpec + <code>timeout: 2s</code> vs. selector string + ms, resolve.ts:28–33). Stačí spoločný default.</div>
+</article>
+
+</section>
+
+<section id="ok" class="space-y-4">
+  <h2 class="font-serif text-2xl">Preskúmané a v poriadku</h2>
+  <ul class="text-sm space-y-3">
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold">Registry (<code>mcp/registry.ts</code>)</span> — deep module: <code>get/select/listAll/shutdown</code> skrýva binding, pin, race po probe (:125–129, :142–144), keyed cache a dispose. Factory je skutočný seam s dvoma adapters (default + test factory, tests/mcp/registry.test.ts 280 riadkov). Probe pri každom <code>get</code> (:122) je cena za „pinned device going offline is an error" — ponechať.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold">Dve IosAdapter inštancie na wda projekte</span> — akčné nástroje (<code>screenshot</code>, <code>swipe</code>, <code>press_key</code>, <code>launch_app</code>…) volajú <code>registry.get(p)</code> bez opts a dostanú idb-kind inštanciu (registry.ts:50–52), tree nástroje wda-kind. Dnes neškodné: vstup ide cez idb/simctl bez ohľadu na tree source (ARCHITECTURE.md:292), duplikuje sa len memo <code>viewport()</code> a stderr oznam (ios.ts:174, :247). Ak sa raz vstup presunie za WDA, toto sa stane kandidátom.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold">Konštrukcia vs. spojenie servera</span> — <code>createAveriServer</code> (tools.ts:172) + stdio v <code>server.ts</code> (23 riadkov) + <code>lifecycle.ts</code> so seamami <code>on/exit</code>. Nástroje sa testujú cez in-memory transport skutočným klientom (tests/mcp/tools.test.ts, 847 riadkov): „the interface is the test surface" splnené.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold">Resolution policy (<code>interact/resolve.ts</code>)</span> — jedna politika pre flow aj MCP, <code>ambiguous</code> povinný (:84–86), <code>resolveNow</code> pure + <code>resolveSettled</code> nad <code>pollTree</code>. Deletion test: zmazanie by vrátilo politiku do engine aj tools (už sa stalo pred 2026-10-03). Deep.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold"><code>fillField</code></span> — veľa správania (overenie, retry, masked pravidlo, empty value) za rozhraním <code>(adapter, target, value, opts)</code>; testované na vlastnej úrovni (355 riadkov). <code>tapElement</code> (39 riadkov) je tenký, ale páruje sa s ním a drží jedno meno operácie pre dvoch volajúcich — ponechať.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold">MCP vs. flow duplikácia</span> — <code>ensure_state</code>/<code>run_flow</code> zdieľajú <code>runOnEngine</code> (commands.ts:66–76); <code>tap</code>/<code>type_text</code>/<code>scroll_until</code> a flow kroky volajú tie isté interact funkcie, líšia sa len ambiguity módom a slovníkom cieľa (<code>Target</code>, resolve.ts:33). Duplikácia operačnej logiky nie je.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold"><code>tool-text.ts</code></span> — header (:11–15) priznáva, že pôvodný dôvod (neimportovateľný server.ts) zanikol; jednoriadkové odpovede ostatných nástrojov sú inline v tools.ts. Nenavrhujem: patrí do rodiny C5 (wording owner → NO-GO) a pure funkcie s 93 riadkami vlastných testov tu nezakrývajú chybu vo volaní.</li>
+    <li class="rounded-lg border border-slate-200 bg-white p-4"><span class="font-semibold">Selektory a <code>read-tree.ts</code></span> — po C8 jeden matcher (<code>findAll</code>/<code>findBySpec</code>) a jeden poll primitive; z pohľadu nástrojov nič nové.</li>
+  </ul>
+</section>
+
+<section id="top-recommendation">
+  <div class="deep text-white rounded-xl p-8 space-y-3">
+    <p class="text-xs uppercase tracking-wider opacity-70">Top recommendation</p>
+    <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-emerald-400">1 · Jedno čítanie averi.yaml na volanie, pod deklarovanou politikou nástroja</a></h2>
+    <p class="opacity-90">Najväčší hot spot (tools.ts, 17 commitov) a jediný kandidát s merateľnou chybou dnes: <code>assert</code> číta config dvakrát a rovnaký pokazený súbor posúdi podľa platformy inak; dve odložené narrowings (commands.ts:120, :154) potrebujú presne tento module, aby boli jedna zmena a nie dve.</p>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

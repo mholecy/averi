@@ -1,0 +1,52 @@
+{
+  "cell": "scroll-collapsing",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "A": {
+      "x": 127,
+      "y": -11,
+      "width": 825,
+      "height": 176
+    },
+    "D": {
+      "x": 127,
+      "y": 209,
+      "width": 825,
+      "height": 176
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "list": {
+      "x": 0,
+      "y": 220,
+      "width": 1080,
+      "height": 2000
+    }
+  },
+  "offsets": {
+    "list": 715
+  },
+  "strokes": [
+    {
+      "view": "list",
+      "from": 715,
+      "to": 715,
+      "at": 1792309323.709
+    }
+  ]
+}

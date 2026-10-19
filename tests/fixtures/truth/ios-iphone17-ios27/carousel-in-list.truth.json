@@ -1,0 +1,107 @@
+{
+  "cell": "carousel-in-list",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "C",
+      "id": "lab.carousel-in-list.C",
+      "color": "#D81B60",
+      "declared": "open",
+      "frame": {
+        "height": 85,
+        "width": 354,
+        "x": 378,
+        "y": 138
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#EEEEEE",
+      "geometry": "outside-scroll-view",
+      "visible": null,
+      "piece": null,
+      "scrollView": "carousel",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "unprobed": "its centre (555,181) lies off the 402x874 screen"
+    },
+    {
+      "tag": "B",
+      "id": "lab.carousel-in-list.B",
+      "color": "#00ACC1",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 1060
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "unprobed": "its centre (201,1092) lies off the 402x874 screen"
+    },
+    {
+      "tag": "U",
+      "id": "lab.carousel-in-list.U",
+      "color": "#7CB342",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": -200
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "unprobed": "its centre (201,-168) lies off the 402x874 screen"
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "carousel": {
+      "height": 85,
+      "width": 354,
+      "x": 24,
+      "y": 138
+    },
+    "page": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    }
+  }
+}

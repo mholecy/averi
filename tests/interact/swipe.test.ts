@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
+import { axisOfEdge } from '../../src/ui-tree/geometry.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { dragMs, EDGE_TOWARD, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, SIDES, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { axisOf, dragMs, EDGE_TOWARD, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, SIDES, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
@@ -271,5 +272,10 @@ describe('dragMs — a stroke\'s duration at the adapter\'s drag speed (2026-10-
 describe('EDGE_TOWARD — SIDES[…].reveals read the other way', () => {
   it('each direction\'s edge is the one whose `reveals` is that direction', () => {
     for (const [direction, edge] of Object.entries(EDGE_TOWARD)) expect(SIDES[edge].reveals).toBe(direction);
+  });
+
+  it('the axis of a direction is its edge\'s: up and down vertical, left and right horizontal', () => {
+    expect([axisOfEdge('top'), axisOfEdge('bottom'), axisOfEdge('left'), axisOfEdge('right')]).toEqual(['vertical', 'vertical', 'horizontal', 'horizontal']);
+    expect([axisOf('up'), axisOf('down'), axisOf('left'), axisOf('right')]).toEqual(['vertical', 'vertical', 'horizontal', 'horizontal']);
   });
 });
