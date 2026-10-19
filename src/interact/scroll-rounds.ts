@@ -2,7 +2,8 @@ import type { ClippedSide, DeviceScreen, Rect, Stroke, UiNode } from '../adapter
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import type { SheetDetent } from '../ui-tree/read-tree.js';
-import { activeWindowHint, outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
+import { missOf, type Miss } from '../ui-tree/miss.js';
+import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -365,10 +366,9 @@ export interface ReadTime {
  *   been taken) nothing is guessed. Every stroke of a scroll that never
  *   found its target goes the caller's way (a turn needs a sighting; the
  *   end turn, `EndTurn`, needs the target in the tree), so the other side
- *   was never stroked. `windowHint` the last tree's active-window hint
- *   (ui-tree/standing.ts#activeWindowHint, the one test of a source that
- *   lists the active window only: a sheet or dialog it does not mark may
- *   hide the target), carried as its words;
+ *   was never stroked. `miss` what the last read saw (ui-tree/miss.ts
+ *   #missOf: a source that lists the active window only, a window it lists
+ *   alone), whose note the failure says;
  * - `gone`: not in the last tree, in the frame after swipe `inFrameAfter`;
  * - `left`: not in the last tree, never in the frame, but in the tree after
  *   swipe `inTreeAfter` (off the frame, or under the keyboard) — a stroke
@@ -392,7 +392,7 @@ export interface ReadTime {
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
   | InFrameShort
-  | { of: 'absent'; unsearched?: Edge; windowHint?: string }
+  | { of: 'absent'; unsearched?: Edge; miss?: Miss }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
@@ -1385,12 +1385,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // (a read failing three times after the popover's hold had stroked onto its dim). Not a wait to the deadline: the
   // reads are failing, and the last one that read is the evidence there is.
   if (read === undefined && s.presentedHold !== undefined) return stop(s, s.presentedHold);
+  // What this round's read saw, for a target no round matched (ui-tree/miss.ts — the not-found's note; asked only at a
+  // stop that may say "never appeared", so a round that goes on pays no presentation walk).
+  const missed = (): Miss | undefined => (s.everFound ? undefined : missOf({ tree: read?.tree, readError }));
   const evidence: WaitEvidence = { sighted: s.everFound, treesRead: s.treesRead, readError };
   // A keyboard that leaves nothing above it: nothing but its own UI can be
   // judged, and no stroke can start on the content — fail now, naming it,
   // rather than swipe on keys or fall back to the whole screen and report a
   // bare "fully visible".
-  if (cover !== undefined && cover.above === undefined) return stop(s, { kind: 'covered', swipes: s.swipes, cover, viewport, evidence });
+  if (cover !== undefined && cover.above === undefined) return stop(s, { kind: 'covered', swipes: s.swipes, cover, viewport, evidence: { ...evidence, miss: missed() } });
   // In the tree, off the frame, and the last UNMOVED_STROKES_EXHAUST
   // strokes — the same stroke — moved no match (the Android device check:
   // the form's last field, wholly under an IME its
@@ -1444,15 +1447,16 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
         : { of: 'timeout', timeoutMs: s.rules.timeoutMs, elapsedMs: seen.elapsedMs, reads: s.reads };
+    const miss = missed();
     return stop(s, {
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, { readError, found, best, viewport, cover, windowHint: read === undefined ? undefined : activeWindowHint(read.tree) }, by),
+      short: shortfall(s, { readError, found, best, viewport, cover, miss }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
-      evidence,
+      evidence: { ...evidence, miss },
       ...(onPresented !== undefined && { presented: onPresented }),
     });
   }
@@ -1653,8 +1657,8 @@ interface BoundRound {
   readonly viewport: Rect;
   /** The keyboard cover applied to that frame, if any — quoted with it. */
   readonly cover: Cover | undefined;
-  /** This round's tree's active-window hint (ui-tree/standing.ts#activeWindowHint) — an `absent` failure carries it. */
-  readonly windowHint: string | undefined;
+  /** What this round's read saw of a target no round matched (ui-tree/miss.ts#missOf) — an `absent` failure carries it. */
+  readonly miss: Miss | undefined;
 }
 
 /**
@@ -1664,7 +1668,7 @@ interface BoundRound {
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, { readError, found, best, viewport, cover, windowHint }: BoundRound, by: BoundBy): Shortfall {
+function shortfall(s: State, { readError, found, best, viewport, cover, miss }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
   if (best !== undefined && best.standing.facts.visible > 0) return shortOf(best);
   const left = s.inFrameAfter;
@@ -1674,7 +1678,7 @@ function shortfall(s: State, { readError, found, best, viewport, cover, windowHi
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
     // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
     const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
-    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }), ...(windowHint !== undefined && { windowHint }) };
+    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }), ...(miss !== undefined && { miss }) };
   }
   // In the tree: scroll-read.ts#judge scores every match, so this read judged one and `past` is this read's.
   return {

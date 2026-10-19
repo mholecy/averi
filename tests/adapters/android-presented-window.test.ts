@@ -3,10 +3,14 @@ import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
-import { ACTIVE_WINDOW_HINT, presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT, missNote, missOf, withMissNote } from '../../src/ui-tree/miss.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { ElementNotFoundError, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
-import { failureOf, play, type Row } from '../helpers/rounds.js';
+import { coverOver, failureOf, play, type Row } from '../helpers/rounds.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { FakeAdapter } from '../helpers/fake.js';
+import { formatSeconds } from '../../src/util/duration.js';
+import { Verifier } from '../../src/verify/assert.js';
 
 // ANDROID'S PRESENTED WINDOW (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md):
 // `uiautomator dump` lists the ACTIVE window only, so beneath an AlertDialog or a ModalBottomSheet the screen's targets
@@ -272,8 +276,8 @@ describe('tap: the wait for a target the tree cannot list beneath the presented 
 // ADR 0018's residuals 18 and 19 (accepted by the owner, 2026-10-18): a presented window the dump gives no fact for — the
 // fully expanded picker sheet (form-picker: no scrim, only Material's "Drag handle"), a full-screen dialog — is not
 // marked, so the screen beneath is missing from the tree with no presented wording. Every reply that says a target is
-// not in a uiautomator tree, and does not already say a window is presented, carries the one hint (standing.ts#
-// ACTIVE_WINDOW_HINT): the tree lists only the active window, so close an open sheet or dialog first.
+// not in a uiautomator tree, and does not already say a window is presented, carries the one hint
+// (ui-tree/miss.ts#ACTIVE_WINDOW_HINT): the tree lists only the active window, so close an open sheet or dialog first.
 describe('a target not in a uiautomator tree that marks no presented window: the active-window hint', () => {
   const adapter = (tree: UiNode) => ({ uiTree: async () => tree });
   const FAST = { ambiguous: 'first' as const, timeoutMs: 30, pollMs: 2 };
@@ -320,5 +324,114 @@ describe('a target not in a uiautomator tree that marks no presented window: the
     const message = failureOf(play(RULES, [row, row, row]), 'id:"lab.form-picker.name"').message;
     expect(message).toContain('element never appeared in the tree');
     expect(message).not.toContain(ACTIVE_WINDOW_HINT);
+  });
+});
+
+// Round 7 (ADR 0018 decision 5, refined): every assert's "not found within …" on such a tree carries the hint too, in
+// the place its last read's error would take (verify/poll-verdict.ts#notFound) — the tree asserts', the rect
+// assert's and the pixel asserts'. Not a found element's wrong content, not a failed last read, not a tree listing
+// every window.
+describe('an assert whose element is not in a uiautomator tree: the active-window hint after "not found within …"', () => {
+  const verifier = (tree: UiNode) => new Verifier(new FakeAdapter({ sheet: tree }, 'sheet'), { pollMs: 2, timeoutMs: 30 });
+  const NOT_FOUND = `not found within ${formatSeconds(30)}`;
+  const WITH_HINT = `${NOT_FOUND} (${ACTIVE_WINDOW_HINT})`;
+  const name = { id: 'lab.form-picker.name' };
+
+  it('form-picker: the element, text, rect and color asserts each say it once', async () => {
+    const v = verifier(capture('form-picker'));
+    expect((await v.assert({ element: name })).detail).toBe(WITH_HINT);
+    expect((await v.assert({ element: name, text: 'Name' })).detail).toBe(WITH_HINT);
+    expect((await v.assert({ element: name, rect: { x: 0, w: 100, h: 10, frameWidth: 360 } })).detail).toBe(WITH_HINT);
+    expect((await v.assert({ element: name, color: { expected: '#FFFFFF' } })).detail).toBe(WITH_HINT);
+  });
+
+  it('not a found element whose content differs, nor an absent assert, which passes', async () => {
+    const v = verifier(capture('form-picker'));
+    const wrong = await v.assert({ element: { id: 'lab.form-picker.country.AL' }, text: 'Austria' });
+    expect(wrong.detail).toBe('element found but content was: "Albania"');
+    expect((await v.assert({ element: name, absent: true })).pass).toBe(true);
+  });
+
+  it('not on a tree listing every window', async () => {
+    const { activeWindowOnly: _, ...everyWindow } = capture('form-picker');
+    expect((await verifier(everyWindow).assert({ element: name })).detail).toBe(NOT_FOUND);
+  });
+
+  it('not when the last read failed: the read error takes its place', async () => {
+    const tree = capture('form-picker');
+    let reads = 0;
+    const fake = new FakeAdapter({ sheet: tree }, 'sheet');
+    const uiTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      if (reads++ > 0) throw new Error('adb gone');
+      return uiTree();
+    };
+    const detail = (await new Verifier(fake, { pollMs: 2, timeoutMs: 30 }).assert({ element: name })).detail;
+    expect(detail).toBe(`${NOT_FOUND} (last UI tree read failed: adb gone)`);
+  });
+});
+
+// THE decision behind every not-found (ui-tree/miss.ts): what the last read saw, in one precedence — a failed read,
+// then a zero-area match (the caller's), then a window listed alone, then the active-window hint — and its words.
+describe('what a miss saw (ui-tree/miss.ts): one decision, one wording', () => {
+  it('the precedence over the real captures: unread, zero-area, presented alone, active window, none', () => {
+    expect(missOf({ tree: capture('alert-dim'), readError: new Error('adb gone') })).toEqual({ of: 'unread' });
+    expect(missOf({})).toEqual({ of: 'unread' });
+    expect(missOf({ tree: capture('alert-dim') }, () => 'at 0×0')).toEqual({ of: 'zeroArea', hint: 'at 0×0' });
+    expect(missOf({ tree: capture('alert-dim') })).toEqual({ of: 'presented', layer: { kind: 'dialog' } });
+    expect(missOf({ tree: capture('sheet-medium') })).toEqual({ of: 'presented', layer: { kind: 'screen' } });
+    expect(missOf({ tree: capture('form-picker') })).toEqual({ of: 'activeWindow' });
+    expect(missOf({ tree: capture('open') })).toEqual({ of: 'activeWindow' });
+    const { activeWindowOnly: _, ...everyWindow } = capture('alert-dim');
+    expect(missOf({ tree: everyWindow })).toEqual({ of: 'none' });
+  });
+
+  it('the words: the presented remedy for a window listed alone, the hint for an unmarked one, nothing for unread or none', () => {
+    expect(missNote({ of: 'presented', layer: { kind: 'dialog' } })).toBe('a dialog is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'screen' } })).toBe('a sheet or modal is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'dialog', label: 'Delete?' } })).toBe('a dialog "Delete?" is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'activeWindow' })).toBe(ACTIVE_WINDOW_HINT);
+    expect(missNote({ of: 'zeroArea', hint: 'h' })).toBe('h');
+    expect(missNote({ of: 'unread' })).toBeUndefined();
+    expect(missNote({ of: 'none' })).toBeUndefined();
+    expect(withMissNote('not found', { of: 'activeWindow' })).toBe(`not found (${ACTIVE_WINDOW_HINT})`);
+    expect(withMissNote('not found', { of: 'none' })).toBe('not found');
+  });
+});
+
+describe('a not-found on a tree listing a presented window alone says the presented remedy, wherever it is said', () => {
+  const verifier = (tree: UiNode) => new Verifier(new FakeAdapter({ s: tree }, 's'), { pollMs: 2, timeoutMs: 30 });
+  const NOT_FOUND = `not found within ${formatSeconds(30)}`;
+  const presentedNote = (layer: { kind: 'dialog' | 'screen' }) => (layer.kind === 'dialog' ? 'a dialog is presented over it, and the tree lists only that window — close it first' : 'a sheet or modal is presented over it, and the tree lists only that window — close it first');
+
+  it('alert-dim: the element and color asserts on a target beneath the dialog say a dialog is presented over it — not the generic hint', async () => {
+    const v = verifier(capture('alert-dim'));
+    const expected = `${NOT_FOUND} (${presentedNote({ kind: 'dialog' })})`;
+    expect((await v.assert({ element: { id: 'lab.alert-dim.A' } })).detail).toBe(expected);
+    expect((await v.assert({ element: { id: 'lab.alert-dim.A' }, color: { expected: '#5C1715' } })).detail).toBe(expected);
+    expect(expected).not.toContain(ACTIVE_WINDOW_HINT);
+    expect(expected.split('close it first')).toHaveLength(2);
+  });
+
+  it('sheet-medium: a screen is presented over it', async () => {
+    expect((await verifier(capture('sheet-medium')).assert({ element: { id: 'lab.sheet-medium.A' } })).detail).toBe(`${NOT_FOUND} (${presentedNote({ kind: 'screen' })})`);
+  });
+
+  it('the tap\'s wait says the same remedy in its headline (unchanged)', async () => {
+    const error = await resolveSettled({ uiTree: async () => capture('alert-dim') }, 'id:"lab.alert-dim.A"', { ambiguous: 'first', timeoutMs: 30, pollMs: 2 }).catch((e: unknown) => e as Error);
+    expect((error as Error).message).toBe(
+      `Timed out after 30ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}`,
+    );
+  });
+});
+
+describe('scroll_until\'s covered stop (a keyboard over the whole screen) on a target never in a uiautomator tree', () => {
+  it('"never appeared in the tree" carries the hint, once, and the absence carries the miss', () => {
+    const row: Row = { tree: capture('form-picker'), found: [], cover: coverOver({ x: 0, y: 0, width: 1080, height: 2220 }) };
+    const error = failureOf(play(RULES, [row]), 'id:"lab.form-picker.name"');
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toContain(`element never appeared in the tree (${ACTIVE_WINDOW_HINT}); the soft keyboard over [0,0][1080,2220] covers the whole screen`);
+    expect(error.message.split(ACTIVE_WINDOW_HINT)).toHaveLength(2);
+    expect((error as ElementNotFoundError).miss).toEqual({ of: 'activeWindow' });
   });
 });

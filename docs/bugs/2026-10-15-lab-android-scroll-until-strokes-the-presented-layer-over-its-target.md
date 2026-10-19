@@ -34,7 +34,7 @@
 > on one AVD) ACCEPTED, with an honest hint: the uiautomator replies that say a target is not in the tree and are not
 > already given the presented window's words — the tap's, fill's and the presence check's "… to appear", `scroll_until`'s
 > "element never appeared in the tree" — adds `(the tree lists only the active window: if a sheet or a dialog is open
-> over the screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT, arch/r22-hint 9acbf77; ADR 0018's
+> over the screen, close it first)` (ui-tree/miss.ts#ACTIVE_WINDOW_HINT, arch/r22-hint 9acbf77; ADR 0018's
 > amendment "Android's presented window", decision 5). `form-picker`'s six rows are filed as residual 18 now
 > (tests/differential/golden/forms.known.ts), the taps' class `not in the tree` (the hint says "close it first"; the
 > reply is still a not-found) where it was "refused without close it first"; calibration.json's L1 leaves nothing open.
