@@ -134,6 +134,15 @@ export interface FillResult {
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
+   * The read-back landed only after the field's DROPPED TAIL was typed again
+   * (interact/fill-type.ts, 2026-10-19): each retyped tail by its length, in
+   * order; absent when nothing was typed again. A field that keeps a strict
+   * prefix of the typing — React Native's controlled single-line TextInput
+   * under `idb ui text`, docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-
+   * text-in-a-react-native-single-line-field.md. A length, never content.
+   */
+  retyped?: number[];
+  /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
    * text is an input whatever its role (an iOS search field reads `other`).
@@ -233,10 +242,14 @@ export type ReadBack =
  *   (`typed`, `shows`: the two lengths), after the clear-fill's one retry;
  *   `differs` says what can be said of the difference without content;
  *   `notInput` when the matched node is not an input (the nearest input,
- *   as FillResult.notInput); `retried` when that retry ran (`clear`) —
+ *   as FillResult.notInput); `again` what was sent again before that
+ *   read-back, in order (`SentAgain`: a dropped tail, the clear's retype —
  *   `wiped` when it deleted what the field held first, else it only typed
- *   again (the field showed nothing, or its placeholder) — so the error
- *   says the read-back is the second (round 8's D3 nit, 2026-10-12).
+ *   again, the field showing nothing or its placeholder), so the error says
+ *   the read-back is not the first (round 8's D3 nit, 2026-10-12; until
+ *   2026-10-19 the clear's retype alone, `retried`); `elsewhere` another input
+ *   that changed while typing — the focus left the field, and nothing was
+ *   sent again into it.
  */
 export type FillFailure =
   | { code: 'reread-failed'; target: string; cause: string }
@@ -247,8 +260,28 @@ export type FillFailure =
       shows: number;
       differs: Difference;
       notInput?: { role: string; input: NearbyInput | 'none' | 'unread' };
-      retried?: { wiped: boolean };
+      again?: SentAgain[];
+      elsewhere?: OtherInput;
     };
+
+/**
+ * What a fill sent again after its first typing, in the order sent
+ * (interact/fill-type.ts): `tail` — the `length` characters a field dropped
+ * from the end of the typing; `whole` — the clear's retype of the whole
+ * value, `wiped` when it deleted what the field held first.
+ */
+export type SentAgain = { kind: 'tail'; length: number } | { kind: 'whole'; wiped: boolean };
+
+/**
+ * Another input on the screen whose value changed while the fill typed —
+ * the typing left the field (an auto-advancing code box moved the focus).
+ * Role, identifier and rect only: never its value.
+ */
+export interface OtherInput {
+  role: string;
+  identifier: string | null;
+  rect: Rect;
+}
 
 /**
  * What differs between the typed value and a read-back that did not match

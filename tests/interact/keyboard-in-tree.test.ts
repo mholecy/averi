@@ -271,7 +271,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       expect(alone.taps).toEqual([]);
     });
 
-    it('the tap does NOT hide the keyboard: AfterDismissalTap, exactly one strategy tap, no second strategy, the target untapped, and the message says the screen may have changed', async () => {
+    it('the tap does NOT hide the keyboard, and no other strategy is usable (the second configured one absent, no scroll view for averi\'s own): AfterDismissalTap, exactly one strategy tap, the target untapped, every strategy passed over named, and the message says the screen may have changed', async () => {
       const fake = iosFake(); // onTap does nothing: the band stays
       const events = recorded(fake);
       const error = (await tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP, OTHER_TAP] }).catch((e: unknown) => e)) as AfterDismissalTap;
@@ -279,7 +279,8 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       expect(error).not.toBeInstanceOf(KeyboardWithoutDismissal);
       expect(error.message).toBe(
         'Tapped id:"login_title" at (201,303) to hide the soft keyboard covering id:login_submit, but it is still up: the band [0,539][402,874] ' +
-          `still contains the tap point (107,571) on ${KEYBOARD_HIDE_CONFIRM_LOOKS} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped. That tap may have changed the screen (the keyboard was raised again, ` +
+          `still contains the tap point (107,571) on ${KEYBOARD_HIDE_CONFIRM_LOOKS} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped (passed over: tap id:"twofactor_title": not found; ` +
+          'a drag: no scroll view holds the target). That tap may have changed the screen (the keyboard was raised again, ' +
           'or the element did something of its own) — look at it (ui_snapshot / screenshot) before retrying. From the MCP tools: hide the keyboard ' +
           'another way, then tap id:login_submit again. In a flow: configure a dismissal that hides the keyboard on THIS screen, or lay the screen out ' +
           'so id:login_submit is not under it',
@@ -975,13 +976,14 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(fake.attachedKeyboard.windowAnswers.queries).toBe(1);
   });
 
-  it('the guard\'s answer carries the node, its note and the point to tap only — never the tree the resolution rode in on (in-tree clear, and oracle hidden)', async () => {
+  it('the guard\'s answer carries the node, its note, the point to tap and the tree the node was resolved in — nothing of the keyboard (in-tree clear, and oracle hidden)', async () => {
+    // The tree since 2026-10-19: the fill's proof of what the other inputs held before it typed (fill-type.ts).
     const clear = await resolveClearOfKeyboard(iosFake(), 'id:login_title', FAST);
-    expect(Object.keys(clear)).toEqual(['node', 'note', 'point']);
+    expect(Object.keys(clear)).toEqual(['node', 'note', 'point', 'tree']);
     const android = iosFake();
     android.attachKeyboard({ state: 'hidden' });
     const hidden = await resolveClearOfKeyboard(android, 'id:login_submit', FAST);
-    expect(Object.keys(hidden)).toEqual(['node', 'note', 'point']);
+    expect(Object.keys(hidden)).toEqual(['node', 'note', 'point', 'tree']);
   });
 
   it('the resolution note of the node tapped is kept, unchanged, when the band does not cover it', async () => {
@@ -1140,12 +1142,13 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     }
   });
 
-  it('the strategy tap does not hide the keyboard: AfterDismissalTap — the screen was touched — and no second strategy', async () => {
+  it('the strategy tap does not hide the keyboard and the next one is unusable: AfterDismissalTap — the screen was touched — naming the one passed over', async () => {
     const fake = withBand('nothing'); // the band stays
     const error = (await dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP, { kind: 'tap', target: { id: 'login_password' } }] }).catch((e: unknown) => e)) as AfterDismissalTap;
     expect(error).toBeInstanceOf(AfterDismissalTap);
     expect(error.message).toBe(
-      `Tapped id:"login_title" at (201,303) to hide the soft keyboard after the fill, but it is still up over [0,539][402,874] on ${KEYBOARD_HIDE_CONFIRM_LOOKS} reads ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped. ` +
+      `Tapped id:"login_title" at (201,303) to hide the soft keyboard after the fill, but it is still up over [0,539][402,874] on ${KEYBOARD_HIDE_CONFIRM_LOOKS} reads ${KEYBOARD_HIDE_DELAY_MS}ms apart; nothing else was tapped ` +
+        '(passed over: tap id:"login_password": only interactive match (textfield) — a dismissal must be a non-interactive element). ' +
         'That tap may have changed the screen (the keyboard was raised again, or the element did something of its own) — look at it (ui_snapshot / screenshot). ' +
         'In a flow: configure a dismissal that hides the keyboard on THIS screen, or drop dismissKeyboard from this fill',
     );

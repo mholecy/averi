@@ -13,7 +13,7 @@ UI from the same things:
 - **The tap** (`interact/tap-judgement.ts`). A WDA key is exempt from the reading's own questions: `over` and
   `frameOver` read `unknown` for it. It is NOT exempt from the reading's merged line, which the chrome aim reads when the
   centre is covered. A node of idb's band is exempt from idb's band line (`KeyboardPosition.line`'s `subject`).
-- **The dismissal picker** (`interact/keyboard-in-tree.ts#pickDismissal`). It skips a WDA key first, as "the keyboard's
+- **The dismissal picker** (`interact/keyboard-dismissal.ts#configuredStrategy`). It skips a WDA key first, as "the keyboard's
   own control", then asks the tap's standing with the same merged line, so a node of idb's band is exempt from the band
   line. It does not skip idb's band nodes as the keyboard's own control.
 - **`scroll_until`'s read** (`interact/scroll-read.ts#judgeRead`). A node `owns` answers for — a WDA key or a node of

@@ -41,6 +41,8 @@ export const IDB_EMPTY_RETRY_MS = 1_000;
  */
 export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
+  /** `idb ui text` delivers its HID events before it returns (types.ts#TypingDelivery, measured 2026-10-19). */
+  readonly typingDelivery = 'on-return' as const;
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;

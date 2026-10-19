@@ -159,18 +159,31 @@ export function sameRect(a: Rect, b: Rect): boolean {
 }
 
 /**
- * The same rect to within a pixel on every side — under 1 unit of x, y,
+ * The same rect to within a pixel on every side — at most 1 unit of x, y,
  * width and height apart. `sameRect`'s sibling, kept beside it so rect
  * equality has one owner with two honestly named questions.
  * `scroll_until` asks it of one match's rect read for read — "did the
  * stroke move it?", "did the confirming read find it where the stop's read
- * did?" — where a sub-unit difference between reads (fractional
- * coordinates, a rounding in the tree source) is not motion. Exact
- * equality stays the question for `sameRect`'s callers: there a one-unit
- * change IS the finding.
+ * did?" — where a difference a tree source's rounding can make is not
+ * motion. One unit, not under one: WDA lists frames in whole points,
+ * rounding each of a frame's sub-point origin and size on its own, so a
+ * node that moved less than a point between two reads — a list resting a
+ * third of a point off its top after the bounce of a stroke that moved
+ * nothing, at scale 3 — reads a whole point apart on one side: measured
+ * live, the lab app's `scroll-bounded` F at 51,1380 300x64 before a stroke
+ * up at `lower`'s top, then 51,1381 300x64 or 51,1380 300x65 after each
+ * stroke, and its content container 0,380 402x1300 → 0,381 402x1300 or
+ * 0,380 402x1301 — and the end proof that needs it unmoved
+ * (interact/scroll-rounds.ts#Observed.ends) came one to three strokes late.
+ * A real motion of one unit is read as none: no stroke moves content that
+ * little. The settle confirm forgives it too, on every source (Android's and
+ * idb's included): a target creeping a unit a read is taken as still — no
+ * stroke's fling moves that little, an animation may. Exact equality stays the question for `sameRect`'s callers: there
+ * a one-unit change IS the finding.
+ * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
  */
 export function sameRectWithinPixel(a: Rect, b: Rect): boolean {
-  return Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1;
+  return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 }
 
 /**
@@ -834,6 +847,20 @@ export interface LaunchOutcome {
   note?: string;
 }
 
+/**
+ * When typed text has reached the focused field:
+ * - `on-return`: all of it has when `typeText` returns, so what a field still
+ *   lacks after the read-back's poll was DROPPED, not delayed. iOS (`idb ui
+ *   text`, HID events): measured 2026-10-19 on the React Native lab field —
+ *   45 typings that kept a prefix had their tail typed again 1.5 s later, and
+ *   none read a character twice (a late arrival would have).
+ * - `may-arrive-late`: keystrokes may still be queued when the call returns —
+ *   Android's IME, Compose's async state (3 of 11 characters landed at first,
+ *   2026-08-05) — so a short reading proves no drop, and typing its "tail"
+ *   again could double it.
+ */
+export type TypingDelivery = 'on-return' | 'may-arrive-late';
+
 export interface DeviceAdapter {
   readonly platform: Platform;
   /**
@@ -977,6 +1004,13 @@ export interface DeviceAdapter {
    * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
    */
   readonly dragSpeed?: number;
+  /**
+   * When text sent by `typeText` has reached the focused field
+   * (`TypingDelivery`) — the platform fact the fill's retype of a dropped
+   * tail asks (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
+   * tail-again.md). Absent: `may-arrive-late`, the retype never sent.
+   */
+  readonly typingDelivery?: TypingDelivery;
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;

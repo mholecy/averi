@@ -36,7 +36,7 @@ time out "waiting for element … to appear" though the node is in the tree. Not
 - `src/interact/resolve.ts` (the one resolution policy, ~:136): zero-area nodes are dropped; rects outside the
   viewport are not.
 - The check exists elsewhere: the dismissal picker refuses a strategy `off screen at (x,y)` "inside the root's rect"
-  (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md stage B, `interact/keyboard-in-tree.ts#pickDismissal`), and
+  (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md stage B, `interact/keyboard-dismissal.ts#configuredStrategy`), and
   `scroll_until` judges visibility against `adapter.viewport()` (`interact/scroll.ts:119`). The tap target itself is
   not judged.
 

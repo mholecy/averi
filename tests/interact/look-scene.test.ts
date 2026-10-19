@@ -7,7 +7,7 @@ import { FAST, hidesKeyboardOn, iosLoginFake, node } from '../helpers/fake.js';
 
 // ONE SCENE PER LOOK (ui-tree/look.ts#Look, carried by interact/keyboard-model.ts#SeenLook): a look carries its tree's
 // scene, derived on first use, and every judgement of that look reads it — the tap's (interact/tap-judgement.ts#judgeTap)
-// and the dismissal picker's (interact/keyboard-in-tree.ts#pickDismissal) — none derives its own (the scroll read builds
+// and the dismissal picker's (interact/keyboard-dismissal.ts#configuredStrategy) — none derives its own (the scroll read builds
 // its own look, once a read). The Look's own contract is pinned in tests/ui-tree/look.test.ts; here, that the guard's
 // looks are what the judgements read. Counted here as the walks sceneOf (ui-tree/standing.ts) makes, one per tree it is
 // handed, and the readings readKeyboard (ui-tree/keyboard-cover.ts) builds, one per look; the guard's sleeps are not

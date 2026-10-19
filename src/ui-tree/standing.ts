@@ -823,7 +823,7 @@ function touchScreen(screen: UsableScreen | undefined, tree: UiNode): UsableScre
  * system bands (`systemBands`): on, in the top band, in the bottom band (in
  * that order), or off. THE on-screen rule for a point about to be tapped —
  * the target's centre, and a configured keyboard dismissal's
- * (interact/keyboard-in-tree.ts#pickDismissal asks the tap's standing,
+ * (interact/keyboard-dismissal.ts#configuredStrategy asks the tap's standing,
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md).
  * With no screen (no usable device size and no window in the tree), the
  * tree's own screen is the one box (`touchScreen`); on a root of no area,

@@ -1,8 +1,12 @@
 # BUG: on Android a React Native field's floating label overhangs its EditText by 3 px (about 1 dp) — past the 2-px own-label allowance — and averi reads it as covered by its own field: the tap refused, `scroll_until` fails
 
-> **Status (2026-10-19):** open. KNOWN as this note (tests/differential/golden/react-native.known.ts: rn-field's N and
-> M, tap, scroll_until and ocr); live LOUD (the tap refused, nothing fired: docs/truth/live-rn-2026-10-19.md, its
-> Android section). Calibration.json LR2.
+> **Status (2026-10-19):** fixed at ce19c234 and f3a7043f (arch/r23-rn-label; the second asks the label to span the field's height) — the own-label overhang is 2 pt or dp, as half a
+> percent of the screen's shorter side (src/ui-tree/draw-order.ts#labelOverhang: 5 px on this AVD), and the field shape
+> no longer asks its parent's size (RN lays the fields in the screen's own view) — docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md,
+> refinement 2026-10-19. Measured: golden from truth/round-7 5c71158 `--side` the branch — rn-field's N and M tap and
+> scroll_until green (`Tapped at its node's centre (304.5,390.5)`), every other reply and device call byte-identical;
+> the ocr rows skipped in the sandbox; pinned over this capture (5 px own, 6 px a cover) by
+> tests/ui-tree/draw-order.test.ts. Calibration.json LR2.
 
 Lab note LR2. **Found 2026-10-19** by round 7's React Native lab app (fixtures/apps/rn, `rn-field`; RN 0.88.0) on the
 `averi_lab` AVD (Android 13, API 33, 1080x2220, density 2.75), averi = truth/r7-rn's src.

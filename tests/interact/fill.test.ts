@@ -1313,3 +1313,203 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     expect(fake.deletes).toEqual([3, 6, 6]);
   });
 });
+
+describe('fillField — a field that drops the tail of the typing gets the tail typed again', () => {
+  // docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md: React Native's
+  // controlled single-line TextInput kept a prefix of an `idb ui text` burst in 6 of 12 fills (`Jan` of `Jan Novak`).
+  /** typeText lands only the first `keep(text)` characters of each typing, in order of the calls. */
+  const dropping = (fake: FakeAdapter, ...keeps: number[]) => {
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      const keep = keeps.shift() ?? text.length;
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + text.slice(0, keep);
+    };
+  };
+
+  it('types only the missing tail, once, and says so: `Filled … (9 characters, the last 6 characters typed again …)`', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3);
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak']);
+    expect(fake.focused?.value).toBe('Jan Novak');
+    expect(result.retyped).toEqual([6]);
+    expect(result.readBack).toEqual({ kind: 'landed' });
+    expect(fillReply(result, 'id:amount_input')).toBe(
+      'Filled id:amount_input (9 characters, the last 6 characters typed again after the field dropped them)',
+    );
+  });
+
+  it('a retyped tail that loses its own end is typed again once more — never past the bound', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 3);
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'vak']);
+    expect(result.retyped).toEqual([6, 3]);
+  });
+
+  it('after two retypes the field still short is the mismatch, and the error says what was typed again', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 1, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow(
+      'fill: typed 9 characters (the last 6 characters typed again after the field dropped them, then the last 5 characters) but the field shows 5',
+    );
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'Novak']);
+  });
+
+  it('a retype that moved nothing is not repeated (a field at its maxLength keeps a prefix too)', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 0);
+    await expect(fillField(fake, { id: 'amount_input' }, 'abcde', FAST)).rejects.toThrow(/typed 5 characters \(the last 2 characters typed again after the field dropped them\) but the field shows 3/);
+    expect(fake.typed).toEqual(['abcde', 'de']);
+  });
+
+  it('with clear the tail is typed again too — no wipe: the clear deletes once, the prefix stays', async () => {
+    const fake = formFake('9.99');
+    dropping(fake, 2);
+    const result = await fillField(fake, { id: 'amount_input' }, '12.34', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([4]);
+    expect(fake.typed).toEqual(['12.34', '.34']);
+    expect(result.retyped).toEqual([3]);
+  });
+
+  it('without clear the tail is what the field misses of its earlier text plus the value', async () => {
+    // Nothing is read after the focus tap here (the field held text, no clear): the tree that resolved it is the
+    // proof of what the other inputs held before the typing.
+    const fake = formFake('9.99');
+    dropping(fake, 2);
+    const result = await fillField(fake, { id: 'amount_input' }, '12.34', FAST);
+    expect(fake.focused?.value).toBe('9.9912.34');
+    expect(fake.typed).toEqual(['12.34', '.34']);
+    expect(result.retyped).toEqual([3]);
+  });
+
+  it('nothing of the typing landed: nothing is typed again (the focus may not be in the field)', async () => {
+    const fake = formFake('9.99');
+    dropping(fake, 0);
+    await expect(fillField(fake, { id: 'amount_input' }, '12.34', FAST)).rejects.toThrow(/the field did not change/);
+    expect(fake.typed).toEqual(['12.34']);
+  });
+
+  it('a reading that is no prefix (the app changed the text) is not typed into again', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = 'Jan';
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, 'jan novak', FAST)).rejects.toThrow(/typed 9 characters but the field shows 3/);
+    expect(fake.typed).toEqual(['jan novak']);
+  });
+
+  it('a masked field that dropped characters is never typed into again — bullets show no prefix', async () => {
+    const fake = formFake(null);
+    appendBullets(fake, 2);
+    await expect(fillField(fake, { id: 'amount_input' }, '12345', FAST)).rejects.toThrow(/typed 5 characters but the field shows 3/);
+    expect(fake.typed).toEqual(['12345']);
+  });
+
+  it('an adapter whose keys may arrive late (Android\'s IME queue) gets no retype: a short reading proves no drop', async () => {
+    const fake = formFake(null);
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 3);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow('fill: typed 9 characters but the field shows 3 (content withheld from this error)');
+    expect(fake.typed).toEqual(['Jan Novak']);
+  });
+
+  /** Two auto-advancing one-digit code boxes and a note under them: a box that has its digit moves the focus on. */
+  const otpFake = () => {
+    resetLayout();
+    const otp1 = el({ role: 'textfield', identifier: 'otp1', value: null });
+    const otp2 = el({ role: 'textfield', identifier: 'otp2', value: null });
+    const note = el({ role: 'textfield', identifier: 'note', value: null });
+    const fake = new FakeAdapter({ form: screen(otp1, otp2, note) }, 'form');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      for (const ch of text) {
+        const box = fake.focused;
+        if (box === undefined) return;
+        box.value = (box.value ?? '') + ch;
+        if (box === otp1) fake.focused = otp2;
+        else if (box === otp2) fake.focused = note;
+      }
+    };
+    return { fake, otp2, note };
+  };
+
+  it('typing that moved the focus to another input is never typed again — it would go there too — and the error names that input', async () => {
+    // Review of this branch: `1234` into otp1 left `1` there, `2` in otp2 and `34` in the note, and the tail `234`
+    // typed again made the note `34234`, the reply saying the field had dropped them.
+    const { fake, otp2, note } = otpFake();
+    await expect(fillField(fake, { id: 'otp1' }, '1234', FAST)).rejects.toThrow(
+      /^fill: typed 4 characters but the field shows 1 .*; the typing left the field: textfield id:"otp2" \(0,40 100x10\) changed while it typed \(the focus moved\), so nothing was typed again$/,
+    );
+    expect(fake.typed).toEqual(['1234']);
+    expect([otp2.value, note.value]).toEqual(['2', '34']);
+  });
+
+  it('with clear, the clear\'s wipe and retype is not sent either: its deletes and its typing would go into the other input', async () => {
+    const { fake, note } = otpFake();
+    await expect(fillField(fake, { id: 'otp1' }, '1234', { ...FAST, clear: true })).rejects.toThrow(/the typing left the field: textfield id:"otp2"/);
+    expect(fake.typed).toEqual(['1234']);
+    expect(fake.deletes).toEqual([]);
+    expect(note.value).toBe('34');
+  });
+
+  /**
+   * An exchange form: the amount typed, and a sibling the app recomputes from it (twice the amount) — the bank app's
+   * send/receive pairs. The first typing lands only `keep` characters of the amount.
+   */
+  const fxFake = (sibling: (amount: string) => string | null, keep = 2) => {
+    resetLayout();
+    const amount = el({ role: 'textfield', identifier: 'amount', value: null });
+    const converted = el({ role: 'textfield', identifier: 'converted', value: null });
+    const fake = new FakeAdapter({ form: screen(amount, converted) }, 'form');
+    let first = true;
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      amount.value = (amount.value ?? '') + (first ? text.slice(0, keep) : text);
+      first = false;
+      converted.value = sibling(amount.value);
+    };
+    return { fake, amount, converted };
+  };
+  const doubled = (a: string) => String(Number(a) * 2);
+
+  it('a sibling the app recomputes proves nothing of where the typing went: with clear, the wipe and retype runs as it always did', async () => {
+    // Review round 2: `converted` going "" → "24" read as the focus moving, and a clear fill that recovered failed.
+    const { fake, amount } = fxFake(doubled);
+    const result = await fillField(fake, { id: 'amount' }, '1234', { ...FAST, clear: true });
+    expect(fake.typed).toEqual(['1234', '1234']);
+    expect(fake.deletes).toEqual([2]);
+    expect(amount.value).toBe('1234');
+    expect(result.readBack).toEqual({ kind: 'landed' });
+  });
+
+  it('without clear the recomputed sibling stops the tail too, and the error does not claim the focus moved', async () => {
+    const { fake } = fxFake(doubled);
+    await expect(fillField(fake, { id: 'amount' }, '1234', FAST)).rejects.toThrow(/^fill: typed 4 characters but the field shows 2 \(content withheld from this error\)$/);
+    expect(fake.typed).toEqual(['1234']);
+  });
+
+  it('a sibling that by coincidence gains a part of the missing text reads as the typing gone there: nothing is sent again, the fill fails loudly', async () => {
+    const { fake } = fxFake((a) => (a.length >= 2 ? '3' : null));
+    await expect(fillField(fake, { id: 'amount' }, '1234', { ...FAST, clear: true })).rejects.toThrow(/the typing left the field: textfield id:"converted"/);
+    expect(fake.typed).toEqual(['1234']);
+    expect(fake.deletes).toEqual([]);
+  });
+
+  it('a prefix still growing at the end of the poll is not typed again (a late keystroke would be sent twice)', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = 'J';
+    };
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      // after the typing, one more character arrives before every read: the reading never holds still
+      if (fake.typed.length > 0 && fake.focused && (fake.focused.value ?? '').length < 8) fake.focused.value = 'Jan Novak'.slice(0, (fake.focused.value ?? '').length + 1);
+      return real();
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow('fill: typed 9 characters but the field shows 6 (content withheld from this error)');
+    expect(fake.typed).toEqual(['Jan Novak']);
+  });
+});

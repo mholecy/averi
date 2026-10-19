@@ -1,8 +1,16 @@
 # BUG: on iOS, a `type_text` fill into a React Native single-line field loses the tail of its text — 6 of 12 fills in two runs, up to 6 of 9 characters, under both tree sources; averi says so (`typed 9 characters but the field shows 3`), but the fill fails
 
-> **Status (2026-10-19):** open. Honest today: the fill's read-back catches every loss and the reply is an ERROR — a
-> LOUD verdict in the live golden, never a false `Filled`. A reliability gap, not a lie: the bank app is React Native,
-> and an agent's fill into an RN single-line field there fails half the time. No KNOWN row (LOUD is no mismatch).
+> **Status (2026-10-19):** fixed at 6ff68e52 and 7909c611 (arch/r23-fill-tail; docs/adr/0023-fill-types-a-dropped-
+> tail-again.md; src/interact/fill-type.ts#typeAndConfirm): a read-back holding a strict prefix of what the field
+> should hold gets the dropped tail typed again — at most twice, on a reading that held still, never on bullets, only
+> on an adapter whose typing has arrived when its call returns (iOS) and while no other input on the screen changed —
+> and the reply says so (`Filled … (9 characters, the last 3 characters typed again after the field dropped them)`).
+> Measured raw (`idb ui text`, no averi, 25 runs a row; docs/truth/live-records/a9-fill-tail-diag/): a burst keeps a
+> prefix 22 of 25, its tail typed again lands whole 45 of 45; chunks of 3 drop a middle character (14 of 25) and one
+> character per call costs ~220 ms a character, so neither was taken. Live, the RN forms group with that src as
+> `--side`: 5 runs × idb and WDA, 29 single-line fills typed, every one whole, 14 with a tail typed again
+> (docs/truth/live-records/ios-rn-forms-a9-1…5.json); the native forms group unchanged, 46 / 38 ok / 8 LOUD / 0
+> mismatches (ios-forms-a9.json).
 
 **Found 2026-10-19** by round 7's React Native lab app (fixtures/apps/rn, `rn-field`; RN 0.88.0, a controlled
 `TextInput`) on the `averi-lab iPhone 17` simulator (iOS 27.0), averi = truth/r7-rn's src (truth/round-7's).
