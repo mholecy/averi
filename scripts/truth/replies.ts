@@ -1,4 +1,4 @@
-import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
@@ -94,7 +94,7 @@ export const ownWords = (reply: string) => reply.replace(/\b[a-z]+:"(?:[^"\\]|\\
 export const presentedRemedySaid = (reply: string) => /is presented over (?:it|the element)\b[^\n]*? — close it first/.test(reply);
 
 /**
- * The reply carries the active-window hint (src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT, imported, not copied):
+ * The reply carries the active-window hint (src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT, imported, not copied):
  * uiautomator's not-found on a tree that marks no presented window — "the tree lists only the active window: if a sheet
  * or a dialog is open over the screen, close it first", a possibility, never the presented remedy.
  */

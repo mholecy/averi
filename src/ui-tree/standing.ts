@@ -423,6 +423,16 @@ const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
 const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
 
 /**
+ * A presented layer named in one phrase, no parenthesis inside it — for a sentence that already sits in one (a
+ * not-found's note, ui-tree/miss.ts#missNote): a layer the source types by its kind and its label (`a dialog`,
+ * `an alert "Delete?"`), a `screen` layer, or none, `a sheet or modal`.
+ */
+export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
+  const typed = typedWords(layer);
+  return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${JSON.stringify(layer.label)}` : ''}`;
+};
+
+/**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
  * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
@@ -437,27 +447,6 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
     ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 };
-
-/**
- * THE hint beneath a reply that says a target is not in a tree whose source lists the ACTIVE WINDOW ONLY
- * (`UiNode.activeWindowOnly`, uiautomator) and that does not already say a window is presented (`presentedRemedy`'s
- * words, for a window the presentation module marks): a sheet or a dialog it does not mark — a fully expanded
- * bottom sheet whose dump carries no scrim (form-picker), a full-screen dialog, a window against the screen's edge —
- * still hides the screen beneath from the tree, and nothing in the dump tells it from no window at all (ADR 0018's
- * residuals 18 and 19, accepted by the owner 2026-10-18 with this hint). So every such reply says what the tree is and
- * what to do if a sheet or dialog is up, as a possibility, never as the cause. It reaches, through `activeWindowHint`
- * (the one test of such a tree, interact/resolve.ts#missOf and interact/scroll-rounds.ts's bound): the never-resolved
- * wait "to appear" (interact/resolve.ts#notFound) of both of its pollers — `resolveSettled`, the tap's and fill's wait,
- * and `resolvePresent`, the presence check a flow's optional tap runs (flow/engine.ts#runOptionalSteps: its error
- * carries it, though the skipped step's line, an ElementNotFoundError's, reads only "(not present)") — and
- * `scroll_until`'s "never appeared in the tree" (interact/scroll-text.ts, the `absent` shortfall); a flow's tap, fill
- * and scroll_until steps through the same. Not a flow's `wait:` step (flow/engine.ts#waitFor polls conditions, not
- * these), nor the asserts' "not found". Not under WDA or idb, which list every window. Said once, here.
- */
-export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
-
-/** ACTIVE_WINDOW_HINT for a tree whose source lists the active window only; undefined for any other. */
-export const activeWindowHint = (tree: Pick<UiNode, 'activeWindowOnly'>): string | undefined => (tree.activeWindowOnly === true ? ACTIVE_WINDOW_HINT : undefined);
 
 /**
  * `scroll_until`'s `presented` stop's remedy (interact/scroll-text.ts#scrollFailure): `presentedRemedy`'s, and why no

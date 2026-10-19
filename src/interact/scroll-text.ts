@@ -2,6 +2,7 @@ import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from 
 import { axisOfEdge, containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
+import { withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
@@ -465,7 +466,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // skipped "(not present)" — with the keyboard named, since no swipe
       // could look further.
       const { cover, viewport } = o;
-      const seenAs = o.evidence.sighted ? 'the element is in the tree but under the soft keyboard' : 'element never appeared in the tree';
+      const seenAs = o.evidence.sighted ? 'the element is in the tree but under the soft keyboard' : withMissNote('element never appeared in the tree', o.evidence.miss);
       return {
         message:
           `scroll_until ${describe} failed after ${swipesText(o.swipes)} — ${seenAs}; the soft keyboard over ` +
@@ -648,7 +649,7 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':
-      return `element never appeared in the tree${short.windowHint !== undefined ? ` (${short.windowHint})` : ''}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
+      return `${withMissNote('element never appeared in the tree', short.miss)}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':

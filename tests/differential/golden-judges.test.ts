@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, type Expectation, type FormExpectation } from '../../scripts/differential/golden-spec.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
-import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 
 // Every judge of the golden spec (scripts/differential/golden-spec/*.ts, behind the façade golden-spec.ts), each on
 // replies it must accept and replies it must reject — including the "not in the tree" replies: judged by their effect
@@ -20,7 +20,7 @@ const PASS = 'All 1 asserts passed\nPASS  element id:"lab.x" …';
 const FAIL = '1/1 asserts FAILED\nFAIL  element id:"lab.x" … — expected … got …';
 const IDB_SWIPE = (y: number) => `idb ui swipe 201 ${y} 201 115 --duration 0.3`;
 const NOT_IN_TREE = /^not in the tree: /;
-/** uiautomator's not-found with the active-window hint beneath it (src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT), and its class beneath a presented layer. */
+/** uiautomator's not-found with the active-window hint beneath it (src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT), and its class beneath a presented layer. */
 const HINTED = `${TIMED_OUT}\n  (${ACTIVE_WINDOW_HINT})`;
 const NEVER_HINTED = `ERROR scroll_until id:"lab.x" failed after 2 swipes (…) — element never appeared in the tree (${ACTIVE_WINDOW_HINT})`;
 const HINT_CLASS = /^not in the tree \(active-window hint\): /;

@@ -1,0 +1,2134 @@
+{
+ "device": "averi_lab emulator-5554",
+ "side": "/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/91f534df-e959-489e-ae8b-f51fecaee6b3/scratchpad/r23-hint",
+ "results": [
+  {
+   "case": "assert element",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "1/1 asserts FAILED\nFAIL  element id:\"lab.form-picker.name\" exists — not found within 3 s (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)\nappAlive: true",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  },
+  {
+   "case": "assert text",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "1/1 asserts FAILED\nFAIL  element id:\"lab.form-picker.name\" with text \"Name\" exists — not found within 3 s (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)\nappAlive: true",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  },
+  {
+   "case": "assert color",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "1/1 asserts FAILED\nFAIL  element id:\"lab.form-picker.name\" fill within dE00 8 of #FFFFFF — not found within 5 s (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)\nappAlive: true",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  },
+  {
+   "case": "assert absent (passes)",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "All 1 asserts passed\nPASS  element id:\"lab.form-picker.name\" is absent\nappAlive: true",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  },
+  {
+   "case": "assert on the sheet (found, passes)",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "All 1 asserts passed\nPASS  element id:\"lab.form-picker.country.AL\" with text \"Albania\" exists\nappAlive: true",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  },
+  {
+   "case": "run_flow wait:",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "ERROR Timed out after 3000ms waiting for element id:\"lab.form-picker.name\"\n  (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)\n\nSteps that ran before the failure:\nflow wait_name: start\n✗ wait id:\"lab.form-picker.name\": failed — Timed out after 3000ms waiting for element id:\"lab.form-picker.name\"",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  },
+  {
+   "case": "run_flow optional tap",
+   "launched": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   },
+   "reply": "flow optional_name: start\noptional: skipped id:\"lab.form-picker.name\" (not present) (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)\nwait: element id:\"lab.form-picker.country.AL\"\nflow optional_name: done\nappAlive: true",
+   "after": {
+    "cell": "form-picker",
+    "ready": true,
+    "screen": {
+     "x": 0,
+     "y": 0,
+     "width": 1080,
+     "height": 2220
+    },
+    "scale": 1,
+    "density": 2.75,
+    "frames": {
+     "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 179,
+      "height": 66
+     },
+     "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+     },
+     "country.title": {
+      "x": 55,
+      "y": 496,
+      "width": 235,
+      "height": 66
+     },
+     "country": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+     },
+     "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+     },
+     "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+     },
+     "row.AL": {
+      "x": 0,
+      "y": 221,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AX": {
+      "x": 0,
+      "y": 364,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AD": {
+      "x": 0,
+      "y": 507,
+      "width": 1080,
+      "height": 143
+     },
+     "row.AT": {
+      "x": 0,
+      "y": 650,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BE": {
+      "x": 0,
+      "y": 793,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BA": {
+      "x": 0,
+      "y": 936,
+      "width": 1080,
+      "height": 143
+     },
+     "row.BG": {
+      "x": 0,
+      "y": 1079,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CI": {
+      "x": 0,
+      "y": 1222,
+      "width": 1080,
+      "height": 143
+     },
+     "row.HR": {
+      "x": 0,
+      "y": 1365,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CY": {
+      "x": 0,
+      "y": 1508,
+      "width": 1080,
+      "height": 143
+     },
+     "row.CZ": {
+      "x": 0,
+      "y": 1651,
+      "width": 1080,
+      "height": 143
+     },
+     "row.DK": {
+      "x": 0,
+      "y": 1794,
+      "width": 1080,
+      "height": 143
+     },
+     "row.EE": {
+      "x": 0,
+      "y": 1937,
+      "width": 1080,
+      "height": 143
+     },
+     "row.FO": {
+      "x": 0,
+      "y": 2080,
+      "width": 1080,
+      "height": 143
+     }
+    },
+    "events": [],
+    "fields": {
+     "name": {
+      "value": "",
+      "focused": false,
+      "error": null
+     },
+     "country": {
+      "value": "",
+      "focused": false,
+      "error": null
+     }
+    },
+    "focus": null,
+    "keyboard": null,
+    "submits": []
+   }
+  }
+ ]
+}
