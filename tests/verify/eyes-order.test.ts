@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { orderQuestion, type OrderPair, type OrderQuestion } from '../../src/ui-tree/eyes.js';
+import { orderQuestion, type AroundStrip, type OrderPair, type OrderQuestion } from '../../src/ui-tree/eyes.js';
+import type { Edge } from '../../src/ui-tree/geometry.js';
 import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { eyesOn, judgeOrder } from '../../src/verify/eyes.js';
@@ -21,6 +22,8 @@ import { Verifier } from '../../src/verify/assert.js';
 const IOS = '../fixtures/truth/ios-iphone17-ios27';
 const file = async (name: string): Promise<Buffer> => readFile(new URL(`${IOS}/${name}`, import.meta.url));
 const png = async (name: string) => PNG.sync.read(await file(name));
+/** A strip around a control (ui-tree/eyes.ts#AroundStrip): its rect and the edge of it against the control. */
+const strip = (x: number, y: number, width: number, height: number, against: Edge): AroundStrip => ({ rect: { x, y, width, height }, against });
 const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id)!;
 const USABLE = { box: { x: 0, y: 0, width: 402, height: 874 }, boxes: [{ x: 0, y: 0, width: 402, height: 874 }], oriented: { x: 0, y: 0, width: 402, height: 874 }, from: 'device' as const };
 
@@ -42,8 +45,8 @@ describe('the order question — asked of a standing covered by a cover the list
         overlap: { x: 51, y: 470, width: 300, height: 42 },
         nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
         peerBands: [{ x: 51, y: 512, width: 300, height: 22 }],
-        nodeAround: [{ x: 51, y: 426, width: 300, height: 22 }, { x: 29, y: 448, width: 22, height: 22 }, { x: 351, y: 448, width: 22, height: 22 }],
-        peerAround: [{ x: 51, y: 534, width: 300, height: 22 }, { x: 29, y: 512, width: 22, height: 22 }, { x: 351, y: 512, width: 22, height: 22 }],
+        nodeAround: [strip(51, 426, 300, 22, 'bottom'), strip(29, 448, 22, 22, 'right'), strip(351, 448, 22, 22, 'left')],
+        peerAround: [strip(51, 534, 300, 22, 'top'), strip(29, 512, 22, 22, 'right'), strip(351, 512, 22, 22, 'left')],
         beside: [
           { x: 0, y: 470, width: 51, height: 42 },
           { x: 351, y: 470, width: 51, height: 42 },
@@ -63,8 +66,8 @@ describe('the order question — asked of a standing covered by a cover the list
         peerBands: [{ x: 51, y: 428, width: 300, height: 42 }],
         // Around each control, as deep as its band: past the edge the band faces (below the row, above the card's top),
         // and sideways on the band's rows past its left and right edges.
-        nodeAround: [{ x: 51, y: 534, width: 300, height: 22 }, { x: 29, y: 512, width: 22, height: 22 }, { x: 351, y: 512, width: 22, height: 22 }],
-        peerAround: [{ x: 51, y: 258, width: 300, height: 42 }, { x: 9, y: 428, width: 42, height: 42 }, { x: 351, y: 428, width: 42, height: 42 }],
+        nodeAround: [strip(51, 534, 300, 22, 'top'), strip(29, 512, 22, 22, 'right'), strip(351, 512, 22, 22, 'left')],
+        peerAround: [strip(51, 258, 300, 42, 'bottom'), strip(9, 428, 42, 42, 'right'), strip(351, 428, 42, 42, 'left')],
       },
     ]);
   });
@@ -76,6 +79,23 @@ describe('the order question — asked of a standing covered by a cover the list
     const standing = sceneOf(t, seen).standing(w, USABLE, { of: 'tap' });
     expect(standing).toMatchObject({ kind: 'covered', remedy: { of: 'unordered', untold: 'the two look alike (ΔE 3.10)' } });
     expect(orderQuestion(t, w, standing)).toBeUndefined();
+  });
+
+  it('a horizontal overlap: bands left and right of it, each with the strip ahead past its control\'s side edge and the two above and below it on the band\'s columns', () => {
+    const left = node({ role: 'button', label: 'Left', rect: { x: 51, y: 470, width: 200, height: 64 } });
+    const right = node({ role: 'button', label: 'Right', rect: { x: 121, y: 470, width: 230, height: 64 } });
+    const t = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [left, right] })] });
+    // Judged for the colour assert, over its whole rect: a tap would move to Left's clear 70-pt part.
+    const q = orderQuestion(t, left, sceneOf(t).standing(left, USABLE, { of: 'pixel', reads: (r) => r, glyphs: false }));
+    expect(q?.pairs.map(({ overlap, nodeBands, peerBands, nodeAround, peerAround }) => ({ overlap, nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
+      {
+        overlap: { x: 121, y: 470, width: 130, height: 64 },
+        nodeBands: [{ x: 51, y: 470, width: 70, height: 64 }],
+        peerBands: [{ x: 251, y: 470, width: 100, height: 64 }],
+        nodeAround: [strip(0, 470, 51, 64, 'right'), strip(51, 400, 70, 70, 'bottom'), strip(51, 534, 70, 70, 'top')],
+        peerAround: [strip(351, 470, 51, 64, 'left'), strip(251, 370, 100, 100, 'bottom'), strip(251, 534, 100, 100, 'top')],
+      },
+    ]);
   });
 
   it("mp-native's chooser (ADR 0015's capture): a band another cover of the target meets is not read — Loan repayment's band above SWIFT payment lies on To my account", async () => {
@@ -166,8 +186,8 @@ const PAIR: OrderPair = {
   overlap: { x: 51, y: 470, width: 300, height: 42 },
   nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
   peerBands: [{ x: 51, y: 512, width: 300, height: 22 }],
-  nodeAround: [{ x: 51, y: 426, width: 300, height: 22 }, { x: 29, y: 448, width: 22, height: 22 }, { x: 351, y: 448, width: 22, height: 22 }],
-  peerAround: [{ x: 51, y: 534, width: 300, height: 22 }, { x: 29, y: 512, width: 22, height: 22 }, { x: 351, y: 512, width: 22, height: 22 }],
+  nodeAround: [strip(51, 426, 300, 22, 'bottom'), strip(29, 448, 22, 22, 'right'), strip(351, 448, 22, 22, 'left')],
+  peerAround: [strip(51, 534, 300, 22, 'top'), strip(29, 512, 22, 22, 'right'), strip(351, 512, 22, 22, 'left')],
   beside: [
     { x: 0, y: 470, width: 51, height: 42 },
     { x: 351, y: 470, width: 51, height: 42 },
@@ -223,8 +243,17 @@ describe('the judge — each rule answers untold where its evidence is missing',
     expect(seenOf(paint([[W, TEAL], [C, GREEN], [PAIR.overlap, TEAL]]))).toEqual({ seen: 'over' });
   });
 
-  it('RESIDUAL (ADR 0024): a text-only peer over a surface exactly its own frame reads as the target on top — its band, the strips around it and the screen beside are what an opaque peer would show', () => {
+  it('RESIDUAL (ADR 0024, 2.): a text-only peer over a surface its own frame or a pixel more reads as the target on top — that pixel is the antialiasing every strip skips', () => {
     expect(seenOf(paint([[C, [255, 255, 255]], [W, TEAL]]))).toEqual({ seen: 'over' });
+    expect(seenOf(paint([[{ x: 50, y: 470, width: 302, height: 65 }, [255, 255, 255]], [W, TEAL]]))).toEqual({ seen: 'over' });
+  });
+
+  it.each([
+    ['3 pt on both sides', { x: 48, y: 500, width: 306, height: 34 }],
+    ['2 pt on the left only', { x: 49, y: 500, width: 302, height: 34 }],
+    ['2 pt past its far edge only', { x: 51, y: 500, width: 300, height: 36 }],
+  ] as const)('a card under a text-only peer running on %s: untold — the thin slice against the peer\'s edge reads it', (_n, card) => {
+    expect(seenOf(paint([[card, [255, 255, 255]], [W, TEAL]]))).toEqual({ untold: 'the other shows the colour around it #FFFFFF beside the overlap: it may draw nothing there' });
   });
 
   it('a band half one colour, half text (no dominant of half of it): untold', () => {

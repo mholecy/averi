@@ -2,7 +2,7 @@ import { PNG } from 'pngjs';
 import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/standing.js';
-import type { Eyes, EyesAnswer, EyesQuestion, OrderPair, OrderQuestion } from '../ui-tree/eyes.js';
+import type { AroundStrip, Eyes, EyesAnswer, EyesQuestion, OrderPair, OrderQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import { errorMessage } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
@@ -229,7 +229,7 @@ const AROUND_SHARE = 0.25;
  * (ui-tree/eyes.ts#OrderPair), one png. Asymmetric on purpose: telling the PEER on top only confirms a refusal; telling
  * the TARGET on top unlocks a tap, so each rule below answers `untold` (the listing's untold order, the refusal kept)
  * wherever its evidence is missing — what one frame cannot tell apart at all is ADR 0024's residuals 2 and 7 (a
- * text-only peer over a surface exactly its own frame; a peer on top drawn in two tones split exactly at the target's
+ * text-only peer over a surface ending within a pixel of its edges; a peer on top drawn in two tones split exactly at the target's
  * edge, its part over the overlap the target's own colour — each pixel for pixel the target on top):
  * 1. Each side's bands, landed in the png (`pngRegion`, one pixel in from each edge against antialiasing), each at least
  *    FLANK_MIN_PX on both sides; none on a side — untold.
@@ -237,14 +237,15 @@ const AROUND_SHARE = 0.25;
  *    EYES_SAME_DE of each other — else untold: a side showing two surfaces (mp-native's chooser row, whose band above
  *    its overlap is the card's gap and whose side bands are its own dimmed row) is not read.
  * 3. THE OPACITY GUARD: what lies around each control — the strips just outside it beside each band, past the edge the
- *    band faces and sideways past its two side edges on the band's rows (`OrderPair.nodeAround`, `peerAround`), and the
- *    screen beside the two on the overlap's rows (`beside`). No screen
- *    beside, or nothing around a side, untold; a side's colour on AROUND_SHARE of any such strip (within
- *    EYES_APART_DE), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
+ *    band faces and sideways past its two side edges on the band's rows (`OrderPair.nodeAround`, `peerAround`), each
+ *    read whole and as its thin slice against the control (`sliceAgainst`: the antialiased pixel skipped, then
+ *    FLANK_MIN_PX), and the screen beside the two on the overlap's rows (`beside`). No screen beside, or nothing around
+ *    a side, untold; a side's colour on AROUND_SHARE of any such strip or slice (within EYES_APART_DE), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
  *    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
  *    there hits the button; over an inset card, the card runs on past the button's edge — ahead or sideways — where
- *    the screen beside the two is another colour. A surface that is exactly the transparent control's frame (or that
- *    frame and a pixel) runs on nowhere: one frame cannot tell it (ADR 0024's residual 2).
+ *    the screen beside the two is another colour — two png pixels of run-on fill the slice to AROUND_SHARE. A surface
+ *    that ends within one png pixel of the transparent control's edges (that pixel the antialiasing every slice skips)
+ *    runs on nowhere it reads: one frame cannot tell it (ADR 0024's residual 2).
  * 4. The two sides farther apart than the colour assert's tolerance (color-parity.ts#DEFAULT_TOLERANCE_DE, 8) — else
  *    untold, the two look alike. The lab's menu: 17.69 (W's teal against C's blurred green).
  * 5. The overlap's dominant (of DOMINANT_SHARE) within EYES_APART_DE of exactly one side and farther than that
@@ -265,9 +266,19 @@ function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
       const on = at === undefined ? undefined : { x0: at.x0 + 1, y0: at.y0 + 1, x1: at.x1 - 1, y1: at.y1 - 1 };
       return on === undefined || on.x1 - on.x0 < FLANK_MIN_PX || on.y1 - on.y0 < FLANK_MIN_PX ? [] : [on];
     });
+  // Each strip around a control whole, and its slice against the control: the pixel there skipped (the antialiasing
+  // between the two), then FLANK_MIN_PX — a surface running on a point or two past the edge fills that slice past
+  // AROUND_SHARE, as it never fills the whole strip.
+  const landAround = (strips: readonly AroundStrip[]): EdgeBounds[] =>
+    strips.flatMap(({ rect, against }) => {
+      const whole = land([rect]);
+      const at = pngRegion(rect, scale, png);
+      const slice = at === undefined ? undefined : sliceAgainst(at, against);
+      return slice === undefined ? whole : [...whole, slice];
+    });
   const sides = [
-    { name: 'it', bands: land(pair.nodeBands), around: land(pair.nodeAround) },
-    { name: 'the other', bands: land(pair.peerBands), around: land(pair.peerAround) },
+    { name: 'it', bands: land(pair.nodeBands), around: landAround(pair.nodeAround) },
+    { name: 'the other', bands: land(pair.peerBands), around: landAround(pair.peerAround) },
   ] as const;
   const colours: Rgb[] = [];
   for (const { name, bands } of sides) {
@@ -300,4 +311,24 @@ function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
   if (toOwn <= EYES_APART_DE && toOther > DEFAULT_TOLERANCE_DE) return { seen: 'over', ...hexes };
   if (toOther <= EYES_APART_DE && toOwn > DEFAULT_TOLERANCE_DE) return { seen: 'under', ...hexes };
   return untold(`the overlap shows neither (ΔE ${toOwn.toFixed(2)} to it, ${toOther.toFixed(2)} to the other)`);
+}
+
+/**
+ * The slice of a strip around a control against it (`against`: the strip's edge that lies on the control's): one pixel
+ * in, off the antialiasing between the two, then FLANK_MIN_PX deep, across the strip less a pixel at each end;
+ * undefined when the strip is too thin for it.
+ */
+function sliceAgainst(at: EdgeBounds, against: Edge): EdgeBounds | undefined {
+  const deep = 1 + FLANK_MIN_PX;
+  const across = against === 'top' || against === 'bottom' ? { x0: at.x0 + 1, x1: at.x1 - 1 } : { y0: at.y0 + 1, y1: at.y1 - 1 };
+  const slice: EdgeBounds =
+    against === 'bottom'
+      ? { ...at, ...across, y0: at.y1 - deep, y1: at.y1 - 1 }
+      : against === 'top'
+        ? { ...at, ...across, y0: at.y0 + 1, y1: at.y0 + deep }
+        : against === 'right'
+          ? { ...at, ...across, x0: at.x1 - deep, x1: at.x1 - 1 }
+          : { ...at, ...across, x0: at.x0 + 1, x1: at.x0 + deep };
+  const fits = against === 'top' || against === 'bottom' ? at.y1 - at.y0 >= deep : at.x1 - at.x0 >= deep;
+  return fits && slice.x1 - slice.x0 >= FLANK_MIN_PX && slice.y1 - slice.y0 >= FLANK_MIN_PX ? slice : undefined;
 }

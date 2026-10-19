@@ -204,9 +204,9 @@ export interface OrderPair {
    * (`bandsBeside`): where a control that draws nothing there shows the same surface as in its band (a text-only
    * button over a card: the card runs on past its edge, ahead or sideways). Empty: none on the screen.
    */
-  readonly nodeAround: readonly Rect[];
+  readonly nodeAround: readonly AroundStrip[];
   /** What lies around the peer beside each of its clear bands, likewise. */
-  readonly peerAround: readonly Rect[];
+  readonly peerAround: readonly AroundStrip[];
   /** The screen beside the two on the overlap's rows — left of both, right of both: what a band showing the screen's own colour is told by (a control that may draw nothing there). */
   readonly beside: readonly Rect[];
 }
@@ -237,7 +237,11 @@ export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | P
         const on = rectIntersection(band, frame);
         return on === undefined || others.some((c) => rectIntersection(c.rect, on) !== undefined) ? [] : [{ band: on, around }];
       });
-    const aroundOf = (bands: readonly BandBeside[]): Rect[] => bands.flatMap(({ around }) => around.flatMap((a) => rectIntersection(a, frame) ?? []));
+    const aroundOf = (bands: readonly BandBeside[]): AroundStrip[] =>
+      bands.flatMap(({ around }) => around.flatMap(({ rect, against }) => {
+        const on = rectIntersection(rect, frame);
+        return on === undefined ? [] : [{ rect: on, against }];
+      }));
     const nodeBands = clear(bandsBeside(node.rect, overlap));
     const peerBands = clear(bandsBeside(peer.rect, overlap));
     const left = Math.min(node.rect.x, peer.rect.x);
@@ -254,13 +258,23 @@ export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | P
 const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
+ * A strip of the screen around a control (`OrderPair.nodeAround`, `peerAround`): its rect, and which of its edges lies
+ * against the control — the judge reads the whole strip and its thin slice against the control (verify/eyes.ts
+ * #judgeOrder), so a surface that runs on only two png pixels past the control's edge is seen too.
+ */
+export interface AroundStrip {
+  readonly rect: Rect;
+  readonly against: Edge;
+}
+
+/**
  * A strip of a control beside the overlap (`band`), and the strips of the screen just outside the control around it
  * (`around`): past the edge the band faces, and on the band's own rows (columns) past the control's two side edges —
  * where a surface showing through a control that draws nothing there runs on, ahead or sideways.
  */
 interface BandBeside {
   readonly band: Rect;
-  readonly around: readonly Rect[];
+  readonly around: readonly AroundStrip[];
 }
 
 /**
@@ -285,18 +299,18 @@ function bandsBeside(r: Rect, overlap: Rect): BandBeside[] {
   // A band above or below the overlap: ahead of it past `r`'s top or bottom edge, sideways past its left and right edges
   // on the band's rows; a band left or right of it, ahead past `r`'s side edge, sideways past its top and bottom edges
   // on the band's columns — every strip as deep as the band.
-  const rows = (band: Rect, ahead: Rect, d: number): BandBeside => ({
+  const rows = (band: Rect, ahead: AroundStrip, d: number): BandBeside => ({
     band,
-    around: [ahead, { x: r.x - d, y: band.y, width: d, height: band.height }, { x: r.x + r.width, y: band.y, width: d, height: band.height }],
+    around: [ahead, { rect: { x: r.x - d, y: band.y, width: d, height: band.height }, against: 'right' }, { rect: { x: r.x + r.width, y: band.y, width: d, height: band.height }, against: 'left' }],
   });
-  const columns = (band: Rect, ahead: Rect, d: number): BandBeside => ({
+  const columns = (band: Rect, ahead: AroundStrip, d: number): BandBeside => ({
     band,
-    around: [ahead, { x: band.x, y: r.y - d, width: band.width, height: d }, { x: band.x, y: r.y + r.height, width: band.width, height: d }],
+    around: [ahead, { rect: { x: band.x, y: r.y - d, width: band.width, height: d }, against: 'bottom' }, { rect: { x: band.x, y: r.y + r.height, width: band.width, height: d }, against: 'top' }],
   });
   return [
-    rows({ x: overlap.x, y: top, width: overlap.width, height: above }, { x: overlap.x, y: r.y - above, width: overlap.width, height: above }, above),
-    rows({ x: overlap.x, y: bottom, width: overlap.width, height: under }, { x: overlap.x, y: r.y + r.height, width: overlap.width, height: under }, under),
-    columns({ x: leftmost, y: overlap.y, width: before, height: overlap.height }, { x: r.x - before, y: overlap.y, width: before, height: overlap.height }, before),
-    columns({ x: right, y: overlap.y, width: after, height: overlap.height }, { x: r.x + r.width, y: overlap.y, width: after, height: overlap.height }, after),
+    rows({ x: overlap.x, y: top, width: overlap.width, height: above }, { rect: { x: overlap.x, y: r.y - above, width: overlap.width, height: above }, against: 'bottom' }, above),
+    rows({ x: overlap.x, y: bottom, width: overlap.width, height: under }, { rect: { x: overlap.x, y: r.y + r.height, width: overlap.width, height: under }, against: 'top' }, under),
+    columns({ x: leftmost, y: overlap.y, width: before, height: overlap.height }, { rect: { x: r.x - before, y: overlap.y, width: before, height: overlap.height }, against: 'right' }, before),
+    columns({ x: right, y: overlap.y, width: after, height: overlap.height }, { rect: { x: r.x + r.width, y: overlap.y, width: after, height: overlap.height }, against: 'left' }, after),
   ].filter(({ band }) => band.width > 0 && band.height > 0);
 }

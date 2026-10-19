@@ -77,14 +77,18 @@ one frame cannot tell apart at all is listed under Residuals (7.):
 2. each side ONE colour: every band's dominant at least half of it, all of a side within ΔE00 1.0 (`EYES_SAME_DE`) —
    else untold (a side showing two surfaces, the chooser's shape, is not read);
 3. THE OPACITY GUARD: what lies around each control — the strips just outside it beside each band (past the edge the
-   band faces, and sideways past its two side edges on the band's rows, each as deep as the band), and the screen
-   beside the two (`beside`). No screen beside (two rows as wide as the screen), or nothing around a side on
-   the screen, untold; a side's colour on a quarter or more of any such strip (`AROUND_SHARE`, within ΔE00 2.0,
-   `EYES_APART_DE`), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
+   band faces, and sideways past its two side edges on the band's rows, each as deep as the band, each read whole and
+   as its thin slice against the control — one png pixel skipped for the antialiasing, then 4 px, `FLANK_MIN_PX`), and
+   the screen beside the two (`beside`). No screen beside (two rows as wide as the screen), or nothing around a side on
+   the screen, untold; a side's colour on a quarter or more of any such strip or slice (`AROUND_SHARE`, within ΔE00
+   2.0, `EYES_APART_DE`), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
    there hits the button; over an inset card the card runs on past the button's edge, ahead or sideways, though the
-   screen beside the two is grey (review rounds 1 and 2, tests/verify/eyes-order.test.ts). The lab: 0.00 of every strip (W's teal against
-   the grey gap and K above W, C's blurred green against the blurred backdrop below C, both against the screen);
+   screen beside the two is grey, and a run-on of two png pixels fills a slice (review rounds 1–3,
+   tests/verify/eyes-order.test.ts: 11 pt sideways, 3 pt both sides, 2 pt one side, 2 pt ahead). The lab: 0.000 of
+   every strip and every slice (W's teal against the grey gap and K above W and the screen beside it, C's blurred green
+   against the blurred backdrop below and beside C) — the blur's edge and any antialiasing come nowhere near either
+   colour within ΔE00 2;
 4. the two sides farther apart than the colour assert's tolerance, ΔE00 8 (`DEFAULT_TOLERANCE_DE`) — else untold, the
    two look alike (the lab: 17.69);
 5. the overlap's dominant (at least half of it) within ΔE00 2.0 of exactly one side and farther than 8 from the other —
@@ -113,8 +117,8 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
     screenshot shows (the two are listed in reading order)` with the `seenOver` remedy — still red as ADR 0018's
     residual 9 (#31: the backdrop has no node, so no "close it first" of a presented layer).
 - Unit and table tests: tests/verify/eyes-order.test.ts (the judge over both lab pngs and synthetic pngs for every
-  untold rule — the inset card ahead of and sideways past the peer, a band of no one colour, sides only just apart,
-  residuals 2 and 7 pinned; the question's bands
+  untold rule — the inset card ahead of and sideways past the peer, run-ons of 2–3 pt read by the slices, a band of no
+  one colour, sides only just apart, residuals 2 and 7 pinned; a horizontal overlap's bands and strips; the question's bands
   and the strips around them on the lab trees and on mp-native's chooser; the colour assert's capture count, its
   answer kept per distinct tree and an unlocking answer never kept (W on top, then C), and its frames unsettled, settled over the region only or failing — untold, the poll
   going on),
@@ -129,16 +133,19 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 
 1. **Alike looks** (two white rows, no dim, no shadow): untold, today's refusal — the safe direction. Such menus' rows
    stay refused; the lab's blur and mp-native's dim are what give the signal.
-2. **A transparent top control over a surface exactly its own frame**: the opacity guard reads a band against what
-   lies around its control — past the edge the band faces and sideways past its side edges, on the band's rows — and
-   against the screen beside the two (review round 1 widened it from the screen alone, which an inset card under a
-   text-only button passed; round 2 added the sideways strips, which a card flush with the button's far edge and
-   running on 11 pt past its sides passed). A text-only button over a surface that is exactly its own frame (or that
-   frame and a pixel, under the antialiasing margin), in a colour neither the screen beside nor any strip around shows,
-   still passes: its band, the strips around it and the screen beside are pixel for pixel what an opaque control of
-   that colour would show — the class of residual 7, no rule of one frame can tell it, and it reads `over`, a `Tapped`
-   that may hit the button. Pinned as told (`RESIDUAL`, tests/verify/eyes-order.test.ts). Not measured by a lab cell (a
-   cell `presented/plain-button-over-row` would measure the common shape).
+2. **A transparent top control over a surface ending within a pixel of its edges**: the opacity guard reads a band
+   against what lies around its control — past the edge the band faces and sideways past its side edges on the band's
+   rows, each strip whole and as its thin slice against the control — and against the screen beside the two (review
+   round 1 widened it from the screen alone, which an inset card under a text-only button passed; round 2 added the
+   sideways strips, which a card running on 11 pt past the button's sides passed; round 3 added the slices, which a
+   run-on of 2–5 pt, diluted in a strip as deep as the band, passed). A run-on of two png pixels along an edge fills its
+   slice. What still passes: a text-only button over a surface that ends within ONE png pixel of its edges — its own
+   frame, or that frame and the antialiased pixel every slice skips — in a colour neither the screen beside nor any
+   strip shows; or one whose run-on covers less than a quarter of every strip and slice along each edge. Its band, the
+   strips and the screen beside are then pixel for pixel what an opaque control of that colour would show — the class
+   of residual 7: no rule of one frame can tell it, and it reads `over`, a `Tapped` that may hit the button. Pinned as
+   told (`RESIDUAL`, tests/verify/eyes-order.test.ts: the frame, and the frame and a pixel). Not measured by a lab cell
+   (a cell `presented/plain-button-over-row` would measure the common shape).
 3. **One unsettled capture** for the tap and `scroll_until` (the pixel assert's is settled): a frame mid-transition
    reads a blend — untold; a frame of another screen than the tree's (read before a navigation, shot after) could in
    principle mis-tell, the gap being one screenshot's latency — ADR 0013's residual for the first question.
