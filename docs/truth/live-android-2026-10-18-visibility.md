@@ -215,6 +215,25 @@ installed for round 7), harness truth/round-7 `b191055d`, `--side` the branch:
 - **Cost:** one screenshot only on a claim the trigger applies to; an unmoved read after a refused `fully` claim is
   refused again with no second screenshot. Ordinary stops take none (pinned: tests/interact/scroll-eyes.test.ts).
 
+# Round 7 final device check, 2026-10-19
+
+truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and
+installed. averi_lab (emulator-5554, Android 13, API 33, 1080x2220, gesture navigation, booted `-no-window`).
+Reproduce (outside the sandbox): `node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups
+visibility|forms [--cells dialog-fullscreen,bottom-sheet-dialog] --record <file>`.
+
+| record (docs/truth/live-records/) | cases | ok | loud | mismatches | against |
+|---|---|---|---|---|---|
+| android-vis-r7final.json | 137 | 120 | 3 | 14 | android-vis.json's visibility group (111/98/3/10): its 111 cases identical case by case; the 26 of T2's two dialog cells new to the group, as below |
+| android-forms-r7final.json | 25 | 23 | 2 | 0 | android-forms-eyes.json: identical; k7 ok — `visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px show #F2F2F7 …`, the band named; b1d, b7 LOUD (adb's `input text` has no non-ASCII) |
+| android-vis-dialogs-r7final.json | 26 | 22 | 0 | 4 | android-vis-dialogs.json (18/0/8, T2's src): bottom-sheet-dialog's A–D `scroll_until` MISMATCH → ok (A7's Material ids; as android-vis-sheet-dialog-run1…3.json); dialog-fullscreen's A–D `presented-stroke` KNOWN (ADR 0018 residual 19), as before |
+
+- The 14 mismatches of the group, every one KNOWN: dialog-fullscreen A–D (residual 19); scroll-bounded's P.fully and S
+  tap, scroll and fully (LE1), O and F (LV1); scroll-sticky-cut R.fully (VA1); carousel-in-list C tap and scroll (LE1);
+  tabbar-floating F (LV1) — as in android-vis.json. LV2's two flush cases (intermittent) ok this run.
+- No new mismatch; no tool call hung (the e98b87e run's three did). The React Native app's runs:
+  docs/truth/live-rn-2026-10-19.md, its section of the same date.
+
 # The run itself
 
 The first run at e98b87e (docs/truth/live-records/android-vis-e98b87e-run1.json) had three tool calls hang past the

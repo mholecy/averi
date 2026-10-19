@@ -6,7 +6,9 @@
 > refinement 2026-10-19. Measured: golden from truth/round-7 5c71158 `--side` the branch — rn-field's N and M tap and
 > scroll_until green (`Tapped at its node's centre (304.5,390.5)`), every other reply and device call byte-identical;
 > the ocr rows skipped in the sandbox; pinned over this capture (5 px own, 6 px a cover) by
-> tests/ui-tree/draw-order.test.ts. Calibration.json LR2.
+> tests/ui-tree/draw-order.test.ts. Calibration.json LR2. Live (round 7's final device check, truth/round-7 836e04b1, the
+> RN app rebuilt from it): rn4 `Tapped text:"Payee’s name"` and the taps of N and M ok in three runs of three on
+> averi_lab (docs/truth/live-records/android-rn-r7final-1…3.json).
 
 Lab note LR2. **Found 2026-10-19** by round 7's React Native lab app (fixtures/apps/rn, `rn-field`; RN 0.88.0) on the
 `averi_lab` AVD (Android 13, API 33, 1080x2220, density 2.75), averi = truth/r7-rn's src.

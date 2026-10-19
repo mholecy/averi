@@ -6,7 +6,9 @@
 > refinement 2026-10-19). Measured: golden from truth/round-7 5c71158 `--side` the branch — rn-field's N and M tap and
 > scroll_until under WDA green (`Tapped at its node's centre (116,142.5)`), the other 1402 checks' replies and device
 > calls byte-identical (mp-native's SWIFT form included); the ocr rows skipped in the sandbox; pinned over this capture
-> by tests/ui-tree/draw-order.test.ts. Calibration.json LR1.
+> by tests/ui-tree/draw-order.test.ts. Calibration.json LR1. Live (round 7's final device check, truth/round-7 836e04b1,
+> the RN app rebuilt from it): rn4 `Tapped text:"Payee’s name"` (the focus on N) and the taps of N and M ok under WDA
+> in three runs of three and under idb once (docs/truth/live-records/ios-rn-wda-r7final-1…3.json, ios-rn-idb-r7final.json).
 
 Lab note LR1. **Found 2026-10-19** by round 7's React Native lab app (fixtures/apps/rn, `rn-field`; RN 0.88.0, new
 architecture) on the `averi-lab iPhone 17` simulator (iOS 27.0, 402x874), WDA on port 8120, averi = truth/r7-rn's src

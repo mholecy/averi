@@ -198,6 +198,32 @@ Reproduce (outside the sandbox):
   not-reached) and its new L — truth/round-7's long table (T3), not this change: their replies are the bound's, with no
   screen change said. "CHANGED THE SCREEN" was said by no other case.
 
+# Round 7 final device check, 2026-10-19
+
+truth/round-7 836e04b1 (after integration 3: arch/round-23's src with A1, A2, A4, A5, A6, A9 and the RN label fix
+ce19c234 + f3a7043f), run from this checkout (no `--side`); the native and RN lab apps rebuilt from it and installed.
+The averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 in the lab's own derived data, idb through
+a companion of this run's own on gRPC 10885 (`IDB_COMPANION=localhost:10885`); the simulator's first boot read its
+accessibility tree at once (no reboot needed). Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources wda|idb --groups visibility|dismissal|forms
+[--cells sheet-long-list] --record <file>`.
+
+| record (docs/truth/live-records/) | cases | ok | loud | mismatches | against |
+|---|---|---|---|---|---|
+| ios-wda-vis-r7final.json | 146 | 129 | 1 | 16 | ios-wda-vis-parked.json (146/128/1/17): LV4's turn of F ok (A1, struck since); every other case as there. Against ios-vis-r23-ios-stop-e687fe83.json's WDA half: the same, plus L's three cases (the 56-row table's, new since) |
+| ios-idb-vis-r7final.json | 145 | 100 | 8 | 37 | ios-idb-vis-a5.json: identical case by case; sheet-background A, B LOUD `presented-changed` |
+| ios-wda-dismissal-r7final.json, ios-idb-dismissal-r7final.json | 12 each | 12 | 0 | 0 | ios-keyboard-fallbacks-dismissal.json: 24/24 as there |
+| ios-wda-forms-r7final.json | 23 | 20 | 3 | 0 | ios-wda-forms-r23.json (18/5/0): k2 and k3 LOUD → ok (A4's drag of the field's scroll view, the keyboard staying up); k1–k4 ok; b1d, b7 (idb's `ui text` has no keycode for Š, ’) and p5 (the secure field's no-clear fill) LOUD as before |
+| ios-wda-long-list-r7final-1…3.json | 6 each | 6 | 0 | 0 | ios-wda-long-list-parked-1…3.json (5, 6, 6 ok) |
+
+- **The carry case** (`carry:sheet-long-list.L`, ADR 0021 residual 1): L "fully visible after 2 swipes", at rest at
+  offsets 1635 (the group's run), 1869.3, 1853.3, 1590 — 51–330 pt inside its window 1172–1920, in four runs of four
+  (A2's three at a1b0b82: 1933.7, 1917.3, 1903.3 — one past it). Its live entry (intermittent) is struck off; ADR 0021's
+  residual 1 records the new margin. The lab logs the table's offset after the strokes, not per stroke, so which of A1's
+  changes moved the rest is not measured.
+- No new mismatch on either source. The React Native app's runs: docs/truth/live-rn-2026-10-19.md, its section of the
+  same date.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 
