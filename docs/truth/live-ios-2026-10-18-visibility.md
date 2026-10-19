@@ -269,7 +269,9 @@ run's own on gRPC 10893 (`IDB_COMPANION=localhost:10893`). Reproduce (outside th
 | record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
 |---|---|---|---|---|---|
 | ios-vis-r8-l4-before.json | fix/round-8 e0c2587e, `--side` | 40 | 7 | 2 | 31 (6 not known since the fix) |
-| ios-vis-r8-l4-1.json, -2.json | 37bf5a15 | 40 each | 10 | 2 | 28 (all known) |
+| ios-vis-r8-l4-1.json, -2.json | 37bf5a15 | 40 each | 10 | 2 | 28 (3 not known since its final src) |
+| ios-vis-r8-l4-3.json | 94fc318b (final) | 40 | 14 | 2 | 24 (all known; idb's tap of A ok vacuously: FIXED printed) |
+| ios-vis-r8-l4-4.json | 94fc318b (final) | 40 | 13 | 2 | 25 (all known) |
 
 - **Before:** `tap C` answered `Tapped id:"lab.blur-menu.C"` and the app logged `tap W` — the menu row fired — under
   idb and WDA on blur-menu, and under idb on blur-menu-grouped (WDA lists W after C there and refused it already);
@@ -288,9 +290,23 @@ run's own on gRPC 10893 (`IDB_COMPANION=localhost:10893`). Reproduce (outside th
 - `tap W` stays LOUD on blur-menu under both sources (refused under C, listed after it): the fix's residual (ADR 0015's
   amendment). The other cases as before: A, B, D beneath the blur Tapped / fully visible (residual 9, each tap logging
   `dismissed menu`), K and the grouped W Tapped.
-- Not run live since: the review's fixes (`f5a28b38` and after) stop `scroll_until` before any swipe under such a cover (C and
-  W), and words W's refusal as overlapped by C, the order not told — measured by the golden only. The records above are
-  `37bf5a15`'s.
+- **At the final src** (`94fc318b`, after the review's fixes; 2026-10-19, the same simulator and lab app, idb through a
+  companion of the run's own on gRPC 10895), both runs:
+  - `tap C` refused, nothing fired — "overlapped by button "Target W" (51,448 300x64) at its centre (201,502), the two
+    listed in reading order: which is drawn on top is not told" — on blur-menu under idb and WDA and on
+    blur-menu-grouped under idb; the grouped cell's WDA reply as before (under W drawn over it, "scroll_until it first").
+  - `scroll_until C` on the same three: "stopped before any swipe — element is in the viewport but overlapped by button
+    "Target W" … which is drawn on top is not told"; the app logged no stroke, no touch, no `dismissed`. Their three
+    `presented-stroke` entries struck from live-known.ts (the 37bf5a15 records now read them not known, pinned as such).
+    blur-menu-grouped.wda's C as before: three strokes on the blur at (201,175) ×2 and (201,699), no `dismissed` —
+    residual 9's (#31), its entry kept.
+  - `tap W` on blur-menu refused under both sources as overlapped by C, "which is drawn on top is not told", nothing
+    fired: LOUD, the residual. Nothing closed the menu in any C or W case; A, B, D beneath the blur as before (Tapped,
+    each logging `dismissed menu`; fully visible), K and the grouped W Tapped.
+  - One anomaly, not the fix's: in run 1 (-3.json) idb's `tap A`, the run's first case on a just-booted simulator,
+    timed out waiting for A ("Timed out after 5000ms waiting for element id:"lab.blur-menu.A" to appear"), nothing
+    tapped — ok vacuously, so the rejudge prints FIXED for its residual-9 entry; in run 2 it read Tapped (the menu
+    dismissed) as before, so the entry stays, and -3.json is pinned exiting 1 on that line alone.
 
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped

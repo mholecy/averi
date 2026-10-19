@@ -99,7 +99,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:sheet-long-list-short.F'], NO_ID, 'not-reached', 'not found'),
   // blur-menu-grouped's C under idb: struck off by round 8's L4 fix (37bf5a15) with blur-menu's C under both sources
   // — refused as overlapped by the menu row W listed before it in reading order, nothing fired, in two runs of two
-  // (ios-vis-r8-l4-1.json, -2.json); WDA's entry was struck off earlier (round-4 review S8: WDA lists W after C).
+  // (ios-vis-r8-l4-1.json, -2.json) and two more at its final src (94fc318b: -3.json, -4.json, the order untold); WDA's
+  // entry was struck off earlier (round-4 review S8: WDA lists W after C).
   // Round 6's iOS device check (ios-vis.json at 11683c3): the refusal case beneath a presented layer in no scroll view
   // (L1's, first run on iOS). idb lists the presented layer alone, the target not in it: a target not yet in the tree is
   // stroked for (residual 6) — two strokes on the layer, the backgrounded sheet dismissed by the first or not.
@@ -114,10 +115,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // idb lists no carousel (LE2 across, as edges.known.ts files C's replayed rows): strokes across the screen's middle,
   // none moving the carousel, the reply "content exhausted … a layout defect".
   ...each('ios idb', ['scroll:carousel-in-list.C'], LE2, 'R-direction', 'refused'),
-  // blur-menu-grouped's C under idb since L4's fix (37bf5a15): refused as overlapped by W, after three strokes on the
-  // blur (no node: residual 9) — the strokes touch the backdrop and do not close the menu (no `dismissed` logged in
-  // ios-vis-r8-l4-1.json, -2.json) — as WDA's below.
-  ...each('ios idb', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
+  // blur-menu-grouped's C under idb: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json,
+  // -2.json; no dismissal), struck off at its final src (94fc318b): stopped before any swipe, nothing stroked, in two
+  // runs of two (ios-vis-r8-l4-3.json, -4.json).
   // iOS, WDA
   // Round 5's device check (ios-vis-2725e76.json, src b71cbbb): LE4's and L3's entries (fixed in fecb0b3, 468dc1b: round 5's
   // 0a and 0b) and LV3's WDA one struck off, their cases ok — but LE4's two cases of F, whose strokes now go inside
@@ -147,21 +147,27 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
   // Its intermittent entry struck off by round 7's A1 (f76be36a, e687fe83, 659fdf00: the unmeasured first stroke cut to
   // 126 pt, the stop judged on the read the fling rests in): C ok, settled, in six runs of six (the same records).
-  // blur-menu-grouped's C: WDA lists the menu row W over it, so the stop is refused — after three strokes on the blur
-  // (no node: residual 9), "content exhausted … a layout defect".
+  // blur-menu-grouped's C: WDA lists the menu row W over it (drawn over, its order told), so the stop is refused —
+  // after three strokes on the blur (no node: residual 9), "content exhausted … a layout defect"; the strokes close
+  // nothing (no `dismissed` logged): so at L4's final src too (94fc318b: ios-vis-r8-l4-3.json, -4.json).
   ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
     ...each(`ios ${src}`, ['scroll:scroll-sticky.R.fully'], LE3, 'stop-claim', 'visible'),
-    // blur-menu's C struck off by round 8's L4 fix (37bf5a15): refused, nothing fired (it fired W before: ios-vis-r8-l4-before.json).
+    // blur-menu's C struck off by round 8's L4 fix (37bf5a15): refused, nothing fired (it fired W before: ios-vis-r8-l4-before.json);
+    // so at its final src too (94fc318b: ios-vis-r8-l4-3.json, -4.json).
+    // (idb's tap of blur-menu's A came back ok once, in ios-vis-r8-l4-3.json: the run's first case on a freshly booted
+    // simulator, a wait that timed out with no tree — nothing tapped, vacuous; Tapped and the menu dismissed in -4.json.)
     ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', 'tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'], BLUR, 'tap-claim', 'Tapped'),
+    // blur-menu's W: refused under C, listed after it — since L4's final src (94fc318b) "which is drawn on top is not
+    // told", nothing fired (ios-vis-r8-l4-3.json, -4.json): the fix's residual (ADR 0015's amendment).
     ...each(`ios ${src}`, ['tap:blur-menu.W'], MENU, 'tap-refused', 'refused'),
     // The scroll case beneath the blur (round 6's iOS check, first run on iOS): the overlay with no node unseen, the stop
     // at once.
     ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.D', 'scroll:blur-menu-grouped.A', 'scroll:blur-menu-grouped.B', 'scroll:blur-menu-grouped.D'], BLUR, 'presented-stop', 'visible'),
-    // blur-menu's C since L4's fix (37bf5a15): refused as overlapped by W after three strokes on the blur, which do not
-    // close the menu (ios-vis-r8-l4-1.json, -2.json) — residual 9's: no "close it first", the backdrop has no node.
-    ...each(`ios ${src}`, ['scroll:blur-menu.C'], BLUR, 'presented-stroke', 'refused'),
+    // blur-menu's C: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json, -2.json; no
+    // dismissal), struck off at its final src (94fc318b): under a cover whose order is not told scroll_until stops
+    // before any swipe, nothing stroked, in two runs of two (ios-vis-r8-l4-3.json, -4.json).
   ]),
 ]);
 

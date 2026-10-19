@@ -1129,10 +1129,10 @@
           "platform": "ios",
           "sources": ["idb", "wda"],
           "before": "e0c2587",
-          "after": "37bf5a1",
-          "cases": ["tap:blur-menu.C", "tap:blur-menu-grouped.C"],
+          "after": "94fc318",
+          "cases": ["tap:blur-menu.C", "tap:blur-menu-grouped.C", "scroll:blur-menu.C", "scroll:blur-menu-grouped.C"],
           "verdict": "CALIBRATED",
-          "remark": "Before (docs/truth/live-records/ios-vis-r8-l4-before.json, --side fix/round-8 e0c2587e): tap:blur-menu.C Tapped and the app logged `tap W` under idb and WDA; tap:blur-menu-grouped.C the same under idb (WDA, listing W after C, refused it already). After (ios-vis-r8-l4-1.json, -2.json at 37bf5a15): refused as overlapped by W, nothing fired, both runs; C's scroll_until three strokes on the blur, no `dismissed` logged — the menu stays (residual 9's presented-stroke, refiled). tap:blur-menu.W LOUD as before (the residual).",
+          "remark": "Before (docs/truth/live-records/ios-vis-r8-l4-before.json, --side fix/round-8 e0c2587e): tap:blur-menu.C Tapped and the app logged `tap W` under idb and WDA, scroll_until fully visible after 0 swipes; blur-menu-grouped's C the same under idb (WDA, listing W after C, drawn over it, refused the tap already and stroked the blur three times for the scroll, as after: residual 9's, #31). After, at the final src (ios-vis-r8-l4-3.json, -4.json at 94fc318b): the taps refused as overlapped by W, the two listed in reading order, which is drawn on top not told — nothing fired, both runs; scroll_until stopped before any swipe, nothing stroked, no `dismissed` logged (at 37bf5a15, ios-vis-r8-l4-1.json, -2.json, it stroked the blur three times first, closing nothing). tap:blur-menu.W LOUD as before (the residual), now worded the order not told, nothing fired. In -3.json idb's tap of A, the run's first case on a freshly booted simulator, timed out with no tree (vacuous; Tapped in -4.json).",
           "summary": "docs/truth/live-ios-2026-10-18-visibility.md"
         }
       ]

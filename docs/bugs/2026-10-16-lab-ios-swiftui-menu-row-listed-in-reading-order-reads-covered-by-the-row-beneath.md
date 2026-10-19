@@ -20,7 +20,9 @@
 > live on the lab simulator at `37bf5a15` (`docs/truth/live-records/ios-vis-r8-l4-before.json` — C's tap fired W under
 > idb and WDA at `e0c2587e` —, and `ios-vis-r8-l4-1.json`, `-2.json`: C's tap refused, nothing fired, under both
 > sources and on the grouped variant under idb; C's `scroll_until` then still stroked three times on the blur, which
-> did not close the menu). The review's `scroll_until` stop and W's new wording are not yet measured live.
+> did not close the menu), and again at the final src `94fc318b` (`ios-vis-r8-l4-3.json`, `-4.json`): C's tap refused,
+> the order not told, nothing fired; C's `scroll_until` stopped before any swipe, nothing stroked; W's tap refused as
+> overlapped by C, the order not told, nothing fired; nothing closed the menu.
 > Left out, on purpose: the grouped variant's WDA tree, where the card and the screen beneath are two containers — W and
 > C children of different parents, W listed after C — so no run lists them in reading order: C stays refused under W by
 > draw order with "scroll_until it first", and its `scroll_until` still strokes three times beneath the blur

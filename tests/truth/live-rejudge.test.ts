@@ -160,12 +160,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-forms-r8-l2-1.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-2.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-3.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
-    // round 8's L4 fix (fix/r8-l4 37bf5a15; docs/truth/live-ios-2026-10-18-visibility.md, its round-8 L4 section): the
-    // blur-menu cells under idb and WDA twice — C's tap refused as overlapped by the menu row W listed before it,
-    // nothing fired (blur-menu under both, the grouped variant under idb); C's scroll_until three strokes on the blur,
-    // no dismissal logged (residual 9's); W's tap still refused under C (LOUD: the residual of the fix)
-    ['ios-vis-r8-l4-1.json', 'visibility', { cases: 40, ok: 10, loud: 2, mismatches: 28 }],
-    ['ios-vis-r8-l4-2.json', 'visibility', { cases: 40, ok: 10, loud: 2, mismatches: 28 }],
+    // round 8's L4 fix at its final src (fix/r8-l4 94fc318b; docs/truth/live-ios-2026-10-18-visibility.md, its round-8
+    // L4 section): the blur-menu cells under idb and WDA — C's tap refused as overlapped by the menu row W listed before
+    // it, the order not told, nothing fired (blur-menu under both, the grouped variant under idb); C's scroll_until
+    // stopped before any swipe, nothing stroked (the same three); W's tap refused under C, the order not told (LOUD: the
+    // residual of the fix). Its first run, -3.json, is pinned below: idb's first case timed out there, vacuous.
+    ['ios-vis-r8-l4-4.json', 'visibility', { cases: 40, ok: 13, loud: 2, mismatches: 25 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -188,6 +188,34 @@ describe('live.ts --rejudge over the committed iOS record of the src before L2\'
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown).toEqual(['k6', 'k7']);
     expect(out).toMatch(/the form was SUBMITTED/);
+    expect(code).toBe(1);
+  });
+});
+
+// L4's fix (round 8): its first src live, and its final src's first run.
+describe('live.ts --rejudge over the committed iOS records of L4\'s fix before its review\'s fixes', () => {
+  // fix/r8-l4 37bf5a15: C's scroll_until under the menu row W stroked the blur three times before refusing (no
+  // dismissal logged) — known as residual 9's `presented-stroke` until its final src (94fc318b) stopped it before any
+  // swipe and the three entries were struck off: here they read as recorded, not known — a calibration of that src now:
+  // exit 1, as recorded. C's taps refused, nothing fired, as at the final src.
+  it.each([
+    ['ios-vis-r8-l4-1.json'],
+    ['ios-vis-r8-l4-2.json'],
+  ] as const)('%s: C\'s three strokes not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record) => {
+    const { code, out } = await rejudge(record, 'visibility');
+    expect(out).toMatch(/^# Live golden: 40 cases, 10 ok, 2 loud, 28 mismatches \(3 not known\), 0 skipped$/m);
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown.sort()).toEqual(['scroll:blur-menu.C', 'scroll:blur-menu.C', 'scroll:blur-menu-grouped.C'].sort());
+    expect(code).toBe(1);
+  });
+  // 94fc318b's first run: every case as -4.json reads it but idb's tap of blur-menu's A, the run's first case on a
+  // freshly booted simulator — averi's wait for A timed out with no tree, nothing tapped: ok, vacuously, so its entry
+  // reads FIXED here; it read Tapped (the menu dismissed) in -4.json, so the entry stays: exit 1, as recorded.
+  it('ios-vis-r8-l4-3.json: idb\'s tap of A ok by a timeout, so FIXED; nothing else not ok unknown', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudge('ios-vis-r8-l4-3.json', 'visibility');
+    expect(out).toMatch(/^# Live golden: 40 cases, 14 ok, 2 loud, 24 mismatches \(0 not known\), 0 skipped$/m);
+    expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
+    expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb tap:blur-menu.A\n');
     expect(code).toBe(1);
   });
 });
@@ -247,7 +275,8 @@ const A5_IDB = [...['A', 'B', 'C', 'D'].map((t) => `scroll:sheet-medium.${t}`), 
  * The blur menus' C as it read before round 8's L4 fix (37bf5a15): Tapped at its centre, which fired the menu row W
  * drawn over it, and scroll_until "fully visible after 0 swipes" — idb's on both cells, WDA's on blur-menu (WDA lists
  * W after C on the grouped cell, which it refused). Known as residual 9's (`tap-claim`, `presented-stop`) until L4's fix
- * struck the taps off and re-classed the scroll cases as three strokes on the blur, refused (`presented-stroke`).
+ * struck the taps off and re-classed the scroll cases as three strokes on the blur, refused (`presented-stroke`) —
+ * struck off too at its final src (94fc318b), which stops them before any swipe.
  */
 const L4_IDB = ['tap:blur-menu.C', 'scroll:blur-menu.C', 'tap:blur-menu-grouped.C', 'scroll:blur-menu-grouped.C'];
 const L4_WDA = ['tap:blur-menu.C', 'scroll:blur-menu.C'];
