@@ -3,7 +3,9 @@
 > **Status (2026-10-19, round 9):** W's half (the false refusal) fixed on `fix/r9-l4w` at `1ef11b9c` (from `fix/round-9`
 > `e52d1797`; docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md): the eyes are asked, once,
 > which of two controls listed in reading order is drawn on top, and judge it on ONE screenshot — the overlap's colour
-> against each control's clear band beside it, the screen's own colour guarded, every rule able only to answer "untold"
+> against each control's clear band beside it, what lies around each control past its edge and the screen beside the
+> two guarded, each rule answering "untold" where its evidence is missing (ADR 0024's residuals name what one frame
+> cannot tell)
 > (`verify/eyes.ts#judgeOrder`; on `blur-menu.png` the overlap `#00897B`, W's band `#00897B`, C's `#347937`: ΔE00 0.00 and
 > 17.69). The answer is an input of the pure draw order (`ui-tree/seen-order.ts`): C, seen under W, is no cover of W;
 > W, seen over C, stays C's cover, named so (`Remedy`'s `seenOver`: close a menu first, no scroll). Measured by the
@@ -14,6 +16,12 @@
 > and tests/flow/engine.test.ts over these captures, by calibrate (CALIBRATED, the note's second pair), and live on the lab
 > simulator at `1ef11b9c` (`docs/truth/live-records/ios-vis-r9-l4w-1.json`, `-2.json`): W's tap `Tapped`, W alone fired,
 > under idb and WDA, both runs; C's tap and `scroll_until` refused as under W, seen so, nothing fired or stroked.
+> Review round 1's fixes at `85e36215`: the opacity guard also reads what lies around each control past its edge (a
+> text-only button over an inset card is untold), the pixel assert judges the order only on a frame settled over the
+> whole screen, keeps a covered answer per distinct tree and never ends its poll on the order question's capture, and
+> one cycle (`ui-tree/eyes.ts#judgedWithOrder`) asks the eyes; the golden unchanged (1410 checks, 217 mismatches, every
+> reply identical), so the live records and calibration stand. A two-tone peer split exactly at the target's edge stays
+> a named residual (ADR 0024, 7.).
 
 > **Status (2026-10-19, round 8):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
 > (its review's fixes; from `fix/round-8` `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual, now

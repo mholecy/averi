@@ -32,41 +32,58 @@ The eyes (ADR 0013, `ui-tree/eyes.ts`) get a second question, **which of two con
 on top** (`Eyes.order`, `OrderQuestion`), answered from ONE screenshot by a pure judge (`verify/eyes.ts#judgeOrder`),
 and the answer enters the pure draw order as an input — **the order seen** (`ui-tree/seen-order.ts`: `OrderSeen`,
 `PairSeen`, `SeenOrder`, `seenOrderOf`; `draw-order.ts#drawOrder(tree, orderSeen?)`, `standing.ts#sceneOf(tree,
-seen?)`, `look.ts#lookAt(tree, reading, seen?)`), so the draw order stays synchronous and replayable.
+seen?)`, `look.ts#lookTold(look, seen)`), so the draw order stays synchronous and replayable. ONE cycle asks it
+(`ui-tree/eyes.ts#judgedWithOrder`: judge the look, ask the question its standing asks once, judge again on the look
+told the answer — the tap and the pixel assert supply only their purpose; `scroll_until`'s pure reducer asks by a step
+its driver answers with `orderSeenBy`, the read judged again on `lookTold`). The port is one shape everywhere,
+`OrderEyes` (`Pick<Eyes, 'order'>`).
 
 WHEN — asked only of a standing `covered` with remedy `unordered` (`eyes.ts#orderQuestion`; 6 targets over all 153
 trees of `tests/fixtures`), once per look, by the three verbs that may act on the answer; a caller without eyes (the
 dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
 - the tap (`interact/tap-judgement.ts#TapJudge.aim`, through `GuardOptions.eyes` → `TapAsks.eyes`): one screenshot,
-  then the standing judged again on a look told the order;
+  then the standing judged again on a look told the order (tests/flow/engine.test.ts pins that an uncovered target and
+  one under an ordinary cover take none);
 - `scroll_until` (`interact/scroll-rounds.ts#round`'s `ask order`, after the read's judgement; the driver answers it,
   `RoundSeen.order`, and the read is judged again with it, `RoundRead.seen`): such a stop never strokes, so one
   screenshot ends the question — no refused-again memo is needed;
 - the colour and ocr asserts (`verify/pixel-poll.ts`): the round's one capture is taken on first need — for the order
-  question before the standing is decided, else after — and the order is judged on that same settled, decoded frame
+  question before the standing is decided, else after — and the order is judged on that same decoded frame
   (`verify/eyes.ts#orderOfFrame`): ZERO extra captures (tests/verify/eyes-order.test.ts counts two, the settled pair).
-  A frame that did not settle reads `untold`. The cost moves instead: an element still covered after the eyes looked
-  (C) now captures each round of its poll before missing, as any element that is measured and fails does — where a
-  covered miss took none before.
+  Only a frame settled over the WHOLE screen is judged: the bands and the strips around the two lie outside the
+  element's region, which a region-settled frame does not vouch for — an unsettled or region-only frame reads `untold`.
+  The order question never throws, as `eyesOn` never does: a capture that fails is `untold`, said why, the round a
+  covered miss and the poll goes on — exactly the poll before the eyes, where a covered element took no capture (a
+  refused capture still ends the poll where the round measures). An answer that keeps the element covered (no pair
+  `over`: C's `under`, or an `untold` judged on a settled frame) is kept while the tree reads the same
+  (`ui-tree/read-tree.ts#treeFingerprint` and the question's pairs), so a covered element captures ONCE per distinct
+  tree, not every round; an answer that unlocks is never kept — that round measures the very frame it was judged on,
+  so keeping it saves nothing, and each round's unlock rests on its own frame.
 - Wired at the composition roots with `verify/eyes.ts#eyesOn` (`mcp/tools.ts#guardOpts`, `flow/engine.ts`'s
   `acting`), as the first question is; interact/ imports no verify/.
 
 WHAT is asked, per `unordered` cover (a peer): where the two overlap (in the standing's frame), each one's CLEAR BANDS
 along the overlap's edges (the strips of it beside the overlap, outside the other by construction, each no deeper than
-the overlap on that axis, none meeting another cover of the target), and the screen beside the two on the overlap's
-rows. Bands, not each control's largest clear rect: mp-native's chooser row's largest clear rect is the 4-pt gap
+the overlap on that axis, none meeting another cover of the target), what lies AROUND each control past its edge
+beyond each band (the strip just outside it, across the band, as deep as the band: `nodeAround`, `peerAround`), and the
+screen beside the two on the overlap's rows. Bands, not each control's largest clear rect: mp-native's chooser row's largest clear rect is the 4-pt gap
 between the card's rows — a surface of the other layer.
 
 THE JUDGE — asymmetric on purpose: telling the PEER on top only confirms a refusal; telling the TARGET on top unlocks a
-tap. Every rule can only answer `untold` (the listing's untold order, the refusal kept), never guess:
+tap. Each rule answers `untold` (the listing's untold order, the refusal kept) wherever its evidence is missing; what
+one frame cannot tell apart at all is listed under Residuals (7.):
 1. each side's bands, landed in the png one pixel in from each edge, at least 4 png px (`FLANK_MIN_PX`) on both sides;
    none — untold;
 2. each side ONE colour: every band's dominant at least half of it, all of a side within ΔE00 1.0 (`EYES_SAME_DE`) —
    else untold (a side showing two surfaces, the chooser's shape, is not read);
-3. THE OPACITY GUARD: the screen beside the two (its dominants) — none, untold (two rows as wide as the screen); either
-   side's colour within ΔE00 2.0 (`EYES_APART_DE`) of it — untold: that control may draw nothing there (a text-only
+3. THE OPACITY GUARD: what lies around each control — the strips just outside it past its edge beyond its bands, and
+   the screen beside the two (`beside`). No screen beside (two rows as wide as the screen), or nothing around a side on
+   the screen, untold; a side's colour on a quarter or more of any such strip (`AROUND_SHARE`, within ΔE00 2.0,
+   `EYES_APART_DE`), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
-   there hits the button);
+   there hits the button; over an inset card the card runs on past the button's edge though the screen beside the two
+   is grey (review round 1's MAJOR-1, tests/verify/eyes-order.test.ts). The lab: 0.00 of every strip (W's teal against
+   the grey gap and K above W, C's blurred green against the blurred backdrop below C, both against the screen);
 4. the two sides farther apart than the colour assert's tolerance, ΔE00 8 (`DEFAULT_TOLERANCE_DE`) — else untold, the
    two look alike (the lab: 17.69);
 5. the overlap's dominant (at least half of it) within ΔE00 2.0 of exactly one side and farther than 8 from the other —
@@ -95,10 +112,14 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
     screenshot shows (the two are listed in reading order)` with the `seenOver` remedy — still red as ADR 0018's
     residual 9 (#31: the backdrop has no node, so no "close it first" of a presented layer).
 - Unit and table tests: tests/verify/eyes-order.test.ts (the judge over both lab pngs and synthetic pngs for every
-  untold rule; the question's bands on the lab trees and on mp-native's chooser; the colour assert's capture count),
+  untold rule — the inset card, a band of no one colour, sides only just apart, residual 7 pinned; the question's bands
+  and the strips around them on the lab trees and on mp-native's chooser; the colour assert's capture count, its
+  answer kept per distinct tree, and its frames unsettled, settled over the region only or failing — untold, the poll
+  going on),
   tests/ui-tree/draw-order-reading-order.test.ts (the seen order into the draw order, both ways, and untold = no
   screenshot), tests/interact/remedy-agreement.test.ts (one remedy for C, W reached, by the tap, the colour assert and
-  `scroll_until`), tests/flow/engine.test.ts (a flow tap on W, the engine's wiring).
+  `scroll_until`), tests/flow/engine.test.ts (a flow tap on W, the engine's wiring; no screenshot for an uncovered
+  target or one under an ordinary cover).
 - Live on the lab simulator: see the bug note's Status and docs/truth/live-ios-2026-10-18-visibility.md (round 9's
   section).
 
@@ -106,10 +127,12 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 
 1. **Alike looks** (two white rows, no dim, no shadow): untold, today's refusal — the safe direction. Such menus' rows
    stay refused; the lab's blur and mp-native's dim are what give the signal.
-2. **A transparent top control over a non-screen surface**: the opacity guard compares a band with the SCREEN beside
-   the overlap; a text-only button whose clear band lies over another coloured surface (not the screen's colour)
-   passes it and could read the row beneath as on top — a `Tapped` that may hit the button. Narrow; not measured by a
-   lab cell (a cell `presented/plain-button-over-row` would measure the common shape).
+2. **A transparent top control over a surface that ends at its edge**: the opacity guard compares a band with what
+   lies around its control past its edge and with the screen beside the two (review round 1 widened it from the
+   screen alone, which an inset card under a text-only button passed — a `Tapped` that would have hit the button). A
+   text-only button whose band lies over a surface that stops within a pixel of the button's own edge, in a colour
+   neither the screen beside nor the strip past that edge shows, still passes. Narrow; not measured by a lab cell (a
+   cell `presented/plain-button-over-row` would measure the common shape).
 3. **One unsettled capture** for the tap and `scroll_until` (the pixel assert's is settled): a frame mid-transition
    reads a blend — untold; a frame of another screen than the tree's (read before a navigation, shot after) could in
    principle mis-tell, the gap being one screenshot's latency — ADR 0013's residual for the first question.
@@ -120,6 +143,14 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 6. mp-native's chooser (`idb-modal-listed-before-content.json`) has no png: its `Loan repayment` row stays refused in
    the tests; live, its bands beside the SWIFT overlap are its own dimmed sides and SWIFT's white below — told or untold,
    never unlocked unless the overlap reads its own colour.
+7. **A two-tone peer on top, split at the target's edge** (review round 1): a peer drawn over the target whose part over
+   the overlap is the target's own colour (within ΔE00 2) and whose part past the target's edge is another — its colour
+   boundary lying exactly on the target's edge — is pixel for pixel the frame of the target drawn on top: the overlap,
+   both bands and every strip around read the same, and no seam differs (where the peer's own edge crosses the target,
+   the two colours are one). No rule of one frame can tell it; it reads `over`, a `Tapped` that hits the peer. It needs
+   three coincidences — a peer drawn in two tones, one matching the target, split on the target's edge — and is pinned
+   as told in tests/verify/eyes-order.test.ts (`RESIDUAL`) so a change that closes it is seen. Only another signal
+   (a device hit test, Rejected below as the mechanism) could close it.
 
 ## Rejected
 
@@ -130,5 +161,9 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 - A settled pair for the tap's and the stop's question: doubles the cost of a decision that already fails safe on motion.
 - An async draw order, or a screenshot inside the parser: the draw order must stay pure and replayable; the seen order
   is an input.
-- A separate `OrderEyes` port beside `Eyes`: two ports for one adapter that takes and scales the same screenshot.
-- A screenshot on every tap: ~0.4 s per tap for 6 targets in 153 trees.
+- A separate order port beside `Eyes`: two ports for one adapter that takes and scales the same screenshot
+  (`OrderEyes` is only `Pick<Eyes, 'order'>`, the face of the one port a verb is handed).
+- A screenshot on every tap: one capture and decode per tap (an ESTIMATE of a few hundred ms on the simulator — the
+  live records, `docs/truth/live-records/ios-vis-r9-l4w-*.json`, keep replies, not timings) for 6 targets in 153 trees.
+- Keeping an answer that unlocks across the pixel poll's rounds: that round measures the frame it was judged on, so
+  keeping it saves no capture, and it would let an unlock outlive the pixels it rested on.
