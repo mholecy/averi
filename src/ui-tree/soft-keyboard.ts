@@ -74,8 +74,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * run cut there left it and `Dictate` out, so the submit lifted onto the
  * keyboard read as no cover and its tap submitted the form
  * (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md;
- * the three toolbar-dismiss captures carry the same `Next keyboard 8,806 68x69`, their runs now reaching
- * `Dictate` too, no reply changed) — `from` to `to`, the walk indexes
+ * the three toolbar-dismiss captures carry the same `Next keyboard 8,806 68x69`) — `from` to `to`, the walk indexes
  * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
@@ -109,8 +108,6 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
     const node = nodes[back];
     const band = node.rect;
     if (!STRUCTURAL_ROLES.has(node.role) || node.label || band.x !== screen.x || band.width !== screen.width || band.y + band.height !== bottom || band.y < barLine) continue;
-    // What of a node lies on the screen is what is judged: the band's bottom is the screen's by its shape, so a key
-    // overhanging the screen's edge (idb's `Next keyboard`, a rounded point past it) proves nothing against it.
     const inside = (n: UiNode | undefined): boolean => {
       if (n === undefined) return false;
       const onScreen = rectIntersection(n.rect, screen);

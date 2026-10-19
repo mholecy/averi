@@ -207,11 +207,8 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
 /**
  * The rect two rects share, or undefined when they share no area (an edge
  * or a corner in common is none) — `rectsOverlap`'s question answered with
- * the shared rect itself, and its one arithmetic. Callers: the box a scroll
- * stroke is drawn in, the gesture box met with a clipping container
- * (interact/stroke-plan.ts#strokeRoom), and the fill's nearest-input pick
- * (interact/fill.ts, its overlap area). Here beside `rectsOverlap`, below ui-tree/
- * geometry.ts, which re-exports it.
+ * the shared rect itself, and its one arithmetic. Here beside `rectsOverlap`,
+ * below ui-tree/geometry.ts, which re-exports it.
  */
 export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
   const x = Math.max(a.x, b.x);

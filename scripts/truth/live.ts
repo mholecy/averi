@@ -240,7 +240,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     id: 'k6',
     cell: K,
     keyboard: true,
-    says: 'a tap on phone, under the bar riding on the keyboard (Android: its dump a strip cut at Continue): never a submit — refused, or tapped where it focuses phone',
+    says: 'a tap on phone, under the bar riding on the keyboard: never a submit — refused, or tapped where it focuses phone',
     calls: [{ tool: 'tap', args: { selector: id(K, 'phone') } }],
     judge: (s, [reply]) => {
       const submits = (s.submits ?? []).length;
