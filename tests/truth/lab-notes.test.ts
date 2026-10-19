@@ -29,14 +29,13 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  * a stroke's reach on the device): no captured tree reproduces it, so the replay has no row to calibrate it on, and
  * calibration.json lists it under `excluded` (checked below, with the reason it gives).
  * (2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md filed idb's sheet-long-list F until round 7's recapture
- * recorded F unlisted under idb — no live entry files it since, so it is no exemption.)
+ * recorded F unlisted under idb — no live entry files it since, so it is no exemption. LV4's and the carousel triage
+ * note's left with their live entries, struck off by round 7's A1: fixed, still excluded with that reason.)
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md': 'LV1: a list moving through blank content, live only',
   '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",
   '2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md': "LV3: the turned stroke's touch-down, live only (idb: fixed under WDA)",
-  '2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md': 'LV4: no turn after strokes that moved nothing, live only (a replayed tree never moves)',
-  '2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md': "a carousel card's stop on a read still moving, live only (and intermittent)",
 };
 
 /**

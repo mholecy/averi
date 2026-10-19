@@ -357,10 +357,10 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
     expect(explains({ cls: 'R-direction', kind: 'visible' }, 'R-direction', 'refused')).toBe(false);
   });
   // Each `also` names the committed record that reads it: the record exists, and its case, judged again by this
-  // checkout's judge (visibilityCases over the case's static truth), fails by that rule on that kind.
+  // checkout's judge (visibilityCases over the case's static truth), fails by that rule on that kind. None today: the
+  // only one, LV4's turn spending its budget (`refused`), left with its entry when round 7's A1 fixed the turn.
   it('every `also` names a committed record whose case reads that rule and kind', () => {
     const alsos = Object.entries(LIVE_KNOWN).flatMap(([key, e]) => (e.also ?? []).map((a) => ({ key, ...a })));
-    expect(alsos.length).toBeGreaterThan(0);
     for (const { key, cls, kind, record } of alsos) {
       const [platform, source, id] = key.split(' ');
       const file = `${ROOT}docs/truth/live-records/${record}`;

@@ -1,0 +1,150 @@
+{"text":"Jan Novak","mode":"burst","i":0,"before":"","ms":356,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":1,"before":"","ms":208,"got":"Jan Nova","whole":false}
+{"text":"Jan Novak","mode":"burst","i":2,"before":"","ms":229,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":3,"before":"","ms":227,"got":"Jan","whole":false}
+{"text":"Jan Novak","mode":"burst","i":4,"before":"","ms":229,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":5,"before":"","ms":229,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":6,"before":"","ms":276,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst","i":7,"before":"","ms":258,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst","i":8,"before":"","ms":300,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":9,"before":"","ms":216,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":10,"before":"","ms":212,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":11,"before":"","ms":203,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":12,"before":"","ms":210,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":13,"before":"","ms":218,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":14,"before":"","ms":219,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":15,"before":"","ms":213,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":16,"before":"","ms":213,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":17,"before":"","ms":213,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":18,"before":"","ms":220,"got":"Jan Nova","whole":false}
+{"text":"Jan Novak","mode":"burst","i":19,"before":"","ms":229,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst","i":20,"before":"","ms":209,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst","i":21,"before":"","ms":226,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":22,"before":"","ms":218,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":23,"before":"","ms":219,"got":"Jan No","whole":false}
+{"text":"Jan Novak","mode":"burst","i":24,"before":"","ms":221,"got":"Jan Nov","whole":false}
+{"text":"Jan Novak","mode":"burst+tail","i":0,"before":"","ms":212,"got":"Jan Nova","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":1,"before":"","ms":264,"got":"Jan No","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":2,"before":"","ms":980,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst+tail","i":3,"before":"","ms":914,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":4,"before":"","ms":218,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst+tail","i":5,"before":"","ms":246,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst+tail","i":6,"before":"","ms":217,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":7,"before":"","ms":243,"got":"Jan No","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":8,"before":"","ms":204,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":9,"before":"","ms":232,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst+tail","i":10,"before":"","ms":223,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":11,"before":"","ms":207,"got":"Jan No","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":12,"before":"","ms":223,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":13,"before":"","ms":217,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":14,"before":"","ms":231,"got":"Jan Nova","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":15,"before":"","ms":270,"got":"Jan No","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":16,"before":"","ms":233,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":17,"before":"","ms":214,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":18,"before":"","ms":220,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"burst+tail","i":19,"before":"","ms":243,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":20,"before":"","ms":274,"got":"Jan No","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":21,"before":"","ms":230,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":22,"before":"","ms":277,"got":"Jan No","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":23,"before":"","ms":276,"got":"Jan Nova","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"burst+tail","i":24,"before":"","ms":242,"got":"Jan Nov","whole":false,"afterTail":"Jan Novak"}
+{"text":"Jan Novak","mode":"chunk3","i":0,"before":"","ms":629,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":1,"before":"","ms":641,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":2,"before":"","ms":701,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":3,"before":"","ms":737,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":4,"before":"","ms":741,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":5,"before":"","ms":810,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":6,"before":"","ms":613,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":7,"before":"","ms":675,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":8,"before":"","ms":649,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":9,"before":"","ms":809,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":10,"before":"","ms":765,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":11,"before":"","ms":619,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":12,"before":"","ms":643,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":13,"before":"","ms":636,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":14,"before":"","ms":635,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":15,"before":"","ms":656,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":16,"before":"","ms":666,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":17,"before":"","ms":679,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":18,"before":"","ms":772,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":19,"before":"","ms":680,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":20,"before":"","ms":630,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":21,"before":"","ms":648,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":22,"before":"","ms":637,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3","i":23,"before":"","ms":624,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3","i":24,"before":"","ms":622,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk1","i":0,"before":"","ms":1930,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":1,"before":"","ms":1891,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":2,"before":"","ms":1880,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":3,"before":"","ms":1877,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":4,"before":"","ms":1925,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":5,"before":"","ms":2051,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":6,"before":"","ms":2143,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":7,"before":"","ms":2150,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":8,"before":"","ms":2260,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":9,"before":"","ms":1951,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":10,"before":"","ms":1988,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":11,"before":"","ms":2428,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":12,"before":"","ms":2500,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":13,"before":"","ms":2082,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":14,"before":"","ms":2425,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":15,"before":"","ms":1904,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":16,"before":"","ms":1867,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":17,"before":"","ms":1856,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":18,"before":"","ms":1879,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":19,"before":"","ms":1983,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":20,"before":"","ms":2158,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":21,"before":"","ms":2147,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":22,"before":"","ms":2404,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":23,"before":"","ms":1916,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk1","i":24,"before":"","ms":1876,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":0,"before":"","ms":1085,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":1,"before":"","ms":1094,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":2,"before":"","ms":1082,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":3,"before":"","ms":1084,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":4,"before":"","ms":1158,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":5,"before":"","ms":1106,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":6,"before":"","ms":1091,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":7,"before":"","ms":1089,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":8,"before":"","ms":1079,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":9,"before":"","ms":1093,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":10,"before":"","ms":1085,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":11,"before":"","ms":1124,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":12,"before":"","ms":1119,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":13,"before":"","ms":1069,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":14,"before":"","ms":1199,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":15,"before":"","ms":1347,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":16,"before":"","ms":1156,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":17,"before":"","ms":1109,"got":"Ja Novak","whole":false}
+{"text":"Jan Novak","mode":"chunk3-150","i":18,"before":"","ms":1166,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":19,"before":"","ms":1211,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":20,"before":"","ms":1136,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":21,"before":"","ms":1146,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":22,"before":"","ms":1111,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":23,"before":"","ms":1143,"got":"Jan Novak","whole":true}
+{"text":"Jan Novak","mode":"chunk3-150","i":24,"before":"","ms":1146,"got":"Jan Novak","whole":true}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":0,"before":"","ms":240,"got":"SK31 1200 0000 00","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":1,"before":"","ms":243,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":2,"before":"","ms":217,"got":"SK31 1200 0000 00","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":3,"before":"","ms":241,"got":"SK31 1200 0000 ","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":4,"before":"","ms":214,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":5,"before":"","ms":219,"got":"SK31 1200 0000 ","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":6,"before":"","ms":213,"got":"SK31 1200 0000 00","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":7,"before":"","ms":215,"got":"SK31 1200 0000 00","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":8,"before":"","ms":213,"got":"SK31 1200 0000 ","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":9,"before":"","ms":212,"got":"SK31 1200 0000 ","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":10,"before":"","ms":242,"got":"SK31 1200 0000 0","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":11,"before":"","ms":238,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":12,"before":"","ms":218,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":13,"before":"","ms":242,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":14,"before":"","ms":240,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":15,"before":"","ms":234,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":16,"before":"","ms":235,"got":"SK31 1200 0000 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":17,"before":"","ms":241,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":18,"before":"","ms":242,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":19,"before":"","ms":236,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":20,"before":"","ms":244,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":21,"before":"","ms":232,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":22,"before":"","ms":241,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":23,"before":"","ms":231,"got":"SK31 1200 0000 ","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}
+{"text":"SK31 1200 0000 0000 0001","mode":"burst+tail","i":24,"before":"","ms":240,"got":"SK31 1200 0000","whole":false,"afterTail":"SK31 1200 0000 0000 0001"}

@@ -1479,7 +1479,7 @@
     },
     {
       "note": "2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md",
-      "why": "lab finding LV4: no turn back after strokes that moved nothing, live only (live.ts --udid, case turn:scroll-bounded.F under WDA): the rule it fails, R-direction, is declared live only (golden never asks it: a replayed tree never moves, so no stroke there brings a target closer)"
+      "why": "lab finding LV4: no turn back after strokes that moved nothing, live only (live.ts --udid, case turn:scroll-bounded.F under WDA): the rule it fails, R-direction, is declared live only (golden never asks it: a replayed tree never moves, so no stroke there brings a target closer); fixed live by round 7's A1 (480660a4: a read within a point is unmoved, the turn after one unmoved stroke) — ok in five WDA runs of five (ios-wda-stop-carousel-r23-1…4.json, ios-wda-scroll-cells-659fdf00.json; docs/truth/live-ios-2026-10-18-one-stroke-stop.md), its live KNOWN entry struck off"
     },
     {
       "note": "2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md",
@@ -1487,7 +1487,7 @@
     },
     {
       "note": "2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md",
-      "why": "triage: a carousel card's stop claimed on a read still moving, the fling then carrying its centre out — live only and intermittent (live.ts --udid, case scroll:carousel-in-list.C under WDA: claimed at b71cbbb's src, ok at 11683c3)"
+      "why": "triage: a carousel card's stop claimed on a read still moving, the fling then carrying its centre out — live only and intermittent (live.ts --udid, case scroll:carousel-in-list.C under WDA: claimed at b71cbbb's src, ok at 11683c3); fixed live by round 7's A1 (f76be36a, e687fe83, 659fdf00: the unmeasured first stroke cut, the stop judged on the read the fling rests in) — C settled and tapped in five WDA runs of five (the same records), its intermittent live KNOWN entry struck off"
     },
     {
       "note": "2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md",
