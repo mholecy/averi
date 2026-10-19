@@ -108,7 +108,7 @@ const pixelSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHON
 
 /** The pixel assert's miss for `target` as a colour assert reads it: the sample rect (verify/color-parity.ts#colorSampleRect). */
 const colourSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE, order?: Order): Promise<string | undefined> =>
-  overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { reads: colorSampleRect, glyphs: false, ...(order !== undefined && { order }) });
+  overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { reads: colorSampleRect, glyphs: false, ...(order !== undefined && { eyes: { order } }) });
 
 /** The eyes' order question, as a verb asks it (ui-tree/eyes.ts#Eyes.order). */
 type Order = (question: OrderQuestion) => Promise<readonly OrderSeen[]>;

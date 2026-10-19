@@ -148,6 +148,11 @@ const distance = (a: Rgb, b: Rgb): number => ciede2000(srgbToLab(...a), srgbToLa
  * one colour, its mean between them).
  */
 function oneColour(png: RgbaImage, bounds: EdgeBounds, ref: Rgb): boolean {
+  return nearShare(png, bounds, ref, EYES_SAME_DE) >= LINE_SHARE;
+}
+
+/** The share of `bounds`' pixels within `within` (ΔE00) of `ref`, each pixel judged as it is (`oneColour`'s count); 0 for an empty one. */
+function nearShare(png: RgbaImage, bounds: EdgeBounds, ref: Rgb, within: number): number {
   const { data, width } = png;
   const near = new Map<number, boolean>();
   let total = 0;
@@ -158,14 +163,14 @@ function oneColour(png: RgbaImage, bounds: EdgeBounds, ref: Rgb): boolean {
       const key = (data[o]! << 16) | (data[o + 1]! << 8) | data[o + 2]!;
       let hit = near.get(key);
       if (hit === undefined) {
-        hit = distance([data[o]!, data[o + 1]!, data[o + 2]!], ref) <= EYES_SAME_DE;
+        hit = distance([data[o]!, data[o + 1]!, data[o + 2]!], ref) <= within;
         near.set(key, hit);
       }
       total++;
       if (hit) same++;
     }
   }
-  return total > 0 && same / total >= LINE_SHARE;
+  return total === 0 ? 0 : same / total;
 }
 
 /**
@@ -212,19 +217,32 @@ function lineOf(r: EdgeBounds, edge: Edge, i: number): EdgeBounds {
 const DOMINANT_SHARE = 0.5;
 
 /**
+ * A strip around a control (or of the screen beside the two) shows a side's colour when this share of its pixels lies
+ * within EYES_APART_DE of it — low on purpose, the unsafe direction being a band that shows what lies behind it: a
+ * quarter of the strip is enough to keep the order untold. The lab's blur-menu: 0.00 of every strip (W's teal, C's
+ * blurred green, against the grey gap above W, the blurred backdrop below C and the screen beside the two).
+ */
+const AROUND_SHARE = 0.25;
+
+/**
  * THE ORDER JUDGE, pure over a decoded png at `scale` px per tree unit — each pair of the question on its own
  * (ui-tree/eyes.ts#OrderPair), one png. Asymmetric on purpose: telling the PEER on top only confirms a refusal; telling
- * the TARGET on top unlocks a tap, so every rule below can only say `untold` (the listing's untold order, the refusal
- * kept), never guess:
+ * the TARGET on top unlocks a tap, so each rule below answers `untold` (the listing's untold order, the refusal kept)
+ * wherever its evidence is missing — what one frame cannot tell apart at all is ADR 0024's residuals (a peer on top
+ * drawn in two tones split exactly at the target's edge, its part over the overlap the target's own colour, is pixel
+ * for pixel the target on top):
  * 1. Each side's bands, landed in the png (`pngRegion`, one pixel in from each edge against antialiasing), each at least
  *    FLANK_MIN_PX on both sides; none on a side — untold.
  * 2. Each side one colour: every band's dominant (`sampleDominant`) at least DOMINANT_SHARE of it, all of a side within
  *    EYES_SAME_DE of each other — else untold: a side showing two surfaces (mp-native's chooser row, whose band above
  *    its overlap is the card's gap and whose side bands are its own dimmed row) is not read.
- * 3. THE OPACITY GUARD: the screen beside the two on the overlap's rows (its dominants, each of DOMINANT_SHARE) — none,
- *    untold; either side's colour within EYES_APART_DE of it, untold: that control may draw nothing there (a text-only
+ * 3. THE OPACITY GUARD: what lies around each control — the strips just outside it past its own edge beyond its bands
+ *    (`OrderPair.nodeAround`, `peerAround`), and the screen beside the two on the overlap's rows (`beside`). No screen
+ *    beside, or nothing around a side, untold; a side's colour on AROUND_SHARE of any such strip (within
+ *    EYES_APART_DE), untold: that control may draw nothing there, its band showing what lies behind it — a text-only
  *    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
- *    there hits the button).
+ *    there hits the button; over an inset card, the card runs on past the button's edge where the screen beside the
+ *    two is another colour.
  * 4. The two sides farther apart than the colour assert's tolerance (color-parity.ts#DEFAULT_TOLERANCE_DE, 8) — else
  *    untold, the two look alike. The lab's menu: 17.69 (W's teal against C's blurred green).
  * 5. The overlap's dominant (of DOMINANT_SHARE) within EYES_APART_DE of exactly one side and farther than that
@@ -246,8 +264,8 @@ function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
       return on === undefined || on.x1 - on.x0 < FLANK_MIN_PX || on.y1 - on.y0 < FLANK_MIN_PX ? [] : [on];
     });
   const sides = [
-    { name: 'it', bands: land(pair.nodeBands) },
-    { name: 'the other', bands: land(pair.peerBands) },
+    { name: 'it', bands: land(pair.nodeBands), around: land(pair.nodeAround) },
+    { name: 'the other', bands: land(pair.peerBands), around: land(pair.peerAround) },
   ] as const;
   const colours: Rgb[] = [];
   for (const { name, bands } of sides) {
@@ -258,14 +276,14 @@ function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
     colours.push(first.rgb);
   }
   const [own, other] = colours as [Rgb, Rgb];
-  const screen = land(pair.beside).flatMap((b) => {
-    const d = sampleDominant(png, [b]);
-    return d === undefined || d.share < DOMINANT_SHARE ? [] : [d.rgb];
-  });
-  if (screen.length === 0) return untold('no screen beside the two to tell a drawn surface from');
-  for (const [i, colour] of [own, other].entries()) {
-    const shown = screen.find((c) => distance(c, colour) <= EYES_APART_DE);
-    if (shown !== undefined) return untold(`${sides[i]!.name} shows the screen's own colour ${rgbToHex(shown)} beside the overlap: it may draw nothing there`);
+  const beside = land(pair.beside);
+  if (beside.length === 0) return untold('no screen beside the two to tell a drawn surface from');
+  for (const [i, { name, around }] of sides.entries()) {
+    if (around.length === 0) return untold(`nothing around ${name} past its edge to tell a drawn surface from`);
+    const colour = colours[i]!;
+    if ([...around, ...beside].some((strip) => nearShare(png, strip, colour, EYES_APART_DE) >= AROUND_SHARE)) {
+      return untold(`${name} shows the colour around it ${rgbToHex(colour)} beside the overlap: it may draw nothing there`);
+    }
   }
   const apart = distance(own, other);
   if (apart <= DEFAULT_TOLERANCE_DE) return untold(`the two look alike (ΔE ${apart.toFixed(2)})`);
@@ -275,6 +293,8 @@ function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
   const toOwn = distance(shows.rgb, own);
   const toOther = distance(shows.rgb, other);
   const hexes = { overlap: rgbToHex(shows.rgb), own: rgbToHex(own), other: rgbToHex(other) };
+  // Both halves bite: the sides only just over DEFAULT_TOLERANCE_DE apart (rule 4), an overlap within EYES_APART_DE of
+  // one can lie within that tolerance of the other too (8.55 apart, 1.95 and 6.60) — a blend, untold.
   if (toOwn <= EYES_APART_DE && toOther > DEFAULT_TOLERANCE_DE) return { seen: 'over', ...hexes };
   if (toOther <= EYES_APART_DE && toOwn > DEFAULT_TOLERANCE_DE) return { seen: 'under', ...hexes };
   return untold(`the overlap shows neither (ΔE ${toOwn.toFixed(2)} to it, ${toOther.toFixed(2)} to the other)`);

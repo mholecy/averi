@@ -121,7 +121,7 @@ export interface RoundSeen {
   unlocated?: boolean;
   /** The answer to `ask eyes`: what the eyes saw of the step's question (ui-tree/eyes.ts). */
   eyes?: EyesAnswer;
-  /** The answer to `ask order`: the order the eyes saw of the step's question (ui-tree/eyes.ts#Eyes.order), as the draw order takes it (ui-tree/seen-order.ts#seenOrderOf of the question's node) — none seen when no eyes were wired. */
+  /** The answer to `ask order`: the order the eyes saw of the step's question (ui-tree/eyes.ts#Eyes.order), as a look is told it (ui-tree/eyes.ts#orderSeenBy) — none seen when no eyes were wired. */
   order?: SeenOrder;
   /** ms since the scroll began (after the device's screen was read), stamped on every call — re-entry included. */
   elapsedMs: number;

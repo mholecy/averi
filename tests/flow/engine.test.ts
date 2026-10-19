@@ -2869,6 +2869,8 @@ flows:
       { action: 'flow f', detail: 'done' },
     ]);
     expect(tapped.tapPoints).toEqual([{ x: 201, y: 767 }]);
+    // The eyes are wired into every flow tap (ADR 0024), asked only of a cover the listing does not order: none here.
+    expect(tapped.screenshots).toHaveLength(0);
     const filled = form(754);
     const trace = await FlowEngine.run(flow('fill: { id: priority, value: "x" }'), filled, FAST, { flow: 'f' });
     expect(trace[1]).toEqual({ action: '⚠ fill', detail: `id:"priority" tapped ${MOVED}` });
@@ -2879,6 +2881,8 @@ flows:
     const error = (await FlowEngine.run(flow('tap: { id: priority }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain('id:"priority" is under button "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over it; only a 354x9 part of it shows');
     expect(fake.tapPoints).toEqual([]);
+    // An ordinary cover (listed after it, in draw order): the eyes wired, never asked — no screenshot.
+    expect(fake.screenshots).toHaveLength(0);
   });
 
   // 2026-10-09, owner's decision (docs/bugs/2026-10-09-android-compose-button-
@@ -4190,5 +4194,24 @@ flows:
     await FlowEngine.run(cfg, fake, FAST, { flow: 'menu' });
     expect(fake.taps).toEqual(['lab.blur-menu.W']);
     expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it('blur-menu (idb): tap D, which nothing overlaps → tapped, no screenshot — the eyes are asked only of a cover the listing does not order', async () => {
+    const lab = (name: string) => readFile(new URL(`../fixtures/truth/ios-iphone17-ios27/${name}`, import.meta.url));
+    const fake = new FakeAdapter({ menu: parseIdbDescribeAll((await lab('blur-menu.idb.json')).toString('utf8')) }, 'menu');
+    fake.platform = 'ios';
+    fake.viewportSize = { width: 402, height: 874 };
+    fake.nextScreenshot = await lab('blur-menu.png');
+    const cfg = parseConfig(`
+app:
+  ios: { bundleId: lab.app }
+flows:
+  menu:
+    steps:
+      - tap: { id: lab.blur-menu.D }
+`);
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'menu' });
+    expect(fake.taps).toEqual(['lab.blur-menu.D']);
+    expect(fake.screenshots).toHaveLength(0);
   });
 });

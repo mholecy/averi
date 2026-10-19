@@ -1,6 +1,7 @@
 import { rectIntersection, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { axisOfEdge, sameRectWithinPixel, type Edge } from './geometry.js';
-import type { OrderSeen } from './seen-order.js';
+import { lookTold, type Look, type LookReading } from './look.js';
+import { seenOrderOf, type OrderSeen, type SeenOrder } from './seen-order.js';
 import type { FlushNeighbour, PixelStanding, Scene, Standing } from './standing.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
@@ -152,10 +153,40 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  * WHAT is asked (`OrderQuestion`): per `unordered` cover of the target (a `peer`), where the two overlap and where each
  * shows ALONE next to that overlap — its clear bands, along the overlap's edges — and the screen beside the two on the
  * overlap's rows. The judge (verify/eyes.ts#judgeOrder) compares colours of the screenshot's own parts only — never a
- * declared colour — and every one of its rules can only answer `untold` (ui-tree/seen-order.ts#PairSeen), which keeps
- * the refusal. The answer re-enters the pure draw order as an input (ui-tree/seen-order.ts#seenOrderOf,
- * draw-order.ts#drawOrder's `orderSeen`, through ui-tree/look.ts#lookAt's `seen`).
+ * declared colour — and each of its rules answers `untold` (ui-tree/seen-order.ts#PairSeen) wherever its evidence is
+ * missing, which keeps the refusal (what one frame cannot tell apart at all: ADR 0024's residuals). The answer re-enters
+ * the pure draw order as an input (ui-tree/seen-order.ts#seenOrderOf, draw-order.ts#drawOrder's `orderSeen`, through
+ * ui-tree/look.ts#lookTold).
+ *
+ * ASKED BY ONE CYCLE (`judgedWithOrder`): judge the look, ask the question its standing asks (if any) once, judge again
+ * on the look told the answer — the verbs supply only their purpose (the tap's standings, the pixel assert's region).
+ * `scroll_until`'s pure reducer cannot await, so it asks by a step and its driver answers with `orderSeenBy`, the read
+ * judged again on `lookTold` (interact/scroll-read.ts#factsOf) — the same conversion and the same told look.
  */
+
+/** The eyes as a verb is handed them for the order question (verify/eyes.ts#eyesOn at the composition root; a table in tests). */
+export type OrderEyes = Pick<Eyes, 'order'>;
+
+/** What `eyes` saw of `question`, as a look is told it (ui-tree/seen-order.ts#seenOrderOf of the question's node); no eyes wired, nothing seen — the listing's untold order. */
+export async function orderSeenBy(eyes: OrderEyes | undefined, question: OrderQuestion): Promise<SeenOrder> {
+  return seenOrderOf(question.node, eyes === undefined ? [] : await eyes.order(question));
+}
+
+/**
+ * THE ORDER QUESTION'S CYCLE: `judge` (the verb's purpose) on `look`; when that standing of `node` asks the order
+ * question (`orderQuestion`) and eyes are wired, they are asked ONCE and `judge` runs again on the look told what they
+ * saw (ui-tree/look.ts#lookTold) — that standing is the answer. Otherwise the first standing, nothing asked.
+ */
+export async function judgedWithOrder<R extends LookReading, S extends Standing | PixelStanding>(
+  look: Look<R>,
+  node: UiNode,
+  eyes: OrderEyes | undefined,
+  judge: (look: Look<R>) => S | Promise<S>,
+): Promise<S> {
+  const first = await judge(look);
+  const question = eyes === undefined ? undefined : orderQuestion(look.tree, node, first);
+  return question === undefined ? first : judge(lookTold(look, await orderSeenBy(eyes, question)));
+}
 
 /** One pair the eyes are asked to order: the target against `peer`, in tree units. */
 export interface OrderPair {
@@ -167,6 +198,15 @@ export interface OrderPair {
   readonly nodeBands: readonly Rect[];
   /** The peer's clear bands, likewise: the strips of it beside the overlap, outside the target. */
   readonly peerBands: readonly Rect[];
+  /**
+   * What lies AROUND the target past its edge, beyond each of its clear bands: the strip of the screen just outside its
+   * rect on the band's axis, across the band, as deep as the band (`bandsBeside`) — where a control that draws nothing
+   * there shows the same surface as in its band (a text-only button over a card: the card runs on past its edge). Empty:
+   * none on the screen.
+   */
+  readonly nodeAround: readonly Rect[];
+  /** What lies around the peer past its edge, beyond each of its clear bands, likewise. */
+  readonly peerAround: readonly Rect[];
   /** The screen beside the two on the overlap's rows — left of both, right of both: what a band showing the screen's own colour is told by (a control that may draw nothing there). */
   readonly beside: readonly Rect[];
 }
@@ -192,41 +232,55 @@ export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | P
     if (overlap === undefined) return [];
     // A band another cover of the target meets shows that cover, not the control it is a band of.
     const others = facts.covers.filter((c) => c !== peer);
-    const clear = (bands: readonly Rect[]): Rect[] =>
-      bands.flatMap((b) => {
-        const on = rectIntersection(b, frame);
-        return on === undefined || others.some((c) => rectIntersection(c.rect, on) !== undefined) ? [] : [on];
+    const clear = (bands: readonly BandBeside[]): BandBeside[] =>
+      bands.flatMap(({ band, around }) => {
+        const on = rectIntersection(band, frame);
+        return on === undefined || others.some((c) => rectIntersection(c.rect, on) !== undefined) ? [] : [{ band: on, around }];
       });
+    const aroundOf = (bands: readonly BandBeside[]): Rect[] => bands.flatMap(({ around }) => rectIntersection(around, frame) ?? []);
+    const nodeBands = clear(bandsBeside(node.rect, overlap));
+    const peerBands = clear(bandsBeside(peer.rect, overlap));
     const left = Math.min(node.rect.x, peer.rect.x);
     const right = Math.max(node.rect.x + node.rect.width, peer.rect.x + peer.rect.width);
     const beside = [
       { x: frame.x, y: overlap.y, width: left - frame.x, height: overlap.height },
       { x: right, y: overlap.y, width: frame.x + frame.width - right, height: overlap.height },
     ].filter((r) => r.width > 0 && r.height > 0);
-    return [{ peer, overlap, nodeBands: clear(bandsBeside(node.rect, overlap)), peerBands: clear(bandsBeside(peer.rect, overlap)), beside }];
+    return [{ peer, overlap, nodeBands: nodeBands.map((b) => b.band), peerBands: peerBands.map((b) => b.band), nodeAround: aroundOf(nodeBands), peerAround: aroundOf(peerBands), beside }];
   });
   return pairs.length === 0 ? undefined : { tree, node, pairs };
 }
 
 const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
+/** A strip of a control beside the overlap (`band`), and the strip of the screen just outside the control past it (`around`). */
+interface BandBeside {
+  readonly band: Rect;
+  readonly around: Rect;
+}
+
 /**
  * The strips of `r` beside `overlap` (a part of it): above, below, left and right of the overlap, on its columns or
  * rows, where `r` reaches past it — each no deeper than the overlap on that axis, so the band read is the one next to it.
  * Outside the other control by construction: the overlap is the two's intersection, so where `r` reaches past an edge of
- * it, the other does not.
+ * it, the other does not. Each with what lies AROUND `r` past that edge: the strip just outside `r`, across the band, as
+ * deep as it.
  */
-function bandsBeside(r: Rect, overlap: Rect): Rect[] {
+function bandsBeside(r: Rect, overlap: Rect): BandBeside[] {
   const bottom = overlap.y + overlap.height;
   const right = overlap.x + overlap.width;
   const top = Math.max(r.y, overlap.y - overlap.height);
   const below = Math.min(r.y + r.height, bottom + overlap.height);
   const leftmost = Math.max(r.x, overlap.x - overlap.width);
   const rightmost = Math.min(r.x + r.width, right + overlap.width);
+  const above = overlap.y - top;
+  const under = below - bottom;
+  const before = overlap.x - leftmost;
+  const after = rightmost - right;
   return [
-    { x: overlap.x, y: top, width: overlap.width, height: overlap.y - top },
-    { x: overlap.x, y: bottom, width: overlap.width, height: below - bottom },
-    { x: leftmost, y: overlap.y, width: overlap.x - leftmost, height: overlap.height },
-    { x: right, y: overlap.y, width: rightmost - right, height: overlap.height },
-  ].filter((b) => b.width > 0 && b.height > 0);
+    { band: { x: overlap.x, y: top, width: overlap.width, height: above }, around: { x: overlap.x, y: r.y - above, width: overlap.width, height: above } },
+    { band: { x: overlap.x, y: bottom, width: overlap.width, height: under }, around: { x: overlap.x, y: r.y + r.height, width: overlap.width, height: under } },
+    { band: { x: leftmost, y: overlap.y, width: before, height: overlap.height }, around: { x: r.x - before, y: overlap.y, width: before, height: overlap.height } },
+    { band: { x: right, y: overlap.y, width: after, height: overlap.height }, around: { x: r.x + r.width, y: overlap.y, width: after, height: overlap.height } },
+  ].filter(({ band }) => band.width > 0 && band.height > 0);
 }

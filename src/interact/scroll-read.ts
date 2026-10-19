@@ -3,7 +3,7 @@ import { largestScroller, type Cut } from '../ui-tree/geometry.js';
 import type { SurfaceFinding } from '../ui-tree/eyes.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, type KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { lookAt, type Look } from '../ui-tree/look.js';
+import { lookAt, lookTold, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -155,7 +155,8 @@ export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
  * in-memory tree beside a device read.
  */
 function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboard' | 'seen'>): TreeFacts {
-  const look = lookAt(tree, { ofKeyboard }, seen);
+  // Told the order the eyes saw, on the read that asked them (`RoundRead.seen`): the same told look as the tap's (ui-tree/eyes.ts#judgedWithOrder).
+  const look = seen === undefined ? lookAt(tree, { ofKeyboard }) : lookTold({ tree, reading: { ofKeyboard } }, seen);
   // The look's members through getters: derived on first use, as the look derives them (a spread would evaluate them).
   return {
     tree,

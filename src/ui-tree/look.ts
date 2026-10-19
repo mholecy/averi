@@ -56,13 +56,22 @@ export interface Look<R extends LookReading = KeyboardReading> {
 /** What of a keyboard reading a look needs: which nodes are the keyboard's own, and — for the reading's line — its cover and witness (ui-tree/keyboard-position.ts#keyboardPosition's). */
 export type LookReading = Pick<KeyboardReading, 'ofKeyboard'> & Partial<Pick<KeyboardReading, 'cover' | 'corroborated'>>;
 
+/** The look of `tree` with `reading` (taken off that tree): every member derived on first use, once; nothing asked of the device. */
+export function lookAt<R extends LookReading>(tree: UiNode, reading: R): Look<R> {
+  return lookOf(tree, reading, undefined);
+}
+
 /**
- * The look of `tree` with `reading` (taken off that tree): every member derived on first use, once; nothing asked of the
- * device. `seen`: the order a screenshot saw of controls the tree lists in reading order (ui-tree/seen-order.ts), which
- * its scene's draw order is told (`sceneOf`) — a verb that asked the eyes judges again on such a look of the same tree
- * and reading (the reading memoises what it asked, so nothing is asked twice).
+ * `look` TOLD the order a screenshot saw (`seen`, ui-tree/seen-order.ts) of controls its tree lists in reading order: a
+ * look of the same tree and reading whose scene's draw order takes it (`sceneOf`) — what a verb that asked the eyes
+ * judges again (ui-tree/eyes.ts#judgedWithOrder; `scroll_until`'s read, interact/scroll-read.ts#factsOf). The reading
+ * memoises what it asked, so nothing is asked twice.
  */
-export function lookAt<R extends LookReading>(tree: UiNode, reading: R, seen?: SeenOrder): Look<R> {
+export function lookTold<R extends LookReading>(look: Pick<Look<R>, 'tree' | 'reading'>, seen: SeenOrder): Look<R> {
+  return lookOf(look.tree, look.reading, seen);
+}
+
+function lookOf<R extends LookReading>(tree: UiNode, reading: R, seen: SeenOrder | undefined): Look<R> {
   let scene: Scene | undefined;
   let keyboard: KeyboardPosition | undefined;
   const look: Look<R> = {

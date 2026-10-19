@@ -132,7 +132,8 @@ export const presented: KnownFile = {
       ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the menu row W, seen drawn over it on the screenshot; the backdrop has no node', as: BLUR }),
       ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'refused', calls: [], note: 'stops before any swipe, under the menu row W seen drawn over it on the screenshot; the backdrop has no node', as: BLUR }),
     ]),
-    // LAB FINDING (calibration.json L4, its residual) — fixed on fix/r9-l4w (ADR 0024): the menu row W, listed in
+    // LAB FINDING (calibration.json L4, its residual) — fixed by docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+    // (docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md): the menu row W, listed in
     // reading order just before C, which it is drawn over, read as covered by C under idb and WDA; the eyes now tell
     // from the screenshot that W is drawn on top — its tap, colour and scroll_until rows green, struck off here.
   ]),

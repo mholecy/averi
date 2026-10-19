@@ -1,9 +1,8 @@
 import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { coverText, nodeText, outsideScrollViewText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { orderQuestion, type Eyes } from '../ui-tree/eyes.js';
-import { lookAt, type Look, type LookReading } from '../ui-tree/look.js';
-import { seenOrderOf } from '../ui-tree/seen-order.js';
+import { judgedWithOrder, type OrderEyes } from '../ui-tree/eyes.js';
+import type { Look, LookReading } from '../ui-tree/look.js';
 import type { KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive } from '../ui-tree/selectors.js';
 import { coverClause, outsideItsScrollView, presentedRemedy, seenOverRemedy, unorderedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
@@ -229,7 +228,7 @@ export function tapStandings(look: Pick<Look, 'scene' | 'keyboard'>, node: UiNod
  */
 export interface TapAsks {
   readonly sent?: string;
-  readonly eyes?: Pick<Eyes, 'order'>;
+  readonly eyes?: OrderEyes;
 }
 
 /** A look the on-screen rule let through: the screen it was judged on (the first look's, or the one read again), and the rest of the judgement. */
@@ -280,10 +279,8 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
     async aim() {
       // The reading's line only for a covered centre of a target on the screen and not cut.
       const judged = async ({ first, full }: TapStandings): Promise<TapStanding> => (!offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? full() : first);
-      let standing = await judged(standings);
       // Covered by a control the listing does not order: the eyes, once, then judged again on the order they saw (ADR 0024).
-      const question = eyes === undefined ? undefined : orderQuestion(look.tree, node, standing);
-      if (eyes !== undefined && question !== undefined) standing = await judged(tapStandings(lookAt(look.tree, look.reading, seenOrderOf(node, await eyes.order(question))), node, on));
+      const standing = await judgedWithOrder(look, node, eyes, (seen) => judged(seen === look ? standings : tapStandings(seen, node, on)));
       // A cut by a node drawn after it: whether the soft keyboard is up, which its remedy names (`cutByRemedy`) — the reading's line, asked on that path only.
       const line = standing.kind === 'cut' && standing.cut.by !== undefined ? await look.keyboard.readingLine() : undefined;
       const keyboard: KeyboardUp | undefined = line === undefined ? undefined : { lineY: line.y, remedy: look.reading.remedy };
