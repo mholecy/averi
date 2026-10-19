@@ -1283,8 +1283,8 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  * `uiautomator dump` lists the active window only (`UiNode.activeWindowOnly`), so with a dialog or a bottom sheet up
  * the dump IS that window and the screen beneath is not in it. Read here, where the raw dump is — the scrim's
  * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags
- * (wda-source.ts#presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks,
- * #byUiautomator). The window is asked of each recognizer in `PRESENTED_WINDOWS`, in order; the first that knows it
+ * (wda-source.ts#presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks, which
+ * answers `alone` of a marked root). The window is asked of each recognizer in `PRESENTED_WINDOWS`, in order; the first that knows it
  * names it.
  * Residuals, stated: a fully expanded Compose sheet dumps no scrim (form-picker's country picker: only the sheet and
  *   its drag handle) and is no presented window here; a floating window against the top or the left edge (a popup at

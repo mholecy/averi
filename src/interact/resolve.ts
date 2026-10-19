@@ -369,7 +369,7 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  */
 function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number; lastTree?: UiNode }): Error {
   const miss = missOf({ tree: outcome.lastTree, readError: outcome.readError }, (tree) => zeroAreaHint(tree, target));
-  if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss.layer)}`);
+  if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, missNote(miss)), { sighted: false, ...outcome, miss });
 }
 

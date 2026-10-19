@@ -503,12 +503,13 @@ export interface UiNode {
    * AlertDialog and ModalBottomSheet, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md).
    * So a target missing from such a tree may lie beneath a presented window rather than be absent: when the parser
    * also marks the root presented (`presentation`), ui-tree/presentation.ts#Presentation.alone names that window, and
-   * the wait for a target "to appear" says close it first instead (interact/resolve.ts). Read by
-   * ui-tree/presentation.ts#presentationOf, which picks the uiautomator adapter (`byUiautomator`) for such a tree, and
-   * through it `Presentation.alone`. A mark of the source, like `flatList`: ui-tree knows no platform. Absent on WDA's
-   * trees (every window of the app, the keyboard's too) and idb's flat list (which lists only a presented layer as
-   * well — measured on the lab's SwiftUI alert and sheet — but is not marked: iOS keeps its behaviour, ADR 0018's
-   * residual 6).
+   * the wait for a target "to appear" says close it first instead (interact/resolve.ts); when it does not, every
+   * not-found says the window may be one (ui-tree/miss.ts#ACTIVE_WINDOW_HINT). Read by ui-tree/miss.ts#missOf, for
+   * that hint and for the words of a window listed alone. A mark of the source, like `flatList`: ui-tree knows no
+   * platform. Absent on WDA's trees (every window of the app, the keyboard's too) and idb's flat list (which lists
+   * only a presented layer as well — measured on the lab's SwiftUI alert and sheets — but not by window: its parser
+   * marks the root presented only when the list holds UIKit's dismiss region, adapters/ios-tree-source.ts
+   * #listsPresentedLayer, and an idb miss gives no hint otherwise, ADR 0018's residual 6).
    */
   activeWindowOnly?: true;
   /**
@@ -558,7 +559,9 @@ export interface UiNode {
    * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one
    * mark per layer, and by the uiautomator parser on the root, the one window it dumps (adapters/android.ts
    * #presentedWindow: `dialog` for a window that floats off the screen's top and left edges both, and `screen` for one
-   * whose clickable, labelled scrim lies screen-wide above its sheet; the root also carries `activeWindowOnly`).
+   * whose clickable, labelled scrim lies screen-wide above its sheet; the root also carries `activeWindowOnly`), and
+   * by the idb parser on the root of its flat list (adapters/ios-tree-source.ts#listsPresentedLayer: `screen`, the
+   * list holding UIKit's dismiss region over the whole screen — the list is then the presented layer alone).
    * WDA's marks:
    * - by the TYPE of an element the layer holds ON THE SCREEN (one parked off it, as WDA keeps a dismissed alert,
    *   types nothing): `alert` (WDA's `Alert`), `actionSheet` (a `Sheet`: UIKit's action sheet, its message the label),
@@ -585,7 +588,8 @@ export interface UiNode {
    *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
-   * Absent everywhere else — on an idb tree always, on an Android tree but on a presented window's root.
+   * Absent everywhere else — on an idb tree but on a presented layer's root, on an Android tree but on a presented
+   * window's root.
    */
   presentation?: PresentationKind;
   /**
@@ -598,8 +602,8 @@ export interface UiNode {
   /**
    * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
    * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
-   * (`presentation`), so the presentation module never asks a fallback of it (ui-tree/presentation.ts#byShape,
-   * #byUiautomator). Absent on a tree whose source does not judge every layer (idb; Android, whose parser marks the one
+   * (`presentation`), so the presentation module never asks a fallback of it (ui-tree/presentation.ts#byShape).
+   * Absent on a tree whose source does not judge every layer (idb; Android, whose parser marks the one
    * window it dumps when that window is presented, but judges no layer inside a window; a flagless WDA payload; a
    * normalized snapshot without it): there a presented screen is still inferred from shape, through that fallback.
    * Read by ui-tree/presentation.ts#presentationOf, which builds the fallback only without it (so on a judged tree draw

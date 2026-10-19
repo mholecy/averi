@@ -16,8 +16,8 @@ import { Verifier } from '../../src/verify/assert.js';
 // `uiautomator dump` lists the ACTIVE window only, so beneath an AlertDialog or a ModalBottomSheet the screen's targets
 // are not in the tree at all. The parser marks its root as such a listing (`UiNode.activeWindowOnly`) and marks the
 // window presented when the dump shows it is (`UiNode.presentation`: a floating window, `dialog`; a window whose scrim
-// lies above its sheet, `screen`); the presentation module reads both (ui-tree/presentation.ts#byMarks, #byUiautomator),
-// and the verbs refuse to stroke or wait on a target the tree cannot list beneath it.
+// lies above its sheet, `screen`); the presentation module reads the root's mark as a window listed alone
+// (ui-tree/presentation.ts#byMarks), ui-tree/miss.ts the listing's, and the verbs refuse to stroke or wait on a target the tree cannot list beneath it.
 //
 // The captures are the lab app's (fixtures/apps/android on truth/phase-3, captured by scripts/truth/capture-android.ts
 // on the averi_lab AVD, Pixel 3a profile, API 33, 1080x2220): tests/fixtures/truth/android-averi_lab-api33/<cell>.xml,
@@ -53,9 +53,9 @@ describe('the uiautomator parser marks its root: the dump lists the active windo
     }
   });
 
-  it('the presentation module picks the uiautomator adapter by that mark (not by `paddedTouchTargets`)', () => {
+  it('the presentation module asks the shape of it, as of any tree whose source did not judge (not by `paddedTouchTargets`)', () => {
     const tree = capture('open');
-    expect(presentationOf(tree).fallback).toBe('uiautomator');
+    expect(presentationOf(tree).fallback).toBe('shape');
     const { activeWindowOnly: _, ...unmarked } = tree;
     expect(presentationOf(unmarked).fallback).toBe('shape');
   });
@@ -167,9 +167,9 @@ describe('the presentation module: the presented window is listed alone', () => 
     expect(presentationOf(capture('form-picker')).alone).toBeUndefined();
   });
 
-  it('a WDA-style marked layer on a tree that lists every window is not alone: a target missing there is missing', () => {
-    const tree = capture('alert-dim');
-    const { activeWindowOnly: _, ...everyWindow } = tree;
+  it('a WDA-style marked layer — a layer inside the tree, its root unmarked — is not alone: a target missing there is missing', () => {
+    const { presentation, ...window } = capture('alert-dim');
+    const everyWindow: UiNode = { role: 'container', label: null, identifier: null, value: null, rect: window.rect, children: [{ ...window, presentation }] };
     expect(presentationOf(everyWindow).alone).toBeUndefined();
   });
 
@@ -378,18 +378,18 @@ describe('what a miss saw (ui-tree/miss.ts): one decision, one wording', () => {
     expect(missOf({ tree: capture('alert-dim'), readError: new Error('adb gone') })).toEqual({ of: 'unread' });
     expect(missOf({})).toEqual({ of: 'unread' });
     expect(missOf({ tree: capture('alert-dim') }, () => 'at 0×0')).toEqual({ of: 'zeroArea', hint: 'at 0×0' });
-    expect(missOf({ tree: capture('alert-dim') })).toEqual({ of: 'presented', layer: { kind: 'dialog' } });
-    expect(missOf({ tree: capture('sheet-medium') })).toEqual({ of: 'presented', layer: { kind: 'screen' } });
+    expect(missOf({ tree: capture('alert-dim') })).toEqual({ of: 'presented', layer: { kind: 'dialog' }, listed: 'window' });
+    expect(missOf({ tree: capture('sheet-medium') })).toEqual({ of: 'presented', layer: { kind: 'screen' }, listed: 'window' });
     expect(missOf({ tree: capture('form-picker') })).toEqual({ of: 'activeWindow' });
     expect(missOf({ tree: capture('open') })).toEqual({ of: 'activeWindow' });
-    const { activeWindowOnly: _, ...everyWindow } = capture('alert-dim');
+    const { activeWindowOnly: _, presentation: __, ...everyWindow } = capture('alert-dim');
     expect(missOf({ tree: everyWindow })).toEqual({ of: 'none' });
   });
 
   it('the words: the presented remedy for a window listed alone, the hint for an unmarked one, nothing for unread or none', () => {
-    expect(missNote({ of: 'presented', layer: { kind: 'dialog' } })).toBe('a dialog is presented over it, and the tree lists only that window — close it first');
-    expect(missNote({ of: 'presented', layer: { kind: 'screen' } })).toBe('a sheet or modal is presented over it, and the tree lists only that window — close it first');
-    expect(missNote({ of: 'presented', layer: { kind: 'dialog', label: 'Delete?' } })).toBe('a dialog "Delete?" is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'dialog' }, listed: 'window' })).toBe('a dialog is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'screen' }, listed: 'window' })).toBe('a sheet or modal is presented over it, and the tree lists only that window — close it first');
+    expect(missNote({ of: 'presented', layer: { kind: 'dialog', label: 'Delete?' }, listed: 'window' })).toBe('a dialog "Delete?" is presented over it, and the tree lists only that window — close it first');
     expect(missNote({ of: 'activeWindow' })).toBe(ACTIVE_WINDOW_HINT);
     expect(missNote({ of: 'zeroArea', hint: 'h' })).toBe('h');
     expect(missNote({ of: 'unread' })).toBeUndefined();

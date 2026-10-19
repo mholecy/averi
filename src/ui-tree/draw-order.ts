@@ -71,9 +71,8 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * `exposure`, `paintsOver`, `coversOf`, `presentedAt` and `presentedOver` alike; the `drawnOver` column (the stroke
  * box) does not read it. Behind it sit the tree source's marks (a LAYER WDA marks presented: a typed alert, action
  * sheet or popover through its element alone, a `screen` its visibility flags show presented through the whole screen
- * with its own nodes covering where they draw; the one window uiautomator dumps, when its parser marks it presented)
- * and, only on a tree whose source did not judge presented layers (`UiNode.presentationsJudged`), the shape fallback
- * (Android's through the uiautomator adapter). A verb learns of a
+ * with its own nodes covering where they draw; the one window uiautomator dumps, and idb's flat list, when its parser marks it presented)
+ * and, only on a tree whose source did not judge presented layers (`UiNode.presentationsJudged`), the shape fallback. A verb learns of a
  * mark from `presentation.press` (`MarkedLayer`: its kind and label), never from the node.
  *
  * The two columns read the rows differently on purpose — each column of

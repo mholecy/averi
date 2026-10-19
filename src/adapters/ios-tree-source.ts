@@ -6,7 +6,7 @@ import { attachFieldErrors } from './field-errors.js';
 import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
 import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
-import { rectArea, zeroRect, type Rect, type UiNode } from './types.js';
+import { rectArea, rectIntersection, zeroRect, type Rect, type UiNode } from './types.js';
 import { countOf } from '../util/count.js';
 
 /**
@@ -142,7 +142,40 @@ function idbTree(elements: IdbElement[]): UiNode {
     rect: zeroRect(),
     children,
     flatList: true,
+    ...(listsPresentedLayer(elements) && { presentation: 'screen' as const }),
   };
+}
+
+/** The identifier UIKit gives the dimming view it lays under a sheet or a popover presented over a screen (idb's `AXUniqueId`, WDA's `name`). */
+const DISMISS_REGION = 'PopoverDismissRegion';
+
+/**
+ * The list IS A PRESENTED LAYER, listed alone (types.ts#UiNode.presentation on the root, `screen`): it holds UIKit's
+ * dismiss region — the dimming view under a sheet or a popover, `Group 'dismiss popup' id=PopoverDismissRegion` —
+ * and that region covers the whole screen (the `Application` element's frame). idb's describe-all lists only what
+ * accessibility exposes, and a presentation hides the screen beneath it: the lab's medium sheet lists the region
+ * (twice, `-402,-874 1206x2622`) and its own button, nothing of the host (tests/fixtures/truth/ios-iphone17-ios27/
+ * sheet-medium.idb.json; over the scrolled host, sheet-medium-edges.idb.json, the regions alone). So a target beneath
+ * is never in this tree: the presentation module reads the root's mark as Android's one presented window
+ * (ui-tree/presentation.ts#byMarks: `scroll_until` sends no stroke for a target not in the tree — one at (201,175)
+ * on the dim dismissed the sheet and read the target "fully visible after 1 swipe" — and the tap's wait says close it
+ * first, `Presentation.alone`). Read here, where the raw element is, as android.ts#presentedWindow reads its dump.
+ * Specific: of every idb capture committed (the lab's 31, tests/fixtures/idb-*.json) only those two hold the region.
+ * Residuals, stated: a presentation UIKit lays with no dimming view — a large-detent or full-screen sheet
+ * (sheet-background.idb.json lists the sheet's button alone, no sign of the sheet), an alert, a transparent cover —
+ * is no presented layer here; a dismiss region that does not reach the whole screen (a popover's on an iPad?
+ * unmeasured) neither; and the screen beneath the region, were idb ever to list it too (unmeasured), reads as the
+ * layer's own — covered by nothing, as the whole listing is the layer.
+ * docs/truth/live-ios-2026-10-18-visibility.md (iOS point 4); ADR 0018 residual 6.
+ */
+function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
+  const app = elements.find((el) => el.type === 'Application')?.frame;
+  if (app === undefined || rectArea(app) === 0) return false;
+  return elements.some((el) => {
+    if (el.AXUniqueId !== DISMISS_REGION || el.frame === undefined) return false;
+    const on = rectIntersection(el.frame, app);
+    return on !== undefined && rectArea(on) === rectArea(app);
+  });
 }
 
 /**

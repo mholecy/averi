@@ -739,7 +739,7 @@ full-screen window, its scrim (`content-desc="Close sheet"`, clickable, `[0,0][1
 (`[0,1110][1080,2220]`). The targets beneath are not in the tree at all, so nothing was "covered": `scroll_until`
 stroked `540 1776 → 540 444` twice — on the device the first stroke dismissed the dialog (it touched down on its dim)
 or dragged the sheet to full height — and the tap waited 5 s "to appear". The uiautomator adapter of the presentation
-module (`presentation.ts#byUiautomator`) had been chosen by the root's `paddedTouchTargets`, a mark meaning something
+module (`byUiautomator`, folded into the marks adapter by the amendment "idb's presented layer", 2026-10-19) had been chosen by the root's `paddedTouchTargets`, a mark meaning something
 else, and knew no fact of its own.
 
 **Decision.**
