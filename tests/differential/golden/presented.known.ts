@@ -50,11 +50,17 @@ export const presented: KnownFile = {
     // off. idb lists only the presented layer: a target beneath it is not in the tree. The tap times out "to appear" —
     // no false Tapped, but no "close it first"; the colour assert fails "not found" (no evidence either way: vacuous);
     // and scroll_until swipes twice beneath the presented layer looking for it.
-    ...['alert-dim', 'sheet-medium'].flatMap((cell) => [
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
-      ...keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
-    ]),
+    // sheet-medium.idb's tap and scroll_until rows went green with round 7's A5 (merged with arch/round-23 at
+    // a1261499): idb's list holds UIKit's dismiss region over the Application frame, now the presented mark
+    // (src/adapters/ios-tree-source.ts#listsPresentedLayer), so the tap's wait says "close it first" and scroll_until
+    // stops before any swipe — ADR 0018 residual 6 closed there (its "Closed on idb for a list holding UIKit's dismiss
+    // region"; a residual, no note: nothing in scripts/truth/calibration.json), the 8 rows struck off here. Its colour
+    // assert still fails "not found" (now with the presented remedy in its miss note): vacuous, no note's.
+    ...keys(`${IOS}/alert-dim.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
+    ...['alert-dim', 'sheet-medium'].flatMap((cell) =>
+      keys(`${IOS}/${cell}.idb.json`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
+    ),
+    ...keys(`${IOS}/alert-dim.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
     // LAB FINDING L1, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
     // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
     // the tree, as on idb. Fixed by round 6 (d43df5d, merged with arch/round-22): the window is marked presented, so
@@ -78,9 +84,13 @@ export const presented: KnownFile = {
     ...unmarkedWindow(`${ANDROID}/dialog-fullscreen.xml`, FULL_SCREEN_DIALOG),
     // --- phase 3 (B3), iOS ---
     // idb lists only the presented layer (as on sheet-medium): beneath the medium sheet over the scrolled host, the large
-    // sheet's bare background and the transparent cover, the targets are not in the tree.
-    ...['sheet-medium-edges', 'sheet-background', 'dim-cover'].flatMap((cell) => {
-      const tags = cell === 'sheet-medium-edges' ? ['H', 'G', 'E', 'F', 'M'] : ['A', 'B', 'C', 'D'];
+    // sheet's bare background and the transparent cover, the targets are not in the tree. sheet-medium-edges.idb's
+    // list holds the dismiss region too: its 10 tap and scroll_until rows went green with A5, as sheet-medium's above —
+    // struck off; its colour rows stay (vacuous). sheet-background's and dim-cover's lists show no sign of the layer
+    // (residual 6 stands there).
+    ...keys(`${IOS}/sheet-medium-edges.idb.json`, ['H', 'G', 'E', 'F', 'M'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
+    ...['sheet-background', 'dim-cover'].flatMap((cell) => {
+      const tags = ['A', 'B', 'C', 'D'];
       return [
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'idb lists only the presented layer' }),
