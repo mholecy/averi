@@ -44,3 +44,23 @@ text, and on name's colour. Judge: the assert FAILS (a PASS is a MISMATCH: the f
 fired, and the detail says "close it first" once — the presented remedy or the active-window hint (live-forms.ts
 #judgeUnderSheet's two matchers, applied to the assert's detail). A flow `wait:` and an optional tap need a run_flow
 call with a flow in the case's averi.yaml; the harness's config writer (live.ts#configFor) writes none today.
+
+# Round 2: one module for every not-found (after review round 1)
+
+The decision moved into ui-tree/miss.ts (`missOf` of the last read: unread, zero-area, a window listed alone, the
+active-window hint, none; `missNote` its words), so beneath a window the tree lists alone the asserts and a `wait:`
+say the presented remedy the tap says, and an optional `wait:`'s skip carries the note. Run again on 2026-10-19 on
+averi_lab (same boot flags, same installed lab app), src e726c77 through `--side`:
+
+- form-picker c2–c4 (live harness): 3 ok, replies unchanged — record
+  docs/truth/live-records/android-hint-everywhere-e726c77-c2c4.json.
+- The scratch driver, twelve calls, nothing fired on any (no event, no focus) — record
+  docs/truth/live-records/android-hint-everywhere-e726c77-asserts.json. Form-picker as in round 1, verbatim, plus an
+  optional `wait:` on name: `optional: skipped step (Timed out after 3000ms waiting for element
+  id:"lab.form-picker.name" (the tree lists only the active window: if a sheet or a dialog is open over the screen,
+  close it first))`. On alert-dim (the dialog listed alone), target A:
+  - element assert: `not found within 3 s (the tree lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first)`;
+  - color assert: the same after `not found within 5 s`;
+  - `wait:` on A: `Timed out after 3000ms waiting for element id:"lab.alert-dim.A"` with that parenthesis beneath;
+  - the tap, unchanged: `Timed out after 5000ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first`.
+  Each says "close it first" once; no reply on alert-dim carries the generic hint.
