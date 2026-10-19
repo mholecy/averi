@@ -78,6 +78,17 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     expect(seen.tapAt).toBeUndefined();
   });
 
+  it("a control listed AFTER the target that only pokes over its edge, clear of its centre, is a cover by draw order, its order told: a FAB over a row's corner in idb's flat list (not pinned: a tab bar's items listed after it)", () => {
+    const row = node({ role: 'button', label: 'Row', rect: { x: 51, y: 600, width: 300, height: 120 } });
+    const fab = node({ role: 'button', label: 'Add', rect: { x: 300, y: 640, width: 60, height: 60 } });
+    const tabs = ['Home', 'Pay', 'Cards', 'More'].map((label, i) => node({ role: 'button', label, rect: { x: 37 + 82 * i, y: 755, width: 82, height: 64 } }));
+    const t = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, readingOrder: true, children: [node({ role: 'other', label: 'Screen', rect: { ...IPHONE } }), row, fab, ...tabs] });
+    const seen = drawOrder(t).exposure(row, IPHONE);
+    expect(seen.covers).toEqual([fab]);
+    expect(seen.unordered).toEqual([]);
+    expect(seen.tapAt).toMatchObject({ moved: false });
+  });
+
   it("mp-native's chooser (idb, ADR 0015's capture): the transaction row listed after the card's rows lies under them", () => {
     const t = parseIdbDescribeAll(JSON.stringify(MODAL.screens.chooser));
     const row = [...everyNode(t)].find((n) => n.label?.startsWith('Loan repayment'))!;
