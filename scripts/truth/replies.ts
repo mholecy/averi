@@ -46,6 +46,13 @@ export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
 export const notInTree = (reply: string) => /waiting for element .* to appear(?![\s\S]*\(it matched only )|never appeared in the tree|not found within/.test(reply);
 
 /**
+ * The call failed on not finding its target: `notInTree`, or a flow's `wait:` that timed out on it
+ * (src/ui-tree/read-tree.ts:192, "Timed out after Nms waiting for element X" — no "to appear", so not `notInTree`, and
+ * not a reply kind of its own: the ratchets' kinds stay as recorded). The live forms cases c5–c7 (live-forms.ts#judgeMissUnderSheet) ask it.
+ */
+export const missedTarget = (reply: string) => notInTree(reply) || /^ERROR Timed out after \d+ms waiting for element /.test(reply);
+
+/**
  * What kind of reply it is, from a closed set — recorded on every golden check (golden.ts), so a known mismatch whose
  * reply turns into another kind (a timeout into a refusal, a stop into `fully visible`) fails the ratchet though its
  * class and its device calls stay; and what the live judges classify a reply by (live-visibility.ts, LiveVerdict.kind).

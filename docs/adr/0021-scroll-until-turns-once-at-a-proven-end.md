@@ -2,16 +2,21 @@
 
 Status: decisions 1–3 accepted, 2026-10-17 (owner, on lab note LV4, option (b): the three conditions and the
 one-stroke stop); decision 4 (lab note LV5's carry model) implemented 2026-10-18 on `arch/r22-lv4` under the round-6
-brief, pending the owner and the device check. The two points on uiautomator decided 2026-10-18 (owner, on round 6's
-Android device check): NO turn, and the two-stroke stop KEPT — unmoved strokes on uiautomator are no proof; the tool
-reports the direction, the agent turns (below). Device-checked on iOS 2026-10-18 (round 6, WDA, below): the turn holds
-(once, toward the target, said); the one-stroke stop does not (2–4 unmoved strokes before the proof held, in four
-runs); decision 4 holds on `lower` (F landed in its window four times of four), its long-list half unmeasured — no
-lab cell can measure it yet.
+brief, device-checked 2026-10-19 (round 7: it lands the row, no extra stroke or turn) and its residual 1 accepted
+2026-10-19 by the round-7 orchestrator, who holds the owner's delegation of round-7 decisions (2026-10-18); the
+one-stroke stop that did not hold on iOS fixed at round 7's A1 (480660a4; decisions 2 and 5 added). The two points on
+uiautomator decided 2026-10-18 (owner, on round 6's Android device check): NO turn, and the two-stroke stop KEPT —
+unmoved strokes on uiautomator are no proof; the tool reports the direction, the agent turns (below). Device-checked
+on iOS 2026-10-18 (round 6, WDA, below): the turn holds (once, toward the target, said); the one-stroke stop does not
+(2–4 unmoved strokes before the proof held, in four runs); decision 4 holds on `lower` (F landed in its window four
+times of four), its long-list half unmeasured — no lab cell can measure it yet.
 Round 7 (2026-10-18, the owner's brief: "make the one-stroke stop hold on iOS"): measured live on the lab simulator,
-the one-stroke stop did not hold under WDA because a list resting a fraction of a point off its end reads a whole point
-off — "unmoved" is now within a point (decision 2), and 4 runs of 4 turn after one stroke; the carry model cuts a first
-stroke over each scroll view too (decision 4); a stop is judged on the read a fling comes to rest in (decision 5).
+the one-stroke stop did not hold under WDA because a list resting a fraction of a point off its end reads a whole
+point off — "unmoved" is now within a point (decision 2), and 6 WDA runs of 6 (the four traced runs,
+docs/truth/live-records/ios-wda-stop-carousel-r23-1…4.json, and the visibility group,
+ios-vis-r23-ios-stop-e687fe83.json, at e687fe83; the scroll cells at 659fdf00, ios-wda-scroll-cells-659fdf00.json)
+turn after one stroke; the carry model cuts a first stroke over each scroll view too (decision 4); a stop is judged on
+the read a fling comes to rest in (decision 5).
 
 ## Context
 
@@ -55,7 +60,7 @@ stroke over each scroll view too (decision 4); a stop is judged on the read a fl
    0,380 402x1300 → 0,381 402x1300 or 0,380 402x1301; the strict "under one unit" read each such read as moved, so the
    proof came on the first read that happened to round as the one before — after 2 unmoved strokes (3 runs of 4) or 4
    (1 run, budget spent). Not a read still bouncing: every read after the stroke, ~1.1 s on, was within that point.
-   With one unit: 4 runs of 4 turn after exactly one stroke. A real motion of one unit reads as none — no stroke moves
+   With one unit: every WDA run since turns after exactly one stroke — 6 of 6 (the status above names them). A real motion of one unit reads as none — no stroke moves
    content that little; two units are motion (the bounce rule above stands).
 3. **The one-stroke stop.** With that proof the scroll ends after the first unmoved stroke (bound `exhausted`,
    `ends`: `(swiping up did not move it: the tree lists the content of … ending at its top — content exhausted)`),
@@ -93,7 +98,7 @@ stroke over each scroll view too (decision 4); a stop is judged on the read a fl
    than the read before found it moving — a fling slowing — spends none of the SETTLE_CONFIRM_READS budget. The
    carousel's fling ran ~2.5 s; the reads, 0.47 s apart, found C moving 54, 21, 8 pt, so the third confirming read was
    still 8–10 pt from rest and the stop was claimed "still moving" — on a read with C's centre inside, in the run whose
-   fling then carried it out. Now 4 runs of 4 stop on two agreeing reads (C moving e.g. 44, 17, 5, then 0). An
+   fling then carried it out. Now every run stops on two agreeing reads, 6 of 6 (in the traced four, C moving e.g. 44, 17, 5, then 0). An
    animation moving as much at every read still spends the budget and is reported "still moving", as before.
 
 ## Where it applies, and where not

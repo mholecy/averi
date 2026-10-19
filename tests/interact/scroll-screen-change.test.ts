@@ -149,7 +149,8 @@ describe('…and not a stroke that moved content', () => {
     });
   }
 
-  it('residual: a read that lists no id says nothing — a label-only sheet dismissed is not told (UIKit rows under idb, NI1)', () => {
+  it('residual: a read that lists no id says nothing — a label-only sheet dismissed is not told (UIKit rows under idb)', () => {
+    // NI1.
     const anonymous = (tree: UiNode): UiNode => ({ ...tree, children: tree.children.map((n) => ({ ...n, identifier: null })) });
     const after = host();
     const a = byId(after, 'lab.sheet-background.A');

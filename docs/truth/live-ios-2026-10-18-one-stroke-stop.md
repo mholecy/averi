@@ -51,8 +51,8 @@ under 108 pt, the shortest drag measured): S's first stroke is the full one agai
 After the floor (659fdf00, 2026-10-19, `--sources wda --groups visibility --cells scroll-bounded,carousel-in-list,
 sheet-long-list,sheet-long-list-short,tabbar-floating`, the lab app as truth/round-7's T3 had reinstalled it, record
 ios-wda-scroll-cells-659fdf00.json): 32 cases, 30 ok, 2 mismatches (0 not known — sheet-long-list L's two, LV6's
-parked rows). `turn:scroll-bounded.F` "fully visible after 5 swipes; 1 swipe up did not move …" (a fifth run, one
-stroke); carousel C `visible after 1 swipe — CLIPPED at right, 84%`, settled; S `fully: true` first stroke the full
+parked rows). `turn:scroll-bounded.F` "fully visible after 5 swipes; 1 swipe up did not move …" (a sixth run, one
+stroke: the visibility group at e687fe83 above is the fifth); carousel C `visible after 1 swipe — CLIPPED at right, 84%`, settled; S `fully: true` first stroke the full
 108 pt again (`lower 0→190.3`, past the window, turned back to 147: 3 swipes — the full stroke's own spread; round 6
 read 2 at 0→170); no "still moving" in any reply.
 

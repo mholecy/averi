@@ -76,6 +76,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // form-picker's c2–c4 with every not-found carrying the miss note — the replies of the taps unchanged, ok
     ['android-hint-everywhere-9fa59ae-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-hint-everywhere-e726c77-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    // round 7's code review (truth/r7-cr, this checkout): c2–c4 again and c5–c7, an assert, a colour assert and a
+    // flow's wait: on name beneath the sheet — each failed, the active-window hint once, nothing fired
+    ['android-hint-c5c7-r7cr.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     // round 7's React Native lab app (rn-field, `--app react-native`, the record keeping its app): the forms cases
     // rn1–rn6 and the label and icon taps; LOUD where WDA (LR1) and uiautomator (LR2) refuse a label under its own field,
     // and where a fill into an RN single-line field lost the tail of its text (averi said so: "the field shows 8").
@@ -140,7 +143,8 @@ describe('live.ts --rejudge over the committed visibility records', () => {
   });
 });
 
-describe('live.ts --rejudge over the committed iOS records of the src before A1\'s fix (round 7\'s one-stroke stop)', () => {
+// A1's fix (480660a4), round 7.
+describe('live.ts --rejudge over the committed iOS records of the src before the one-stroke stop', () => {
   // WDA's turn of F after strokes that moved nothing (LV4: 2–4 unmoved strokes before the turn, or none) was known until
   // round 7's A1 (480660a4: a read within a point is unmoved, the turn after ONE such stroke) and its entry was struck
   // off: in these records, each an older src's, it reads as recorded, not known — a calibration of that src now, not
@@ -176,7 +180,8 @@ describe('live.ts --rejudge over the committed iOS records of the src before A1\
  */
 const A5_IDB = [...['A', 'B', 'C', 'D'].map((t) => `scroll:sheet-medium.${t}`), 'scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G', 'scroll:sheet-background.A', 'scroll:sheet-background.B'];
 
-describe('live.ts --rejudge over the committed iOS records of the src before A5\'s fix (round 7\'s idb presented layer)', () => {
+// A5's fix (a1261499), round 7.
+describe('live.ts --rejudge over the committed iOS records of the src before idb\'s presented layer', () => {
   // The live entries of idb's cases beneath the medium sheet, struck off by round 7's A5, and the re-classed two of the
   // large sheet: in these records, each an older src's, they read as recorded — a stroke beneath the layer, a stop
   // claimed — not known: a calibration of that src now, not HEAD's KNOWN: exit 1, as recorded. Two of them are older
@@ -206,7 +211,8 @@ describe('live.ts --rejudge over the committed iOS records of the src before A5\
   });
 });
 
-describe('live.ts --rejudge over the committed Android records of the src before A6\'s fix (round 7\'s eyes on a "fully" claim)', () => {
+// A6's fix, round 7.
+describe('live.ts --rejudge over the committed Android records of the src before the eyes on a "fully" claim', () => {
   // k7: scroll_until phone under the bar riding on the IME. Its stop said "fully visible" with 18 px of phone under the
   // bar's node-less padding — ok by an allowance (ADR 0013's residual) until round 7's A6 made averi name the band
   // ("PARTLY UNDER a surface …") and live-forms.ts#judgePhoneScroll ask it. A forms case has no KNOWN: in these records,
@@ -244,12 +250,13 @@ describe('live.ts --rejudge over a committed calibration record where the flush 
   });
 });
 
-describe('live.ts --rejudge over the committed record of round 5\'s src (a --side run of b71cbbb), before L1\'s and F2A1\'s fixes', () => {
+// Before L1's and F2A1's fixes.
+describe('live.ts --rejudge over the committed record of a --side run of b71cbbb, before the fixes of the scroll stop beneath a presented window and of k7', () => {
   // Round 6's device check, the same cases and lab build as android-vis.json. Its cases not known are exactly the two
   // fixes' before: L1's eight scroll_until beneath the AlertDialog and the half sheet (a stop "after 1 swipe" that
   // dismissed the layer, or three strokes that expanded the sheet) and F2A1's k7 (a forms case: no KNOWN) — a
   // calibration, not HEAD's KNOWN: exit 1, as recorded.
-  it('android-vis-b71cbbb.json: L1\'s scroll cases and k7 not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
+  it('android-vis-b71cbbb.json: the scroll cases beneath the dialog and the half sheet, and k7, not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('android-vis-b71cbbb.json', 'forms,visibility');
     // (108 ok, 20 mismatches until 2026-10-18: the turn of scroll-collapsing's A ok by the Android turn judge since.)
     expect(out).toMatch(/^# Live golden: 133 cases, 109 ok, 5 loud, 19 mismatches \(9 not known\), 0 skipped$/m);
@@ -259,7 +266,8 @@ describe('live.ts --rejudge over the committed record of round 5\'s src (a --sid
   });
 });
 
-describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a --side run of b71cbbb), round 6\'s iOS device check', () => {
+// Round 5's src, round 6's iOS device check.
+describe('live.ts --rejudge over the committed iOS record of a --side run of b71cbbb', () => {
   // A new run of this harness's cases at round 5's src (not round 5's own run: ios-vis-2725e76.json), the same lab
   // build as ios-vis.json (src 11683c3), the forms group with them. HEAD's KNOWN explains every visibility case not ok
   // — WDA's carousel C, its stop claimed on a read still moving, by the triage note's intermittent entry. Its cases not
@@ -267,7 +275,8 @@ describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a -
   // 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md): a forms case has no KNOWN, so exit 1 — and,
   // since round 7's A1 struck their entries off, WDA's turn of F (LV4) and carousel C's stop claimed on a read still
   // moving, as recorded at that src; since A5's, idb's presented-layer cases (A5_IDB, above).
-  it('ios-vis-b71cbbb.json: forms b4 and p2 not known, and the visibility cases A1 and A5 fixed since', { timeout: 60_000 }, async () => {
+  // The visibility cases A1 and A5 fixed since.
+  it('ios-vis-b71cbbb.json: forms b4 and p2 not known, and the visibility cases the one-stroke stop and idb\'s presented layer fixed since', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
     // (351 cases, 14 loud, 67 mismatches until round 7: its carry case, Row 30 of the 40-row table, no case since; idb's
     // scroll case of F LOUD, F recorded unlisted under idb.)
@@ -278,7 +287,8 @@ describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a -
   });
 });
 
-describe('live.ts --rejudge over the committed records of the src before LV6\'s fix (round 7\'s lab fixes, truth/r7-lab-fixes)', () => {
+// LV6's fix (A2, a1b0b82), round 7's lab fixes, truth/r7-lab-fixes.
+describe('live.ts --rejudge over the committed records of the src before the parked cell content moved to its cell', () => {
   // sheet-long-list at 56 rows, its target L past one carry and before the end. L's carry and scroll cases under WDA
   // were LV6's (its parked label read above the screen: turned three times; the scroll case's turns merged into one
   // stroke in the second run, read not-reached) until round 7's A2 fixed it (a1b0b82) and their entries were struck
@@ -299,7 +309,8 @@ describe('live.ts --rejudge over the committed records of the src before LV6\'s 
   });
 });
 
-describe('live.ts --rejudge over the committed records of the src before LW1\'s fix (round 7\'s T2, truth/r7-dialogs)', () => {
+// LW1's fix (A7, f924893e), round 7's T2, truth/r7-dialogs.
+describe('live.ts --rejudge over the committed records of the src before the Views BottomSheetDialog was marked presented', () => {
   // Round 7's presented windows the parser did not mark: both cells' taps, scroll_until and colour asserts, then their
   // eight scroll cases twice more — the same in every run. Beneath the full-screen Compose Dialog residual 19's four,
   // known; beneath the Views BottomSheetDialog LW1's four (A's and B's stroke up on the scrim dismissing the sheet and
@@ -309,7 +320,7 @@ describe('live.ts --rejudge over the committed records of the src before LW1\'s 
     ['android-vis-dialogs.json', { cases: 26, ok: 18, loud: 0, mismatches: 8, notKnown: 4 }],
     ['android-vis-dialogs-scroll-run2.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 4 }],
     ['android-vis-dialogs-scroll-run3.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 4 }],
-  ] as const)('%s: LW1\'s four scroll cases not known, residual 19\'s known', { timeout: 60_000 }, async (record, want) => {
+  ] as const)('%s: the bottom sheet dialog\'s four scroll cases not known, the full-screen dialog\'s known', { timeout: 60_000 }, async (record, want) => {
     const { code, out } = await rejudge(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
