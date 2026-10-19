@@ -192,7 +192,8 @@
             "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
           ],
           "broke": "8a55d2b",
-          "why": "fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2"
+          "fixed": "837ec3e",
+          "why": "fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); red until 837ec3e — lab note L2"
         },
         {
           "rows": [
@@ -466,7 +467,8 @@
             "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
           ],
           "broke": "8a55d2b",
-          "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since — lab note L2 (#6 records it too)"
+          "fixed": "837ec3e",
+          "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and until 837ec3e — lab note L2 (#6 records it too)"
         }
       ],
       "remark": "presented/blur-menu-grouped: the menu card and the screen beneath it each an accessibility container, the card's first, so idb lists its rows K, W before A–D, and A (top 110, above W's 448) is ADR 0015's reading break — mp-native's chooser shape. W's colour row is green on both sides (no evidence). The ungrouped blur-menu lists the targets in reading order (A, B, K, W, C, D): no break, W refused at every commit — lab note L4. The analysis' 'regression dd50327→2f98900 (8c0fb41?)' is the idb pinned-bar row (L2): Tapped from b75b8b5 to dff7381, refused at 8c0fb41 — verified by a first-parent bisect over golden. 8a55d2b itself re-breaks it (recorded in regressions, as in #6's)."
@@ -1018,7 +1020,10 @@
     {
       "n": "L2",
       "note": "2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["837ec3e"],
+      "before": "6f3a633",
+      "after": "837ec3e",
       "verified": "golden",
       "defect": "^Tapped|reached with no swipe where a tap fires",
       "checks": [
@@ -1041,10 +1046,11 @@
             "ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until"
           ],
           "broke": "8a55d2b",
-          "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since"
+          "fixed": "837ec3e",
+          "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and until 837ec3e"
         }
       ],
-      "remark": "No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed row."
+      "remark": "Fixed by round 8, 837ec3e on fix/r8-l2 (soft-keyboard.ts#flatListKeyboardBand: a node is of the keyboard's run when its part on the screen lies inside the background — idb's `Next keyboard`, parsed to end at 875 of 874, cut the run short, so Continue lifted onto the keyboard read as no cover; ADR 0007 amended): the pair is 837ec3e and its parent 6f3a633 (fix/round-8's src). Before: tap Tapped, sending `idb ui tap 201 547` (a submit); scroll_until fully visible after 0 swipes. After: both refused under Continue, no tap sent. Live (round 8, docs/truth/live-records/ios-forms-r8-l2-*.json): at 6f3a633 idb's k6 SUBMITTED the form; at 837ec3e no submit in three runs under idb and WDA. Not a gap that was always there — a twice-regressed row."
     },
     {
       "n": "L3",

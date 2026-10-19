@@ -50,7 +50,7 @@ open note on the working tree. See the script for the verdicts.
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
 | TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | b71cbbb → d43df5d | CALIBRATED (partial: AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) is ADR 0018's residual 18, accepted by the owner 2026-10-18 with the active-window hint — its six rows filed as that residual) |
-| L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | open | working tree | OPEN-RED |
+| L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | calibrate | 6f3a633 → 837ec3e | CALIBRATED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | open | working tree | OPEN-RED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
@@ -267,7 +267,7 @@ Regressions recorded:
 - android-averi_lab-api33/own-parts.xml I tap, android-averi_lab-api33/own-parts.xml I scroll_until: broke at 13d68a2, fixed at c8c06a8 — a Compose icon button's icon read as under the unlabelled button inset round it, listed after it (#8's second fix; own-parts' I, round 6)
 - ios-iphone17-ios27/own-parts.wda.json N tap, ios-iphone17-ios27/own-parts.wda.json N scroll_until, ios-iphone17-ios27/own-parts.idb.json N tap, ios-iphone17-ios27/own-parts.idb.json N scroll_until: broke at 13d68a2, fixed at 81a7d62 — a text field read as a cover over its own label, the label's rect 2 pt past the field's at top and bottom (#18)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: green at 13d68a2, Tapped at b75b8b5 (fix/r5-cr) … dff7381, green again at 8c0fb41 (fix/r6-ios-top)
-- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); still red at HEAD — lab note L2
+- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, fixed at 837ec3e — fix/r6b-idb (green at 20053ae, Tapped at 8a55d2b); red until 837ec3e — lab note L2
 - ios-iphone17-ios27/blur-menu.idb.json W tap, ios-iphone17-ios27/blur-menu.idb.json W scroll_until, ios-iphone17-ios27/blur-menu.wda.json W tap, ios-iphone17-ios27/blur-menu.wda.json W scroll_until: broke at 13d68a2, not fixed — the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4
 - ios-iphone17-ios27/blur-menu-grouped.idb.json W tap, ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until: broke at 13d68a2, fixed at 8a55d2b — the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)
 - android-averi_lab-api33/fab.xml L tap, android-averi_lab-api33/fab.xml L scroll_until, android-averi_lab-api33/fab.xml K tap, android-averi_lab-api33/fab.xml K scroll_until: broke at 13d68a2, not fixed — pinned app chrome became a cover: the FAB host, a cover by the accepted round-13 reading (#24, residual), refuses the targets beside the FAB
@@ -448,7 +448,7 @@ Regressed elsewhere at 8a55d2b (green at 20053ae):
 
 Regressions recorded:
 
-- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since — lab note L2 (#6 records it too)
+- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, fixed at 837ec3e — fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and until 837ec3e — lab note L2 (#6 records it too)
 
 presented/blur-menu-grouped: the menu card and the screen beneath it each an accessibility container, the card's first, so idb lists its rows K, W before A–D, and A (top 110, above W's 448) is ADR 0015's reading break — mp-native's chooser shape. W's colour row is green on both sides (no evidence). The ungrouped blur-menu lists the targets in reading order (A, B, K, W, C, D): no break, W refused at every commit — lab note L4. The analysis' 'regression dd50327→2f98900 (8c0fb41?)' is the idb pinned-bar row (L2): Tapped from b75b8b5 to dff7381, refused at 8c0fb41 — verified by a first-parent bisect over golden. 8a55d2b itself re-breaks it (recorded in regressions, as in #6's).
 
@@ -961,20 +961,23 @@ A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.t
 
 Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment "Android's presented window"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out "to appear" without "close it first", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's "not found" is vacuous). Partial: form-picker's fully expanded sheet dumps no scrim and is not marked — its six tap and scroll_until rows stay KNOWN (tests/differential/golden/forms.known.ts), filed as ADR 0018's residual 18 since the owner accepted it (2026-10-18) with the active-window hint Android's tap and fill wait and scroll_until not-found now carry (the taps' "to appear" then reads the hint's conditional "close it first", no presented remedy: their class `not in the tree (active-window hint)`).
 
-## L2: OPEN-RED
+## L2: CALIBRATED
 
 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — defect: `^Tapped|reached with no swipe where a tap fires`
 
-- working tree:
+- before 6f3a633:
   - RED ios-iphone17-ios27/form-keyboard.idb.json phone tap — Tapped: Tapped id:"lab.form-keyboard.phone"
   - RED ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until — reached with no swipe where a tap fires submit invalid: Element id:"lab.form-keyboard.phone" fully visible after 0 swipes
+- after 837ec3e:
+  - ok ios-iphone17-ios27/form-keyboard.idb.json phone tap — ERROR id:"lab.form-keyboard.phone" is under button "Continue" (20,517 362x46, reaching 20,517 362x73) at its centre (201,547), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing w
+  - ok ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until — ERROR scroll_until id:"lab.form-keyboard.phone" failed after 3 swipes — element is in the viewport but under button "Continue" (20,517 362x46, reaching 20,517 362x73) at its centre (201,547), drawn over it — 0% of it sho
 
 Regressions recorded:
 
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: refused at 13d68a2, Tapped from b75b8b5 (fix/r5-cr)
-- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, not fixed — fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and since
+- ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, fixed at 837ec3e — fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and until 837ec3e
 
-No fix yet: red at HEAD. Not a gap that was always there — a twice-regressed row.
+Fixed by round 8, 837ec3e on fix/r8-l2 (soft-keyboard.ts#flatListKeyboardBand: a node is of the keyboard's run when its part on the screen lies inside the background — idb's `Next keyboard`, parsed to end at 875 of 874, cut the run short, so Continue lifted onto the keyboard read as no cover; ADR 0007 amended): the pair is 837ec3e and its parent 6f3a633 (fix/round-8's src). Before: tap Tapped, sending `idb ui tap 201 547` (a submit); scroll_until fully visible after 0 swipes. After: both refused under Continue, no tap sent. Live (round 8, docs/truth/live-records/ios-forms-r8-l2-*.json): at 6f3a633 idb's k6 SUBMITTED the form; at 837ec3e no submit in three runs under idb and WDA. Not a gap that was always there — a twice-regressed row.
 
 ## L3: CALIBRATED
 

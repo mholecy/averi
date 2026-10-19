@@ -1,5 +1,15 @@
 # BUG: under idb, a submit pinned above the keyboard (SwiftUI's bottom safe-area inset) is no cover of the field it lies over — `tap` answers `Tapped` and sends a tap that SUBMITS the form; `scroll_until` calls the field "fully visible after 0 swipes"
 
+> **Status (2026-10-19):** fixed on `fix/r8-l2` at `837ec3ef` (from `fix/round-8` `6f3a633f`).
+> `soft-keyboard.ts#flatListKeyboardBand` takes a node into the keyboard's run when its part ON THE SCREEN lies inside
+> the background (ADR 0007, amended), so `Next keyboard`'s rounded point past the screen no longer cuts the run, and
+> `Continue` reads as lifted onto the keyboard. Measured by the golden (its two rows, `form-keyboard.idb.json phone tap` and `… scroll_until`, green, refused under
+> `Continue`, no tap sent; 0 new mismatch), by `tests/ui-tree/standing.test.ts` and `tests/ui-tree/soft-keyboard.test.ts`
+> over this capture, by calibrate (`CALIBRATED`), and live on the lab simulator (forms k6/k7, opened to iOS:
+> `docs/truth/live-records/ios-forms-r8-l2-before.json` — idb's tap SUBMITTED the form at `6f3a633f` —, and
+> `ios-forms-r8-l2-1…3.json`, no submit, k6 refused under Continue; docs/truth/live-ios-2026-10-18-visibility.md, its
+> round-8 section).
+
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/form-keyboard.*`, captured by scripts/truth/capture.ts on the dedicated
 `averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `truth/phase-0-1` on `arch/round-20`'s

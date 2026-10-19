@@ -18,6 +18,11 @@ run that it does not overlap past the slack (ADR 0002). The rule is `draw-order.
 - the band's background;
 - what is listed after the background (Dictate).
 
+A node is of the band's run when its part ON THE SCREEN lies inside the background (amended 2026-10-19, round 8): the
+band's bottom is the screen's, so a key overhanging the screen's edge by a rounded point (`Next keyboard` ending at 875
+of 874) is still the keyboard's
+(docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md).
+
 Keys TILE the band in rows: the number pad's `1 2 3` at 596, QWERTY's letters, neighbours overlapping by 1 pt at most.
 An app node stands alone on its row, or shares the row only with a node laid OVER it (a field and its placeholder).
 
