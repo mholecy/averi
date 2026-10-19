@@ -1,8 +1,12 @@
 # BUG: under WDA, a React Native text input is listed inside an unnamed wrapper of its own size — averi reads it as a cover of its own floating label: the tap on the label refused, `scroll_until` fails
 
-> **Status (2026-10-19):** open. KNOWN as this note (tests/differential/golden/react-native.known.ts: rn-field's N and
-> M, tap, scroll_until and ocr under WDA); live LOUD (the tap refused, nothing fired:
-> docs/truth/live-rn-2026-10-19.md). Calibration.json LR1.
+> **Status (2026-10-19):** fixed at ce19c234 (arch/r23-rn-label) — the field's outermost self
+> (src/ui-tree/draw-order.ts#outermostSelf: the input and every unnamed `container` of its rect holding it alone are
+> one node to its label) is the label's sibling, in any parent (docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md,
+> refinement 2026-10-19). Measured: golden from truth/round-7 5c71158 `--side` the branch — rn-field's N and M tap and
+> scroll_until under WDA green (`Tapped at its node's centre (116,142.5)`), the other 1402 checks' replies and device
+> calls byte-identical (mp-native's SWIFT form included); the ocr rows skipped in the sandbox; pinned over this capture
+> by tests/ui-tree/draw-order.test.ts. Calibration.json LR1.
 
 Lab note LR1. **Found 2026-10-19** by round 7's React Native lab app (fixtures/apps/rn, `rn-field`; RN 0.88.0, new
 architecture) on the `averi-lab iPhone 17` simulator (iOS 27.0, 402x874), WDA on port 8120, averi = truth/r7-rn's src
