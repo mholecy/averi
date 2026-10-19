@@ -94,10 +94,12 @@ moves the adapter sends), each from a fresh launch:
   have been pulled down.
 
 **Live, at this src** (docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md, records
-docs/truth/live-records/ios-keyboard-fallbacks-*.json): k2 and k3 — LOUD before — ok 3 of 3 each: the title and the
-blank point leave the keyboard up, the drag lifts the target clear of it (120 pt for `vs`, 278 pt for `note`) and
-averi taps / fills it, saying the keyboard is still up but no longer over it; no submit, no other field touched. k1
-(nothing configured) refused as before, 3 of 3; the dismissal group 24 of 24 ok.
+docs/truth/live-records/ios-keyboard-fallbacks-*.json): k2 and k3 — LOUD before — ok 2 of 2 each: the title leaves the
+keyboard up, the drag lifts the target to its start (135 pt for `vs`, 357 pt for `note`, above the pinned Continue bar)
+and averi taps / fills it, saying the keyboard is still up but no longer over it; no submit, no other field touched. k1
+(nothing configured) refused as before, 2 of 2; the dismissal group 24 of 24 ok. On the way: lifted only to the
+keyboard's top, `note` stopped 3 pt under it (the pan's slop), then — with the slop — under the pinned bar, refused
+honestly both times.
 
 ## Residuals accepted
 

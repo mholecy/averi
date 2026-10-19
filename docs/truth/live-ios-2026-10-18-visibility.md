@@ -21,9 +21,9 @@ below. The previous iOS run (src b71cbbb, visibility and dismissal): docs/truth/
 
 # 2026-10-19: k2 and k3 after round 7's A4
 
-k2 and k3 (WDA, LOUD below) are ok 3 of 3 at arch/r23-keyboard: after the configured title tap leaves the keyboard
-up, averi's own fallbacks (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md) tap a blank
-point, then drag the form up until the target lies above the keyboard, and tap / fill it — the run and its records:
+k2 and k3 (WDA, LOUD below) are ok 2 of 2 at arch/r23-keyboard: after the configured title tap leaves the keyboard
+up, averi's own drag (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md) lifts the
+target above it, and averi taps / fills it — the run and its records:
 docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md.
 
 # What the check added
