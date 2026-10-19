@@ -58,6 +58,9 @@ const fixture = async (name: string): Promise<string> => readFile(new URL(`../fi
 const idbAt = async (name: string, ...path: string[]): Promise<UiNode> =>
   parseIdbDescribeAll(JSON.stringify(path.reduce<any>((j, k) => j[k], JSON.parse(await fixture(name)))));
 
+/** The iOS lab app's form-keyboard cell as idb lists it (tests/fixtures/truth/ios-iphone17-ios27): QWERTY up, Continue lifted onto it, `Next keyboard` overhanging the screen's bottom by a rounded point. */
+const labFormKeyboardIdb = async (): Promise<UiNode> => parseIdbDescribeAll(await fixture('truth/ios-iphone17-ios27/form-keyboard.idb.json'));
+
 /** A usable screen (ui-tree/usable-screen.ts#UsableScreen) of the device's size, `oriented` its box: what every purpose is handed — the pixel assert judges `oriented`, the touches `box`/`boxes`. */
 /** A screen's boxes and bands as a test writes them, before `usable` makes it the one screen type a standing takes. */
 type Bare = Omit<UsableScreen, 'oriented' | 'from'>;
@@ -138,6 +141,9 @@ describe('Scene.standing for scroll_until\'s stop — measured cases, fixture ×
     // A Compose button's text under its own control is no cover of it.
     ['Android Compose snapshot, logged out: LOGIN, plain', async () => ({ ...(JSON.parse(await fixture('android-ui-snapshot-compose.json')).screens.loggedOut as UiNode), paddedTouchTargets: true as const }), 'LOGIN', PIXEL, PLAIN, { kind: 'reachable', at: { x: 540, y: 1463 } }],
     // WDA lists the RN screen's texts as siblings of placeholder_screen: no cover of it (scroll_until stuck on it once).
+    // The lab's form-keyboard under idb (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md): Continue lifted onto the keyboard over phone's centre (201,547); the probe's tap there submitted the form.
+    ['idb lab form-keyboard: phone under the lifted Continue, plain', () => labFormKeyboardIdb(), 'lab.form-keyboard.phone', IPHONE, PLAIN, { kind: 'covered', cover: 'lab.form-keyboard.submit' }],
+    ['…fully: true', () => labFormKeyboardIdb(), 'lab.form-keyboard.phone', IPHONE, FULLY, { kind: 'covered', cover: 'lab.form-keyboard.submit' }],
     ['WDA RN screen: placeholder_screen, plain', async () => parseWdaSource(await fixture('wda-source-rn-myport.json')), 'placeholder_screen', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 495 } }],
   ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
     const t = await tree();
@@ -168,6 +174,8 @@ describe('Scene.standing for the tap — measured cases, fixture × purpose → 
     ['…its leaf label: the toggle\'s cut, inherited', async () => parseDump(SWIFT_ANDROID), 'Payment details', PIXEL, { kind: 'cut', edge: 'bottom', depth: 42, within: { x: 66, y: 1924, width: 948, height: 55 } }],
     ['…the toggle 65 deep: reachable at its centre', async () => parseDump(swiftAndroid(65)), 'swift_payment.form.details_toggle', PIXEL, { kind: 'reachable', at: { x: 540, y: 1947 } }],
     ['idb scrolled under the top bar, position 2: Back, reachable', () => idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos2'), 'BackButton', IPHONE, { kind: 'reachable', at: { x: 44, y: 84 } }],
+    // The same lab note: the tap at phone's centre pressed Continue — covered, never Tapped.
+    ['idb lab form-keyboard: phone under the lifted Continue: covered', () => labFormKeyboardIdb(), 'lab.form-keyboard.phone', IPHONE, { kind: 'covered', cover: 'lab.form-keyboard.submit' }],
     ['Android Compose snapshot, logged out: LOGIN, reachable', () => compose('loggedOut'), 'LOGIN', PIXEL, { kind: 'reachable', at: { x: 540, y: 1463 } }],
   ] as const)('%s', async (_name, tree, id, screen, expected) => {
     const t = await tree();

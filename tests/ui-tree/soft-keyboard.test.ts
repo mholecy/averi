@@ -125,6 +125,15 @@ describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing 
     expect(nodes.slice(band.from, band.to).map((n) => n.label ?? n.role)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'Delete', 'other']);
   });
 
+  it('the lab\'s form-keyboard QWERTY (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md): `Next keyboard` parses to end at 875, a rounded point past the screen, and is of the run with `Dictate` — what of a node lies on the screen is what is judged', async () => {
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/form-keyboard.idb.json', import.meta.url), 'utf8'));
+    const nodes = [tree, ...tree.children];
+    const band = flatListKeyboardBand(nodes, r(0, 0, 402, 874), 874 * FLAT_LIST_TOP_BAR_FRACTION)!;
+    expect(band).toEqual({ top: 590, from: 16, to: 51, at: 48 });
+    expect(nodes[band.at + 1].rect).toEqual(r(8, 806, 68, 69));
+    expect(nodes.slice(band.at + 1, band.to).map((n) => n.label)).toEqual(['Next keyboard', 'Dictate']);
+  });
+
   it('Contacts\' QWERTY (run3-ios #45/#51, run8-ios #233 shape): 590, Dictate listed after the background inside the run', () => {
     expect(keyboardBandTop(contacts())).toBe(590);
   });

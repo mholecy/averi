@@ -1,5 +1,5 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, STRUCTURAL_ROLES, type Rect, type SoftKeyboard, type UiNode } from '../adapters/types.js';
-import { rectWithin } from './geometry.js';
+import { rectIntersection, rectWithin } from './geometry.js';
 
 /**
  * What the TREE says about the soft keyboard: the in-tree half
@@ -67,7 +67,14 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * pre-order lists BEFORE its own rows — a band at the sheet's top, with no
  * keyboard on screen, cut the strokes and the taps there); the keyboard is
  * that node and the run of nodes listed beside it (before and after, in the
- * list's order) lying wholly inside it — `from` to `to`, the walk indexes
+ * list's order) whose part ON THE SCREEN lies wholly inside it — a key may
+ * overhang the screen's bottom, which is the band's by its shape: the lab's
+ * QWERTY lists `Next keyboard` at `{8.48, 805.70}, {68.09, 68.74}`, parsed
+ * (origin and size rounded apart) to end at 875 on an 874-pt screen, and a
+ * run cut there left it and `Dictate` out, so the submit lifted onto the
+ * keyboard read as no cover and its tap submitted the form
+ * (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md)
+ * — `from` to `to`, the walk indexes
  * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
@@ -97,7 +104,13 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
     const node = nodes[back];
     const band = node.rect;
     if (!STRUCTURAL_ROLES.has(node.role) || node.label || band.x !== screen.x || band.width !== screen.width || band.y + band.height !== bottom || band.y < barLine) continue;
-    const inside = (n: UiNode | undefined): boolean => n !== undefined && rectWithin(n.rect, band);
+    // What of a node lies on the screen is what is judged: the band's bottom is the screen's by its shape, so a key
+    // overhanging the screen's edge (idb's `Next keyboard`, a rounded point past it) proves nothing against it.
+    const inside = (n: UiNode | undefined): boolean => {
+      if (n === undefined) return false;
+      const onScreen = rectIntersection(n.rect, screen);
+      return onScreen !== undefined && rectWithin(onScreen, band);
+    };
     let from = back;
     while (from > 1 && inside(nodes[from - 1])) from--;
     if (from === back) continue; // no key listed before it: a sheet's background, not a keyboard's

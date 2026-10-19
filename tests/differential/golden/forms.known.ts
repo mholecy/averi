@@ -2,10 +2,6 @@ import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
 
-// This KNOWN owns the ratchet for the lab finding's rows too (L2); scripts/truth/calibration.json owns only the link
-// from its note to the rows. A fix that strikes those rows off here turns L2 OPEN-NOT-REPRODUCED, and calibrate.ts
-// exits 1, until the note's entry becomes `calibrate` with that fix as its after commit.
-const LAB_IOS = 'bug:2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md';
 // Phase 2b's Android form cells. uiautomator lists only the presented window — here the picker's ModalBottomSheet,
 // fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix
 // (d43df5d, round 6) marks the AlertDialog and the half-expanded sheet but not a sheet whose dump carries no scrim.
@@ -37,12 +33,10 @@ export const forms: KnownFile = {
     // …and so does its ocr half (phase 4, golden-spec/text.ts#ocrFailsClosed: asked only where the host's recognizer
     // reads — golden.ts#ocrAvailability).
     ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['ocr'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the ocr assert finds no node` }),
-    // LAB FINDING, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md — under
-    // idb the submit pinned in the bottom safe-area inset, over the phone field's centre, is no cover: tap answers
-    // Tapped and sends `idb ui tap 201 547`, which submits the form; scroll_until calls it fully visible after 0
-    // swipes.
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 547'], note: 'lab finding: idb reads the pinned submit bar as no cover — the tap submits the form', as: LAB_IOS }),
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['phone'], ['scroll_until'], { cls: 'reached with no swipe where a tap fires submit invalid', kind: 'visible', calls: [], note: 'lab finding: idb reads the pinned submit bar as no cover', as: LAB_IOS }),
+    // LAB FINDING L2, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md —
+    // under idb the submit lifted onto the keyboard over the phone field's centre read as no cover (a key overhanging
+    // the screen's bottom by a rounded point cut the keyboard's run short): fixed by round 8, the phone tap and
+    // scroll_until rows refused under Continue, green, struck off here, calibrated in scripts/truth/calibration.json.
     // LAB FINDING F2A1, docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
     // — the phone field under the submit bar riding on the IME (Compose cuts its bounds at Continue, the bar's surface
     // has no node): fixed by round 6 (6d8f8de, merged with arch/round-22), the strip refused as cut by the bar — the
