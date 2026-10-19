@@ -135,6 +135,8 @@ export interface FillVerdict {
   /** `[]` ⇔ `did === 'filled'` — the only way to say "verified". */
   reasons: Reason[];
   caveats: Caveat[];
+  /** The dropped tails typed again before the read-back landed, by length (FillResult.retyped); absent when none. */
+  retyped?: number[];
   /** The resolution note (resolve.ts#resolveNow), carried for the MCP reply; the flow line prints none. */
   note?: string;
 }
@@ -180,6 +182,7 @@ export function judgeFill(r: FillResult): FillVerdict {
     sent,
     reasons,
     caveats,
+    ...(r.retyped !== undefined && r.retyped.length > 0 && { retyped: r.retyped }),
     note: r.note,
   };
 }

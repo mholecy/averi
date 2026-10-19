@@ -79,6 +79,12 @@ export interface ResolvedClear extends Resolved {
   /** Where to tap: the centre (`tapPoint`), or the moved point `moved` describes. */
   point: Point;
   /**
+   * The tree the node was resolved in, before the tap — the fill's proof of
+   * what the screen's other inputs held before it typed
+   * (interact/fill-type.ts#whereTyped) when it reads nothing after the tap.
+   */
+  tree: UiNode;
+  /**
    * Set when the tap goes elsewhere than the centre — the clause, `at
    * (201,767) — its centre (201,780) is under button "Continue to summary"
    * (24,780 354x44), drawn over it; tapped the uncovered part 354x26`.
