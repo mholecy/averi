@@ -14,8 +14,7 @@ const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in th
 /** Review round 4's P4 (calibration.json NI1): idb lists a UIKit table's labels without their identifiers. */
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
-/** Round 7 (T2): Android's presented windows the uiautomator parser does not mark. */
-const SHEET_DIALOG: Classed = 'bug:2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md';
+/** Round 7 (T2): Android's presented window the uiautomator parser does not mark. */
 const FULL_SCREEN_DIALOG: Classed = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /**
  * A target beneath a window uiautomator lists alone and the parser leaves unmarked: the tap's hint, no remedy; the
@@ -66,10 +65,14 @@ export const presented: KnownFile = {
       keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
     ),
     // --- round 7 (T2), Android: the presented windows the parser does not mark (ADR 0018 residual 19) ---
-    // LAB FINDING LW1: a Views BottomSheetDialog's touch_outside scrim is unlabelled (NAF) and laid between the bars, so
-    // the scrim rule does not hold; Material's view ids would mark it (the note's proposal). Live, scroll_until's first
-    // stroke up touches down on the scrim and dismisses the sheet (live-known.ts).
-    ...unmarkedWindow(`${ANDROID}/bottom-sheet-dialog.xml`, SHEET_DIALOG),
+    // LAB FINDING LW1, docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-
+    // strokes-its-scrim-and-dismisses-it.md: a Views BottomSheetDialog's touch_outside scrim is unlabelled (NAF) and laid
+    // between the bars, so the scrim rule does not hold. Fixed by round 7's A7 (f924893e, merged with arch/round-23): the
+    // parser marks the window by Material's view ids, so the tap's wait says the presented remedy and scroll_until stops
+    // before any swipe — the 8 tap and scroll_until rows green, struck off here, calibrated in
+    // scripts/truth/calibration.json. The colour assert still fails "not found" (now with the presented remedy in its
+    // miss note): no evidence either way (vacuous), as alert-dim's — no note's.
+    ...keys(`${ANDROID}/bottom-sheet-dialog.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
     // A full-screen Compose Dialog: Compose lays its window between the bars at full width ([0,66][1080,2153]), against
     // the left edge — an app's own window by the parser's rule — and the dump carries no fact that tells it from one.
     ...unmarkedWindow(`${ANDROID}/dialog-fullscreen.xml`, FULL_SCREEN_DIALOG),
