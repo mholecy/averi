@@ -1,6 +1,6 @@
 # BUG: under WDA, a React Native text input is listed inside an unnamed wrapper of its own size — averi reads it as a cover of its own floating label: the tap on the label refused, `scroll_until` fails
 
-> **Status (2026-10-19):** fixed at ce19c234 (arch/r23-rn-label) — the field's outermost self
+> **Status (2026-10-19):** fixed at ce19c234 and f3a7043f (arch/r23-rn-label; the second asks the label to span the field's height) — the field's outermost self
 > (src/ui-tree/draw-order.ts#outermostSelf: the input and every unnamed `container` of its rect holding it alone are
 > one node to its label) is the label's sibling, in any parent (docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md,
 > refinement 2026-10-19). Measured: golden from truth/round-7 5c71158 `--side` the branch — rn-field's N and M tap and

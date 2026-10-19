@@ -1,6 +1,6 @@
 # BUG: on Android a React Native field's floating label overhangs its EditText by 3 px (about 1 dp) — past the 2-px own-label allowance — and averi reads it as covered by its own field: the tap refused, `scroll_until` fails
 
-> **Status (2026-10-19):** fixed at ce19c234 (arch/r23-rn-label) — the own-label overhang is 2 pt or dp, as half a
+> **Status (2026-10-19):** fixed at ce19c234 and f3a7043f (arch/r23-rn-label; the second asks the label to span the field's height) — the own-label overhang is 2 pt or dp, as half a
 > percent of the screen's shorter side (src/ui-tree/draw-order.ts#labelOverhang: 5 px on this AVD), and the field shape
 > no longer asks its parent's size (RN lays the fields in the screen's own view) — docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md,
 > refinement 2026-10-19. Measured: golden from truth/round-7 5c71158 `--side` the branch — rn-field's N and M tap and
