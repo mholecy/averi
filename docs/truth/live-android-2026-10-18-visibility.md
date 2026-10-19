@@ -158,6 +158,27 @@ NOT be marked from the dump, the Views sheet CAN — by Material's view ids, `to
 The one harmful reply is LW1's: a dialog averi closed on its own, reported as a plain "fully visible" (L1's failure,
 on a window L1's fix does not mark).
 
+# Round 7, A7: the Views BottomSheetDialog marked by Material's ids (2026-10-19)
+
+averi_lab (API 33, booted `-no-window -no-snapshot-save`), the lab app built from truth/round-7 41302012, averi =
+arch/r23-sheet-dialog 25da22d4 (`--side`). Records: docs/truth/live-records/android-vis-sheet-dialog-run1.json, -run2,
+-run3. Reproduce: `node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups visibility --cells
+bottom-sheet-dialog --side <arch/r23-sheet-dialog checkout>`.
+
+| run | cases | ok | loud | mismatches | not known |
+|---|---|---|---|---|---|
+| run1, run2, run3 | 13 each | 13 | 0 | 0 | 0 — LW1's four scroll cases known, ok every run |
+
+- tap A–D: "Timed out after 5000ms: element … is not in the tree, which lists only the window presented on top (the
+  tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; …";
+  nothing fired.
+- scroll_until A, B (up): "stopped before any swipe — … the next swipe would touch down at (540,444) on container
+  (0,0 1080x2220) — a screen is presented over it … close it first"; C, D (down): the same at (540,1776) on the sheet
+  (0,1164 1080x990). Strokes none, touches none, the sheet NOT dismissed (no `dismissed sheet` in the app's log) —
+  every run.
+- tap S: Tapped, fired alone. colour assert A–D: FAIL "not found" (vacuous, as before).
+LW1's harm (a stroke on `touch_outside` that dismissed the sheet and then claimed "fully visible") is gone.
+
 # The run itself
 
 The first run at e98b87e (docs/truth/live-records/android-vis-e98b87e-run1.json) had three tool calls hang past the

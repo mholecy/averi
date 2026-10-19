@@ -118,6 +118,33 @@ rows without identifier, idb's sheet-medium-edges H/G (residual 6), the fling in
 5. **The forms' lost last character** (4 of 40 fills, the screenshot showing it typed): still the lab binding's,
    unproven; a fill on a real app reading its model, not its field, would need the same check.
 
+# Round 7, A2: LV6 fixed — the parked frame of a scrolled table (2026-10-19)
+
+The averi-lab iPhone 17 simulator as above, WDA on 8120, the lab app built from truth/round-7 461d6fd (sheet-long-list
+at 56 rows, its target L at row 30, whole over the offsets 1172–1920), averi = arch/r23-parked a1b0b82 (`--side`:
+src/adapters/wda-source.ts#atParkedFrame — a parked element lies at the scroll view's content origin, inside it at
+rest, wholly above it at its left edge once scrolled; ADR 0019's amendment). Records: docs/truth/live-records/
+ios-wda-long-list-parked-1.json, -2.json, -3.json (sheet-long-list's six WDA cases, three runs) and
+ios-wda-vis-parked.json (the whole WDA visibility group, once). Reproduce: `node --import tsx scripts/truth/live.ts
+--udid <lab simulator> --sources wda --groups visibility [--cells sheet-long-list] --side <arch/r23-parked checkout>`.
+
+| record | cases | ok | loud | mismatches | not known |
+|---|---|---|---|---|---|
+| ios-wda-long-list-parked-1.json | 6 | 5 | 0 | 1 | 0 — the carry case 14 pt past L's window (ADR 0021 residual 1) |
+| ios-wda-long-list-parked-2.json, -3.json | 6 each | 6 | 0 | 0 | 0 |
+| ios-wda-vis-parked.json | 146 | 128 | 1 | 17 | 0 |
+
+- `scroll:sheet-long-list.L` and `carry:sheet-long-list.L`: two strokes down, no turn, L reached — every run (until
+  then three turns away from L, read parked above the screen, and a failure at maxSwipes: ios-long-list-r7-lab-1.json,
+  -2.json). LV6's two live KNOWN entries struck off.
+- The carry case now measures ADR 0021 decision 4's final approach on a long list: L at rest at 1917.3 and 1903.3,
+  inside its window, in runs 2 and 3; at 1933.7 in run 1 — 14 pt past it, the reply honest ("visible after 2 swipes —
+  CLIPPED at top, 78% of it is in the viewport", its centre clear) but the stroke carried it past its window:
+  R-direction on `visible`. Filed as ADR 0021 residual 1, the carry's margin (live-known.ts, intermittent).
+- The WDA visibility group's 17 mismatches and 1 loud are the blur residual 9 (blur-menu and blur-menu-grouped taps and
+  scroll cases), the menu row W (LOUD), LV4's turn and LE3's sticky row — each KNOWN as before; carousel C ok this run
+  (its triage entry intermittent).
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

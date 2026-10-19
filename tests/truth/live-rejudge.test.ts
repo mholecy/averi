@@ -9,9 +9,10 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; ios-vis.json and
- * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-scroll-bounded-wda-2725e76-*.json, round
- * 5's; round 7's records of the src before LV6's and LW1's fixes, below) judged again by this checkout's
+ * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; android-vis-sheet-dialog-run1…3.json
+ * and android-hint-everywhere-*-c2c4.json, round 7's A7 and A3; ios-vis.json and
+ * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-wda-long-list-parked-1…3.json and
+ * ios-wda-vis-parked.json, round 7's A2; ios-scroll-bounded-wda-2725e76-*.json, round 5's) judged again by this checkout's
  * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
  * records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not
  * explain, no known case not intermittent ok), no case not known, and the counts of the summary's header.
@@ -65,6 +66,15 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // strokes and reaching F
     ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
     ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
+    // round 7's A2 (LV6 fixed: src arch/r23-parked a1b0b82 through --side, the lab app truth/round-7 461d6fd): L's
+    // scroll case ok in all three runs, two strokes down, no turn; its carry case reached likewise, at rest inside L's
+    // window in runs 2 and 3 (ok, its entry intermittent) and 14 pt past it in run 1 — the reply "CLIPPED at top, 78%",
+    // R-direction on `visible`: ADR 0021 residual 1
+    ['ios-wda-long-list-parked-1.json', 'visibility', { cases: 6, ok: 5, loud: 0, mismatches: 1 }],
+    ['ios-wda-long-list-parked-2.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-wda-long-list-parked-3.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    // …and the whole WDA visibility group at the same src: nothing not known, the carry case ok
+    ['ios-wda-vis-parked.json', 'visibility', { cases: 146, ok: 128, loud: 1, mismatches: 17 }],
     // …and the forms with the lab model's fix (a field reported from the binding's write): no fill lost one of 30
     // (b1, b4, p2 five times under each source); c2–c4 ok under both sources (idb: not in its tree, all it can say);
     // b1d and b7 (idb ui text has no keycode for them), p5 (the secure field iOS clears) and k2/k3 under WDA LOUD; the
@@ -75,6 +85,16 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-forms-r7-lab-4.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-5.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-picker.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    // round 7's A7 (LW1 fixed: src arch/r23-sheet-dialog 25da22d4 through --side, the lab app truth/round-7 41302012):
+    // the Views BottomSheetDialog's cell three times — taps refused with the presented remedy, scroll_until stopped
+    // before any stroke, the sheet not dismissed, tap S tapped; 13 of 13 ok in each run
+    ['android-vis-sheet-dialog-run1.json', 'visibility', { cases: 13, ok: 13, loud: 0, mismatches: 0 }],
+    ['android-vis-sheet-dialog-run2.json', 'visibility', { cases: 13, ok: 13, loud: 0, mismatches: 0 }],
+    ['android-vis-sheet-dialog-run3.json', 'visibility', { cases: 13, ok: 13, loud: 0, mismatches: 0 }],
+    // round 7's A3 (src arch/r23-hint-everywhere 9fa59ae, then e726c77 after its review round 1, through --side):
+    // form-picker's c2–c4 with every not-found carrying the miss note — the replies of the taps unchanged, ok
+    ['android-hint-everywhere-9fa59ae-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    ['android-hint-everywhere-e726c77-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     // round 5's two reruns of scroll-bounded under WDA, at ios-vis-2725e76.json's src: LV5's case ok in both, LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
