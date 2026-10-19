@@ -127,8 +127,9 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * window state stale-shown behind it. What a round asks the device is
  * counted on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the one place
  * it is. The rounds — strokes and confirming reads alike — number at most
- * 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes`, 25 at the defaults, and
- * stop at the deadline whichever comes first. A failed or `fully: true`
+ * 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes`, 25 at the defaults, besides a
+ * slowing fling's reads (scroll-rounds.ts#SETTLE_CONFIRM_READS), bounded by the
+ * deadline — and stop at the deadline whichever comes first. A failed or `fully: true`
  * stop may add one more query, the `unlocated` row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
  * judged under one this round — a clip at its edge, or another of several

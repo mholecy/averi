@@ -8,6 +8,10 @@ reports the direction, the agent turns (below). Device-checked on iOS 2026-10-18
 (once, toward the target, said); the one-stroke stop does not (2–4 unmoved strokes before the proof held, in four
 runs); decision 4 holds on `lower` (F landed in its window four times of four), its long-list half unmeasured — no
 lab cell can measure it yet.
+Round 7 (2026-10-18, the owner's brief: "make the one-stroke stop hold on iOS"): measured live on the lab simulator,
+the one-stroke stop did not hold under WDA because a list resting a fraction of a point off its end reads a whole point
+off — "unmoved" is now within a point (decision 2), and 4 runs of 4 turn after one stroke; the carry model cuts a first
+stroke over each scroll view too (decision 4); a stop is judged on the read a fling comes to rest in (decision 5).
 
 ## Context
 
@@ -43,6 +47,16 @@ lab cell can measure it yet.
    (`scroll-containers.ts#scrollAxis`). The strokes are no proof on their own: a stroke not taken moves nothing too.
    The listing is: a stroke not taken cannot make the content end where the tree shows it ending. A read still moving
    (a bounce at the end, an earlier fling) proves nothing until one reads still.
+   **Unmoved is within a point** (round 7, adapters/types.ts#sameRectWithinPixel): every match at most one unit from
+   where it was on each of x, y, width and height. WDA lists frames in whole points, each of a frame's sub-point origin
+   and size rounded on its own, and a list a stroke left resting a third of a point off its top (scale 3) reads a whole
+   point off on one side. Measured live (round 6's iOS check, then round 7's trace of averi's reads per stroke): F at
+   51,1380 300x64 before the stroke up, then 51,1381 300x64 or 51,1380 300x65 after each, `lower`'s content
+   0,380 402x1300 → 0,381 402x1300 or 0,380 402x1301; the strict "under one unit" read each such read as moved, so the
+   proof came on the first read that happened to round as the one before — after 2 unmoved strokes (3 runs of 4) or 4
+   (1 run, budget spent). Not a read still bouncing: every read after the stroke, ~1.1 s on, was within that point.
+   With one unit: 4 runs of 4 turn after exactly one stroke. A real motion of one unit reads as none — no stroke moves
+   content that little; two units are motion (the bounce rule above stands).
 3. **The one-stroke stop.** With that proof the scroll ends after the first unmoved stroke (bound `exhausted`,
    `ends`: `(swiping up did not move it: the tree lists the content of … ending at its top — content exhausted)`),
    where `UNMOVED_STROKES_EXHAUST`'s two identical unmoved strokes stay the rule wherever the tree cannot list the end.
@@ -59,6 +73,26 @@ lab cell can measure it yet.
    device check runs a long-list live case under WDA (a row far down a full-height list — the lab app's
    `sheet-long-list`, or a cell like it) beside `scroll-bounded`'s, and judges that the cut stroke lands the row in its
    window without an extra stroke or turn.
+   **The first stroke too** (round 7, `stroke-plan.ts#UNMEASURED_CARRY`): until a stroke over a scroll view was measured
+   (the carry is kept per scroll view, above) the carry is taken as 2.8 a point, the most any measured WDA fling
+   carried (`lower` 2.1–2.4, the SwiftUI form 2.1–2.8, sheet-long-list 2.1, the carousel 2.1–2.5); the first measured sample replaces it. Measured on `carousel-in-list`
+   (docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md): C, a
+   card as wide as its 354-pt carousel, is whole at one offset (354) and has its centre inside over 177–531; the full
+   212-pt stroke flung the carousel 447, 454, 495, 532 pt (one run past the window, the tap then refused). Cut to
+   126 pt: 283, 289, 315, 317 pt in 4 runs of 4 — C 80–90 % drawn, "visible after 1 swipe", settled, tapped. The most,
+   not a mean: shorter than needed costs a stroke, longer a turn. Where the target is far (F from `lower`'s top: 942 pt
+   needed) the cut is no cut — the full stroke. Never under 108 pt (`UNMEASURED_MIN_DRAG`), the shortest drag a fling
+   was measured at: below it the fling is not proportional — `scroll-bounded` S (`fully: true`), its first stroke cut
+   to 41 pt, carried `lower` 36 pt (0.9 a point), and the 0.9 then measured sent the next stroke past S's window and
+   back: 4 swipes where the full first stroke took 2 (the visibility run at `e687fe83`). Held at 108, S's first
+   stroke is the full one again.
+5. **A stop is judged on a settled read** (round 7, `scroll-rounds.ts#SETTLE_CONFIRM_READS`, `Observed.slowing`): the
+   rule stays two reads agreeing (within a point, as above), and a confirming read that found the target moving less
+   than the read before found it moving — a fling slowing — spends none of the SETTLE_CONFIRM_READS budget. The
+   carousel's fling ran ~2.5 s; the reads, 0.47 s apart, found C moving 54, 21, 8 pt, so the third confirming read was
+   still 8–10 pt from rest and the stop was claimed "still moving" — on a read with C's centre inside, in the run whose
+   fling then carried it out. Now 4 runs of 4 stop on two agreeing reads (C moving e.g. 44, 17, 5, then 0). An
+   animation moving as much at every read still spends the budget and is reported "still moving", as before.
 
 ## Where it applies, and where not
 
@@ -102,7 +136,8 @@ lab cell can measure it yet.
   stroke must go untaken, nothing drawn over its touch-down), not impossible; nothing in the reads rules it out.
 - An axis the tree cannot tell proves nothing (a fitting page, the false negatives scroll-containers.ts names).
 - The carry model takes the fling as proportional to the drag at the fixed 300 ms (a shorter drag is a slower one) —
-  measured at 108 and 344 pt, unmeasured below; a mid-fling read understates a sample, which is why the largest is
+  measured at 108, 212 and 344 pt, and at 126 (the carousel's cut first stroke: 2.25–2.52 a point, as the full
+  stroke's 2.1–2.5), unmeasured below; a mid-fling read understates a sample, which is why the largest is
   kept. Both are the device check's to confirm (`ios wda turn:scroll-bounded.F`, `ios wda scroll:scroll-bounded.F`).
 - Two tolerances meet across reads, on purpose: whether a stroke moved the match ("unmoved") forgives under a pixel
   (`sameRectWithinPixel`), while the proof's and the carry's scroll view is found again by its EXACT rect

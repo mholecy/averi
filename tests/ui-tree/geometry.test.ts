@@ -361,12 +361,13 @@ describe('rect equality — one owner, two questions (code review of round 2, 20
     expect(sameRect(r, { ...r, y: 21 })).toBe(false);
     expect(sameRect(r, { ...r, height: 40.5 })).toBe(false);
   });
-  it('sameRectWithinPixel forgives under one unit on every side, and nothing more', () => {
+  it('sameRectWithinPixel forgives one unit on every side — a sub-point position WDA rounds to whole points either way — and nothing more', () => {
     expect(sameRectWithinPixel(r, { x: 10.9, y: 19.1, width: 30.5, height: 39.5 })).toBe(true);
-    expect(sameRectWithinPixel(r, { ...r, x: 11 })).toBe(false);
-    expect(sameRectWithinPixel(r, { ...r, y: 19 })).toBe(false);
-    expect(sameRectWithinPixel(r, { ...r, width: 31 })).toBe(false);
-    expect(sameRectWithinPixel(r, { ...r, height: 39 })).toBe(false);
+    expect(sameRectWithinPixel(r, { x: 11, y: 19, width: 31, height: 39 })).toBe(true);
+    expect(sameRectWithinPixel(r, { ...r, x: 11.5 })).toBe(false);
+    expect(sameRectWithinPixel(r, { ...r, y: 18 })).toBe(false);
+    expect(sameRectWithinPixel(r, { ...r, width: 32 })).toBe(false);
+    expect(sameRectWithinPixel(r, { ...r, height: 38.9 })).toBe(false);
   });
 });
 

@@ -83,9 +83,9 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * no witness), or 1 once it reads hidden or unknown, at most six rounds
  * (keyboard-window.ts#KEYBOARD_DISAGREEMENT_BUDGET_MS) — 18 at worst. A
  * `scroll_until` confirming read (scroll-rounds.ts#SETTLE_CONFIRM_READS, up
- * to 3 after a stroke) is a round like any other and pays the same; how
- * many rounds there are is scroll.ts's (its bound, 25 at the defaults, and
- * the deadline). The per-round counts are pinned at the driver, through a
+ * to 3 after a stroke, besides a slowing fling's reads, bounded by the
+ * deadline) is a round like any other and pays the same; how many rounds
+ * there are is scroll.ts's (its bound, 25 at the defaults, and the deadline). The per-round counts are pinned at the driver, through a
  * fake oracle, in tests/interact/scroll.test.ts, and as asks in
  * scroll-rounds.test.ts.
  *
