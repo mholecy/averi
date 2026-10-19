@@ -404,6 +404,12 @@ function better(a: Judged, b: Judged): number {
   return Number(stops(b)) - Number(stops(a)) || b.standing.facts.shows - a.standing.facts.shows;
 }
 
+/**
+ * A stop that claims "fully visible": nothing of the match clipped, nothing of the app listed over it — one predicate
+ * for the round (the claim the eyes confirm, ui-tree/eyes.ts) and the reply (scroll-text.ts#describeScrollResult).
+ */
+export const fullyClaimed = ({ clipped, covered }: { readonly clipped: readonly unknown[]; readonly covered: boolean }): boolean => clipped.length === 0 && !covered;
+
 /** THE stop condition: the judged match stands `reachable` for the stop (ui-tree/standing.ts#Scene.standing owns the rule). */
 export function stops(j: Judged): boolean {
   return j.standing.kind === 'reachable';

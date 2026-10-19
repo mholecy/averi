@@ -308,10 +308,11 @@ export interface Scene {
    */
   presentedAt(point: Point, target?: UiNode): PresentedPress | undefined;
   /**
-   * THE FLUSH NEIGHBOUR of the node (`FlushNeighbour`), or undefined when it has none: what makes a `fully visible`
-   * claim on it worth a screenshot (ui-tree/eyes.ts). One reader: `scroll_until`'s stop (interact/scroll-rounds.ts).
+   * THE FLUSH NEIGHBOURS of the node (`FlushNeighbour`), one per edge that has one (top, bottom, left, right), empty
+   * when none: what makes a `fully visible` claim on it worth a screenshot (ui-tree/eyes.ts). One reader:
+   * `scroll_until`'s stop, through ui-tree/eyes.ts#eyesQuestion.
    */
-  flushNeighbour(node: UiNode): FlushNeighbour | undefined;
+  flushNeighbours(node: UiNode): readonly FlushNeighbour[];
 }
 
 /**
@@ -324,7 +325,7 @@ export interface Scene {
  * 970x125`, flush with `Continue`, read "fully visible" while the bar covered 18 px of its field (live case k7;
  * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md, the eyes). The neighbour is the first such
  * node in draw order (the outermost: the submit bar's node, not its button) — `cutByLater`'s, whatever the node's
- * depth across that edge. Only a node in a clipping scroll view whose neighbour lies outside it: rows of one list laid
+ * depth across that edge, and one per edge (a row between a pinned header and a bar riding on the IME has two). Only a node in a clipping scroll view whose neighbour lies outside it: rows of one list laid
  * flush against each other are the list's own (no bar), and a node in no scroll view is no stop a scroll moves.
  */
 export interface FlushNeighbour {
@@ -666,7 +667,7 @@ export function sceneOf(tree: UiNode): Scene {
     },
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
-    flushNeighbour: (node) => flushNeighbourOf(scene, node, cutsAtLater),
+    flushNeighbours: (node) => flushNeighboursOf(scene, node, cutsAtLater),
     presentedAt(point, target) {
       const surface = target === undefined ? scene.order.markedAt(point) : scene.order.presentedAt(target, point);
       return surface === undefined ? undefined : scene.order.presentation.press(surface);
@@ -1123,7 +1124,7 @@ const EDGES = ['top', 'bottom', 'left', 'right'] as const;
  * The first node in draw order (the outermost) drawn after `node`, outside its subtree, that draws over it as a target
  * (draw-order.ts#DrawOrder.coversOf) and holds the pixel row (column) just past `edge` along the node's whole extent
  * there without holding the node itself — a node laid FLUSH against that edge: `cutByLater`'s evidence and the flush
- * neighbour's (`Scene.flushNeighbour`).
+ * neighbour's (`Scene.flushNeighbours`).
  */
 function laterAcross(scene: Scene, node: UiNode, edge: Edge): UiNode | undefined {
   const r = node.rect;
@@ -1137,20 +1138,21 @@ function laterAcross(scene: Scene, node: UiNode, edge: Edge): UiNode | undefined
 }
 
 /**
- * `Scene.flushNeighbour`: on a tree whose source cuts a node's bounds at a node drawn after it (`cutsAtLater`,
- * Android's), a node in a clipping scroll view (geometry.ts#Clips.scrollersOf) with a node drawn after it laid flush
- * against one of its edges (`laterAcross`) that does not lie in that scroll view — a bar pinned over the content or
- * riding on the IME, the first edge of top, bottom, left, right.
+ * `Scene.flushNeighbours`: on a tree whose source cuts a node's bounds at a node drawn after it (`cutsAtLater`,
+ * Android's), for a node in a clipping scroll view (geometry.ts#Clips.scrollersOf), each edge with a node drawn after
+ * it laid flush against it (`laterAcross`) that does not lie in that scroll view — a bar pinned over the content or
+ * riding on the IME — in the order top, bottom, left, right.
  */
-function flushNeighbourOf(scene: Scene, node: UiNode, cutsAtLater: boolean): FlushNeighbour | undefined {
-  if (!cutsAtLater || rectArea(node.rect) === 0) return undefined;
+function flushNeighboursOf(scene: Scene, node: UiNode, cutsAtLater: boolean): readonly FlushNeighbour[] {
+  if (!cutsAtLater || rectArea(node.rect) === 0) return [];
   const own = scene.clips.scrollersOf(node)[0];
-  if (own === undefined) return undefined;
+  if (own === undefined) return [];
+  const flush: FlushNeighbour[] = [];
   for (const edge of EDGES) {
     const by = laterAcross(scene, node, edge);
-    if (by !== undefined && !scene.clips.scrollersOf(by).some((r) => sameRect(r, own))) return { edge, by };
+    if (by !== undefined && !scene.clips.scrollersOf(by).some((r) => sameRect(r, own))) flush.push({ edge, by });
   }
-  return undefined;
+  return flush;
 }
 
 /** The facts of a node judged in `frame`, from its exposure there. */

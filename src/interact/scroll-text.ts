@@ -9,7 +9,7 @@ import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '.
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { shortOf, type Cover, type Judged } from './scroll-read.js';
+import { fullyClaimed, shortOf, type Cover, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
@@ -99,11 +99,11 @@ export interface ScrollUntilResult {
   /**
    * Set on a stop whose "fully visible" claim the eyes looked at (ui-tree/eyes.ts) and did not confirm: the target lies
    * flush with `neighbour` at `edge`, a node drawn after it outside its scroll view, and the screenshot showed a band
-   * of the surface around that node over the target (`surface` — only without `fully: true`, which does not stop so:
-   * its centre is clear, a tap there lands) or could not tell (`unjudged`). The reply says so; absent when the eyes
-   * saw its own colour to the edge, or were not asked (no flush neighbour).
+   * of the surface around that node over the target (`surface` — only on a plain stop the band leaves the centre of:
+   * `fully: true` does not stop so, nor the plain stop with the band over its centre) or could not tell (`unjudged`).
+   * The reply says so; absent when the eyes saw its own colour to every edge, or were not asked.
    */
-  unlisted?: EyesFinding;
+  eyes?: EyesFinding;
   /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
   /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (scroll-rounds.ts#EndTurn); the reply says so. */
@@ -148,7 +148,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
     ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
-    ...(o.eyes !== undefined && { unlisted: o.eyes }),
+    ...(o.eyes !== undefined && { eyes: o.eyes }),
     ...(o.detent !== undefined && { detent: o.detent }),
     ...(o.endTurn !== undefined && { endTurn: o.endTurn }),
   };
@@ -202,12 +202,12 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   // clean `fully: true` stop (scroll-rounds.ts#round).
   const topCover = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
   const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
-  const surface = r.unlisted?.answer.sees === 'surface' ? (r.unlisted as SurfaceFinding) : undefined;
-  if (r.clipped.length === 0 && r.covered === undefined && surface === undefined) {
+  const surface = r.eyes?.sees === 'surface' ? r.eyes : undefined;
+  if (fullyClaimed({ clipped: r.clipped, covered: r.covered !== undefined }) && surface === undefined) {
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
     // The eyes could not tell (ui-tree/eyes.ts): the claim is the tree's, and what it cannot see is said.
-    const unjudged = r.unlisted?.answer.sees === 'unjudged' ? r.unlisted : undefined;
+    const unjudged = r.eyes?.sees === 'unjudged' ? r.eyes : undefined;
     const claim = unjudged === undefined ? `fully visible after ${n}` : `fully visible by the tree after ${n}`;
     const eyes = unjudged === undefined ? '' : `; ${unjudgedText(unjudged)}`;
     return `${claim}${above}${flushText(r.flush)}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
@@ -228,13 +228,12 @@ export function describeScrollResult(r: ScrollUntilResult): string {
  * beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own #FFFFFF (a screenshot)`.
  * In tree units, which on Android (the only source the trigger fires on) are pixels.
  */
-function surfaceText({ edge, neighbour, answer }: SurfaceFinding): string {
-  return `its ${edge} ${answer.depth} px show ${answer.surface}, the colour beside ${nodeText(neighbour)} drawn after it, not its own ${answer.own} (a screenshot)`;
+function surfaceText({ edge, neighbour, depth, surface, own }: SurfaceFinding): string {
+  return `its ${edge} ${depth} px show ${surface}, the colour beside ${nodeText(neighbour)} drawn after it, not its own ${own} (a screenshot)`;
 }
 
 /** The eyes could not tell (`unjudged`): the edge flush with that node, what may lie there, and why no screenshot settled it. */
-function unjudgedText({ edge, neighbour, answer }: EyesFinding): string {
-  const why = answer.sees === 'unjudged' ? answer.why : '';
+function unjudgedText({ edge, neighbour, why }: Extract<EyesFinding, { sees: 'unjudged' }>): string {
   return `its ${edge} edge lies flush with ${nodeText(neighbour)}, drawn after it outside its scroll view, whose surface may draw past that node over it — the tree lists none there, and a screenshot could not tell (${why})`;
 }
 
