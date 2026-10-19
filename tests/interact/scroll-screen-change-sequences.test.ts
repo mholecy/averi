@@ -6,7 +6,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { play } from '../helpers/rounds.js';
 
-// THE SCREEN-CHANGED STOP over REAL consecutive reads (interact/scroll-rounds.ts#ScreenChange): every pair of trees the
+// THE SCREEN-CHANGED STOP over REAL consecutive reads (ui-tree/read-tree.ts#ScreenChange): every pair of trees the
 // fixtures hold of ONE screen read before and after it moved — never a `changed` stop, whichever way the stroke between
 // them went. The pairs, each played both ways round (before → after, after → before) and with both directions of
 // stroke:

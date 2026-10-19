@@ -572,7 +572,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
 }
 
 /**
- * The `changed` stop (scroll-rounds.ts#ScreenChange): the swipe CHANGED THE SCREEN — said loud, with its evidence (the
+ * The `changed` stop (ui-tree/read-tree.ts#ScreenChange): the swipe CHANGED THE SCREEN — said loud, with its evidence (the
  * ids gone, where it touched down), what it likely was, and that nothing found after it is claimed. A plain Error,
  * never absence: the scroll did not look and miss, its own stroke replaced the screen, and an `optional:` step must
  * not skip it as "(not present)".
