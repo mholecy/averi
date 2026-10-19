@@ -200,7 +200,7 @@ describe('eyesOn — one screenshot, never a throw', () => {
     fake.viewportSize = { width: 1080, height: 2220 };
     fake.nextScreenshot = await k7Png();
     const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
-    expect(await eyesOn(fake)(q)).toMatchObject({ sees: 'surface', depth: 28 });
+    expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'surface', depth: 28 });
     expect(fake.screenshots).toHaveLength(1);
   });
 
@@ -208,7 +208,7 @@ describe('eyesOn — one screenshot, never a throw', () => {
     const tree = await k7Tree();
     const fake = new FakeAdapter({ s: tree }, 's');
     const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
-    expect(await eyesOn(fake)(q)).toMatchObject({ sees: 'unjudged', why: expect.stringMatching(/^the screenshot did not decode: /) });
+    expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'unjudged', why: expect.stringMatching(/^the screenshot did not decode: /) });
   });
 
   it('a screenshot that fails — unjudged, its first line quoted', async () => {
@@ -216,6 +216,6 @@ describe('eyesOn — one screenshot, never a throw', () => {
     const fake = new FakeAdapter({ s: tree }, 's');
     fake.screenshot = () => Promise.reject(new Error('adb: device offline\nmore'));
     const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
-    expect(await eyesOn(fake)(q)).toMatchObject({ sees: 'unjudged', edge: 'bottom', why: 'the screenshot failed: adb: device offline' });
+    expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'unjudged', edge: 'bottom', why: 'the screenshot failed: adb: device offline' });
   });
 });

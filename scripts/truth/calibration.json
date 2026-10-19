@@ -203,7 +203,8 @@
             "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
           ],
           "broke": "13d68a2",
-          "why": "the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); still red at HEAD — lab note L4"
+          "fixed": "1ef11b9",
+          "why": "the cover judgement 13d68a2 introduced reads the menu row W as under C, listed after it in reading order (green at 16ae6bb); green again at 1ef11b9, where the eyes see W drawn over C (ADR 0024) — lab note L4"
         },
         {
           "rows": [
@@ -685,7 +686,8 @@
             "ios-iphone17-ios27/blur-menu.wda.json W colour"
           ],
           "broke": "596a379",
-          "why": "the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4"
+          "fixed": "1ef11b9",
+          "why": "the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11); green again at 1ef11b9, where the eyes see W drawn over C (ADR 0024) — lab note L4"
         },
         {
           "rows": ["android-rn-averi_lab-api33/rn-field.xml M ocr"],
@@ -1096,11 +1098,10 @@
       "n": "L4",
       "note": "2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md",
       "status": "calibrate",
-      "fix": ["37bf5a1", "f5a28b3", "bea9769"],
+      "fix": ["37bf5a1", "f5a28b3", "bea9769", "1ef11b9", "85e3621", "a374227", "0f28b4c"],
       "before": "e0c2587",
       "after": "bea9769",
       "verified": "golden",
-      "partial": "C's half, the unsafe direction (C, under the menu row W listed before it in reading order, no longer Tapped / a PASS on W's colour / fully visible); W's half (W refused under C, listed after it — a false refusal) stays open as ADR 0015's residual of its 2026-10-19 amendment: the listing does not tell which of the two is on top",
       "defect": "^Tapped|passed on #00897B|fully visible",
       "checks": [
         "ios-iphone17-ios27/blur-menu.idb.json C tap",
@@ -1113,17 +1114,25 @@
         "ios-iphone17-ios27/blur-menu-grouped.idb.json C colour",
         "ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until"
       ],
-      "open": [
-        "ios-iphone17-ios27/blur-menu.idb.json W tap",
-        "ios-iphone17-ios27/blur-menu.idb.json W colour",
-        "ios-iphone17-ios27/blur-menu.idb.json W scroll_until",
-        "ios-iphone17-ios27/blur-menu.wda.json W tap",
-        "ios-iphone17-ios27/blur-menu.wda.json W colour",
-        "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
-      ],
-      "openLive": ["ios idb tap:blur-menu.W", "ios wda tap:blur-menu.W"],
       "expect": "CALIBRATED-ON-DEFECT",
-      "remark": "Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4 (draw-order.ts#readingOrderPeers: in a listing the parsers mark as reading order — idb's flat list, a WDA run sorted by top, UiNode.readingOrder — the controls listed before a control target that overlap it cover it when one holds its centre, every control overlapping it over its centre, before or after, is a cover whose order is not told, and a moved tap is never aimed at one listed before it; never a target pinned at the bottom; ADR 0015 amended): the pair is bea9769 and e0c2587 (fix/round-8's src). Before: C's tap Tapped (`idb ui tap 201 502`, which fires W), its colour a PASS on #00897B, scroll_until fully visible after 0 swipes. After: each refused as overlapped by W, the order not told (scroll_until stopped before any swipe) — still red, as blur-menu-grouped.wda's C was already: no \"close it first\" (ADR 0018 residual 9, calibration.json #31: the backdrop has no node), so CALIBRATED-ON-DEFECT; refiled in presented.known.ts as that residual. W's six rows still red (`open`, filed as this note), now worded as overlapped by C, the order not told, scroll_until stopped before any swipe. Live: C's tap fired W under idb and WDA before, refused after.",
+      "remark": "Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4 (draw-order.ts#readingOrderPeers: in a listing the parsers mark as reading order — idb's flat list, a WDA run sorted by top, UiNode.readingOrder — the controls listed before a control target that overlap it cover it when one holds its centre, every control overlapping it over its centre, before or after, is a cover whose order is not told, and a moved tap is never aimed at one listed before it; never a target pinned at the bottom; ADR 0015 amended): the pair is bea9769 and e0c2587 (fix/round-8's src). Before: C's tap Tapped (`idb ui tap 201 502`, which fires W), its colour a PASS on #00897B, scroll_until fully visible after 0 swipes. After: each refused as overlapped by W, the order not told (scroll_until stopped before any swipe) — still red, as blur-menu-grouped.wda's C was already: no \"close it first\" (ADR 0018 residual 9, calibration.json #31: the backdrop has no node), so CALIBRATED-ON-DEFECT; refiled in presented.known.ts as that residual. W's six rows, red after this pair (overlapped by C, the order not told, scroll_until stopped before any swipe), are the second pair's (round 9, `pairs`). Live: C's tap fired W under idb and WDA before, refused after.",
+      "pairs": [
+        {
+          "before": "e52d179",
+          "after": "0f28b4c",
+          "checks": [
+            "ios-iphone17-ios27/blur-menu.idb.json W tap",
+            "ios-iphone17-ios27/blur-menu.idb.json W colour",
+            "ios-iphone17-ios27/blur-menu.idb.json W scroll_until",
+            "ios-iphone17-ios27/blur-menu.wda.json W tap",
+            "ios-iphone17-ios27/blur-menu.wda.json W colour",
+            "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
+          ],
+          "defect": "overlapped by button \"Target C\"|\"Target C\" \\(51,470 300x64\\) overlaps the element",
+          "expect": "CALIBRATED",
+          "remark": "W's half, round 9 (fix/r9-l4w 1ef11b9, its review fixes 85e3621, a374227 and 0f28b4c; ADR 0024): the eyes tell the order of two controls listed in reading order from one screenshot (verify/eyes.ts#judgeOrder over the committed blur-menu.png: the overlap #00897B, W's band #00897B, C's #347937, ΔE00 0.00 and 17.69) and the draw order takes the answer as an input (ui-tree/seen-order.ts). Before (fix/round-9 e52d179): W refused / FAIL / stopped before any swipe, overlapped by C, the order not told. After: Tapped at (201,480), colour PASS on #00897B, fully visible after 0 swipes. C's nine rows reworded as under W, seen drawn over it on the screenshot — still red as #31's residual (the first pair's ON-DEFECT)."
+        }
+      ],
       "live": [
         {
           "platform": "ios",
@@ -1133,6 +1142,22 @@
           "cases": ["tap:blur-menu.C", "tap:blur-menu-grouped.C", "scroll:blur-menu.C", "scroll:blur-menu-grouped.C"],
           "verdict": "CALIBRATED",
           "remark": "Before (docs/truth/live-records/ios-vis-r8-l4-before.json, --side fix/round-8 e0c2587e): tap:blur-menu.C Tapped and the app logged `tap W` under idb and WDA, scroll_until fully visible after 0 swipes; blur-menu-grouped's C the same under idb (WDA, listing W after C, drawn over it, refused the tap already and stroked the blur three times for the scroll, as after: residual 9's, #31). After, at the final src (ios-vis-r8-l4-3.json, -4.json at 94fc318b): the taps refused as overlapped by W, the two listed in reading order, which is drawn on top not told — nothing fired, both runs; scroll_until stopped before any swipe, nothing stroked, no `dismissed` logged (at 37bf5a15, ios-vis-r8-l4-1.json, -2.json, it stroked the blur three times first, closing nothing). tap:blur-menu.W LOUD as before (the residual), now worded the order not told, nothing fired. In -3.json idb's tap of A, the run's first case on a freshly booted simulator, timed out with no tree (vacuous; Tapped in -4.json).",
+          "summary": "docs/truth/live-ios-2026-10-18-visibility.md"
+        },
+        {
+          "platform": "ios",
+          "pair": 2,
+          "sources": [
+            "idb",
+            "wda"
+          ],
+          "before": "94fc318",
+          "after": "1ef11b9",
+          "cases": [
+            "tap:blur-menu.W"
+          ],
+          "verdict": "CALIBRATED",
+          "remark": "Before (docs/truth/live-records/ios-vis-r8-l4-3.json, -4.json, round 8's final src 94fc318b — the src of fix/round-9 for this case): tap W refused as overlapped by C, the order not told, nothing fired — LOUD under idb and WDA. After (ios-vis-r9-l4w-1.json, -2.json at 1ef11b9c): Tapped id:\"lab.blur-menu.W\", the app logged W alone, under idb and WDA, both runs; C's tap and scroll_until refused as under W, seen so, nothing fired or stroked; nothing closed the menu.",
           "summary": "docs/truth/live-ios-2026-10-18-visibility.md"
         }
       ]

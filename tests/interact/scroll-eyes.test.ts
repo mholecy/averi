@@ -69,13 +69,13 @@ describe('scroll_until — the eyes confirm a fully claim', () => {
 
   it('k7, the eyes see its own colour to the edge: "fully visible", as before', async () => {
     const fake = await k7();
-    const own: Eyes = async () => ({ sees: 'own' });
+    const own: Eyes = { fully: async () => ({ sees: 'own' }), order: async () => [] };
     expect(describeScrollResult(await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: own }))).toBe('fully visible after 0 swipes');
   });
 
   it('k7, the eyes cannot tell: the claim is the tree\'s, the edge and why said', async () => {
     const fake = await k7();
-    const unjudged: Eyes = async ({ flush }): Promise<EyesAnswer> => ({ sees: 'unjudged', edge: flush[0]!.edge, neighbour: flush[0]!.by, why: 'the screenshot failed: offline' });
+    const unjudged: Eyes = { fully: async ({ flush }): Promise<EyesAnswer> => ({ sees: 'unjudged', edge: flush[0]!.edge, neighbour: flush[0]!.by, why: 'the screenshot failed: offline' }), order: async () => [] };
     expect(describeScrollResult(await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: unjudged }))).toBe(
       'fully visible by the tree after 0 swipes; its bottom edge lies flush with container id:lab.form-keyboard.submit (55,1238 970x132), drawn after it outside its scroll view, ' +
         'whose surface may draw past that node over it — the tree lists none there, and a screenshot could not tell (the screenshot failed: offline)',
@@ -126,7 +126,7 @@ describe('scroll_until — no screenshot on an ordinary stop (the trigger is nar
     const fake = new FakeAdapter({ s: tree }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     let asked = 0;
-    const eyes: Eyes = async () => (asked++, { sees: 'own' });
+    const eyes: Eyes = { fully: async () => (asked++, { sees: 'own' }), order: async () => [] };
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:row', { ...FAST, eyes }))).toMatch(/^visible after 0 swipes — PARTLY UNDER button id:badge/);
     expect(asked).toBe(0);
     // The same row with the badge gone: the claim is "fully", and the eyes are asked once.

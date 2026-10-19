@@ -1,10 +1,11 @@
 import { rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { coverText, nodeText, outsideScrollViewText, rectText, type Cut } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
+import { judgedWithOrder, type OrderEyes } from '../ui-tree/eyes.js';
 import type { Look, LookReading } from '../ui-tree/look.js';
 import type { KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive } from '../ui-tree/selectors.js';
-import { coverClause, outsideItsScrollView, presentedRemedy, unorderedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
+import { coverClause, outsideItsScrollView, presentedRemedy, seenOverRemedy, unorderedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -219,6 +220,17 @@ export function tapStandings(look: Pick<Look, 'scene' | 'keyboard'>, node: UiNod
   };
 }
 
+/**
+ * What the tap's judgement may ask besides the look, and what it is told: `sent` — what the keyboard guard sent before
+ * this look (`Hiding.sent`), which fronts every refusal; `eyes` — the eyes' order question (ui-tree/eyes.ts#Eyes.order,
+ * the composition root's verify/eyes.ts#eyesOn), asked by `TapJudge.aim` once, only of a centre covered by a control the
+ * listing does not order (`orderQuestion`). Without it the listing's untold order stands.
+ */
+export interface TapAsks {
+  readonly sent?: string;
+  readonly eyes?: OrderEyes;
+}
+
 /** A look the on-screen rule let through: the screen it was judged on (the first look's, or the one read again), and the rest of the judgement. */
 export interface TapJudge {
   readonly screen: UsableScreen | undefined;
@@ -258,16 +270,19 @@ const offTheScreen = (s: TapStanding): s is OffTheScreen => (s.kind === 'offScre
  * `look.node`: the system-bar remedy looks the node up in its tree; the
  * keyboard's line is its position's, the refusals' remedy its reading's.
  */
-export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target: Target, { node, look }: TapLook, screen: UsableScreen | undefined, sent?: string): Promise<TapJudge> {
+export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target: Target, { node, look }: TapLook, screen: UsableScreen | undefined, { sent, eyes }: TapAsks = {}): Promise<TapJudge> {
   const { scene } = look;
   const what = describeTarget(target);
   const told: Told = { node, scene, remedy: look.reading.remedy, refusal: (finding: string): string => (sent === undefined ? `${what} is ${finding}; nothing was tapped` : `${what} was not tapped: after ${sent}, it is ${finding}`) };
   const judge = (on: UsableScreen | undefined, standings: TapStandings): TapJudge => ({
     screen: on,
     async aim() {
-      const { first } = standings;
       // The reading's line only for a covered centre of a target on the screen and not cut.
-      const standing = !offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? await standings.full() : first;
+      const judged = async ({ first, full }: TapStandings): Promise<TapStanding> => (!offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? full() : first);
+      // Covered by a control the listing does not order: the eyes, once, then judged again on the order they saw (ADR 0024).
+      // judgedWithOrder judges `look` itself first — the untold look, whose standings are already built — and then, only
+      // if it asked the eyes, a told look of the same tree, whose standings are built here.
+      const standing = await judgedWithOrder(look, node, eyes, (onLook) => judged(onLook === look ? standings : tapStandings(onLook, node, on)));
       // A cut by a node drawn after it: whether the soft keyboard is up, which its remedy names (`cutByRemedy`) — the reading's line, asked on that path only.
       const line = standing.kind === 'cut' && standing.cut.by !== undefined ? await look.keyboard.readingLine() : undefined;
       const keyboard: KeyboardUp | undefined = line === undefined ? undefined : { lineY: line.y, remedy: look.reading.remedy };
@@ -347,8 +362,10 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
           ? `nothing of it shows${above}${clear}`
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}${clear}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint — or, under
-      // a cover whose order the tree does not tell, no scroll.
-      const remedy = advice(standing.remedy, (r) => (r.of === 'unordered' ? unorderedRemedy('touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first')));
+      // a cover whose order the tree does not tell, or one a screenshot saw drawn over it, no scroll.
+      const remedy = advice(standing.remedy, (r) =>
+        r.of === 'unordered' ? unorderedRemedy('touch', r) : r.of === 'seenOver' ? seenOverRemedy('touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first'),
+      );
       throw new CoveredRefusal(told.refusal(`${coverClause(standing.facts, standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':

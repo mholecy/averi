@@ -4,6 +4,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { seenOrderOf, type OrderSeen } from '../../src/ui-tree/seen-order.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -133,5 +134,64 @@ describe("the parsers mark a listing given in reading order (UiNode.readingOrder
     const contacts = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-new-contact.json', import.meta.url), 'utf8'));
     const run = [...everyNode(contacts)].find((n) => n.children.includes(byLabel(contacts, 'Remove photo')))!;
     expect(run.readingOrder).toBeUndefined();
+  });
+});
+
+/**
+ * THE ORDER SEEN (ui-tree/seen-order.ts): what a screenshot showed of two controls the listing does not order enters the
+ * draw order as an input — a peer seen UNDER the target is no cover of it (nor a part a moved tap keeps clear of), a peer
+ * seen OVER it stays a cover, named `seenOver` instead of `unordered`; an untold pair is today's.
+ * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+ */
+describe('the order a screenshot saw, handed to the draw order', () => {
+  const HEX = { overlap: '#00897B', own: '#00897B', other: '#347937' };
+  const trees = [
+    ['blur-menu.idb.json', () => idb('blur-menu.idb.json')],
+    ['blur-menu.wda.json', () => wda('blur-menu.wda.json')],
+  ] as const;
+
+  it.each(trees)('%s: W seen over C — C is no cover of W: W is tapped at its centre, nothing it keeps clear of', async (_n, tree) => {
+    const t = await tree();
+    const w = byId(t, 'lab.blur-menu.W');
+    const c = byId(t, 'lab.blur-menu.C');
+    const seen = drawOrder(t, seenOrderOf(w, [{ peer: c, seen: 'over', ...HEX }])).exposure(w, IPHONE);
+    expect(seen.covers).toEqual([]);
+    expect(seen.unordered).toEqual([]);
+    expect(seen.seenOver).toEqual([]);
+    expect(seen.aimedClearOf).toEqual([]);
+    expect(seen.shows).toBe(1);
+    expect(seen.tapAt).toEqual({ point: { x: 201, y: 480 }, moved: false });
+  });
+
+  it.each(trees)('%s: the same answer read from C — W stays its cover, seen over it, no longer one whose order is untold', async (_n, tree) => {
+    const t = await tree();
+    const w = byId(t, 'lab.blur-menu.W');
+    const c = byId(t, 'lab.blur-menu.C');
+    const seen = drawOrder(t, seenOrderOf(w, [{ peer: c, seen: 'over', ...HEX }])).exposure(c, IPHONE);
+    expect(seen.covers).toEqual([w]);
+    expect(seen.centreCover).toBe(w);
+    expect(seen.seenOver).toEqual([w]);
+    expect(seen.unordered).toEqual([]);
+    expect(seen.tapAt).toBeUndefined();
+  });
+
+  it.each(trees)('%s: the other way round (C seen over W), the seam is honest both ways — W covered, seen; C clear', async (_n, tree) => {
+    const t = await tree();
+    const w = byId(t, 'lab.blur-menu.W');
+    const c = byId(t, 'lab.blur-menu.C');
+    const order = drawOrder(t, seenOrderOf(c, [{ peer: w, seen: 'over', ...HEX }]));
+    expect(order.exposure(w, IPHONE)).toMatchObject({ covers: [c], seenOver: [c], unordered: [] });
+    expect(order.exposure(c, IPHONE)).toMatchObject({ covers: [], seenOver: [], unordered: [], tapAt: { point: { x: 201, y: 502 }, moved: false } });
+  });
+
+  it.each(trees)('%s: an untold pair is the listing\'s untold order, as with no screenshot', async (_n, tree) => {
+    const t = await tree();
+    const w = byId(t, 'lab.blur-menu.W');
+    const c = byId(t, 'lab.blur-menu.C');
+    const untold: OrderSeen[] = [{ peer: c, seen: 'untold', why: 'the two look alike (ΔE 3.10)' }];
+    const { coverAt: _a, ...told } = drawOrder(t, seenOrderOf(w, untold)).exposure(w, IPHONE);
+    const { coverAt: _b, ...listed } = drawOrder(t).exposure(w, IPHONE);
+    expect(told).toEqual(listed);
+    expect(listed.unordered).toEqual([c]);
   });
 });

@@ -331,10 +331,12 @@ describe('tool descriptions on a screen presented over the target', () => {
 
   it('tap: the general remedy defers to it, and its refusal says to close the screen first; a host with children is no such screen', () => {
     expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below); ');
-    // …or a cover whose order the tree does not tell (iOS's reading order): no scroll advised either.
-    expect(description('tap')).toContain('"overlapped by …, the two listed in reading order: which is drawn on top is not told" and advises a screenshot, not a scroll (if the screenshot shows the target on top, tap it by coordinates). ');
-    expect(description('scroll_until')).toContain('"overlapped by …, the two listed in reading order: which is drawn on top is not told") stops it before any swipe');
-    expect(description('assert')).toContain('the failure says which is drawn on top is not told and advises a screenshot, not a scroll. ');
+    // …or a cover whose order the tree does not tell (iOS's reading order): one screenshot tells it (ADR 0024); no scroll advised either.
+    expect(description('tap')).toContain('averi then takes ONE screenshot and compares the two controls\' colours where they overlap and beside it: the target seen on top is tapped as usual; ');
+    expect(description('tap')).toContain('"under …, drawn over it as a screenshot shows (the two are listed in reading order)" — close a menu or popover first, no scroll; ');
+    expect(description('tap')).toContain('"overlapped by …, the two listed in reading order: which is drawn on top is not told" and why the screenshot could not tell, advising no scroll (if the target is the one on top, tap it by coordinates). ');
+    expect(description('scroll_until')).toContain('"overlapped by …, the two listed in reading order: which is drawn on top is not told") is judged on one screenshot, as for tap — seen on top, it is reached; else it stops before any swipe');
+    expect(description('assert')).toContain('the assert judges which is drawn on top on the frame it captures anyway, as for tap: the element seen on top is measured; else the failure names the control drawn over it (or says the order is not told) and advises no scroll. ');
     expect(description('tap')).toContain('fully: true when the next step measures it), unless a screen is presented over the target (below); ');
     expect(description('tap')).toContain(
       'Under a screen presented over the target — iOS wda: a layer WebDriverAgent shows presented (see ui_snapshot\'s "presentation"; an alert, an action sheet or a popover is named as ui_snapshot says); elsewhere (Android): a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +

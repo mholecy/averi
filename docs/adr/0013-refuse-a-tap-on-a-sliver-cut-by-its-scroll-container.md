@@ -78,6 +78,11 @@ Three points the device check left open (docs/truth/live-android-2026-10-18-visi
 
 ## Refined 2026-10-19 (orchestrator, round 7 A6): the eyes confirm a fully claim
 
+(Extended 2026-10-19, round 9: the eyes answer a second question — which of two controls listed in reading order is
+drawn on top — on one screenshot as well, unsettled by the same reasoning for the tap and `scroll_until`, the pixel
+assert's own settled frame for it: docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md.
+`Eyes` is now an interface of the two questions, `fully` this section's.)
+
 The owner's 2026-10-18 point 5 asked for pixels where the tree cannot see. A stop about to say "fully visible" —
 nothing of the target clipped, nothing listed over it (`interact/scroll-read.ts#fullyClaimed`, the round's and the
 reply's one predicate) — on a target with a FLUSH NEIGHBOUR (`ui-tree/standing.ts#Scene.flushNeighbours`: a node drawn

@@ -1175,6 +1175,19 @@ export const orderUntoldText = (cover: QuotedNode, centre?: Point, reach?: Rect)
  */
 export const overlapsUntoldText = (element: string): string => `overlaps ${element}, ${ORDER_UNTOLD}`;
 
+/**
+ * How a sentence says a cover the tree did not order and a screenshot saw drawn over the target lies over it
+ * (draw-order.ts#Exposure.seenOver): `under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as
+ * a screenshot shows (the two are listed in reading order)` — `drawnOverText`'s place (ui-tree/standing.ts#coverClause).
+ */
+export const seenOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): string => `${drawnOverText(cover, centre, reach)} ${SEEN_OVER}`;
+
+/** How the pixel assert's covered sentence says the same (`<cover> is drawn over <element> as a screenshot shows (…)`). */
+export const drawnOverSeenText = (element: string): string => `is drawn over ${element} ${SEEN_OVER}`;
+
+/** Why a cover named by `seenOverText` or `drawnOverSeenText` is said to be drawn over the target though the tree does not order the two. */
+const SEEN_OVER = 'as a screenshot shows (the two are listed in reading order)';
+
 /** Why a cover named by `orderUntoldText` or `overlapsUntoldText` is not said to be drawn over the target. */
 const ORDER_UNTOLD = 'the two listed in reading order: which is drawn on top is not told';
 

@@ -4,7 +4,8 @@ Status: accepted, 2026-10-09 (owner). Amended 2026-10-19 (owner, round 8, L4: th
 controls overlapping in a reading-order listing are covers of each other whose order is not told — see "Amendment:
 covers listed before the target" below. The reading BREAK below still meets idb's flat list only; the amendment's rule
 meets WDA's nested tree too (its residual "WDA's nested tree and Android's never meet this rule" holds for the break
-alone).
+alone). Amended again 2026-10-19 (round 9) by docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md:
+a screenshot tells the order the listing does not — the amendment's first residual closed, its second narrowed (below).
 
 ## Context
 
@@ -91,11 +92,14 @@ docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-cove
 
 ### Residuals of the amendment
 
-- The menu row listed BEFORE the row it is drawn over is still covered by that row, listed after it: W is refused
+- ~~The menu row listed BEFORE the row it is drawn over is still covered by that row, listed after it: W is refused
   under C (a false refusal, the safe direction), its reply saying the order is not told and to look at a screenshot;
-  W's live tap stays LOUD (`tap:blur-menu.W`, live-known.ts).
+  W's live tap stays LOUD (`tap:blur-menu.W`, live-known.ts).~~ Closed by ADR 0024 (round 9, `1ef11b9c`): the eyes see W
+  drawn over C on one screenshot — W is tapped, C refused as under W, seen so; live ok under idb and WDA.
 - Two overlapping controls of a reading-order run that are really drawn in list order (a later card over an earlier
-  one) both refuse a tap at the overlap where it holds the centre: a false refusal. Since the WDA mark is a sort
+  one) both refuse a tap at the overlap where it holds the centre: a false refusal — since ADR 0024 only where a
+  screenshot cannot tell them apart (they look alike, a side shows the screen's own colour, a frame mid-animation, rows
+  as wide as the screen); where it can, the one on top is tapped and the other refused naming it. Since the WDA mark is a sort
   check, this reaches UIKit screens too — a row's accessory or a badge poking out of its control with its centre on
   that control reads as covered (a refusal, a failed colour assert, no `fully` stop), never as a wrong tap.
 - A row under an in-screen menu whose centre lies clear of the menu's rows is still `Tapped` at its centre, on the

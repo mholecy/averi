@@ -1,15 +1,18 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { coverText, nodeText, overlapsUntoldText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, drawnOverSeenText, nodeText, overlapsUntoldText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
+import { judgedWithOrder, type OrderEyes, type OrderQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
-import { pollTree } from '../ui-tree/read-tree.js';
+import type { OrderSeen } from '../ui-tree/seen-order.js';
+import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { orderUntold, outsideItsScrollView, presentedRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { orderUntold, outsideItsScrollView, presentedRemedy, seenOver, seenOverRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
-import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
+import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
+import { orderOfFrame, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
 import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } from './poll-verdict.js';
@@ -25,7 +28,16 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * - the round's ORDER: tree read (the tree poll's) → find → deadline check →
  *   what lies over the element (`overElement`: the soft keyboard first, then
  *   the system bands, a cut and the app's covers) → capture with that tree
- *   and the deadline → stability gate → decode gate → measure. A round that
+ *   and the deadline → stability gate → decode gate → measure. One
+ *   exception moves the capture, never adds one: an element covered by a
+ *   control the tree lists in reading order asks the eyes which is drawn on
+ *   top (ADR 0024), answered from THE round's capture, taken first — on a
+ *   frame that did not settle over the whole screen or decode, or a capture
+ *   that failed, the order stays untold and the round is a covered miss (the
+ *   poll goes on: the order question never throws, `orderOnCapture`); an
+ *   answer that keeps the element covered is kept while the tree reads the
+ *   same, so a covered element captures once per distinct tree
+ *   (`PixelPollMemory.keptOrder`). A round that
  *   begins past the deadline takes no screenshot and queries nothing: the
  *   overrun of a slow tree read is never compounded by a stability budget.
  * - the two gates: `measure` sees only a SETTLED, DECODED frame. A moving
@@ -304,6 +316,33 @@ class PixelPollMemory {
    * does not erase it; a later round that finds the element clear
    * withdraws it (`uncovered`).
    */
+  /**
+   * The eyes' order answer this poll keeps (ADR 0024) — on this round's tree, `tree`: a covered element's order question
+   * captures the round's frame, and an answer that keeps it covered (no pair seen `over`) would cost that capture again
+   * every round for nothing. So such an answer, judged on a frame settled over the whole screen, is kept and handed back
+   * while the tree reads the same (ui-tree/read-tree.ts#treeFingerprint: every node's role, text, id and rect) and the
+   * question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks (a pair `over`) is never
+   * kept: that round measures the very frame it was judged on, so keeping it saves nothing, and each round's unlock rests
+   * on its own frame. Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next
+   * round looks again.
+   */
+  keptOrder(tree: UiNode): KeptOrder {
+    let fingerprint: string | undefined;
+    const keyOf = (q: OrderQuestion): string => `${(fingerprint ??= treeFingerprint(tree))} ${JSON.stringify(q.pairs.map((p) => [p.peer.rect, p.overlap]))}`;
+    return {
+      answer: (q) => {
+        const kept = this.order;
+        if (kept === undefined || kept.key !== keyOf(q) || kept.seen.length !== q.pairs.length) return undefined;
+        return q.pairs.map((p, i) => ({ ...kept.seen[i]!, peer: p.peer }));
+      },
+      keep: (q, seen) => {
+        this.order = seen.some((s) => s.seen === 'over') ? undefined : { key: keyOf(q), seen };
+      },
+    };
+  }
+
+  private order: { key: string; seen: readonly OrderSeen[] } | undefined;
+
   coveredMiss(reason: string): PollVerdict {
     const detail = failClosed(reason, this.unchecked);
     this.lastCovered = detail;
@@ -369,7 +408,9 @@ class PixelPollMemory {
  * instead. `reads`: what the measurement reads (`PixelPollSpec.reads`; the
  * whole rect when omitted); `glyphs`: it reads glyphs (the ocr assert);
  * `judgedOn`: told the usable screen the standing is judged on, once read
- * (the pixel poll's sampler asks THE region of the same screen).
+ * (the pixel poll's sampler asks THE region of the same screen); `eyes`: the eyes' order question
+ * (ui-tree/eyes.ts#Eyes.order), asked once of an element covered by a control the listing does not order — the pixel
+ * poll answers it from the frame it captures anyway (`pollPixels`); absent, that order stays untold.
  * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  *
  * The reading's two rects are in the same units: on Android both are device
@@ -388,12 +429,12 @@ export async function overElement(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   look: Look,
   element: UiNode,
-  { reads = (rect) => rect, glyphs = false, judgedOn = () => {} }: { reads?: PixelRegionOf; glyphs?: boolean; judgedOn?: (screen: UsableScreen) => void } = {},
+  { reads = (rect) => rect, glyphs = false, judgedOn = () => {}, eyes }: { reads?: PixelRegionOf; glyphs?: boolean; judgedOn?: (screen: UsableScreen) => void; eyes?: OrderEyes } = {},
 ): Promise<string | undefined> {
   const { reading } = look;
   const frame = await reading.overlapping(element.rect, element);
   if (frame !== undefined) return keyboardOver(element.rect, frame, reading.remedy);
-  return judgeOver(adapter, look, element, { reads, glyphs, judgedOn, keyboard: { line: look.keyboard.line(element), remedy: reading.remedy } });
+  return judgeOver(adapter, look, element, { reads, glyphs, judgedOn, eyes, keyboard: { line: look.keyboard.line(element), remedy: reading.remedy } });
 }
 
 /**
@@ -499,15 +540,15 @@ async function judgeOver(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   look: Look,
   element: UiNode,
-  { reads, glyphs, judgedOn, keyboard }: { reads: PixelRegionOf; glyphs: boolean; judgedOn: (screen: UsableScreen) => void; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
+  { reads, glyphs, judgedOn, eyes, keyboard }: { reads: PixelRegionOf; glyphs: boolean; judgedOn: (screen: UsableScreen) => void; eyes: OrderEyes | undefined; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
-  const { scene } = look;
   const usable = (await usableScreen(adapter, look)) ?? treeScreen(look.tree);
   judgedOn(usable);
   // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelRegionOf).
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;
   // The usable screen whole: the pixel purpose judges its single `oriented` box (ui-tree/standing.ts#Scene, D6).
-  const standing = scene.standing(element, usable, purpose);
+  // Covered by a control the listing does not order: the eyes, once, then judged again on the order they saw (ADR 0024).
+  const standing = await judgedWithOrder(look, element, eyes, (seen) => seen.scene.standing(element, usable, purpose));
   if (standing.kind === 'reachable') return undefined;
   const at = `(element ${rectText(element.rect)}`;
   switch (standing.kind) {
@@ -537,7 +578,12 @@ async function judgeOver(
     case 'covered': {
       const named = coverText(standing.cover, standing.reach);
       // A cover whose order against the element the tree does not tell (listed in reading order) is said as such.
-      const over = orderUntold(standing.facts, standing.cover) ? overlapsUntoldText(`the element ${at})`) : `is drawn over the element ${at})`;
+      // …and one a screenshot saw drawn over it, as such.
+      const over = orderUntold(standing.facts, standing.cover)
+        ? overlapsUntoldText(`the element ${at})`)
+        : seenOver(standing.facts, standing.cover)
+          ? drawnOverSeenText(`the element ${at})`)
+          : `is drawn over the element ${at})`;
       return `${named} ${over} — ${coverRemedy(standing.remedy)}`;
     }
     default: {
@@ -618,7 +664,9 @@ const coverRemedy = (remedy: CoverRemedy): string => {
     case 'scroll':
       return scroll;
     case 'unordered':
-      return `the capture may show it, not the element; ${unorderedRemedy('pixel')}`;
+      return `the capture may show it, not the element; ${unorderedRemedy('pixel', remedy)}`;
+    case 'seenOver':
+      return `the capture would show it, not the element; ${seenOverRemedy('pixel')}`;
   }
 };
 
@@ -635,6 +683,39 @@ const FIXED_REMEDY: Record<Extract<Remedy, { of: 'fixed' }>['what'], string> = {
   header: `the capture would show it, not the element — ${CLEAR_CHILD} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`,
   footer: `the capture would show it, not the element — ${CLEAR_CHILD} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`,
 };
+
+/** The order answer a poll keeps across rounds, as one round asks it (`PixelPollMemory.keptOrder`). */
+interface KeptOrder {
+  /** The answer kept for `question` on this round's tree, its peers this tree's nodes; undefined when none is kept. */
+  answer(question: OrderQuestion): readonly OrderSeen[] | undefined;
+  /** Keep `seen`, judged for `question` on a settled whole-screen frame — or forget the kept one, when `seen` unlocks. */
+  keep(question: OrderQuestion, seen: readonly OrderSeen[]): void;
+}
+
+/**
+ * THE POLL'S EYES for the order question (ADR 0024): the answer `kept` from an earlier round of the same tree, else
+ * judged on THE round's one capture (`capture`, memoised by the round: the measurement reuses it). Never throws, as the
+ * production eyes (verify/eyes.ts#eyesOn) never do: a capture that fails is every pair `untold`, said why, and the
+ * element stays covered — that round a covered miss, as before the eyes, and the poll goes on (a refused capture ends
+ * the poll only where the round measures). Judged only on a frame settled over the WHOLE screen: the bands and the
+ * strips around the two lie outside the element's region, which a region-settled frame does not vouch for.
+ */
+async function orderOnCapture(question: OrderQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {
+  const known = kept.answer(question);
+  if (known !== undefined) return known;
+  let frame: TreeRequestedFrame;
+  try {
+    frame = await capture();
+  } catch (e) {
+    return untoldAll(question, `the screenshot failed: ${captureRefusal(e)}`);
+  }
+  if (frame.stability !== 'settled') return untoldAll(question, 'the screen did not settle');
+  if (frame.settledOver !== 'screen') return untoldAll(question, 'only the element held still, not the screen around it');
+  if (frame.measured.error !== undefined) return untoldAll(question, frame.measured.error);
+  const seen = orderOfFrame(frame.measured, question);
+  kept.keep(question, seen);
+  return seen;
+}
 
 /**
  * A miss no later round can change, carried out of the tree poll to end it
@@ -688,11 +769,16 @@ export async function pollPixels(
     const judgedOn = (s: UsableScreen): void => {
       screen = s;
     };
-    const over = await overElement(adapter, look, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, judgedOn });
+    // The round's one capture, taken on first need: for the eyes' order question (an element covered by a control the
+    // listing does not order, ADR 0024) before the standing is decided, else after it — never a second one.
+    let captured: Promise<TreeRequestedFrame> | undefined;
+    const capture = (): Promise<TreeRequestedFrame> => (captured ??= captureFrame(adapter, { tree, deadline, region: rect }));
+    const eyes: OrderEyes = { order: (question) => orderOnCapture(question, memory.keptOrder(tree), capture) };
+    const over = await overElement(adapter, look, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, judgedOn, eyes });
     if (over !== undefined) return memory.coveredMiss(over);
     memory.uncovered();
     // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
-    const frame = await captureFrame(adapter, { tree, deadline, region: rect }).catch((e: unknown) => {
+    const frame = await capture().catch((e: unknown) => {
       throw new FinalMiss(screenshotFailed(captureRefusal(e), unchecked));
     });
     if (frame.stability !== 'settled') return memory.unsettled(frame);

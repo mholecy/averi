@@ -308,6 +308,39 @@ run's own on gRPC 10893 (`IDB_COMPANION=localhost:10893`). Reproduce (outside th
     tapped — ok vacuously, so the rejudge prints FIXED for its residual-9 entry; in run 2 it read Tapped (the menu
     dismissed) as before, so the entry stays, and -3.json is pinned exiting 1 on that line alone.
 
+# Round 9, L4's remaining half: the menu row W on iOS, 2026-10-19
+
+fix/r9-l4w (src 1ef11b9c, from fix/round-9 e52d1797; docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md:
+the eyes tell, from one screenshot, which of two controls listed in reading order is drawn on top, and the draw order
+takes the answer as an input; docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md),
+run from that checkout; the lab app as installed (no app change). The averi-lab iPhone 17 simulator (3AB1E82E, iOS
+27.0, 402x874), WDA on 8120 in the lab's own derived data, idb through a companion of this run's own on gRPC 10897
+(`IDB_COMPANION=localhost:10897`); the simulator shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb,wda --groups visibility
+--cells blur-menu,blur-menu-grouped --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r9-l4w-1.json | 1ef11b9c | 40 | 16 | 0 | 24 (all known; idb's tap of A ok vacuously: FIXED printed) |
+| ios-vis-r9-l4w-2.json | 1ef11b9c | 40 | 15 | 0 | 25 (all known) |
+
+- **`tap W`** on blur-menu: `Tapped id:"lab.blur-menu.W"`, the app logging a touch at (201,480) and `tap W` alone —
+  under idb and WDA, both runs (LOUD before, at round 8's final src 94fc318b: refused as overlapped by C, the order not
+  told). Its two live-known.ts entries struck off.
+- **`tap C`** on blur-menu (idb and WDA) and blur-menu-grouped (idb): refused, nothing fired — `ERROR id:"lab.blur-menu.C"
+  is under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are
+  listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a
+  popover, close it first; no scroll moves it out from under it; nothing was tapped`.
+- **`scroll_until C`** on the same three: `stopped before any swipe — element is in the viewport but under button
+  "Target W" … drawn over it as a screenshot shows …`; the app logged no stroke, no touch, no `dismissed`.
+- As before: blur-menu-grouped's WDA C (W listed after it, under it by draw order: refused, its scroll three strokes on
+  the blur — residual 9's, #31); A, B, D beneath the blur `Tapped` (each logging `dismissed menu`) and fully visible
+  (residual 9); K and the grouped W `Tapped`. Nothing closed the menu in any C or W case.
+- The same anomaly as round 8's first run: in -1.json idb's `tap A`, the run's first case on a just-booted simulator,
+  timed out waiting for A, nothing tapped — ok vacuously, FIXED printed for its residual-9 entry; in -2.json it read
+  Tapped (the menu dismissed), so the entry stays, and -1.json is pinned exiting 1 on that line alone.
+- Not measured separately: the latency of the one screenshot the W and C taps now take (the record keeps no timings).
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

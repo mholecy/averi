@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { lookAt, lookOn } from '../../src/ui-tree/look.js';
-import { presentedRemedy, sceneOf, unorderedRemedy } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, sceneOf, seenOverRemedy, unorderedRemedy } from '../../src/ui-tree/standing.js';
+import type { OrderQuestion } from '../../src/ui-tree/eyes.js';
+import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
+import { judgeOrder } from '../../src/verify/eyes.js';
+import { PNG } from 'pngjs';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
@@ -88,10 +92,10 @@ const ON_PIXEL: On = {
  * The tap's refusal of `target` on `tree` (or its point), as the guard's clear path judges it: the look of the tree
  * over a reading that sees no keyboard, its position the tree's own (or `idbLine`'s).
  */
-async function tapSaid(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE): Promise<string> {
+async function tapSaid(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE, order?: Order): Promise<string> {
   const look = lookAt(tree, { ofKeyboard: () => false, cover: async () => undefined, corroborated: async () => false, remedy: NONE });
   try {
-    const judge = await judgeTap({ viewport: async () => device }, 'id:t', { node: target, look }, usable);
+    const judge = await judgeTap({ viewport: async () => device }, 'id:t', { node: target, look }, usable, order === undefined ? {} : { eyes: { order } });
     return JSON.stringify(await judge.aim());
   } catch (e) {
     return (e as Error).message;
@@ -103,8 +107,11 @@ const pixelSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHON
   overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { glyphs: true });
 
 /** The pixel assert's miss for `target` as a colour assert reads it: the sample rect (verify/color-parity.ts#colorSampleRect). */
-const colourSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE): Promise<string | undefined> =>
-  overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { reads: colorSampleRect, glyphs: false });
+const colourSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHONE, order?: Order): Promise<string | undefined> =>
+  overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { reads: colorSampleRect, glyphs: false, ...(order !== undefined && { eyes: { order } }) });
+
+/** The eyes' order question, as a verb asks it (ui-tree/eyes.ts#Eyes.order). */
+type Order = (question: OrderQuestion) => Promise<readonly OrderSeen[]>;
 
 /** scroll_until's outcome for `target`: two reads of the same tree, the status band known. */
 function stopOf(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE) {
@@ -742,5 +749,82 @@ describe('a refused tap on a target its moved tap keeps clear of a control liste
     const row: Row = { tree, found: [c], screen: USABLE };
     const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: IPHONE }, [row, row]), 'id:t').message;
     expect(failure).toContain('33% of it shows');
+  });
+});
+
+// THE ORDER SEEN (ADR 0024): the eyes, asked once of a target under a cover the listing does not order, tell the lab's
+// menu row W drawn over C from the screenshot (the committed blur-menu.png, judged by verify/eyes.ts#judgeOrder) — W is
+// reached by every verb, C refused by every verb as under W, seen so, with one remedy: close a menu first, no scroll.
+// docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+describe('one remedy for a target under a cover a screenshot saw drawn over it — and none for the one on top', () => {
+  const lab = async (name: string) => readFile(new URL(`../fixtures/truth/ios-iphone17-ios27/${name}`, import.meta.url));
+  const trees = async (): Promise<[string, UiNode][]> => [
+    ['idb', parseIdbDescribeAll((await lab('blur-menu.idb.json')).toString('utf8'))],
+    ['wda', parseWdaSource((await lab('blur-menu.wda.json')).toString('utf8'))],
+  ];
+  const byId = (tree: UiNode, id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
+  /** The eyes over the committed screenshot, counting the questions. */
+  const eyesOver = async () => {
+    const png = PNG.sync.read(await lab('blur-menu.png'));
+    const asked: OrderQuestion[] = [];
+    const order: Order = async (q) => (asked.push(q), judgeOrder(png, 3, q));
+    return { order, asked, sync: (q: OrderQuestion) => (asked.push(q), judgeOrder(png, 3, q)) };
+  };
+  const RULES = { direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE } as const;
+  const SEEN = 'under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order)';
+
+  it('W, seen on top: tapped at its centre, its colour measured, reached with no swipe — each verb asking once', async () => {
+    for (const [, tree] of await trees()) {
+      const w = byId(tree, 'lab.blur-menu.W');
+      const tap = await eyesOver();
+      expect(await tapSaid(tree, w, ON_IPHONE, tap.order)).toBe('{"point":{"x":201,"y":480}}');
+      expect(tap.asked.map((q) => q.pairs.map((p) => p.peer.identifier))).toEqual([['lab.blur-menu.C']]);
+      const colour = await eyesOver();
+      expect(await colourSaid(tree, w, ON_IPHONE, colour.order)).toBeUndefined();
+      expect(colour.asked).toHaveLength(1);
+      const stop = await eyesOver();
+      const played = play(RULES, [{ tree, found: [w], screen: USABLE, order: stop.sync }]);
+      expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 0 });
+      expect(played.asks).toEqual(['order']);
+    }
+  });
+
+  it('C, seen under W: refused by every verb with one remedy — close a menu first, no scroll; scroll_until stops before any swipe', async () => {
+    for (const [, tree] of await trees()) {
+      const c = byId(tree, 'lab.blur-menu.C');
+      expect(await tapSaid(tree, c, ON_IPHONE, (await eyesOver()).order)).toBe(
+        `id:t is ${SEEN}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${seenOverRemedy('touch')}; nothing was tapped`,
+      );
+      expect(await colourSaid(tree, c, ON_IPHONE, (await eyesOver()).order)).toBe(
+        'button "Target W" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — ' +
+          `the capture would show it, not the element; ${seenOverRemedy('pixel')}`,
+      );
+      const failure = failureOf(play(RULES, [{ tree, found: [c], screen: USABLE, order: (await eyesOver()).sync }]), 'id:t').message;
+      expect(failure).toBe(
+        `scroll_until id:t stopped before any swipe — element is in the viewport but ${SEEN} — 34% of it shows; no swipe was sent — ${seenOverRemedy('touch')}. ` +
+          'Last rect {"x":51,"y":470,"width":300,"height":64} in a 402x874 viewport',
+      );
+    }
+  });
+
+  it('a screenshot that could not tell: the order untold, said why, no screenshot advised again', async () => {
+    const [[, tree]] = await trees();
+    const w = byId(tree, 'lab.blur-menu.W');
+    const untold: Order = async (q) => q.pairs.map(({ peer }) => ({ peer, seen: 'untold', why: 'the two look alike (ΔE 3.10)' }));
+    const remedy = unorderedRemedy('touch', { of: 'unordered', untold: 'the two look alike (ΔE 3.10)' });
+    expect(remedy).toContain('a screenshot could not tell either (the two look alike (ΔE 3.10))');
+    expect(remedy).not.toContain('see a screenshot');
+    expect(await tapSaid(tree, w, ON_IPHONE, untold)).toBe(
+      'id:t is overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading order: which is drawn on top is not told; ' +
+        `only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${remedy}; nothing was tapped`,
+    );
+  });
+
+  it('no question where no cover is unordered: A, beneath the blur, is tapped and the eyes are not asked', async () => {
+    const [[, tree]] = await trees();
+    const eyes = await eyesOver();
+    expect(await tapSaid(tree, byId(tree, 'lab.blur-menu.A'), ON_IPHONE, eyes.order)).toMatch(/^\{"point"/);
+    expect(await colourSaid(tree, byId(tree, 'lab.blur-menu.A'), ON_IPHONE, eyes.order)).toBeUndefined();
+    expect(eyes.asked).toEqual([]);
   });
 });

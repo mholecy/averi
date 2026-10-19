@@ -37,7 +37,6 @@ const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-
 const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
-const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
@@ -159,9 +158,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // (idb's tap of blur-menu's A came back ok once, in ios-vis-r8-l4-3.json: the run's first case on a freshly booted
     // simulator, a wait that timed out with no tree — nothing tapped, vacuous; Tapped and the menu dismissed in -4.json.)
     ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', 'tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'], BLUR, 'tap-claim', 'Tapped'),
-    // blur-menu's W: refused under C, listed after it — since L4's final src (94fc318b) "which is drawn on top is not
-    // told", nothing fired (ios-vis-r8-l4-3.json, -4.json): the fix's residual (ADR 0015's amendment).
-    ...each(`ios ${src}`, ['tap:blur-menu.W'], MENU, 'tap-refused', 'refused'),
+    // blur-menu's W struck off by round 9's L4 fix (1ef11b9c, ADR 0024): the eyes see it drawn over C — Tapped, it alone
+    // fired, under idb and WDA (ios-vis-r9-l4w-1.json, -2.json); refused under C, the order not told, before.
     // The scroll case beneath the blur (round 6's iOS check, first run on iOS): the overlay with no node unseen, the stop
     // at once.
     ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.D', 'scroll:blur-menu-grouped.A', 'scroll:blur-menu-grouped.B', 'scroll:blur-menu-grouped.D'], BLUR, 'presented-stop', 'visible'),

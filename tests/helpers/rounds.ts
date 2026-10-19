@@ -1,5 +1,6 @@
 import type { DeviceScreen, Rect, Stroke, UiNode } from '../../src/adapters/types.js';
-import type { EyesAnswer } from '../../src/ui-tree/eyes.js';
+import type { EyesAnswer, OrderQuestion } from '../../src/ui-tree/eyes.js';
+import { seenOrderOf, type OrderSeen } from '../../src/ui-tree/seen-order.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
@@ -73,6 +74,8 @@ export interface Row {
   unlocated?: boolean;
   /** The answer to `ask eyes` (ui-tree/eyes.ts); default `own` — the claim confirmed. */
   eyes?: EyesAnswer;
+  /** The answer to `ask order` (ui-tree/eyes.ts#Eyes.order), from its question; default none — no eyes, the listing's order. */
+  order?: (question: OrderQuestion) => readonly OrderSeen[];
   /** The stroke the previous step drew, when it was a stroke; default `drawnFor` that step — the driver's points for it. */
   drawn?: Stroke;
   /** ms since the scroll began; default 0. */
@@ -136,7 +139,7 @@ export function treeOf(row: Row, screen: DeviceScreen): UiNode {
 const contains = (root: UiNode, n: UiNode): boolean => root.children.some((c) => c === n || contains(c, n));
 
 type Step = Exclude<RoundStep, { do: 'ask' }>;
-export type Ask = 'witness' | 'unlocated' | 'eyes';
+export type Ask = 'witness' | 'unlocated' | 'eyes' | 'order';
 
 export interface Played {
   /** Per row: the questions the round asked, then the step it took. */
@@ -180,6 +183,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       asks.push(next.step.what);
       if (next.step.what === 'witness') seen.corroborated = row.corroborated ?? true;
       else if (next.step.what === 'eyes') seen.eyes = row.eyes ?? { sees: 'own' };
+      else if (next.step.what === 'order') seen.order = seenOrderOf(next.step.question.node, row.order?.(next.step.question) ?? []);
       else seen.unlocated = row.unlocated ?? false;
       next = round(state, seen);
     }

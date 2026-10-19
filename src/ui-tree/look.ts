@@ -1,6 +1,7 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { readKeyboard, type KeyboardReading } from './keyboard-cover.js';
 import { keyboardPosition, type KeyboardPosition } from './keyboard-position.js';
+import type { SeenOrder } from './seen-order.js';
 import { sceneOf, type Scene } from './standing.js';
 
 /**
@@ -57,13 +58,27 @@ export type LookReading = Pick<KeyboardReading, 'ofKeyboard'> & Partial<Pick<Key
 
 /** The look of `tree` with `reading` (taken off that tree): every member derived on first use, once; nothing asked of the device. */
 export function lookAt<R extends LookReading>(tree: UiNode, reading: R): Look<R> {
+  return lookOf(tree, reading, undefined);
+}
+
+/**
+ * `look` TOLD the order a screenshot saw (`seen`, ui-tree/seen-order.ts) of controls its tree lists in reading order: a
+ * look of the same tree and reading whose scene's draw order takes it (`sceneOf`) — what a verb that asked the eyes
+ * judges again (ui-tree/eyes.ts#judgedWithOrder; `scroll_until`'s read, interact/scroll-read.ts#factsOf). The reading
+ * memoises what it asked, so nothing is asked twice.
+ */
+export function lookTold<R extends LookReading>(look: Pick<Look<R>, 'tree' | 'reading'>, seen: SeenOrder): Look<R> {
+  return lookOf(look.tree, look.reading, seen);
+}
+
+function lookOf<R extends LookReading>(tree: UiNode, reading: R, seen: SeenOrder | undefined): Look<R> {
   let scene: Scene | undefined;
   let keyboard: KeyboardPosition | undefined;
   const look: Look<R> = {
     tree,
     reading,
     get scene() {
-      return (scene ??= sceneOf(tree));
+      return (scene ??= sceneOf(tree, seen));
     },
     get keyboard() {
       return (keyboard ??= keyboardPosition(look.scene.order, reading));

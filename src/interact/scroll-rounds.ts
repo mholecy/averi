@@ -2,10 +2,11 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
-import { askedOf, eyesQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion } from '../ui-tree/eyes.js';
+import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
+import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
-import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
+import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
@@ -41,8 +42,9 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  *   saw. A step `ask` changes nothing — `state` comes back as it went in —
  *   and the driver calls `round` again with the SAME seen plus the answer
  *   (`corroborated` for `witness`, `unlocated` for `unlocated`, `eyes` for
- *   `eyes` — its question carried by the step, ui-tree/eyes.ts); a round asks
- *   at most once of each, the witness first, the eyes last. That re-entry is what keeps the
+ *   `eyes`, `order` for `order` — each eyes' question carried by the step,
+ *   ui-tree/eyes.ts); a round asks at most once of each, the witness first,
+ *   the order next, the eyes last. That re-entry is what keeps the
  *   reducer free of async: the two questions cost a device query each on
  *   Android. Which read asks the witness is
  *   interact/scroll-read.ts#judgeRead's rule; the probe's late witness and
@@ -58,8 +60,9 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  * - `stop`: the scroll is over; `outcome` says how (interact/scroll-text.ts
  *   renders it — the reply or the failure, one switch over its kind).
  *
- * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead);
- * motion observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
+ * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead),
+ * then `ask order` for a best match covered by a control the listing does not order (ADR 0024) and the judgement again
+ * on what the eyes saw; motion observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
  * PROBE_REACH; then `ask unlocated` on a `fully: true` stop with no cover under it; then `ask eyes` on a stop that would
  * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
@@ -118,6 +121,8 @@ export interface RoundSeen {
   unlocated?: boolean;
   /** The answer to `ask eyes`: what the eyes saw of the step's question (ui-tree/eyes.ts). */
   eyes?: EyesAnswer;
+  /** The answer to `ask order`: the order the eyes saw of the step's question (ui-tree/eyes.ts#Eyes.order), as a look is told it (ui-tree/eyes.ts#orderSeenBy) — none seen when no eyes were wired. */
+  order?: SeenOrder;
   /** ms since the scroll began (after the device's screen was read), stamped on every call — re-entry included. */
   elapsedMs: number;
   /**
@@ -145,6 +150,8 @@ export type RoundStep =
   | { do: 'ask'; what: 'witness' | 'unlocated' }
   /** Look (ui-tree/eyes.ts): ask the eyes `question` — one screenshot — and call `round` again with the same seen and the answer (`eyes`); the state is unchanged. */
   | { do: 'ask'; what: 'eyes'; question: EyesQuestion }
+  /** Look (ui-tree/eyes.ts#Eyes.order): ask the eyes which of the target and a control the listing does not order is drawn on top — one screenshot — and call `round` again with the same seen and the answer (`order`); the state is unchanged. */
+  | { do: 'ask'; what: 'order'; question: OrderQuestion }
   /** Settle, read again, send nothing — a confirming read (SETTLE_CONFIRM_READS), or a confirming read that did not read, read again. */
   | { do: 'confirm' }
   /**
@@ -228,12 +235,14 @@ export type ScrollOutcome = (
   | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; layer?: MarkedLayer; next?: undefined }
   | { kind: 'presented'; swipes: number; judged: Judged | undefined; viewport: Rect; next: PresentedTouchDown }
   /**
-   * Under a cover whose order against it the tree does not tell (ui-tree/standing.ts#Remedy's `unordered`: the two
-   * listed in reading order): stopped without a swipe — no scroll tells which is drawn on top, and a stroke beside an
-   * in-screen menu lands on its backdrop.
+   * Under a cover the tree lists in reading order with it (ui-tree/standing.ts#Remedy's `unordered`, the order not
+   * told — `remedy.untold` when a screenshot could not tell either —, or `seenOver`, a screenshot saw it drawn over the
+   * target): stopped without a swipe — no scroll tells which is drawn on top or moves the target out from under it, and
+   * a stroke beside an in-screen menu lands on its backdrop.
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+   * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
-  | { kind: 'unordered'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode }
+  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
   | {
       kind: 'bound';
       swipes: number;
@@ -1353,9 +1362,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // judged and the frames — or the witness to ask first, which changes
   // nothing (the state comes back as it went in). A round whose tree did
   // not read judges nothing.
-  const judged = read === undefined ? undefined : judgeRead(read, s.frame, fully, seen.corroborated);
+  const judged = read === undefined ? undefined : judgeRead(seen.order === undefined ? read : { ...read, seen: seen.order }, s.frame, fully, seen.corroborated);
   if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
   const best = judged?.best;
+  // THE ORDER SEEN (ui-tree/eyes.ts, ADR 0024): the best match covered by a control the listing does not order — the
+  // eyes are asked once which is drawn on top, and the read judged again on what they saw (`RoundSeen.order`). Such a
+  // stop never strokes (`overlapped`, below), so one screenshot ends the scroll's question.
+  const ordering = seen.order !== undefined || best === undefined || read === undefined ? undefined : orderQuestion(read.tree, best.node, best.standing);
+  if (ordering !== undefined) return { state, step: { do: 'ask', what: 'order', question: ordering } };
   const cover = judged?.cover;
   const offered = judged?.offered;
   if (cover !== undefined) {
@@ -1455,8 +1469,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
     if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
-    // Under a cover whose order the tree does not tell (listed in reading order), no swipe tells which is on top: stop.
-    if (best.standing.kind === 'covered' && best.standing.remedy.of === 'unordered') return stop(s, { kind: 'unordered', swipes: s.swipes, judged: best, viewport, cover: best.standing.cover });
+    // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — no swipe tells which is
+    // on top or moves it out from under the other: stop.
+    if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver')) {
+      return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cover: best.standing.cover, remedy: best.standing.remedy });
+    }
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the
