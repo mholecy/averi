@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
@@ -282,34 +282,38 @@ describe('PARKED cell content of a SCROLLED table — the parked frame lies abov
     });
   });
 
-  it('the sweep: over every raw WDA capture, the parser moves exactly the parked elements — the Contacts sheet\'s and the long list\'s at rest, the long list\'s scrolled — and nothing of the lab\'s carousel, Account Detail\'s cards, the SWIFT form or the bounded scroll views', async () => {
-    const moved = async (name: string): Promise<number> => {
-      const raw = JSON.parse(await readFile(new URL(`../fixtures/wda-capture-${name}.json`, import.meta.url), 'utf8')) as { value: RawEl };
+  it('the sweep: over every raw /source payload in tests/fixtures (wda-*.json), the parser moves exactly the parked elements — the Contacts sheet\'s and the long list\'s at rest, the long list\'s scrolled — and nothing else; of the payloads moving nothing only the lab\'s form-picker holds cells (15, all on screen), so the rest guard only that no content outside a cell moves (the scroll-view shape and the above-the-view clause are pinned by the synthetic trees above)', async () => {
+    const dir = new URL('../fixtures/', import.meta.url);
+    const counts: Record<string, number> = {};
+    for (const file of (await readdir(dir)).filter((f) => /^wda-.*\.json$/.test(f)).sort()) {
+      const raw = JSON.parse(await readFile(new URL(file, dir), 'utf8')) as RawEl & { value?: unknown };
+      const root = (typeof raw.type === 'string' ? raw : raw.value) as RawEl | undefined;
+      if (typeof root?.type !== 'string') continue; // a ui_snapshot capture, not a /source payload
       let count = 0;
       const zip = (e: RawEl, n: UiNode): void => {
         if (e.rect !== undefined && at(n) !== `${e.rect.x},${e.rect.y} ${e.rect.width}x${e.rect.height}`) count++;
         (e.children ?? []).forEach((c, i) => { if (n.children[i] !== undefined) zip(c, n.children[i]); });
       };
-      zip(raw.value, parseWdaSourceValue(raw));
-      return count;
-    };
-    const names = ['contacts-new-contact', 'contacts-discard-popover', 'lab-sheet-long-list', 'lab-sheet-long-list-scrolled-273', 'lab-sheet-long-list-scrolled-522', 'lab-carousel-in-list', 'account-detail-bar-shown', 'swift-form-pushed', 'lab-scroll-bounded'];
-    const counts = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await moved(n)] as const)));
-    expect(counts).toEqual({
-      'contacts-new-contact': 41,
-      'contacts-discard-popover': 41,
-      'lab-sheet-long-list': 81,
-      'lab-sheet-long-list-scrolled-273': 72,
-      'lab-sheet-long-list-scrolled-522': 75,
-      'lab-carousel-in-list': 0,
-      'account-detail-bar-shown': 0,
-      'swift-form-pushed': 0,
-      'lab-scroll-bounded': 0,
+      zip(root, parseWdaSourceValue(raw));
+      counts[file.replace(/\.json$/, '')] = count;
+    }
+    const moved = Object.fromEntries(Object.entries(counts).filter(([, n]) => n > 0));
+    expect(moved).toEqual({
+      'wda-capture-contacts-discard-popover': 41,
+      'wda-capture-contacts-new-contact': 41,
+      'wda-capture-lab-sheet-long-list': 81,
+      'wda-capture-lab-sheet-long-list-scrolled-273': 72,
+      'wda-capture-lab-sheet-long-list-scrolled-522': 75,
     });
+    // Swept, moving nothing: the lab's form-picker (cells on screen), carousel and bounded scroll views, Account
+    // Detail, the SWIFT form, the MyPort and skeleton logins, the filter sheet, the synthetic alert.
+    expect(Object.keys(counts).length).toBe(19);
+    expect(counts['wda-capture-lab-form-picker']).toBe(0);
   });
 });
 
 interface RawEl {
+  type?: unknown;
   rect?: { x: number; y: number; width: number; height: number };
   children?: RawEl[] | null;
 }

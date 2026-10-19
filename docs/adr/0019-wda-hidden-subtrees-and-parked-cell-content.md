@@ -174,17 +174,20 @@ reads, since this amendment:
   `scroll_until text:"Row 30"` down read the row above the screen after its first stroke and turned up three times
   until its budget ran out, in every live run.
 - **Why this narrow.** The scroll-view shape was added against content scrolled out sideways read as parked (a
-  carousel's chip past its scroller, a collection view's card past its edge); those negatives still hold, as does a
-  badge hung off an on-screen cell. Above the view only the content origin's column is taken — the left edge, which
-  every measured parked frame shares with its view (Contacts' `0,62` on its `Table 0,62`; the lab's `0,…` on its
-  `Table 0,62`). An unlaid cell's element above the view off its left edge, beside the view or below it keeps its rect.
-  At rest nothing changes: Contacts' two scroll-bar indicators, parked inside the view but not at its origin
-  (`297,62 30x22`, `0,70 330x11`), are placed as before.
-- **The sweep.** Over every raw WDA capture in tests/fixtures (the two Contacts sheets, the long list at rest and
-  scrolled twice, the lab's carousel-in-list, Account Detail's cards, the SWIFT form, the lab's bounded scroll views)
-  the parser moves exactly the parked elements: 41, 41, 81, 72, 75 and none elsewhere
-  (tests/adapters/wda-source-visibility.test.ts). The golden harness (1344 checks over the truth corpus, captured at
-  launch) gives byte-identical replies before and after.
+  carousel's chip past its scroller, a collection view's card past its edge); those negatives, and a badge hung off an
+  on-screen cell, are SYNTHETIC trees (tests/adapters/wda-source-visibility.test.ts), and they still hold. No real
+  capture pins the shape: the lab's carousel holds no `Cell`, so the rule never asks it. Above the view only the
+  content origin's column is taken — the left edge, which every measured parked frame shares with its view (Contacts'
+  `0,62` on its `Table 0,62`; the lab's `0,…` on its `Table 0,62`) — pinned by synthetic elements too: an unlaid
+  cell's element above the view off its left edge, beside the view or below it keeps its rect. At rest nothing
+  changes: Contacts' two scroll-bar indicators, parked inside the view but not at its origin (`297,62 30x22`,
+  `0,70 330x11`), are placed as before.
+- **The sweep.** Over every raw `/source` payload in tests/fixtures (`wda-*.json`, 19) the parser moves exactly the
+  parked elements: the two Contacts sheets 41 and 41, the long list at rest 81, scrolled 72 and 75, and nothing
+  elsewhere. Of the 14 that move nothing only the lab's `form-picker` holds cells (15, every one on screen: a real
+  on-screen-cells negative); the other 13 hold no `Cell`, so `parkedIn` returns before any shape is asked — they
+  guard only that no content outside a cell moves. The golden harness (at e856afc 1344 checks, at 461d6fd 1350, the
+  truth corpus captured at launch) gives byte-identical replies before and after.
 - **Not taken, unmeasured:** a horizontally scrolled view's parked frame (moved left, not up), and a scroll view
   whose content is inset from its left edge (its parked frame, if WDA parks there, would sit off that edge and keep
   its rect above the view).
