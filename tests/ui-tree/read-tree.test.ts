@@ -160,7 +160,28 @@ describe('pollTree — the one deadline loop', () => {
     reads = 0;
     const read = await pollTree({ uiTree: async () => (reads++, tree) }, () => undefined, { timeoutMs: 0, pollMs: 2 });
     expect(reads).toBe(1);
-    expect(read).toEqual({ timedOut: true, detail: undefined, readError: undefined, treesRead: 1 });
+    expect(read).toEqual({ timedOut: true, detail: undefined, readError: undefined, treesRead: 1, lastTree: tree });
+  });
+
+  it('lastTree is the last tree READ: a failed read after it leaves it standing, beside the read error', async () => {
+    const second: UiNode = { ...tree, label: 'second' };
+    const script: (UiNode | Error)[] = [tree, second, new Error('transient')];
+    let reads = 0;
+    const outcome = await pollTree(
+      {
+        uiTree: async () => {
+          const next = script[Math.min(reads++, script.length - 1)];
+          if (next instanceof Error) throw next;
+          return next;
+        },
+      },
+      () => undefined,
+      FAST,
+    );
+    expect(reads).toBeGreaterThan(3);
+    if (!outcome.timedOut) throw new Error('expected a timeout');
+    expect(outcome.lastTree).toBe(second);
+    expect(outcome.readError?.message).toBe('transient');
   });
 
   it('treesRead counts only the rounds that READ a tree — a read error after good reads does not reset it, and every failed round adds nothing', async () => {

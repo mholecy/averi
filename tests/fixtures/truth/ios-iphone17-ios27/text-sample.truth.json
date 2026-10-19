@@ -1,0 +1,448 @@
+{
+  "cell": "text-sample",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.text-sample.A",
+      "text": "Prihlásiť sa",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 64
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,96.0"
+        }
+      ],
+      "drawn": 0.986,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 64,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 64,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "B",
+      "id": "lab.text-sample.B",
+      "text": "Ľubomír Šťastný",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 136
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,168.0"
+        }
+      ],
+      "drawn": 0.979,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 136,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 136,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "C",
+      "id": "lab.text-sample.C",
+      "text": "Mäkčeň, dĺžeň a vokáň",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 208
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,240.0"
+        }
+      ],
+      "drawn": 0.971,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 208,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 208,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "D",
+      "id": "lab.text-sample.D",
+      "text": "Jiří Dvořák: věřitel, půjčka",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 280
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,312.0"
+        }
+      ],
+      "drawn": 0.968,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 280,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 280,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "E",
+      "id": "lab.text-sample.E",
+      "text": "Payee’s name",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 352
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,384.0"
+        }
+      ],
+      "drawn": 0.984,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 352,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 352,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "F",
+      "id": "lab.text-sample.F",
+      "text": "Poznámka “pre mňa” a ‘OK’",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 424
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,456.0"
+        }
+      ],
+      "drawn": 0.969,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 424,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 424,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "G",
+      "id": "lab.text-sample.G",
+      "text": "Splatnosť 1–15 — mesačne…",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 496
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,528.0"
+        }
+      ],
+      "drawn": 0.97,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 496,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 496,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "H",
+      "id": "lab.text-sample.H",
+      "text": "1 234,56 €",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 568
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,600.0"
+        }
+      ],
+      "drawn": 0.988,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 568,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 568,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "I",
+      "id": "lab.text-sample.I",
+      "text": "−12 345,00 EUR",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 640
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,672.0"
+        }
+      ],
+      "drawn": 0.981,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 640,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 640,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "J",
+      "id": "lab.text-sample.J",
+      "text": "SK31 1200 0000 1987 4263 7541",
+      "color": "#E3F2FD",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 380,
+        "x": 11,
+        "y": 712
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,744.0"
+        }
+      ],
+      "drawn": 0.96,
+      "seen": "#E3F2FD",
+      "geometry": "whole",
+      "visible": {
+        "x": 11,
+        "y": 712,
+        "width": 380,
+        "height": 64
+      },
+      "piece": {
+        "x": 11,
+        "y": 712,
+        "width": 380,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  }
+}

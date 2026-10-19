@@ -10,7 +10,8 @@ import { join } from 'node:path';
  *   { "platform": "ios" | "android", "app"?: string, "screen"?: { width, height },
  *     "device"?: string, "note"?: string,
  *     "captures": [{ "file": string, "source": "wda" | "idb" | "uiautomator",
- *                    "form": "raw" | "normalized", "app"?, "screen"?, "note"? }] }
+ *                    "form": "raw" | "normalized", "app"?, "screen"?, "note"?,
+ *                    "screenshot"?: string, "truth"?: string }] }
  *
  * A RAW capture is the payload the tree source read off the device — WDA's
  * `/source?format=json` body, idb's `ui describe-all --json` array,
@@ -21,7 +22,9 @@ import { join } from 'node:path';
  *
  * The screen is the device's, in the tree's units (points on iOS, pixels on
  * Android) — what the fake device answers for `idb describe` and `wm size`;
- * a capture's own overrides its run's. The corpus itself lives outside the
+ * a capture's own overrides its run's. A ground-truth capture (scripts/truth/capture.ts) also names the screenshot the
+ * device showed and its truth file (scripts/truth/schema.ts#CellTruth), both beside it: the golden mode
+ * (golden.ts) serves the one and judges by the other. The corpus itself lives outside the
  * repository (device trees of real apps); the repository's committed sample
  * is a handful of tests/fixtures trees.
  */
@@ -41,6 +44,10 @@ export interface CaptureEntry {
   app?: string;
   screen?: Screen;
   note?: string;
+  /** A PNG beside the capture: the screen the device showed when the tree was read. */
+  screenshot?: string;
+  /** A JSON beside the capture: what the screen is known to show (scripts/truth/schema.ts#CellTruth). */
+  truth?: string;
 }
 
 export interface RunManifest {
@@ -64,6 +71,10 @@ export interface Recording {
   screen?: Screen;
   note?: string;
   payload: string;
+  /** The screenshot's path, when the capture names one. */
+  screenshot?: string;
+  /** The truth file's path, when the capture names one. */
+  truth?: string;
 }
 
 /** Which source kinds each platform's adapter reads — a capture of another kind has no reader to replay it through. */
@@ -105,6 +116,11 @@ export async function loadCorpus(dir: string): Promise<Recording[]> {
       } catch (e) {
         throw new Error(`corpus capture ${id}: ${(e as Error).message}`, { cause: e });
       }
+      for (const extra of [c.screenshot, c.truth]) {
+        if (extra !== undefined && !(await stat(join(runDir, extra)).catch(() => undefined))?.isFile()) {
+          throw new Error(`corpus capture ${id}: ${extra} is missing`);
+        }
+      }
       const app = c.app ?? manifest.app;
       const screen = c.screen ?? manifest.screen;
       out.push({
@@ -118,6 +134,8 @@ export async function loadCorpus(dir: string): Promise<Recording[]> {
         ...(screen !== undefined && { screen }),
         ...(c.note !== undefined && { note: c.note }),
         payload,
+        ...(c.screenshot !== undefined && { screenshot: join(runDir, c.screenshot) }),
+        ...(c.truth !== undefined && { truth: join(runDir, c.truth) }),
       });
     }
   }

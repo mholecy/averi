@@ -1,0 +1,110 @@
+{
+  "cell": "form-prefilled",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "frames": {
+    "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 453,
+      "height": 66
+    },
+    "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+    },
+    "email.title": {
+      "x": 55,
+      "y": 496,
+      "width": 321,
+      "height": 66
+    },
+    "email": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+    },
+    "iban.title": {
+      "x": 55,
+      "y": 678,
+      "width": 383,
+      "height": 66
+    },
+    "iban": {
+      "x": 55,
+      "y": 750,
+      "width": 970,
+      "height": 99
+    },
+    "amount.title": {
+      "x": 55,
+      "y": 860,
+      "width": 460,
+      "height": 66
+    },
+    "amount": {
+      "x": 55,
+      "y": 932,
+      "width": 970,
+      "height": 99
+    },
+    "pin.title": {
+      "x": 55,
+      "y": 1042,
+      "width": 83,
+      "height": 66
+    },
+    "pin": {
+      "x": 55,
+      "y": 1114,
+      "width": 970,
+      "height": 99
+    },
+    "submit": {
+      "x": 55,
+      "y": 1246,
+      "width": 970,
+      "height": 132
+    }
+  },
+  "events": [],
+  "fields": {
+    "name": {
+      "value": "Jan Šťastný",
+      "focused": false,
+      "error": null
+    },
+    "email": {
+      "value": "jan.stastny@example.com",
+      "focused": false,
+      "error": null
+    },
+    "iban": {
+      "value": "SK31 1200 0000 1987 4263 7541",
+      "focused": false,
+      "error": null
+    },
+    "amount": {
+      "value": "1 234,56",
+      "focused": false,
+      "error": null
+    },
+    "pin": {
+      "value": "2580",
+      "focused": false,
+      "error": null
+    }
+  },
+  "focus": null,
+  "keyboard": null,
+  "submits": []
+}

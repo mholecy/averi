@@ -1,0 +1,16 @@
+{
+  "family": "base",
+  "note": "The control: four coloured targets, nothing over them (phase 1). Every other family's targets are judged against what `open` shows works. App files: AveriLab/Base.swift (the coloured-target host, Slot, TargetView), Base.kt.",
+  "cells": [
+    {
+      "id": "open",
+      "layer": "none",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "open" }
+      ]
+    }
+  ]
+}

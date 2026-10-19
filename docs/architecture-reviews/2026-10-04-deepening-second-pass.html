@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review for averi — 2026-10-04</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 4 4; }
+      .leak { stroke: #dc2626; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .mod { @apply border border-slate-300 bg-white rounded px-2 py-1 text-xs uppercase tracking-wider; }
+      .lbl { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+      .mermaid svg { max-height: 340px; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+      <!-- ─────────────────────────── HEADER ─────────────────────────── -->
+      <header class="space-y-4">
+        <h1 class="font-serif text-4xl">Architecture review · <span class="text-indigo-700">averi</span></h1>
+        <p class="text-slate-600">2026-10-04 · branch <code class="font-mono text-sm">architecture/deepening</code> at <code class="font-mono text-sm">c4a2491</code> · 36 test files, 1 055 tests green · second pass after the 2026-08-14 review</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 items-center">
+          <span class="lbl">Legend</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-5 h-3 border border-slate-400 bg-white"></span> module</span>
+          <span class="inline-flex items-center gap-1"><svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#475569" stroke-width="1.5" class="seam"/></svg> seam</span>
+          <span class="inline-flex items-center gap-1"><svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#dc2626" stroke-width="2"/></svg> leakage</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-5 h-3 deep rounded-sm"></span> deep module</span>
+          <span class="ml-4 inline-flex gap-1">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700">Speculative</span>
+          </span>
+        </div>
+      </header>
+
+      <!-- ─────────────────────────── PREVIOUS REVIEW STATUS ─────────────────────────── -->
+      <section id="previous" class="space-y-4">
+        <h2 class="font-serif text-2xl">What the 2026-08-14 review asked for, and what landed</h2>
+        <p class="text-sm text-slate-600">Source: <code class="font-mono">docs/architecture-review-2026-08-14.md</code> §5. Nine steps, nine commits on this branch. Layer arrows all point down (<code class="font-mono">mcp → run → flow → interact → verify → ui-tree → adapters</code>, checked by grep).</p>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-left lbl text-slate-600"><tr><th class="px-3 py-2">#</th><th class="px-3 py-2">Step</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Evidence / residue</th></tr></thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="px-3 py-2">1</td><td class="px-3 py-2">Tolerance constants single-owner (C3)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 font-mono text-xs">DEFAULT_TOLERANCE_PCT · DEFAULT_TOLERANCE_DE · DEFAULT_SIZE_TOLERANCE_PCT, one owner each</td></tr>
+              <tr><td class="px-3 py-2">2</td><td class="px-3 py-2">verify/layout-contract.ts + ui-tree/geometry.ts (S5, E2)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 text-xs">Viewport predicates still sit in <span class="font-mono">selectors.ts</span>, not geometry → <a class="text-indigo-700 underline" href="#c8">C8</a></td></tr>
+              <tr><td class="px-3 py-2">3</td><td class="px-3 py-2">ElementSpec → ui-tree, ElementAssert → verify, parseDuration → util (S2, S3)</td><td class="px-3 py-2 text-amber-700">Partly</td><td class="px-3 py-2 text-xs">Moves done. <span class="font-mono">loadEnvBeside</span> still mutates module state and <span class="font-mono">process.env</span>; config.ts grew 455 → 728 lines → <a class="text-indigo-700 underline" href="#c2">C2</a>, <a class="text-indigo-700 underline" href="#c6">C6</a></td></tr>
+              <tr><td class="px-3 py-2">4</td><td class="px-3 py-2">tapElement off DeviceAdapter (S4, E1)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 text-xs">Now <span class="font-mono">interact/tap.ts</span>. The interface then regained two Android-only members → <a class="text-indigo-700 underline" href="#c7">C7</a></td></tr>
+              <tr><td class="px-3 py-2">5</td><td class="px-3 py-2">One poll primitive (E3)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 font-mono text-xs">ui-tree/read-tree.ts#pollTree; Verifier.poll, FlowEngine.pollUntil, resolveSettled are callers</td></tr>
+              <tr><td class="px-3 py-2">6</td><td class="px-3 py-2">verify / appHealth / stability out of server.ts (S1, C1)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 text-xs"><span class="font-mono">run/verify.ts</span> (987 test lines), <span class="font-mono">run/commands.ts</span>, <span class="font-mono">mcp/tools.ts</span> tested over in-memory transport. <span class="font-mono">paritySection</span> landed. One measurement phase stayed up in run/ → <a class="text-indigo-700 underline" href="#c3">C3</a></td></tr>
+              <tr><td class="px-3 py-2">7</td><td class="px-3 py-2">Dispatch-table runStep; decompose compare* (C1)</td><td class="px-3 py-2 text-amber-700">Partly</td><td class="px-3 py-2 text-xs"><span class="font-mono">runStep</span> is 23 lines; dispatch stays an if-chain by decision (<span class="font-mono">engine.ts:487</span>). <span class="font-mono">compareRectParity</span> decomposed; color (130) and text (190) still single bodies. Step kinds now have 8 owners → <a class="text-indigo-700 underline" href="#c4">C4</a></td></tr>
+              <tr><td class="px-3 py-2">8</td><td class="px-3 py-2">pairFieldErrors · swipeVector · one sleep · one describeSpec (E5, C4–C6)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 font-mono text-xs">adapters/field-errors.ts · interact/swipe.ts · util/sleep.ts</td></tr>
+              <tr><td class="px-3 py-2">9</td><td class="px-3 py-2">Table mechanics only (E4)</td><td class="px-3 py-2 text-emerald-700">Done</td><td class="px-3 py-2 font-mono text-xs">verify/table.ts: headerWithRule, row — 38 lines</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-sm text-slate-600">New since that review and therefore never reviewed: <span class="font-mono">interact/keyboard.ts</span> (soft-keyboard guard, 370 lines, two commits this week), <span class="font-mono">verify/text-parity.ts</span> (931 lines), <span class="font-mono">verify/capture.ts</span>, the <span class="font-mono">IosTreeSource</span> seam. The candidates below concentrate there.</p>
+      </section>
+
+      <!-- ─────────────────────────── CANDIDATES ─────────────────────────── -->
+      <section id="candidates" class="space-y-12">
+        <h2 class="font-serif text-2xl">Candidates</h2>
+
+        <!-- ═══════════ C1 ═══════════ -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C1 · One keyboard-action table, one <code class="font-mono text-base">back</code></h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/interact/keyboard.ts · src/interact/fill.ts (dismissKeyboard, :207-215) · src/interact/tap.ts · tests/interact/keyboard.test.ts · tests/adapters/android.test.ts (:722-787)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">Before — policy in two files, table in prose</div>
+              <div class="space-y-2 text-xs">
+                <div class="border border-slate-300 bg-white rounded p-2">
+                  <div class="lbl text-slate-500">interact/keyboard.ts</div>
+                  <div class="mt-1 text-slate-700">70-line comment = the window × witness table</div>
+                  <div class="mt-1 border border-slate-200 rounded p-1 bg-stone-50">resolveClearOfKeyboard · 140-line loop, 3 exits, 4 mutable locals</div>
+                  <div class="mt-1 border border-slate-200 rounded p-1 bg-stone-50">pressBackUnlessKeyboardDenied · whenUnknown: 'press'</div>
+                </div>
+                <div class="border-2 border-red-500 bg-white rounded p-2">
+                  <div class="lbl text-red-600">interact/fill.ts · dismissKeyboard</div>
+                  <pre class="mt-1 text-[11px] leading-tight text-slate-700">if (platform !== 'android') pressKey('enter')
+state = softKeyboard()
+hidden  → return
+shown   → pressBackUnlessKeyboardDenied
+unknown → pressKey('back')   ← second copy</pre>
+                </div>
+                <div class="text-red-600">unknown → back is encoded twice; the platform branch sits in the interact layer</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">After — one pure table, three callers</div>
+              <div class="deep rounded-lg p-3 text-white text-xs space-y-2">
+                <div class="lbl text-slate-300">interact/keyboard.ts</div>
+                <div class="border border-slate-500 rounded p-2 bg-slate-800">
+                  <span class="font-mono">keyboardAction(window, witness, covers, phase) → proceed | back | hold | refuse</span>
+                  <div class="text-slate-400 mt-1">pure · table-tested row by row</div>
+                </div>
+                <div class="grid grid-cols-3 gap-1 text-[11px] text-slate-300">
+                  <div class="border border-slate-600 rounded p-1 opacity-80">resolveClearOfKeyboard</div>
+                  <div class="border border-slate-600 rounded p-1 opacity-80">dismissKeyboard <span class="text-emerald-300">(moved in)</span></div>
+                  <div class="border border-slate-600 rounded p-1 opacity-80">pressBack…Denied</div>
+                </div>
+              </div>
+              <div class="mt-2 text-xs text-slate-600">tap.ts and fill.ts call one entry each and know nothing of witnesses</div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>The decision "what to do with this keyboard state" exists as a 70-line comment, a 140-line loop and a 9-line copy in fill.ts, and a <code class="font-mono">back</code> that can navigate the app is sent from two owners.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Lift the state table into a pure function the guard loop and the dismissal both call; move <code class="font-mono">dismissKeyboard</code> into keyboard.ts, which already claims to be "THE ONE back".</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>locality: one table, one fix</li><li>table rows become unit tests</li><li>delete the second unknown→back</li><li>adapter tests stop pinning guard cadence</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test: delete keyboard.ts and the guard reappears in tap.ts and fill.ts — it earns its keep; the friction is that part of it already has. Note the cross-layer tests at <span class="font-mono">android.test.ts:722-787</span> re-run <span class="font-mono">keyboard.test.ts</span> scenarios and pin the adb call order; keep one e2e file for that and let adapter tests assert adapter behaviour.</p>
+        </article>
+
+        <!-- ═══════════ C2 ═══════════ -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C2 · Credentials stop travelling through <code class="font-mono text-base">process.env</code></h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">ports &amp; adapters</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/flow/config.ts (loadEnvBeside :570-593, resolveCredentials :537-554) · src/flow/engine.ts (expandEnv :844-882, :152) · src/run/commands.ts · src/run/verify.ts :366 · tests/flow/config.test.ts :238-300</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">Before — an ordering invariant no type states</div>
+              <pre class="mermaid">
+sequenceDiagram
+  participant T as mcp/tools
+  participant L as loadProjectConfig
+  participant E as process.env
+  participant F as FlowEngine
+  T->>L: load(averi.yaml)
+  L->>E: write .env.averi vars (module-state refresh)
+  T->>F: new FlowEngine(cfg)
+  F->>E: read AVERI_ENV (constructor)
+  F->>E: read ${VAR} at STEP time
+  Note over L,F: construct after loadProjectConfig,<br/>never after parseConfig — or ${VAR} fails<br/>with "create the file you already have"
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">After — env is a value the loader returns</div>
+              <pre class="mermaid">
+sequenceDiagram
+  participant T as mcp/tools
+  participant L as flow/load
+  participant C as flow/credentials
+  participant F as FlowEngine
+  T->>L: load(averi.yaml)
+  L-->>T: { cfg, env }
+  T->>C: resolve(cfg, env, environment)
+  C-->>T: Credentials (frozen)
+  T->>F: new FlowEngine(cfg, credentials)
+  Note over L,C: process.env is read in ONE function;<br/>the ordering is now a parameter
+              </pre>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>Three modules read <code class="font-mono">process.env</code>; the loader mutates it and keeps a module-level <code class="font-mono">envVarsFromFile</code>, so the interface of <code class="font-mono">FlowEngine</code> includes "call the right loader first", and config tests scrub the global by hand.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>The loader returns <code class="font-mono">env</code> beside <code class="font-mono">cfg</code>; a <code class="font-mono">flow/credentials</code> module resolves <code class="font-mono">$name</code> / <code class="font-mono">${VAR}</code> / environments from that map once and hands the engine frozen values.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>interface shrinks: ordering becomes a type</li><li>locality: one env reader</li><li>tests inject a map, no global scrub</li><li>step-time env reads disappear</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test: delete <code class="font-mono">loadEnvBeside</code> and the behaviour vanishes — it earns its keep, at the wrong seam. The refresh semantics it documents (2026-08-05 stale-credential bug) survive unchanged inside the loader.</p>
+        </article>
+
+        <!-- ═══════════ C3 ═══════════ -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C3 · The text dimension measures its own legs</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/run/verify.ts (runOcr :542-594, collect :470-475) · src/verify/text-parity.ts (TextCapture :119-126, ocrRegionsFor :349) · src/verify/ocr.ts (ocrUnavailableReason :81) · src/verify/assert.ts :352-356</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">Before — cross-section of one verify run</div>
+              <div class="space-y-1 text-xs">
+                <div class="lbl text-slate-500 pl-2">run/verify.ts · paritySection</div>
+                <div class="h-10 border-l-4 border-emerald-500 bg-white px-2 flex items-center justify-between"><span>rect</span><span class="text-slate-500">collect = treeOf · 1 line</span></div>
+                <div class="h-10 border-l-4 border-emerald-500 bg-white px-2 flex items-center justify-between"><span>color</span><span class="text-slate-500">collect = measuredOf · 1 line</span></div>
+                <div class="h-24 border-l-4 border-red-500 bg-white px-2 py-1 text-slate-700">
+                  <div class="flex justify-between"><span>text</span><span class="text-red-600">collect + runOcr · 50 lines</span></div>
+                  <div class="text-[11px] mt-1 leading-tight">engine availability (copy of assert.ts) · per-leg ocrRegionsFor · engine.recognize · re-key by id · pngWidth · four degrade wordings · "Undecoded" worded twice</div>
+                </div>
+                <div class="lbl text-slate-500 pl-2 pt-1">verify/text-parity.ts</div>
+                <div class="h-10 border-l-4 border-slate-400 bg-white px-2 flex items-center"><span>compareTextParity(TextCapture{tree, ocr?, pngWidth?})</span></div>
+                <div class="text-red-600 pl-2">pngWidth "required with ocr" — not enforced; inkPct silently 0</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">After — three one-line collectors</div>
+              <div class="space-y-1 text-xs">
+                <div class="lbl text-slate-500 pl-2">run/verify.ts · paritySection</div>
+                <div class="h-10 border-l-4 border-emerald-500 bg-white px-2 flex items-center justify-between"><span>rect</span><span class="text-slate-500">treeOf</span></div>
+                <div class="h-10 border-l-4 border-emerald-500 bg-white px-2 flex items-center justify-between"><span>color</span><span class="text-slate-500">measuredOf</span></div>
+                <div class="h-10 border-l-4 border-emerald-500 bg-white px-2 flex items-center justify-between"><span>text</span><span class="text-slate-500">measureTextLeg</span></div>
+                <div class="lbl text-slate-500 pl-2 pt-1">verify/text-parity.ts</div>
+                <div class="deep rounded p-2 text-white">
+                  <div class="font-mono">measureTextLeg(contract, frame, engine) → Contribution&lt;TextCapture&gt;</div>
+                  <div class="text-slate-300 mt-1">owns crop, OCR call, degrade notes, <span class="font-mono">ocr: { byId, pngWidth }</span></div>
+                </div>
+                <div class="lbl text-slate-500 pl-2 pt-1">verify/ocr.ts</div>
+                <div class="h-9 border-l-4 border-slate-700 bg-white px-2 flex items-center font-mono">ocrEngineFor(override?) → engine | { unavailable }</div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>The text comparator's measurement phase lives one layer up in run/, so run/ must know OCR is keyed by anchor id, that <code class="font-mono">pngWidth</code> normalizes ink height, and which throws from <code class="font-mono">ocrRegionsFor</code> are policy — and the engine-selection rule is written in both run/ and assert.ts.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Move the per-leg measurement into text-parity as one function returning a <code class="font-mono">Contribution</code>; make "OCR without its normalizer" unrepresentable in <code class="font-mono">TextCapture</code>; one <code class="font-mono">ocrEngineFor</code> in ocr.ts answers "engine or the reason there is none".</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>DIMENSIONS carries <code class="font-mono">collect</code> uniformly</li><li>locality: tree-vs-OCR wording in one file</li><li>one engine-selection rule</li><li>fixture bug class closed by the type</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test: delete <code class="font-mono">runOcr</code> and its complexity reappears in exactly one place — text-parity, which already owns <code class="font-mono">ocrRegionsFor</code>, <code class="font-mono">OcrEngine</code> and the evidence wording. Pass-through that moved up a layer. <code class="font-mono">OcrEngine</code> has one production adapter; it is a test seam, legitimately so (needs swiftc), not an abstraction over recognizers.</p>
+        </article>
+
+        <!-- ═══════════ C4 ═══════════ -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C4 · A step kind has eight owners</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/flow/config.ts (:63-81, :114-215, :607, :674-683, :697-709) · src/flow/engine.ts (dispatchStep :493, stepSummary :935, runOptionalSteps :702-732)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">Before — adding <code class="font-mono">hold:</code> touches</div>
+              <pre class="mermaid">
+flowchart LR
+  K((new step<br/>kind)):::k
+  K --> A[zod union<br/>config:114]
+  K --> B[Step type<br/>config:63]
+  K --> C[childSteps<br/>config:607]
+  K --> D[stepsAreDestructive<br/>safe-leaf list :674]:::leak
+  K --> E[validateReferences<br/>config:697]
+  K --> F[dispatchStep<br/>engine:493]
+  K --> G[stepSummary<br/>engine:935]
+  K --> H[runOptionalSteps<br/>'tap' in s :706]:::leak
+  classDef k fill:#fef3c7,stroke:#d97706;
+  classDef leak stroke:#dc2626,stroke-width:2px;
+              </pre>
+              <p class="text-xs text-red-600 mt-1">A kind missing from the safe-leaf list silently disables the recovery pass. <code class="font-mono">optional:</code> re-implements <code class="font-mono">tap:</code> (own presence poll, own <code class="font-mono">splitTapSpec</code>, <code class="font-mono">timeout:</code> redefined).</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">After — one descriptor per kind</div>
+              <div class="deep rounded-lg p-3 text-white text-xs space-y-2">
+                <div class="font-mono">StepKind&lt;'tap'&gt; = { schema, summary(step), children(step), destructive(step), present?(tree) }</div>
+                <div class="grid grid-cols-4 gap-1 text-[11px] text-slate-300">
+                  <div class="border border-slate-600 rounded p-1">launch</div><div class="border border-slate-600 rounded p-1">tap</div><div class="border border-slate-600 rounded p-1">fill</div><div class="border border-slate-600 rounded p-1">wait</div>
+                  <div class="border border-slate-600 rounded p-1">branch</div><div class="border border-slate-600 rounded p-1">optional</div><div class="border border-slate-600 rounded p-1">assert</div><div class="border border-slate-600 rounded p-1">…</div>
+                </div>
+              </div>
+              <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div class="border border-slate-300 bg-white rounded p-2">config.ts<br/><span class="text-slate-500">union, childSteps, destructive, validate = derived from the table</span></div>
+                <div class="border border-slate-300 bg-white rounded p-2">engine.ts<br/><span class="text-slate-500">one typed handler per kind — the hand-written half; <code class="font-mono">optional</code> asks <code class="font-mono">kind.present(tree)</code></span></div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>Step vocabulary is spread over eight edit sites in two files; the comments at <code class="font-mono">config.ts:596-605</code> and <code class="font-mono">:658-667</code> exist to warn about exactly this drift.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>A per-kind descriptor colocating schema, summary, children, destructiveness and an optional presence probe; the engine's handler stays hand-written and typed.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>leverage: one entry, eight derivations</li><li>missing safe-leaf becomes a compile error</li><li><code class="font-mono">optional</code> stops knowing <code class="font-mono">tap</code>'s insides</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test on <code class="font-mono">dispatchStep</code> alone: pass-through, fine as is (the 2026-10-03 decision to keep the if-chain stands). On the vocabulary as a whole: it reappears in eight places. The previous review's C1 asked for the wrong thing; the chain was never the cost.</p>
+        </article>
+
+        <!-- ═══════════ C5 ═══════════ -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C5 · Trace severity and result wording get one owner</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/flow/engine.ts (TraceEntry :27, ⚠ at 8 sites, tracingDismissal :774, guard :904) · src/run/verify.ts (:141-158 assertSummary) · src/run/commands.ts (appHealth :73, :123) · src/mcp/tool-text.ts</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 text-xs space-y-2">
+              <div class="lbl text-slate-500">Before — meaning in the first character</div>
+              <pre class="bg-white border border-slate-200 rounded p-2 text-[11px] leading-tight">interface TraceEntry { action: string; detail?: string }
+
+trace.push({ action: '⚠ reach login', … })   // ×8 sites
+trace.push({ action: '↻ recovery' })
+tracingDismissal(kind: '⚠ tap' | '⚠ fill')   // literal union
+guard: t.action.startsWith('environment ')  // filter by prefix
+tests: expect(action).startsWith('↻ recovery')</pre>
+              <div class="text-red-600">loggedFailures WeakSet + swallowDepth exist to keep "one ✗ per failure" while emission is interleaved with control flow</div>
+              <div class="border border-red-400 bg-white rounded p-2">AssertResult rendered three ways: <span class="font-mono">assert PASS d — x</span> (engine :641), <span class="font-mono">PASS  d</span> (run/verify :141), <span class="font-mono">FAIL d</span> (engine :646). <span class="font-mono">appHealth</span> returns a string with a leading <span class="font-mono">\n</span> three callers rely on.</div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 text-xs space-y-2">
+              <div class="lbl text-slate-500">After — a typed entry, glyphs in the formatter</div>
+              <div class="deep rounded-lg p-3 text-white space-y-1">
+                <div class="font-mono">TraceEntry { level: ok|warn|fail|recovery; action; detail? }</div>
+                <div class="font-mono">formatTrace(entries) → glyphs live here</div>
+                <div class="font-mono">renderAssert(result, style) · healthLine(…) → one wording</div>
+              </div>
+              <div class="grid grid-cols-3 gap-1 text-[11px]">
+                <div class="border border-slate-300 bg-white rounded p-1 text-center">engine<br/><span class="text-slate-500">pushes levels</span></div>
+                <div class="border border-slate-300 bg-white rounded p-1 text-center">run/*<br/><span class="text-slate-500">calls renderers</span></div>
+                <div class="border border-slate-300 bg-white rounded p-1 text-center">mcp/tool-text<br/><span class="text-slate-500">inlined — 3 one-liners, 1 caller each</span></div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>The user-facing trace is the product's debugging surface, and its severity is a string prefix matched by filters and tests; the same assert result and health line are worded in three modules.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Give <code class="font-mono">TraceEntry</code> a level and let <code class="font-mono">formatTrace</code> own the glyphs; one renderer for assert results and the health line; inline <code class="font-mono">mcp/tool-text.ts</code> (its header admits the reason lapsed).</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>filters stop string-matching</li><li>locality: one wording per fact</li><li>delete a shallow module</li><li>interface: level is a type, not a glyph</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test on <code class="font-mono">formatTrace</code> today: pass-through, because it has nothing to decide. Deletion test on <code class="font-mono">tool-text.ts</code>: pass-through — <code class="font-mono">tests/mcp/tools.test.ts</code> already pins the responses through the protocol.</p>
+        </article>
+
+        <!-- ═══════════ C6 ═══════════ -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C6 · <code class="font-mono text-base">flow/config.ts</code> is a bag with one real seam inside</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/flow/config.ts (728 lines, 23 exports) · src/mcp/tools.ts (sole caller of projectConfigPath, iosTreeSourceFor, appBuildPath, loadConfigIfPresent)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">Before — mass diagram</div>
+              <div class="flex items-end gap-6 h-64 text-[11px]">
+                <div class="flex flex-col items-center gap-1 flex-1">
+                  <div class="w-full bg-red-200 border border-red-400 rounded-t flex items-center justify-center text-center p-1" style="height:150px">interface<br/>23 exports · 7 groups</div>
+                  <div class="w-full bg-slate-200 border border-slate-400 rounded-b flex items-center justify-center text-center p-1" style="height:90px">implementation<br/>mostly schema + one-liners</div>
+                  <div class="lbl text-slate-500 mt-1">config.ts</div>
+                </div>
+                <ul class="flex-1 text-slate-600 space-y-0.5 self-center">
+                  <li>schema + types (:9-295)</li><li>loading + I/O</li><li>credentials + env file (module state)</li><li>cross-ref validation</li><li class="text-red-600">MCP path policies — 1 caller each</li><li class="text-red-600">destructive-flow walk — descriptor semantics</li><li>launch-activity rule — 2 callers ✓</li>
+                </ul>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <div class="lbl text-slate-500 mb-2">After — three modules, one short interface each</div>
+              <div class="flex items-end gap-3 h-64 text-[11px]">
+                <div class="flex flex-col items-center gap-1 flex-1">
+                  <div class="w-full bg-slate-200 border border-slate-400 rounded-t p-1 text-center" style="height:40px">parse · validate</div>
+                  <div class="w-full deep text-white rounded-b p-1 text-center flex items-center justify-center" style="height:170px">flow/schema.ts<br/>types, zod, childSteps, flowIsDestructive</div>
+                </div>
+                <div class="flex flex-col items-center gap-1 flex-1">
+                  <div class="w-full bg-slate-200 border border-slate-400 rounded-t p-1 text-center" style="height:40px">load → {cfg, env}</div>
+                  <div class="w-full deep text-white rounded-b p-1 text-center flex items-center justify-center" style="height:110px">flow/load.ts<br/>I/O, .env.averi, paths</div>
+                </div>
+                <div class="flex flex-col items-center gap-1 flex-1">
+                  <div class="w-full bg-slate-200 border border-slate-400 rounded-t p-1 text-center" style="height:40px">resolve(cfg, env)</div>
+                  <div class="w-full deep text-white rounded-b p-1 text-center flex items-center justify-center" style="height:90px">flow/credentials.ts<br/>(C2)</div>
+                </div>
+              </div>
+              <div class="text-xs text-slate-600 mt-2">MCP path policies return to their one caller in <span class="font-mono">mcp/tools.ts</span> — they moved out only because server.ts was un-importable, and that reason lapsed on 2026-10-03.</div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>The file grew from five to seven responsibilities since the last review; four exports exist for one caller that can now import them directly, and the descriptor semantics (destructive walk) sit beside file I/O.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Split by what varies: schema (pure, imported everywhere), load (I/O and the env file with its state visibly owned), credentials (C2). Pull the four MCP policies back into tools.ts.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>interface per module shrinks</li><li>pure schema loads no I/O</li><li>C4's descriptor table has a home</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test per group: schema+validation and credentials reappear across callers (keep); the MCP path policies would just move back to their one caller (pass-through). Do this when C2 or C4 is touched, not on its own.</p>
+        </article>
+
+        <!-- ═══════════ C7 ═══════════ -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C7 · The keyboard oracle as an optional capability, not two more methods</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">ports &amp; adapters</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/adapters/types.ts (:117-229, 20 methods) · src/adapters/ios.ts (:235-242 constants) · tests/helpers/fake.ts (:80-146) · 13 Pick&lt;DeviceAdapter,…&gt; shapes across src/</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">Before — one interface, asymmetric adapters</div>
+              <pre class="mermaid">
+flowchart TB
+  I[DeviceAdapter · 20 methods]
+  I --> A[AndroidAdapter]
+  I --> S[IosAdapter]
+  I --> F[FakeAdapter · 223 lines]
+  A --- a1[softKeyboard: dumpsys]
+  A --- a2[softKeyboardWitness: input_method]
+  S -.-> s1[softKeyboard: 'unknown' constant]:::leak
+  S -.-> s2[witness: 'unknown' constant]:::leak
+  F -.-> f1[65 lines simulating two witnesses]:::leak
+  classDef leak stroke:#dc2626,stroke-width:2px;
+              </pre>
+              <p class="text-xs text-red-600 mt-1">Also asymmetric: <code class="font-mono">LaunchOptions.activity/intent</code> (iOS throws), <code class="font-mono">pressKey('back')</code> (iOS throws), <code class="font-mono">setClipboard</code> (Android throws), <code class="font-mono">uiTree({settle})</code> (iOS ignores). <code class="font-mono">fill.ts:210</code> branches on <code class="font-mono">adapter.platform</code>.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">After — capability present or absent</div>
+              <pre class="mermaid">
+flowchart TB
+  I[DeviceAdapter · 18 methods<br/>keyboard?: KeyboardOracle]
+  I --> A[AndroidAdapter<br/>keyboard = { state, witness }]
+  I --> S[IosAdapter<br/>keyboard: undefined]
+  I --> F[FakeAdapter<br/>keyboard: optional fake]
+  G[interact/keyboard.ts] -->|if !adapter.keyboard return first| I
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+  class G deep
+              </pre>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>Exactly one platform answers the keyboard question, yet every adapter — including the fake — must implement two methods whose invariant ("witness only immediately before a back") lives in interact/, and callers carve 13 different <code class="font-mono">Pick&lt;&gt;</code> views of the bag.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Model the oracle as an optional capability on the adapter; the guard's first line is the absence check. Consider the same shape for the other one-sided members.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>interface shrinks by two stubs</li><li>FakeAdapter loses 65 lines when unused</li><li>delete the <code class="font-mono">platform</code> branch in interact</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test: delete <code class="font-mono">softKeyboardWitness</code> as an interface member and the veto reappears in one place only — one meaningful adapter means a hypothetical seam. Pair with C1; the capability makes C1's table's first row "no oracle → proceed".</p>
+        </article>
+
+        <!-- ═══════════ C8 ═══════════ -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C8 · <code class="font-mono text-base">ui-tree/</code>: one matcher, geometry on the geometry shelf</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/ui-tree/selectors.ts (matches :96, findBySpec :232, viewport predicates :155-221) · geometry.ts :7-9 · text-hint.ts (1 importer: verify/assert) · masked-value.ts (10 lines, 1 importer: interact/fill)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 text-xs">
+              <div class="lbl text-slate-500 mb-2">Before — call-graph</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="border border-slate-300 bg-white rounded p-2 space-y-1">
+                  <div class="lbl text-slate-500">selectors.ts</div>
+                  <div class="border border-slate-200 rounded p-1">parse grammar → findAll → <b>matches()</b> eq/regex, text = label|value</div>
+                  <div class="border-2 border-red-400 rounded p-1"><b>findBySpec()</b> eq-only, text restated</div>
+                  <div class="border-2 border-red-400 rounded p-1">intersectsViewport · absentFromViewport · visibleFraction · clippedEdges</div>
+                  <div class="border border-slate-200 rounded p-1">preferInteractive (1 caller)</div>
+                </div>
+                <div class="space-y-1">
+                  <div class="border border-slate-300 bg-white rounded p-1"><span class="lbl text-slate-500">geometry.ts</span><br/>"predicates live in this package" — in the other file</div>
+                  <div class="border border-slate-300 bg-white rounded p-1"><span class="lbl text-slate-500">text-hint.ts</span><br/>verify's rule, tested via assert.test.ts</div>
+                  <div class="border border-slate-300 bg-white rounded p-1"><span class="lbl text-slate-500">masked-value.ts</span><br/>10 lines, one consumer, no test</div>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 text-xs">
+              <div class="lbl text-slate-500 mb-2">After — collapsed</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="deep text-white rounded p-2 space-y-1">
+                  <div class="lbl text-slate-300">selectors.ts</div>
+                  <div class="border border-slate-600 rounded p-1">findAll(root, conditions) · matches()</div>
+                  <div class="border border-slate-600 rounded p-1 text-slate-300">findBySpec = findAll(root, conditionsOf(spec))</div>
+                </div>
+                <div class="space-y-1">
+                  <div class="deep text-white rounded p-1"><span class="lbl text-slate-300">geometry.ts</span><br/>+ viewport predicates (moved in)</div>
+                  <div class="border border-slate-300 bg-white rounded p-1"><span class="lbl text-slate-500">verify/text-hint.ts</span><br/>moved to its only consumer's layer</div>
+                  <div class="border border-slate-300 bg-white rounded p-1 text-slate-500">masked-value → inlined in fill.ts</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>Two matchers over the same five fields can disagree on what <code class="font-mono">text</code> means; viewport geometry sits in the selector file its own geometry module cites; two helpers are shelves for a second consumer that never came.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Derive <code class="font-mono">findBySpec</code> from <code class="font-mono">findAll</code>; move the viewport predicates to geometry.ts; move text-hint to verify; inline masked-value.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>one matcher, one meaning of <code class="font-mono">text</code></li><li>delete two shallow modules</li><li>geometry.ts header becomes true</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test on <code class="font-mono">findBySpec</code>: it reappears as a spec→conditions conversion over <code class="font-mono">findAll</code> — pass-through. On <code class="font-mono">masked-value.ts</code>: reappears once in fill.ts — pass-through. <code class="font-mono">element-spec.ts</code> has five importers and earns its keep.</p>
+        </article>
+
+        <!-- ═══════════ C9 ═══════════ -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C9 · <code class="font-mono text-base">capture.ts</code>'s claim made true</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/verify/assert.ts (assertScreenshot :503-534, :506 bare screenshot) · src/verify/capture.ts (:7-9 claim, :225-242 pure tail) · tests/verify/color-parity.test.ts :76-79 · tests/verify/text-parity.test.ts :62-65</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">Before — one reader bypasses, fixtures re-derive</div>
+              <pre class="mermaid">
+flowchart LR
+  subgraph callers
+    S[screenshot tool] --> C
+    E[ensure_state] --> C
+    L[verify leg] --> C
+    AC[assertColor / assertOcr] --> C
+    AS[assertScreenshot]
+  end
+  C[capture.ts<br/>captureFrame → settled + pngScale + crop]:::deep
+  AS -.bare adapter.screenshot().-> D[(device)]:::leak
+  T[comparator tests] -.re-implement<br/>scale: pngScale(tree, w, h, screen).-> P[pngScale]:::leak
+  C --> P
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+  classDef leak stroke:#dc2626,stroke-width:2px;
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <div class="lbl text-slate-500 mb-2">After — every pixel reading, every fixture</div>
+              <pre class="mermaid">
+flowchart LR
+  subgraph callers
+    S[screenshot tool] --> C
+    E[ensure_state] --> C
+    L[verify leg] --> C
+    AC[assertColor / assertOcr] --> C
+    AS[assertScreenshot] --> C
+  end
+  C[capture.ts<br/>captureFrame · measuredFrameFor]:::deep
+  T[comparator tests] --> M[measuredFrameFor<br/>exported pure tail]
+  C --- M
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+              </pre>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>The baseline diff takes a mid-animation frame the 2026-10-02 change removed everywhere else, and comparator fixtures re-implement capture's one derivation line, so a wiring change in capture leaves the comparator tests green against stale fixtures — the shape of three of the four 2026-08 bugs.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Route <code class="font-mono">assertScreenshot</code> through <code class="font-mono">captureFrame</code>; export the pure tail of <code class="font-mono">captureFrame</code> and build fixtures with it.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>locality: one frame derivation, tests included</li><li>flakiest assert settled by construction</li><li>two lines of production change</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Also observed: <code class="font-mono">assertColor</code>/<code class="font-mono">assertOcr</code> call <code class="font-mono">captureFrame</code> inside the poll predicate (capture.ts :245 warns against exactly that), and <code class="font-mono">pollMs</code> doubles as the stability delay. Worth a look in the same pass; not a deepening.</p>
+        </article>
+
+        <!-- ═══════════ C10 ═══════════ -->
+        <article id="c10" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h3 class="font-serif text-xl">C10 · <code class="font-mono text-base">android.ts</code>: parsers out, launch assembly pure</h3>
+            <span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 lbl">ports &amp; adapters</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/adapters/android.ts (launch :127-170, amStart :218-262, diagnoseDumpFailure :324-370, parsers :577-789) · tests/adapters/android.test.ts (:288-470 command-string tests)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 text-xs">
+              <div class="lbl text-slate-500 mb-2">Before — cross-section of the file</div>
+              <div class="space-y-1">
+                <div class="h-8 border-l-4 border-slate-400 bg-white px-2 flex items-center">class · exec glue · 575 lines</div>
+                <div class="h-12 border-l-4 border-red-500 bg-white px-2 flex items-center justify-between"><span>launch / amStart / diagnoseDumpFailure</span><span class="text-red-600">arg building + error prose inline — testable only via ExecFn + 'adb -s … am start -n …' strings</span></div>
+                <div class="h-8 border-l-4 border-slate-400 bg-white px-2 flex items-center">typeText per-char pacing · uiautomator</div>
+                <div class="h-14 border-l-4 border-emerald-500 bg-white px-2 flex items-center justify-between"><span>parseInputShown · parseImeInsets · parseUiautomatorXml</span><span class="text-emerald-700">pure, tested on real dump fixtures ✓</span></div>
+                <div class="text-slate-500">the launch maintainer scrolls past 120 lines of IME regex prose</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 text-xs">
+              <div class="lbl text-slate-500 mb-2">After — split by locality</div>
+              <div class="space-y-1">
+                <div class="deep text-white rounded p-2">android.ts · adb glue, one ExecFn seam</div>
+                <div class="border border-slate-300 bg-white rounded p-2">android-launch.ts · <span class="font-mono">amStartArgs(pkg, opts)</span> · <span class="font-mono">amStartFailure(out) → string | undefined</span> — pure, table-tested</div>
+                <div class="border border-slate-300 bg-white rounded p-2">android-dumps.ts · the three parsers and their measured rationale</div>
+              </div>
+              <div class="text-slate-500 mt-2">adapter tests assert adb behaviour; the keyboard e2e scenarios move to one integration file</div>
+            </div>
+          </div>
+
+          <dl class="grid md:grid-cols-3 gap-4 text-sm">
+            <div><dt class="lbl text-slate-500">Problem</dt><dd>Sixty lines of load-bearing launch knowledge (three entry-point shapes, "am start exits 0 on Error") can only be tested by faking <code class="font-mono">ExecError</code> with both streams and asserting command strings.</dd></div>
+            <div><dt class="lbl text-slate-500">Solution</dt><dd>Lift arg assembly and failure classification to pure functions beside the parsers; move the parsers to their own file. Layering is unchanged; this is locality.</dd></div>
+            <div><dt class="lbl text-slate-500">Wins</dt><dd><ul class="list-disc ml-4 space-y-0.5"><li>launch rules become table tests</li><li>command-string tests shrink</li><li>parsers stay where they are read</li></ul></dd></div>
+          </dl>
+          <p class="text-xs text-slate-500">Deletion test on the pure pair: the knowledge is real; deleting them puts it back into <code class="font-mono">launch</code>. Not a seam — one adapter — so no interface, just two pure functions.</p>
+        </article>
+      </section>
+
+      <!-- ─────────────────────────── LEFT ALONE ─────────────────────────── -->
+      <section id="left-alone" class="space-y-4">
+        <h2 class="font-serif text-2xl">Checked and left alone</h2>
+        <p class="text-sm text-slate-600">Recorded so the next pass does not re-suggest them.</p>
+        <ul class="grid md:grid-cols-2 gap-3 text-sm">
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b>The three parity comparators' shared skeleton.</b> Same loop shape, but the depth is in <code class="font-mono">measure</code>/compare (gap chain, OCCLUDED, per-platform stats), not the loop. A generic anchor table would be pass-through. Agrees with <code class="font-mono">run/verify.ts:200-203</code>. Only mechanics candidate: one <code class="font-mono">missingLine</code> helper, three copies differing by noun.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b>The <code class="font-mono">IosTreeSource</code> seam.</b> Two methods, two real adapters, one normalizer both call, one test table pinning both. A third source costs a field map, a shape walk and a Record entry. Only note: <code class="font-mono">IosTreeSourceDeps = Omit&lt;WdaServerOptions,'udid'&gt;</code> — the seam's dependency type is one adapter's option bag.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code class="font-mono">mcp/registry.ts</code>, <code class="font-mono">mcp/lifecycle.ts</code>, <code class="font-mono">interact/resolve.ts</code>, <code class="font-mono">wda.ts</code>.</b> Deep: binding/cache/race/disposal, the shutdown chain, one resolution policy with a required <code class="font-mono">ambiguous</code> knob that two callers set differently at the call. Nothing to extract.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b>The ensure_state ladder (250 lines across five methods + config's destructive walk).</b> <span class="px-1.5 rounded bg-slate-200 text-slate-700 text-xs">Speculative</span> One caller, so a hypothetical seam; the gain would be locality and a test surface that does not need <code class="font-mono">reachRecheckMs: 20</code> in 23 tests. Revisit when the queued follow-up at <code class="font-mono">engine.ts:434-440</code> lands.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b>Observe vs act asymmetry.</b> <span class="px-1.5 rounded bg-slate-200 text-slate-700 text-xs">Speculative</span> <code class="font-mono">resolveNow</code> drops zero-area nodes; <code class="font-mono">wait:</code> and the asserts use raw <code class="font-mono">findBySpec</code>, so a wait can be satisfied by a ghost the next tap then waits on again. Documented; one owner for acting, none for observing.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b>Engine knobs.</b> <code class="font-mono">EngineOptions</code> has 9 fields; both production callers pass <code class="font-mono">{ environment }</code>. Eight are test timing, and <code class="font-mono">util/sleep</code> is also mocked — two mechanisms for one need. A <code class="font-mono">timeouts</code> preset (or an injected clock) is small and orthogonal; mention, not a card.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3"><b>Long comment headers, <code class="font-mono">ExecFn</code>/<code class="font-mono">FetchFn</code>/<code class="font-mono">SpawnFn</code>, the two adapter classes' separate shapes.</b> Still correct as the 2026-08-14 review's "deliberately not extracting" list said.</li>
+        </ul>
+      </section>
+
+      <!-- ─────────────────────────── TOP RECOMMENDATION ─────────────────────────── -->
+      <section id="top-recommendation" class="rounded-2xl deep text-white p-8 space-y-3 shadow-lg">
+        <div class="lbl text-slate-300">Top recommendation</div>
+        <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-emerald-400 underline-offset-4">C1 · One keyboard-action table</a>, paired with <a href="#c7" class="underline decoration-emerald-400 underline-offset-4">C7</a></h2>
+        <p class="text-slate-200 max-w-3xl">It is the newest code (two commits this week), the hottest, and the only candidate where two owners can disagree about sending a <code class="font-mono">back</code> that may navigate a banking app. The table is already written — as a comment. Making it a pure function moves the guard's correctness from prose to a row-per-case test, and C7 gives that table its first row.</p>
+        <p class="text-slate-400 text-sm">Second: <a href="#c3" class="underline">C3</a> and <a href="#c2" class="underline">C2</a>, both subtractive and both closing an interface that today includes an unstated invariant.</p>
+      </section>
+
+      <footer class="text-xs text-slate-500 pb-8">Vocabulary from the codebase-design skill: module · interface · implementation · depth · seam · adapter · leverage · locality. No interfaces proposed yet — pick a candidate to design one.</footer>
+    </main>
+  </body>
+</html>

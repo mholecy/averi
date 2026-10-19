@@ -17,6 +17,7 @@ import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { readFileSync } from 'node:fs';
 import { parseDump } from '../helpers/android-dumps.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -2047,14 +2048,81 @@ flows:
     });
 
     // A window the dump does not mark (form-picker's fully expanded sheet): the presence check's ElementNotFoundError
-    // carries the active-window hint (ui-tree/standing.ts#ACTIVE_WINDOW_HINT; pinned in
-    // tests/adapters/android-presented-window.test.ts, resolvePresent on form-picker), but it is absence, so the skip
-    // line reads "(not present)" only — the hint never reaches the trace.
-    it('an Android tap whose target is not in a tree with no window marked presented: skipped (not present), nothing tapped', async () => {
+    // carries the active-window hint (ui-tree/miss.ts#ACTIVE_WINDOW_HINT; pinned in
+    // tests/adapters/android-presented-window.test.ts, resolvePresent on form-picker). It is absence, so the step is
+    // skipped "(not present)" — with the hint after it, once: the interstitial may lie beneath a sheet the tree does
+    // not list.
+    const formPickerTree = (): UiNode => {
       const raw = readFileSync(new URL('../fixtures/uiautomator-lab-form-picker.xml', import.meta.url), 'utf8');
-      const fake = new FakeAdapter({ sheet: parseDump(raw.slice(0, raw.lastIndexOf('>') + 1)) }, 'sheet');
-      expect(await skipOf(fake, 'tap: { id: lab.form-picker.name }')).toEqual(['skipped id:"lab.form-picker.name" (not present)']);
+      return parseDump(raw.slice(0, raw.lastIndexOf('>') + 1));
+    };
+    const formPicker = (): FakeAdapter => new FakeAdapter({ sheet: formPickerTree() }, 'sheet');
+    it('an Android tap whose target is not in a tree with no window marked presented: skipped (not present) with the active-window hint, nothing tapped', async () => {
+      const fake = formPicker();
+      expect(await skipOf(fake, 'tap: { id: lab.form-picker.name }')).toEqual([`skipped id:"lab.form-picker.name" (not present) (${ACTIVE_WINDOW_HINT})`]);
       expect(fake.taps).toEqual([]);
+    });
+
+    it('…and so is a nested fill and scroll_until whose target the uiautomator tree never held', async () => {
+      expect(await skipOf(formPicker(), 'fill: { id: lab.form-picker.nope, value: "1" }')).toEqual([`skipped step (not present) (${ACTIVE_WINDOW_HINT})`]);
+      expect(await skipOf(formPicker(), 'scroll_until: { element: { id: lab.form-picker.nope }, maxSwipes: 1 }')).toEqual([`skipped step (not present) (${ACTIVE_WINDOW_HINT})`]);
+    });
+
+    // A target matched only at 0×0 is absence too ("(not present)"), and the skip says what the wait's message says
+    // beneath it (ui-tree/miss.ts's zero-area note): it may be scrolled off — scroll_until it first.
+    it('an optional tap whose target matched only 0×0 nodes: skipped (not present) with the zero-area note after it', async () => {
+      resetLayout();
+      const fake = new FakeAdapter({ s: screen(node({ identifier: 'ghost', rect: { x: 0, y: 0, width: 0, height: 0 } })) }, 's');
+      expect(await skipOf(fake, 'tap: { id: ghost }')).toEqual([
+        'skipped id:"ghost" (not present) (it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first)',
+      ]);
+      expect(fake.taps).toEqual([]);
+    });
+
+    it('…not on a tree listing every window', async () => {
+      const { activeWindowOnly: _, ...everyWindow } = formPickerTree();
+      expect(await skipOf(new FakeAdapter({ sheet: everyWindow }, 'sheet'), 'tap: { id: lab.form-picker.name }')).toEqual(['skipped id:"lab.form-picker.name" (not present)']);
+    });
+
+    it('an optional wait: on an element the uiautomator tree never held: skipped with its headline and the hint after it, once', async () => {
+      expect(await skipOf(formPicker(), 'wait: { element: { id: lab.form-picker.name }, timeout: 20ms }')).toEqual([
+        `skipped step (Timed out after 20ms waiting for element id:"lab.form-picker.name" (${ACTIVE_WINDOW_HINT}))`,
+      ]);
+    });
+
+    it('a wait: on an element beneath a dialog the tree lists alone says the presented remedy beneath its headline, as the tap does', async () => {
+      const raw = readFileSync(new URL('../fixtures/uiautomator-lab-alert-dim.xml', import.meta.url), 'utf8');
+      const fake = new FakeAdapter({ dialog: parseDump(raw.slice(0, raw.lastIndexOf('>') + 1)) }, 'dialog');
+      const flow = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - wait: { element: { id: lab.alert-dim.A }, timeout: 20ms }
+`);
+      const error = (await FlowEngine.run(flow, fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+      expect(error.message.split('\n').slice(0, 2)).toEqual([
+        'Timed out after 20ms waiting for element id:"lab.alert-dim.A"',
+        '  (a dialog is presented over it, and the tree lists only that window — close it first)',
+      ]);
+    });
+
+    it('a flow\'s wait: on an element a uiautomator tree never held says the hint beneath its headline; on a tree listing every window, nothing', async () => {
+      const waitFlow = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - wait: { element: { id: lab.form-picker.name }, timeout: 20ms }
+`);
+      const headlineOf = async (fake: FakeAdapter): Promise<string[]> => {
+        const error = (await FlowEngine.run(waitFlow, fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
+        expect(error).toBeInstanceOf(FlowError);
+        return error.message.split('\n').slice(0, 2);
+      };
+      expect(await headlineOf(formPicker())).toEqual(['Timed out after 20ms waiting for element id:"lab.form-picker.name"', `  (${ACTIVE_WINDOW_HINT})`]);
+      const { activeWindowOnly: _, ...everyWindow } = formPickerTree();
+      expect(await headlineOf(new FakeAdapter({ sheet: everyWindow }, 'sheet'))).toEqual(['Timed out after 20ms waiting for element id:"lab.form-picker.name"', '']);
     });
 
     it('a fill whose field is ABSENT: skipped step (not present), nothing typed', async () => {
@@ -3566,6 +3634,16 @@ flows:
       expect(waitTimeoutHint({ state: 's' }, 'ios', 'idb')).toBeUndefined();
       expect(waitTimeoutHint({ any: [id] }, 'ios', 'idb')).toBeUndefined();
       expect(waitTimeoutHint({ all: [id] }, 'ios', 'idb')).toBeUndefined();
+    });
+
+    it('the active-window hint for any present-element condition whose last tree lists the active window only — never for an absent one, a state, or another tree', () => {
+      const activeOnly = { ...screen(), activeWindowOnly: true as const };
+      expect(waitTimeoutHint({ element: { text: 'x', role: 'button' } }, 'android', undefined, activeOnly)).toBe(ACTIVE_WINDOW_HINT);
+      expect(waitTimeoutHint(id, 'android', undefined, activeOnly)).toBe(ACTIVE_WINDOW_HINT);
+      expect(waitTimeoutHint({ element: { id: 'x' }, absent: true }, 'android', undefined, activeOnly)).toBeUndefined();
+      expect(waitTimeoutHint({ state: 's' }, 'android', undefined, activeOnly)).toBeUndefined();
+      expect(waitTimeoutHint(id, 'android', undefined, screen())).toBeUndefined();
+      expect(waitTimeoutHint(id, 'android', undefined, undefined)).toBeUndefined();
     });
   });
 

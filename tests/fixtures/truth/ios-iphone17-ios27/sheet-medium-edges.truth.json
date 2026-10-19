@@ -1,0 +1,158 @@
+{
+  "cell": "sheet-medium-edges",
+  "layer": "sheet-medium-scrolled",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "H",
+      "id": "lab.sheet-medium-edges.H",
+      "color": "#E53935",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": -88
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "host",
+      "unprobed": "its centre (201,-56) lies off the 402x874 screen"
+    },
+    {
+      "tag": "G",
+      "id": "lab.sheet-medium-edges.G",
+      "color": "#1E88E5",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": -20
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#317ABA",
+      "geometry": "status-band",
+      "visible": {
+        "x": 51,
+        "y": 0,
+        "width": 300,
+        "height": 44
+      },
+      "piece": null,
+      "scrollView": "host"
+    },
+    {
+      "tag": "E",
+      "id": "lab.sheet-medium-edges.E",
+      "color": "#43A047",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 869
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#327735",
+      "geometry": "sliver",
+      "visible": {
+        "x": 51,
+        "y": 869,
+        "width": 300,
+        "height": 5
+      },
+      "piece": null,
+      "scrollView": "host",
+      "unprobed": "its centre (201,901) lies off the 402x874 screen"
+    },
+    {
+      "tag": "F",
+      "id": "lab.sheet-medium-edges.F",
+      "color": "#FB8C00",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 1009
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "host",
+      "unprobed": "its centre (201,1041) lies off the 402x874 screen"
+    },
+    {
+      "tag": "M",
+      "id": "lab.sheet-medium-edges.M",
+      "color": "#8E24AA",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 290
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,322.0"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "sheet"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#721D88",
+      "geometry": "whole",
+      "visible": {
+        "x": 51,
+        "y": 290,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 290,
+        "width": 300,
+        "height": 64
+      },
+      "scrollView": "host"
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "host": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    }
+  }
+}

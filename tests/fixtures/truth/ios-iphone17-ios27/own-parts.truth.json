@@ -1,0 +1,86 @@
+{
+  "cell": "own-parts",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "L",
+      "id": "lab.own-parts.L",
+      "text": "LOGIN",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "height": 20.333333333333343,
+        "width": 51.66666666666666,
+        "x": 175.16666666666669,
+        "y": 131.83333333333334
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,142.0"
+        }
+      ],
+      "drawn": 0.985,
+      "seen": "#3949AB",
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "N",
+      "id": "lab.own-parts.N",
+      "text": "Payee’s name",
+      "color": "#B2EBF2",
+      "declared": "open",
+      "frame": {
+        "height": 18,
+        "width": 111.66666666666666,
+        "x": 51,
+        "y": 493
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "107.0,502.0"
+        }
+      ],
+      "drawn": 0.981,
+      "seen": "#B2EBF2",
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "I",
+      "id": "lab.own-parts.I",
+      "label": "Close",
+      "color": "#3949AB",
+      "declared": "open",
+      "frame": {
+        "height": 44,
+        "width": 44,
+        "x": 179,
+        "y": 660
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,682.0"
+        }
+      ],
+      "drawn": 0.996,
+      "seen": "#3949AB"
+    }
+  ]
+}

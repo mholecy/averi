@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>iOS adapter stack review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+  <style>
+    .seam { stroke-dasharray: 4 4; }
+    .leak { stroke: #dc2626; }
+    .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+    .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+    pre.mermaid { background: transparent; }
+  </style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+
+  <header class="space-y-3">
+    <p class="lbl text-slate-500">averi · architecture review · 2026-10-07 · branch architecture/keyboard-model-2026-10-07</p>
+    <h1 class="font-serif text-4xl">Device adapter seam, iOS strana</h1>
+    <p class="text-sm text-slate-600 font-mono">src/adapters/types.ts · ios.ts · wda.ts · wda-source.ts · wda-tree-source.ts · ios-tree-source.ts · ios-node.ts · idb.ts · xcode-env.ts · exec.ts · field-errors.ts · (android.ts len na porovnanie) · mcp/registry.ts · tests/helpers/fake.ts</p>
+    <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+      <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border border-slate-500 bg-white"></span>module</span>
+      <span class="flex items-center gap-2"><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="#64748b" stroke-width="2" class="seam"/></svg>seam</span>
+      <span class="flex items-center gap-2"><svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke-width="2" class="leak"/></svg>leakage</span>
+      <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep"></span>deep module</span>
+    </div>
+    <p class="text-xs text-slate-500">Mimo rozsahu (už pokryté): C1–C10, V1–V8, šesť kandidátov po iOS/idb keyboard fixoch, K1–K3, zamietnutý detect-probe. Keyboard handling sa tu nerieši. Hot spoty z <code>git log --since=2026-09-15</code>: <code>types.ts</code> 22 commitov, <code>ios.ts</code> 13, <code>wda-source.ts</code> 7, <code>ios-tree-source.ts</code> 6; <code>idb.ts</code>, <code>xcode-env.ts</code>, <code>exec.ts</code> takmer nič.</p>
+  </header>
+
+  <section id="candidates" class="space-y-12">
+
+    <!-- ============ 1 ============ -->
+    <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">1 · Objavovanie zariadení nie je naviazaný adapter</h2>
+        <span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-xs font-semibold">Strong</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">ports &amp; adapters</span>
+      </div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/types.ts:305 — <code>listDevices()</code> na <code>DeviceAdapter</code></li>
+        <li>src/mcp/registry.ts:29-38, 207-209 — <code>defaultFactory(platform)</code> bez id = „unbound probe“; každý <code>get()</code> postaví nový adapter len kvôli <code>listDevices()</code></li>
+        <li>src/adapters/ios.ts:24, 52-54 (<code>'booted'</code>), 72-83 (<code>resolveTarget</code>/<code>bootedUdidPromise</code>), 96-104 (uiTree odmieta unbound), 205 (<code>'&lt;udid&gt;'</code>), 47-50</li>
+        <li>src/adapters/android.ts:99-109 (<code>serial?</code>, adb bez <code>-s</code>), 348 (<code>'the default adb device'</code>), 359-361 („several devices … select_device“)</li>
+        <li>tests/mcp/registry.test.ts:19-28 — FakeAdapter s ručne prepísaným <code>listDevices</code> · tests/helpers/fake.ts:267 · tests/adapters/ios.test.ts:78-82, 236-242 · tests/mcp/registry.test.ts:270-274</li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">Before — jeden interface, dva režimy</p>
+          <pre class="mermaid">
+flowchart TB
+  R[AdapterRegistry]
+  R -->|"factory(p).listDevices()<br/>každý get()"| U[IosAdapter unbound<br/>udid? = undefined]
+  R -->|"factory(p, id, kind)"| B[IosAdapter bound]
+  U -.->|"target() = 'booted'<br/>resolveTarget()"| X[mŕtve v produkcii]:::leak
+  U -.->|"uiTree() → Error"| X
+  A[AndroidAdapter serial?] -.->|"adb bez -s<br/>'more than one device'"| X
+  T[registry.test] -.->|"FakeAdapter +<br/>adapter.listDevices = …"| R
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+          </pre>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">After — discovery a bound adapter na dvoch seams</p>
+          <pre class="mermaid">
+flowchart TB
+  R[AdapterRegistry]
+  R -->|"probe(p)"| D[DeviceDiscovery<br/>listDevices]:::deep
+  D --- D1[adb devices -l]
+  D --- D2[simctl list --json]
+  D --- D3[fake list v testoch]
+  R -->|"factory(p, id, kind)"| B[DeviceAdapter<br/>id povinné]
+  B --- B1[AndroidAdapter serial]
+  B --- B2[IosAdapter udid]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+          </pre>
+        </div>
+      </div>
+
+      <dl class="grid sm:grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="lbl text-slate-500 pt-0.5">Problém</dt>
+        <dd><code>listDevices</code> je otázka platformy, nie zariadenia, no sedí na interface naviazaného adaptera — preto oba adaptery nesú „unbound“ režim (<code>udid?</code>, <code>serial?</code>, alias <code>booted</code>, lenivé rozlíšenie UDID, odmietnutý <code>uiTree</code>), ktorý registry nikdy nepoužije na nič iné než výpis zariadení.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Riešenie</dt>
+        <dd>Vyňať <code>listDevices</code> do vlastného malého modulu (discovery per platforma) a bound adaptery konštruovať len s povinným id; registry dostane discovery ako druhú závislosť popri factory.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Deletion test</dt>
+        <dd>Zmazanie unbound režimu komplexitu nepresúva, ale odstraňuje: <code>ios.ts:72-83</code>, vetva <code>'booted'</code>, chybová hláška z <code>uiTree</code>, fallback <code>'&lt;udid&gt;'</code>, Android <code>adb</code> bez <code>-s</code> a jeho diagnóza „more than one device“ (s <code>-s</code> ju <code>adb get-state</code> nevráti). Zostáva ~25 riadkov parsovania výpisu, ktoré sa len presunú.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Wins</dt>
+        <dd>
+          <ul class="list-disc pl-5 space-y-0.5">
+            <li>interface sa zúži o jeden člen</li>
+            <li>locality: id je invariant konštruktora</li>
+            <li>tri adaptery discovery = reálny seam</li>
+            <li>registry testy fakeujú zoznam, nie adapter</li>
+            <li>zmažú sa dva testy unbound režimu</li>
+          </ul>
+        </dd>
+      </dl>
+      <p class="text-xs bg-slate-50 border border-slate-200 rounded p-2">Dôsledok pre <code>treeSourceKind</code>: „undefined na unbound probe“ (types.ts:292-302, ARCHITECTURE §3) zmizne; na iOS bude kind vždy definovaný. <code>IosAdapter.listDevices</code> dnes slúži aj <code>resolveTarget</code> (ios.ts:77) — práve to je tá mŕtva cesta.</p>
+    </article>
+
+    <!-- ============ 2 ============ -->
+    <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">2 · Jeden vlastník pre „idb strom simulátora je zaseknutý“</h2>
+        <span class="px-2 py-0.5 rounded bg-amber-500 text-white text-xs font-semibold">Worth exploring</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">local-substitutable</span>
+      </div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/ios.ts:162-217 — <code>enableAccessibilityAutomation</code> (zápis pred launchom, oznámenie raz na adapter, stderr pri zlyhaní s príkazom na reboot)</li>
+        <li>src/adapters/ios.ts:224-228 — ten istý zápis pred <code>openDeepLink</code></li>
+        <li>src/adapters/ios-tree-source.ts:113-173 — <code>IdbEmptyTreeError</code>: rada „terminate then launch … if … the stderr said that write failed, reboot“ (:158-161)</li>
+        <li>src/adapters/wda.ts:287-299 — <code>shutdown()</code>, príčina (teardown zapíše kľúče na 0) — tu nie je ani zmienka</li>
+        <li>commity 1e0501d, 73eea5f, 79b458e (3 opravy za 2 dni) · docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md · 2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md · 2026-10-07-idb-empty-tree-advice-relaunch-does-not-restart.md · 2026-10-06-wda-read-wakes-stuck-idb-tree.md</li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">Before — jeden fakt, tri moduly, spojené prózou</p>
+          <pre class="mermaid">
+flowchart LR
+  W[WdaServer.shutdown<br/>príčina: kľúče → 0]
+  A[IosAdapter.launch / openDeepLink<br/>zápis kľúčov, stderr]
+  S[IdbTreeSource.read<br/>IdbEmptyTreeError + rada]
+  U((user))
+  A -->|"stderr: write failed …<br/>reboot …"| U
+  S -->|"'ak stderr hovoril,<br/>že zápis zlyhal' + reboot"| U
+  S -.->|"nevie výsledok zápisu"| A
+  W -.->|"nikto nevie"| S
+  linkStyle 2 stroke:#dc2626,stroke-width:2px
+  linkStyle 3 stroke:#dc2626,stroke-width:2px
+          </pre>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">After — jeden modul per simulátor, zdieľaný adapterom aj idb source</p>
+          <pre class="mermaid">
+flowchart LR
+  A[IosAdapter.launch] -->|"beforeLaunch()"| H
+  S[IdbTreeSource.read] -->|"emptyTree(types)"| H
+  H[Simulator AX health<br/>zápis · výsledok · rada]:::deep
+  H -->|"jedna veta podľa<br/>posledného zápisu"| U((user))
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+          </pre>
+        </div>
+      </div>
+
+      <dl class="grid sm:grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="lbl text-slate-500 pt-0.5">Problém</dt>
+        <dd>Liek (ios.ts) a diagnóza (ios-tree-source.ts) jedného javu sú v dvoch moduloch, ktoré o sebe vedia len cez text: chyba čitateľovi radí pozrieť sa do stderr, či zápis zlyhal, hoci to vedel proces, ktorý ju hádže; príkaz na reboot je napísaný dvakrát (ios.ts:205, ios-tree-source.ts:161).</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Riešenie</dt>
+        <dd>Jeden modul viazaný na UDID, ktorý vlastní zápis pred launchom, pamätá si jeho výsledok a skladá <code>IdbEmptyTreeError</code>; registry ho odovzdá adapteru aj idb source (obaja už dnes dostávajú ten istý UDID z <code>defaultFactory</code>).</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Wins</dt>
+        <dd>
+          <ul class="list-disc pl-5 space-y-0.5">
+            <li>locality: celý protokol v jednom module</li>
+            <li>rada podľa faktu, nie podmienená</li>
+            <li>jeden test: zápis zlyhal → iná veta</li>
+            <li>reboot príkaz jedenkrát</li>
+          </ul>
+        </dd>
+      </dl>
+      <p class="text-xs bg-amber-50 border border-amber-200 rounded p-2">Nie je to návrh presunúť zápis do <code>WdaServer.shutdown</code>: liek pred <em>každým</em> launchom je zámerný (pokrýva aj WDA iného procesu, ios.ts:175-181) — to ostáva. Otvorená otázka na grilovanie: koľko stavu je ok zdieľať medzi adapterom a source, a či sa netreba držať „source je čistá funkcia nad exec“. Ak áno, menšia verzia: <code>IdbEmptyTreeError</code> a stderr veta z ios.ts zdieľajú jednu konštantu rady.</p>
+    </article>
+
+    <!-- ============ 3 ============ -->
+    <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">3 · <code>setClipboard</code> je člen interface bez jediného volajúceho</h2>
+        <span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-xs font-semibold">Strong</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">in-process</span>
+      </div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/types.ts:396 — <code>setClipboard(text)</code></li>
+        <li>src/adapters/ios.ts:341-344 — jediný príkaz, ktorý obchádza <code>this.simctl()</code> (vlastný <code>detectEnv</code> kvôli <code>stdin</code>)</li>
+        <li>src/adapters/android.ts:572-575 — <code>throw 'not supported on Android yet'</code></li>
+        <li>tests/helpers/fake.ts:275 · tests/adapters/ios.test.ts:92-96 · tests/adapters/android.test.ts:486-488 · ARCHITECTURE.md:100</li>
+        <li><code>grep -rn setClipboard src</code> mimo <code>src/adapters/</code>: <b>0 výsledkov</b> — žiadny MCP tool, flow krok ani CLI</li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-3">Before — interface vs. použitie</p>
+          <div class="flex items-end gap-6 h-40">
+            <div class="flex flex-col items-center gap-1"><div class="w-16 h-32 border-2 border-slate-500 bg-slate-100 flex items-center justify-center text-[10px] text-center">4 implementácie<br/>(ios, android, fake, ARCH)</div><span class="lbl text-slate-500">interface</span></div>
+            <div class="flex flex-col items-center gap-1"><div class="w-16 h-1 bg-red-600"></div><span class="lbl text-red-600">0 callers</span></div>
+            <div class="flex flex-col items-center gap-1"><div class="w-16 h-12 border-2 border-red-600 border-dashed flex items-center justify-center text-[10px] text-center text-red-700">Android throws</div><span class="lbl text-slate-500">asymetria</span></div>
+          </div>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-3">After — člen zmizne</p>
+          <div class="flex items-end gap-6 h-40">
+            <div class="flex flex-col items-center gap-1"><div class="w-16 h-24 deep text-white flex items-center justify-center text-[10px] text-center">DeviceAdapter<br/>−1 člen</div><span class="lbl text-slate-500">interface</span></div>
+            <div class="text-xs text-slate-600 max-w-[12rem]">Keď príde prvý volajúci (napr. paste OTP), vráti sa ako <em>optional capability</em> ako <code>keyboard?</code> — prítomná len tam, kde funguje.</div>
+          </div>
+        </div>
+      </div>
+
+      <dl class="grid sm:grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="lbl text-slate-500 pt-0.5">Problém</dt>
+        <dd>Každý adapter a fake musí implementovať metódu, ktorú nič nevolá a ktorá na jednej z dvoch platforiem len hádže — interface sľubuje schopnosť, ktorú averi nemá.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Riešenie</dt>
+        <dd>Zmazať člen, obe implementácie, fake stub a tri testy; ARCHITECTURE §3 upraviť.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Nový dôkaz</dt>
+        <dd>C7 (2026-10-04) len navrhlo „zvážiť rovnaký tvar pre ostatné jednostranné členy“. Nové je, že <code>setClipboard</code> nemá volajúceho vôbec — deletion test je triviálny, nie je čo presúvať.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Wins</dt>
+        <dd><ul class="list-disc pl-5 space-y-0.5"><li>interface sa zúži bez náhrady</li><li>zmizne Android throw</li><li>ios.ts stratí jedinú výnimku z <code>simctl()</code></li></ul></dd>
+      </dl>
+    </article>
+
+    <!-- ============ 4 ============ -->
+    <article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="font-serif text-2xl">4 · <code>runIdb</code> ako hlboký modul, ktorý pomenuje zlyhanie idb</h2>
+        <span class="px-2 py-0.5 rounded bg-slate-500 text-white text-xs font-semibold">Speculative</span>
+        <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs">local-substitutable</span>
+      </div>
+      <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+        <li>src/adapters/idb.ts:13-22 — env probe + <code>--udid</code> na koniec, nič viac (shallow: interface ≈ implementácia)</li>
+        <li>src/adapters/android.ts:291-384 — <code>uiTree</code> + <code>diagnoseDumpFailure</code>: po zlyhaní <code>adb get-state</code> a veta „not reachable / SLOW / settling“</li>
+        <li>src/adapters/ios-tree-source.ts:195-201 · ios.ts:85-91, 243-301 — idb chyba ide hore ako surový <code>ExecError</code> (<code>Command failed (exit 1): idb … ('Request was not sent',)</code>)</li>
+        <li>docs/bugs/2026-09-18-handoff-run5-and-finportal-login-findings.md a1/a4 (diagnóza doplnená len pre Android) · docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md:21-22 (surová idb hláška u používateľa)</li>
+      </ul>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">Before — asymetrická diagnóza</p>
+          <div class="space-y-1 text-xs">
+            <div class="h-10 border-l-4 border-slate-800 bg-slate-100 px-2 flex items-center">Android uiTree → diagnoseDumpFailure → „device X is not reachable: adb get-state says …“</div>
+            <div class="h-10 border-l-4 border-red-600 bg-red-50 px-2 flex items-center">iOS idb read → ExecError „Command failed (exit 1): idb ui describe-all …“</div>
+            <div class="h-10 border-l-4 border-red-600 bg-red-50 px-2 flex items-center">iOS idb input (tap/text/key) → ExecError, bez UDID stavu</div>
+            <div class="h-10 border-l-4 border-slate-400 bg-slate-50 px-2 flex items-center">WDA → vlastné vety s logPath (wda.ts:238-262)</div>
+          </div>
+        </div>
+        <div class="rounded-lg border border-slate-200 p-4">
+          <p class="lbl text-slate-500 mb-2">After — idb modul vlastní svoje chyby</p>
+          <pre class="mermaid">
+flowchart TB
+  A[IosAdapter input] --> I
+  S[IdbTreeSource.read] --> I
+  I[idb invocation<br/>env · --udid · timeout<br/>zlyhanie → simctl stav + veta]:::deep
+  I --> E[exec]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+          </pre>
+        </div>
+      </div>
+
+      <dl class="grid sm:grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="lbl text-slate-500 pt-0.5">Problém</dt>
+        <dd>Zlyhanie čítania alebo vstupu na iOS dorazí ako surový príkaz a stderr idb; Android po rovnakej triede chýb (a1/a4) dostal diagnózu stavu zariadenia, iOS nie.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Riešenie</dt>
+        <dd>Prehĺbiť <code>runIdb</code>: pri <code>ExecError</code> sa raz opýtať <code>simctl</code> na stav UDID a obaliť chybu vetou (nie je booted / idb neodpovedá / timeout), pôvodnú chybu ako <code>cause</code>.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Prečo len Speculative</dt>
+        <dd>Na iOS nie je nameraný incident „simulátor zomrel pod nami“; jediný zdokumentovaný surový idb text (prázdny <code>ui text</code>) bol opravený pri zdroji. Bez merania je to jeden adapter pre hypotetický problém.</dd>
+        <dt class="lbl text-slate-500 pt-0.5">Wins</dt>
+        <dd><ul class="list-disc pl-5 space-y-0.5"><li>leverage: všetky idb volania naraz</li><li>parita s Android diagnózou</li><li>test cez jeden fake exec</li></ul></dd>
+      </dl>
+    </article>
+  </section>
+
+  <section id="ok" class="space-y-4">
+    <h2 class="font-serif text-2xl">Preskúmané a v poriadku</h2>
+    <ul class="space-y-3 text-sm">
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>IosTreeSource</code> seam</b> (ios-tree-source.ts:35-65). Dva reálne adaptery (idb, WDA), <code>Record</code> nad kind-om = compile error pri novom kinde, normalizér <code>normalizeIosElement</code> zdieľaný a testovaný cez oba zdroje (tests/adapters/ios-tree-source.test.ts:79-96). Potvrdené rozhodnutie z 2026-10-04.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>WdaServer</code></b> (wda.ts, 650 r.). Deep: malý interface (<code>source</code>, <code>shutdown</code>, <code>stop</code>, <code>ensureRunning</code>), za ním build, single-flight štart, stop-epoch, cudzí server na porte, reštart pri mŕtvom serveri, rozpočet shutdownu &lt; 1 500 ms. Retries/timeouty sú konštanty s nameraným dôvodom (:28-46). Nič na vyťahovanie.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>WdaTreeSource</code></b> (wda-tree-source.ts). Vlastný <code>disposed</code> príznak nie je duplikát <code>WdaServer.shutDown</code>: mení formuláciu chyby (deselect vs. „process is exiting“), testované (wda-tree-source.test.ts:122-177). Komentár :34-37 správne odmieta druhý seam pre fake server (jeden adapter).</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>ios-node.ts</code>, <code>field-errors.ts</code></b>. Čisté, jeden vlastník pravidla, oba zdroje ho volajú. Rozdelenie kvôli tomu, aby parser nenačítal <code>child_process</code>, je zdôvodnené.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>exec.ts</code>, <code>xcode-env.ts</code></b>. <code>ExecFn</code> je reálny seam (produkcia + <code>fakeExec</code> v každom adapter teste). Memo per <code>ExecFn</code> (WeakMap) dáva testom čerstvý probe bez reset hooku.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b>Zápis accessibility kľúčov v <code>launch</code>, nie v <code>WdaServer.shutdown</code></b>. Umiestnenie je správne: kľúče rozbije aj WDA iného procesu alebo iného projektu (ios.ts:175-181); kandidát 2 rieši len to, kto vlastní radu, nie kedy sa zapisuje.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b>Ostatné jednostranné členy</b>: <code>LaunchOptions.activity/intent</code> (iOS hádže s návodom, flow/config.ts:437-439 pravidlo len pre Android, tool popis „Android only“), <code>pressKey('back')</code> (iOS hádže; window model ho viaže na oracle), <code>uiTree({settle})</code> (iOS ignoruje, zdôvodnené ios.ts:93-95). Volajúci existujú a chyba je zrozumiteľná — capability by bola pass-through.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>viewport()</code> cez <code>idb describe</code> aj pod WDA</b>. Jeden zdroj jednotiek (body) pre oba tree sources, memo podľa kontraktu; WDA <code>/window/size</code> by bol druhý pravopis tej istej veci bez nameraného dôvodu.</li>
+      <li class="rounded-lg border border-slate-200 bg-white p-3"><b><code>FakeAdapter</code></b> (tests/helpers/fake.ts). Snapshot per read (<code>structuredClone</code>, :120-126) zodpovedá kontraktu reálnych adapterov; <code>iosLoginFake</code> nastaví iOS tvar (bez oracle, s advice). Po kandidátoch 1 a 3 stratí dva stuby.</li>
+    </ul>
+    <div class="rounded-lg border border-slate-200 bg-stone-100 p-3 text-xs text-slate-700 space-y-1">
+      <p class="lbl text-slate-500">Drobnosti mimo kariet</p>
+      <p>ARCHITECTURE.md:119 hovorí <code>xcrun simctl io booted screenshot</code>; kód používa <code>this.target()</code> = konkrétny UDID (ios.ts:234). ARCHITECTURE.md:100 vymenúva <code>setClipboard</code> (kandidát 3).</p>
+      <p>Pozorovanie mimo rozsahu (keyboard): 13 z 22 nedávnych commitov do <code>types.ts</code> boli keyboard úpravy, väčšinou prózy o politike v <code>interact/</code> (types.ts:178-254, 369-395). Interface súbor adaptera sa mení s každou zmenou modelu nad ním — ak sa bude keyboard ešte hýbať, stojí za to, aby doc v <code>types.ts</code> hovoril len čo adapter sľubuje a ukazoval na <code>interact/keyboard-model.ts</code>.</p>
+    </div>
+  </section>
+
+  <section id="top-recommendation">
+    <a href="#c1" class="block rounded-xl deep text-white p-8 space-y-3 hover:opacity-95">
+      <p class="lbl text-slate-300">Top recommendation</p>
+      <h2 class="font-serif text-3xl">1 · Objavovanie zariadení nie je naviazaný adapter</h2>
+      <p class="text-slate-200 text-sm max-w-3xl">Je to jediný kandidát, ktorý zmenšuje interface <code>DeviceAdapter</code> a zároveň maže mŕtvy kód v oboch adapteroch (unbound režim, alias <code>booted</code>, Android bez <code>-s</code>), a discovery má hneď tri adaptery — adb, simctl a fake zoznam v registry testoch —, takže seam je reálny. Kandidát 3 (<code>setClipboard</code>) je čisté mazanie a dá sa pribaliť do toho istého commitu.</p>
+    </a>
+  </section>
+
+  <footer class="text-xs text-slate-500">Slovník z codebase-design: module · interface · implementation · depth · seam · adapter · leverage · locality. Interface sa ešte nenavrhuje — vyber kandidáta na grilovanie.</footer>
+</main>
+</body>
+</html>

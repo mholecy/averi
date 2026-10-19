@@ -1,0 +1,40 @@
+{
+  "cell": "sheet-long-list",
+  "events": [],
+  "frames": {
+    "F": {
+      "height": 64,
+      "width": 402,
+      "x": 0,
+      "y": 1342
+    },
+    "R": {
+      "height": 64,
+      "width": 402,
+      "x": 0,
+      "y": 126
+    }
+  },
+  "ready": true,
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  },
+  "scrollViews": {
+    "list": {
+      "height": 812,
+      "width": 402,
+      "x": 0,
+      "y": 62
+    }
+  }
+}

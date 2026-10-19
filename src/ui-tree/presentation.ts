@@ -424,9 +424,10 @@ function byShape(screenArea: number): PresentationAdapter {
  * window" is (lab note L1, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md).
  *
  * Whether it is, the PARSER decides, from the raw dump (adapters/android.ts#presentedWindow: a window floating off the
- * screen's top and left edges is a `dialog`; a full-screen one whose clickable scrim lies above its sheet, a `screen`) and marks on
- * the root (`UiNode.presentation`) — as the WDA parser marks WDA's layers, since the scrim's `clickable` never reaches
- * the tree. The marks adapter (`byMarks`) reads that mark as any other: the window, the tree's first layer, is over no
+ * screen's top and left edges is a `dialog`; a full-screen one whose clickable scrim lies above its sheet — a labelled
+ * scrim, or a Views `BottomSheetDialog`'s `touch_outside` by Material's view ids — a `screen`) and marks on the root
+ * (`UiNode.presentation`) — as the WDA parser marks WDA's layers, since the scrim's `clickable` never reaches the
+ * tree. The marks adapter (`byMarks`) reads that mark as any other: the window, the tree's first layer, is over no
  * target in it (every node of the tree is the window's own), and for NO target its cover takes every touch-down — the
  * dim outside the dialog, which dismisses it on a touch; the sheet, which a stroke drags to full height — unless the
  * point lies on a scroll view of the window's own (a search inside the sheet's list): `scroll_until` for a target not

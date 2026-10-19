@@ -1,0 +1,140 @@
+{
+  "cell": "text-sample",
+  "events": [],
+  "frames": {
+    "A": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 64
+    },
+    "A.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 64
+    },
+    "B": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 136
+    },
+    "B.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 136
+    },
+    "C": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 208
+    },
+    "C.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 208
+    },
+    "D": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 280
+    },
+    "D.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 280
+    },
+    "E": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 352
+    },
+    "E.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 352
+    },
+    "F": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 424
+    },
+    "F.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 424
+    },
+    "G": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 496
+    },
+    "G.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 496
+    },
+    "H": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 568
+    },
+    "H.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 568
+    },
+    "I": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 640
+    },
+    "I.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 640
+    },
+    "J": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 712
+    },
+    "J.box": {
+      "height": 64,
+      "width": 380,
+      "x": 11,
+      "y": 712
+    }
+  },
+  "ready": true,
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "cell": "scroll-sticky-cut",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "R",
+      "id": "lab.scroll-sticky-cut.R",
+      "color": "#00897B",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 391,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,479"
+        }
+      ],
+      "drawn": 0.625,
+      "seen": "#00897B",
+      "geometry": "chrome-overlap:stickyHeader",
+      "visible": {
+        "x": 128,
+        "y": 391,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 128,
+        "y": 457,
+        "width": 825,
+        "height": 110
+      },
+      "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "list": {
+      "x": 0,
+      "y": 303,
+      "width": 1080,
+      "height": 1238
+    }
+  },
+  "chrome": {
+    "stickyHeader": {
+      "x": 0,
+      "y": 303,
+      "width": 1080,
+      "height": 154
+    }
+  },
+  "navigation": "gesture"
+}

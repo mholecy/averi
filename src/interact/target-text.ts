@@ -117,23 +117,34 @@ export interface KeyboardUp {
  * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
  * the MCP tools; \`dismissKeyboard: true\` on the fill before this step in a flow`, or `tap a neutral element such as
  * the screen title — a tap: step in a flow`. The one wording of the clause for `scroll_until`'s whole-screen advice
- * (scroll-text.ts#hideToJudgeWholeScreen) and the cut-by remedy (`dismissKeyboardFirstText`); each says the adapter's
- * `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
+ * (scroll-text.ts#hideToJudgeWholeScreen), the cut-by remedy (`dismissKeyboardFirstText`) and the tap's refusal of a
+ * centre under idb's band (tap-judgement.ts#hideIt); each says the adapter's `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
  */
 export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
   dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : 'tap a neutral element such as the screen title — a tap: step in a flow';
 
 /**
+ * `clause` — the sentence that says how to hide the soft keyboard, `hideKeyboardHow`'s words alone by default — then,
+ * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice: the one composition of the cut-by
+ * remedy (`dismissKeyboardFirstText`, inside its parentheses), `scroll_until`'s whole-screen advice
+ * (scroll-text.ts#hideToJudgeWholeScreen, after "and scroll again") and the tap's refusal under idb's band
+ * (tap-judgement.ts#hideIt). Both branches are reached: `back` on Android, the other on iOS (WDA's and idb's remedy is
+ * `none`: the whole-screen advice and the band's refusal).
+ */
+export function hideClause(remedy: KeyboardRemedy, clause: string = hideKeyboardHow(remedy)): string {
+  return remedy.dismissal === 'back' ? clause : `${clause}; ${cannotHide(remedy.advice)}`;
+}
+
+/**
  * The first half of the remedy for a node cut by a node drawn after it while the soft keyboard is up (`Cut.by`, the
  * owner's decision for lab note F2A1): `the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key
  * back from the MCP tools; …) — a bar riding on it goes down with it` — a submit bar laid on the IME's inset moves off
- * the field when the keyboard goes. How to hide it is `hideKeyboardHow`'s. The cut-by rule holds on Android's trees only
- * (standing.ts#cutByLater), whose adapter hides the keyboard with `back`, so the other branch — `cannotHide` with the
- * adapter's advice — is unreachable today; kept so a source that one day cuts so on another adapter is said right.
+ * the field when the keyboard goes. How to hide it is `hideClause`'s. The cut-by rule holds on Android's trees only
+ * (standing.ts#cutByLater), whose adapter hides the keyboard with `back`, so here `hideClause`'s other branch —
+ * `cannotHide` with the adapter's advice — is unreachable today; it is the composition's, which other sentences reach.
  */
 export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string {
-  const how = remedy.dismissal === 'back' ? hideKeyboardHow(remedy) : `${hideKeyboardHow(remedy)}; ${cannotHide(remedy.advice)}`;
-  return `the soft keyboard is up (its top edge at y ${lineY}): dismiss it first (${how}) — a bar riding on it goes down with it`;
+  return `the soft keyboard is up (its top edge at y ${lineY}): dismiss it first (${hideClause(remedy)}) — a bar riding on it goes down with it`;
 }
 
 /**

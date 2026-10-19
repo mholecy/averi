@@ -10,9 +10,36 @@
 > first" instead of "to appear". Measured by golden replay from truth/round-6 with `--side` that commit: the 16 rows
 > of `alert-dim.xml` and `sheet-medium.xml` A–D `tap` and `scroll_until` turned green (242 → 226 mismatches, no other
 > row changed); their colour rows stay KNOWN (the assert's "not found" is vacuous). `form-picker`'s expanded country
-> sheet dumps no scrim, so it is not marked: its rows stay KNOWN (ADR 0018's residual 18). Not yet re-measured on the
-> emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
+> sheet dumps no scrim, so it is not marked: its rows stay KNOWN, filed as this note, which calibration.json calibrates
+> partially (the AlertDialog and the half-expanded sheet; the fully expanded sheet open) — ADR 0018's residual 18 for
+> it awaited the owner (round 6's code review, P1; decided below). Not yet re-measured on the emulator. docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "Amendment: Android's presented
 > window".
+>
+> **Live (2026-10-18, round 6's Android device check):** confirmed on the emulator for the AlertDialog and the
+> half-expanded sheet. The live golden gained a `scroll_until` case per target beneath a presented layer in no scroll
+> view (live-visibility.ts#judgePresentedScroll: any touch the app logs is a stroke on the layer), run on the
+> `averi_lab` AVD with the lab app of truth/round-6 at round 5's src (`--side` b71cbbb) and at round 6's (e98b87e):
+> before, `alert-dim` A–D and `sheet-medium` A–B stopped "fully visible after 1 swipe" — the one stroke (touch-down
+> `540,444` or `540,1776`) DISMISSED the layer (`dismissed alert`, `dismissed sheet`) and the tap then found the
+> target; `sheet-medium` C–D sent three strokes at `540,1776` that EXPANDED the sheet (S from y 1353 to 243) and failed
+> "never appeared in the tree". After: all eight `stopped before any swipe — element is not in the tree, and the next
+> swipe would touch down at (540,444) on the dim outside container (155,851 770x517) — a dialog is presented over it —
+> close it first` (the sheet: `… on other "Close sheet" (0,0 1080x1110) — a screen is presented over it (a modal or a
+> sheet) — close it first`), the app logging no touch, nothing dismissed; the eight taps refused with "is not in the
+> tree, which lists only the window presented on top … close it first". docs/truth/live-android-2026-10-18-visibility.md,
+> docs/truth/live-records/android-vis.json (and android-vis-b71cbbb.json). `form-picker`'s fully expanded sheet has no
+> live case (no coloured target): unmeasured live, still open.
+>
+> **Decided (2026-10-18, the owner):** ADR 0018's residuals 18 (the fully expanded sheet) and 19 (the shapes measured
+> on one AVD) ACCEPTED, with an honest hint: the uiautomator replies that say a target is not in the tree and are not
+> already given the presented window's words — the tap's, fill's and the presence check's "… to appear", `scroll_until`'s
+> "element never appeared in the tree" — adds `(the tree lists only the active window: if a sheet or a dialog is open
+> over the screen, close it first)` (ui-tree/miss.ts#ACTIVE_WINDOW_HINT, arch/r22-hint 9acbf77; ADR 0018's
+> amendment "Android's presented window", decision 5). `form-picker`'s six rows are filed as residual 18 now
+> (tests/differential/golden/forms.known.ts), the taps' class `not in the tree` (the hint says "close it first"; the
+> reply is still a not-found) where it was "refused without close it first"; calibration.json's L1 leaves nothing open.
+> Golden (sandbox, no OCR): 1322 checks / 228 mismatches / 0 broken / 86 skipped, as before — 24 Android rows' wording
+> changed, no verdict.
 
 **Found 2026-10-15** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33`, captured by scripts/truth/capture-android.ts on a dedicated

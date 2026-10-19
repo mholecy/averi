@@ -1,0 +1,367 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 64}, {380, 64}}",
+              "label": "Prihlásiť sa",
+              "rawIdentifier": "lab.text-sample.A",
+              "traits": "Button",
+              "frame": "{{11, 64}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.A",
+              "rect": {
+               "y": 64,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 136}, {380, 64}}",
+              "label": "Ľubomír Šťastný",
+              "rawIdentifier": "lab.text-sample.B",
+              "traits": "Button",
+              "frame": "{{11, 136}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.B",
+              "rect": {
+               "y": 136,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 208}, {380, 64}}",
+              "label": "Mäkčeň, dĺžeň a vokáň",
+              "rawIdentifier": "lab.text-sample.C",
+              "traits": "Button",
+              "frame": "{{11, 208}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.C",
+              "rect": {
+               "y": 208,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 280}, {380, 64}}",
+              "label": "Jiří Dvořák: věřitel, půjčka",
+              "rawIdentifier": "lab.text-sample.D",
+              "traits": "Button",
+              "frame": "{{11, 280}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.D",
+              "rect": {
+               "y": 280,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 352}, {380, 64}}",
+              "label": "Payee’s name",
+              "rawIdentifier": "lab.text-sample.E",
+              "traits": "Button",
+              "frame": "{{11, 352}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.E",
+              "rect": {
+               "y": 352,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 424}, {380, 64}}",
+              "label": "Poznámka “pre mňa” a ‘OK’",
+              "rawIdentifier": "lab.text-sample.F",
+              "traits": "Button",
+              "frame": "{{11, 424}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.F",
+              "rect": {
+               "y": 424,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 496}, {380, 64}}",
+              "label": "Splatnosť 1–15 — mesačne…",
+              "rawIdentifier": "lab.text-sample.G",
+              "traits": "Button",
+              "frame": "{{11, 496}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.G",
+              "rect": {
+               "y": 496,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 568}, {380, 64}}",
+              "label": "1 234,56 €",
+              "rawIdentifier": "lab.text-sample.H",
+              "traits": "Button",
+              "frame": "{{11, 568}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.H",
+              "rect": {
+               "y": 568,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 640}, {380, 64}}",
+              "label": "−12 345,00 EUR",
+              "rawIdentifier": "lab.text-sample.I",
+              "traits": "Button",
+              "frame": "{{11, 640}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.I",
+              "rect": {
+               "y": 640,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{11, 712}, {380, 64}}",
+              "label": "SK31 1200 0000 1987 4263 7541",
+              "rawIdentifier": "lab.text-sample.J",
+              "traits": "Button",
+              "frame": "{{11, 712}, {380, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.text-sample.J",
+              "rect": {
+               "y": 712,
+               "x": 11,
+               "width": 380,
+               "height": 64
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

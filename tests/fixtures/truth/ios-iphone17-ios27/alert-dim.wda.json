@@ -1,0 +1,1207 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "0",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "0",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "0",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 110}, {300, 64}}",
+              "label": "Target A",
+              "rawIdentifier": "lab.alert-dim.A",
+              "traits": "Button",
+              "frame": "{{51, 110}, {300, 64}}",
+              "isVisible": "0",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.alert-dim.A",
+              "rect": {
+               "y": 110,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 290}, {300, 64}}",
+              "label": "Target B",
+              "rawIdentifier": "lab.alert-dim.B",
+              "traits": "Button",
+              "frame": "{{51, 290}, {300, 64}}",
+              "isVisible": "0",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.alert-dim.B",
+              "rect": {
+               "y": 290,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 470}, {300, 64}}",
+              "label": "Target C",
+              "rawIdentifier": "lab.alert-dim.C",
+              "traits": "Button",
+              "frame": "{{51, 470}, {300, 64}}",
+              "isVisible": "0",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.alert-dim.C",
+              "rect": {
+               "y": 470,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 650}, {300, 64}}",
+              "label": "Target D",
+              "rawIdentifier": "lab.alert-dim.D",
+              "traits": "Button",
+              "frame": "{{51, 650}, {300, 64}}",
+              "isVisible": "0",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.alert-dim.D",
+              "rect": {
+               "y": 650,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     },
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       },
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "0",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       },
+       {
+        "customActions": null,
+        "nativeFrame": "{{41, 375}, {320, 152}}",
+        "label": "Lab alert",
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{41, 375}, {320, 152}}",
+        "isVisible": "1",
+        "type": "Alert",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{41, 375}, {320, 152}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{41, 375}, {320, 152}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{41, 375}, {320, 152}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{41, 375}, {320, 152}}",
+            "isVisible": "1",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{41, 375}, {320, 152}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{41, 375}, {320, 152}}",
+              "isVisible": "0",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 375,
+               "x": 41,
+               "width": 320,
+               "height": 152
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{41, 375}, {320, 152}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{41, 375}, {320, 152}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{41, 375}, {320, 72}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{41, 375}, {320, 72}}",
+                "isVisible": "1",
+                "type": "ScrollView",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 375}, {320, 72}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{41, 375}, {320, 72}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{71, 397}, {260, 20.333333333333314}}",
+                    "label": "Lab alert",
+                    "rawIdentifier": null,
+                    "traits": "StaticText",
+                    "frame": "{{71, 397}, {260, 21}}",
+                    "isVisible": "1",
+                    "type": "StaticText",
+                    "value": "Lab alert",
+                    "isEnabled": "1",
+                    "isAccessible": "1",
+                    "isNativeAccessibilityElement": "1",
+                    "isFocused": "0",
+                    "name": "Lab alert",
+                    "rect": {
+                     "y": 397,
+                     "x": 71,
+                     "width": 260,
+                     "height": 21
+                    }
+                   },
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{71, 424.66666666666669}, {260, 18}}",
+                    "label": "A presented layer over the targets.",
+                    "rawIdentifier": null,
+                    "traits": "StaticText",
+                    "frame": "{{71, 424}, {260, 19}}",
+                    "isVisible": "1",
+                    "type": "StaticText",
+                    "value": "A presented layer over the targets.",
+                    "isEnabled": "1",
+                    "isAccessible": "1",
+                    "isNativeAccessibilityElement": "1",
+                    "isFocused": "0",
+                    "name": "A presented layer over the targets.",
+                    "rect": {
+                     "y": 424,
+                     "x": 71,
+                     "width": 260,
+                     "height": 19
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 375,
+                   "x": 41,
+                   "width": 320,
+                   "height": 72
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 445}, {320, 2}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{41, 445}, {320, 2}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 445,
+                   "x": 41,
+                   "width": 320,
+                   "height": 2
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{328, 375}, {30, 72}}",
+                  "label": "Vertical scroll bar, 2 pages",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{328, 375}, {30, 72}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{355, 336}, {3, 36}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{355, 336}, {3, 36}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 336,
+                     "x": 355,
+                     "width": 3,
+                     "height": 36
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Vertical scroll bar, 2 pages",
+                  "rect": {
+                   "y": 375,
+                   "x": 328,
+                   "width": 30,
+                   "height": 72
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 414}, {320, 30}}",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{41, 414}, {320, 30}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{2, 441}, {36, 3}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{2, 441}, {36, 3}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 441,
+                     "x": 2,
+                     "width": 36,
+                     "height": 3
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Horizontal scroll bar, 1 page",
+                  "rect": {
+                   "y": 414,
+                   "x": 41,
+                   "width": 320,
+                   "height": 30
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{328, 375}, {30, 72}}",
+                  "label": "Vertical scroll bar, 2 pages",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{328, 375}, {30, 72}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{355, 336}, {3, 36}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{355, 336}, {3, 36}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 336,
+                     "x": 355,
+                     "width": 3,
+                     "height": 36
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Vertical scroll bar, 2 pages",
+                  "rect": {
+                   "y": 375,
+                   "x": 328,
+                   "width": 30,
+                   "height": 72
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 414}, {320, 30}}",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{41, 414}, {320, 30}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{2, 441}, {36, 3}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{2, 441}, {36, 3}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 441,
+                     "x": 2,
+                     "width": 36,
+                     "height": 3
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Horizontal scroll bar, 1 page",
+                  "rect": {
+                   "y": 414,
+                   "x": 41,
+                   "width": 320,
+                   "height": 30
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 375,
+                 "x": 41,
+                 "width": 320,
+                 "height": 72
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{41, 447}, {320, 80}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{41, 447}, {320, 80}}",
+                "isVisible": "1",
+                "type": "ScrollView",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 447}, {320, 80}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{41, 447}, {320, 80}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{57, 463}, {288, 48}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{57, 463}, {288, 48}}",
+                    "isVisible": "1",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "children": [
+                     {
+                      "customActions": null,
+                      "nativeFrame": "{{57, 463}, {140, 48}}",
+                      "label": "Keep",
+                      "rawIdentifier": null,
+                      "traits": "Button",
+                      "frame": "{{57, 463}, {140, 48}}",
+                      "isVisible": "1",
+                      "type": "Button",
+                      "value": null,
+                      "isEnabled": "1",
+                      "isAccessible": "1",
+                      "isNativeAccessibilityElement": "1",
+                      "isFocused": "0",
+                      "name": "Keep",
+                      "rect": {
+                       "y": 463,
+                       "x": 57,
+                       "width": 140,
+                       "height": 48
+                      }
+                     },
+                     {
+                      "customActions": null,
+                      "nativeFrame": "{{205, 463}, {140, 48}}",
+                      "label": "Discard",
+                      "rawIdentifier": null,
+                      "traits": "Button",
+                      "frame": "{{205, 463}, {140, 48}}",
+                      "isVisible": "1",
+                      "type": "Button",
+                      "value": null,
+                      "isEnabled": "1",
+                      "isAccessible": "1",
+                      "isNativeAccessibilityElement": "1",
+                      "isFocused": "0",
+                      "name": "Discard",
+                      "rect": {
+                       "y": 463,
+                       "x": 205,
+                       "width": 140,
+                       "height": 48
+                      }
+                     }
+                    ],
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 463,
+                     "x": 57,
+                     "width": 288,
+                     "height": 48
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 447,
+                   "x": 41,
+                   "width": 320,
+                   "height": 80
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{328, 447}, {30, 80}}",
+                  "label": "Vertical scroll bar, 1 page",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{328, 447}, {30, 80}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{355, 537}, {3, 7}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{355, 537}, {3, 7}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 537,
+                     "x": 355,
+                     "width": 3,
+                     "height": 7
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Vertical scroll bar, 1 page",
+                  "rect": {
+                   "y": 447,
+                   "x": 328,
+                   "width": 30,
+                   "height": 80
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 494}, {320, 30}}",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{41, 494}, {320, 30}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{131, 521}, {7, 3}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{131, 521}, {7, 3}}",
+                    "isVisible": "1",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 521,
+                     "x": 131,
+                     "width": 7,
+                     "height": 3
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Horizontal scroll bar, 1 page",
+                  "rect": {
+                   "y": 494,
+                   "x": 41,
+                   "width": 320,
+                   "height": 30
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{328, 447}, {30, 80}}",
+                  "label": "Vertical scroll bar, 1 page",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{328, 447}, {30, 80}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{355, 537}, {3, 7}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{355, 537}, {3, 7}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 537,
+                     "x": 355,
+                     "width": 3,
+                     "height": 7
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Vertical scroll bar, 1 page",
+                  "rect": {
+                   "y": 447,
+                   "x": 328,
+                   "width": 30,
+                   "height": 80
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 494}, {320, 30}}",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "rawIdentifier": null,
+                  "traits": "Adjustable",
+                  "frame": "{{41, 494}, {320, 30}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": "0 %",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{131, 521}, {7, 3}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{131, 521}, {7, 3}}",
+                    "isVisible": "1",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 521,
+                     "x": 131,
+                     "width": 7,
+                     "height": 3
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Horizontal scroll bar, 1 page",
+                  "rect": {
+                   "y": 494,
+                   "x": 41,
+                   "width": 320,
+                   "height": 30
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 447,
+                 "x": 41,
+                 "width": 320,
+                 "height": 80
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 375,
+               "x": 41,
+               "width": 320,
+               "height": 152
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 375,
+             "x": 41,
+             "width": 320,
+             "height": 152
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 375,
+           "x": 41,
+           "width": 320,
+           "height": 152
+          }
+         },
+         {
+          "customActions": null,
+          "nativeFrame": "{{41, 375}, {320, 152}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{41, 375}, {320, 152}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{41, 375}, {320, 152}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{41, 375}, {320, 152}}",
+            "isVisible": "1",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{41, 375}, {320, 152}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{41, 375}, {320, 152}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{41, 375}, {320, 152}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{41, 375}, {320, 152}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 375}, {320, 152}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{41, 375}, {320, 152}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{41, 375}, {402, 874}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{41, 375}, {402, 874}}",
+                    "isVisible": "1",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 375,
+                     "x": 41,
+                     "width": 402,
+                     "height": 874
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 375,
+                   "x": 41,
+                   "width": 320,
+                   "height": 152
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 375,
+                 "x": 41,
+                 "width": 320,
+                 "height": 152
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{41, 375}, {320, 152}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{41, 375}, {320, 152}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{41, 375}, {402, 874}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{41, 375}, {402, 874}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 375,
+                   "x": 41,
+                   "width": 402,
+                   "height": 874
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 375,
+                 "x": 41,
+                 "width": 320,
+                 "height": 152
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 375,
+               "x": 41,
+               "width": 320,
+               "height": 152
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 375,
+             "x": 41,
+             "width": 320,
+             "height": 152
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 375,
+           "x": 41,
+           "width": 320,
+           "height": 152
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": "Lab alert",
+        "rect": {
+         "y": 375,
+         "x": 41,
+         "width": 320,
+         "height": 152
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}
