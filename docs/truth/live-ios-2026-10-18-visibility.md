@@ -29,7 +29,9 @@ taps / fills it — the run and its records: docs/truth/live-ios-2026-10-18-keyb
 # 2026-10-19: LV4's turn and carousel C after round 7's A1
 
 `ios wda turn:scroll-bounded.F` (LV4, R-direction below) and `ios wda scroll:carousel-in-list.C` (the carousel triage
-note, a stop claimed on a read still moving) are ok 5 of 5 at arch/r23-ios-stop: the turn after ONE unmoved stroke (a
+note, a stop claimed on a read still moving) are ok 6 of 6 under WDA at arch/r23-ios-stop (the four traced runs and
+the visibility group at e687fe83, the scroll cells at 659fdf00: ios-wda-stop-carousel-r23-1…4.json,
+ios-vis-r23-ios-stop-e687fe83.json, ios-wda-scroll-cells-659fdf00.json): the turn after ONE unmoved stroke (a
 read within a point is unmoved), C's first stroke cut by the unmeasured carry (2.8 a point, never under 108 pt) and its
 stop judged on the read the fling rests in (docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md, decisions 2, 4
 and 5). Both live KNOWN entries struck off; the records below (ios-vis.json and the 11683c3 smoke runs) now read the
