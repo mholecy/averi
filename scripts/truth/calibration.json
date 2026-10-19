@@ -228,6 +228,24 @@
           "broke": "13d68a2",
           "fixed": "83e282a",
           "why": "pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop, and moves C's tap 20 pt off its probe point to 'the uncovered part' (red on the open row's tap at its probe point since phase 3 round 3), until ADR 0019's hidden subtree"
+        },
+        {
+          "rows": ["android-rn-averi_lab-api33/rn-field.xml N tap", "android-rn-averi_lab-api33/rn-field.xml N scroll_until", "android-rn-averi_lab-api33/rn-field.xml M tap", "android-rn-averi_lab-api33/rn-field.xml M scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "ce19c23",
+          "why": "the cover judgement 13d68a2 introduced reads a React Native field's floating label, overhanging its EditText by 3 px past the 2-px own-label allowance, as under its own field (green at 16ae6bb: round 7's RN corpus, captured after the fact, shows it) — lab note LR2 (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md), fixed by A8's ce19c23 (the overhang half a percent of the screen's shorter side, 5 px here), f3a7043 keeping it green"
+        },
+        {
+          "rows": ["ios-rn-iphone17-ios27/rn-field.wda.json N tap", "ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until", "ios-rn-iphone17-ios27/rn-field.wda.json M tap", "ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "ce19c23",
+          "why": "the cover judgement 13d68a2 introduced reads WDA's RN text input, listed inside an unnamed wrapper of its own rect, as a cover of its own floating label (M's under the field's horizontal scroll bar until 81a7d62, then under its field) — green at 16ae6bb; lab note LR1 (docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md), fixed by A8's ce19c23 (the field's outermost self is the label's sibling), f3a7043 keeping it green"
+        },
+        {
+          "rows": ["ios-rn-iphone17-ios27/rn-field.idb.json N tap", "ios-rn-iphone17-ios27/rn-field.idb.json N scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "8c0fb41",
+          "why": "the same cover judgement on idb's flat list: N's label read as under its own field (green at 16ae6bb), green again from 8c0fb41 (fix/r6-ios-top) — first-parent bisect over round 7's RN corpus: red at b75b8b5 … dff7381, green at 8c0fb41 and every merge after; no note (the RN corpus did not exist then), LR1/LR2's rows on the other sources fixed by ce19c23 + f3a7043"
         }
       ],
       "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."
@@ -666,6 +684,18 @@
           ],
           "broke": "596a379",
           "why": "the colour assert's cover judgement reads the menu row W as under C, listed after it in reading order (green at ad7ed11) — lab note L4"
+        },
+        {
+          "rows": ["android-rn-averi_lab-api33/rn-field.xml M ocr"],
+          "broke": "596a379",
+          "fixed": "ce19c23",
+          "why": "the ocr assert asks the covers the tap asks: M's label, overhanging its EditText by 3 px, fails it closed as under its own field (green at ad7ed11) — lab note LR2 (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md), fixed by A8's ce19c23, f3a7043 keeping it green"
+        },
+        {
+          "rows": ["ios-rn-iphone17-ios27/rn-field.wda.json M ocr"],
+          "broke": "596a379",
+          "fixed": "ce19c23",
+          "why": "the ocr assert asks the covers the tap asks: WDA's wrapped RN input fails M's label closed as under its own field (green at ad7ed11) — lab note LR1 (docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md), fixed by A8's ce19c23, f3a7043 keeping it green"
         }
       ]
     },
@@ -1254,7 +1284,10 @@
     {
       "n": "LR1",
       "note": "2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["ce19c23", "f3a7043"],
+      "before": "565bcb9",
+      "after": "f3a7043",
       "verified": "golden",
       "defect": "^(not tapped|stopped|failed): .*\\bunder textfield\\b|textfield .* is drawn over the element",
       "checks": [
@@ -1265,12 +1298,15 @@
         "ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until",
         "ios-rn-iphone17-ios27/rn-field.wda.json M ocr"
       ],
-      "remark": "No fix yet: red at HEAD, round 7's React Native lab app (fixtures/apps/rn). WDA lists RN's text input inside an unnamed wrapper of its own rect, so ownControl's sibling rule misses its floating label; idb lists the field flat and is green. react-native.known.ts owns the ratchet. Live LOUD under WDA (rn4, tap:rn-field.N, tap:rn-field.M refused, nothing fired: docs/truth/live-rn-2026-10-19.md)."
+      "remark": "Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#outermostSelf — the input and every unnamed `container` of its rect holding it alone are one node to its label, the label's sibling in any parent; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height, so a composer or search field in a screen-sized parent still covers). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes; idb lists the field flat and is green on both sides. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src."
     },
     {
       "n": "LR2",
       "note": "2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["ce19c23", "f3a7043"],
+      "before": "565bcb9",
+      "after": "f3a7043",
       "verified": "golden",
       "defect": "^(not tapped|stopped|failed): .*\\bunder textfield\\b|textfield .* is drawn over the element",
       "checks": [
@@ -1281,7 +1317,7 @@
         "android-rn-averi_lab-api33/rn-field.xml M scroll_until",
         "android-rn-averi_lab-api33/rn-field.xml M ocr"
       ],
-      "remark": "No fix yet: red at HEAD, round 7's React Native lab app. The label overhangs its EditText by 3 px (1 dp at 2.75), past LABEL_OVERHANG's 2 px — ADR 0014's allowance stated in the tree's units, stricter on Android. react-native.known.ts owns the ratchet. Live LOUD (rn4, tap:rn-field.N, tap:rn-field.M refused, nothing fired: docs/truth/live-rn-2026-10-19.md)."
+      "remark": "Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#labelOverhang — the own-label overhang is 2 pt or dp, half a percent of the screen's shorter side: 5 px on averi_lab, where RN's 1-dp overhang is 3 px; the field shape no longer asks its parent's size; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src."
     }
   ],
   "excluded": [
@@ -1459,7 +1495,7 @@
     },
     {
       "note": "2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md",
-      "why": "flow: typing (`idb ui text` into a React Native single-line field loses the tail of the text, 6 of 12 fills in round 7's two live runs, ios-rn-field-055c666.json and ios-rn-field-97de1b9.json) — averi's read-back reports it; not a visibility judgement, no golden row"
+      "why": "flow: typing (`idb ui text` into a React Native single-line field loses the tail of the text, 6 of 12 fills in round 7's two live runs, ios-rn-field-055c666.json and ios-rn-field-97de1b9.json) — averi's read-back reports it; not a visibility judgement, no golden row; fixed by round 7's A9 at 6ff68e5 and 7909c61 (src/interact/fill-type.ts#typeAndConfirm types a dropped tail again, at most twice, only where the typing provably stayed in the field; docs/adr/0023-fill-types-a-dropped-tail-again.md), measured live: 29 RN single-line fills whole over 5 runs × idb and WDA, 14 with a tail typed again (docs/truth/live-records/ios-rn-forms-a9-1…5.json), the native forms group unchanged (ios-forms-a9.json)"
     },
     {
       "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
