@@ -29,11 +29,23 @@ export interface LabAppIdentity {
   bundle: string;
   package: string;
   source: Record<Platform, string>;
+  /**
+   * The cell layers its Android build builds, or `any`: the native app's are Lab.kt#SUPPORTED_LAYERS (its cells routed
+   * by family, MainActivity.kt#CellRouter; a layer only the iOS app has yet is refused); the React Native app builds
+   * its family whatever the layer (App.tsx).
+   */
+  androidLayers: ReadonlySet<string> | 'any';
 }
 
 export const LAB_APP: Record<LabApp, LabAppIdentity> = {
-  native: { name: 'AveriLab', bundle: 'dev.averi.lab', package: 'dev.averi.lab', source: { ios: 'fixtures/apps/ios', android: 'fixtures/apps/android' } },
-  'react-native': { name: 'AveriLabRN', bundle: 'dev.averi.lab.rn', package: 'dev.averi.lab.rn', source: { ios: 'fixtures/apps/rn', android: 'fixtures/apps/rn' } },
+  native: {
+    name: 'AveriLab',
+    bundle: 'dev.averi.lab',
+    package: 'dev.averi.lab',
+    source: { ios: 'fixtures/apps/ios', android: 'fixtures/apps/android' },
+    androidLayers: new Set(['none', 'sheet-medium', 'alert', 'dialog-fullscreen', 'bottom-sheet-dialog']),
+  },
+  'react-native': { name: 'AveriLabRN', bundle: 'dev.averi.lab.rn', package: 'dev.averi.lab.rn', source: { ios: 'fixtures/apps/rn', android: 'fixtures/apps/rn' }, androidLayers: 'any' },
 };
 
 /** Why `app` does not build `cell` (another app's family: schema.ts#appOf), or undefined when it does. */
@@ -263,12 +275,6 @@ export class IosLab implements LabDevice {
 // --- Android: adb ---
 
 /**
- * The cell layers the native Android app builds (Lab.kt#SUPPORTED_LAYERS; its cells routed by family,
- * MainActivity.kt#CellRouter).
- */
-const ANDROID_LAYERS = new Set(['none', 'sheet-medium', 'alert', 'dialog-fullscreen', 'bottom-sheet-dialog']);
-
-/**
  * averi's keyboard queries (src/adapters/android.ts: INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND), word for word — copied,
  * not imported, so the capture asks what averi asks without loading the code it judges.
  */
@@ -317,11 +323,11 @@ export class AndroidLab implements LabDevice {
   unsupported(cell: CatalogCell): string | undefined {
     const other = otherApp(cell, this.app);
     if (other !== undefined) return other;
-    // The React Native app builds its family whatever its layer (App.tsx).
-    if (this.app === 'react-native') return undefined;
+    const layers = LAB_APP[this.app].androidLayers;
+    if (layers === 'any') return undefined;
     // A form cell builds its own picker sheet (Forms.kt): its `sheet-large` is the form's, not a presented layer's.
     if (cell.form !== undefined && cell.layer === 'sheet-large') return undefined;
-    if (!ANDROID_LAYERS.has(cell.layer)) return `layer ${cell.layer} is not one the Android app builds`;
+    if (!layers.has(cell.layer)) return `layer ${cell.layer} is not one the Android app builds`;
     return undefined;
   }
 

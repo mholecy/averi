@@ -71,6 +71,13 @@ export type Family = (typeof FAMILIES)[number];
 export const LAB_APPS = ['native', 'react-native'] as const;
 export type LabApp = (typeof LAB_APPS)[number];
 
+/** A command line's `--app` (capture.ts, live.ts): the native app when not given; anything else not a LabApp refused. */
+export function parseLabApp(value: string | undefined): LabApp {
+  const app = value ?? 'native';
+  if (!(LAB_APPS as readonly string[]).includes(app)) throw new Error(`no lab app ${app} (${LAB_APPS.join(', ')})`);
+  return app as LabApp;
+}
+
 /** The app that builds a family's cells: the react-native family the React Native app's alone, every other the native apps'. */
 export const appOf = (family: Family | undefined): LabApp => (family === 'react-native' ? 'react-native' : 'native');
 

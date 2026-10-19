@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, type Exec } from '../../scripts/truth/lab-device.js';
-import type { CatalogCell } from '../../scripts/truth/schema.js';
+import { parseLabApp, type CatalogCell } from '../../scripts/truth/schema.js';
 
 // The lab devices' guards (scripts/truth/lab-device.ts): a capture or a live run touches the lab's own simulator or
 // AVD, or nothing — checked against what simctl and adb report, through a fake exec (no device).
@@ -168,6 +168,19 @@ describe('the lab apps: each device object drives one app, its cells only', () =
       expect(lab.unsupported(RN_CELL)).toBeUndefined();
       expect(lab.unsupported(NATIVE_CELL)).toBe('a cell of the native lab app (AveriLab), not of AveriLabRN');
     }
+  });
+
+  it("the Android layers each app builds are its own: the native app's set, the React Native app's any", () => {
+    const own = { id: 'rn-sheet', family: 'react-native', layer: 'rn-sheet', targets: [] } satisfies CatalogCell;
+    expect(new AndroidLab('emulator-5554', { app: 'react-native' }).unsupported(own)).toBeUndefined();
+    const native = { id: 'x', family: 'presented', layer: 'rn-sheet', targets: [] } satisfies CatalogCell;
+    expect(new AndroidLab('emulator-5554').unsupported(native)).toBe('layer rn-sheet is not one the Android app builds');
+  });
+
+  it('--app: the native app when not given, a lab app by its name, anything else refused', () => {
+    expect(parseLabApp(undefined)).toBe('native');
+    expect(parseLabApp('react-native')).toBe('react-native');
+    expect(() => parseLabApp('rn')).toThrow('no lab app rn (native, react-native)');
   });
 
   it('the React Native app launches its own bundle on iOS and reads its own container', async () => {

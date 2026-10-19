@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { capture } from './capture-run.js';
 import { loadCatalog, selectCells } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, type LabDevice } from './lab-device.js';
-import { LAB_APPS, type LabApp } from './schema.js';
+import { parseLabApp } from './schema.js';
 
 /**
  * The truth capture's command lines (capture-run.ts does the work; README.md beside scripts/differential, "Golden
@@ -49,8 +49,7 @@ export async function main(platform: 'ios' | 'android', argv: string[] = process
   if (id === undefined || values.out === undefined) {
     throw new Error(platform === 'ios' ? 'usage: capture.ts --udid <udid> --out <dir> [--wda-port N] [--app native|react-native] [--family f,g] [--cells a,b]' : 'usage: capture-android.ts --serial <serial> --out <dir> [--app native|react-native] [--family f,g] [--cells a,b]');
   }
-  const app = (values.app ?? 'native') as LabApp;
-  if (!LAB_APPS.includes(app)) throw new Error(`no lab app ${values.app} (${LAB_APPS.join(', ')})`);
+  const app = parseLabApp(values.app);
   // The selection before the device: a name that matches nothing is refused without touching it.
   const catalog = await loadCatalog();
   const cells = selectCells(catalog, { families: values.family?.split(','), cells: values.cells?.split(',') });

@@ -16,7 +16,7 @@ import { knownEntry, knownLive } from './live-known.js';
 import { holds, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
-import { appOf, LAB_APPS, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
+import { appOf, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -103,8 +103,7 @@ if (rejudging === undefined && (values.udid === undefined) === (values.serial ==
   throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
 }
 const platform: 'ios' | 'android' = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
-const app: LabApp = rejudging?.app ?? ((values.app ?? 'native') as LabApp);
-if (!LAB_APPS.includes(app)) throw new Error(`no lab app ${values.app} (${LAB_APPS.join(', ')})`);
+const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
 const port = Number(values['wda-port'] ?? 8120);
 /** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
