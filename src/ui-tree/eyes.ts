@@ -1,5 +1,5 @@
-import type { Rect, UiNode } from '../adapters/types.js';
-import type { Edge } from './geometry.js';
+import type { Point, Rect, UiNode } from '../adapters/types.js';
+import { axisOfEdge, sameRectWithinPixel, type Edge } from './geometry.js';
 import type { FlushNeighbour, Scene } from './standing.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
@@ -30,6 +30,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * region a pixel measurement reads (ui-tree/standing.ts#Scene.pixelRegion). One capture, unsettled by design: the stop
  * it checks was settled by its tree reads, and a settled pair would double the cost (ADR 0013, "Refined 2026-10-19",
  * states the residual: a bar or an IME still animating could be misread).
+ *
+ * WHAT A REFUSAL KEEPS, and what a finding reaches — the module's too, so the round (interact/scroll-rounds.ts#round)
+ * spells none of it: `EyesAsked` (`askedOf`), a question as asked, in rects; `sameQuestion`, a later question of the
+ * same region and neighbours within a pixel — refused again with no second screenshot, nothing having moved; and
+ * `reachesPoint`, whether a band the eyes saw reaches the point the next tap presses.
  */
 
 /** What the eyes are asked: the target, its region a pixel measurement reads, and its flush neighbours — every edge judged, one screenshot. */
@@ -71,7 +76,7 @@ export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: U
 /** The neighbour reaches both ends of the screen along its edge (across it for a top or bottom edge, down it for a side edge): nothing of the screen beside it. */
 function spansScreen({ edge, by }: FlushNeighbour, box: Rect): boolean {
   const r = by.rect;
-  return edge === 'top' || edge === 'bottom' ? r.x <= box.x && r.x + r.width >= box.x + box.width : r.y <= box.y && r.y + r.height >= box.y + box.height;
+  return axisOfEdge(edge) === 'vertical' ? r.x <= box.x && r.x + r.width >= box.x + box.width : r.y <= box.y && r.y + r.height >= box.y + box.height;
 }
 
 /** The eyes' finding a reply or a failure quotes: what they saw that was not the target's own colour. */
@@ -79,3 +84,39 @@ export type EyesFinding = Exclude<EyesAnswer, { readonly sees: 'own' }>;
 
 /** A finding of a band of a surface: what keeps a `fully: true` stop from being claimed, or a plain stop whose centre it reaches. */
 export type SurfaceFinding = Extract<EyesAnswer, { readonly sees: 'surface' }>;
+
+/** A question as asked, in rects (`askedOf`): its region and each flush neighbour's rect, in order — what a later question is compared with. */
+export interface EyesAsked {
+  readonly region: Rect;
+  readonly neighbours: readonly Rect[];
+}
+
+/** `question` as asked (`EyesAsked`), its rects copied. */
+export const askedOf = (question: EyesQuestion): EyesAsked => ({ region: { ...question.region }, neighbours: question.flush.map((f) => ({ ...f.by.rect })) });
+
+/**
+ * `question` is the SAME QUESTION as `asked`: its region and its neighbours' rects, as many, each within a pixel — nothing
+ * moved, so the pixels did not, and the eyes would answer as before (interact/scroll-rounds.ts#round's refused again).
+ */
+export const sameQuestion = (asked: EyesAsked, question: EyesQuestion): boolean =>
+  sameRectWithinPixel(asked.region, question.region) &&
+  asked.neighbours.length === question.flush.length &&
+  question.flush.every((f, i) => sameRectWithinPixel(asked.neighbours[i]!, f.by.rect));
+
+/**
+ * The band the eyes saw REACHES `point` along its edge's axis — measured from the edge of `region` (the question's)
+ * inward by its depth. The round asks it of the centre the next tap presses (selectors.ts#tapPoint): the bar's padding
+ * over a 42-px label 23 px deep from its bottom (1971–1993 of 1952–1993) reaches its centre at 1973.
+ */
+export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, point: Point): boolean {
+  switch (edge) {
+    case 'bottom':
+      return region.y + region.height - depth <= point.y;
+    case 'top':
+      return region.y + depth > point.y;
+    case 'right':
+      return region.x + region.width - depth <= point.x;
+    case 'left':
+      return region.x + depth > point.x;
+  }
+}

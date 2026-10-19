@@ -1,6 +1,6 @@
 import { INPUT_ROLE, rectArea, rectIntersection, sameRect, sameRectWithinPixel, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
-import { FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
@@ -477,7 +477,7 @@ const paddedOn = (control: Rect, parent: Rect, target: Rect): boolean => {
  * over its `textfield 42,447 318x20` under WDA, 1 pt above and below — or 2 dp on Android, as a fraction of the
  * screen's shorter side (`labelOverhang`): the tree's units are points on iOS and pixels on Android, and a
  * physical size is what the allowance means. Measured on Android: React Native lays a field's floating label 1 dp
- * above its EditText, 3 px at density 2.75 (round 7's RN lab app: `Payee’s name` `177,360 255x61` over its field
+ * above its EditText, 3 px at density 2.75 (the lab's RN app: `Payee’s name` `177,360 255x61` over its field
  * `177,363 726x55`), refused while the allowance was 2 tree units. Scaled by the screen, as `minTapPiece` is, and not
  * by the density: the draw order is the tree's (and the uiautomator parser's widening's, before any device read),
  * and no tree carries its density — `dumpsys window displays` does, read for the system bands after the tree (the
@@ -496,7 +496,7 @@ export const labelOverhang = (screen: { readonly width: number; readonly height:
  * THE FIELD'S OUTERMOST SELF: a text input and every wrapper that is NOTHING BUT it (`nothingBut`) are one node to its
  * label — the field its label's siblings list. React Native's text input component view (RCTTextInputComponentView)
  * hosts the UITextField / UITextView as its child, and WDA lists both — `text 'Payee’s name' 69,131 94x23`, then
- * `Other 69,132 264x20` holding `TextField 69,132 264x20` (round 7's RN lab app on the iPhone 17) — so the input is
+ * `Other 69,132 264x20` holding `TextField 69,132 264x20` (the lab's RN app on the iPhone 17) — so the input is
  * its label's nephew, behind a wrapper that draws nothing the input does not. `outermostSelf` is the outermost of
  * `placed` and its ancestors that are nothing but it (the one a sibling test asks); `inputOf` the text input a node
  * is, down through such wrappers (what the field's own tests ask). Narrow on purpose: a wrapper that is named, holds
@@ -517,12 +517,9 @@ const inputOf = (node: UiNode): UiNode | undefined => {
   return self.role === INPUT_ROLE ? self : undefined;
 };
 
-/** `wrapper` is nothing but `inner`: an unnamed (no label, identifier or value) `container` — never interactive — whose only child it is, of its rect to a sub-unit (`sameRectWithinPixel`). */
+/** `wrapper` is nothing but `inner`: an empty frame (placed.ts#emptyFrame: an unnamed `container` — never interactive) whose only child it is, of its rect to a sub-unit (`sameRectWithinPixel`). */
 const nothingBut = (wrapper: UiNode, inner: UiNode): boolean =>
-  wrapper.role === 'container' &&
-  !wrapper.label &&
-  !wrapper.identifier &&
-  !wrapper.value &&
+  emptyFrame(wrapper) &&
   wrapper.children.length === 1 &&
   wrapper.children[0] === inner &&
   sameRectWithinPixel(wrapper.rect, inner.rect);
@@ -551,7 +548,7 @@ const ownButton = (control: Placed, { target, screenArea, paddedTouchTargets }: 
  * the field's (the SWIFT form 446–468 over 447–467, the RN lab app's WDA 131–154 over 132–152, its Android 360–421
  * over 363–418), while a text a field merely lies over — a message under a chat composer `0,790 402x44`, a header
  * title under a search field `8,100 386x36` — is shorter than the field it lies in. React Native lays its fields in
- * the screen's own view (round 7's RN lab app, Android and WDA alike), which the button shapes' screen-sized-parent
+ * the screen's own view (the lab's RN app, Android and WDA alike), which the button shapes' screen-sized-parent
  * rule would refuse.
  */
 const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor): boolean => {
@@ -1090,7 +1087,7 @@ const NOT_DRAWN = {
    * (`outermostSelf`): React Native's component view, which WDA lists as an
    * unnamed `Other` of the input's rect holding the input alone — `text
    * 'Payee’s name' 69,131 94x23`, then `Other 69,132 264x20` → `TextField
-   * 69,132 264x20` (round 7's RN lab app) — is the field, not a node
+   * 69,132 264x20` (the lab's RN app) — is the field, not a node
    * between it and its label. A wrapper named, interactive, of another rect
    * or holding anything else is not: the field in it still covers.
    * docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md

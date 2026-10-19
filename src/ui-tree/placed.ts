@@ -98,10 +98,20 @@ export const stackedScreens = (scroller: Placed, target: Placed, screenArea: num
 export const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable']);
 
 /**
- * A descendant that cannot be an item: a named wrapper type with nothing of its own (`container` — not `other`, see
- * draw-order.ts's `itemlessToolbar` row).
+ * AN UNNAMED WRAPPER: a structural role (`STRUCTURAL_ROLES`: `container`, `other`) with no label, identifier or value —
+ * nothing of its own a reader could name or read. The keyboard's blank point lets the drag start over one
+ * (interact/keyboard-dismissal.ts#blankPoint); `emptyFrame` narrows it to the `container` role.
  */
-export const emptyFrame = (n: UiNode): boolean => n.role === 'container' && !n.label && !n.value && !n.identifier;
+export const isUnnamedWrapper = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.role) && !n.label && !n.identifier && !n.value;
+
+/**
+ * A descendant that cannot be an item, and the wrapper a field's outermost self passes through (draw-order.ts's
+ * `nothingBut`): an unnamed wrapper (`isUnnamedWrapper`) of the named wrapper type, `container` — not `other`, the
+ * role the sources give a node they know no type for (adapters/android.ts: a class off the role map with no children;
+ * adapters/ios-node.ts: a type off its map), which may be something drawn rather than a wrapper (draw-order.ts's
+ * `itemlessToolbar` row).
+ */
+export const emptyFrame = (n: UiNode): boolean => n.role === 'container' && isUnnamedWrapper(n);
 
 /** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
 export const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));

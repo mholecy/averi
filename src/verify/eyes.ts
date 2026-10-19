@@ -1,7 +1,6 @@
 import { PNG } from 'pngjs';
-import type { DeviceAdapter } from '../adapters/types.js';
-import type { Rect } from '../adapters/types.js';
-import { PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
+import type { DeviceAdapter, Rect, ScrollAxis } from '../adapters/types.js';
+import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/standing.js';
 import type { Eyes, EyesAnswer, EyesQuestion } from '../ui-tree/eyes.js';
 import { errorMessage } from '../util/error-message.js';
@@ -96,13 +95,13 @@ function judgeEdge(png: RgbaImage, scale: number, regionRect: Rect, { edge, by: 
   const region = pngRegion(regionRect, scale, png);
   const by = pngRegion(neighbour.rect, scale, png);
   if (region === undefined || by === undefined) return unjudged('the element or the node beside it lies off the screenshot');
-  const across = edge === 'top' || edge === 'bottom';
-  const flanks = besideAlong(by, across, png).filter((f) => (across ? f.x1 - f.x0 : f.y1 - f.y0) >= FLANK_MIN_PX);
+  const axis = axisOfEdge(edge);
+  const flanks = flanksBeside(by, axis, png);
   const colours = flanks.map((f) => sampleDominant(png, [f])?.rgb);
   if (flanks.length === 0 || colours.some((c, i) => c === undefined || !oneColour(png, flanks[i]!, c))) return unjudged('no plain surface beside that node to read its colour from');
   const surface = colours[0]!;
   if (colours.some((c) => distance(c!, surface) > EYES_SAME_DE)) return unjudged('the surface beside that node is not one colour');
-  const lines = across ? region.y1 - region.y0 : region.x1 - region.x0;
+  const lines = axis === 'vertical' ? region.y1 - region.y0 : region.x1 - region.x0;
   let band = 0;
   while (band < lines && oneColour(png, lineOf(region, edge, band), surface)) band++;
   const depth = Math.round(band / scale);
@@ -112,7 +111,7 @@ function judgeEdge(png: RgbaImage, scale: number, regionRect: Rect, { edge, by: 
   if (past === undefined || own === undefined) return unjudged(`it reads that surface's colour ${rgbToHex(surface)} to its far edge`);
   const apart = distance(own, surface);
   if (apart <= EYES_APART_DE) return unjudged(`its own colour ${rgbToHex(own)} and that surface's ${rgbToHex(surface)} are too close to tell apart (ΔE ${apart.toFixed(2)})`);
-  const beside = besideAlong(past, across, png).filter((f) => (across ? f.x1 - f.x0 : f.y1 - f.y0) >= FLANK_MIN_PX);
+  const beside = flanksBeside(past, axis, png);
   if (beside.length === 0) return unjudged('nothing of the screen beside it to tell its own margin from that surface');
   if (beside.some((f) => oneColour(png, f, surface))) return unjudged(`the screen beside it shows that surface's colour ${rgbToHex(surface)} too: the band may be its own margin over that background`);
   return { sees: 'surface', edge, neighbour, depth, surface: rgbToHex(surface), own: rgbToHex(own) };
@@ -147,10 +146,15 @@ function oneColour(png: RgbaImage, bounds: EdgeBounds, ref: Rgb): boolean {
   return total > 0 && same / total >= LINE_SHARE;
 }
 
-/** The two strips of the screen beside `r` along a top or bottom edge's axis (left and right of it, on its rows), or a side edge's (above and below it, on its columns). */
-function besideAlong(r: EdgeBounds, across: boolean, png: { width: number; height: number }): EdgeBounds[] {
-  return across
-    ? [
+/**
+ * The strips of the screen beside `r` across the edge's axis (geometry.ts#axisOfEdge) — for a top or bottom edge's
+ * (`vertical`) left and right of it, on its rows; for a side edge's above and below it, on its columns — each kept only
+ * when at least FLANK_MIN_PX wide, a plain surface to read rather than an antialiased edge.
+ */
+function flanksBeside(r: EdgeBounds, axis: ScrollAxis, png: { width: number; height: number }): EdgeBounds[] {
+  const strips: EdgeBounds[] =
+    axis === 'vertical'
+      ? [
         { x0: 0, y0: r.y0, x1: r.x0, y1: r.y1 },
         { x0: r.x1, y0: r.y0, x1: png.width, y1: r.y1 },
       ]
@@ -158,6 +162,7 @@ function besideAlong(r: EdgeBounds, across: boolean, png: { width: number; heigh
         { x0: r.x0, y0: 0, x1: r.x1, y1: r.y0 },
         { x0: r.x0, y0: r.y1, x1: r.x1, y1: png.height },
       ];
+  return strips.filter((f) => (axis === 'vertical' ? f.x1 - f.x0 : f.y1 - f.y0) >= FLANK_MIN_PX);
 }
 
 /** What of `r` lies past a band `band` lines deep from `edge`; undefined when the band takes it all. */

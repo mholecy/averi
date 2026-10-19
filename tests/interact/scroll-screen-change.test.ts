@@ -6,7 +6,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { failureOf, play, resultOf } from '../helpers/rounds.js';
 
-// THE SCREEN CHANGED UNDER THE STROKE (interact/scroll-rounds.ts#ScreenChange; iOS point 4 of
+// THE SCREEN CHANGED UNDER THE STROKE (ui-tree/read-tree.ts#ScreenChange; iOS point 4 of
 // docs/truth/live-ios-2026-10-18-visibility.md): beneath the lab's large sheet idb lists the sheet's button alone, no
 // sign of the sheet, so scroll_until for the host's A strokes — and live the stroke from (201,175) DISMISSED the sheet
 // and the next read found A: "fully visible after 1 swipe". The read after a stroke that touched down on nothing the
@@ -218,7 +218,7 @@ describe('the changed stop\'s words for several ids', () => {
   });
 });
 
-// THE PERSISTENCE CLAUSES, each pinned on its edge (interact/scroll-rounds.ts#touchedPersists; the slice's review round 3).
+// THE PERSISTENCE CLAUSES, each pinned on its edge (ui-tree/read-tree.ts#screenChangedUnder, through the round that calls it).
 describe('what the stroke touched persists only as the rule says', () => {
   /** An idb read: the Application, `touched` under the touch-down (201,175), and identified rows `row_<from>…`. */
   const idbRead = (touched: unknown, from: number): UiNode =>
