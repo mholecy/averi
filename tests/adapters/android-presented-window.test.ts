@@ -21,10 +21,13 @@ import { Verifier } from '../../src/verify/assert.js';
 //
 // The captures are the lab app's (fixtures/apps/android on truth/phase-3, captured by scripts/truth/capture-android.ts
 // on the averi_lab AVD, Pixel 3a profile, API 33, 1080x2220): tests/fixtures/truth/android-averi_lab-api33/<cell>.xml,
-// copied unchanged.
+// copied unchanged — bottom-sheet-dialog and dialog-fullscreen from truth/round-7 (round 7's cells, lab note LW1:
+// docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md).
+
+type Cell = 'alert-dim' | 'sheet-medium' | 'bottom-sheet-dialog' | 'dialog-fullscreen' | 'form-picker' | 'open';
 
 /** A lab capture as the adapter parses it (the status line uiautomator appends cut, as AndroidAdapter.uiTree does). */
-const capture = (cell: 'alert-dim' | 'sheet-medium' | 'form-picker' | 'open'): UiNode => {
+const capture = (cell: Cell): UiNode => {
   const raw = readFileSync(new URL(`../fixtures/uiautomator-lab-${cell}.xml`, import.meta.url), 'utf8');
   return parseDump(raw.slice(0, raw.lastIndexOf('>') + 1));
 };
@@ -45,7 +48,9 @@ const raw = (bounds: string, attrs: { desc?: string; clickable?: boolean; scroll
 
 describe('the uiautomator parser marks its root: the dump lists the active window only', () => {
   it('every dump\'s root carries `activeWindowOnly`, a plain screen\'s as a presented window\'s', () => {
-    for (const cell of ['open', 'alert-dim', 'sheet-medium', 'form-picker'] as const) expect(capture(cell).activeWindowOnly).toBe(true);
+    for (const cell of ['open', 'alert-dim', 'sheet-medium', 'bottom-sheet-dialog', 'dialog-fullscreen', 'form-picker'] as const) {
+      expect(capture(cell).activeWindowOnly).toBe(true);
+    }
   });
 
   it('the presentation module picks the uiautomator adapter by that mark (not by `paddedTouchTargets`)', () => {
@@ -67,9 +72,57 @@ describe('the uiautomator parser marks the one window presented when the dump sh
     expect(capture('sheet-medium').presentation).toBe('screen');
   });
 
-  it('a plain screen (open) is no presented window; nor is the expanded picker sheet (form-picker), whose dump carries no scrim — a residual', () => {
+  it('measured, the Views BottomSheetDialog (bottom-sheet-dialog): Material\'s unlabelled `touch_outside` scrim and its `design_bottom_sheet`, laid between the bars — `screen`', () => {
+    const tree = capture('bottom-sheet-dialog');
+    expect(tree.rect).toEqual({ x: 0, y: 0, width: 1080, height: 2220 });
+    expect(tree.presentation).toBe('screen');
+  });
+
+  it('a plain screen (open) is no presented window; nor is the expanded picker sheet (form-picker), whose dump carries no scrim, nor the full-screen Compose dialog (dialog-fullscreen), laid between the bars against the left edge — residuals', () => {
     expect(capture('open').presentation).toBeUndefined();
     expect(capture('form-picker').presentation).toBeUndefined();
+    expect(capture('dialog-fullscreen').presentation).toBeUndefined();
+  });
+
+  it('Material\'s sheet dialog is read by its view ids\' entries, its geometry against the scrim\'s, not the window\'s', () => {
+    /** A raw node with a resource-id (`raw` writes none). */
+    const idNode = (id: string, bounds: string, attrs: { clickable?: boolean } = {}, children = ''): string =>
+      raw(bounds, attrs, children).replace('resource-id=""', `resource-id="${id}"`);
+    const S = raw('[128,1406][953,1582]', { desc: 'Target S', clickable: true });
+    const scrim = (attrs: { id?: string; bounds?: string; clickable?: boolean; child?: string } = {}) =>
+      idNode(attrs.id ?? 'dev.averi.lab:id/touch_outside', attrs.bounds ?? '[0,66][1080,2154]', { clickable: attrs.clickable ?? true }, attrs.child ?? '');
+    const sheet = (bounds = '[0,1164][1080,2154]', id = 'dev.averi.lab:id/design_bottom_sheet') => idNode(id, bounds, {}, S);
+    const window = (kids: string, coordinator = 'dev.averi.lab:id/coordinator') =>
+      dump('[0,0][1080,2220]', raw('[0,0][1080,2154]', {}, idNode(coordinator, '[0,66][1080,2154]', {}, kids)) + raw('[0,2154][1080,2220]'));
+    expect(window(scrim() + sheet()).presentation).toBe('screen');
+    // The entry is Material's; the package is the app's.
+    expect(window(scrim({ id: 'com.bank.app:id/touch_outside' }) + sheet('[0,1164][1080,2154]', 'com.bank.app:id/design_bottom_sheet'), 'com.bank.app:id/coordinator').presentation).toBe('screen');
+    // A fully expanded sheet starts where the scrim does (unmeasured; `>=`).
+    expect(window(scrim() + sheet('[0,66][1080,2154]')).presentation).toBe('screen');
+    // Another entry, or an id only ending in Material's: no mark.
+    expect(window(scrim({ id: 'dev.averi.lab:id/my_touch_outside' }) + sheet()).presentation).toBeUndefined();
+    expect(window(scrim() + sheet('[0,1164][1080,2154]', 'dev.averi.lab:id/bottom_sheet')).presentation).toBeUndefined();
+    expect(window(scrim() + sheet(), 'dev.averi.lab:id/container').presentation).toBeUndefined();
+    // The scrim must take the touch and hold nothing.
+    expect(window(scrim({ clickable: false }) + sheet()).presentation).toBeUndefined();
+    expect(window(scrim({ child: raw('[40,100][400,160]', { desc: 'x' }) }) + sheet()).presentation).toBeUndefined();
+    // The sheet right after the scrim, not before it nor apart from it.
+    expect(window(sheet() + scrim()).presentation).toBeUndefined();
+    expect(window(scrim() + raw('[0,66][1080,200]') + sheet()).presentation).toBeUndefined();
+    // The sheet shares the scrim's left, width and bottom, its top inside the scrim.
+    expect(window(scrim() + sheet('[40,1164][1120,2154]')).presentation).toBeUndefined();
+    expect(window(scrim() + sheet('[0,1164][1000,2154]')).presentation).toBeUndefined();
+    expect(window(scrim() + sheet('[0,1164][1080,2220]')).presentation).toBeUndefined();
+    expect(window(scrim() + sheet('[0,40][1080,2154]')).presentation).toBeUndefined();
+    expect(window(scrim() + sheet('[0,2154][1080,2154]')).presentation).toBeUndefined();
+  });
+
+  it('…not a relaxed scrim shape: the same nodes with no Material ids — an unlabelled full-width touch layer over a full-width sibling — are app content', () => {
+    const plain = dump(
+      '[0,0][1080,2220]',
+      raw('[0,0][1080,2220]', {}, raw('[0,0][1080,1110]', { clickable: true }) + raw('[0,1110][1080,2220]', {}, raw('[128,1406][953,1582]', { desc: 'x' }))),
+    );
+    expect(plain.presentation).toBeUndefined();
   });
 
   it('the scrim must be clickable, labelled, childless and screen-wide from the window\'s top, its sibling reaching the bottom from no lower than the scrim\'s', () => {
@@ -109,6 +162,7 @@ describe('the presentation module: the presented window is listed alone', () => 
   it('`alone` names the dialog, and the sheet as a presented screen; nothing on a plain screen', () => {
     expect(presentationOf(capture('alert-dim')).alone).toEqual({ kind: 'dialog' });
     expect(presentationOf(capture('sheet-medium')).alone).toEqual({ kind: 'screen' });
+    expect(presentationOf(capture('bottom-sheet-dialog')).alone).toEqual({ kind: 'screen' });
     expect(presentationOf(capture('open')).alone).toBeUndefined();
     expect(presentationOf(capture('form-picker')).alone).toBeUndefined();
   });
@@ -126,7 +180,7 @@ describe('the presentation module: the presented window is listed alone', () => 
   });
 
   it('a target of the window\'s own is not beneath it: nothing presented over the dialog\'s Keep, nor the sheet\'s S', () => {
-    for (const [cell, label] of [['alert-dim', 'Keep'], ['sheet-medium', 'Target S']] as const) {
+    for (const [cell, label] of [['alert-dim', 'Keep'], ['sheet-medium', 'Target S'], ['bottom-sheet-dialog', 'Target S']] as const) {
       const tree = capture(cell);
       const own = find(tree, (n) => n.label === label)!;
       const order = walkOf(tree);
@@ -154,6 +208,15 @@ describe('scroll_until for a target the tree cannot list beneath the presented w
     const played = play(RULES, [row, row]);
     expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
     expect(failureOf(played, 'id:"lab.sheet-medium.D"').message).toContain(`${presentedStop({ kind: 'screen' })}, so none was sent.`);
+  });
+
+  it('bottom-sheet-dialog: the stroke up would touch down on the `touch_outside` scrim, which dismisses the sheet; the stroke down on the sheet — none is sent either way', () => {
+    const row: Row = { tree: capture('bottom-sheet-dialog'), found: [] };
+    for (const direction of ['up', 'down'] as const) {
+      const played = play({ ...RULES, direction }, [row, row]);
+      expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+      expect(failureOf(played, 'id:"lab.bottom-sheet-dialog.A"').message).toContain(`${presentedStop({ kind: 'screen' })}, so none was sent.`);
+    }
   });
 
   it('…a plain failure, not absence', () => {
@@ -194,6 +257,13 @@ describe('tap: the wait for a target the tree cannot list beneath the presented 
     const error = await waitFails(capture('sheet-medium'), 'id:"lab.sheet-medium.A"');
     expect(error.message).toContain(presentedRemedy('it', { kind: 'screen' }));
     expect(error.message).not.toMatch(/to appear/);
+  });
+
+  it('bottom-sheet-dialog: the presented screen\'s remedy, not the active-window hint', async () => {
+    const error = await waitFails(capture('bottom-sheet-dialog'), 'id:"lab.bottom-sheet-dialog.A"');
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    expect(error.message).not.toContain(ACTIVE_WINDOW_HINT);
   });
 
   it('a plain screen still waits "to appear"', async () => {
