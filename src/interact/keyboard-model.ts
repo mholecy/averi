@@ -16,14 +16,15 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  *   own, absent from the tree, read through the adapter's oracle
  *   (`DeviceAdapter.keyboard`) and hidden by `back` — Android;
  * - the IN-TREE model (`keyboard-in-tree.ts`): the keyboard is part of the
- *   tree, read off the band the tree source marks, hidden by one tap on an
- *   element the config names — iOS under WDA.
+ *   tree, read off the band the tree source marks, hidden by a tap on an
+ *   element the config names — and, when that leaves it up, by averi's own
+ *   fallbacks, one move at a time (`keyboard-dismissal.ts`) — iOS under WDA.
  * Which one an adapter gets is decided ONCE, from whether it has the oracle
  * (`keyboard.ts#keyboardModel`), not again inside the guard and again inside
  * the dismissal, where each branch would re-write the shape every model
- * shares — one irreversible side effect, the hide delay, the target resolved
+ * shares — an irreversible side effect, the hide delay, the target resolved
  * AGAIN with the same options, a reading against where it is now, a refusal
- * if it still covers — around its own decisions and words. The shape is
+ * (or, in-tree, the next strategy's side effect) if it still covers — around its own decisions and words. The shape is
  * `keyboard.ts`'s; the decisions, the
  * side effect and the words are the model's (`KeyboardModel`, `Hiding`).
  *
@@ -43,7 +44,7 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * look's and builds none of its own, so one look is at most one draw-order
  * walk and one reading; `scroll_until`'s read builds its own Look, once per
  * read (scroll-read.ts#factsOf). `grep lookOn src/interact` finds only
- * `seenLook` and the post-fill dismissal's one tree read.
+ * `seenLook` and the post-fill dismissal's tree reads (its first, and each confirming one).
  */
 
 /**
@@ -65,8 +66,8 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  */
 export const KEYBOARD_HIDE_DELAY_MS = 300;
 
-/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice (the in-tree model's refusal), the screen size (the on-screen rule of the tap's standing, ui-tree/standing.ts#Scene — the tap's and a dismissal's). */
-export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>;
+/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice and the drag (the in-tree model's refusal, and its fallback drag — interact/keyboard-dismissal.ts), the screen size (the on-screen rule of the tap's standing, ui-tree/standing.ts#Scene — the tap's and a dismissal's). */
+export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>;
 
 /**
  * A resolved node whose tap point no soft keyboard covers, and the point a
@@ -168,7 +169,7 @@ export interface DismissResult {
  * that holds it (ui-tree/look.ts#Look: its scene, its keyboard reading and
  * position) — read by every judgement of the look: the tap's
  * (tap-judgement.ts#judgeTap, a TapLook as it stands) and the dismissal
- * picker's (keyboard-in-tree.ts#pickDismissal). None derives a scene or a
+ * picker's (keyboard-dismissal.ts#configuredStrategy). None derives a scene or a
  * position of its own, so a look is at most one draw-order walk; the scroll
  * read builds its own look once per read (scroll-read.ts#factsOf).
  */
@@ -262,23 +263,18 @@ export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: 
 export type ConfirmLook<T, S> = { gone: T } | { stillUp: S };
 
 /**
- * The confirmation after the one side effect, shared by the guard (both
- * models) and the in-tree dismissal: up to `looks` looks, KEYBOARD_HIDE_DELAY_MS
- * before each — the first that finds the keyboard gone answers, and only
- * the LAST still-up look refuses, with the caller's error over what that
- * look saw and how many looks there were. A look that throws (the target
- * not coming back, or the tree not reading) ends it there. Never a second side effect between the
- * looks: that is the invariant both models' failure classes rest on —
- * "back was pressed", "that tap cannot be untapped" — and the loop has no
- * way to act.
+ * The confirmation after a side effect, shared by the guard (both models) and the in-tree dismissal: up to `looks`
+ * looks, KEYBOARD_HIDE_DELAY_MS before each — the first that finds the keyboard gone answers, and only the LAST still-up
+ * look is handed back, with how many looks there were, for the caller to refuse over or (the in-tree model) to judge
+ * its next strategy on. A look that throws (the target not coming back, or the tree not reading) ends it there. Never a
+ * side effect between the looks: the loop has no way to act, so what a refusal says was done — "back was pressed",
+ * "that tap cannot be untapped" — is what was done.
  */
-export async function confirmHidden<T, S>(looks: number, look: () => Promise<ConfirmLook<T, S>>, stillUp: (seen: S, looks: number) => KeyboardGuardError): Promise<T> {
+export async function confirmHidden<T, S>(looks: number, look: () => Promise<ConfirmLook<T, S>>): Promise<ConfirmLook<T, S> & { looks: number }> {
   for (let n = 1; ; n++) {
     await sleep(KEYBOARD_HIDE_DELAY_MS);
     const seen = await look();
-    if ('gone' in seen) return seen.gone;
-    if (n < looks) continue;
-    throw stillUp(seen.stillUp, n);
+    if ('gone' in seen || n >= looks) return { ...seen, looks: n };
   }
 }
 
@@ -307,13 +303,15 @@ export interface CoveredLook {
 
 /**
  * What a model decided to do about a covered point, handed to `keyboard.ts`
- * to carry out: the ONE irreversible side effect, how many looks confirm it,
+ * to carry out: ONE irreversible side effect, how many looks confirm it,
  * and the words for what those looks find. The model builds it after its own
  * pre-checks and never performs it — the skeleton does, once, and then only
- * looks (`confirmHidden`).
+ * looks (`confirmHidden`); a hiding the model hands back from
+ * `stillCovering` (in-tree only) is the next one, performed and confirmed
+ * the same way.
  */
 export interface Hiding {
-  /** The side effect: the window model's `back`, the in-tree model's tap on the picked element. */
+  /** The side effect: the window model's `back`, the in-tree model's move of the strategy it chose (a tap, or its fallback's drag). */
   perform(): Promise<void>;
   /** What `perform` sent, as a clause — `back was pressed to hide the soft keyboard`, `id:"login_title" was tapped at (201,303) to hide the soft keyboard` — for a refusal after it that must say something was (the off-screen rule, tap-judgement.ts#judgeTap). */
   sent: string;
@@ -323,8 +321,20 @@ export interface Hiding {
   failed(e: unknown): KeyboardGuardError;
   /** A look found the point clear (or the state unreadable — fail open, but the note must not claim what was not seen): the `keyboardHidden` sentence. */
   hidden(after: Uncovered): string;
-  /** The last look still found it covering: the model's refusal — nothing more is done. */
-  stillCovering(seen: { frame: Rect; point: Point }, looks: number): KeyboardGuardError;
+  /**
+   * The last look still found it covering: the model's refusal — nothing more is done — or, on the in-tree model
+   * only, the NEXT hiding, chosen on that look (its next dismissal strategy, interact/keyboard-dismissal.ts), which
+   * the skeleton performs and confirms as it did this one. The window model never answers a hiding: its one `back` is
+   * the only key it has.
+   */
+  stillCovering(seen: StillCovering, looks: number): Promise<Hiding | KeyboardGuardError>;
+}
+
+/** The last confirming look that still found the point covered: the band, where the target is now, and the look it was resolved in. */
+export interface StillCovering {
+  frame: Rect;
+  point: Point;
+  resolved: SeenLook;
 }
 
 /**
@@ -333,13 +343,13 @@ export interface Hiding {
  * window model and the in-tree model — so it is a real one: what varies
  * across it is how a covering keyboard is confirmed, what may be done about
  * it, and what every outcome is called; what does not vary (the first
- * look, the fail-open rule, the one side effect, the confirming looks) is
- * written once above it.
+ * look, the fail-open rule, performing a side effect, the confirming looks)
+ * is written once above it.
  */
 export interface KeyboardModel {
   /**
    * The guard from a first look that found the point covered up to — not
-   * including — the one side effect: the model's own re-checks (the window
+   * including — the first side effect: the model's own re-checks (the window
    * model, on a first look the input method DENIED, waits out a stale
    * window state; the in-tree model takes a second look and picks a
    * dismissal). Three endings: the keyboard left on its own and the target

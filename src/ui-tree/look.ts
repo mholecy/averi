@@ -9,7 +9,7 @@ import { sceneOf, type Scene } from './standing.js';
  * soft keyboard lies on it (ui-tree/keyboard-position.ts#KeyboardPosition: the line for a subject, `owns`, the
  * reading's line). Built ONCE per read, by `lookAt` (`lookOn` with the adapter's reading), and handed whole to the
  * verbs that judge the read: the tap (interact/tap-judgement.ts#judgeTap, through the guard's looks,
- * interact/keyboard-model.ts#SeenLook), the dismissal picker (interact/keyboard-in-tree.ts#pickDismissal), the pixel
+ * interact/keyboard-model.ts#SeenLook), the dismissal picker (interact/keyboard-dismissal.ts#configuredStrategy), the pixel
  * poll (verify/pixel-poll.ts#overElement, one look a round) and `scroll_until`'s read (interact/scroll-read.ts
  * #TreeFacts, over a look with the round's synchronous reading facts). None of them derives a scene or builds a
  * keyboard position of its own.

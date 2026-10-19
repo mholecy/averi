@@ -443,7 +443,7 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
           // interact/scroll-text.ts#hideToJudgeWholeScreen: the reader's next move differs per surface, and
           // one message with two honest halves beats two translation sites that
           // must agree. Only words cross the layer, no import.
-          stillCovering: ({ frame: still, point }) =>
+          stillCovering: async ({ frame: still, point }) =>
             new AfterKeyboardDismissal(
               `Pressed back to hide the soft keyboard covering ${what}, but back did not close it: the keyboard frame ` +
                 `${frameText(still)} still contains the tap point (${point.x},${point.y}); nothing was tapped. ` +

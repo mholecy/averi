@@ -305,9 +305,10 @@ describe('PARKED cell content of a SCROLLED table — the parked frame lies abov
       'wda-capture-lab-sheet-long-list-scrolled-273': 72,
       'wda-capture-lab-sheet-long-list-scrolled-522': 75,
     });
-    // Swept, moving nothing: the lab's form-picker (cells on screen), carousel and bounded scroll views, Account
-    // Detail, the SWIFT form, the MyPort and skeleton logins, the filter sheet, the synthetic alert, the RN lab app's rn-field.
-    expect(Object.keys(counts).length).toBe(20);
+    // Swept, moving nothing: the lab's form-picker (cells on screen), carousel and bounded scroll views and
+    // form-keyboard, Account Detail, the SWIFT form, the MyPort and skeleton logins, the filter sheet, the synthetic
+    // alert, the RN lab app's rn-field.
+    expect(Object.keys(counts).length).toBe(21);
     expect(counts['wda-capture-lab-form-picker']).toBe(0);
   });
 });
