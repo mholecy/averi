@@ -353,14 +353,22 @@ export function showsProgress(tree: UiNode): boolean {
  * One walk.
  */
 export interface ScreenIdentity {
+  /** Every `role:identifier` pair the read lists. */
   readonly ids: ReadonlySet<string>;
+  /** The bare identifiers, each once, in tree order — as a sentence quotes them (`id:"…"`). */
+  readonly identifiers: readonly string[];
 }
 
 /** The identity of the screen `tree` shows (`ScreenIdentity`). */
 export function screenIdentity(tree: UiNode): ScreenIdentity {
   const ids = new Set<string>();
-  for (const n of everyNode(tree)) if (n.identifier !== null) ids.add(`${n.role}:${n.identifier}`);
-  return { ids };
+  const identifiers = new Set<string>();
+  for (const n of everyNode(tree)) {
+    if (n.identifier === null) continue;
+    ids.add(`${n.role}:${n.identifier}`);
+    identifiers.add(n.identifier);
+  }
+  return { ids, identifiers: [...identifiers] };
 }
 
 /** `a` and `b` are the same screen by identity: the very same ids (`ScreenIdentity`). */

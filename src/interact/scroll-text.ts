@@ -543,7 +543,7 @@ function changedText(o: Extract<ScrollOutcome, { kind: 'changed' }>, describe: s
     : 'The element is not in the tree after it either';
   return (
     `scroll_until ${describe} stopped after ${swipesText(o.swipes)} — the swipe CHANGED THE SCREEN: ${ids}, ` +
-    `and it touched down at ${at} on nothing that read listed — it most likely dismissed a sheet or a modal presented over the screen, ` +
+    `and nothing it touched down on at ${at} is still listed — it most likely dismissed a sheet or a modal presented over the screen, ` +
     `or the app left the screen. ${target}, and no further swipe was sent. ` +
     'If a sheet or a modal was open, it is gone: reopen it if the flow needs it — a target beneath one is reached by closing it first, never by scroll_until'
   );

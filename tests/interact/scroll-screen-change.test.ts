@@ -13,7 +13,7 @@ import { failureOf, play, resultOf } from '../helpers/rounds.js';
 // read before listed, and that lists none of its ids, is another screen: the scroll stops and says so, never visible.
 
 const TRUTH = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
-const raw = (cell: string): { type?: string; AXUniqueId?: string | null }[] => JSON.parse(readFileSync(new URL(`${cell}.idb.json`, TRUTH), 'utf8'));
+const raw = (cell: string): { type?: string; AXUniqueId?: string | null; AXLabel?: string | null }[] => JSON.parse(readFileSync(new URL(`${cell}.idb.json`, TRUTH), 'utf8'));
 const parse = (elements: unknown[]): UiNode => parseIdbDescribeAll(JSON.stringify(elements));
 
 /** The sheet as idb lists it (sheet-background.idb.json: the Application and the sheet's S). */
@@ -41,7 +41,7 @@ describe('scroll_until: a stroke that changed the screen stops the scroll, the t
     expect(failure).not.toBeInstanceOf(ElementNotFoundError);
     expect(failure.message).toBe(
       'scroll_until id:"lab.sheet-background.A" stopped after 1 swipe — the swipe CHANGED THE SCREEN: the one element the read before it listed by id ' +
-        '(id:"lab.sheet-background.S") is not in the tree after it, and it touched down at (201,175) on nothing that read listed — it most likely dismissed a ' +
+        '(id:"lab.sheet-background.S") is not in the tree after it, and nothing it touched down on at (201,175) is still listed — it most likely dismissed a ' +
         'sheet or a modal presented over the screen, or the app left the screen. The element is in the tree only after that ' +
         'change, on the new screen: not judged, not claimed visible, and no further swipe was sent. If a sheet or a modal was open, it is gone: reopen it if ' +
         'the flow needs it — a target beneath one is reached by closing it first, never by scroll_until',
@@ -71,11 +71,27 @@ describe('…and not a stroke that moved content', () => {
     expect(resultOf(played).visible).toBe(1);
   });
 
-  it('a stroke that touched down on a row the read listed is a scroll, however far it flung: every id replaced, still judged', () => {
-    // A list of rows with ids of their own, the touch-down (201,175) on one of them; after it, every row another.
+  // RECYCLED ROWS: a fling that replaces every row a list lists, the touch-down on one of them. idb lists no scroll view,
+  // and an identified row cannot persist where every id changed — so nothing the stroke touched is still there, and the
+  // stop is loud: what the slice's review round 2 decided (a dismissed sheet's rows read exactly so; the loud stop is the
+  // failure the spec prefers). Every role a row takes: a Button, idb's `Other` (an RN row) and `Group` (SwiftUI's).
+  for (const type of ['Button', 'Other', 'Group']) {
+    it(`residual: idb rows of type ${type} with ids, every row recycled under a touch-down on one — a loud changed stop`, () => {
+      const rows = (from: number): unknown[] => [
+        { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
+        ...Array.from({ length: 12 }, (_, i) => ({ type, AXLabel: `Row ${from + i}`, AXUniqueId: `row_${from + i}`, frame: { x: 0, y: 62 + 64 * i, width: 402, height: 64 } })),
+      ];
+      const after = parse(rows(40));
+      const played = play(UP, [{ tree: parse(rows(0)), found: [] }, { tree: after, found: [byId(after, 'row_45')] }]);
+      expect(played.outcome?.kind).toBe('changed');
+    });
+  }
+
+  it('a touch-down on a node named by its label alone that the read after still lists (a section header) is a scroll, every id changed', () => {
     const rows = (from: number): unknown[] => [
       { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
-      ...Array.from({ length: 12 }, (_, i) => ({ type: 'Button', AXLabel: `Row ${from + i}`, AXUniqueId: `row_${from + i}`, frame: { x: 0, y: 62 + 64 * i, width: 402, height: 64 } })),
+      { type: 'StaticText', AXLabel: 'Transactions', AXUniqueId: null, frame: { x: 0, y: 140, width: 402, height: 60 } },
+      ...Array.from({ length: 10 }, (_, i) => ({ type: 'Button', AXLabel: null, AXUniqueId: `row_${from + i}`, frame: { x: 0, y: 200 + 64 * i, width: 402, height: 64 } })),
     ];
     const after = parse(rows(40));
     const target = byId(after, 'row_45');
@@ -83,32 +99,55 @@ describe('…and not a stroke that moved content', () => {
     expect(played.outcome?.kind).toBe('visible');
   });
 
-  // Rows of a STRUCTURAL role carry ids too: idb lists an RN row as `Other` (a `container`) and SwiftUI's grouped row as
-  // `Group` (an `other`); every row recycled by one fling, the touch-down on one of them.
-  for (const type of ['Other', 'Group']) {
-    it(`idb rows of type ${type} with ids, every row recycled under a touch-down on one: a scroll, still judged`, () => {
-      const rows = (from: number): unknown[] => [
-        { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
-        ...Array.from({ length: 12 }, (_, i) => ({ type, AXLabel: null, AXUniqueId: `row_${from + i}`, frame: { x: 0, y: 62 + 64 * i, width: 402, height: 64 } })),
-      ];
-      const after = parse(rows(40));
-      const target = byId(after, 'row_45');
-      const played = play(UP, [{ tree: parse(rows(0)), found: [] }, { tree: after, found: [target] }, { tree: after, found: [target] }]);
-      expect(played.outcome?.kind).toBe('visible');
-    });
-  }
-
-  it('a touch-down on a row that names itself by its label alone is a scroll too, when the ids the reads list (a header\'s) change', () => {
+  it('…but one whose label the read after does not list (a recycled row named only by its text) is gone: changed', () => {
     const rows = (from: number): unknown[] => [
       { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
       { type: 'StaticText', AXLabel: `Section ${from}`, AXUniqueId: `section_${from}`, frame: { x: 0, y: 62, width: 402, height: 40 } },
       ...Array.from({ length: 12 }, (_, i) => ({ type: 'Other', AXLabel: `Row ${from + i}`, AXUniqueId: null, frame: { x: 0, y: 102 + 64 * i, width: 402, height: 64 } })),
     ];
     const after = parse(rows(40));
-    const target = byId(after, 'section_40');
-    const played = play(UP, [{ tree: parse(rows(0)), found: [] }, { tree: after, found: [target] }, { tree: after, found: [target] }]);
-    expect(played.outcome?.kind).toBe('visible');
+    const played = play(UP, [{ tree: parse(rows(0)), found: [] }, { tree: after, found: [byId(after, 'section_40')] }]);
+    expect(played.outcome?.kind).toBe('changed');
   });
+
+  // THE DISMISSED SHEET WITH NAMED CONTENT (the slice's review round 2): the lab's long-list sheet as idb lists it, its
+  // rows given ids, then the host — the stroke at (201,175) touched a row of the sheet, which the host does not list.
+  for (const type of ['StaticText', 'Other']) {
+    it(`sheet-long-list's rows as ${type} with ids, then the host: the touched row is gone — changed`, () => {
+      const list = raw('sheet-long-list').map((el, i) => (el.type === 'StaticText' ? { ...el, type, AXUniqueId: `sheet.row_${i}` } : el));
+      const after = host();
+      const played = play(UP, [{ tree: parse(list), found: [] }, { tree: after, found: [byId(after, 'lab.sheet-background.A')] }]);
+      expect(played.outcome?.kind).toBe('changed');
+    });
+  }
+
+  // …and a sheet whose content view names itself (a labelled `Other` under the touch-down), either side of the screen-sized
+  // line (SCREEN_SIZED_FRACTION, 0.9): gone after the stroke, it excuses nothing, whatever its size.
+  for (const [height, share] of [[780, '89 %'], [800, '92 %']] as const) {
+    it(`sheet-background with a labelled content view of ${share} of the screen, then the host: changed`, () => {
+      const before = parse([...raw('sheet-background'), { type: 'Other', AXLabel: 'Sheet', AXUniqueId: null, frame: { x: 0, y: 874 - height, width: 402, height } }]);
+      const after = host();
+      const played = play(UP, [{ tree: before, found: [] }, { tree: after, found: [byId(after, 'lab.sheet-background.A')] }]);
+      expect(played.outcome?.kind).toBe('changed');
+    });
+  }
+
+  // THE SCREEN-SIZED LINE itself: a structural frame that persists under the touch-down — every screen's `Application`,
+  // a window — excuses nothing at 0.9 of the screen or more; a smaller persisting labelled frame (a card the screen keeps)
+  // is content that stayed.
+  for (const [height, kind] of [[780, 'visible'], [800, 'changed']] as const) {
+    it(`a labelled structural frame of ${height === 780 ? '89' : '92'} % of the screen that persists under the touch-down: ${kind}`, () => {
+      const read = (from: number): unknown[] => [
+        { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
+        { type: 'Other', AXLabel: 'Card', AXUniqueId: null, frame: { x: 0, y: 874 - height, width: 402, height } },
+        ...Array.from({ length: 4 }, (_, i) => ({ type: 'Button', AXLabel: null, AXUniqueId: `row_${from + i}`, frame: { x: 51, y: 500 + 70 * i, width: 300, height: 64 } })),
+      ];
+      const after = parse(read(40));
+      const target = byId(after, 'row_41');
+      const rows = kind === 'visible' ? [{ tree: parse(read(0)), found: [] }, { tree: after, found: [target] }, { tree: after, found: [target] }] : [{ tree: parse(read(0)), found: [] }, { tree: after, found: [target] }];
+      expect(play(UP, rows).outcome?.kind).toBe(kind);
+    });
+  }
 
   it('residual: a read that lists no id says nothing — a label-only sheet dismissed is not told (UIKit rows under idb, NI1)', () => {
     const anonymous = (tree: UiNode): UiNode => ({ ...tree, children: tree.children.map((n) => ({ ...n, identifier: null })) });
