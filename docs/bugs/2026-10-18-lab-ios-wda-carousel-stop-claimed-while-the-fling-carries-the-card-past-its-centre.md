@@ -1,5 +1,20 @@
 # TRIAGE: under WDA, `scroll_until` a carousel card `right` stops "visible" on a read still moving, and the fling carries the card's centre out of the carousel — the tap after it is refused; the two verbs disagree
 
+> **Status (2026-10-18, round 7):** fixed at `e687fe83` (the stop) and `f76be36a` (the first stroke) on
+> `arch/r23-ios-stop` (from `arch/round-23` `565bcb9`), measured 4 runs of 4. Both of the note's expected fixes:
+> (1) a stop is judged on a settled read — the rule stays two reads agreeing, and a confirming read that finds C moving
+> less than the read before (a fling slowing) spends none of SETTLE_CONFIRM_READS (interact/scroll-rounds.ts
+> #Observed.slowing; ADR 0021 decision 5). Traced live before the fix: C at x 7, −47, −68, −76 (rest −75.7) and −16,
+> −82, −106, −116 (rest −117) — the third confirming read still moving, the stop claimed "still moving"; (2) the first
+> stroke is cut by the carry model at UNMEASURED_CARRY (2.8 a point, the most any measured WDA fling carried;
+> interact/stroke-plan.ts; ADR 0021 decision 4): `307 181 → 181 181` (126 pt) in place of `307 181 → 95 181`, the
+> measured carry of the full stroke being 447, 454, 495, 532 pt (2.1–2.5 a point; one past the centre window 177–531).
+> Live (`live.ts --sources wda --cases scroll:carousel-in-list.C` at `e687fe83`, 4 runs,
+> docs/truth/live-records/ios-wda-stop-carousel-r23-1…4.json): the carousel 0→289, 317, 315, 283 (2.25–2.52 a point),
+> `visible after 1 swipe — CLIPPED at right, 80–90%`, settled (C moving e.g. 44, 17, 5, then 0), Tapped, fired. Pinned
+> over the real capture (tests/fixtures/wda-capture-lab-carousel-in-list.json, tests/interact/scroll-carousel.test.ts).
+> The live KNOWN `ios wda scroll:carousel-in-list.C` (intermittent) is the harness's to strike.
+>
 > **Status (2026-10-18):** open, triage, intermittent; measured live only (round 6's iOS device check). KNOWN as this
 > note, `intermittent` (scripts/truth/live-known.ts, `ios wda scroll:carousel-in-list.C`, stop-claim on `visible`): one
 > run of two read it (b71cbbb's), the other (11683c3's) was ok.

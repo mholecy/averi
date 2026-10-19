@@ -1,6 +1,6 @@
-# 14. A text input is no cover of its own label (overhang up to 2 units)
+# 14. A text input is no cover of its own label (overhang up to 2 pt or dp)
 
-Status: accepted, 2026-10-10 (owner).
+Status: accepted, 2026-10-10 (owner); refined 2026-10-19 (round 7, React Native — see Refinement).
 
 ## Context
 
@@ -16,21 +16,71 @@ did not fit.
 ## Decision
 
 A third shape of the `ownControl` row (`ui-tree/draw-order.ts`): an unlabelled, unvalued text input that holds the
-label's centre, with the label overhanging it by at most `LABEL_OVERHANG` on any side (`fieldOf`), is the label's own
+label's centre, with the label overhanging it by at most the overhang on any side (`ownField`), is the label's own
 field, not a cover of it. It is a row of the same table, not one of its own: the same judgement (the label's control,
 laid after it, takes the tap the caller means), with a geometry per shape.
 
-`LABEL_OVERHANG` is 2, in the tree's units: "up to 1–2 pt", as the owner put it, against the 1 pt measured. On Android
-the units are pixels, so there it is a third as wide — stricter, the safe direction.
+The overhang is 2, "up to 1–2 pt", as the owner put it, against the 1 pt measured — first in the tree's units
+(pixels on Android, a third as wide there); since 2026-10-19 2 pt or dp (Refinement 3).
+
+## Refinement (2026-10-19): React Native's fields
+
+Round 7's React Native lab app (fixtures/apps/rn, `rn-field`, RN 0.88, new architecture) refused the tap on each
+field's floating label on both platforms, as under its own field — two shapes the 2026-10-10 rule did not reach:
+
+- **WDA wraps the input** (docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md):
+  `text 'Payee’s name' 69,131 94x23`, then `Other 69,132 264x20` (no label, identifier or value) holding
+  `TextField 69,132 264x20` — React Native's text input component view hosting the UITextField. The field was the
+  label's nephew, so no sibling. mp-native's SWIFT form (an older React Native) lists no such wrapper.
+- **Android's overhang is 3 px** (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md):
+  the label laid 1 dp above its EditText, `177,360 255x61` over `177,363 726x55` at density 2.75 — past the 2 tree
+  units, which on Android are pixels.
+
+Decided (the orchestrator's, round 7):
+
+1. **The field's outermost self.** A text input and every wrapper that is nothing but it — an unnamed `container`
+   whose only child it is, of its rect to a sub-unit — are one node to the label (`draw-order.ts#outermostSelf`,
+   `inputOf`): the sibling test asks the outermost, and the wrapper is excused with the input. A wrapper named,
+   interactive, of another rect or holding anything else is a node of its own, and the input inside it still covers.
+2. **The label's shape, not the parent's size, is the field's evidence.** React Native lays its fields in the
+   screen's own view (both platforms), which `screenSized` read as a scrim's parent, so the field shape no longer asks
+   it. In its place the label must SPAN THE FIELD'S HEIGHT: its top and its bottom each within the overhang of the
+   field's (`draw-order.ts#spansHeight`). A placeholder or floating label lies in its field's line — every measured
+   one does: the SWIFT form 446–468 over 447–467, the RN lab app's WDA 131–154 over 132–152, its Android 360–421 over
+   363–418 — while a text a field merely lies over is shorter than the field: a chat composer `0,790 402x44` over a
+   message text `16,800 140x20`, a search field `8,100 386x36` over a header title `16,104 90x22`, an editor of 0.8
+   of the screen over "Draft saved" (the round-7 review's cases, each a cover at the base and still one). The width
+   and padded shapes keep the screen-sized-parent rule (a backdrop spanning its container); a control filling the
+   screen still covers in every shape.
+3. **The overhang is a physical size: 2 pt or dp**, as half a percent of the screen's shorter side
+   (`draw-order.ts#labelOverhang`, `LABEL_OVERHANG_FRACTION`), as `minTapPiece` is scaled — 2 pt on every iPhone
+   (320–440 pt), 5 px on the 1080-px averi_lab (1.8 dp), 7 px on a 1440-px phone at 3.5, 4 px on a 720-px one at 2.
+   Not by the density, weighed: the density is in `dumpsys window displays` (`440dpi`), which the Android adapter
+   reads for the system bands at `viewport()`, after the tree — but the draw order is a function of the tree alone
+   (memoized per tree, and judged inside the uiautomator parser's widening, before any such read), and no tree
+   carries its density. Carrying it would put a device read on every tree read, or make the draw order depend on
+   which read came first. Nor stamped on the tree's root by the source, as `paddedTouchTargets` is: that mark is a
+   constant of uiautomator's dialect, while the density is a device's value the parser never sees — the adapter
+   would have to read the dump before every first tree read (one more adb call on the tree's path, and a timeout
+   there to decide) and the golden harness's fake device to serve it per capture, for an allowance the screen's
+   share already gives within the rounding. A phone's shorter side in pt or dp is narrow enough (320–440) that the
+   share is 2 pt or dp to the rounding.
 
 ## Residuals accepted
 
 - A label overhanging further, or whose centre lies off the field (a floating label above its outline), is still covered.
 - A labelled or valued field still covers. A placeholder label that WDA keeps listing over a filled field is refused.
 - Any other control of that shape (a button) still covers.
+- On a tablet the overhang is wider in its own units: 4 pt on an 820-pt iPad, 4 dp on an 800-dp tablet.
+- A text input in a screen-sized parent is excused like any other when the label spans its height (refinement 2);
+  one filling the screen is not.
+- A label not spanning its field's height — at the top of a tall multiline field — is still covered (unmeasured; the
+  safe direction).
 
-## Bug note
+## Bug notes
 
 docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
+docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md
+docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md
 
-This note is not tracked yet. The measurements are recorded above.
+The first note is not tracked yet; its measurements are recorded above.

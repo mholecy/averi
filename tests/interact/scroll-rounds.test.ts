@@ -443,7 +443,8 @@ describe('round — after the device check', () => {
   it(`a target still moving inside the viewport is read again until it holds still; one that never does is reported after SETTLE_CONFIRM_READS (${SETTLE_CONFIRM_READS}) more reads with settled: false, and the reply says so`, () => {
     const slowing = play(FULLY, [681, 300, 250, 250].map((y) => wdaRow(y))); // round 0, 300, 250, 250
     expect(resultOf(slowing)).toEqual({ swipes: 1, visible: 1, clipped: [] });
-    const restless = play(FULLY, [681, 300, 301, 302, 303].map((y) => wdaRow(y))); // round 0, the stop at 300, then three confirming reads — reported at 303
+    // Moving as much at every read — an animation, not a fling slowing — and more than a tree source's rounding (a unit).
+    const restless = play(FULLY, [681, 300, 302, 304, 306].map((y) => wdaRow(y))); // round 0, the stop at 300, then three confirming reads — reported at 306
     const result = resultOf(restless);
     expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
     expect(restless.steps.filter((s) => s.do === 'stroke')).toHaveLength(1);
@@ -1189,11 +1190,11 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
   });
 
   it('the bound (maxSwipes, timeout) with the row under the bar names the bar as what it was short of', () => {
-    const moving = [form(771), form(772), form(773)];
+    const moving = [form(769), form(771), form(773)];
     expect(failureOf(play({ ...IPHONE, maxSwipes: 2 }, moving), 'id:priority').message).toBe(
       `scroll_until id:priority failed after 2 swipes (maxSwipes) — element reached the viewport but stayed under ${COVER} at its centre (201,799), drawn over it — 15% of it shows (last rect {"x":24,"y":773,"width":354,"height":52})`,
     );
-    const late = play({ ...IPHONE, fully: true }, [{ ...form(771), readMs: 400 }, { ...form(772), elapsedMs: 2_000, readMs: 1_500 }]);
+    const late = play({ ...IPHONE, fully: true }, [{ ...form(770), readMs: 400 }, { ...form(772), elapsedMs: 2_000, readMs: 1_500 }]);
     expect(failureOf(late, 'id:priority').message).toBe(
       `scroll_until id:priority failed after 2000ms (timeout 2000ms; 1 swipe sent; 2 tree reads took 1900ms, the last 1500ms) — element reached the viewport but stayed under ${COVER} at its centre (201,798), drawn over it — 15% of it shows (last rect {"x":24,"y":772,"width":354,"height":52})`,
     );

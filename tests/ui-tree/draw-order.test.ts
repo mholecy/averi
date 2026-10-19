@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
-import { drawOrder, minTapPiece } from '../../src/ui-tree/draw-order.js';
+import { drawOrder, labelOverhang, minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
@@ -2042,6 +2042,120 @@ describe('exposure.centreExcused — the later nodes the target column excused t
     expect(order.exposure(title, IPHONE)).toMatchObject({ covers: [bar], centreCover: bar, centreExcused: [twin] });
     // The box ends at 740, above the centre: the twin still meets what shows, but no tap lands at the centre.
     expect(order.exposure(title, rect(0, 0, 402, 740))).toMatchObject({ covers: [], centreExcused: [] });
+  });
+});
+
+describe('exposure — a React Native field\'s floating label is its own field\'s (round 7\'s RN lab app, rn-field\'s N and M)', () => {
+  /** The RN lab app's rn-field under WDA (iPhone 17, iOS 27): each input inside an unnamed wrapper of its rect. Parsed afresh per case: the negatives edit it. */
+  const wda = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-field.json', import.meta.url), 'utf8'));
+  /** The same screen under uiautomator (averi_lab, API 33, 1080x2220 at 2.75): the label 3 px past its EditText above and below. */
+  const xml = async () => parseDump(await readFile(new URL('../fixtures/uiautomator-rn-field.xml', import.meta.url), 'utf8'));
+  const byId = (tree: UiNode, id: string) => [...everyNode(tree)].find((n) => n.identifier === id)!;
+  const exposed = (tree: UiNode) => drawOrder(tree).exposure(byId(tree, 'lab.rn-field.N'), tree.rect);
+  /** N's field and the unnamed wrapper WDA lists it in, as captured. */
+  const wrapped = (tree: UiNode) => {
+    const field = byId(tree, 'lab.rn-field.N.field');
+    const wrapper = [...everyNode(tree)].find((n) => n.children.length === 1 && n.children[0] === field)!;
+    return { field, wrapper };
+  };
+
+  it('WDA (docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md): the input inside its unnamed wrapper of its own rect is the label\'s field — nothing over `Payee’s name`, tapped at its centre', async () => {
+    const tree = await wda();
+    const { field, wrapper } = wrapped(tree);
+    expect(wrapper).toMatchObject({ role: 'container', label: null, identifier: null, rect: field.rect });
+    expect(exposed(tree)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 116, y: 143 }, moved: false } });
+    expect(exposed(tree).centreExcused).toEqual(expect.arrayContaining([wrapper, field]));
+    // M, the multiline field: its text view's `Horizontal scroll bar` (69,499 264x10) over the label's centre too — no cover.
+    const m = byId(tree, 'lab.rn-field.M');
+    expect(drawOrder(tree).exposure(m, tree.rect)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
+  });
+
+  it('…and the wrapper stays a node of its own when it is anything more: named, interactive, of another rect, or holding anything else — the field in it covers', async () => {
+    const edits: ((w: UiNode) => void)[] = [
+      (w) => (w.identifier = 'payee.card'),
+      (w) => (w.label = 'Payee'),
+      (w) => (w.role = 'button'),
+      (w) => (w.rect = { ...w.rect, height: w.rect.height + 4 }),
+      (w) => w.children.push(uiNode({ role: 'image', rect: rect(310, 134, 16, 16) })),
+    ];
+    for (const edit of edits) {
+      const tree = await wda();
+      const { field, wrapper } = wrapped(tree);
+      edit(wrapper);
+      expect(exposed(tree).covers).toContain(field);
+    }
+  });
+
+  it('…and an unrelated container over the label still covers: one holding a text laid after it over the label', async () => {
+    const tree = await wda();
+    const { wrapper } = wrapped(tree);
+    const banner = uiNode({ role: 'container', rect: rect(69, 128, 264, 30), children: [uiNode({ role: 'text', label: 'Offline', rect: rect(69, 128, 264, 30) })] });
+    const parent = [...everyNode(tree)].find((n) => n.children.includes(wrapper))!;
+    parent.children.splice(parent.children.indexOf(wrapper) + 1, 0, banner);
+    expect(exposed(tree).covers).toContain(banner);
+  });
+
+  it('…and a text a field merely lies over, in a screen-sized parent, still covers — the label must span the field\'s height: a chat composer over a message, a search field over a header title, the composer in an unnamed wrapper of its rect, an editor of 0.8 of the screen over "Draft saved", a label at the top of a tall multiline field', () => {
+    const screen = (...children: UiNode[]) => uiNode({ role: 'container', rect: IPHONE_BOX, children: [uiNode({ role: 'container', rect: IPHONE_BOX, children })] });
+    const field = (r: ReturnType<typeof rect>) => uiNode({ role: 'textfield', rect: r });
+    const cases: [UiNode, UiNode, UiNode][] = [];
+    const message = uiNode({ role: 'text', label: 'See you at 6', rect: rect(16, 800, 140, 20) });
+    const composer = field(rect(0, 790, 402, 44));
+    cases.push([message, composer, composer]);
+    const title = uiNode({ role: 'text', label: 'Payments', rect: rect(16, 104, 90, 22) });
+    const search = field(rect(8, 100, 386, 36));
+    cases.push([title, search, search]);
+    const message2 = uiNode({ role: 'text', label: 'See you at 6', rect: rect(16, 800, 140, 20) });
+    const inner = field(rect(0, 790, 402, 44));
+    cases.push([message2, uiNode({ role: 'container', rect: rect(0, 790, 402, 44), children: [inner] }), inner]);
+    const saved = uiNode({ role: 'text', label: 'Draft saved', rect: rect(16, 400, 100, 20) });
+    const editor = field(rect(0, 87, 402, 700));
+    cases.push([saved, editor, editor]);
+    // A label at the top of a tall multiline field, its top at the field's: the residual, a cover (unmeasured).
+    const hint = uiNode({ role: 'text', label: 'Message', rect: rect(16, 501, 140, 20) });
+    const multiline = field(rect(0, 500, 402, 120));
+    cases.push([hint, multiline, multiline]);
+    for (const [text, later, cover] of cases) expect(drawOrder(screen(text, later)).exposure(text, IPHONE_BOX).covers).toContain(cover);
+  });
+
+  it('…and a text input filling the screen covers a label spanning its height', () => {
+    const label = uiNode({ role: 'text', label: 'Write here', rect: rect(0, 1, 402, 872) });
+    const input = uiNode({ role: 'textfield', rect: IPHONE_BOX });
+    const tree = uiNode({ role: 'container', rect: IPHONE_BOX, children: [uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: [label, input] })] });
+    expect(drawOrder(tree).exposure(label, IPHONE_BOX).covers).toContain(input);
+  });
+
+  it('Android (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md): the label 3 px — 1 dp — past its EditText above and below is the field\'s: nothing over it, tapped at its centre', async () => {
+    const tree = await xml();
+    expect(byId(tree, 'lab.rn-field.N').rect).toEqual(rect(177, 360, 255, 61));
+    expect(byId(tree, 'lab.rn-field.N.field').rect).toEqual(rect(177, 363, 726, 55));
+    expect(exposed(tree)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 305, y: 391 }, moved: false } });
+  });
+
+  it('…up to the allowance on this screen, 5 px; 6 px past the field, or a valued field, covers', async () => {
+    const grown = async (by: number) => {
+      const tree = await xml();
+      const label = byId(tree, 'lab.rn-field.N');
+      label.rect = { ...label.rect, y: 363 - by, height: 55 + 2 * by };
+      return tree;
+    };
+    expect(exposed(await grown(5)).covers).toEqual([]);
+    const past = await grown(6);
+    expect(exposed(past).covers).toEqual([byId(past, 'lab.rn-field.N.field')]);
+    const valued = await xml();
+    byId(valued, 'lab.rn-field.N.field').value = 'ACME s.r.o.';
+    expect(exposed(valued).covers).toEqual([byId(valued, 'lab.rn-field.N.field')]);
+  });
+});
+
+describe('labelOverhang: how far a label may overhang its own field — 2 pt or dp, as a share of the screen', () => {
+  it('half a percent of the screen\'s shorter side, rounded — 2 pt on the 402-pt iPhone 17 and a 320-pt one, 5 px on the 1080-px averi_lab (2.75), 7 px at 1440 (3.5), 4 px at 720 (2), either orientation', () => {
+    expect(labelOverhang({ width: 402, height: 874 })).toBe(2);
+    expect(labelOverhang({ width: 320, height: 568 })).toBe(2);
+    expect(labelOverhang({ width: 1080, height: 2220 })).toBe(5);
+    expect(labelOverhang({ width: 2220, height: 1080 })).toBe(5);
+    expect(labelOverhang({ width: 1440, height: 3120 })).toBe(7);
+    expect(labelOverhang({ width: 720, height: 1280 })).toBe(4);
   });
 });
 

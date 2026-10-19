@@ -58,17 +58,18 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * view that scrolls only across it (none sent, rather than a probe that moves nothing and is read as checked; a chain
  * of such scroll views alone is unchecked for its own reason, `probeAcrossOnly`, `flush.why: 'axis'`). Why: a gesture
  * belongs to the view the finger first touches, and a carousel touched down on by a vertical drag hands the outer list
- * part of it at most (~51 pt a stroke on iOS, inferred; unmeasured on iOS) —
+ * part of it at most (~51 pt a stroke on iOS, inferred; the stroke keeps off it, so still unmeasured) —
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. The lab's
- * `carousel-in-list` (harness task H2) is captured on Android only: there the carousel is a `HorizontalScrollView`, its
+ * `carousel-in-list` (harness task H2): on Android the carousel is a `HorizontalScrollView`, its
  * axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the stretch
  * below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched down on it
  * on the replay before S4 (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
  * recorded); C, the card past the carousel's right clip, is never stroked there, uiautomator dumping it as a strip at
  * the screen's edge that averi stops on at once (lab finding LE1,
- * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md).
- * The iOS measurement — C asked `right` under WDA, and what a carousel hands the page — waits on the plan's "Pending
- * captures (round 6)" (docs/plans/2026-10-15-ground-truth-lab-app.md). ADR 0010
+ * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md). Captured on iOS
+ * since round 6 (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes
+ * INSIDE the carousel (24,138 354x85), along its axis — the full stroke `307 181 → 95 181`, the first one cut by the
+ * carry model to `307 181 → 181 181` (UNMEASURED_CARRY). ADR 0010
  * (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke rules: the candidates — the target's own scroll
  * views, nearest first (round 21's step 0a) — and their axis (round 22). What else this module holds is A1's move of
  * the round's five pieces into one, which changed no stroke.
@@ -107,7 +108,7 @@ interface Memory {
   readonly within: Rect | undefined;
   /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `within`. */
   readonly chosen: Rect | undefined;
-  /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did. */
+  /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did (UNMEASURED_CARRY stands in, `carryOver`). */
   readonly carry: { readonly within: Rect | undefined; readonly perPoint: number } | undefined;
 }
 
@@ -380,7 +381,9 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
  * stroke over this box; never above the turns' reach, never under `shortenStroke`'s floors. Proportional because the
  * drag keeps its 300 ms whatever its length: a shorter drag is a slower one, and its fling shrinks with it (the linear
  * model; unmeasured under 108 pt — a residual). On the measured case: three full strokes leave F ~150 pt short of the
- * window's middle, and the fourth travels ~63 pt, landing it mid-window whatever the spread of the runs.
+ * window's middle, and the fourth travels ~63 pt, landing it mid-window whatever the spread of the runs. Before any
+ * stroke over that scroll view was measured the carry is taken as UNMEASURED_CARRY, so a FIRST stroke that would skip
+ * the window is cut too (the carousel's card, round 7).
  * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md
  */
 export function carried(memory: StrokeMemory, { moved, drawn }: { moved: number; drawn: Stroke }): StrokeMemory {
@@ -405,11 +408,42 @@ function carryOver(carry: Memory['carry'], within: Rect | undefined): number | u
  */
 export const CARRY_CEILING = 4;
 
-/** The reach of the full stroke (`full` points of travel) that carries the target what it still needs (the carry model, `carried`), never above `reach`; `reach` itself while nothing is measured, nothing is needed, or one stroke cannot skip the window. */
-function carryReach(carry: number | undefined, still: StillNeeds | undefined, full: number, reach: number): number {
-  if (carry === undefined || still === undefined || full <= 0) return reach;
+/**
+ * What a stroke is taken to carry its target, per point of finger travel, before a stroke of this scroll was measured
+ * to (`carryReach`): 2.8, the most any measured WDA fling carried. Measured, at the fixed 300 ms: `lower` 226–263 pt
+ * for a 108-pt drag (2.1–2.4); the SwiftUI form 729–970 for 344 (2.1–2.8); sheet-long-list ≈ 1040 for 487 (2.1); and
+ * `carousel-in-list`'s carousel (24,138 354x85), C as wide as it and whole at one offset only, its centre inside over
+ * offsets 177–531, 447, 454, 495, 532 pt for the 212-pt stroke `307 181 → 95 181` (2.1–2.5) — one run in four past
+ * that window, by a point, the next tap refused (lab note,
+ * docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md). The
+ * first stroke there is cut to ≈ 126 pt (C's 354 still needed over 2.8 a point), which carries it 266–318 pt at the
+ * measured spread: C's centre inside, 75–90 % of it drawn, in one stroke. The most, not a mean: a stroke shorter than
+ * needed costs one more stroke, one longer than needed a turn (`carried`'s rule). Used only where the model is (a tree
+ * that lists the target where it lies, the target short of its window, a full stroke able to skip that window), never
+ * cutting a drag under UNMEASURED_MIN_DRAG; the first measured sample replaces it, whatever its size. The carry is
+ * kept per scroll view (`carryOver`), so this stands in for the first stroke over EACH scroll view no sample was
+ * measured over — the scroll's first stroke, and the first after the plan moves to another scroll view.
+ */
+export const UNMEASURED_CARRY = 2.8;
+
+/**
+ * The shortest drag UNMEASURED_CARRY may cut a first stroke to: 108 pt, the shortest drag any fling was measured at
+ * (`lower`'s full stroke). Below it the fling is not proportional to the drag: measured live (round 7, `scroll-bounded`
+ * S, `fully: true`, the window 116 pt and S 56 pt past it) a first stroke cut to 41 pt carried `lower` 36 pt — 0.9 a
+ * point, not 2.1–2.5 — and the 0.9 then measured cut the next stroke too long, past the window and back: 4 swipes
+ * where the full first stroke took 2. A first stroke cut no shorter than this keeps to the measured range; the
+ * carousel's, 126 pt, is above it.
+ */
+export const UNMEASURED_MIN_DRAG = 108;
+
+/** The reach of the full stroke (`full` points of travel) that carries the target what it still needs (the carry model, `carried`; UNMEASURED_CARRY until a stroke was measured), never above `reach`; `reach` itself while nothing is needed or one stroke cannot skip the window. */
+function carryReach(measured: number | undefined, still: StillNeeds | undefined, full: number, reach: number): number {
+  if (still === undefined || full <= 0) return reach;
+  const carry = measured ?? UNMEASURED_CARRY;
   if (carry * full * reach <= still.slack) return reach;
-  return Math.min(reach, still.needs / carry / full);
+  const cut = still.needs / carry / full;
+  // Unmeasured, never under the shortest drag the carry was measured at (UNMEASURED_CARRY's floor).
+  return Math.min(reach, measured === undefined ? Math.max(cut, UNMEASURED_MIN_DRAG / full) : cut);
 }
 
 /** The rects drawn over `rect` in this read, when it holds that scroll view (`TreeFacts.scene`'s draw order). */
