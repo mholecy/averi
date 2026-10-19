@@ -935,8 +935,8 @@ for (residual 6 stands there), and where a stroke dismisses it Decision 2 says s
 whose reads list no id (label-only content, idb's UIKit rows, NI1) is never told changed. RECYCLED ROWS give a loud
 stop: under idb, which lists no scroll view, a fling that replaces every identified row it lists, with nothing under
 the touch-down kept (no header, no scroll view), reads as changed — a stop where the scroll could go on, the failure
-preferred to a claimed stop. A stroke whose touched node PERSISTS while the sheet goes — a title the host repeats by
-role and label, a scroll view at the very rect of one the host lists — keeps it unchanged, and the stop is claimed as
+preferred to a claimed stop. A stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by
+role and label (a picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists — keeps it unchanged, and the stop is claimed as
 before. A dismiss region short of the whole screen (a popover's on an iPad?) is unmeasured, as is idb listing the
 screen beneath the region too (it would read as the layer's own). Decision 2 is source-agnostic: on WDA and
 uiautomator trees a fling keeps its scroll view's rect and is excused, a dismissal is their marks' to stop for first.
@@ -1000,8 +1000,8 @@ uiautomator trees a fling keeps its scroll view's rect and is excused, a dismiss
      medium sheet's targets are not stroked for. Beneath a layer idb shows no sign of (the large sheet, the alert, the
      cover) they still are; a stroke that dismisses the layer is no longer a claimed stop when nothing it touched down on
      is listed after it (the layer's rows, its list, its surface gone with it): `scroll_until` stops, saying the swipe
-     changed the screen — still claimed when the read lists no id, or when what it touched persists (a title the
-     screen beneath repeats);
+     changed the screen — still claimed when the read lists no id, or when what it touched persists (a row label
+     the screen beneath repeats by role and label — a picker sheet over a list of the same items — or a title);
    - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
      target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
      hidden twin `PopoverDismissRegion` of the sheet's dim in the form's own layer; scroll_until to it, judged either

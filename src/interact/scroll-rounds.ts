@@ -265,9 +265,9 @@ export type ScrollOutcome = (
  *   it lists — touching down on a row or a gap — reads `changed` (the stop where the scroll could have gone on: the
  *   failure the decision prefers to a claimed stop); a list that also lists a node the read after keeps under the
  *   touch-down (a labelled header, a scroll view) is a scroll;
- * - a stroke whose touched node PERSISTS while the sheet goes — the sheet's labelled title that the host repeats by
- *   role and label, a scroll view at the very rect of one the host lists — keeps it unchanged, the stop claimed as
- *   before;
+ * - a stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by role and label (a
+ *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists —
+ *   keeps it unchanged, the stop claimed as before;
  * - a presented layer that shares an id with the screen beneath, or a keyboard's ids listed at both reads, keeps it
  *   unchanged.
  * Source-agnostic: on WDA and uiautomator trees a fling keeps its scroll view's rect, so it is excused; a dismissal

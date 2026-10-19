@@ -217,3 +217,48 @@ describe('the changed stop\'s words for several ids', () => {
     );
   });
 });
+
+// THE PERSISTENCE CLAUSES, each pinned on its edge (interact/scroll-rounds.ts#touchedPersists; the slice's review round 3).
+describe('what the stroke touched persists only as the rule says', () => {
+  /** An idb read: the Application, `touched` under the touch-down (201,175), and identified rows `row_<from>…`. */
+  const idbRead = (touched: unknown, from: number): UiNode =>
+    parse([
+      { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
+      touched,
+      ...Array.from({ length: 4 }, (_, i) => ({ type: 'Button', AXLabel: null, AXUniqueId: `row_${from + i}`, frame: { x: 51, y: 500 + 70 * i, width: 300, height: 64 } })),
+    ]);
+  const at175 = { x: 0, y: 140, width: 402, height: 60 };
+  const changedAfter = (before: UiNode, after: UiNode): string | undefined => play(UP, [{ tree: before, found: [] }, { tree: after, found: [byId(after, 'row_41')] }]).outcome?.kind;
+
+  it('a scroll view persists only at its very rect: the list touched at one rect, the read after listing a scroll view at another — changed', () => {
+    const dump = (top: number, from: number): UiNode =>
+      parseDump(
+        `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0"><node ${attrs('', 'android.widget.FrameLayout', '[0,0][1080,2220]', ' scrollable="false"')}>` +
+          `<node ${attrs('', 'android.view.View', `[0,${top}][1080,2220]`, ' scrollable="true"')}>` +
+          Array.from({ length: 8 }, (_, i) => `<node ${attrs(`row_${from + i}`, 'android.view.View', `[0,${top + 200 * i}][1080,${top + 200 * i + 200}]`, ' scrollable="false"')} />`).join('') +
+          '</node></node></hierarchy>',
+      );
+    const after = dump(300, 40);
+    const played = play(DOWN_PHONE, [{ tree: dump(200, 0), found: [] }, { tree: after, found: [byId(after, 'row_41')] }]);
+    expect(played.steps[0]).toMatchObject({ do: 'stroke' });
+    expect(played.outcome?.kind).toBe('changed');
+  });
+
+  it('a label persists only under its own role: the touched text "Payee" repeated after as a button — changed', () => {
+    const before = idbRead({ type: 'StaticText', AXLabel: 'Payee', AXUniqueId: null, frame: at175 }, 0);
+    const after = idbRead({ type: 'Button', AXLabel: 'Payee', AXUniqueId: null, frame: at175 }, 40);
+    expect(changedAfter(before, after)).toBe('changed');
+  });
+
+  it('an identified touched row does not persist by its label: the sheet\'s "Alpha" row (id sheet.row_1) repeated after unidentified — changed', () => {
+    const before = idbRead({ type: 'Other', AXLabel: 'Alpha', AXUniqueId: 'sheet.row_1', frame: at175 }, 0);
+    const after = idbRead({ type: 'Other', AXLabel: 'Alpha', AXUniqueId: null, frame: at175 }, 40);
+    expect(changedAfter(before, after)).toBe('changed');
+  });
+
+  it('…nor does a label persist on an identified node after: the touched "Alpha" repeated after with an id — changed', () => {
+    const before = idbRead({ type: 'Other', AXLabel: 'Alpha', AXUniqueId: null, frame: at175 }, 0);
+    const after = idbRead({ type: 'Other', AXLabel: 'Alpha', AXUniqueId: 'host.alpha', frame: at175 }, 40);
+    expect(changedAfter(before, after)).toBe('changed');
+  });
+});
