@@ -21,7 +21,7 @@
  *   early on an unchanged mismatch (`pollValue`).
  * - what is sent again, bounded, in this order:
  *   1. A DROPPED TAIL (2026-10-19, docs/bugs/2026-10-19-ios-fill-loses-the-
- *      tail-of-its-text-in-a-react-native-single-line-field.md, ADR 0023):
+ *      tail-of-its-text-in-a-react-native-single-line-field.md, docs/adr/0023-fill-types-a-dropped-tail-again.md):
  *      the field holds a strict prefix of what it should hold — some of the
  *      typed characters landed, the end did not — and the reading held still
  *      over the poll's last two reads. Only the missing tail is typed, up to
@@ -34,7 +34,7 @@
  *      never duplicate one that is there. Measured on React Native 0.88's
  *      controlled single-line TextInput under `idb ui text`: 6 of 12 fills
  *      kept a prefix (up to 6 of 9 characters lost), the field itself holding
- *      the short value; the measurement of the remedy is in the note.
+ *      the short value; the measurements that chose this remedy over chunked typing are the ADR's.
  *   2. With clear only: one wipe of what the field holds and a retype of the
  *      whole value — the content is ours (unchanged since 2026-08-05: Compose
  *      async state swallowing synthetic input).
@@ -89,7 +89,7 @@ export type Typed =
   | { kind: 'unread' }
   | { kind: 'missed'; observed: string; retyped: number[]; retried?: { wiped: boolean } };
 
-/** How many times a dropped tail is typed again (ADR 0023): the second covers a tail the first retype lost a part of. */
+/** How many times a dropped tail is typed again (docs/adr/0023-fill-types-a-dropped-tail-again.md): the second covers a tail the first retype lost a part of. */
 export const MAX_TAIL_RETYPES = 2;
 
 /** Type the value and confirm it landed; send again what the rules above allow. */
