@@ -1,0 +1,483 @@
+{
+  "cell": "toolbar-dismiss",
+  "layer": "toolbar-screen",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [],
+  "config": {
+    "ios": {
+      "keyboardDismiss": [
+        {
+          "tap": {
+            "id": "lab.toolbar-dismiss.title"
+          }
+        }
+      ]
+    }
+  },
+  "form": {
+    "fields": [
+      {
+        "tag": "reference",
+        "id": "lab.toolbar-dismiss.reference",
+        "kind": "text",
+        "title": "Payment reference",
+        "titleId": "lab.toolbar-dismiss.reference.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 129,
+          "x": 20,
+          "y": 136
+        }
+      },
+      {
+        "tag": "message",
+        "id": "lab.toolbar-dismiss.message",
+        "kind": "text",
+        "title": "Message for the recipient",
+        "titleId": "lab.toolbar-dismiss.message.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 174.33333333333331,
+          "x": 20,
+          "y": 210
+        }
+      },
+      {
+        "tag": "street",
+        "id": "lab.toolbar-dismiss.street",
+        "kind": "text",
+        "title": "Street & number",
+        "titleId": "lab.toolbar-dismiss.street.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 308
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 113,
+          "x": 20,
+          "y": 284
+        }
+      },
+      {
+        "tag": "city",
+        "id": "lab.toolbar-dismiss.city",
+        "kind": "text",
+        "title": "City / town",
+        "titleId": "lab.toolbar-dismiss.city.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 382
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 73,
+          "x": 20,
+          "y": 358
+        }
+      },
+      {
+        "tag": "postcode",
+        "id": "lab.toolbar-dismiss.postcode",
+        "kind": "text",
+        "title": "Postcode",
+        "titleId": "lab.toolbar-dismiss.postcode.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 456
+        },
+        "error": null,
+        "focused": true,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 64.66666666666666,
+          "x": 20,
+          "y": 432
+        }
+      },
+      {
+        "tag": "phone",
+        "id": "lab.toolbar-dismiss.phone",
+        "kind": "text",
+        "title": "Phone – optional",
+        "titleId": "lab.toolbar-dismiss.phone.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 530
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 115,
+          "x": 20,
+          "y": 506
+        }
+      },
+      {
+        "tag": "vs",
+        "id": "lab.toolbar-dismiss.vs",
+        "kind": "text",
+        "title": "Variable symbol",
+        "titleId": "lab.toolbar-dismiss.vs.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 604
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 108.33333333333331,
+          "x": 20,
+          "y": 580
+        }
+      },
+      {
+        "tag": "ks",
+        "id": "lab.toolbar-dismiss.ks",
+        "kind": "text",
+        "title": "Constant symbol",
+        "titleId": "lab.toolbar-dismiss.ks.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 678
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 115.66666666666666,
+          "x": 20,
+          "y": 654
+        }
+      },
+      {
+        "tag": "ss",
+        "id": "lab.toolbar-dismiss.ss",
+        "kind": "text",
+        "title": "Specific symbol",
+        "titleId": "lab.toolbar-dismiss.ss.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 752
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 108.33333333333331,
+          "x": 20,
+          "y": 728
+        }
+      },
+      {
+        "tag": "note",
+        "id": "lab.toolbar-dismiss.note",
+        "kind": "text",
+        "title": "Note “for me”",
+        "titleId": "lab.toolbar-dismiss.note.title",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 826
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 18,
+          "width": 94.66666666666666,
+          "x": 20,
+          "y": 802
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "reference",
+        "id": "lab.toolbar-dismiss.reference",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 160
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,177.0"
+          }
+        ]
+      },
+      {
+        "tag": "message",
+        "id": "lab.toolbar-dismiss.message",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 234
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,251.0"
+          }
+        ]
+      },
+      {
+        "tag": "street",
+        "id": "lab.toolbar-dismiss.street",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 308
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,325.0"
+          }
+        ]
+      },
+      {
+        "tag": "city",
+        "id": "lab.toolbar-dismiss.city",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 382
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,399.0"
+          }
+        ]
+      },
+      {
+        "tag": "postcode",
+        "id": "lab.toolbar-dismiss.postcode",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 456
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,473.0"
+          }
+        ]
+      },
+      {
+        "tag": "phone",
+        "id": "lab.toolbar-dismiss.phone",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 530
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,547.0"
+          }
+        ]
+      },
+      {
+        "tag": "vs",
+        "id": "lab.toolbar-dismiss.vs",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 604
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,621.0"
+          }
+        ],
+        "seen": "#FFFFFF"
+      },
+      {
+        "tag": "ks",
+        "id": "lab.toolbar-dismiss.ks",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 678
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,695.0"
+          }
+        ],
+        "seen": "#FFFFFF"
+      },
+      {
+        "tag": "ss",
+        "id": "lab.toolbar-dismiss.ss",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 752
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,769.0"
+          }
+        ],
+        "seen": "#FFFFFF"
+      },
+      {
+        "tag": "note",
+        "id": "lab.toolbar-dismiss.note",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 826
+        },
+        "situation": "under-keyboard",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,843.0"
+          }
+        ],
+        "seen": "#E2E3E8"
+      },
+      {
+        "tag": "submit",
+        "id": "lab.toolbar-dismiss.submit",
+        "kind": "button",
+        "frame": {
+          "height": 46.33333333333337,
+          "width": 362,
+          "x": 20,
+          "y": 884
+        },
+        "situation": "off-screen",
+        "reached": false,
+        "probe": []
+      }
+    ],
+    "keyboard": {
+      "frame": {
+        "height": 301,
+        "width": 402,
+        "x": 0,
+        "y": 573
+      },
+      "field": "postcode"
+    },
+    "screenError": null,
+    "submits": [],
+    "title": {
+      "id": "lab.toolbar-dismiss.title",
+      "frame": {
+        "height": 20.33333333333333,
+        "width": 125.66666666666663,
+        "x": 138,
+        "y": 73.83333333333333
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,84.0"
+        }
+      ]
+    }
+  }
+}

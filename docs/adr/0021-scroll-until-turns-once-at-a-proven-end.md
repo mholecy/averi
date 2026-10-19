@@ -2,9 +2,12 @@
 
 Status: decisions 1–3 accepted, 2026-10-17 (owner, on lab note LV4, option (b): the three conditions and the
 one-stroke stop); decision 4 (lab note LV5's carry model) implemented 2026-10-18 on `arch/r22-lv4` under the round-6
-brief, pending the owner and the device check. The points on uiautomator decided 2026-10-18 (owner, on round 6's
+brief, pending the owner and the device check. The two points on uiautomator decided 2026-10-18 (owner, on round 6's
 Android device check): NO turn, and the two-stroke stop KEPT — unmoved strokes on uiautomator are no proof; the tool
-reports the direction, the agent turns (below).
+reports the direction, the agent turns (below). Device-checked on iOS 2026-10-18 (round 6, WDA, below): the turn holds
+(once, toward the target, said); the one-stroke stop does not (2–4 unmoved strokes before the proof held, in four
+runs); decision 4 holds on `lower` (F landed in its window four times of four), its long-list half unmeasured — no
+lab cell can measure it yet.
 
 ## Context
 
@@ -26,9 +29,10 @@ reports the direction, the agent turns (below).
       not guessed (below);
    2. the tree places the target past the opposite (far) edge of the SAME scroll view those strokes went over, inside
       it;
-   3. the reply says averi turned: `; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content
-      ending at its top — so averi turned down, as the tree places the element below it` (or `3 swipes up, the last of
-      which did not move …` when the ones before moved it).
+   3. the reply says averi turned: `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380
+      402x180) ending at its top — so averi turned down, as the tree places the element below it` (or `3 swipes up, the
+      last of which did not move it …` when the ones before moved it) — the proof in the words of the one-stroke stop's
+      failure (decision 3; scroll-text.ts#endText, one wording for both since round 6's code review).
    The caller's direction is always stroked first. The turn keeps the full reach — no fling carried the target past;
    it was never near — and is not counted among the fling's turns (`scroll-rounds.ts#EndTurn`).
 2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedEnd`,
@@ -44,12 +48,17 @@ reports the direction, the agent turns (below).
    where `UNMOVED_STROKES_EXHAUST`'s two identical unmoved strokes stay the rule wherever the tree cannot list the end.
 4. **The carry model (LV5)** (`stroke-plan.ts#carried`, `scroll-rounds.ts#stillNeeds`): on the same trees, the read
    after a stroke measures what it carried the target, per point of the finger's actual travel, of the same node at
-   the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept. Once the
+   the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept — kept for the
+   scroll view the stroke went over: a carry measured over one is never applied to a stroke over another (the plan
+   falling back to an outer scroll view), and a sample over another replaces it (round 6's code review, P5). Once the
    target lies short of its window and a stroke at the turns' reach would carry it further than the window lets it
    travel whole, the stroke's travel is cut to what brings it to the window's middle over that carry. Any window one
    stroke can skip, not only a short scroll view's: on a long WDA list the final approach is cut too (a carry of ≈ 2.4
    × a 420-pt stroke, ~1000 pt, is more than a ~650-pt slack); only a window wider than one stroke's carry keeps the
-   full stroke.
+   full stroke. That final-approach cut on a long list is inferred, not measured (LV5 measured `lower`, 180 pt): the
+   device check runs a long-list live case under WDA (a row far down a full-height list — the lab app's
+   `sheet-long-list`, or a cell like it) beside `scroll-bounded`'s, and judges that the cut stroke lands the row in its
+   window without an extra stroke or turn.
 
 ## Where it applies, and where not
 
@@ -95,3 +104,31 @@ reports the direction, the agent turns (below).
 - The carry model takes the fling as proportional to the drag at the fixed 300 ms (a shorter drag is a slower one) —
   measured at 108 and 344 pt, unmeasured below; a mid-fling read understates a sample, which is why the largest is
   kept. Both are the device check's to confirm (`ios wda turn:scroll-bounded.F`, `ios wda scroll:scroll-bounded.F`).
+- Two tolerances meet across reads, on purpose: whether a stroke moved the match ("unmoved") forgives under a pixel
+  (`sameRectWithinPixel`), while the proof's and the carry's scroll view is found again by its EXACT rect
+  (`Clips.endsAt`, `stroke-plan.ts#carryOver`, as `axesOf` and `drawnOver` find it — round 6's code review, S1/P5).
+  WDA's rects reach the tree rounded (ios-node.ts), so a scroll view at rest keeps its rect; one that moves by a pixel
+  between reads loses the proof (no turn after one stroke: the two-stroke rule decides) or the carry (no shortened
+  final stroke), both the safe side. The live cases are where such a 1-px flip would show:
+  `ios wda turn:scroll-bounded.F` turning only after the second stroke, `ios wda scroll:scroll-bounded.F` overshooting
+  with a full final stroke — the device check reads both for it.
+
+## The iOS device check (2026-10-18, round 6; docs/truth/live-ios-2026-10-18-visibility.md)
+
+Under WDA at truth/round-6's src (11683c3), four runs of each case:
+- **The turn (decision 1)** holds in kind: the caller's `up` stroked first, one turn `down`, the reply saying averi
+  turned (`… 2 swipes up, the last of which did not move it — the tree lists the content of scrollable (0,380 402x180)
+  ending at its top — so averi turned down …`). **The one-stroke stop (decision 3) does not hold live**: the proof held
+  after 2 unmoved strokes in three runs (F then reached, tapped, fired) and after 4 in one (the budget spent before F,
+  `failed after 6 swipes`). Two is the two-stroke rule's count, the residual above foretold (a 1-px flip between reads
+  losing the proof — F reads 300x64 at launch and 300x65 after a stroke — or a read still bouncing at the top; no trace
+  of averi's reads was kept to tell which). `ios wda turn:scroll-bounded.F` stays KNOWN (lab note LV4).
+- **The carry model (decision 4)** holds on `lower`: F landed whole in all four runs (`lower` at rest at 915–981 of its
+  884–1000 window; LV5 struck off). Its long-list half is unmeasured, and no lab cell can measure it yet: the live
+  case built for it (a far row of `sheet-long-list`, `CARRY` in scripts/truth/live-visibility.ts) is blocked by a WDA
+  reading of scrolled tables (lab note LV6,
+  docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md) — and with LV6 fixed it
+  still could not fail on a missing cut: the table's last offset (1748) lies inside Row 30's window (1172–1748), so a
+  full final stroke comes to rest at the end, inside the window; no row of its 40 has a window wholly before the end
+  and past one stroke's carry (≈ 1040 pt). The measurement needs a longer table (the plan's round 7).
+

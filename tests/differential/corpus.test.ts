@@ -70,6 +70,26 @@ describe('loadCorpus', () => {
     await expect(loadCorpus(dir)).rejects.toThrow(/run-a\/x\.json.*"parsed"/);
   });
 
+  it('gives a ground-truth capture the paths of its screenshot and truth, beside it', async () => {
+    await run(
+      'truth',
+      { platform: 'ios', captures: [{ file: 'open.wda.json', source: 'wda', form: 'raw', screenshot: 'open.png', truth: 'open.truth.json' }, { file: 'plain.json', source: 'idb', form: 'raw' }] },
+      { 'open.wda.json': '{}', 'open.png': 'png', 'open.truth.json': '{}', 'plain.json': '[]' },
+    );
+    const corpus = await loadCorpus(dir);
+    expect(corpus.map((r) => [r.id, r.screenshot, r.truth])).toEqual([
+      ['truth/open.wda.json', join(dir, 'truth', 'open.png'), join(dir, 'truth', 'open.truth.json')],
+      ['truth/plain.json', undefined, undefined],
+    ]);
+  });
+
+  it.each(['screenshot', 'truth'] as const)('refuses a capture whose %s file is missing, naming the capture and the file', async (field) => {
+    const files: Record<string, string> = { 'open.wda.json': '{}', 'open.png': 'png', 'open.truth.json': '{}' };
+    delete files[field === 'screenshot' ? 'open.png' : 'open.truth.json'];
+    await run('truth', { platform: 'ios', captures: [{ file: 'open.wda.json', source: 'wda', form: 'raw', screenshot: 'open.png', truth: 'open.truth.json' }] }, files);
+    await expect(loadCorpus(dir)).rejects.toThrow(field === 'screenshot' ? /truth\/open\.wda\.json: open\.png is missing/ : /truth\/open\.wda\.json: open\.truth\.json is missing/);
+  });
+
   it('refuses a directory without a manifest rather than skipping its trees', async () => {
     await mkdir(join(dir, 'stray'));
     await expect(loadCorpus(dir)).rejects.toThrow(/stray.*manifest\.json/);

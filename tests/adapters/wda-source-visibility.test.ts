@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
@@ -219,3 +219,101 @@ describe('PARKED cell content — a cell UIKit has not laid out lists its conten
     });
   });
 });
+
+// docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md: once a UIKit table has
+// scrolled, WDA parks a below-the-fold row's content at the table's CONTENT ORIGIN — its top-left moved up by the
+// offset (62 − offset) — which lies above the screen, outside the table.
+describe('PARKED cell content of a SCROLLED table — the parked frame lies above the scroll view, at its left edge', () => {
+  /** Every text of a row (`Row N`, `Target X`) with its cell's rect: the parsed cell is its text's nearest container ancestor holding it. */
+  const rowTexts = (tree: UiNode): string[] => {
+    const out: string[] = [];
+    const walk = (n: UiNode, cell: UiNode | undefined): void => {
+      if (n.role === 'text' && /^(Row \d+|Target \w)$/.test(n.label ?? '')) out.push(`${n.label} ${at(n)} cell ${cell === undefined ? '-' : at(cell)}`);
+      n.children.forEach((c) => walk(c, n.role === 'container' && n.children.some((k) => k.role === 'text') ? n : cell));
+    };
+    walk(tree, undefined);
+    return out;
+  };
+
+  it('the lab\'s sheet-long-list after 273 pt: Row 30\'s text lies at its cell, 0,1708 below the screen — not at the parked 0,-212 above it — and so does every row\'s, above the fold and below it', async () => {
+    const tree = await capture('lab-sheet-long-list-scrolled-273');
+    const rows = rowTexts(tree);
+    expect(rows.find((r) => r.startsWith('Row 30 '))).toBe('Row 30 0,1708 402x65 cell 0,1708 402x65');
+    expect(rows.find((r) => r.startsWith('Target F '))).toBe('Target F 0,1068 402x65 cell 0,1068 402x65');
+    // Scrolled past the top too: Row 2's cell lies at 0,-84, its text parked at 0,-212 (Row 0's own place). The one
+    // left parked is Target R, whose cell at 0,-148 meets the parked frame by a point (65-pt rects 64 apart: the
+    // residual of a parked element that meets its cell) — above the screen either way.
+    expect(rows.find((r) => r.startsWith('Row 2 '))).toBe('Row 2 0,-84 402x65 cell 0,-84 402x65');
+    expect(rows.length).toBe(40);
+    expect(rows.filter((r) => { const [own, cell] = r.replace(/^\S+ \S+ /, '').split(' cell '); return own !== cell; })).toEqual(['Target R 0,-212 402x65 cell 0,-148 402x65']);
+  });
+
+  it('…after 522 pt: Row 30 at its cell 0,1460; Target F, laid out on screen at 0,820, stays where WDA put it; no text is left at the parked 0,-460 but Row 0, whose cell lies there', async () => {
+    const tree = await capture('lab-sheet-long-list-scrolled-522');
+    const rows = rowTexts(tree);
+    expect(rows.find((r) => r.startsWith('Row 30 '))).toBe('Row 30 0,1460 402x64 cell 0,1460 402x64');
+    expect(rows.find((r) => r.startsWith('Target F '))).toBe('Target F 0,820 402x64 cell 0,820 402x64');
+    expect(rows.filter((r) => r.includes(' 0,-460 402x64 cell'))).toEqual(['Row 0 0,-460 402x64 cell 0,-460 402x64']);
+  });
+
+  it('the rule, on synthetic elements: above the scroll view it is parked only at its left edge, in a cell wholly outside that scroll view; an element above it elsewhere, or of a cell on screen, stays where WDA put it', () => {
+    const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
+    const cellAt = r(0, 1708, 402, 65);
+    const tree = parseWdaSourceValue(
+      app(
+        el('Table', { rect: r(0, 62, 402, 812), children: [
+          el('Cell', { rect: cellAt, isVisible: '0', children: [
+            el('StaticText', { label: 'at the left edge, above', rect: r(0, -212, 402, 65), isVisible: '0' }),
+            el('StaticText', { label: 'its bottom on the top edge', rect: r(0, -3, 402, 65), isVisible: '0' }),
+            el('StaticText', { label: 'above, off the left edge', rect: r(16, -212, 300, 65), isVisible: '0' }),
+            el('StaticText', { label: 'visible, above', rect: r(0, -212, 402, 65), isVisible: '1' }),
+          ] }),
+          el('Cell', { rect: r(0, 300, 402, 65), children: [el('StaticText', { label: 'of a cell on screen', rect: r(0, -212, 402, 65), isVisible: '0' })] }),
+        ] }),
+      ),
+    );
+    const rects = Object.fromEntries(all(tree).filter((n) => n.role === 'text').map((n) => [n.label, at(n)]));
+    expect(rects).toEqual({
+      'at the left edge, above': '0,1708 402x65',
+      'its bottom on the top edge': '0,1708 402x65',
+      'above, off the left edge': '16,-212 300x65',
+      'visible, above': '0,-212 402x65',
+      'of a cell on screen': '0,-212 402x65',
+    });
+  });
+
+  it('the sweep: over every raw /source payload in tests/fixtures (wda-*.json), the parser moves exactly the parked elements — the Contacts sheet\'s and the long list\'s at rest, the long list\'s scrolled — and nothing else; of the payloads moving nothing only the lab\'s form-picker holds cells (15, all on screen), so the rest guard only that no content outside a cell moves (the scroll-view shape and the above-the-view clause are pinned by the synthetic trees above)', async () => {
+    const dir = new URL('../fixtures/', import.meta.url);
+    const counts: Record<string, number> = {};
+    for (const file of (await readdir(dir)).filter((f) => /^wda-.*\.json$/.test(f)).sort()) {
+      const raw = JSON.parse(await readFile(new URL(file, dir), 'utf8')) as RawEl & { value?: unknown };
+      const root = (typeof raw.type === 'string' ? raw : raw.value) as RawEl | undefined;
+      if (typeof root?.type !== 'string') continue; // a ui_snapshot capture, not a /source payload
+      let count = 0;
+      const zip = (e: RawEl, n: UiNode): void => {
+        if (e.rect !== undefined && at(n) !== `${e.rect.x},${e.rect.y} ${e.rect.width}x${e.rect.height}`) count++;
+        (e.children ?? []).forEach((c, i) => { if (n.children[i] !== undefined) zip(c, n.children[i]); });
+      };
+      zip(root, parseWdaSourceValue(raw));
+      counts[file.replace(/\.json$/, '')] = count;
+    }
+    const moved = Object.fromEntries(Object.entries(counts).filter(([, n]) => n > 0));
+    expect(moved).toEqual({
+      'wda-capture-contacts-discard-popover': 41,
+      'wda-capture-contacts-new-contact': 41,
+      'wda-capture-lab-sheet-long-list': 81,
+      'wda-capture-lab-sheet-long-list-scrolled-273': 72,
+      'wda-capture-lab-sheet-long-list-scrolled-522': 75,
+    });
+    // Swept, moving nothing: the lab's form-picker (cells on screen), carousel and bounded scroll views, Account
+    // Detail, the SWIFT form, the MyPort and skeleton logins, the filter sheet, the synthetic alert.
+    expect(Object.keys(counts).length).toBe(19);
+    expect(counts['wda-capture-lab-form-picker']).toBe(0);
+  });
+});
+
+interface RawEl {
+  type?: unknown;
+  rect?: { x: number; y: number; width: number; height: number };
+  children?: RawEl[] | null;
+}

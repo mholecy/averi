@@ -1,0 +1,66 @@
+{
+  "family": "bars",
+  "note": "System bands and app chrome over targets (phase 3 B4; calibration.json #11, #14, #21, #22, #23 static part, #24, #26). bands: targets against the status and navigation bands, edge to edge (on Android under gesture navigation, `navigation`); bands-three-button (Android only): the same screen captured under three-button navigation (`navigation`), beside bands' gesture capture in the same run (#23). pinned-bar: a button pinned at the bottom over a target's edge. tabbar-floating: a floating tab bar over a scroll view running to the screen's bottom — a row in the strip of its surface above its items, a row far below the fold. tabbar-hidden-push (iOS only, layer tab-host): a screen pushed over a tab host that hides the tab bar. fab: a transparent full-width host holding only a FAB, targets beside the FAB. Every cell reports safeArea, its scroll view's clip and its chrome's frames. App files: AveriLab/Bars.swift, Bars.kt.",
+  "cells": [
+    {
+      "id": "bands",
+      "layer": "none",
+      "navigation": "gesture",
+      "targets": [
+        { "tag": "S", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "O", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "W", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "Q", "color": "#FB8C00", "slot": 3, "declared": "open" },
+        { "tag": "N", "color": "#8E24AA", "slot": 4, "declared": "open" }
+      ]
+    },
+    {
+      "id": "bands-three-button",
+      "layer": "none",
+      "platforms": ["android"],
+      "navigation": "three-button",
+      "targets": [
+        { "tag": "S", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "O", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "W", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "Q", "color": "#FB8C00", "slot": 3, "declared": "open" },
+        { "tag": "N", "color": "#8E24AA", "slot": 4, "declared": "open" }
+      ]
+    },
+    {
+      "id": "pinned-bar",
+      "layer": "none",
+      "targets": [
+        { "tag": "W", "color": "#43A047", "slot": 0, "declared": "open" },
+        { "tag": "P", "color": "#E53935", "slot": 1, "declared": "open" }
+      ]
+    },
+    {
+      "id": "tabbar-floating",
+      "layer": "none",
+      "targets": [
+        { "tag": "T", "color": "#1E88E5", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "R", "color": "#E53935", "slot": 1, "declared": "open", "scrollView": "list" },
+        { "tag": "F", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "tabbar-hidden-push",
+      "layer": "tab-host",
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "open" }
+      ]
+    },
+    {
+      "id": "fab",
+      "layer": "none",
+      "targets": [
+        { "tag": "W", "color": "#1E88E5", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "L", "color": "#E53935", "slot": 1, "declared": "open", "scrollView": "list" },
+        { "tag": "K", "color": "#FB8C00", "slot": 2, "declared": "open", "scrollView": "list" }
+      ]
+    }
+  ]
+}

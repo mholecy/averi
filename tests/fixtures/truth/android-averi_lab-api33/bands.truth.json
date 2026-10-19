@@ -1,0 +1,191 @@
+{
+  "cell": "bands",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "S",
+      "id": "lab.bands.S",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 11,
+        "width": 825,
+        "height": 44
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0.95,
+      "seen": "#E53935",
+      "geometry": "status-band",
+      "visible": {
+        "x": 127,
+        "y": 11,
+        "width": 825,
+        "height": 44
+      },
+      "piece": null,
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "O",
+      "id": "lab.bands.O",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 55,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,143"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5",
+      "geometry": "band-overlap:status",
+      "visible": {
+        "x": 127,
+        "y": 55,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 127,
+        "y": 66,
+        "width": 825,
+        "height": 165
+      },
+      "listed": {
+        "uiautomator": true
+      },
+      "reachedAtPiece": true
+    },
+    {
+      "tag": "W",
+      "id": "lab.bands.W",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 1022,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1110"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#43A047",
+      "geometry": "whole",
+      "visible": {
+        "x": 127,
+        "y": 1022,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 127,
+        "y": 1022,
+        "width": 825,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "Q",
+      "id": "lab.bands.Q",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 1989,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,2077"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#FB8C00",
+      "geometry": "band-overlap:nav",
+      "visible": {
+        "x": 127,
+        "y": 1989,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 127,
+        "y": 1989,
+        "width": 825,
+        "height": 165
+      },
+      "listed": {
+        "uiautomator": true
+      },
+      "reachedAtPiece": true
+    },
+    {
+      "tag": "N",
+      "id": "lab.bands.N",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 2165,
+        "width": 825,
+        "height": 44
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,2187"
+        }
+      ],
+      "drawn": 0.902,
+      "seen": "#8E24AA",
+      "geometry": "nav-band",
+      "visible": {
+        "x": 127,
+        "y": 2165,
+        "width": 825,
+        "height": 44
+      },
+      "piece": null,
+      "listed": {
+        "uiautomator": true
+      }
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "navigation": "gesture"
+}

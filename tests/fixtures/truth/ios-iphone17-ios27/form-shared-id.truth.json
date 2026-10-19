@@ -1,0 +1,244 @@
+{
+  "cell": "form-shared-id",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [],
+  "form": {
+    "fields": [
+      {
+        "tag": "amount",
+        "id": "lab.form-shared-id.component",
+        "kind": "amount",
+        "title": "Value*",
+        "titleId": "lab.form-shared-id.component",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 146
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 14.333333333333314,
+          "width": 45,
+          "x": 20,
+          "y": 136
+        }
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-shared-id.component",
+        "kind": "iban",
+        "title": "IBAN*",
+        "titleId": "lab.form-shared-id.component",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 206
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 14.333333333333314,
+          "width": 42,
+          "x": 20,
+          "y": 196
+        }
+      },
+      {
+        "tag": "bic",
+        "id": "lab.form-shared-id.component",
+        "kind": "text",
+        "title": "BIC*",
+        "titleId": "lab.form-shared-id.component",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 266
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 14.333333333333371,
+          "width": 33.666666666666664,
+          "x": 20,
+          "y": 256
+        }
+      },
+      {
+        "tag": "bank",
+        "id": "lab.form-shared-id.component",
+        "kind": "text",
+        "title": "Payee’s bank name*",
+        "titleId": "lab.form-shared-id.component",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 326
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 14.333333333333371,
+          "width": 122,
+          "x": 20,
+          "y": 316
+        }
+      },
+      {
+        "tag": "name",
+        "id": "lab.form-shared-id.component",
+        "kind": "text",
+        "title": "Payee’s name",
+        "titleId": "lab.form-shared-id.component",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 386
+        },
+        "error": null,
+        "focused": false,
+        "value": "",
+        "titleFrame": {
+          "height": 14.333333333333314,
+          "width": 85.33333333333333,
+          "x": 20,
+          "y": 376
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "amount",
+        "id": "lab.form-shared-id.component",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 146
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,163.0"
+          }
+        ]
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-shared-id.component",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 206
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,223.0"
+          }
+        ]
+      },
+      {
+        "tag": "bic",
+        "id": "lab.form-shared-id.component",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 266
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,283.0"
+          }
+        ]
+      },
+      {
+        "tag": "bank",
+        "id": "lab.form-shared-id.component",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 326
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,343.0"
+          }
+        ]
+      },
+      {
+        "tag": "name",
+        "id": "lab.form-shared-id.component",
+        "kind": "field",
+        "frame": {
+          "height": 34,
+          "width": 362,
+          "x": 20,
+          "y": 386
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,403.0"
+          }
+        ]
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-shared-id.submit",
+        "kind": "button",
+        "frame": {
+          "height": 46.333333333333314,
+          "width": 362,
+          "x": 20,
+          "y": 444
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "201.0,467.0"
+          }
+        ]
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": []
+  }
+}
