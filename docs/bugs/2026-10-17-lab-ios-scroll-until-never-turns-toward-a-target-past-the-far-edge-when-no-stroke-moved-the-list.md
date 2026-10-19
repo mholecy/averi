@@ -1,5 +1,21 @@
 # BUG (or a decision to record): on iOS, `scroll_until` asked the wrong way for a row of a scroll view already at its end that way strokes three times, moves nothing, and fails with the right direction as advice — it never turns back toward the target the tree places past the far edge
 
+> **Status (2026-10-18, round 7):** the one-stroke stop holds live under WDA — fixed at `480660a4` on
+> `arch/r23-ios-stop` (from `arch/round-23` `565bcb9`), measured 4 runs of 4. Round 6's device check had the turn come
+> after 2 unmoved strokes (3 runs of 4) or 4 (1 run). A trace of averi's reads per stroke (round 7, the lab simulator)
+> found why: after each stroke up at `lower`'s top F read 51,1381 300x64 or 51,1380 300x65 against 51,1380 300x64
+> before it, `lower`'s content 0,381 402x1300 or 0,380 402x1301 — WDA rounding a frame's sub-point origin and size on
+> their own, the list resting a fraction of a point off its top — and "unmoved" forgave under one unit, so the proof
+> (scroll-rounds.ts#Observed.ends) waited for a read that rounded as the one before. Not a read still bouncing: every
+> read ~1.1 s after the stroke was within that point. Unmoved is now within one unit (adapters/types.ts
+> #sameRectWithinPixel; ADR 0021 decision 2). Live (`live.ts --sources wda --cases turn:scroll-bounded.F` at
+> `e687fe83`, 4 runs, docs/truth/live-records/ios-wda-stop-carousel-r23-1…4.json): one stroke up (`lower 0→0`), the
+> turn, `fully visible after 5 swipes; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content
+> ending at its top — so averi turned down, as the tree places the element below it`, F tapped — in one run `visible
+> … CLIPPED at top, 86%` (`lower` at 1008.7, 8.7 past F's window: LV5's spread, a plain stop). Pinned over the real
+> capture (tests/interact/scroll-end-turn.test.ts). The live KNOWN `ios wda turn:scroll-bounded.F` is the harness's to
+> strike.
+>
 > **Status (2026-10-18):** fixed under WDA at `1a1871f` on `arch/r22-lv4` (rebased onto `arch/round-22` `8b2530c`; review round 1 fixes after it, ADR 0021) (from `arch/round-22` `b71cbbb`), the owner's (b)
 > as decided on 2026-10-17; unmeasured on a device — the live KNOWN `ios wda turn:scroll-bounded.F` is the device
 > check's to judge. The caller's direction is stroked first; the read after the one stroke up finds every match where
