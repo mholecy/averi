@@ -418,6 +418,18 @@ describe('each rule names its class (what the live KNOWN pins)', () => {
     const closed = judgePresentedScroll(p, ['Element id:"x" fully visible after 1 swipe'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state());
     expect(closed).toMatchObject({ cls: 'presented-stop', why: expect.stringMatching(/ — the app logged dismissed sheet: averi closed the presented layer and claimed the stop$/) });
     expect(judgePresentedScroll(p, ['ERROR'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state()).cls).toBe('presented-fired');
+    // … unless averi said its swipe changed the screen and claimed nothing (idb's sheet-background A, B since A5):
+    // honest — LOUD, its own class, the dismissal named; neither a mismatch nor a stop
+    const changed = 'ERROR scroll_until id:"lab.sheet-background.A" stopped after 1 swipe — the swipe CHANGED THE SCREEN: the one element … is not in the tree after it';
+    expect(judgePresentedScroll(p, [changed], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state())).toMatchObject({
+      outcome: 'LOUD',
+      cls: 'presented-changed',
+      kind: 'refused',
+      why: expect.stringMatching(/^the app logged dismissed sheet, and averi said its swipe changed the screen, claiming nothing — /),
+    });
+    expect(judgePresentedScroll({ tag: 'A', view: undefined, platform: 'ios' as const }, [changed], state({ events: [{ kind: 'touch', tag: '201,175', at }] }), state())).toMatchObject({ outcome: 'LOUD', cls: 'presented-changed' });
+    // the words alone, not echoed in a selector, are the stop's
+    expect(judgePresentedScroll(p, ['ERROR scroll_until id:"stopped after 1 swipe — the swipe CHANGED THE SCREEN: x" failed'], state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] }), state()).cls).toBe('presented-fired');
     expect(judgePresentedScroll(p, ['ERROR'], state({ strokes: [stroke(200, 0, 'host')] }), state()).cls).toBe('presented-stroke');
     // a touch on the layer is no evidence against a target in a scroll view (the stroke may move the layer's own list) …
     const touch = state({ events: [{ kind: 'touch', tag: '540,1776', at }] });

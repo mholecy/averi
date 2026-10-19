@@ -186,7 +186,10 @@ Reproduce (outside the sandbox):
   review: the one id quoted as `id:"lab.sheet-background.S"`, "the one element … is not in the tree after it", the
   parenthesis dropped — the same stop, rejudged the same). The judge reads them
   `presented-fired` (a stroke dismissed the layer), not `presented-stop` — still MISMATCH, live-known's entries
-  (`presented-stop`, `visible`) to move to it. C, D: two strokes at (201,699) on the large sheet, nothing dismissed,
+  (`presented-stop`, `visible`) to move to it. (Since round 7's integration 3 the judge reads an honest changed stop
+  as its own LOUD class, `presented-changed` — the sheet lost, said, nothing claimed — and live-known.ts files A and B
+  so on `refused`: each record 14 ok, 2 loud, 2 mismatches, 0 not known; the group 100 ok, 8 loud, 37 mismatches.)
+  C, D: two strokes at (201,699) on the large sheet, nothing dismissed,
   "never appeared" — as before (residual 6 stands where the tree shows no layer).
 - The visibility group under idb, once (docs/truth/live-records/ios-idb-vis-a5.json): 145 cases, 100 ok, 6 loud, 39
   mismatches (2 not known: sheet-background A and B above). Against ios-vis.json's idb cases: sheet-medium A–D and

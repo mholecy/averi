@@ -101,6 +101,13 @@ export const presentedRemedySaid = (reply: string) => /is presented over (?:it|t
 export const windowHintSaid = (reply: string) => reply.includes(ACTIVE_WINDOW_HINT);
 
 /**
+ * scroll_until's changed stop (src/interact/scroll-text.ts#changedText, scroll-rounds.ts#ScreenChange): its swipe
+ * replaced the screen — "stopped after N swipe(s) — the swipe CHANGED THE SCREEN: …" — and nothing found after it is
+ * claimed. In its own words, not in a selector it echoes.
+ */
+export const screenChangedSaid = (reply: string) => /stopped after \d+ swipes? — the swipe CHANGED THE SCREEN: /.test(ownWords(reply));
+
+/**
  * The reply names scroll_until as the remedy (the off-screen, outside-its-scroll-view and sliver refusals do: src/
  * interact/tap-judgement.ts:336, "scroll_until it first") — in its own words, not in a selector it echoes.
  */

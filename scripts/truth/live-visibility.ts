@@ -1,6 +1,6 @@
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
-import { refusedAfterDismissal, replyKind, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind } from './replies.js';
+import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
@@ -51,7 +51,8 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * while something fired; `tap-refused` (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N
  * swipes did not change the screen" against the app's strokes; `R-direction` the strokes broke it; `failed-holds` a
  * failure where the app shows the stop; `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`,
- * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `presented-pass` a colour
+ * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `presented-changed`
+ * (LOUD) one whose stroke changed the screen — the layer dismissed — and that said so, claiming nothing; `presented-pass` a colour
  * assert beneath a presented layer that passed (it measured the layer); `dismissal` the dismissal's judge.
  */
 export type VerdictClass =
@@ -66,6 +67,7 @@ export type VerdictClass =
   | 'presented-stop'
   | 'presented-fired'
   | 'presented-stroke'
+  | 'presented-changed'
   | 'presented-pass'
   | 'dismissal';
 
@@ -375,6 +377,13 @@ export function judgePresentedScroll(c: { tag: string; view: string | undefined;
   if (kind === 'visible') {
     const why = fired.length > 0 ? `the app logged ${eventsText(fired)}: averi closed the presented layer and claimed the stop` : 'the target lies beneath the presented layer';
     return { outcome: 'MISMATCH', cls: 'presented-stop', kind, why: `averi says ${short(scroll)} — ${why}`, app };
+  }
+  // A stroke that changed the screen, said so — scroll_until's changed stop (idb beneath a layer its list shows no sign
+  // of: sheet-background's A and B) — is honest: the layer is gone, which the caller is told, and nothing found after
+  // it is claimed. LOUD (the stroke still cost the caller its sheet: ADR 0018 residual 6), not a mismatch; not ok.
+  if (screenChangedSaid(scroll)) {
+    const what = fired.length > 0 ? `the app logged ${eventsText(fired)}` : 'nothing logged but the touches';
+    return { outcome: 'LOUD', cls: 'presented-changed', kind, why: `${what}, and averi said its swipe changed the screen, claiming nothing — ${short(scroll)}`, app };
   }
   if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'presented-fired', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}`, app };
   if (moved.length > 0) return { outcome: 'MISMATCH', cls: 'presented-stroke', kind, why: `stroked beneath the presented layer: ${moved.map((s) => `${s.view} ${round(s.from)}→${round(s.to)}`).join(', ')} — averi: ${short(scroll)}`, app };

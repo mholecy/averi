@@ -103,7 +103,6 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], LE2, 'R-direction', 'refused'),
   // LV3 under idb only (no scroll view listed: its turned stroke still touches down in the header); fixed under WDA.
   ...each('ios idb', ['scroll:tabbar-floating.R'], LV3, 'R-direction', 'refused'),
-  ...each('ios idb', ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G'], NOT_YET_IN_TREE, 'presented-stop', 'visible'),
   // sheet-long-list's F and L: idb lists the table's labels without their identifiers (and no row below the fold), so
   // neither is ever in its tree — an honest not-reached, its strokes unjudged since round 7's recapture records them
   // unlisted (TargetTruth.listed); until then F read R-direction, filed as
@@ -116,10 +115,15 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['tap:blur-menu-grouped.C'], BLUR, 'tap-claim', 'Tapped'),
   // Round 6's iOS device check (ios-vis.json at 11683c3): the refusal case beneath a presented layer in no scroll view
   // (L1's, first run on iOS). idb lists the presented layer alone, the target not in it: a target not yet in the tree is
-  // stroked for (residual 6, as sheet-medium-edges' H and G) — two strokes on the layer, the half sheet and the
-  // backgrounded sheet dismissed by the first (then the target found: "fully visible after 1 swipe") or not.
-  ...each('ios idb', ['scroll:sheet-medium.A', 'scroll:sheet-medium.B', 'scroll:sheet-background.A', 'scroll:sheet-background.B'], NOT_YET_IN_TREE, 'presented-stop', 'visible'),
-  ...each('ios idb', ['scroll:sheet-medium.C', 'scroll:sheet-medium.D', 'scroll:sheet-background.C', 'scroll:sheet-background.D', ...['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`])], NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
+  // stroked for (residual 6) — two strokes on the layer, the backgrounded sheet dismissed by the first or not.
+  // Round 7's A5 (a1261499; ios-idb-sheet-a5-1.json, -2.json, ios-idb-vis-a5.json): a list holding UIKit's dismiss
+  // region marks the layer presented, so sheet-medium's A–D and sheet-medium-edges' H and G stop before any swipe —
+  // their six entries struck off (ok in three runs of three). Beneath the large sheet idb's list shows no sign of it:
+  // A's and B's stroke still dismisses it, but scroll_until's changed stop says so and claims nothing — LOUD
+  // (`presented-changed`) on `refused`, no longer a stop claimed on `visible`: known still, the sheet's loss
+  // residual 6's cost; C and D, never dismissed, two strokes as before.
+  ...each('ios idb', ['scroll:sheet-background.A', 'scroll:sheet-background.B'], NOT_YET_IN_TREE, 'presented-changed', 'refused'),
+  ...each('ios idb', ['scroll:sheet-background.C', 'scroll:sheet-background.D', ...['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`])], NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
   // idb lists no carousel (LE2 across, as edges.known.ts files C's replayed rows): strokes across the screen's middle,
   // none moving the carousel, the reply "content exhausted … a layout defect".
   ...each('ios idb', ['scroll:carousel-in-list.C'], LE2, 'R-direction', 'refused'),
