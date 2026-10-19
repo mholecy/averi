@@ -258,9 +258,11 @@ export const dragMs = (m: Extract<DismissalMove, { kind: 'drag' }>): number => M
 /**
  * How far the fallback's drag moves at least, in points: the 120-pt drag measured to hide the keyboard on the Contacts
  * form (ADR 0022), far past a tap's slop and a fraction of a screen of scroll. Further when the target's centre lies
- * deeper under the keyboard: the drag then also LIFTS it — its centre to BLANK_MARGIN above the keyboard's top, plus
- * PAN_SLOP, as far as the area above the keyboard reaches — so a scroll view that does not hide the keyboard on a drag
- * still brings the target out from under it (measured: the lab's form-keyboard, k2 and k3).
+ * deeper: the drag then also LIFTS it — its centre up to the drag's own start, plus PAN_SLOP, as far as the area
+ * above the keyboard reaches. The start is the lowest point of the scroll view that nothing is drawn over, so a centre
+ * lifted to it clears the keyboard AND what rides above it — the lab form's pinned Continue bar, which a lift to the
+ * keyboard's top left over `note` (measured: centre 559 under the bar 516–563, refused). So a scroll view that does
+ * not hide the keyboard on a drag still brings the target out from under it (the lab's form-keyboard, k2 and k3).
  */
 export const DRAG_LENGTH = 120;
 
@@ -279,7 +281,7 @@ const THE_DRAG: DismissalStrategy = {
     const found = await blankPoint(ground);
     if ('skipped' in found) return found;
     if (scrollAxis(found.scroller, ground.look.tree.unclippedFrames === true) === 'horizontal') return { skipped: "the target's scroll view scrolls sideways" };
-    const lift = Math.max(DRAG_LENGTH, found.centre.y - (found.bottom - BLANK_MARGIN) + PAN_SLOP);
+    const lift = Math.max(DRAG_LENGTH, found.centre.y - found.at.y + PAN_SLOP);
     const to = { x: found.at.x, y: Math.max(found.at.y - lift, found.top) };
     if (found.at.y - to.y < 2 * BLANK_MARGIN) return { skipped: 'no room to drag above the keyboard' };
     return { kind: 'drag', what: "the target's scroll view", from: found.at, to };
@@ -289,12 +291,11 @@ const THE_DRAG: DismissalStrategy = {
 /** Averi's own strategies, in order: the guard walks them after a configured move left the keyboard up (the module's doc). */
 export const AVERIS_OWN: readonly DismissalStrategy[] = [THE_DRAG];
 
-/** A blank point found: where, in which scroll view, the top and bottom of the area it was sought in (below the status band, above the keyboard's top), and the target's centre. */
+/** A blank point found: where, in which scroll view, the top of the area it was sought in (below the status band), and the target's centre. */
 interface BlankPoint {
   readonly at: Point;
   readonly scroller: UiNode;
   readonly top: number;
-  readonly bottom: number;
   /** The guarded target's centre on this look. */
   readonly centre: Point;
 }
@@ -364,7 +365,7 @@ async function blankPoint({ look, screen, target }: DismissalGround): Promise<Bl
   const rows: number[] = [];
   for (let y = area.y + BLANK_MARGIN; y <= bottom - BLANK_MARGIN; y += BLANK_MARGIN) rows.push(y);
   rows.reverse();
-  for (const y of rows) for (const x of columns) if (clear({ x, y })) return { at: { x, y }, scroller, top: area.y, bottom, centre: tapPoint(target) };
+  for (const y of rows) for (const x of columns) if (clear({ x, y })) return { at: { x, y }, scroller, top: area.y, centre: tapPoint(target) };
   return { skipped: 'none in the target\'s scroll view above the keyboard' };
 }
 

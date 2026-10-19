@@ -65,28 +65,28 @@ const dropKeyboard = (live: UiNode): void => {
 const COVERED = 'the soft keyboard covered id:lab.form-keyboard.vs';
 
 describe('the guard: when the configured dismissal leaves the keyboard up, averi drags the target\'s scroll view up (the lab form-keyboard capture, k2)', () => {
-  it('a scroll view that keeps its keyboard: the title tapped, then the form dragged UP 120 pt at 240 pt/s from its blank point nearest the keyboard, which lifts vs above it — vs tapped where it now is; the note says where the drag went', async () => {
+  it('a scroll view that keeps its keyboard: the title tapped, then the form dragged UP at 240 pt/s from its blank point nearest the keyboard, far enough to lift vs\'s centre to that point (135 pt) — vs tapped where it now is; the note says where the drag went', async () => {
     const fake = labFake({ lifts: true });
     const result = await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
-    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,382) 500ms', 'tap (201,501)']);
+    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,367) 563ms', 'tap (201,486)']);
     expect(result.keyboardHidden).toBe(
-      `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; dragged the target's scroll view up from (201,502) to (201,382), and the keyboard is still up but no longer over it`,
+      `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; dragged the target's scroll view up from (201,502) to (201,367), and the keyboard is still up but no longer over it`,
     );
   });
 
   it('a scroll view that hides its keyboard on a drag (onDrag, as Contacts): hidden by the drag, then vs tapped', async () => {
     const fake = labFake({ hides: 'drag' });
     const result = await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
-    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,382) 500ms', 'tap (201,621)']);
+    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,367) 563ms', 'tap (201,621)']);
     expect(result.keyboardHidden).toBe(
-      `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; hidden by dragging the target's scroll view up from (201,502) to (201,382) before tapping`,
+      `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; hidden by dragging the target's scroll view up from (201,502) to (201,367) before tapping`,
     );
   });
 
-  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre above the keyboard\'s top, plus the pan\'s slop — 294 pt, not only DRAG_LENGTH — at the same speed, so it takes longer (k3)', async () => {
+  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre to its own start — the lowest point nothing lies over, above the pinned Continue bar — plus the pan\'s slop: 357 pt, not only DRAG_LENGTH — at the same speed, so it takes longer (k3)', async () => {
     const fake = labFake();
     await tapElement(fake, 'id:lab.form-keyboard.note', { ...FAST, dismissals: [TITLE] }).catch(() => undefined);
-    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,208) 1225ms'); // 843 − (573 − 8) + 16 = 294 pt at 240 pt/s
+    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,145) 1488ms'); // 843 − 502 + 16 = 357 pt at 240 pt/s
   });
 
   it('the title already hides it: no drag at all', async () => {
@@ -99,9 +99,9 @@ describe('the guard: when the configured dismissal leaves the keyboard up, averi
     const fake = labFake();
     const error = (await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] }).catch((e: unknown) => e)) as AfterDismissalTap;
     expect(error).toBeInstanceOf(AfterDismissalTap);
-    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,382) 500ms']);
+    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,367) 563ms']);
     expect(error.message).toBe(
-      'Tapped text:"Transfer details" at (201,84), then dragged the target\'s scroll view up from (201,502) to (201,382) to hide the soft keyboard covering ' +
+      'Tapped text:"Transfer details" at (201,84), then dragged the target\'s scroll view up from (201,502) to (201,367) to hide the soft keyboard covering ' +
         'id:lab.form-keyboard.vs, but it is still up: the band [0,573][402,874] still contains the tap point ' +
         `(201,621) on ${KEYBOARD_HIDE_CONFIRM_LOOKS} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart after each; nothing else was done. Those moves may have changed the screen ` +
         '(the keyboard was raised again, an element tapped did something of its own, or a drag scrolled the content) — look at it (ui_snapshot / screenshot) before ' +
@@ -180,7 +180,7 @@ describe('the drag: where it touches down and how far it goes (keyboard-dismissa
     const spacer = node({ role: 'other', rect: { x: 0, y: 300, width: 402, height: 273 } });
     expect(await dragOn(screenWith([spacer]))).toEqual({ from: { x: 201, y: 558 }, to: { x: 201, y: 438 } });
     const dim = node({ role: 'other', rect: { x: 0, y: 300, width: 402, height: 273 } });
-    expect(await dragOn(screenWith([], [dim]))).toEqual({ from: { x: 201, y: 286 }, to: { x: 201, y: 166 } });
+    expect(await dragOn(screenWith([], [dim]))).toEqual({ from: { x: 201, y: 286 }, to: { x: 201, y: 62 } });
   });
 
   it('a hidden subtree (WDA\'s isVisible=0, drawn nowhere — the SwiftUI screen-sized toolbar host) does not stop it', async () => {
@@ -189,7 +189,7 @@ describe('the drag: where it touches down and how far it goes (keyboard-dismissa
   });
 
   it('never past the status band: a lift longer than the room above stops at the area\'s top', async () => {
-    // A keyboard (with an accessory bar) up to y 200: the target's centre 621 asks a lift of 621 − 192 + 16 = 445 pt.
+    // A keyboard (with an accessory bar) up to y 200: the target's centre 621 asks a lift of 621 − 190 + 16 = 447 pt.
     const { tree, target } = screenWith([], [], { x: 0, y: 200, width: 402, height: 674 });
     expect(await dragOn({ tree, target })).toEqual({ from: { x: 201, y: 190 }, to: { x: 201, y: 62 } });
   });
