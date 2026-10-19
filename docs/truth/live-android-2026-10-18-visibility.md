@@ -145,6 +145,9 @@ installed for round 7), harness truth/round-7 `b191055d`, `--side` the branch:
   ~1.9 s each). Before the turn-back fix (`33605fdd`) the stroke back up laid phone under the bar again (a 42-px strip)
   and the scroll ran to its 15-s timeout. After `back` the same call fails on the touch target's overlap with
   "Variable symbol"'s title below it (a cover the tree lists; unchanged, not the eyes').
+- **After review round 1** (`b4a2d151`: every flush edge, the screen-spanning neighbour unasked, the own-margin
+  check, own colour past the band, the centre rule, pixel-by-pixel lines): k7 once more, ok, the same reply
+  (android-k7-eyes-r1.json).
 - **Cost:** one screenshot only on a claim the trigger applies to; an unmoved read after a refused `fully` claim is
   refused again with no second screenshot. Ordinary stops take none (pinned: tests/interact/scroll-eyes.test.ts).
 
