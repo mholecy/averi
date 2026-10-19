@@ -1280,19 +1280,21 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  * The PRESENTED WINDOW the dump is, when its one window shows it is one (types.ts#UiNode.presentation on the root):
  * `uiautomator dump` lists the active window only (`UiNode.activeWindowOnly`), so with a dialog or a bottom sheet up
  * the dump IS that window and the screen beneath is not in it. Read here, where the raw dump is — the scrim's
- * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags (wda-source.ts#presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks,
+ * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags
+ * (wda-source.ts#presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks,
  * #byUiautomator). The window is asked of each recognizer in `PRESENTED_WINDOWS`, in order; the first that knows it
  * names it.
  * Residuals, stated: a fully expanded Compose sheet dumps no scrim (form-picker's country picker: only the sheet and
  *   its drag handle) and is no presented window here; a floating window against the top or the left edge (a popup at
  *   the top-left corner, a bottom-anchored full-width dialog) and a full-screen dialog (dialog-fullscreen: Compose lays
  *   it between the bars against the left edge, no fact telling it from an app's screen) are none either; an app's own
- *   sheet built without Material's dialog layout is none; a window offset on both axes that is the app's own — a
- *   freeform (desktop-mode) window, a compat-mode app boxed on both axes — reads as a `dialog`; an app's own
- *   clickable, labelled leaf laid from its window's top edge at full width, with a full-width sibling under it to the
- *   bottom, reads as a scrim, and an app's own views it gave Material's three ids, laid so, as Material's sheet dialog.
- *   What a mark changes is asked only for a target the tree does not hold
- *   (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false `Tapped`.
+ *   sheet built without Material's dialog layout is none, nor is Material's `SideSheetDialog` (other ids; unmeasured);
+ *   a window offset on both axes that is the app's own — a freeform (desktop-mode) window, a compat-mode app boxed on
+ *   both axes — reads as a `dialog`; an app's own clickable, labelled leaf laid from its window's top edge at full
+ *   width, with a full-width sibling under it to the bottom, reads as a scrim, and an app's own views it gave
+ *   Material's three ids, laid so, as Material's sheet dialog. What a mark changes is asked only for a target the tree
+ *   does not hold (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false
+ *   `Tapped`.
  * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
  */
 function presentedWindow(window: RawNode, rect: Rect): 'dialog' | 'screen' | undefined {

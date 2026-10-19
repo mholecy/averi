@@ -867,11 +867,14 @@ the tap's wait ends with the presented remedy ("a screen is presented over it (a
 **Measured.** Golden over truth/round-7's captures (41302012, `--side` arch/r23-sheet-dialog): 251 → 243 mismatches —
 the 8 rows of `bottom-sheet-dialog.xml` A–D `tap` and `scroll_until` green (LW1's), every other row byte-identical
 (`dialog-fullscreen.xml` unmarked, residual 19). The colour asserts there still fail "not found" (vacuous, KNOWN as no
-note's, as alert-dim's). Live on averi_lab: the lab notes' live record (LW1's Status).
+note's, as alert-dim's). Live on averi_lab, three runs (docs/truth/live-records/android-vis-sheet-dialog-run1.json,
+-run2.json, -run3.json): 13 cases ok each — taps refused with the presented remedy, `scroll_until` stopped before any
+swipe, no stroke, the sheet never dismissed.
 
 **Residuals.** A `BottomSheetDialogFragment` lays the same layout (unmeasured, expected to match); a fully expanded
 sheet dialog (the `>=`) is unmeasured; an app's own sheet built without Material's dialog layout (a custom `Dialog`, a
-Compose `ModalBottomSheet` fully expanded — residual 18) stays unmarked; an app's own views given Material's three ids
+Compose `ModalBottomSheet` fully expanded — residual 18) stays unmarked, as does Material's `SideSheetDialog` (its own
+layout, `m3_side_sheet_dialog.xml`, other ids; unmeasured); an app's own views given Material's three ids
 and laid so read as the sheet dialog.
 
 ## Residuals accepted
@@ -1060,8 +1063,9 @@ and laid so read as the sheet dialog.
    (the amendment "a Views BottomSheetDialog by Material's ids"). What a mark changes is asked only for a target the
    tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped`. Accepted by the owner
    2026-10-18 with the active-window hint (decision 5: a window left unmarked is said as possible on every not-found);
-   the unmeasured shapes — a full-screen dialog, a Views `BottomSheetDialog` — are lab cells to come
-   (docs/plans/2026-10-15-ground-truth-lab-app.md).
+   both shapes then unmeasured were measured in round 7's lab cells (docs/plans/2026-10-15-ground-truth-lab-app.md):
+   the full-screen Compose dialog (dialog-fullscreen) stays unmarked, no fact in its dump; the Views `BottomSheetDialog`
+   (bottom-sheet-dialog) is marked by the amendment "a Views BottomSheetDialog by Material's ids".
 
 ## Bug notes
 
