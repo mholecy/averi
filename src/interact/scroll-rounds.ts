@@ -1,4 +1,4 @@
-import { everyNode, rectArea, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, STRUCTURAL_ROLES, type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
 import { axisOfEdge, containsPoint, flushEdges, quoted, rectIntersection, sameRectWithinPixel, screenOf, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { isScrollViewOf, scrolls } from '../ui-tree/scroll-containers.js';
@@ -6,6 +6,7 @@ import { anotherScreen, screenIdentity, type ScreenIdentity, type SheetDetent } 
 import { eyesQuestion, type EyesAnswer, type EyesFinding, type EyesQuestion, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
+import { fillsScreen } from '../ui-tree/placed.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
@@ -267,7 +268,7 @@ export type ScrollOutcome = (
  * persistence, not being named: the slice's review round 2 found "the touched node names itself" excusing exactly the
  * sheet whose rows carry ids (sheet-long-list's rows given ids, stroked from (201,175) and dismissed — read visible),
  * and replaced it. Never excused: the root, and a structural frame the size of the screen that does not scroll
- * (`SCREEN_SIZED_FRACTION`: idb's `Application`, a window, a dim) — every screen of the app has it, so it persists
+ * (ui-tree/placed.ts#fillsScreen: idb's `Application`, a window, a dim) — every screen of the app has it, so it persists
  * across any change; sheet-background's (201,175) lies on idb's `Application 'AveriLab'` alone. Residuals, stated:
  * - a screen whose reads list no id at all (idb's UIKit table rows, NI1) is never told changed;
  * - RECYCLED ROWS give a loud stop: under idb, which lists no scroll view, a fling that replaces every identified row
@@ -1843,7 +1844,7 @@ function screenChangedUnder(before: IdentifiedRead, after: IdentifiedRead, touch
 /**
  * A touch-down at `point` lay on a node of `tree` (the read before) that PERSISTS in `after` — what the stroke dragged
  * is still there, so it scrolled rather than replaced the screen. The node: not the root, of some area, holding the
- * point, and no structural frame the size of the screen that does not scroll (`SCREEN_SIZED_FRACTION` of the tree's
+ * point, and no structural frame the size of the screen that does not scroll (ui-tree/placed.ts#fillsScreen, of the tree's
  * screen: idb's `Application 'AveriLab'`, a window, a dim — the frame every screen of the app has, persisting across
  * any change). It persists when `after` lists:
  * - for a node with a label and no identifier, a node of the same role and label, unidentified too;
@@ -1855,7 +1856,7 @@ function screenChangedUnder(before: IdentifiedRead, after: IdentifiedRead, touch
  */
 function touchedPersists(tree: UiNode, after: IdentifiedRead, point: Point): boolean {
   const screenArea = rectArea(screenOf(tree));
-  const frame = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.role) && !scrolls(n) && rectArea(n.rect) >= screenArea * SCREEN_SIZED_FRACTION;
+  const frame = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.role) && !scrolls(n) && fillsScreen(n.rect, screenArea);
   const afterNodes = [...everyNode(after.tree)];
   const persists = (n: UiNode): boolean =>
     (n.identifier === null && n.label !== null && afterNodes.some((m) => m.role === n.role && m.identifier === null && m.label === n.label)) ||
