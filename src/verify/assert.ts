@@ -229,7 +229,7 @@ interface PollSpec {
    * the numbers are the finding) — as the pixel poll does for the color and
    * ocr asserts (verify/pixel-poll.ts), which word theirs there.
    */
-  timeoutDetail: (last: { detail?: string; readError?: Error; undecidedTree?: UiNode }) => string;
+  timeoutDetail: (last: { detail?: string; readError?: Error; undecidedTree?: UiNode; lastTree?: UiNode }) => string;
 }
 
 export class Verifier {
@@ -328,12 +328,12 @@ export class Verifier {
       {
         description,
         timeoutMs,
-        timeoutDetail: ({ detail, readError }) => {
-          if (readError !== undefined) return notFound(timeoutMs, readError);
+        timeoutDetail: ({ detail, readError, lastTree }) => {
+          if (readError !== undefined) return notFound(timeoutMs, { readError });
           const base =
             detail !== undefined ?
               `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
-            : notFound(timeoutMs);
+            : notFound(timeoutMs, { lastTree });
           const hint =
             exactText === undefined || hintScope === undefined ?
               undefined
@@ -375,7 +375,7 @@ export class Verifier {
       {
         description,
         timeoutMs,
-        timeoutDetail: ({ detail, readError }) => detail ?? notFound(timeoutMs, readError),
+        timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last),
       },
     );
   }
@@ -508,7 +508,7 @@ export class Verifier {
     return {
       description,
       pass: false,
-      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree }),
+      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree, lastTree: outcome.lastTree }),
     };
   }
 

@@ -349,13 +349,24 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
-  it('tap and the troubleshooting reference quote the active-window hint the tap\'s, fill\'s and scroll_until\'s not-found carry on Android with no window marked presented — not the asserts\' nor a flow\'s wait: steps', async () => {
-    const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+  it('tap, assert and the troubleshooting reference quote the active-window hint every not-found carries on Android with no window marked presented — the waits\', scroll_until\'s, the asserts\', a flow\'s wait: and an optional step\'s skip', async () => {
+    const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/miss.js')>('../../src/ui-tree/miss.js');
     expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it (on every such tap or fill wait on Android, unless the target matched only 0×0 nodes, whose hint takes its place:`);
     expect(description('tap')).toContain(
-      'and so does a flow\'s tap, fill and scroll_until step (the same waits); a skipped optional tap\'s line reads "(not present)", without the hint; a flow\'s wait: steps and the asserts\' "not found" do not.',
+      'as scroll_until\'s "element never appeared in the tree" carries it (its stop under a keyboard over the whole screen too), and so do a flow\'s tap, fill and scroll_until steps (the same waits), a flow\'s wait: on an element (beneath its "Timed out …"), every assert\'s "not found within …" (after it) and a skipped optional step\'s line ("(not present) (…)", or a skipped wait:\'s "Timed out … (…)"): every reply that says a target is not in such a tree, once.',
     );
-    expect(TROUBLESHOOTING).toContain(`\`element never appeared in the tree\` carries \`(${ACTIVE_WINDOW_HINT})\``);
+    expect(description('assert')).toContain(`On Android an assert whose element is not in the tree fails "not found within … (${ACTIVE_WINDOW_HINT})"`);
+    expect(TROUBLESHOOTING).toContain(
+      `\`element never appeared in the tree\` (its stop under a keyboard over the whole screen too), every assert's \`not found within …\`, a flow's \`wait:\` on an element and an optional step's \`(not present)\` (a skipped \`wait:\`'s headline too) carry \`(${ACTIVE_WINDOW_HINT})\``,
+    );
+  });
+
+  it('tap, assert and the troubleshooting reference: an assert and a flow\'s wait: beneath a window listed alone say the presented remedy, as the tap does', () => {
+    // The note is miss.ts's (missNote, quoted by the descriptions from its owner), one phrase with no parenthesis inside.
+    const note = 'a dialog is presented over it, and the tree lists only that window — close it first';
+    expect(description('assert')).toContain(`the parenthesis names it instead: "(${note})"`);
+    expect(description('tap')).toContain(`(a flow's wait: on an element says "(${note})" beneath its "Timed out …", every assert's "not found within …" after it)`);
+    expect(TROUBLESHOOTING).toContain(`An assert's \`not found within …\` and a flow's \`wait:\` on an element say the same remedy, in their parenthesis: \`(${note})\``);
   });
 
   it('scroll_until: one confirming read when the timeout allows, then it fails without swiping further, saying which', () => {

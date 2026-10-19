@@ -157,6 +157,12 @@ export type PollOutcome<T> =
        * is its own wording.
        */
       undecidedTree?: UiNode;
+      /**
+       * The last tree read, whatever the predicate said of it — a round whose read failed leaves it standing, as
+       * `undecidedTree`. For a timeout that words what the tree WAS, not what it held: a not-found on a tree whose
+       * source lists the active window only carries the hint (ui-tree/miss.ts#missOf).
+       */
+      lastTree?: UiNode;
     };
 
 /**
@@ -273,17 +279,19 @@ export async function pollTree<T>(
   let readError: Error | undefined;
   let treesRead = 0;
   let undecidedTree: UiNode | undefined;
+  let lastTree: UiNode | undefined;
   for (;;) {
     const read = await readTreeOrError(adapter);
     readError = read.error;
     if (read.tree !== undefined) {
       treesRead++;
+      lastTree = read.tree;
       const verdict = await predicate(read.tree, { deadline });
       undecidedTree = verdict === Undecided ? read.tree : undefined;
       if (verdict instanceof PollMiss) detail = verdict.detail;
       else if (verdict !== undefined && verdict !== Undecided) return { timedOut: false, value: verdict };
     }
-    if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree };
+    if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree, lastTree };
     await sleep(opts.pollMs);
   }
 }

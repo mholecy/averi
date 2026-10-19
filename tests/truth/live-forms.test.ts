@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { judgeNoteFill, judgePhoneScroll, judgeUnderSheet } from '../../scripts/truth/live-forms.js';
-import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
 // Lab note F2A1's live form cases (scripts/truth/live-forms.ts), over the committed record of round 6's Android device
