@@ -22,9 +22,19 @@ below. The previous iOS run (src b71cbbb, visibility and dismissal): docs/truth/
 # 2026-10-19: k2 and k3 after round 7's A4
 
 k2 and k3 (WDA, LOUD below) are ok 3 of 3 at arch/r23-keyboard: after the configured title tap leaves the keyboard
-up, averi's own fallbacks (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md) tap a blank
-point, then drag the form up until the target lies above the keyboard, and tap / fill it — the run and its records:
-docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md.
+up, averi's own fallback (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md: no
+blank-point tap, no return key) drags the target's scroll view up until the target lies clear of the keyboard, and
+taps / fills it — the run and its records: docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md.
+
+# 2026-10-19: LV4's turn and carousel C after round 7's A1
+
+`ios wda turn:scroll-bounded.F` (LV4, R-direction below) and `ios wda scroll:carousel-in-list.C` (the carousel triage
+note, a stop claimed on a read still moving) are ok 5 of 5 at arch/r23-ios-stop: the turn after ONE unmoved stroke (a
+read within a point is unmoved), C's first stroke cut by the unmeasured carry (2.8 a point, never under 108 pt) and its
+stop judged on the read the fling rests in (docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md, decisions 2, 4
+and 5). Both live KNOWN entries struck off; the records below (ios-vis.json and the 11683c3 smoke runs) now read the
+turn as not known — pinned so in tests/truth/live-rejudge.test.ts. The runs, the visibility group at the new src (no
+regression) and the keyboard forms: docs/truth/live-ios-2026-10-18-one-stroke-stop.md.
 
 # What the check added
 
