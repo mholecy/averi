@@ -344,8 +344,8 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       const clear = standing.clearOf === undefined ? '' : ` clear of ${standing.clearOf.map((n) => coverText(n)).join(' and ')}, listed before it in reading order`;
       const shows =
         standing.largest === undefined
-          ? `nothing of it shows${clear}${above}`
-          : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${clear}${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
+          ? `nothing of it shows${above}${clear}`
+          : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}${clear}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint — or, under
       // a cover whose order the tree does not tell, no scroll.
       const remedy = advice(standing.remedy, (r) => (r.of === 'unordered' ? unorderedRemedy('touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first')));

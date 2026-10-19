@@ -346,8 +346,8 @@ export interface Exposure {
   /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals) that a tap may be aimed at — clear, too, of the controls listed before it in reading order that overlap it (`readingOrderPeers`' `listedBefore`); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
   /**
-   * The controls listed before it in reading order that overlap it (`readingOrderPeers`' `listedBefore`) which `largest`
-   * is cut clear of — in the list's order; empty when none cut what shows of it. Covers or not: one that is no cover
+   * The controls listed before it in reading order that overlap it (`readingOrderPeers`' `listedBefore`) and meet what
+   * shows of it, which the pieces `largest` is chosen from are cut clear of — in the list's order; empty when none meets it. Covers or not: one that is no cover
    * (it holds no part of its centre) still counts in `shows`, so a sentence quoting `largest` names these.
    */
   readonly aimedClearOf: readonly UiNode[];
