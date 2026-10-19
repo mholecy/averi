@@ -256,8 +256,9 @@ this run's own on gRPC 10891 (`IDB_COMPANION=localhost:10891`). Reproduce (outsi
 
 # Round 8, L4's fix: the blur menus on iOS, 2026-10-19
 
-fix/r8-l4 (src 37bf5a15: draw-order.ts#readingOrderCovers — in a listing the parsers mark as reading order, a control
-listed before a control target that overlaps it covers it, its order not told;
+fix/r8-l4 (src 37bf5a15: its `readingOrderCovers` — renamed draw-order.ts#readingOrderPeers by the review's fixes, which also
+gate it on the target's centre and name an overlapping control listed after the target the same way — in a listing the
+parsers mark as reading order, a control listed before a control target that overlaps it covers it, its order not told;
 docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md), run from
 that checkout; the lab app as round 7's final device check installed it (no app change since). The averi-lab iPhone 17
 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 in the lab's own derived data, idb through a companion of this
@@ -287,6 +288,9 @@ run's own on gRPC 10893 (`IDB_COMPANION=localhost:10893`). Reproduce (outside th
 - `tap W` stays LOUD on blur-menu under both sources (refused under C, listed after it): the fix's residual (ADR 0015's
   amendment). The other cases as before: A, B, D beneath the blur Tapped / fully visible (residual 9, each tap logging
   `dismissed menu`), K and the grouped W Tapped.
+- Not run live since: the review's fixes (`f5a28b38` and after) stop `scroll_until` before any swipe under such a cover (C and
+  W), and words W's refusal as overlapped by C, the order not told — measured by the golden only. The records above are
+  `37bf5a15`'s.
 
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped

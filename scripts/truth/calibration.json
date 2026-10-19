@@ -1096,9 +1096,9 @@
       "n": "L4",
       "note": "2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md",
       "status": "calibrate",
-      "fix": ["37bf5a1"],
+      "fix": ["37bf5a1", "f5a28b3", "bea9769"],
       "before": "e0c2587",
-      "after": "37bf5a1",
+      "after": "bea9769",
       "verified": "golden",
       "partial": "C's half, the unsafe direction (C, under the menu row W listed before it in reading order, no longer Tapped / a PASS on W's colour / fully visible); W's half (W refused under C, listed after it — a false refusal) stays open as ADR 0015's residual of its 2026-10-19 amendment: the listing does not tell which of the two is on top",
       "defect": "^Tapped|passed on #00897B|fully visible",
@@ -1123,7 +1123,7 @@
       ],
       "openLive": ["ios idb tap:blur-menu.W", "ios wda tap:blur-menu.W"],
       "expect": "CALIBRATED-ON-DEFECT",
-      "remark": "Fixed by round 8, 37bf5a1 on fix/r8-l4 (draw-order.ts#readingOrderCovers: in a listing the parsers mark as reading order — idb's flat list, a WDA run sorted by top, UiNode.readingOrder — a control listed before a control target that overlaps it covers it, never a target pinned at the bottom; ADR 0015 amended): the pair is 37bf5a1 and its parent e0c2587 (fix/round-8's src). Before: C's tap Tapped (`idb ui tap 201 502`, which fires W), its colour a PASS on #00897B, scroll_until fully visible after 0 swipes. After: each refused as overlapped by W, the order not told — still red, as blur-menu-grouped.wda's C was already: no \"close it first\" (ADR 0018 residual 9, calibration.json #31: the backdrop has no node), so CALIBRATED-ON-DEFECT; refiled in presented.known.ts as that residual. W's six rows unchanged (`open`, filed as this note). Live: C's tap fired W under idb and WDA before, refused after.",
+      "remark": "Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4 (draw-order.ts#readingOrderPeers: in a listing the parsers mark as reading order — idb's flat list, a WDA run sorted by top, UiNode.readingOrder — the controls listed before a control target that overlap it cover it when one holds its centre, every control overlapping it over its centre, before or after, is a cover whose order is not told, and a moved tap is never aimed at one listed before it; never a target pinned at the bottom; ADR 0015 amended): the pair is bea9769 and e0c2587 (fix/round-8's src). Before: C's tap Tapped (`idb ui tap 201 502`, which fires W), its colour a PASS on #00897B, scroll_until fully visible after 0 swipes. After: each refused as overlapped by W, the order not told (scroll_until stopped before any swipe) — still red, as blur-menu-grouped.wda's C was already: no \"close it first\" (ADR 0018 residual 9, calibration.json #31: the backdrop has no node), so CALIBRATED-ON-DEFECT; refiled in presented.known.ts as that residual. W's six rows still red (`open`, filed as this note), now worded as overlapped by C, the order not told, scroll_until stopped before any swipe. Live: C's tap fired W under idb and WDA before, refused after.",
       "live": [
         {
           "platform": "ios",

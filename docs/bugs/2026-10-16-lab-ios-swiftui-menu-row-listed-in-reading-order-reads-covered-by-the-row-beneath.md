@@ -1,22 +1,26 @@
 # BUG: an in-screen SwiftUI menu's row, listed in reading order just before a row of the screen it is drawn over, reads as covered by that row — `tap` refuses it ("under button Target C"), the colour assert fails and `scroll_until` swipes, under idb AND WDA, while a raw tap on it fires it; and the row beneath reads as drawn over the menu row — `Tapped` at its centre, which fires the menu row
 
-> **Status (2026-10-19):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15` (from `fix/round-8`
-> `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual. In a listing given in reading order —
-> idb's flat list, a WDA run of siblings sorted by top (`UiNode.readingOrder`, the parsers' mark) — a control listed
-> BEFORE a control target that overlaps it is a cover of it, never of a target pinned at the screen's bottom
-> (`draw-order.ts#readingOrderCovers`, `Exposure.unordered`; ADR 0015, amended). So C is refused as overlapped by W —
+> **Status (2026-10-19):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
+> (its review's fixes; from `fix/round-8` `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual, now
+> worded as the Expected's fallback. In a listing given in reading order — idb's flat list, a WDA run of siblings sorted
+> by top (`UiNode.readingOrder`, the parsers' mark; on WDA a sort check) — the controls listed BEFORE a control target
+> that overlap it cover it when one of them holds its centre, every control overlapping it over its centre, listed
+> before or after, is a cover whose order is not told, and a tap moved off a covered centre is never aimed at a control
+> listed before it; never for a target pinned at the screen's bottom
+> (`draw-order.ts#readingOrderPeers`, `Exposure.unordered`; ADR 0015, amended). So C is refused as overlapped by W —
 > "overlapped by button "Target W" (51,448 300x64) at its centre (201,502), the two listed in reading order: which is
-> drawn on top is not told" — with no scroll advised (`standing.ts#Remedy`'s `unordered`: "see a screenshot — if the
-> other is drawn over it (a menu, a popover), close it first"). Measured by the golden (C's nine rows on blur-menu.idb,
-> blur-menu.wda and blur-menu-grouped.idb: Tapped / PASS / fully visible → refused / FAIL / failed after 3 swipes, still
-> red as ADR 0018's residual 9 — no "close it first", the backdrop has no node; W's six rows unchanged; 0 new mismatch),
-> by `tests/ui-tree/draw-order-reading-order.test.ts` and `tests/interact/remedy-agreement.test.ts` over these
-> captures, by calibrate (`CALIBRATED-ON-DEFECT`, partial), and live on the lab simulator
-> (`docs/truth/live-records/ios-vis-r8-l4-before.json` — C's tap fired W under idb and WDA at `e0c2587e` —, and
-> `ios-vis-r8-l4-1.json`, `-2.json` at `37bf5a15`: C's tap refused, nothing fired, under both sources and on the grouped
-> variant under idb; C's `scroll_until` three strokes on the blur, which do not close the menu — no dismissal logged).
-> W stays refused under C (C, listed after it, still covers it as draw order): the listing does not tell which of the
-> two is on top, so each now covers the other.
+> drawn on top is not told" — and W as overlapped by C, each with no scroll advised (`standing.ts#Remedy`'s
+> `unordered`: "no scroll tells which is on top: see a screenshot — if the other is drawn over it (a menu, a popover),
+> close it first; if it is the one on top, tap it by coordinates"), and `scroll_until` stops before any swipe. Measured
+> by the golden (15 replies change: C's nine rows on blur-menu.idb, blur-menu.wda and blur-menu-grouped.idb: Tapped /
+> PASS / fully visible → refused / FAIL / stopped before any swipe, still red as ADR 0018's residual 9 — no "close it
+> first" of the presented kind, the backdrop has no node; W's six rows on blur-menu.idb and .wda still red, reworded,
+> its `scroll_until` no longer swiping; 0 new mismatch), by `tests/ui-tree/draw-order-reading-order.test.ts` and
+> `tests/interact/remedy-agreement.test.ts` over these captures, by calibrate (`CALIBRATED-ON-DEFECT`, partial), and
+> live on the lab simulator at `37bf5a15` (`docs/truth/live-records/ios-vis-r8-l4-before.json` — C's tap fired W under
+> idb and WDA at `e0c2587e` —, and `ios-vis-r8-l4-1.json`, `-2.json`: C's tap refused, nothing fired, under both
+> sources and on the grouped variant under idb; C's `scroll_until` then still stroked three times on the blur, which
+> did not close the menu). The review's `scroll_until` stop and W's new wording are not yet measured live.
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/blur-menu.*`, captured by scripts/truth/capture.ts on the dedicated
