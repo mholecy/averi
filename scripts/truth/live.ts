@@ -343,14 +343,14 @@ const FORMS: Omit<Case, 'group'>[] = [
   // its not-found saying the sheet's remedy once — live-forms.ts#judgeMissUnderSheet. Android: the hint is
   // uiautomator's; an iOS run of them is unmeasured.
   ...[
-    { tool: 'assert' as const, args: { asserts: [{ element: { id: 'lab.form-picker.name' }, timeout: 3_000 }] } },
-    { tool: 'assert' as const, args: { asserts: [{ element: { id: 'lab.form-picker.name' }, color: { expected: '#FFFFFF' }, timeout: 5_000 }] } },
-    { tool: 'run_flow' as const, args: { flow: 'wait_name' } },
-  ].map((call, i) => ({
+    { asks: 'an assert on', call: { tool: 'assert' as const, args: { asserts: [{ element: { id: 'lab.form-picker.name' }, timeout: 3_000 }] } } },
+    { asks: 'a colour assert on', call: { tool: 'assert' as const, args: { asserts: [{ element: { id: 'lab.form-picker.name' }, color: { expected: '#FFFFFF' }, timeout: 5_000 }] } } },
+    { asks: "a flow's wait: on", call: { tool: 'run_flow' as const, args: { flow: 'wait_name' } } },
+  ].map(({ asks, call }, i) => ({
     id: `c${i + 5}`,
     cell: 'form-picker',
     platforms: ['android'] as const,
-    says: `${call.tool === 'run_flow' ? "a flow's wait: on" : i === 0 ? 'an assert on' : "a colour assert on"} name beneath the picker sheet, open and fully expanded: it fails, nothing fires, the not-found says to close the sheet once`,
+    says: `${asks} name beneath the picker sheet, open and fully expanded: it fails, nothing fires, the not-found says to close the sheet once`,
     ...(call.tool === 'run_flow' && { flows: { wait_name: { steps: [{ wait: { element: { id: 'lab.form-picker.name' }, timeout: '3s' } }] } } }),
     calls: [call],
     judge: judgeMissUnderSheet('name'),
