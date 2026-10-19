@@ -768,8 +768,10 @@ describe('Scene.standing for the tap — the screen\'s edges, the status band an
     ['…flung to -20 with no band read: reachable at (201,6)', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE_BARE, { kind: 'reachable', at: { x: 201, y: 6 } }],
     // A moved tap never lands in the band: the only uncovered piece (30–62) lies in it — covered, nothing of it shows.
     ['a row 30–100 under a banner at 62–102: covered, its uncovered piece all band', () => swiftIdbWith(30, 70, node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 62, width: 402, height: 40 } })), 'swift_payment.form.priority_select', IPHONE, { kind: 'covered', cover: 'banner' }],
-    // …and the band is cut before the largest piece is chosen: 120–160 below the bar, not the larger 30–90 reaching into it.
-    ['a row 30–160 under a banner at 90–120: moved to the piece below the bar', () => swiftIdbWith(30, 130, node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 90, width: 402, height: 30 } })), 'swift_payment.form.priority_select', IPHONE, { kind: 'reachable', at: { x: 201, y: 140 }, moved: { piece: { x: 24, y: 120, width: 354, height: 40 }, cover: 'banner', aboveKeyboard: false } }],
+    // …and the band is cut before the largest piece is chosen: 120–150 below the bar, not the larger 30–90 reaching into it
+    // (150–160 lies on debit_select 42,150 318x89, listed before the row in idb's reading order: no cover of it — it holds
+    // no part of its centre — but a moved tap is never aimed there, the order of the two not told).
+    ['a row 30–160 under a banner at 90–120: moved to the piece below the bar', () => swiftIdbWith(30, 130, node({ role: 'button', label: 'Banner', identifier: 'banner', rect: { x: 0, y: 90, width: 402, height: 30 } })), 'swift_payment.form.priority_select', IPHONE, { kind: 'reachable', at: { x: 201, y: 135 }, moved: { piece: { x: 24, y: 120, width: 354, height: 30 }, cover: 'banner', aboveKeyboard: false } }],
     // A landscape box is not cut (an iPhone hides its status bar there): a centre at y 30 is tapped.
     ['a landscape box with the band read: (400,30) reachable', () => on(box(874, 402), node({ identifier: 'n', rect: { x: 300, y: 10, width: 200, height: 40 } })), 'n', usable({ box: box(874, 402), boxes: [box(874, 402)], statusBand: 62 }), { kind: 'reachable', at: { x: 400, y: 30 } }],
   ] as const)('%s', async (_name, tree, id, screen, expected) => {

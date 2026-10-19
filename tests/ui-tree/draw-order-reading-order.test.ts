@@ -60,6 +60,24 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     expect(seen.shows).toBe(1);
   });
 
+  it.each([
+    ['idb', 'flat'],
+    ['wda', 'nested'],
+  ])("%s: a moved tap is never aimed at a control listed before the target that overlaps it, its centre clear of it (W 51,390 over C's top, a toast listed after C over its centre)", (_n, shape) => {
+    const w = node({ role: 'button', label: 'W', rect: { x: 51, y: 390, width: 300, height: 40 } });
+    const c = node({ role: 'button', label: 'C', rect: { x: 51, y: 400, width: 300, height: 120 } });
+    const toast = node({ role: 'button', label: 'Toast', rect: { x: 0, y: 440, width: 402, height: 100 } });
+    const t =
+      shape === 'flat'
+        ? node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, readingOrder: true, children: [node({ role: 'other', label: 'Screen', rect: { ...IPHONE } }), w, c, toast] })
+        : node({ role: 'other', rect: { ...IPHONE }, children: [node({ role: 'other', rect: { ...IPHONE }, readingOrder: true, children: [w, c, toast] })] });
+    const seen = drawOrder(t).exposure(c, IPHONE);
+    expect(seen.covers).toEqual([toast]);
+    expect(seen.centreCover).toBe(toast);
+    // The only piece of C clear of the toast, 400–440, lies on W down to 430: 10 pt left, under the 24 a tap needs.
+    expect(seen.tapAt).toBeUndefined();
+  });
+
   it("mp-native's chooser (idb, ADR 0015's capture): the transaction row listed after the card's rows lies under them", () => {
     const t = parseIdbDescribeAll(JSON.stringify(MODAL.screens.chooser));
     const row = [...everyNode(t)].find((n) => n.label?.startsWith('Loan repayment'))!;

@@ -702,7 +702,7 @@ describe('one remedy for a target under a cover whose order is not told — the 
           `only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('touch')}; nothing was tapped`,
       );
       const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [{ tree, found: [w], screen: USABLE }]), 'id:t').message;
-      expect(failure).toMatch(/^scroll_until id:t stopped before any swipe — element is in the viewport but overlapped by button "Target C" .* so none was sent\./);
+      expect(failure).toMatch(/^scroll_until id:t stopped before any swipe — element is in the viewport but overlapped by button "Target C" .*; no swipe was sent — /);
     }
   });
 
@@ -716,7 +716,7 @@ describe('one remedy for a target under a cover whose order is not told — the 
       const row: Row = { tree, found: [c(tree)], screen: USABLE };
       const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row]), 'id:t').message;
       expect(failure).toBe(
-        `scroll_until id:t stopped before any swipe — element is in the viewport but ${OVERLAPPED} — 34% of it shows — ${unorderedRemedy('touch')}, so none was sent. ` +
+        `scroll_until id:t stopped before any swipe — element is in the viewport but ${OVERLAPPED} — 34% of it shows; no swipe was sent — ${unorderedRemedy('touch')}. ` +
           'Last rect {"x":51,"y":470,"width":300,"height":64} in a 402x874 viewport',
       );
     }

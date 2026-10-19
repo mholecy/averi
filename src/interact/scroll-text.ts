@@ -554,7 +554,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       return {
         message:
           `scroll_until ${describe} stopped ${when} — element is in the viewport but ${coverClause(judged.standing.facts, o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ` +
-            `${percent(judged.standing.facts.shows)}% of it shows — ${unorderedRemedy('touch')}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+            `${percent(judged.standing.facts.shows)}% of it shows; ${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${unorderedRemedy('touch')}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

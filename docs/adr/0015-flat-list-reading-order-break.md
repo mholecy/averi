@@ -1,6 +1,6 @@
 # 15. A reading-order break in idb's flat list ends what covers a content target
 
-Status: accepted, 2026-10-09 (owner). Amended 2026-10-19 (round 8, L4; owner's decision in the round's brief): two
+Status: accepted, 2026-10-09 (owner). Amended 2026-10-19 (owner, round 8, L4: the menu row's false refusal accepted as a residual): two
 controls overlapping in a reading-order listing are covers of each other whose order is not told — see "Amendment:
 covers listed before the target" below. The reading BREAK below still meets idb's flat list only; the amendment's rule
 meets WDA's nested tree too (its residual "WDA's nested tree and Android's never meet this rule" holds for the break
@@ -62,7 +62,12 @@ container lists flat there too.
   - those listed BEFORE it are covers of it when one of them holds its centre (the draw order alone gives them not):
     C, under W. Only then: siblings that only overlap the target's edges by a few points (a card's shadow, an avatar
     stack, a badge) would else fail its colour assert and every `fully` stop on a cover that may lie beneath it;
-  - those listed AFTER it are covers by the draw order already, and are named so too: W, under C.
+  - those listed AFTER it are covers by the draw order already, and are named so too where they hold its centre: W,
+    under C. One that only pokes over its edge (a floating button in idb's flat list, not pinned by shape) keeps the
+    draw order's remedy, a scroll;
+  - and a tap moved off a covered centre is never aimed at one listed before it, cover or not (`Exposure.tapAt`,
+    `largest`): W `51,690 300x40` listed before C `51,700 300x120` under a pinned Continue had C's tap moved to
+    (201,720), on W — now refused, only a 300x10 part of C clear of both.
 - Never for a target PINNED at the screen's bottom (`bottomPinned`'s shape, on either listing): a pinned bar is drawn
   over what scrolls under it, listed before it or not — the pinned-bar cell's Continue (idb and WDA), the text-under-bar
   cell and the SWIFT form's CONTINUE keep their covers as before.
