@@ -1401,6 +1401,14 @@
     {
       "note": "2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md",
       "why": "lab finding LV6: WDA parks a below-the-fold row's elements at the sheet's origin moved by the table's offset, above the screen once it has scrolled — live only (live.ts --udid, case carry:sheet-long-list.Row30 under WDA): the golden captures each cell at rest, where the parked frame lies inside the table"
+    },
+    {
+      "note": "2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md",
+      "why": "lab finding LR1, calibrated on truth/round-7 (row LR1): its golden rows' captures (ios-rn-iphone17-ios27) live there, not on this src line — listed here only so this table holds every note; drop this line when merging into truth"
+    },
+    {
+      "note": "2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md",
+      "why": "lab finding LR2, calibrated on truth/round-7 (row LR2): its golden rows' captures (android-rn-averi_lab-api33) live there, not on this src line — listed here only so this table holds every note; drop this line when merging into truth"
     }
   ]
 }
