@@ -1339,15 +1339,10 @@ const composeSheetScrim: PresentedWindowRecognizer = {
   as: 'screen',
   holds: (window, rect) =>
     someAdjacentPair(window, (_parent, scrim, sheet) => {
-      const s = parseBounds(scrim.bounds);
-      const below = parseBounds(sheet.bounds);
-      return (
-        scrim.clickable === 'true' &&
-        emptyToNull(scrim['content-desc']) !== null &&
-        childrenOf(scrim).length === 0 &&
-        s.x === rect.x && s.width === rect.width && s.y === rect.y && s.height > 0 &&
-        below.x === rect.x && below.width === rect.width && below.y + below.height === rect.y + rect.height && below.y > s.y && below.y <= s.y + s.height
-      );
+      const pair = scrimAndSheet(scrim, sheet);
+      if (pair === undefined || emptyToNull(scrim['content-desc']) === null) return false;
+      const { s, below } = pair;
+      return s.x === rect.x && s.width === rect.width && s.y === rect.y && below.y + below.height === rect.y + rect.height && below.y > s.y && below.y <= s.y + s.height;
     }),
 };
 
@@ -1368,16 +1363,24 @@ const materialSheetDialog: PresentedWindowRecognizer = {
   holds: (window) =>
     someAdjacentPair(window, (parent, scrim, sheet) => {
       if (idEntry(parent) !== 'coordinator' || idEntry(scrim) !== 'touch_outside' || idEntry(sheet) !== 'design_bottom_sheet') return false;
-      const s = parseBounds(scrim.bounds);
-      const below = parseBounds(sheet.bounds);
-      return (
-        scrim.clickable === 'true' &&
-        childrenOf(scrim).length === 0 &&
-        s.height > 0 &&
-        below.x === s.x && below.width === s.width && below.y + below.height === s.y + s.height && below.y >= s.y && below.height > 0
-      );
+      const pair = scrimAndSheet(scrim, sheet);
+      if (pair === undefined) return false;
+      const { s, below } = pair;
+      return below.y + below.height === s.y + s.height && below.y >= s.y && below.height > 0;
     }),
 };
+
+/**
+ * What both sheet recognizers ask of a scrim and the sibling after it, with their bounds: the scrim a clickable,
+ * childless node of some height, the sheet as wide as it and at its left (`composeSheetScrim` lays the scrim at the
+ * window's width, so its sheet spans the window too). Where the sheet's top and bottom lie is each recognizer's own.
+ */
+function scrimAndSheet(scrim: RawNode, sheet: RawNode): { s: Rect; below: Rect } | undefined {
+  if (scrim.clickable !== 'true' || childrenOf(scrim).length > 0) return undefined;
+  const s = parseBounds(scrim.bounds);
+  const below = parseBounds(sheet.bounds);
+  return s.height > 0 && below.x === s.x && below.width === s.width ? { s, below } : undefined;
+}
 
 /** The recognizers `presentedWindow` asks, in order. */
 const PRESENTED_WINDOWS: readonly PresentedWindowRecognizer[] = [floatingDialog, composeSheetScrim, materialSheetDialog];
