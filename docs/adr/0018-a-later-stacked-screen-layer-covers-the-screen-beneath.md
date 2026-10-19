@@ -797,10 +797,39 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    open over the screen, close it first)` — beneath the tap's, fill's and the presence check's "Timed out … to appear"
    (interact/resolve.ts#notFound, in the hint's place; a zero-area match's hint, which says the target IS in the
    tree, takes it first) and after `scroll_until`'s "element never appeared in the tree" (scroll-text.ts, the
-   `absent` shortfall). One constant (ui-tree/standing.ts#ACTIVE_WINDOW_HINT); never under WDA or idb. A possibility,
+   `absent` shortfall). One constant (ui-tree/miss.ts#ACTIVE_WINDOW_HINT); never under WDA or idb. A possibility,
    not a cause: it rides on every such wait and `scroll_until` on Android, a plain screen's too, and the wait's class
-   is unchanged (absence). The asserts' "not found within …" (verify/poll-verdict.ts) and a flow's `wait:` timeouts
-   do not carry it — an assert of absence passes there, and the hint would point the wrong way.
+   is unchanged (absence). ~~The asserts' "not found within …" (verify/poll-verdict.ts) and a flow's `wait:` timeouts
+   do not carry it — an assert of absence passes there, and the hint would point the wrong way.~~ Refined in round 7
+   (2026-10-18, the orchestrator's decision under the owner's delegation): EVERY reply that says a target is not in
+   such a tree says what that miss saw, once — the reason above was the absent assert's, which passes there and says
+   no not-found, so it never applied to "not found". One module decides it and words it (ui-tree/miss.ts): `missOf`,
+   of the LAST read the miss made (ui-tree/read-tree.ts#pollTree's `lastTree`), answers one of `unread` (the read
+   error is the story), `zeroArea` (the caller's 0×0 match, which says the target IS in the tree), `presented` (a
+   window listed alone — decision 4's remedy), `activeWindow` (this hint) or `none` (WDA, idb), in that precedence;
+   `missNote` words it; the replies only pick the layout — beneath a thrown poll timeout's headline (the tap's, fill's
+   and presence check's wait, a flow's `wait:` on a present element), after a one-line not-found in a parenthesis
+   (`withMissNote`: `scroll_until`'s "element never appeared in the tree", its `covered` stop under a keyboard over
+   the whole screen included; every assert's `not found within …`, verify/poll-verdict.ts#notFound; an optional
+   step's skip, `(not present) (…)`, and a skipped `wait:`'s `Timed out … (…)`, read off the `Miss` the error carries,
+   `missCarried`), or — the tap's and fill's wait on a `presented` miss only — in place of the headline
+   (`presentedAloneHeadline`, decision 4's words unchanged). So beneath a dialog or a sheet the tree lists alone the
+   asserts and a `wait:` now say decision 4's remedy, as the tap does, in one phrase with no parenthesis inside (it sits
+   in one): `(a dialog is presented over it, and the tree lists only that window — close it first)`, a sheet `a sheet
+   or modal is presented over it, …` (round 2, the orchestrator's MINOR-B); and the hint where the tree marks no
+   window. An optional step skipped on a zero-area match says that note too, `(not present) (it matched only 0×0
+   nodes … — if it is in a scroll view, scroll_until it first)` — kept on purpose: the agent learns to scroll first. Not
+   carried: an assert whose element is found with the wrong content, an absent assert, a `wait:` on a state, a wait
+   whose last tree was bare (its note claims the line). Golden (truth/round-7 4130201, `--side` this branch): 1380
+   checks, 251 mismatches before and after; wording only, the 23 Android colour rows that end `not found within 1 s`
+   — alert-dim A–D and sheet-medium A–D the presented remedy (golden rerun after the rewording: below), bottom-sheet-dialog A–D, dialog-fullscreen A–D,
+   carousel-in-list B and U, scroll-bounded F and O, scroll-top-edge(-end) A and tabbar-floating F the hint; no class,
+   kind or device call moved, and every tap, fill and `scroll_until` reply is byte-identical. Rerun after the rewording
+   (truth/round-7 5c71158): 1410 checks, 259 mismatches before and after, the same 23 rows, wording only.
+   Live on averi_lab 2026-10-19 (docs/truth/live-android-2026-10-19-hint-everywhere.md): form-picker c2–c4 ok; under
+   its sheet the element, text and color asserts, a flow's `wait:` and an optional tap each said it once, nothing fired;
+   again at e726c77 with the module, plus an optional `wait:` (the hint after its headline) and alert-dim's A (the
+   asserts and `wait:` the presented remedy, the tap's reply unchanged), nothing fired.
    Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
    name, country, submit and country.ST; scroll-bounded O, F; carousel-in-list B, U; scroll-top-edge(-end) A;
    tabbar-floating F; text-under-bar P — tap and scroll_until each); form-picker's three taps, which the presented row
@@ -810,6 +839,43 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
 
 **Residuals** 18 and 19 ("Residuals accepted" below — accepted by the owner 2026-10-18, with decision 5's hint): a fully
 expanded sheet is no presented window; the shapes are measured on one AVD and Material 3 only.
+
+## Amendment: a Views BottomSheetDialog by Material's ids (2026-10-19)
+
+Lab note LW1 (docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md,
+round 7's cell `presented/bottom-sheet-dialog`, Material Components 1.13.0 on averi_lab): a Views `BottomSheetDialog`
+dumps its window at 0,0 the screen's size, and in it, under `…:id/coordinator` `[0,66][1080,2154]`, the scrim
+`…:id/touch_outside` (clickable, childless, UNLABELLED — `NAF="true"`) at the coordinator's bounds, followed at once by
+`…:id/design_bottom_sheet` `[0,1164][1080,2154]`. Decision 2's `screen` rule failed three ways — no label, the scrim from
+y 66 not the window's top, the sheet ending at 2154 above the navigation bar's background, not at the window's bottom —
+so the window was unmarked: the taps timed out "to appear" with the hint, and `scroll_until` for a target beneath the
+scrim stroked up from (540,444), ON the scrim, dismissed the sheet and reported the target "fully visible after 1 swipe".
+
+**Decision.** Decision 2 gains a second `screen`, the Views sheet dialog, read by Material's own layout
+(`design_bottom_sheet_dialog.xml`): a clickable, childless node whose resource-id's ENTRY is `touch_outside`, followed
+at once by its sibling whose entry is `design_bottom_sheet`, both children of an entry `coordinator`; the sheet of the
+scrim's left, width and bottom, its top inside the scrim — at or below the scrim's top (a fully expanded sheet starts
+where the scrim does) — and of some height. Read against the SCRIM's edges, not the window's (the coordinator fits the
+bars); by the entry, not the full id (the package is the app's; the ids are never localized). Not a relaxation of the
+labelled scrim to unlabelled leaves: an unlabelled full-width clickable leaf over a full-width sibling is common app
+content, and the label was that rule's guard — the ids are this one's. The parser now asks the window of an ordered
+list of named recognizers (`android.ts#PRESENTED_WINDOWS`: `floatingDialog`, `composeSheetScrim`, `materialSheetDialog`),
+the one place that answers whether the window is presented and as what. Decisions 3 and 4 read the mark as any other:
+the tap's wait ends with the presented remedy ("a screen is presented over it (a modal or a sheet) — close it first"),
+`scroll_until` stops before any stroke — none on the scrim, so nothing is dismissed.
+
+**Measured.** Golden over truth/round-7's captures (41302012, `--side` arch/r23-sheet-dialog): 251 → 243 mismatches —
+the 8 rows of `bottom-sheet-dialog.xml` A–D `tap` and `scroll_until` green (LW1's), every other row byte-identical
+(`dialog-fullscreen.xml` unmarked, residual 19). The colour asserts there still fail "not found" (vacuous, KNOWN as no
+note's, as alert-dim's). Live on averi_lab, three runs (docs/truth/live-records/android-vis-sheet-dialog-run1.json,
+-run2.json, -run3.json): 13 cases ok each — taps refused with the presented remedy, `scroll_until` stopped before any
+swipe, no stroke, the sheet never dismissed.
+
+**Residuals.** A `BottomSheetDialogFragment` lays the same layout (unmeasured, expected to match); a fully expanded
+sheet dialog (the `>=`) is unmeasured; an app's own sheet built without Material's dialog layout (a custom `Dialog`, a
+Compose `ModalBottomSheet` fully expanded — residual 18) stays unmarked, as does Material's `SideSheetDialog` (its own
+layout, `m3_side_sheet_dialog.xml`, other ids; unmeasured); an app's own views given Material's three ids
+and laid so read as the sheet dialog.
 
 ## Residuals accepted
 
@@ -993,11 +1059,13 @@ expanded sheet is no presented window; the shapes are measured on one AVD and Ma
    landscape window beside a cutout, a letterboxed or pillarboxed compat-mode app, a split screen's lower window) is
    not; an app's own clickable, labelled leaf laid from its window's top edge
    at full width, with a full-width sibling under it to the bottom, reads as a scrim; a Views `BottomSheetDialog`'s
-   `touch_outside` holds by the rule only if labelled (unmeasured). What a mark changes is asked only for a target the
+   `touch_outside` fails the rule labelled or not (measured 2026-10-19), and is marked by Material's view ids instead
+   (the amendment "a Views BottomSheetDialog by Material's ids"). What a mark changes is asked only for a target the
    tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped`. Accepted by the owner
    2026-10-18 with the active-window hint (decision 5: a window left unmarked is said as possible on every not-found);
-   the unmeasured shapes — a full-screen dialog, a Views `BottomSheetDialog` — are lab cells to come
-   (docs/plans/2026-10-15-ground-truth-lab-app.md).
+   both shapes then unmeasured were measured in round 7's lab cells (docs/plans/2026-10-15-ground-truth-lab-app.md):
+   the full-screen Compose dialog (dialog-fullscreen) stays unmarked, no fact in its dump; the Views `BottomSheetDialog`
+   (bottom-sheet-dialog) is marked by the amendment "a Views BottomSheetDialog by Material's ids".
    **Measured 2026-10-19** (round 7's lab cells `presented/dialog-fullscreen`, `presented/bottom-sheet-dialog`, averi_lab;
    docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md):
    a full-screen Compose `Dialog` (`usePlatformDefaultWidth = false`) is laid by Compose between the bars at full width,
@@ -1021,3 +1089,4 @@ docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-t
 docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md
 docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
 docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
+docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PresentationKind } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
-import { ACTIVE_WINDOW_HINT, presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by

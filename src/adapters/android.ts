@@ -1280,53 +1280,119 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  * The PRESENTED WINDOW the dump is, when its one window shows it is one (types.ts#UiNode.presentation on the root):
  * `uiautomator dump` lists the active window only (`UiNode.activeWindowOnly`), so with a dialog or a bottom sheet up
  * the dump IS that window and the screen beneath is not in it. Read here, where the raw dump is — the scrim's
- * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags (wda-source.ts
- * #presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks, #byUiautomator).
- * - `dialog`: a window of some area that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES — its left edge past x 0 AND its
- *   top edge past y 0. An app's window lies against at least one of the screen's top and left edges: a phone's
- *   full-screen window at 0,0 whatever its bars, and also one offset on ONE axis only — a landscape window beside a
- *   cutout the app does not draw into, a letterboxed or pillarboxed compat-mode app on a tablet or a foldable, the lower
- *   window of a split screen. A dialog laid in the middle floats off both. Measured: the lab's Compose AlertDialog,
- *   `[155,851][925,1368]` on 1080x2220 (alert-dim); a touch outside it dismisses it. Why not "smaller than the screen",
- *   the round-5 plan: the parser has no screen size — the adapter's `wm size` is memoized as a pending read
- *   (viewport-memo.ts), with no answer to peek at before a tree's first read, and awaiting it would add an adb call
- *   before the first dump and make the mark depend on which verb read first.
- * - `screen`: a full-screen window whose content lays a SCRIM above a SHEET — some node's child that is clickable,
- *   labelled and childless, spanning the window's width from its top edge, followed at once by a sibling spanning
- *   the width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the lab's half-expanded
- *   Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"` `[0,0][1080,1110]`, the sheet
- *   `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height.
- * Residuals, stated: a fully expanded sheet dumps no scrim (form-picker's country picker: only the sheet and its
- *   drag handle) and is no presented window here; a floating window against the top or the left edge (a popup at the
- *   top-left corner, a bottom-anchored full-width dialog) and a full-screen dialog are none either; a window offset on
- *   both axes that is the app's own — a freeform (desktop-mode) window, a compat-mode app boxed on both axes — reads as
- *   a `dialog`; an
- *   app's own clickable, labelled leaf laid from its window's top edge at full width, with a full-width sibling under it
- *   to the bottom, reads as a scrim. What a mark changes is asked only for a target the tree does not hold
- *   (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false `Tapped`.
+ * `clickable` never reaches the normalized tree — as the WDA parser reads WDA's own flags
+ * (wda-source.ts#presentedLayers); the presentation module reads the mark (ui-tree/presentation.ts#byMarks,
+ * #byUiautomator). The window is asked of each recognizer in `PRESENTED_WINDOWS`, in order; the first that knows it
+ * names it.
+ * Residuals, stated: a fully expanded Compose sheet dumps no scrim (form-picker's country picker: only the sheet and
+ *   its drag handle) and is no presented window here; a floating window against the top or the left edge (a popup at
+ *   the top-left corner, a bottom-anchored full-width dialog) and a full-screen dialog (dialog-fullscreen: Compose lays
+ *   it between the bars against the left edge, no fact telling it from an app's screen) are none either; an app's own
+ *   sheet built without Material's dialog layout is none, nor is Material's `SideSheetDialog` (other ids; unmeasured);
+ *   a window offset on both axes that is the app's own — a freeform (desktop-mode) window, a compat-mode app boxed on
+ *   both axes — reads as a `dialog`; an app's own clickable, labelled leaf laid from its window's top edge at full
+ *   width, with a full-width sibling under it to the bottom, reads as a scrim, and an app's own views it gave
+ *   Material's three ids, laid so, as Material's sheet dialog. What a mark changes is asked only for a target the tree
+ *   does not hold (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false
+ *   `Tapped`.
  * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
  */
 function presentedWindow(window: RawNode, rect: Rect): 'dialog' | 'screen' | undefined {
   if (rectArea(rect) === 0) return undefined;
-  if (rect.x > 0 && rect.y > 0) return 'dialog';
-  const childrenOf = (n: RawNode): RawNode[] => (n.node === undefined ? [] : Array.isArray(n.node) ? n.node : [n.node]);
-  const bottom = rect.y + rect.height;
-  const scrimAbove = (scrim: RawNode, sheet: RawNode): boolean => {
-    const s = parseBounds(scrim.bounds);
-    const below = parseBounds(sheet.bounds);
-    return (
-      scrim.clickable === 'true' &&
-      emptyToNull(scrim['content-desc']) !== null &&
-      childrenOf(scrim).length === 0 &&
-      s.x === rect.x && s.width === rect.width && s.y === rect.y && s.height > 0 &&
-      below.x === rect.x && below.width === rect.width && below.y + below.height === bottom && below.y > s.y && below.y <= s.y + s.height
-    );
-  };
-  const holds = (n: RawNode): boolean => {
-    const kids = childrenOf(n);
-    return kids.some((kid, i) => i + 1 < kids.length && scrimAbove(kid, kids[i + 1])) || kids.some(holds);
-  };
-  return holds(window) ? 'screen' : undefined;
+  return PRESENTED_WINDOWS.find((r) => r.holds(window, rect))?.as;
+}
+
+/** One kind of presented window the dump can show: what it is presented as, and whether this window is one. */
+interface PresentedWindowRecognizer {
+  as: 'dialog' | 'screen';
+  /** `window` the dump's one window, raw; `rect` its bounds as normalized, of some area. */
+  holds(window: RawNode, rect: Rect): boolean;
+}
+
+/**
+ * A window that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES — its left edge past x 0 AND its top edge past y 0 — is a
+ * `dialog`. An app's window lies against at least one of the screen's top and left edges: a phone's full-screen window
+ * at 0,0 whatever its bars, and also one offset on ONE axis only — a landscape window beside a cutout the app does not
+ * draw into, a letterboxed or pillarboxed compat-mode app on a tablet or a foldable, the lower window of a split
+ * screen. A dialog laid in the middle floats off both. Measured: the lab's Compose AlertDialog, `[155,851][925,1368]`
+ * on 1080x2220 (alert-dim); a touch outside it dismisses it. Why not "smaller than the screen", the round-5 plan: the
+ * parser has no screen size — the adapter's `wm size` is memoized as a pending read (viewport-memo.ts), with no answer
+ * to peek at before a tree's first read, and awaiting it would add an adb call before the first dump and make the mark
+ * depend on which verb read first.
+ */
+const floatingDialog: PresentedWindowRecognizer = {
+  as: 'dialog',
+  holds: (_window, rect) => rect.x > 0 && rect.y > 0,
+};
+
+/**
+ * A full-screen window whose content lays a SCRIM above a SHEET is a `screen`: some node's child that is clickable,
+ * labelled and childless, spanning the window's width from its top edge, followed at once by a sibling spanning the
+ * width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the lab's half-expanded
+ * Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"` `[0,0][1080,1110]`, the sheet
+ * `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height. The label is the guard: an unlabelled
+ * full-width clickable leaf over a full-width sibling is common app content (a card's touch layer).
+ */
+const composeSheetScrim: PresentedWindowRecognizer = {
+  as: 'screen',
+  holds: (window, rect) =>
+    someAdjacentPair(window, (_parent, scrim, sheet) => {
+      const s = parseBounds(scrim.bounds);
+      const below = parseBounds(sheet.bounds);
+      return (
+        scrim.clickable === 'true' &&
+        emptyToNull(scrim['content-desc']) !== null &&
+        childrenOf(scrim).length === 0 &&
+        s.x === rect.x && s.width === rect.width && s.y === rect.y && s.height > 0 &&
+        below.x === rect.x && below.width === rect.width && below.y + below.height === rect.y + rect.height && below.y > s.y && below.y <= s.y + s.height
+      );
+    }),
+};
+
+/**
+ * A Views `BottomSheetDialog` (Material Components' own layout, `design_bottom_sheet_dialog.xml`) is a `screen`: under
+ * a `…:id/coordinator`, a clickable, childless `…:id/touch_outside` scrim followed at once by its sibling
+ * `…:id/design_bottom_sheet`, the sheet of the scrim's left, width and bottom, its top inside the scrim — at or below
+ * the scrim's top (a fully expanded sheet starts where the scrim does; unmeasured). Read by the ids' ENTRIES, never
+ * localized (the package is the app's), and against the SCRIM's edges, not the window's: the coordinator fits the
+ * system bars. Measured: the lab's sheet over its slots (bottom-sheet-dialog, Material 1.13.0), the window
+ * `[0,0][1080,2220]`, `touch_outside` `[0,66][1080,2154]` UNLABELLED (`NAF="true"`), the sheet `[0,1164][1080,2154]`;
+ * a touch on the scrim dismisses the sheet. The ids are the guard `composeSheetScrim`'s label is — the scrim rule is
+ * not relaxed to unlabelled leaves. A `BottomSheetDialogFragment` lays the same layout (unmeasured).
+ * docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md
+ */
+const materialSheetDialog: PresentedWindowRecognizer = {
+  as: 'screen',
+  holds: (window) =>
+    someAdjacentPair(window, (parent, scrim, sheet) => {
+      if (idEntry(parent) !== 'coordinator' || idEntry(scrim) !== 'touch_outside' || idEntry(sheet) !== 'design_bottom_sheet') return false;
+      const s = parseBounds(scrim.bounds);
+      const below = parseBounds(sheet.bounds);
+      return (
+        scrim.clickable === 'true' &&
+        childrenOf(scrim).length === 0 &&
+        s.height > 0 &&
+        below.x === s.x && below.width === s.width && below.y + below.height === s.y + s.height && below.y >= s.y && below.height > 0
+      );
+    }),
+};
+
+/** The recognizers `presentedWindow` asks, in order. */
+const PRESENTED_WINDOWS: readonly PresentedWindowRecognizer[] = [floatingDialog, composeSheetScrim, materialSheetDialog];
+
+const childrenOf = (n: RawNode): RawNode[] => (n.node === undefined ? [] : Array.isArray(n.node) ? n.node : [n.node]);
+
+/** Whether some node of `root`'s subtree has two children, one followed at once by the other, that `pair` accepts. */
+function someAdjacentPair(root: RawNode, pair: (parent: RawNode, first: RawNode, next: RawNode) => boolean): boolean {
+  const kids = childrenOf(root);
+  return kids.some((kid, i) => i + 1 < kids.length && pair(root, kid, kids[i + 1])) || kids.some((kid) => someAdjacentPair(kid, pair));
+}
+
+/** A view id's entry name — `touch_outside` of `com.bank.app:id/touch_outside` — or undefined for no `…:id/…` id. */
+function idEntry(n: RawNode): string | undefined {
+  const id = n['resource-id'] ?? '';
+  const at = id.indexOf(':id/');
+  return at < 0 ? undefined : id.slice(at + ':id/'.length);
 }
 
 /**

@@ -90,7 +90,7 @@ text` fails on non-ASCII, LOUD).
 5. **ADR 0018's residuals 18 and 19 — accepted,** with an honest hint on the tap's and fill's wait ("… to appear") and
    `scroll_until`'s "element never appeared in the tree" on uiautomator, where the presented window's words do not
    claim them (not the asserts' "not found", nor a flow's `wait:`): `(the tree lists only the active window: if a sheet or a dialog is open over the
-   screen, close it first)` (ui-tree/standing.ts#ACTIVE_WINDOW_HINT). `form-picker`'s six rows are filed as residual
+   screen, close it first)` (ui-tree/miss.ts#ACTIVE_WINDOW_HINT). `form-picker`'s six rows are filed as residual
    18; lab cells for a full-screen dialog and a Views `BottomSheetDialog` are planned.
 
 # The active-window hint, run live (round 6's closing review)

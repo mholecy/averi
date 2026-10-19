@@ -1,8 +1,14 @@
 # BUG: under WDA, once a UIKit table has scrolled, the text of a row below the fold is parked ABOVE the screen — averi reads the row there, strokes away from it and turns until the budget runs out
 
-> **Status (2026-10-18):** open; measured live only (round 6's iOS device check). KNOWN as this note
-> (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.Row30` (since round 7 `carry:sheet-long-list.L`), R-direction: three turns in every run). Not a carry-model fault (ADR 0021 decision 4):
-> the carry case was built to measure that model, and this defect comes first — averi never sees where the row is.
+> **Status (2026-10-19):** fixed at a1b0b82 (arch/r23-parked: src/adapters/wda-source.ts#atParkedFrame, ADR 0019
+> "Amendment: the parked frame of a scrolled table"). Measured on the two raw trees (Row 30 at its cell, 0,1708 and
+> 0,1460; a parser sweep over every raw WDA capture moves exactly the parked elements) and live on the lab sim with
+> truth/round-7's 56-row app (461d6fd): `ios wda carry:sheet-long-list.L` and `scroll:sheet-long-list.L` no longer turn
+> — two strokes down, no turn, in 3 of 3 runs, both cases KNOWN-but-ok (records docs/truth/live-records/
+> ios-wda-long-list-parked-1…3.json); the WDA visibility group 146 cases, 128 ok, 1 loud, 17 mismatches, 0 not known
+> (ios-wda-vis-parked.json). Their LV6 KNOWN entries (scripts/truth/live-known.ts) go at merge. What the carry case
+> now measures is ADR 0021 decision 4's carry: run 1 rested at 1933.7, 14 pt past L's window (L 78% shown, the reply
+> says "CLIPPED at top"), runs 2 and 3 inside it (1917.3, 1903.3) — the carry model's, not this note's.
 
 Lab note LV6. **Found 2026-10-18** by round 6's iOS device check: the live golden's new long-list carry case
 (scripts/truth/live-visibility.ts#CARRY: `scroll_until text:"Row 30"`, `down`, on `sheet-long-list`) on the
@@ -76,3 +82,9 @@ view's top moved up by any amount, its x and size the cell's.
   (asked by id; round 6's `Row30` case gone), KNOWN as this note, with L's own scroll case: two live runs, each turned
   three times, L's label parked above the screen as Target F's was (docs/truth/live-ios-2026-10-19-lab-fixes.md,
   docs/truth/live-records/ios-long-list-r7-lab-1.json, -2.json).
+- Fix (2026-10-19, round 7 A2): a parked element lies at the scroll view's PARKED FRAME — its content origin, inside
+  the view at rest, wholly above it at its left edge once scrolled; nothing else widened (src/adapters/wda-source.ts
+  #atParkedFrame; tests/adapters/wda-source-visibility.test.ts, tests/interact/parked-cell-content.test.ts: the at-rest
+  read then 273 and 522 pt, three strokes down, no turn; the scrolled tap refused BELOW the screen). One element of the
+  273 tree stays parked: Target R, whose cell at 0,-148 meets its parked frame 0,-212 by a point (ADR 0019 residual 4),
+  above the screen either way. The golden harness gives byte-identical replies (its captures are at launch).

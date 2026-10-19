@@ -91,7 +91,7 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
  * Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and no `Tapped`. What the
  * reply must say then is per tree source, as much as the source can know: WDA marks the sheet, so the presented remedy
  * ("close it first", once); uiautomator's dump marks no presented window here (no scrim: ADR 0018's residual 18,
- * accepted with the active-window hint), so the hint (src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT), once; idb lists the
+ * accepted with the active-window hint), so the hint (src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT), once; idb lists the
  * presented sheet alone and carries no mark (ADR 0018, "iOS unchanged"; measured live 2026-10-19,
  * docs/truth/live-ios-2026-10-19-lab-fixes.md), so the target not in its tree — "Timed out … to appear" — is all it
  * can say, and is ok. Anything else, or "close it first" said twice, is LOUD.
