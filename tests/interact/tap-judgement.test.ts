@@ -71,7 +71,7 @@ async function judge(
   const look = lookWith(tree, kb, remedy);
   const screen = await usableScreen(adapter, look);
   freshReads.length = 0;
-  const outcome = await judgeTap(adapter, id, { node: find(tree, id), look }, screen, sent)
+  const outcome = await judgeTap(adapter, id, { node: find(tree, id), look }, screen, sent === undefined ? {} : { sent })
     .then((j) => j.aim())
     .catch((e: unknown) => e as Error);
   return { outcome, freshReads, asked: kb.asked };

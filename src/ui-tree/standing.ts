@@ -7,6 +7,7 @@ import {
   type Exposure,
 } from './draw-order.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
+import type { SeenOrder } from './seen-order.js';
 import {
   aboveNavigationBand,
   across,
@@ -18,6 +19,7 @@ import {
   drawnOverText,
   drawnPart,
   orderUntoldText,
+  seenOverText,
   overlapsPastSlack,
   PIXEL_OVERLAP_SLACK,
   rectWithin,
@@ -278,8 +280,13 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   docs/adr/0007-idb-keyboard-key-row-tiling.md
  */
 export interface Scene {
-  /** The tree's draw order (draw-order.ts#drawOrder). */
+  /** The tree's draw order (draw-order.ts#drawOrder), told `orderSeen` when given. */
   readonly order: DrawOrder;
+  /**
+   * The order a screenshot saw of controls the tree lists in reading order (ui-tree/seen-order.ts), which this scene's
+   * draw order was told (`sceneOf`'s `seen`); absent when no one looked. The remedy reads it for why a pair stayed untold.
+   */
+  readonly orderSeen?: SeenOrder;
   /** The tree's clip facts (geometry.ts#clipsOf), its dialect as draw order reads it (draw-order.ts#listsAncestry, #listsUnclippedFrames). */
   readonly clips: Clips;
   /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
@@ -426,6 +433,8 @@ export interface StandingFacts {
   readonly presented?: readonly UiNode[];
   /** draw-order.ts#Exposure's: the covers whose order against the node the tree does not tell (listed in reading order); absent when none. */
   readonly unordered?: readonly UiNode[];
+  /** draw-order.ts#Exposure's: the covers whose order the tree did not tell and a screenshot did, seen drawn over the node; absent when none. */
+  readonly seenOver?: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -495,10 +504,25 @@ export const presentedStop = (layer?: MarkedLayer): string => {
  * beneath it), the way out: a tap by coordinates, or an assert on a part of it clear of the other.
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  */
-export const unorderedRemedy = (purpose: 'touch' | 'pixel'): string =>
+export const unorderedRemedy = (purpose: 'touch' | 'pixel', { untold }: RemedyCase<'unordered'> = { of: 'unordered' }): string => {
+  // A screenshot already looked at (`untold`: why it could not tell) is not advised again.
+  const look = untold === undefined ? 'see a screenshot' : `a screenshot could not tell either (${untold})`;
+  return purpose === 'touch'
+    ? `no scroll tells which is on top: ${look} — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates`
+    : `no scroll tells which is on top: ${look} — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other`;
+};
+
+/**
+ * THE remedy's words for a node under a cover whose order the tree did not tell and a screenshot did (`Remedy`'s
+ * `seenOver`): drawn over it, in the node's own screen — a menu or popover over it is closed first; no scroll moves it
+ * out from under it (a stroke beside an in-screen menu lands on its backdrop); the pixel assert, something of the
+ * element clear of it.
+ * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+ */
+export const seenOverRemedy = (purpose: 'touch' | 'pixel'): string =>
   purpose === 'touch'
-    ? 'no scroll tells which is on top: see a screenshot — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates'
-    : 'no scroll tells which is on top: see a screenshot — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other';
+    ? 'if it is a menu or a popover, close it first; no scroll moves it out from under it'
+    : 'if it is a menu or a popover, close it first; else assert something in the element that lies clear of it';
 
 /**
  * How a sentence says `cover`, one of `facts.covers`, lies over the node — at its centre when `centre` is given: drawn
@@ -506,8 +530,8 @@ export const unorderedRemedy = (purpose: 'touch' | 'pixel'): string =>
  * (geometry.ts#orderUntoldText). The one choice of the two for the tap's refusal and move, and `scroll_until`'s
  * covered sentences.
  */
-export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered'>, cover: UiNode, centre?: Point): string =>
-  (orderUntold(facts, cover) ? orderUntoldText : drawnOverText)(cover, centre, reachOf(facts, cover));
+export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered' | 'seenOver'>, cover: UiNode, centre?: Point): string =>
+  (orderUntold(facts, cover) ? orderUntoldText : seenOver(facts, cover) ? seenOverText : drawnOverText)(cover, centre, reachOf(facts, cover));
 
 /**
  * Whether `cover`, one of `facts.covers`, is one whose ORDER against the node the tree does not tell
@@ -515,6 +539,12 @@ export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'u
  * `facts.unordered` asks: `Remedy`'s `unordered`, `coverClause`, the pixel assert's covered sentence.
  */
 export const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
+
+/**
+ * Whether `cover`, one of `facts.covers`, is one whose order the tree did not tell and a screenshot did, seen drawn over
+ * the node (draw-order.ts#Exposure.seenOver) — `orderUntold`'s sibling, asked by the same readers.
+ */
+export const seenOver = (facts: Pick<StandingFacts, 'seenOver'>, cover: UiNode): boolean => facts.seenOver?.includes(cover) === true;
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
@@ -544,8 +574,12 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  * 2. `unordered` — `covered` by a cover whose order against the node the tree does not tell (`facts.unordered`,
  *    draw-order.ts#Exposure.unordered: the two listed in reading order): which is drawn on top is not told, and no
  *    scroll tells it — a screenshot does (`unorderedRemedy`). Not `scroll`: a stroke for the lab's menu row's
- *    neighbour would land on the menu's backdrop, which closes it.
+ *    neighbour would land on the menu's backdrop, which closes it. `untold`: a screenshot was looked at and could not
+ *    tell either (the scene's `orderSeen`), why — its words drop "see a screenshot".
  *    docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+ *    `seenOver` — the same place, `covered` by a cover the tree did not order and a screenshot saw drawn over the node
+ *    (`facts.seenOver`, draw-order.ts#Exposure.seenOver): close it first if it is a menu or a popover; no scroll
+ *    (`seenOverRemedy`). docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  * 3. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
  * 4. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
@@ -579,7 +613,8 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  */
 export type Remedy =
   | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: MarkedLayer }
-  | { readonly of: 'unordered' }
+  | { readonly of: 'unordered'; readonly untold?: string }
+  | { readonly of: 'seenOver' }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
   | { readonly of: 'pinned' }
@@ -598,7 +633,7 @@ interface TouchRemedies {
   readonly systemBar: RemedyCase<'presented'> | ScrollableRemedy;
   readonly clipped: RemedyCase<'presented' | 'scroll'>;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
-  readonly covered: RemedyCase<'presented' | 'unordered' | 'scroll'>;
+  readonly covered: RemedyCase<'presented' | 'unordered' | 'seenOver' | 'scroll'>;
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
@@ -607,7 +642,7 @@ interface PixelRemedies {
   readonly offScreen: RemedyCase<'presented' | 'scroll'>;
   readonly systemBar: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
-  readonly covered: RemedyCase<'presented' | 'unordered' | 'fixed'> | ScrollableRemedy;
+  readonly covered: RemedyCase<'presented' | 'unordered' | 'seenOver' | 'fixed'> | ScrollableRemedy;
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
@@ -695,15 +730,16 @@ type PixelJudgement = { readonly facts: StandingFacts } & PixelKind;
 type Unreached<J> = Exclude<J, { readonly kind: 'reachable' }>;
 
 /** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
-export function sceneOf(tree: UiNode): Scene {
+export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   // Whether the tree's source cuts a node's bounds at a node drawn after it (`cutByLater`): a nested tree of clipped frames.
   const cutsAtLater = listsAncestry(tree) && !listsUnclippedFrames(tree);
   let order: DrawOrder | undefined;
   let clips: Clips | undefined;
   const scene: Scene = {
     get order() {
-      return (order ??= drawOrder(tree));
+      return (order ??= drawOrder(tree, seen));
     },
+    ...(seen !== undefined && { orderSeen: seen }),
     get clips() {
       return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree) }));
     },
@@ -786,7 +822,7 @@ function remedied(
       case 'covered':
         // 2. Under a cover whose order the tree does not tell: no scroll tells it. 7. Else a touch's cover over the
         // centre: scroll it clear (the stop's stuck sentence names a cover no scroll clears).
-        return { ...touch, remedy: orderUntold(touch.facts, touch.cover) ? { of: 'unordered' } : { of: 'scroll' } };
+        return { ...touch, remedy: orderRemedy(scene, node, touch) ?? { of: 'scroll' } };
       // 7. What a scroll brings within reach whatever lies around it.
       case 'offScreen':
       case 'clipped':
@@ -818,7 +854,10 @@ function remedied(
     }
     case 'covered':
       // 2. Under a cover whose order the tree does not tell: no scroll tells it.
-      if (orderUntold(pixel.facts, pixel.cover)) return { ...pixel, remedy: { of: 'unordered' } };
+      {
+        const ordered = orderRemedy(scene, node, pixel);
+        if (ordered !== undefined) return { ...pixel, remedy: ordered };
+      }
       // 4. No scroll ever moves the screen itself out from under anything — idb's flat-list root, a screen-sized
       // element — nor an element laid from the screen's top edge at full width (a full-bleed header: iOS's, or
       // Android 15+'s edge-to-edge app bar).
@@ -831,6 +870,18 @@ function remedied(
       return unhandled;
     }
   }
+}
+
+/**
+ * 2. of THE PRECEDENCE for a `covered` node: its cover is one the tree lists in reading order — its order untold
+ * (`unordered`, with why a screenshot looked at could not tell, the scene's `orderSeen`) or seen drawn over it
+ * (`seenOver`); undefined for any other cover.
+ */
+function orderRemedy(scene: Scene, node: UiNode, { facts, cover }: { readonly facts: StandingFacts; readonly cover: UiNode }): RemedyCase<'unordered' | 'seenOver'> | undefined {
+  if (seenOver(facts, cover)) return { of: 'seenOver' };
+  if (!orderUntold(facts, cover)) return undefined;
+  const pair = scene.orderSeen?.between(node, cover);
+  return pair?.seen === 'untold' ? { of: 'unordered', untold: pair.why } : { of: 'unordered' };
 }
 
 /**
@@ -1218,6 +1269,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
     centreExcused: seen.centreExcused,
     ...(seen.presented.length > 0 && { presented: seen.presented }),
     ...(seen.unordered.length > 0 && { unordered: seen.unordered }),
+    ...(seen.seenOver.length > 0 && { seenOver: seen.seenOver }),
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),

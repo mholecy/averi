@@ -16,6 +16,8 @@ import { EngineSession } from '../../src/flow/launch.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 
@@ -4165,5 +4167,28 @@ flows:
     const trace = await FlowEngine.run(SEQ('[f1, stall]'), fake, { ...FAST, reachRecheckMs: 20 }, { state: 's' });
     expect(fake.taps).toEqual(['to_t_btn', 'go', 'stall_btn', 'to_t_btn', 'go']);
     expect(trace.at(-1)).toEqual({ action: 'state s', detail: 'reached after recovery f1' });
+  });
+});
+
+// THE ORDER SEEN (ADR 0024) reaches a flow's tap: the engine wires the eyes into every tap (its `acting`), so the lab's
+// menu row W — listed in reading order before the row C it is drawn over — is tapped once the screenshot shows it on top.
+describe('a flow tap on a control the listing does not order — the eyes wired', () => {
+  it('blur-menu (idb): tap W → W tapped at its centre, one screenshot taken', async () => {
+    const lab = (name: string) => readFile(new URL(`../fixtures/truth/ios-iphone17-ios27/${name}`, import.meta.url));
+    const fake = new FakeAdapter({ menu: parseIdbDescribeAll((await lab('blur-menu.idb.json')).toString('utf8')) }, 'menu');
+    fake.platform = 'ios';
+    fake.viewportSize = { width: 402, height: 874 };
+    fake.nextScreenshot = await lab('blur-menu.png');
+    const cfg = parseConfig(`
+app:
+  ios: { bundleId: lab.app }
+flows:
+  menu:
+    steps:
+      - tap: { id: lab.blur-menu.W }
+`);
+    await FlowEngine.run(cfg, fake, FAST, { flow: 'menu' });
+    expect(fake.taps).toEqual(['lab.blur-menu.W']);
+    expect(fake.screenshots).toHaveLength(1);
   });
 });

@@ -1,4 +1,5 @@
 import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
+import type { Eyes } from '../ui-tree/eyes.js';
 import type { Covering, FrameVerdict, Uncovered } from '../ui-tree/keyboard-cover.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -151,6 +152,12 @@ export interface GuardOptions extends SettleOptions {
    * an Android run with dismissals configured is the same run.
    */
   dismissals?: readonly KeyboardDismissal[];
+  /**
+   * The eyes' order question (ui-tree/eyes.ts#Eyes.order; verify/eyes.ts#eyesOn, wired at the composition root —
+   * mcp/tools.ts, flow/engine.ts): asked once by the tap's judgement of a centre covered by a control the listing does
+   * not order (tap-judgement.ts#TapAsks). Absent: that order stays untold.
+   */
+  eyes?: Pick<Eyes, 'order'>;
 }
 
 /** What `dismissKeyboard` takes of the guard's options: the dismissals it may tap and the ambiguity policy they are judged under — no default policy is written here. The settle options are not among them: it resolves nothing. */

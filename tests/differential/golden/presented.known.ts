@@ -7,7 +7,6 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 // The lab finding L1's tap and scroll_until rows were this KNOWN's until round 6's fix (d43df5d on arch/r22-l1)
 // struck them off; scripts/truth/calibration.json calibrates the note on them.
 // Phase 3 (B3): the lab findings of the presented cells, open — and the residual of calibration.json #31.
-const LAB_MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
@@ -119,7 +118,8 @@ export const presented: KnownFile = {
     // RESIDUAL #31 (ADR 0018 residual 9): the blur menu's backdrop has no node in either tree — A, B, D beneath it read
     // as open. C's centre lies under the menu row W (its probe fires W): C is refused under W, truly, but not "close it
     // first" (#31's) — on the grouped variant's WDA tree as W is listed after it, elsewhere since L4's fix (a control
-    // listed before it in reading order, overlapping it, is a cover whose order is not told, ADR 0015's amendment).
+    // listed before it in reading order, overlapping it, is a cover whose order is not told, ADR 0015's amendment) and,
+    // since ADR 0024, seen drawn over it on the screenshot.
     ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'D']),
@@ -128,19 +128,13 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the menu row W; the backdrop has no node', as: BLUR }),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: 'strokes for C under the menu row W; the backdrop has no node', as: BLUR }),
     ...[`${IOS}/blur-menu.idb.json`, `${IOS}/blur-menu.wda.json`, `${IOS}/blur-menu-grouped.idb.json`].flatMap((file) => [
-      ...keys(file, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused as overlapped by the menu row W listed before it, the order not told; the backdrop has no node', as: BLUR }),
-      ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails as overlapped by the menu row W, the order not told; the backdrop has no node', as: BLUR }),
-      ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'refused', calls: [], note: 'stops before any swipe, overlapped by the menu row W, the order not told; the backdrop has no node', as: BLUR }),
+      ...keys(file, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused under the menu row W, seen drawn over it on the screenshot; the backdrop has no node', as: BLUR }),
+      ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the menu row W, seen drawn over it on the screenshot; the backdrop has no node', as: BLUR }),
+      ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'refused', calls: [], note: 'stops before any swipe, under the menu row W seen drawn over it on the screenshot; the backdrop has no node', as: BLUR }),
     ]),
-    // LAB FINDING (calibration.json L4, its residual): the menu row W, listed in reading order just before C, which it
-    // is drawn over, still reads as covered by C under idb and WDA (C listed after it; no reading break, ADR 0015) — a
-    // false refusal, the safe direction: the listing does not tell which of the two is on top, and the replies say so
-    // (no scroll advised, none sent).
-    ...['idb', 'wda'].flatMap((src) => [
-      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: 'lab finding: the menu row read as overlapped by the row it is drawn over, the order not told', as: LAB_MENU }),
-      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: 'lab finding: the menu row read as overlapped by the row it is drawn over, the order not told', as: LAB_MENU }),
-      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: [], note: 'lab finding: stops before any swipe, the menu row read as overlapped by the row it is drawn over, the order not told', as: LAB_MENU }),
-    ]),
+    // LAB FINDING (calibration.json L4, its residual) — fixed on fix/r9-l4w (ADR 0024): the menu row W, listed in
+    // reading order just before C, which it is drawn over, read as covered by C under idb and WDA; the eyes now tell
+    // from the screenshot that W is drawn on top — its tap, colour and scroll_until rows green, struck off here.
   ]),
   counts: {
     [`${ANDROID}/alert-dim.xml`]: 12,

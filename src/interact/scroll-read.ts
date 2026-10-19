@@ -5,6 +5,7 @@ import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { lookAt, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
+import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { bandRect, farEdgeFrames, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -83,6 +84,12 @@ export interface RoundRead {
   ofKeyboard: (node: UiNode) => boolean;
   /** The reading's `remedy` — what the adapter can do about a covering keyboard — for the sentences of a round that applied idb's band, which no `cover` carries. */
   remedy: KeyboardRemedy;
+  /**
+   * The order a screenshot saw of controls `tree` lists in reading order (ui-tree/seen-order.ts) — the round's answer to
+   * its `ask order` (scroll-rounds.ts#round), which the read's scene is told (`factsOf`); absent before it, and on every
+   * read that asks none.
+   */
+  seen?: SeenOrder;
 }
 
 /**
@@ -147,8 +154,8 @@ export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
  * on a round that then asks for the witness too, a pure walk of an
  * in-memory tree beside a device read.
  */
-function factsOf({ tree, ofKeyboard }: Pick<RoundRead, 'tree' | 'ofKeyboard'>): TreeFacts {
-  const look = lookAt(tree, { ofKeyboard });
+function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboard' | 'seen'>): TreeFacts {
+  const look = lookAt(tree, { ofKeyboard }, seen);
   // The look's members through getters: derived on first use, as the look derives them (a spread would evaluate them).
   return {
     tree,

@@ -406,7 +406,7 @@ export const unconfirmedReason = (frame: Pick<Frame, 'captures'>): string =>
  * measured half is always there, though it may say the read failed
  * (`Treeless`). What `captureFrame` returns to such a caller.
  */
-interface TreeRequestedFrame extends Frame {
+export interface TreeRequestedFrame extends Frame {
   measured: FrameMeasurement;
 }
 

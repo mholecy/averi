@@ -1100,7 +1100,7 @@
       "before": "e0c2587",
       "after": "bea9769",
       "verified": "golden",
-      "partial": "C's half, the unsafe direction (C, under the menu row W listed before it in reading order, no longer Tapped / a PASS on W's colour / fully visible); W's half (W refused under C, listed after it — a false refusal) stays open as ADR 0015's residual of its 2026-10-19 amendment: the listing does not tell which of the two is on top",
+      "partial": "C's half, the unsafe direction (C, under the menu row W listed before it in reading order, no longer Tapped / a PASS on W's colour / fully visible); W's half (W refused under C, listed after it — a false refusal) fixed in replay by round 9 (ADR 0024: the eyes tell the order from a screenshot), its live tap still to be measured (`openLive`)",
       "defect": "^Tapped|passed on #00897B|fully visible",
       "checks": [
         "ios-iphone17-ios27/blur-menu.idb.json C tap",
@@ -1112,14 +1112,6 @@
         "ios-iphone17-ios27/blur-menu-grouped.idb.json C tap",
         "ios-iphone17-ios27/blur-menu-grouped.idb.json C colour",
         "ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until"
-      ],
-      "open": [
-        "ios-iphone17-ios27/blur-menu.idb.json W tap",
-        "ios-iphone17-ios27/blur-menu.idb.json W colour",
-        "ios-iphone17-ios27/blur-menu.idb.json W scroll_until",
-        "ios-iphone17-ios27/blur-menu.wda.json W tap",
-        "ios-iphone17-ios27/blur-menu.wda.json W colour",
-        "ios-iphone17-ios27/blur-menu.wda.json W scroll_until"
       ],
       "openLive": ["ios idb tap:blur-menu.W", "ios wda tap:blur-menu.W"],
       "expect": "CALIBRATED-ON-DEFECT",

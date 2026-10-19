@@ -5,7 +5,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { coverClause, outsideItsScrollView, presentedRemedy, presentedStop, unorderedRemedy } from '../ui-tree/standing.js';
+import { coverClause, outsideItsScrollView, presentedRemedy, presentedStop, seenOverRemedy, unorderedRemedy } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
@@ -549,14 +549,14 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }
-    case 'unordered': {
-      // Under a cover whose order the tree does not tell (ui-tree/standing.ts#Remedy's `unordered`): stopped without a
-      // swipe, as under a presented screen. A plain Error, as `stuck`: the element was there and seen.
-      const { judged, viewport } = o;
+    case 'overlapped': {
+      // Under a cover listed in reading order with it (ui-tree/standing.ts#Remedy's `unordered` or `seenOver`): stopped
+      // without a swipe, as under a presented screen. A plain Error, as `stuck`: the element was there and seen.
+      const { judged, viewport, remedy } = o;
       return {
         message:
           `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${underText({ judged, cover: o.cover })}; ` +
-            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${unorderedRemedy('touch')}. ` +
+            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${remedy.of === 'unordered' ? unorderedRemedy('touch', remedy) : seenOverRemedy('touch')}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

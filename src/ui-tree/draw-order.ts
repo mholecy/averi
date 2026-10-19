@@ -4,6 +4,7 @@ import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSiz
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
+import type { SeenOrder } from './seen-order.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
 /**
@@ -31,7 +32,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * `51,448`, `zIndex` over C `51,470`), so for a control target such a
  * listing gives the overlapping controls listed before it as covers too
  * when one holds its centre, and every overlapping control of it, before or after, as a
- * cover whose order it does not tell (`readingOrderPeers`, `Exposure.unordered`).
+ * cover whose order it does not tell (`readingOrderPeers`, `Exposure.unordered`) — unless a screenshot
+ * told it: the order SEEN is an input (`drawOrder`'s `seen`, ui-tree/seen-order.ts), a peer seen under the
+ * target no cover of it, one seen over it a cover named so (`Exposure.seenOver`).
  *
  * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
@@ -334,6 +337,14 @@ export interface Exposure {
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    */
   readonly unordered: readonly UiNode[];
+  /**
+   * The covers whose order the listing did not tell and a screenshot did — seen drawn over the node in their overlap
+   * (`drawOrder`'s `seen`, ui-tree/seen-order.ts) — in `covers`' order; empty when none. What the sentences read: such a
+   * cover is named as drawn over the node, a screenshot showing it on top, and no scroll is advised
+   * (ui-tree/standing.ts#Remedy's `seenOver`). A peer seen UNDER the node is no cover, nor in `aimedClearOf`.
+   * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+   */
+  readonly seenOver: readonly UiNode[];
   /**
    * Where each of `covers` presses, in the same order: its rect, or — for a
    * node pinned at a flat list's bottom (`bottomPinned`) — its reach
@@ -1604,16 +1615,27 @@ function listsInReadingOrder(parent: UiNode): boolean {
 interface ReadingOrderPeers {
   readonly before: readonly Placed[];
   readonly unordered: ReadonlySet<Placed>;
+  readonly seenOver: ReadonlySet<Placed>;
+  /** The peers a screenshot saw drawn UNDER the target: no covers of it, wherever listed (`seen`). */
+  readonly seenUnder: ReadonlySet<Placed>;
   readonly listedBefore: readonly Placed[];
 }
 
+/**
+ * …and THE ORDER SEEN (`seen`, ui-tree/seen-order.ts): a peer a screenshot saw drawn UNDER the target is no peer — not
+ * in `before`, `unordered` or `listedBefore`, and, listed after it, no cover by the draw order either (`seenUnder`: the
+ * screenshot overrides the listing for exactly that pair): the lab's W, seen over C. A peer seen OVER it stays the
+ * cover the listing made it, named `seenOver` instead of `unordered`: C, under W. An untold pair is as with no
+ * screenshot.
+ */
 function readingOrderPeers(
   order: readonly Placed[],
   about: SeenFor,
   pinnedTargets: () => ReadonlyMap<Placed, number>,
+  seen: SeenOrder | undefined,
 ): ReadingOrderPeers {
   const { target, flatList, contentFrom, bottomChrome } = about;
-  const none: ReadingOrderPeers = { before: [], unordered: new Set<Placed>(), listedBefore: [] };
+  const none: ReadingOrderPeers = { before: [], unordered: new Set<Placed>(), seenOver: new Set<Placed>(), seenUnder: new Set<Placed>(), listedBefore: [] };
   const t = target.node;
   const parent = target.parent;
   if (parent === undefined || !listsInReadingOrder(parent.node) || !isInteractive(t) || (flatList && target.at < contentFrom)) return none;
@@ -1631,12 +1653,29 @@ function readingOrderPeers(
   if (peers.length === 0 || pinnedTargets().has(target)) return none;
   const centre = tapPoint(t);
   const holdsCentre = (p: Placed): boolean => containsPoint(p.node.rect, centre);
-  const listedBefore = peers.filter((p) => p.at < target.at);
+  const told = (p: Placed): 'over' | 'under' | undefined => {
+    const pair = seen?.between(t, p.node);
+    return pair === undefined || pair.seen === 'untold' ? undefined : pair.seen;
+  };
+  const overIt = (p: Placed): boolean => told(p) === 'under';
+  const kept = peers.filter((p) => told(p) !== 'over');
+  const listedBefore = kept.filter((p) => p.at < target.at);
   const before = listedBefore.some(holdsCentre) ? listedBefore : [];
-  return { before, unordered: new Set([...before, ...peers.filter((p) => p.at > target.at && holdsCentre(p))]), listedBefore };
+  const overlapping = [...before, ...kept.filter((p) => p.at > target.at && holdsCentre(p))];
+  return {
+    before,
+    unordered: new Set(overlapping.filter((p) => !overIt(p))),
+    seenOver: new Set(overlapping.filter(overIt)),
+    seenUnder: new Set(peers.filter((p) => told(p) === 'over')),
+    listedBefore,
+  };
 }
 
-export function drawOrder(tree: UiNode): DrawOrder {
+/**
+ * The draw order of `tree` — `orderSeen`: the order a screenshot saw of controls the tree lists in reading order
+ * (ui-tree/seen-order.ts; `readingOrderPeers`), when the caller looked; absent, the listing alone.
+ */
+export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
   const seen: Seen = { screenArea };
@@ -1812,7 +1851,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const tabsBefore = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       // In a listing given in reading order, the controls that overlap it whose order is not told: those listed before it over its centre are
       // covers too.
-      const peers = about === undefined ? undefined : readingOrderPeers(order, about, pinnedTargets);
+      const peers = about === undefined ? undefined : readingOrderPeers(order, about, pinnedTargets, orderSeen);
       const before = [...tabsBefore, ...(peers?.before ?? [])].sort((a, b) => a.at - b.at);
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
       // A presented layer's cover reaches the whole screen and draws whatever the rows say (presentation.ts#PresentedOver).
@@ -1821,7 +1860,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
       const met =
         shown === undefined || about === undefined
           ? []
-          : [...before, ...laterFor(places, about)]
+          : [...before, ...laterFor(places, about).filter((p) => peers?.seenUnder.has(p) !== true)]
               .filter((p) => rectIntersection(reachOf(p), shown) !== undefined)
               .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: wholeScreen(p) || drawsOverTarget(p, about), wholeScreen: wholeScreen(p) }));
       const over = met.filter((c) => c.draws);
@@ -1853,6 +1892,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
         unordered: over.filter((c) => peers?.unordered.has(c.placed) === true).map((c) => c.node),
+        seenOver: over.filter((c) => peers?.seenOver.has(c.placed) === true).map((c) => c.node),
         presented: over.filter((c) => c.wholeScreen || about?.over.surface(c.placed) !== undefined).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,

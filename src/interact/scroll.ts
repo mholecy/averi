@@ -1,6 +1,7 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
 import type { Eyes, EyesAnswer, EyesQuestion } from '../ui-tree/eyes.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { seenOrderOf } from '../ui-tree/seen-order.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, matchesToJudge, type Target } from './resolve.js';
@@ -338,7 +339,8 @@ export async function scrollUntilVisible(
     let next = round(state, { ...seen, elapsedMs: Date.now() - started });
     while (next.step.do === 'ask') {
       if (next.step.what === 'witness') seen.corroborated = reading !== undefined && (await reading.corroborated());
-      else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? noEyes(next.step.question) : await opts.eyes(next.step.question);
+      else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? noEyes(next.step.question) : await opts.eyes.fully(next.step.question);
+      else if (next.step.what === 'order') seen.order = seenOrderOf(next.step.question.node, opts.eyes === undefined ? [] : await opts.eyes.order(next.step.question));
       else seen.unlocated = reading !== undefined && (await reading.unlocated());
       next = round(state, { ...seen, elapsedMs: Date.now() - started });
     }

@@ -453,7 +453,10 @@ export class FlowEngine {
    * the dismissals are carried, not used — and the dismissal only
    * `ambiguous` and `dismissals`. The engine never branches on the platform for the
    * dismissals: interact/ reads the list only where the adapter has no
-   * keyboard oracle, so on Android it is carried and never read.
+   * keyboard oracle, so on Android it is carried and never read. And the
+   * eyes' order question (verify/eyes.ts#eyesOn, ADR 0024), which a tap's
+   * judgement asks only of a centre covered by a control the listing does
+   * not order — wired here: interact/ may not import verify/.
    */
   private readonly acting: Omit<GuardOptions, 'timeoutMs'>;
 
@@ -476,7 +479,7 @@ export class FlowEngine {
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
-    this.acting = { ambiguous: FLOW_AMBIGUITY, pollMs: this.pollMs, dismissals: keyboardDismissals(cfg) };
+    this.acting = { ambiguous: FLOW_AMBIGUITY, pollMs: this.pollMs, dismissals: keyboardDismissals(cfg), eyes: eyesOn(adapter) };
     this.session = opts.session;
   }
 

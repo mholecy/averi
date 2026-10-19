@@ -1,41 +1,63 @@
 import { PNG } from 'pngjs';
-import type { DeviceAdapter, Rect, ScrollAxis } from '../adapters/types.js';
+import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/standing.js';
-import type { Eyes, EyesAnswer, EyesQuestion } from '../ui-tree/eyes.js';
+import type { Eyes, EyesAnswer, EyesQuestion, OrderPair, OrderQuestion } from '../ui-tree/eyes.js';
+import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import { errorMessage } from '../util/error-message.js';
-import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type RgbaImage } from './capture.js';
+import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
 import { ciede2000, rgbToHex, srgbToLab, type Rgb } from './ciede2000.js';
-import { sampleDominant } from './color-parity.js';
+import { DEFAULT_TOLERANCE_DE, sampleDominant } from './color-parity.js';
 
 /**
- * THE EYES' production adapter (ui-tree/eyes.ts has the concept and the trigger): one screenshot, decoded and scaled
- * against the stop's tree as every pixel reader's (verify/capture.ts#measuredFrameFor), judged by `judgeEyes`. Never
- * throws: a screenshot that fails, a png that does not decode, a scale the tree refuses is `unjudged`, said why.
+ * THE EYES' production adapter (ui-tree/eyes.ts has the concept and the triggers): for either question one screenshot,
+ * decoded and scaled against the question's tree as every pixel reader's (verify/capture.ts#measuredFrameFor), judged
+ * by `judgeEyes` or `judgeOrder`. Never throws: a screenshot that fails, a png that does not decode, a scale the tree
+ * refuses is `unjudged` (every pair `untold`), said why.
  */
-export const eyesOn =
-  (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>): Eyes =>
-  async (question) => {
-    // A failure before any edge is judged is the first edge's to say.
-    const first = question.flush[0];
-    if (first === undefined) return { sees: 'own' };
-    const unjudged = (why: string): EyesAnswer => ({ sees: 'unjudged', edge: first.edge, neighbour: first.by, why });
+export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>): Eyes => {
+  /** The screenshot as `tree` scales it, or why there is none. */
+  const look = async (tree: UiNode): Promise<{ png: RgbaImage; scale: number } | { why: string }> => {
     let shot: Buffer;
     try {
       shot = await adapter.screenshot();
     } catch (e) {
-      return unjudged(`the screenshot failed: ${errorMessage(e).split('\n')[0]}`);
+      return { why: `the screenshot failed: ${errorMessage(e).split('\n')[0]}` };
     }
     let png: RgbaImage;
     try {
       png = PNG.sync.read(shot);
     } catch (e) {
-      return unjudged(`the screenshot did not decode: ${errorMessage(e).split('\n')[0]}`);
+      return { why: `the screenshot did not decode: ${errorMessage(e).split('\n')[0]}` };
     }
-    const { scale } = measuredFrameFor(question.tree, png, await witnessScreen(adapter));
-    if (scale.error !== undefined) return unjudged(`the screenshot could not be scaled to the tree: ${scale.error}`);
-    return judgeEyes(png, scale.scale, question);
+    const { scale } = measuredFrameFor(tree, png, await witnessScreen(adapter));
+    return scale.error !== undefined ? { why: `the screenshot could not be scaled to the tree: ${scale.error}` } : { png, scale: scale.scale };
   };
+  return {
+    async fully(question) {
+      // A failure before any edge is judged is the first edge's to say.
+      const first = question.flush[0];
+      if (first === undefined) return { sees: 'own' };
+      const seen = await look(question.tree);
+      return 'why' in seen ? { sees: 'unjudged', edge: first.edge, neighbour: first.by, why: seen.why } : judgeEyes(seen.png, seen.scale, question);
+    },
+    async order(question) {
+      const seen = await look(question.tree);
+      return 'why' in seen ? untoldAll(question, seen.why) : judgeOrder(seen.png, seen.scale, question);
+    },
+  };
+};
+
+/**
+ * The order question answered from a frame already captured (verify/capture.ts#MeasuredFrame) — the pixel assert's,
+ * which captures one anyway (verify/pixel-poll.ts): no second screenshot. A frame whose scale the tree refused is every
+ * pair `untold`, said why.
+ */
+export const orderOfFrame = (frame: MeasuredFrame, question: OrderQuestion): readonly OrderSeen[] =>
+  frame.scale.error !== undefined ? untoldAll(question, `the screenshot could not be scaled to the tree: ${frame.scale.error}`) : judgeOrder(frame.png, frame.scale.scale, question);
+
+/** Every pair of `question` untold, for `why`. */
+export const untoldAll = (question: OrderQuestion, why: string): readonly OrderSeen[] => question.pairs.map(({ peer }) => ({ peer, seen: 'untold', why }));
 
 /**
  * Two colours read as one surface: CIEDE2000 within this — about one just-noticeable difference. Measured on the
@@ -184,4 +206,76 @@ function lineOf(r: EdgeBounds, edge: Edge, i: number): EdgeBounds {
     case 'left':
       return { ...r, x0: r.x0 + i, x1: r.x0 + i + 1 };
   }
+}
+
+/** A band's or the overlap's dominant colour counts only when it holds at least this share of the region (`sampleDominant`): a region mostly one surface. */
+const DOMINANT_SHARE = 0.5;
+
+/**
+ * THE ORDER JUDGE, pure over a decoded png at `scale` px per tree unit — each pair of the question on its own
+ * (ui-tree/eyes.ts#OrderPair), one png. Asymmetric on purpose: telling the PEER on top only confirms a refusal; telling
+ * the TARGET on top unlocks a tap, so every rule below can only say `untold` (the listing's untold order, the refusal
+ * kept), never guess:
+ * 1. Each side's bands, landed in the png (`pngRegion`, one pixel in from each edge against antialiasing), each at least
+ *    FLANK_MIN_PX on both sides; none on a side — untold.
+ * 2. Each side one colour: every band's dominant (`sampleDominant`) at least DOMINANT_SHARE of it, all of a side within
+ *    EYES_SAME_DE of each other — else untold: a side showing two surfaces (mp-native's chooser row, whose band above
+ *    its overlap is the card's gap and whose side bands are its own dimmed row) is not read.
+ * 3. THE OPACITY GUARD: the screen beside the two on the overlap's rows (its dominants, each of DOMINANT_SHARE) — none,
+ *    untold; either side's colour within EYES_APART_DE of it, untold: that control may draw nothing there (a text-only
+ *    button over a coloured row lets the row show through the overlap, which would read as the row on top while a tap
+ *    there hits the button).
+ * 4. The two sides farther apart than the colour assert's tolerance (color-parity.ts#DEFAULT_TOLERANCE_DE, 8) — else
+ *    untold, the two look alike. The lab's menu: 17.69 (W's teal against C's blurred green).
+ * 5. The overlap's dominant (of DOMINANT_SHARE) within EYES_APART_DE of exactly one side and farther than that
+ *    tolerance from the other: that side is drawn on top. Else untold — a frame mid-fade reads a blend. The lab: 0.00
+ *    to W's band, 17.69 to C's.
+ * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+ */
+export function judgeOrder(png: RgbaImage, scale: number, q: OrderQuestion): readonly OrderSeen[] {
+  return q.pairs.map((pair) => ({ peer: pair.peer, ...judgePair(png, scale, pair) }));
+}
+
+function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
+  const untold = (why: string): PairSeen => ({ seen: 'untold', why });
+  const land = (rects: readonly Rect[]): EdgeBounds[] =>
+    rects.flatMap((r) => {
+      const at = pngRegion(r, scale, png);
+      // One pixel in from each edge, off the antialiasing between the two.
+      const on = at === undefined ? undefined : { x0: at.x0 + 1, y0: at.y0 + 1, x1: at.x1 - 1, y1: at.y1 - 1 };
+      return on === undefined || on.x1 - on.x0 < FLANK_MIN_PX || on.y1 - on.y0 < FLANK_MIN_PX ? [] : [on];
+    });
+  const sides = [
+    { name: 'it', bands: land(pair.nodeBands) },
+    { name: 'the other', bands: land(pair.peerBands) },
+  ] as const;
+  const colours: Rgb[] = [];
+  for (const { name, bands } of sides) {
+    if (bands.length === 0) return untold(`no part of ${name} shows beside the overlap`);
+    const dominants = bands.map((b) => sampleDominant(png, [b]));
+    const first = dominants[0];
+    if (first === undefined || dominants.some((d) => d === undefined || d.share < DOMINANT_SHARE || distance(d.rgb, first.rgb) > EYES_SAME_DE)) return untold(`${name} is not one colour beside the overlap`);
+    colours.push(first.rgb);
+  }
+  const [own, other] = colours as [Rgb, Rgb];
+  const screen = land(pair.beside).flatMap((b) => {
+    const d = sampleDominant(png, [b]);
+    return d === undefined || d.share < DOMINANT_SHARE ? [] : [d.rgb];
+  });
+  if (screen.length === 0) return untold('no screen beside the two to tell a drawn surface from');
+  for (const [i, colour] of [own, other].entries()) {
+    const shown = screen.find((c) => distance(c, colour) <= EYES_APART_DE);
+    if (shown !== undefined) return untold(`${sides[i]!.name} shows the screen's own colour ${rgbToHex(shown)} beside the overlap: it may draw nothing there`);
+  }
+  const apart = distance(own, other);
+  if (apart <= DEFAULT_TOLERANCE_DE) return untold(`the two look alike (ΔE ${apart.toFixed(2)})`);
+  const [overlap] = land([pair.overlap]);
+  const shows = overlap === undefined ? undefined : sampleDominant(png, [overlap]);
+  if (shows === undefined || shows.share < DOMINANT_SHARE) return untold('the overlap is not one colour');
+  const toOwn = distance(shows.rgb, own);
+  const toOther = distance(shows.rgb, other);
+  const hexes = { overlap: rgbToHex(shows.rgb), own: rgbToHex(own), other: rgbToHex(other) };
+  if (toOwn <= EYES_APART_DE && toOther > DEFAULT_TOLERANCE_DE) return { seen: 'over', ...hexes };
+  if (toOther <= EYES_APART_DE && toOwn > DEFAULT_TOLERANCE_DE) return { seen: 'under', ...hexes };
+  return untold(`the overlap shows neither (ΔE ${toOwn.toFixed(2)} to it, ${toOther.toFixed(2)} to the other)`);
 }

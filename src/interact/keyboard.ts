@@ -149,7 +149,9 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // scroll view scrolls back down). The screen comes from the first look —
   // the orientation does not turn inside one tap — or from the re-read a
   // refusal makes first.
-  const judge = await judgeTap(adapter, target, first, await usableScreen(adapter, first.look));
+  // The eyes' order question, when the caller wired them (GuardOptions.eyes).
+  const asks = opts.eyes === undefined ? {} : { eyes: opts.eyes };
+  const judge = await judgeTap(adapter, target, first, await usableScreen(adapter, first.look), asks);
   const { screen } = judge;
   const at = tapPoint(first.node);
   const opening = await reading.over(at, first.node);
@@ -175,7 +177,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   const ready = await model.guard({ target, opts, point: at, screen, verdict: opening, what, covered: `the soft keyboard covered ${what}` });
   if ('cleared' in ready) {
     // Handed back clear, nothing sent: judged again on the look that holds the node, off its reading.
-    return clearOf(ready.cleared, await (await judgeTap(adapter, target, ready.cleared, screen)).aim());
+    return clearOf(ready.cleared, await (await judgeTap(adapter, target, ready.cleared, screen, asks)).aim());
   }
   // Each hiding: its one side effect, then its confirming looks; still covered on the last, the model's refusal — or,
   // in-tree, the next hiding it chose on that look, performed and confirmed the same way.
@@ -191,7 +193,7 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     });
     if ('gone' in seen) {
       // After the side effects: judged again with `sent`, the headline of any refusal.
-      return clearOf(seen.gone, await (await judgeTap(adapter, target, seen.gone, screen, current.sent)).aim());
+      return clearOf(seen.gone, await (await judgeTap(adapter, target, seen.gone, screen, { ...asks, sent: current.sent })).aim());
     }
     const next = await current.stillCovering(seen.stillUp, seen.looks);
     if (next instanceof KeyboardGuardError) throw next;
