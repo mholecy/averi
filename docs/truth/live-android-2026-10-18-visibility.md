@@ -206,7 +206,9 @@ installed for round 7), harness truth/round-7 `b191055d`, `--side` the branch:
   dismiss it first (press_key back …) … and scroll again; else a layout defect` (13.8 s, the emulator's tree reads
   ~1.9 s each). Before the turn-back fix (`33605fdd`) the stroke back up laid phone under the bar again (a 42-px strip)
   and the scroll ran to its 15-s timeout. After `back` the same call fails on the touch target's overlap with
-  "Variable symbol"'s title below it (a cover the tree lists; unchanged, not the eyes').
+  "Variable symbol"'s title below it (a cover the tree lists; unchanged, not the eyes'): filed as
+  docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md,
+  open.
 - **After review round 1** (`b4a2d151`: every flush edge, the screen-spanning neighbour unasked, the own-margin
   check, own colour past the band, the centre rule, pixel-by-pixel lines): k7 once more, ok, the same reply
   (android-k7-eyes-r1.json).

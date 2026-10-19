@@ -1500,6 +1500,10 @@
     {
       "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
       "why": "lab finding LR3: WDA lists RN sibling views by their frames' tops, not their draw order — measured on rn-field's M before 843229f; no golden row yet (rn-field's fields no longer hit it): the note names the react-native cell that would reproduce it"
+    },
+    {
+      "note": "2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md",
+      "why": "residual found by round 7's A6: `scroll_until … fully: true` on form-keyboard's phone after `back` is refused under the next field's title, which its 132-px touch target overlaps by 6 px, though the 99 px it draws are whole — live only (driven directly over MCP: docs/truth/live-records/android-k7-fully-eyes-direct.jsonl), no golden row (the replay asks no `fully: true` of phone) and no live.ts case asks it; open"
     }
   ]
 }
