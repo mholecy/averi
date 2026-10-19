@@ -226,6 +226,32 @@ accessibility tree at once (no reboot needed). Reproduce (outside the sandbox):
 - No new mismatch on either source. The React Native app's runs: docs/truth/live-rn-2026-10-19.md, its section of the
   same date.
 
+# Round 8, L2's fix: forms k6 and k7 on iOS, 2026-10-19
+
+fix/r8-l2 (src 837ec3ef: soft-keyboard.ts#flatListKeyboardBand judges each node by its part on the screen;
+docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md), run from that checkout;
+the lab app as round 7's final device check installed it (no app change since). k6 and k7 (a tap on and `scroll_until`
+phone, under the submit riding on the keyboard) had run on Android only; their judges read only what both lab apps log
+(submits, focus, the frames of phone and `submit.bar`, the keyboard), so they now run on both platforms. The averi-lab
+iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 in the lab's own derived data, idb through a companion of
+this run's own on gRPC 10891 (`IDB_COMPANION=localhost:10891`). Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb,wda --groups forms --cells form-keyboard
+--cases k6,k7 [--side <checkout>] --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-forms-r8-l2-before.json (idb only) | fix/round-8 6f3a633f, `--side` | 2 | 0 | 0 | 2 (not known) |
+| ios-forms-r8-l2-1…3.json | 837ec3ef | 4 each | 4 | 0 | 0 |
+
+- **Before** (idb): k6 `Tapped id:"lab.form-keyboard.phone"` and the app logged a SUBMIT — the note's harm, live; k7
+  `fully visible after 0 swipes`, phone's centre under the bar, no stroke.
+- **After**, idb: k6 refused — `under button "Continue" (20,517 362x46, reaching 20,517 362x73) at its centre (201,547),
+  drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped` (runs 2, 3;
+  run 1, the first launch after boot: phone not yet in idb's tree, `Timed out … to appear`, nothing fired); k7 one
+  stroke touching down at (201,472), phone at rest 149–183 clear of the bar, `fully visible after 1 swipe`. WDA: k6
+  refused under Continue (`only a 362x1 part of it shows above the soft keyboard`), k7 one stroke at (201,413), the same
+  rest — as before the fix (WDA marks its keyboard; the fix is idb's flat list only). No submit in any run.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

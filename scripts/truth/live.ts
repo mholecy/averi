@@ -233,12 +233,14 @@ const FORMS: Omit<Case, 'group'>[] = [
   },
   // F2A1 (docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md): phone lies
   // under the bar riding on the IME, its dump a 42-px strip cut at Continue; a tap at its centre submits the form.
+  // L2 (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md) is the same screen
+  // on iOS — Continue in the bottom safe-area inset, lifted onto the keyboard over phone's centre — and the judges read
+  // only what both apps log (submits, focus, the frames of phone and `submit.bar`, the keyboard), so both platforms.
   {
     id: 'k6',
     cell: K,
     keyboard: true,
-    platforms: ['android'],
-    says: 'a tap on phone, under the bar riding on the IME (its dump a strip cut at Continue): never a submit — refused, or tapped where it focuses phone',
+    says: 'a tap on phone, under the bar riding on the keyboard (Android: its dump a strip cut at Continue): never a submit — refused, or tapped where it focuses phone',
     calls: [{ tool: 'tap', args: { selector: id(K, 'phone') } }],
     judge: (s, [reply]) => {
       const submits = (s.submits ?? []).length;
@@ -251,8 +253,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     id: 'k7',
     cell: K,
     keyboard: true,
-    platforms: ['android'],
-    says: 'scroll_until phone, under the bar riding on the IME: no stop while its centre lies under the bar or the IME, never a submit (the strokes counted)',
+    says: 'scroll_until phone, under the bar riding on the keyboard: no stop while its centre lies under the bar or the keyboard, never a submit (the strokes counted)',
     calls: [{ tool: 'scroll_until', args: { selector: id(K, 'phone'), direction: 'down' } }],
     judge: (s, replies, source, launched) => judgePhoneScroll(s, replies, source, launched),
   },
