@@ -144,6 +144,9 @@ Residuals, stated:
   deep), though the stop's tree had settled;
 - a surface the same colour as the target (within ΔE00 2.0), or the target on a background of the surface's colour, is
   `unjudged`, said;
+- a target as wide as the screen has no screen beside it, so step 4 always answers `unjudged`: a full-width list row
+  flush with a narrower pinned button costs one screenshot and says "fully visible by the tree … a screenshot could
+  not tell (nothing of the screen beside it to tell its own margin from that surface)";
 - the band is measured on the dumped node (k7: 28 px of its touch target, of which 18 px are the drawn field's);
 - a surface with no flush node at all (a node-less bar over a target no later node touches) is not looked for — no
   trigger, no screenshot.
