@@ -93,9 +93,9 @@ export async function nextMove(strategies: readonly DismissalStrategy[], ground:
   return { skipped };
 }
 
-/** The move, sent: one tap, or one drag at DRAG_SPEED (`dragMs`). */
+/** The move, sent: one tap, or one drag at DRAG_SPEED (`dismissalDragMs`). */
 export function perform(adapter: Pick<DeviceAdapter, 'tap' | 'swipe'>, move: DismissalMove): Promise<void> {
-  return move.kind === 'tap' ? adapter.tap(move.at.x, move.at.y) : adapter.swipe(move.from, move.to, dragMs(move));
+  return move.kind === 'tap' ? adapter.tap(move.at.x, move.at.y) : adapter.swipe(move.from, move.to, dismissalDragMs(move));
 }
 
 /** `tapping id:"login_title"`, `dragging the target's scroll view up` — the fragment after `hidden by `. */
@@ -248,12 +248,12 @@ export const SCREEN_EDGE = 24;
  * How fast the fallback's drag moves: 240 pt/s, the speed measured to hide the Contacts form's keyboard (120 pt in
  * 500 ms, 3 of 3) — the drag's length read as a scroll, not a flick: interact/scroll-rounds.ts measured a 300-ms
  * stroke at 1147 pt/s flinging a SwiftUI form 729–970 pt, and a fling would carry the target past where the drag
- * lifted it. The duration follows from the length (`dragMs`), so a longer lift is no faster.
+ * lifted it. The duration follows from the length (`dismissalDragMs`), so a longer lift is no faster.
  */
 export const DRAG_SPEED = 240;
 
 /** How long a drag takes at DRAG_SPEED, in ms. */
-export const dragMs = (m: Extract<DismissalMove, { kind: 'drag' }>): number => Math.round((Math.abs(m.from.y - m.to.y) / DRAG_SPEED) * 1000);
+export const dismissalDragMs = (m: Extract<DismissalMove, { kind: 'drag' }>): number => Math.round((Math.abs(m.from.y - m.to.y) / DRAG_SPEED) * 1000);
 
 /**
  * How far the fallback's drag moves at least, in points: the 120-pt drag measured to hide the keyboard on the Contacts
@@ -317,8 +317,10 @@ interface BlankPoint {
  * outside the scroll view — a dimming view or a decoration drawn over it.
  *
  * Bare is not inert: WDA lists a tappable row (`Cell`) and an RN Pressable without a label as bare containers. A drag
- * that touches down on one is a scroll — UIKit cancels the row's touch once the scroll view takes the pan — so the rule
- * keeps the drag off what the tree names, and no TAP is ever sent here (the module's doc).
+ * that touches down on one is meant as a scroll — that UIKit cancels the row's touch once the scroll view takes the
+ * pan is UNMEASURED here — and an RN Pressable's `onPressIn` fires on the touch-down itself, before any scroll takes
+ * over (ADR 0022, residual 1). The rule keeps the drag off what the tree names, and no TAP is ever sent here (the
+ * module's doc).
  */
 async function blankPoint({ look, screen, target }: DismissalGround): Promise<BlankPoint | { readonly skipped: string }> {
   if (target === undefined) return { skipped: 'no target to find it by' };

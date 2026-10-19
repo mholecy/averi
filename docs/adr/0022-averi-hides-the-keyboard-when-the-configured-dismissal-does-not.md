@@ -104,9 +104,11 @@ honestly both times.
 ## Residuals accepted
 
 1. **The drag may touch down on an unlabelled control.** Its start keeps off every node the tree names, but WDA lists a
-   tappable row (`Cell`) and an unlabelled RN Pressable as bare containers. A drag that begins on one is a scroll —
-   UIKit cancels the row's touch once the scroll view takes the pan — so nothing is pressed; a gesture recogniser on a
-   bare wrapper that fires on touch-down is not seen (ADR 0016's residual for the picker).
+   tappable row (`Cell`) and an unlabelled RN Pressable as bare containers. A drag that begins on one is meant as a
+   scroll; that UIKit cancels the row's touch once the scroll view takes the pan is UNMEASURED. A residual risk
+   either way: an RN Pressable's `onPressIn` (and any gesture recogniser on a bare wrapper that acts on touch-down)
+   fires on the touch-down itself, before the scroll takes over — not seen in the tree (ADR 0016's residual for the
+   picker).
 2. **The drag scrolls the scroll view** toward its end when it does not hide the keyboard — that is how it lifts the
    target. The target is resolved again after it, the note says where the drag went, and a refusal after it says a
    drag may have scrolled the content.
