@@ -352,11 +352,13 @@ export interface FlushNeighbour {
  * (`cutsAtLater`, Android's: Compose leaves out of a node's bounds what a later node covers), `by` is the node laid
  * flush against that edge along the node's whole width, drawn after it outside its subtree (`laterAcross`, the cut's
  * and the flush neighbour's evidence), that also REACHES PAST THE NODE AT BOTH ENDS of the edge: an overlay laid over
- * content with margins of its own (the lab's pinned `Continue` 66..1014 over its row 127..952; a full-bleed sticky
- * header over an inset row), where a sibling laid beside it in a column shares an alignment line with it at one end at
- * least (a list's next row, a field under its title, a touch target exactly as wide). In the node's own scroll view,
- * only a `by` pinned at that scroll view's edge on its far side counts (a sticky header at the list's top, a footer at
- * its bottom): a next section's header laid flush under a row scrolls with it. Top and bottom only: every measured
+ * content with margins of its own (the lab's pinned `Continue` 66..1014 over its row 127..952; mp-native's floating
+ * tab bar over a row's avatar and texts), where a sibling laid beside it in a column shares an alignment line with it at one end at
+ * least (a list's next row, a field under its title, a touch target exactly as wide). Never a `by` in the node's own
+ * scroll view: a sticky header pinned at the list's top lies flush on its first row at rest, whole, exactly as on a
+ * row it cuts — the tree cannot tell the two, and no stroke settles it (live, the lab's `scroll-sticky-cut`: `fully`
+ * strokes on `R` ended with it scrolled away), so a row cut at a sticky header stays read whole (VA1, open). Top and
+ * bottom only: every measured
  * Compose cut is vertical, and sideways a row's padded overflow icon reaches past its neighbour's ends (Contacts' "Save"
  * beside its 132-px touch target). Decided from the tree alone — no screenshot sees under an opaque node.
  *
@@ -366,7 +368,6 @@ export interface FlushNeighbour {
  * to a strip under the tap minimum, is a sliver (`cutByLater`). The tap and the plain stop judge the centre, which the
  * cut leaves clear unless it is a sliver.
  * docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
- * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
  * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (refined 2026-10-20)
  */
 export interface OverlaidEdge {
@@ -1296,7 +1297,7 @@ function laterAcross(scene: Scene, node: UiNode, edge: Edge): UiNode | undefined
 /**
  * The node's overlaid edge (`OverlaidEdge`), top before bottom, or undefined: on a tree whose source cuts a node's bounds
  * at a node drawn after it (`cutsAtLater`), the node laid flush across that edge (`laterAcross`) reaching past the
- * node at both of its ends — and, in the node's own scroll view, pinned at that scroll view's far edge. At most two
+ * node at both of its ends, outside the node's own scroll view. At most two
  * `coversOf` questions; asked only where it decides (`cutByLater` for a role-less strip, the `fully` stop and the pixel
  * assert with no other cover).
  */
@@ -1310,9 +1311,8 @@ function overlaidEdge({ scene, node, cutsAtLater }: Judged): OverlaidEdge | unde
     const c = by.rect;
     // An overlay's own margins: past the node at both ends, not on an alignment line it shares with it.
     if (c.x >= r.x || c.x + c.width <= r.x + r.width) continue;
-    // In its own scroll view, only pinned at that scroll view's far edge (a sticky header or footer).
-    const sameView = own !== undefined && scene.clips.scrollersOf(by).some((s) => sameRect(s, own));
-    if (!sameView || (edge === 'top' ? c.y === own.y : c.y + c.height === own.y + own.height)) return { edge, by };
+    // Never one in its own scroll view: a row at rest lies whole and flush under its sticky header, as one it cuts.
+    if (own === undefined || !scene.clips.scrollersOf(by).some((s) => sameRect(s, own))) return { edge, by };
   }
   return undefined;
 }

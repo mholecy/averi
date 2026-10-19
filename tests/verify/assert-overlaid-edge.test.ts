@@ -7,10 +7,9 @@ import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
 
 // THE PIXEL ASSERT ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/standing.ts#OverlaidEdge): the tree shows the pinned
-// button or the sticky header only by the cut, so the assert fails closed naming it, saying the element may run on
+// button only by the cut, so the assert fails closed naming it, saying the element may run on
 // under it — never a PASS on the cut rect's own colour. The lab's real captures and screenshots.
 // docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
-// docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
   resetSleeps();
@@ -39,12 +38,6 @@ describe('the colour assert on a node cut at an overlay fails closed naming it',
     expect(passed).toBe(false);
     expect(detail).toContain(`container id:lab.pinned-bar.continue (66,1956 948x154) meets the element's bottom edge (element 127,1846 825x110), ${RUNS_ON}`);
     expect(detail).toContain('assert something in it that lies clear of that; failing closed, color unchecked');
-  });
-  it('scroll-sticky-cut R under the sticky header (VA1): its top edge, the scroll advice', async () => {
-    const { passed, detail } = await colourOn('scroll-sticky-cut', 'lab.scroll-sticky-cut.R', '#00897B');
-    expect(passed).toBe(false);
-    expect(detail).toContain(`container id:lab.scroll-sticky-cut.header (0,303 1080x154) meets the element's top edge (element 128,457 825x110), ${RUNS_ON}`);
-    expect(detail).toContain('scroll_until the element with `fully: true` first and re-run; failing closed, color unchecked');
   });
   it('bands Q above N\'s touch target, exactly as wide: no overlay — the colour is measured', async () => {
     expect((await colourOn('bands', 'lab.bands.Q', '#FB8C00')).passed).toBe(true);

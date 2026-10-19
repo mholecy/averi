@@ -21,8 +21,8 @@ crop's whole rect. The miss names what lies over the element:
 
 - `the status bar …` or `the navigation bar …`, with the band's rect;
 - the cover's role, label and rect, plus its reach for a pinned bar. On Android the cover may be one the tree shows only
-  by the cut: a node drawn after the element whose own node begins exactly where the element's top or bottom edge ends,
-  reaching past it at both ends (`ui-tree/standing.ts#OverlaidEdge`, since 2026-10-20: Compose leaves out of a node's
+  by the cut: a node drawn after the element, outside its scroll view, whose own node begins exactly where the element's
+  top or bottom edge ends, reaching past it at both ends (`ui-tree/standing.ts#OverlaidEdge`, since 2026-10-20: Compose leaves out of a node's
   bounds what a later node covers). The miss says the element "meets" it and may run on under it, its rect the reach
   (docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md, refined 2026-10-20).
 

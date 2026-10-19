@@ -6,9 +6,8 @@ import { FakeAdapter } from '../helpers/fake.js';
 
 /**
  * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/standing.ts#OverlaidEdge), over the lab's real captures
- * served unchanged by every read: `fully: true` never claims a row whose rest may lie under the pinned button or the
- * sticky header, and a role-less strip cut by the button is no stop; the plain stop on a row whose centre is clear
- * still stops. docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
+ * served unchanged by every read: `fully: true` never claims a row whose rest may lie under the pinned button, and a
+ * role-less strip cut by the button is no stop; the plain stop on a row whose centre is clear still stops. docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
 
 const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
@@ -38,9 +37,5 @@ describe('scroll_until on a node cut at an overlay', () => {
   it('text-under-bar P (a role-less strip under Continue), the plain stop: no stop on the strip — cut by Continue', async () => {
     const message = await failure('text-under-bar', 'id:"lab.text-under-bar.P"', false);
     expect(message).toContain(`element is in the viewport but cut at its bottom edge by container id:lab.text-under-bar.continue (66,1956 948x154), ${RUNS_ON}; only a 825x22 part of it shows`);
-  });
-  it('scroll-sticky-cut R (VA1), fully: true — fails naming the sticky header at its top edge', async () => {
-    const message = await failure('scroll-sticky-cut', 'id:"lab.scroll-sticky-cut.R"', true);
-    expect(message).toContain(`element is in the viewport but cut at its top edge by container id:lab.scroll-sticky-cut.header (0,303 1080x154), ${RUNS_ON}`);
   });
 });
