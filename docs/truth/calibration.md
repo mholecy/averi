@@ -53,7 +53,7 @@ open note on the working tree. See the script for the verdicts.
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | calibrate | 6f3a633 → 837ec3e | CALIBRATED; live ios: CALIBRATED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4.1 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e0c2587 → bea9769 | CALIBRATED-ON-DEFECT; live ios: CALIBRATED |
-| L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 1ef11b9 | CALIBRATED; live ios: CALIBRATED |
+| L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 0f28b4c | CALIBRATED; live ios: CALIBRATED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
@@ -1061,7 +1061,7 @@ Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4
   - RED ios-iphone17-ios27/blur-menu.wda.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading order: which is drawn on top is not told; only a 300x22 part of it show
   - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) overlaps the element (element 51,448 300x64), the two listed in reading order: which is drawn on to
   - RED ios-iphone17-ios27/blur-menu.wda.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" stopped before any swipe — element is in the viewport but overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading ord
-- after 1ef11b9:
+- after 0f28b4c:
   - ok ios-iphone17-ios27/blur-menu.idb.json W tap — Tapped id:"lab.blur-menu.W"
   - ok ios-iphone17-ios27/blur-menu.idb.json W colour — PASS  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — sampled #00897B (dominant, 100% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 3.000
   - ok ios-iphone17-ios27/blur-menu.idb.json W scroll_until — Element id:"lab.blur-menu.W" fully visible after 0 swipes
@@ -1071,7 +1071,7 @@ Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4
 
 Live (phase 5, ios idb, wda): **CALIBRATED**, 94fc318 → 1ef11b9, tap:blur-menu.W — Before (docs/truth/live-records/ios-vis-r8-l4-3.json, -4.json, round 8's final src 94fc318b — the src of fix/round-9 for this case): tap W refused as overlapped by C, the order not told, nothing fired — LOUD under idb and WDA. After (ios-vis-r9-l4w-1.json, -2.json at 1ef11b9c): Tapped id:"lab.blur-menu.W", the app logged W alone, under idb and WDA, both runs; C's tap and scroll_until refused as under W, seen so, nothing fired or stroked; nothing closed the menu. (docs/truth/live-ios-2026-10-18-visibility.md)
 
-W's half, round 9 (fix/r9-l4w 1ef11b9; ADR 0024): the eyes tell the order of two controls listed in reading order from one screenshot (verify/eyes.ts#judgeOrder over the committed blur-menu.png: the overlap #00897B, W's band #00897B, C's #347937, ΔE00 0.00 and 17.69) and the draw order takes the answer as an input (ui-tree/seen-order.ts). Before (fix/round-9 e52d179): W refused / FAIL / stopped before any swipe, overlapped by C, the order not told. After: Tapped at (201,480), colour PASS on #00897B, fully visible after 0 swipes. C's nine rows reworded as under W, seen drawn over it on the screenshot — still red as #31's residual (the first pair's ON-DEFECT).
+W's half, round 9 (fix/r9-l4w 1ef11b9, its review fixes 85e3621, a374227 and 0f28b4c; ADR 0024): the eyes tell the order of two controls listed in reading order from one screenshot (verify/eyes.ts#judgeOrder over the committed blur-menu.png: the overlap #00897B, W's band #00897B, C's #347937, ΔE00 0.00 and 17.69) and the draw order takes the answer as an input (ui-tree/seen-order.ts). Before (fix/round-9 e52d179): W refused / FAIL / stopped before any swipe, overlapped by C, the order not told. After: Tapped at (201,480), colour PASS on #00897B, fully visible after 0 swipes. C's nine rows reworded as under W, seen drawn over it on the screenshot — still red as #31's residual (the first pair's ON-DEFECT).
 
 ## LE1: OPEN-RED
 

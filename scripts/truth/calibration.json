@@ -1098,7 +1098,7 @@
       "n": "L4",
       "note": "2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md",
       "status": "calibrate",
-      "fix": ["37bf5a1", "f5a28b3", "bea9769", "1ef11b9"],
+      "fix": ["37bf5a1", "f5a28b3", "bea9769", "1ef11b9", "85e3621", "a374227", "0f28b4c"],
       "before": "e0c2587",
       "after": "bea9769",
       "verified": "golden",
@@ -1119,7 +1119,7 @@
       "pairs": [
         {
           "before": "e52d179",
-          "after": "1ef11b9",
+          "after": "0f28b4c",
           "checks": [
             "ios-iphone17-ios27/blur-menu.idb.json W tap",
             "ios-iphone17-ios27/blur-menu.idb.json W colour",
@@ -1130,7 +1130,7 @@
           ],
           "defect": "overlapped by button \"Target C\"|\"Target C\" \\(51,470 300x64\\) overlaps the element",
           "expect": "CALIBRATED",
-          "remark": "W's half, round 9 (fix/r9-l4w 1ef11b9; ADR 0024): the eyes tell the order of two controls listed in reading order from one screenshot (verify/eyes.ts#judgeOrder over the committed blur-menu.png: the overlap #00897B, W's band #00897B, C's #347937, ΔE00 0.00 and 17.69) and the draw order takes the answer as an input (ui-tree/seen-order.ts). Before (fix/round-9 e52d179): W refused / FAIL / stopped before any swipe, overlapped by C, the order not told. After: Tapped at (201,480), colour PASS on #00897B, fully visible after 0 swipes. C's nine rows reworded as under W, seen drawn over it on the screenshot — still red as #31's residual (the first pair's ON-DEFECT)."
+          "remark": "W's half, round 9 (fix/r9-l4w 1ef11b9, its review fixes 85e3621, a374227 and 0f28b4c; ADR 0024): the eyes tell the order of two controls listed in reading order from one screenshot (verify/eyes.ts#judgeOrder over the committed blur-menu.png: the overlap #00897B, W's band #00897B, C's #347937, ΔE00 0.00 and 17.69) and the draw order takes the answer as an input (ui-tree/seen-order.ts). Before (fix/round-9 e52d179): W refused / FAIL / stopped before any swipe, overlapped by C, the order not told. After: Tapped at (201,480), colour PASS on #00897B, fully visible after 0 swipes. C's nine rows reworded as under W, seen drawn over it on the screenshot — still red as #31's residual (the first pair's ON-DEFECT)."
         }
       ],
       "live": [
