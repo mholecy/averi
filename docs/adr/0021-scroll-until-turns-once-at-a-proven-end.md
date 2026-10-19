@@ -181,7 +181,8 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
 ## Residuals accepted
 
 1. **The final approach's carry on a long WDA list can rest a row a few points past its window** (recorded
-   2026-10-19 at round 7's integration, pending the owner). The cut stroke is planned over the largest carry sampled
+   2026-10-19 at round 7's integration; accepted 2026-10-19 by the round-7 orchestrator — the owner delegated round-7
+   decisions on 2026-10-18). The cut stroke is planned over the largest carry sampled
    (decision 4), and a fling is not exactly proportional run to run: on the lab's 56-row table it brought L to rest
    14 pt past its window in one run of three (1933.7 against 1920), the row still 78% shown with its centre clear. The
    reply says so ("CLIPPED at top, … % of it is in the viewport"), so a caller asking `fully` is told; no stop is
