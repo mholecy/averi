@@ -12,7 +12,7 @@ open note on the working tree. See the script for the verdicts.
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 22 rows (recorded) |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 32 rows — **10 unrecorded** |
 | 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED; live ios: CALIBRATED |
 | 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED; live ios: CALIBRATED-ON-DEFECT |
 | 8.1 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
@@ -26,12 +26,12 @@ open note on the working tree. See the script for the verdicts.
 | 15 | 2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it | calibrate | 20053ae → 8a55d2b | CALIBRATED, regressed elsewhere: 2 rows (recorded) |
 | 16 | 2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard | calibrate | 81a7d62 → f4ff4be | CALIBRATED-ON-DEFECT |
 | 17 | 2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band | calibrate | 8a55d2b → 21f1deb | DOES-NOT-FAIL (partial: the static half only (a row resting in the status band); the turn-back is calibrated live (`live`)); live ios: CALIBRATED |
-| 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node) |
+| 18 | 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers | calibrate | d2b7744 → 81a7d62 | CALIBRATED (partial: the cell-background half and the text field over its own label; the field's scroll-indicator node is captured since round 7 (rn-field) but asks no row of its own: what covers there is LR1's and LR2's) |
 | 19.1 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | bd06470 → 470dafe | CALIBRATED; live ios: CALIBRATED |
 | 19.2 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | c11d179 → cd4d177 | STILL-RED-AFTER |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only), regressed elsewhere: 1 row (recorded) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
-| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts), regressed elsewhere: 6 rows (recorded) |
+| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts), regressed elsewhere: 8 rows — **2 unrecorded** |
 | 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | CALIBRATED (partial: the band's pixel half: a text across the gesture navigation band (text-nav-cut's T), its colour assert) |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
@@ -64,6 +64,9 @@ open note on the working tree. See the script for the verdicts.
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | open | working tree | OPEN-RED |
 | NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | open | working tree | OPEN-RED |
+| LW1 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 054a59f → f924893 | CALIBRATED |
+| LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | open | working tree | OPEN-RED |
+| LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | open | working tree | OPEN-RED |
 
 ## 1.1: CALIBRATED
 
@@ -232,6 +235,10 @@ Regressed elsewhere at 13d68a2 (green at 16ae6bb):
   - RED android-averi_lab-api33/own-parts.xml L scroll_until — stopped: ERROR scroll_until text:"LOGIN" failed after 2 swipes — element is in the viewport but under button (127,303 825x176) at its centre (540,392), drawn over it — 0% of it shows — and the content is exhau
   - RED android-averi_lab-api33/own-parts.xml I tap — not tapped: ERROR label:"Close" is under button (485,1821 110x110) at its centre (540,1876), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
   - RED android-averi_lab-api33/own-parts.xml I scroll_until — stopped: ERROR scroll_until label:"Close" failed after 2 swipes — element is in the viewport but under button (485,1821 110x110) at its centre (540,1876), drawn over it — 0% of it shows — and the content is ex
+  - RED android-rn-averi_lab-api33/rn-field.xml N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it; only a 255x3 part of it shows, under the 65x65 a tap may be moved to — scr — **not in `regressions`**
+  - RED android-rn-averi_lab-api33/rn-field.xml N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it — 10% of i — **not in `regressions`**
+  - RED android-rn-averi_lab-api33/rn-field.xml M tap — not tapped: ERROR text:"Message for the recipient" is under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn over it; only a 475x3 part of it shows, under the 65x65 a tap may be — **not in `regressions`**
+  - RED android-rn-averi_lab-api33/rn-field.xml M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn ove — **not in `regressions`**
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu-grouped.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows 
   - RED ios-iphone17-ios27/blur-menu.idb.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_until it fi
@@ -246,6 +253,12 @@ Regressed elsewhere at 13d68a2 (green at 16ae6bb):
   - RED ios-iphone17-ios27/sheet-medium.wda.json S scroll_until — stopped: ERROR scroll_until id:"lab.sheet-medium.S" failed after 2 swipes — element is in the viewport but under container (8,415 386x451) at its centre (201,484), drawn over it — 0% of it shows — and the cont
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap — Tapped moved off a cover over its centre, on a target measured uncovered: Tapped id:"lab.tabbar-hidden-push.C" at (201,830) — its centre (201,810) is under button "Cards" (201,754 82x64), drawn over it; tapped the uncovered part 300x24
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until — stopped: ERROR scroll_until id:"lab.tabbar-hidden-push.C" failed after 2 swipes — element is in the viewport but under button "Cards" (201,754 82x64) at its centre (201,810), drawn over it — 38% of it shows — 
+  - RED ios-rn-iphone17-ios27/rn-field.idb.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,142), drawn over it; only a 94x1 part of it shows, under the 24x24 a tap may be moved to — scrol — **not in `regressions`**
+  - RED ios-rn-iphone17-ios27/rn-field.idb.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,142), drawn over it — 9% of it  — **not in `regressions`**
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,143), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scrol — **not in `regressions`**
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,143), drawn over it — 13% of it — **not in `regressions`**
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M tap — not tapped: ERROR text:"Message for the recipient" is under container "Horizontal scroll bar, 1 page" (69,499 264x10) at its centre (157,503), drawn over it; only a 175x2 part of it shows, under the 24x24 a tap m — **not in `regressions`**
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 2 swipes — element is in the viewport but under container "Horizontal scroll bar, 1 page" (69,499 264x10) at its centre (157,503), draw — **not in `regressions`**
 
 Regressions recorded:
 
@@ -468,7 +481,7 @@ Live (phase 5, ios wda, idb): **CALIBRATED**, 8a55d2b → 21f1deb, turn:scroll-t
 
 The static half does not fail: scroll-top-edge's T (iOS: -2–62 pt, its centre 30 under the status bar itself, its probe swallowed) is already not reached where it is at 8a55d2b, as at 21f1deb. What the fix changed is the stroke's direction: phase 5. At 21f1deb only the wording of sheet-medium.wda's scroll_until rows changes (still red until ce33431).
 
-## 18: CALIBRATED (partial: the cell-background half and the text field over its own label; not the field's scroll-indicator node)
+## 18: CALIBRATED (partial: the cell-background half and the text field over its own label; the field's scroll-indicator node is captured since round 7 (rn-field) but asks no row of its own: what covers there is LR1's and LR2's)
 
 2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md — defect: `^(not tapped|stopped): .*\bunder (container|textfield)\b`
 
@@ -491,7 +504,7 @@ Regressions recorded:
 
 - ios-iphone17-ios27/sheet-medium.wda.json S tap, ios-iphone17-ios27/sheet-medium.wda.json S scroll_until: broke at 13d68a2, fixed at 81a7d62 — green at 16ae6bb: the cover judgement 13d68a2 introduced read the sheet's frames-only background (8,415 386x451) as drawn over its own button
 
-Needs: The text field's own scroll indicator (`container 'Horizontal scroll bar, 1 page'` under an RN text field) needs a field whose tree lists one: neither SwiftUI's TextField nor a UIKit UITextField in the lab lists it (iOS 27.0, empty, unfocused).
+Needs: Round 7 (fixtures/apps/rn, rn-field; RN 0.88.0, new architecture, iOS 27.0) reproduces the indicator's geometry on RN's MULTILINE TextInput (a UITextView), laid as the SWIFT field: WDA `TextView 69,492 264x20` → `Other 'Horizontal scroll bar, 1 page'` value `0 %` `69,499 264x10` (one bare thumb `72,506 258x3`), after M's label `69,491 174.3x22.3` (centre y 502.2) and over its centre — mp-native's `textfield 42,447 318x20` → bar `42,454 318x10` over its label's centre 457 (tests/fixtures/truth/ios-rn-iphone17-ios27/rn-field.wda.json). RN 0.88's single-line TextInput (a UITextField) lists no bar, where mp-native's single-line field does (tests/fixtures/wda-capture-swift-form-pushed.json), and RN 0.88 lists every input inside an unnamed wrapper of its rect, where mp-native's is the label's direct sibling — most likely the new architecture's (mp-native's build is older; not measured). At HEAD the bar is excused (`scrollIndicator`, its parent a text input): no reply names it. M's rows are red all the same, for the field itself (the wrapper: LR1) — so they cannot calibrate the indicator half: the indicator's fix (81a7d62) and the wrapper both decide them. A row isolating the bar needs LR1 fixed first, then rn-field's M under WDA at d2b7744 vs 81a7d62; mp-native's own shape (no wrapper, a single-line field) needs a lab app on the bank app's older RN.
 
 The sheet's background container is a frames-only wrapper over its button S — the cell-background half of the note. own-parts' N: an empty UIKit field 14 pt tall laid over its label (18 pt) and after it — red at d2b7744 under WDA and idb alike (`under textfield id:lab.own-parts.N.field`), green at 81a7d62. On Android N is a green control row, no reproduction: uiautomator lists the label AFTER the field (EditText [177,1316][902,1448], TextView [177,1351][443,1412]).
 
@@ -602,10 +615,12 @@ Regressed elsewhere at 596a379 (green at ad7ed11):
 
   - RED android-averi_lab-api33/fab.xml L colour — failed: FAIL  element id:"lab.fab.L" fill within dE00 8 of #E53935 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 44,1846 320x176) — the capture would show it, not the elemen
   - RED android-averi_lab-api33/fab.xml K colour — failed: FAIL  element id:"lab.fab.K" fill within dE00 8 of #FB8C00 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 716,1846 320x176) — the capture would show it, not the eleme
+  - RED android-rn-averi_lab-api33/rn-field.xml M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (177,1353 726x55) is drawn over the element (element 177,1350 475x61) — the  — **not in `regressions`**
   - RED ios-iphone17-ios27/blur-menu.idb.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
   - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — failed: FAIL  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — button "More" (283,754 82x64, reaching 283,741 82x77) is drawn over the element (element 51,698 300x64) — the capture would 
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — failed: FAIL  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — button "Cards" (201,754 82x64, reaching 201,741 82x77) is drawn over the element (element 51,778 300x64) — the capture would
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (69,492 264x20) is drawn over the element (element 69,491 175x23) — the capt — **not in `regressions`**
 
 Regressions recorded:
 
@@ -1158,6 +1173,59 @@ No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none)
   - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — elemen
 
 No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply says why (review round 4, P4). presented.known.ts owns the ratchet; this entry links the note to its rows. Live: scripts/truth/live-known.ts NO_ID (idb tap:sheet-long-list.R, tap:sheet-long-list-short.R, scroll:sheet-long-list-short.F).
+
+## LW1: CALIBRATED
+
+2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md — defect: `to appear$|active-window hint|never appeared in the tree`
+
+- before 054a59f:
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml A tap — not in the tree (active-window hint): ERROR Timed out after 5000ms waiting for element id:"lab.bottom-sheet-dialog.A" to appear
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml A scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.bottom-sheet-dialog.A" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element 
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml B tap — not in the tree (active-window hint): ERROR Timed out after 5000ms waiting for element id:"lab.bottom-sheet-dialog.B" to appear
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml B scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.bottom-sheet-dialog.B" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element 
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml C tap — not in the tree (active-window hint): ERROR Timed out after 5000ms waiting for element id:"lab.bottom-sheet-dialog.C" to appear
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml C scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.bottom-sheet-dialog.C" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element 
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml D tap — not in the tree (active-window hint): ERROR Timed out after 5000ms waiting for element id:"lab.bottom-sheet-dialog.D" to appear
+  - RED android-averi_lab-api33/bottom-sheet-dialog.xml D scroll_until — swiped 2× beneath a presented layer: ERROR scroll_until id:"lab.bottom-sheet-dialog.D" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element 
+- after f924893:
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml A tap — ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a mod
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml A scroll_until — ERROR scroll_until id:"lab.bottom-sheet-dialog.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1164 1080x990) — a screen is presented over it (a
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml B tap — ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a mod
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml B scroll_until — ERROR scroll_until id:"lab.bottom-sheet-dialog.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1164 1080x990) — a screen is presented over it (a
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml C tap — ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a mod
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml C scroll_until — ERROR scroll_until id:"lab.bottom-sheet-dialog.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1164 1080x990) — a screen is presented over it (a
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml D tap — ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a mod
+  - ok android-averi_lab-api33/bottom-sheet-dialog.xml D scroll_until — ERROR scroll_until id:"lab.bottom-sheet-dialog.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1164 1080x990) — a screen is presented over it (a
+
+Fixed by round 7's A7, f924893 on arch/r23-sheet-dialog (adapters/android.ts#presentedWindow asks the window of an ordered list of named recognizers, and #materialSheetDialog — Material's touch_outside followed by design_bottom_sheet under a coordinator, read by the ids' entries against the scrim's edges — is one; ADR 0018's amendment "a Views BottomSheetDialog by Material's ids"), its ADR amended at 25da22d4, merged into arch/round-23 as 3ec1f26: the pair is f924893 itself and its parent 054a59f (a docs commit over round 6's src 565bcb9, LW1's note carried). Before: the taps time out "to appear" with the active-window hint, scroll_until strokes the window twice and says it never appeared in the tree with the hint; after: each tap's wait says the presented remedy, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's "not found" is vacuous; with ui-tree/miss.ts its miss now says the presented remedy). Live: the four scroll cases struck off scripts/truth/live-known.ts — round 7's A7 run three times (docs/truth/live-records/android-vis-sheet-dialog-run1…3.json), 13/13 ok each, the sheet never dismissed.
+
+## LR1: OPEN-RED
+
+2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md — defect: `^(not tapped|stopped|failed): .*\bunder textfield\b|textfield .* is drawn over the element`
+
+- working tree:
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,143), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scrol
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,143), drawn over it — 13% of it
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — textfield id:lab.rn-field.N.field (69,132 264x20) is drawn over the element (element 69,131 94x23) — the capture would show it, not the 
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M tap — not tapped: ERROR text:"Message for the recipient" is under textfield id:lab.rn-field.M.field (69,492 264x20) at its centre (157,503), drawn over it; only a 175x2 part of it shows, under the 24x24 a tap may be mo
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.M.field (69,492 264x20) at its centre (157,503), drawn over i
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (69,492 264x20) is drawn over the element (element 69,491 175x23) — the capt
+
+No fix yet: red at HEAD, round 7's React Native lab app (fixtures/apps/rn). WDA lists RN's text input inside an unnamed wrapper of its own rect, so ownControl's sibling rule misses its floating label; idb lists the field flat and is green. react-native.known.ts owns the ratchet. Live LOUD under WDA (rn4, tap:rn-field.N, tap:rn-field.M refused, nothing fired: docs/truth/live-rn-2026-10-19.md).
+
+## LR2: OPEN-RED
+
+2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md — defect: `^(not tapped|stopped|failed): .*\bunder textfield\b|textfield .* is drawn over the element`
+
+- working tree:
+  - RED android-rn-averi_lab-api33/rn-field.xml N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it; only a 255x3 part of it shows, under the 65x65 a tap may be moved to — scr
+  - RED android-rn-averi_lab-api33/rn-field.xml N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it — 10% of i
+  - RED android-rn-averi_lab-api33/rn-field.xml N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — textfield id:lab.rn-field.N.field (177,363 726x55) is drawn over the element (element 177,360 255x61) — the capture would show it, not t
+  - RED android-rn-averi_lab-api33/rn-field.xml M tap — not tapped: ERROR text:"Message for the recipient" is under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn over it; only a 475x3 part of it shows, under the 65x65 a tap may be
+  - RED android-rn-averi_lab-api33/rn-field.xml M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn ove
+  - RED android-rn-averi_lab-api33/rn-field.xml M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (177,1353 726x55) is drawn over the element (element 177,1350 475x61) — the 
+
+No fix yet: red at HEAD, round 7's React Native lab app. The label overhangs its EditText by 3 px (1 dp at 2.75), past LABEL_OVERHANG's 2 px — ADR 0014's allowance stated in the tree's units, stricter on Android. react-native.known.ts owns the ratchet. Live LOUD (rn4, tap:rn-field.N, tap:rn-field.M refused, nothing fired: docs/truth/live-rn-2026-10-19.md).
 
 ## Not reproducible with the existing cells
 
