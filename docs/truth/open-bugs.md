@@ -4,8 +4,8 @@ This is the one place an agent or a person starts from to fix an averi bug the t
 
 The bugs are already written down. You do not have to rediscover them by testing. The harness shows that a bug exists, and then that it is fixed.
 
-Snapshot: `main` at 880a9a6a (2026-10-19, end of truth-lab round 7):
-- golden: 1410 checks, 225 mismatches (all known), 0 broken, 92 skipped;
+Snapshot: `main` at b3cf10ea (2026-10-19, round 8 so far: L2 fixed, L4's unsafe half fixed):
+- golden: 1410 checks, 223 mismatches (all known), 0 broken, 92 skipped (no OCR in the sandbox; 249 with OCR);
 - calibrate: exit 0.
 
 When a bug is fixed, update its row here: strike it or remove it, and give the commit.
