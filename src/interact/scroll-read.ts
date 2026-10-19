@@ -417,7 +417,13 @@ export type InFrameShort =
   | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
   | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number }
   /** A `fully: true` stop the eyes refused (ui-tree/eyes.ts): a band of a surface the tree does not list over the match's edge — never `shortOf`'s, the round's (scroll-rounds.ts#round). */
-  | { of: 'unlisted'; judged: Judged; finding: SurfaceFinding };
+  | {
+      of: 'unlisted';
+      judged: Judged;
+      finding: SurfaceFinding;
+      /** The round's keyboard reading's cover as offered — applied or not, the witness not asked (the band was moot: the match lies above it) — for the remedy's "if it is up". */
+      offered?: { lineY: number; remedy: KeyboardRemedy };
+    };
 
 /**
  * What a judged match in the frame is short of a stop (`stops`) — the one

@@ -1410,7 +1410,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (!fully || finding?.answer.sees !== 'surface') {
         return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }), ...(finding !== undefined && { eyes: finding }) });
       }
-      unlisted = { of: 'unlisted', judged: best, finding: { ...finding, answer: finding.answer } };
+      unlisted = { of: 'unlisted', judged: best, finding: { ...finding, answer: finding.answer }, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
       if (question !== undefined) s.eyesRefused = { region: { ...question.region }, neighbour: { ...question.neighbour.rect }, short: unlisted };
     }
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
@@ -1450,7 +1450,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const stuckOn = backUnmoved ? s.stuckOn : observed.stuck ? s.lastStroke : undefined;
     if (stuckOn !== undefined) {
       const { sliver } = best.standing.facts;
-      const outward = !fully && sliver !== undefined && SIDES[sliver.edge].reveals === stuckOn;
+      // Nor for a band of a surface the eyes saw (THE EYES) stuck on strokes that lift it out from under that surface:
+      // the other way only pushes it further under — measured live on k7 with `fully: true`, the stroke back up laid
+      // phone under the bar again, a 42-px strip.
+      const outward = (!fully && sliver !== undefined && SIDES[sliver.edge].reveals === stuckOn) || (unlisted !== undefined && SIDES[unlisted.finding.edge].reveals === stuckOn);
       const otherWay = backUnmoved ? 'unmoved' : outward ? 'outward' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
       const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
       if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: unlisted ?? shortOf(best), lastStroke: stuckOn, viewport, otherWay });

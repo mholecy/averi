@@ -437,12 +437,17 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // A band of a surface the tree does not list, the eyes saw (ui-tree/eyes.ts), at the end of the content: the rest
       // of it stays under that surface — with the keyboard up and the node riding on it, dismiss it first.
       if (short.of === 'unlisted') {
-        const keyboard = ridingKeyboard(short.finding.neighbour, keyboardUp(judged), judged.standing.facts.minPiece ?? 0);
+        // The keyboard as the round's reading offered it, unwitnessed (the band was moot: the match lies above it) — so an "if".
+        const keyboard = ridingKeyboard(short.finding.neighbour, short.offered, judged.standing.facts.minPiece ?? 0);
+        const away = o.otherWay === 'outward' ? `, and swiping ${back} would only push it further under that surface` : neither;
+        const why =
+          keyboard === undefined
+            ? 'a layout defect (no clearance for a pinned bar?)'
+            : `if the soft keyboard is still up (the window state reads its top edge at y ${keyboard.lineY}, that node riding on it), dismiss it first (${hideClause(keyboard.remedy)}) — a bar riding on it goes down with it — and scroll again; else a layout defect (no clearance for a pinned bar?)`;
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${surfaceText(short.finding)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. That surface stays over it at the end of the content — ` +
-              `${keyboard === undefined ? 'a layout defect (no clearance for a pinned bar?)' : `${dismissKeyboardFirstText(keyboard)}, and scroll again`}. ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${away}. That surface stays over it at the end of the content — ${why}. ${last}`,
         };
       }
       if (short.of === 'covered') {

@@ -47,8 +47,13 @@ describe('scroll_until — the eyes confirm a fully claim', () => {
     const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: eyesOn(fake) }).catch((e: unknown) => e)) as Error;
     expect(failure).toBeInstanceOf(Error);
     expect(failure.message).toContain(`element is in the viewport but ${SURFACE} — and the content is exhausted`);
-    // Two strokes down that moved nothing, one back up that moved it neither (the stuck test, as for a cover).
-    expect(fake.swipes).toHaveLength(3);
+    // Two strokes down that moved nothing, and none back up: that would only push it further under the bar (live k7).
+    expect(failure.message).toContain('swiping down no longer moves it, and swiping up would only push it further under that surface. That surface stays over it at the end of the content');
+    expect(fake.swipes).toHaveLength(2);
+    // The bar rides on the IME the window state reads (unwitnessed: the band was moot over phone): the remedy, as an "if".
+    expect(failure.message).toContain(
+      'if the soft keyboard is still up (the window state reads its top edge at y 1398, that node riding on it), dismiss it first (press_key back from the MCP tools; ',
+    );
     // ONE screenshot: each read after a stroke finds phone and the bar where the eyes refused them — refused again, unlooked.
     expect(fake.screenshots).toHaveLength(1);
   });
