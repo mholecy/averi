@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type Point, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { AfterDismissalTap, KeyboardWithoutDismissal, type KeyboardDismissal } from '../../src/interact/keyboard.js';
-import { dismissalStrategies, nextMove, type DismissalGround } from '../../src/interact/keyboard-dismissal.js';
+import { AVERIS_OWN, configuredStrategies, nextMove, type DismissalGround } from '../../src/interact/keyboard-dismissal.js';
 import { KEYBOARD_HIDE_CONFIRM_LOOKS } from '../../src/interact/keyboard-in-tree.js';
 import { KEYBOARD_HIDE_DELAY_MS } from '../../src/interact/keyboard-model.js';
 import { dismissKeyboard } from '../../src/interact/keyboard.js';
@@ -12,11 +12,11 @@ import { lookOn } from '../../src/ui-tree/look.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { bandNode, dropBand, FAST, FakeAdapter, hidesKeyboardOn, iosLoginFake, node } from '../helpers/fake.js';
 
-// The in-tree model's dismissal strategies (interact/keyboard-dismissal.ts): the configured ones, then — some being
-// configured — averi's own blank-point tap and drag, tried one move at a time until the keyboard is gone
+// The in-tree model's dismissal strategies (interact/keyboard-dismissal.ts): the configured ones, then — after a
+// configured move left the keyboard up — averi's own upward drag, tried one move at a time
 // (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md). Through the guard's interface
-// (tapElement) on the lab's real form-keyboard capture, and through the strategy list's own (`nextMove`) for where a
-// blank point may lie.
+// (tapElement) on the lab's real form-keyboard capture, and through the strategy list's own (`nextMove`) for where the
+// drag may touch down.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => {} }));
 
 /** The lab's form-keyboard cell as WDA read it (tests/fixtures/wda-capture-lab-form-keyboard.json's comment). */
@@ -26,9 +26,13 @@ const VS = 'id:lab.form-keyboard.vs';
 /** iOS's status band on the iPhone 17 (adapters/ios-status-band.ts), as IosAdapter's viewport reports it. */
 const IPHONE_17 = { width: 402, height: 874, statusBand: 62 };
 
-/** What the app does on each move: `hides` the move that hides the keyboard (the title never does — it has no gesture, the lab's cell); taps go to the tree's hit test only for the target. */
-type Move = 'title' | 'blank' | 'drag';
-function labFake(hides?: Move): FakeAdapter & { moves: string[] } {
+/**
+ * What the app does on each move: `hides` the move that hides the keyboard (the title never does on the lab's cell — it
+ * has no gesture); `lifts`, a drag that scrolls the form by its length, the keyboard staying (the lab's SwiftUI form,
+ * measured live). Taps go to the tree's hit test only for the target.
+ */
+type Move = 'title' | 'drag';
+function labFake({ hides, lifts = false }: { hides?: Move; lifts?: boolean } = {}): FakeAdapter & { moves: string[] } {
   const fake = Object.assign(new FakeAdapter({ form: parseWdaSource(CAPTURE) }, 'form'), { moves: [] as string[] });
   fake.platform = 'ios';
   fake.keyboard = undefined;
@@ -43,16 +47,13 @@ function labFake(hides?: Move): FakeAdapter & { moves: string[] } {
       fake.moves.push(`title (${x},${y})`);
       return hideIf('title');
     }
-    if (y < 573 && x > 0 && !isField(fake.live(), { x, y })) {
-      fake.moves.push(`blank (${x},${y})`);
-      return hideIf('blank');
-    }
     fake.moves.push(`tap (${x},${y})`);
     return tap(x, y);
   };
   fake.swipe = async (from: Point, to: Point, durationMs?: number) => {
     fake.moves.push(`drag (${from.x},${from.y})→(${to.x},${to.y}) ${durationMs}ms`);
     hideIf('drag');
+    if (lifts) for (const n of everyNode(fake.live())) if (n.identifier?.startsWith('lab.form-keyboard.')) n.rect.y -= from.y - to.y;
   };
   return fake;
 }
@@ -60,82 +61,82 @@ function labFake(hides?: Move): FakeAdapter & { moves: string[] } {
 const dropKeyboard = (live: UiNode): void => {
   for (const n of everyNode(live)) if (n.children.some((c) => c.role === 'keyboard')) dropBand(n);
 };
-const isField = (tree: UiNode, p: Point): boolean =>
-  [...everyNode(tree)].some((n) => n.role === 'textfield' && p.x >= n.rect.x && p.x < n.rect.x + n.rect.width && p.y >= n.rect.y && p.y < n.rect.y + n.rect.height);
 
 const COVERED = 'the soft keyboard covered id:lab.form-keyboard.vs';
 
-describe('the guard: when the configured dismissal leaves the keyboard up, averi tries its own (the lab form-keyboard capture, k2)', () => {
-  it('a blank point of the target\'s scroll view hides it: the title tapped, then the blank point just under the navigation bar, then the target at its centre — the note says which move hid it', async () => {
-    const fake = labFake('blank');
+describe('the guard: when the configured dismissal leaves the keyboard up, averi drags the target\'s scroll view up (the lab form-keyboard capture, k2)', () => {
+  it('a scroll view that keeps its keyboard: the title tapped, then the form dragged UP 120 pt at 240 pt/s from its blank point nearest the keyboard, which lifts vs above it — vs tapped where it now is; the note says where the drag went', async () => {
+    const fake = labFake({ lifts: true });
     const result = await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
-    expect(fake.moves).toEqual(['title (201,84)', 'blank (201,126)', 'tap (201,621)']);
-    expect(fake.swipes).toEqual([]);
-    const note = `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; hidden by tapping a blank point of the target's scroll view before tapping`;
-    expect(result.keyboardHidden).toBe(note);
-  });
-
-  it('the blank point leaves it up too: the target\'s scroll view is dragged UP, slowly, from its blank point nearest the keyboard (a downward drag would pull a sheet down); then the target', async () => {
-    const fake = labFake('drag');
-    const result = await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
-    expect(fake.moves).toEqual(['title (201,84)', 'blank (201,126)', 'drag (201,502)→(201,382) 500ms', 'tap (201,621)']);
+    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,382) 500ms', 'tap (201,501)']);
     expect(result.keyboardHidden).toBe(
-      `${COVERED}; tapped text:"Transfer details", tapped a blank point of the target's scroll view, the keyboard stayed up; hidden by dragging the target's scroll view up before tapping`,
+      `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; dragged the target's scroll view up from (201,502) to (201,382), and the keyboard is still up but no longer over it`,
     );
   });
 
-  it('a target deeper under the keyboard (note, centre 843): the drag is long enough to lift its centre above the keyboard\'s top, not only DRAG_LENGTH — so a scroll view that keeps its keyboard still brings the target out (k3)', async () => {
-    const fake = labFake();
-    await tapElement(fake, 'id:lab.form-keyboard.note', { ...FAST, dismissals: [TITLE] }).catch(() => undefined);
-    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,224) 500ms'); // 843 − (573 − 8) = 278 pt
+  it('a scroll view that hides its keyboard on a drag (onDrag, as Contacts): hidden by the drag, then vs tapped', async () => {
+    const fake = labFake({ hides: 'drag' });
+    const result = await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
+    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,382) 500ms', 'tap (201,621)']);
+    expect(result.keyboardHidden).toBe(
+      `${COVERED}; tapped text:"Transfer details", the keyboard stayed up; hidden by dragging the target's scroll view up from (201,502) to (201,382) before tapping`,
+    );
   });
 
-  it('nothing hides it: AfterDismissalTap naming every move, in order — the target never tapped, no move repeated', async () => {
+  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre above the keyboard\'s top — 278 pt, not only DRAG_LENGTH — at the same speed, so it takes longer (k3)', async () => {
+    const fake = labFake();
+    await tapElement(fake, 'id:lab.form-keyboard.note', { ...FAST, dismissals: [TITLE] }).catch(() => undefined);
+    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,224) 1158ms'); // 843 − (573 − 8) = 278 pt at 240 pt/s
+  });
+
+  it('the title already hides it: no drag at all', async () => {
+    const fake = labFake({ hides: 'title' });
+    await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
+    expect(fake.moves).toEqual(['title (201,84)', 'tap (201,621)']);
+  });
+
+  it('nothing gets it clear: AfterDismissalTap naming every move, in order — the target never tapped, no move repeated', async () => {
     const fake = labFake();
     const error = (await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] }).catch((e: unknown) => e)) as AfterDismissalTap;
     expect(error).toBeInstanceOf(AfterDismissalTap);
-    expect(fake.moves).toEqual(['title (201,84)', 'blank (201,126)', 'drag (201,502)→(201,382) 500ms']);
+    expect(fake.moves).toEqual(['title (201,84)', 'drag (201,502)→(201,382) 500ms']);
     expect(error.message).toBe(
-      'Tapped text:"Transfer details" at (201,84), then tapped a blank point of the target\'s scroll view at (201,126), then dragged the target\'s scroll view up ' +
-        'from (201,502) to (201,382) to hide the soft keyboard covering id:lab.form-keyboard.vs, but it is still up: the band [0,573][402,874] still contains the tap point ' +
+      'Tapped text:"Transfer details" at (201,84), then dragged the target\'s scroll view up from (201,502) to (201,382) to hide the soft keyboard covering ' +
+        'id:lab.form-keyboard.vs, but it is still up: the band [0,573][402,874] still contains the tap point ' +
         `(201,621) on ${KEYBOARD_HIDE_CONFIRM_LOOKS} looks ${KEYBOARD_HIDE_DELAY_MS}ms apart after each; nothing else was done. Those moves may have changed the screen ` +
         '(the keyboard was raised again, an element tapped did something of its own, or a drag scrolled the content) — look at it (ui_snapshot / screenshot) before ' +
         'retrying. From the MCP tools: hide the keyboard another way, then tap id:lab.form-keyboard.vs again. In a flow: configure a dismissal that hides the keyboard ' +
         'on THIS screen, or lay the screen out so id:lab.form-keyboard.vs is not under it',
     );
-    expect(error.traceLine).toBe(`${COVERED}; tapped text:"Transfer details", tapped a blank point of the target's scroll view, dragged the target's scroll view up to hide it, still covered`);
+    expect(error.traceLine).toBe(`${COVERED}; tapped text:"Transfer details", dragged the target's scroll view up to hide it, still covered`);
   });
 
-  it('no dismissal configured: today\'s refusal, nothing moved — averi\'s own are tried only where the author opted into dismissals (k1)', async () => {
-    const fake = labFake('blank');
+  it('no dismissal configured: today\'s refusal, nothing moved (k1)', async () => {
+    const fake = labFake({ hides: 'drag' });
     const error = (await tapElement(fake, VS, FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
     expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
     expect(error.message).toContain('and no dismissal is configured. Nothing was tapped');
     expect(fake.moves).toEqual([]);
-    expect(fake.swipes).toEqual([]);
   });
 
-  it('the configured title absent from the screen: averi\'s own are still tried — the refusal it would have been is a blank-point tap that hides it', async () => {
-    const fake = labFake('blank');
-    const result = await tapElement(fake, VS, { ...FAST, dismissals: [{ kind: 'tap', target: { id: 'nowhere' } }] });
-    expect(fake.moves).toEqual(['blank (201,126)', 'tap (201,621)']);
-    expect(result.keyboardHidden).toBe(`${COVERED}; hidden by tapping a blank point of the target's scroll view before tapping`);
+  it('the configured title absent from the screen: the refusal, nothing moved — averi\'s own follow a configured move that left the keyboard up, never stand in for one', async () => {
+    const fake = labFake({ hides: 'drag' });
+    const error = (await tapElement(fake, VS, { ...FAST, dismissals: [{ kind: 'tap', target: { id: 'nowhere' } }] }).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
+    expect(error).toBeInstanceOf(KeyboardWithoutDismissal);
+    expect(error.message).toContain('and none of the configured dismissals is usable on this screen (tap id:"nowhere": not found). Nothing was tapped');
+    expect(fake.moves).toEqual([]);
   });
 
-  it('the target gone after the blank point (the tap did something of its own): AfterDismissalTap at once, saying both taps — no drag on a screen the target has left', async () => {
+  it('the target gone after the title tap: AfterDismissalTap at once — no drag on a screen the target has left', async () => {
     const fake = labFake();
     const tap = fake.tap;
     fake.tap = async (x, y) => {
       await tap(x, y);
-      if (fake.moves.at(-1)?.startsWith('blank')) for (const n of everyNode(fake.live())) n.children = n.children.filter((c) => c.identifier !== 'lab.form-keyboard.vs');
+      for (const n of everyNode(fake.live())) n.children = n.children.filter((c) => c.identifier !== 'lab.form-keyboard.vs');
     };
     const error = (await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] }).catch((e: unknown) => e)) as AfterDismissalTap;
     expect(error).toBeInstanceOf(AfterDismissalTap);
-    expect(error.message.split('\n')[0]).toMatch(
-      /^After tapping text:"Transfer details" at \(201,84\), then tapping a blank point of the target's scroll view at \(201,126\) to hide the soft keyboard that covered id:lab\.form-keyboard\.vs at \(201,621\): Timed out .* Those moves may have changed the screen/,
-    );
-    expect(fake.moves).toEqual(['title (201,84)', 'blank (201,126)']);
-    expect(fake.swipes).toEqual([]);
+    expect(fake.moves).toEqual(['title (201,84)']);
   });
 });
 
@@ -144,84 +145,75 @@ const FULL: Rect = { x: 0, y: 0, width: 402, height: 874 };
 const BAND: Rect = { x: 0, y: 573, width: 402, height: 301 };
 const NAV = node({ role: 'container', identifier: 'Title', rect: { x: 0, y: 62, width: 402, height: 54 } });
 const TARGET = () => node({ role: 'textfield', identifier: 'target', rect: { x: 20, y: 604, width: 362, height: 34 } });
-function screenWith(content: UiNode[], after: UiNode[] = []): { tree: UiNode; target: UiNode } {
+function screenWith(content: UiNode[], after: UiNode[] = [], band: Rect = BAND): { tree: UiNode; target: UiNode } {
   const target = TARGET();
   const scroller = node({ role: 'scrollable', rect: FULL, children: [node({ role: 'container', rect: { x: 0, y: 116, width: 402, height: 764 }, children: [...content, target] })] });
-  const tree = node({ role: 'container', rect: FULL, children: [node({ role: 'container', rect: FULL, children: [NAV, scroller, ...after] }), bandNode(BAND)] });
+  const tree = node({ role: 'container', rect: FULL, children: [node({ role: 'container', rect: FULL, children: [NAV, scroller, ...after] }), bandNode(band)] });
   return { tree, target };
 }
-/** The first move of averi's own strategies on `tree`, the configured one absent: its point, or every skip line. */
-async function blankOn({ tree, target }: { tree: UiNode; target: UiNode }, device = IPHONE_17): Promise<Point | string[]> {
+/** Averi's own strategies on `tree`: the drag's from/to, or every skip line. */
+async function dragOn({ tree, target }: { tree: UiNode; target: UiNode }): Promise<{ from: Point; to: Point } | readonly string[]> {
   const fake = new FakeAdapter({ s: tree }, 's');
   fake.keyboard = undefined;
-  fake.viewportSize = device;
+  fake.viewportSize = IPHONE_17;
   const look = lookOn(fake, tree);
   const ground: DismissalGround = { look, screen: await usableScreen(fake, look), ambiguous: 'first', target };
-  const { move, skipped } = await nextMove(dismissalStrategies([{ kind: 'tap', target: { id: 'absent' } }], { fallbacks: true }), ground);
-  if (move === undefined) return skipped.map((s) => s.line);
-  if (move.move.kind !== 'tap') throw new Error('a drag before a blank tap');
-  return move.move.at;
+  const { move, skipped } = await nextMove(AVERIS_OWN, ground);
+  if (move === undefined) return skipped;
+  if (move.move.kind !== 'drag') throw new Error('averi\'s own only drag');
+  return { from: move.move.from, to: move.move.to };
 }
 
-describe('a blank point: where averi\'s own tap may land (keyboard-dismissal.ts#blankPoint)', () => {
-  it('the first row whose square holds only bare wrappers, below the status band and the identified navigation bar, from the middle of the row outward', async () => {
-    expect(await blankOn(screenWith([]))).toEqual({ x: 201, y: 126 });
+describe('the drag: where it touches down and how far it goes (keyboard-dismissal.ts#blankPoint)', () => {
+  it('from the lowest row above the keyboard whose square holds only bare wrappers, the middle of the row first, up DRAG_LENGTH', async () => {
+    expect(await dragOn(screenWith([]))).toEqual({ from: { x: 201, y: 558 }, to: { x: 201, y: 438 } });
   });
 
-  it('a text, a control or a labelled node in the square stops the point: the middle of the row is skipped for the nearest clear column, a full-width one pushes it to the next row', async () => {
-    const text = node({ role: 'text', label: 'Payment reference', rect: { x: 150, y: 120, width: 100, height: 18 } });
-    expect(await blankOn(screenWith([text]))).toEqual({ x: 137, y: 126 });
-    const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 116, width: 402, height: 40 } });
-    expect(await blankOn(screenWith([field]))).toEqual({ x: 201, y: 166 });
+  it('a text, a control or a labelled node in the square stops the point: the middle of the row is skipped for the nearest clear column, a full-width one pushes it to a higher row', async () => {
+    const text = node({ role: 'text', label: 'Payment reference', rect: { x: 150, y: 556, width: 100, height: 18 } });
+    expect(await dragOn(screenWith([text]))).toEqual({ from: { x: 137, y: 558 }, to: { x: 137, y: 438 } });
+    const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 530, width: 402, height: 43 } });
+    expect(await dragOn(screenWith([field]))).toEqual({ from: { x: 201, y: 518 }, to: { x: 201, y: 398 } });
   });
 
   it('a bare leaf INSIDE the scroll view is a spacer of its content (no stop); a bare leaf listed AFTER it, outside, is drawn over it (a dimming view) and stops every point it lies on', async () => {
-    const spacer = node({ role: 'other', rect: { x: 0, y: 116, width: 402, height: 400 } });
-    expect(await blankOn(screenWith([spacer]))).toEqual({ x: 201, y: 126 });
-    const dim = node({ role: 'other', rect: { x: 0, y: 116, width: 402, height: 400 } });
-    expect(await blankOn(screenWith([], [dim]))).toEqual({ x: 201, y: 526 });
+    const spacer = node({ role: 'other', rect: { x: 0, y: 300, width: 402, height: 273 } });
+    expect(await dragOn(screenWith([spacer]))).toEqual({ from: { x: 201, y: 558 }, to: { x: 201, y: 438 } });
+    const dim = node({ role: 'other', rect: { x: 0, y: 300, width: 402, height: 273 } });
+    expect(await dragOn(screenWith([], [dim]))).toEqual({ from: { x: 201, y: 286 }, to: { x: 201, y: 166 } });
   });
 
   it('a hidden subtree (WDA\'s isVisible=0, drawn nowhere — the SwiftUI screen-sized toolbar host) does not stop it', async () => {
     const host = node({ role: 'toolbar', label: 'Toolbar', identifier: 'Toolbar', hidden: true, rect: FULL, children: [node({ role: 'container', hidden: true, rect: FULL })] });
-    expect(await blankOn(screenWith([], [host]))).toEqual({ x: 201, y: 126 });
+    expect(await dragOn(screenWith([], [host]))).toEqual({ from: { x: 201, y: 558 }, to: { x: 201, y: 438 } });
   });
 
-  it('never in the band or under the status band: a screen full of controls above the keyboard has no blank point, and says so — the drag none either', async () => {
+  it('never past the status band: a lift longer than the room above stops at the area\'s top', async () => {
+    // A keyboard (with an accessory bar) up to y 200: the target's centre 621 asks a lift of 621 − 192 = 429 pt.
+    const { tree, target } = screenWith([], [], { x: 0, y: 200, width: 402, height: 674 });
+    expect(await dragOn({ tree, target })).toEqual({ from: { x: 201, y: 190 }, to: { x: 201, y: 62 } });
+  });
+
+  it('a screen full of controls above the keyboard: no point, and the skip line says so', async () => {
     const wall = node({ role: 'button', identifier: 'wall', rect: { x: 0, y: 116, width: 402, height: 457 } });
-    expect(await blankOn(screenWith([wall]))).toEqual([
-      'tap id:"absent": not found',
-      "a blank point: none in the target's scroll view above the keyboard",
-      'a drag: no blank point to drag from',
-    ]);
+    expect(await dragOn(screenWith([wall]))).toEqual(["a drag: none in the target's scroll view above the keyboard"]);
   });
 
-  it('no scroll view holds the target: none — averi taps no point of a screen it cannot tie to the target', async () => {
+  it('no scroll view holds the target: no drag — nothing to tie it to the target', async () => {
     const target = TARGET();
     const tree = node({ role: 'container', rect: FULL, children: [node({ role: 'container', rect: FULL, children: [NAV, target] }), bandNode(BAND)] });
-    expect(await blankOn({ tree, target })).toEqual(['tap id:"absent": not found', 'a blank point: no scroll view holds the target', 'a drag: no blank point to drag from']);
+    expect(await dragOn({ tree, target })).toEqual(['a drag: no scroll view holds the target']);
   });
 
-  it('the target beneath something else (an alert\'s card over it, besides the keyboard): it cannot be tapped where it stands — no point is sought', async () => {
+  it('the target beneath something else (an alert\'s card over it, besides the keyboard): it cannot be tapped where it stands — no drag', async () => {
     const card = node({ role: 'button', label: 'OK', rect: { x: 0, y: 590, width: 402, height: 60 } });
-    const skipped = await blankOn(screenWith([], [card]));
-    expect(skipped).toEqual(['tap id:"absent": not found', 'a blank point: the target cannot be tapped where it stands (covered by button "OK")', 'a drag: no blank point to drag from']);
+    expect(await dragOn(screenWith([], [card]))).toEqual(['a drag: the target cannot be tapped where it stands (covered by button "OK")']);
   });
 
-  it('a scroll view that scrolls sideways is tapped at its blank point but never dragged', async () => {
+  it('a scroll view that scrolls sideways is never dragged', async () => {
     const { tree, target } = screenWith([]);
-    const scroller = [...everyNode(tree)].find((n) => n.role === 'scrollable')!;
-    scroller.scrollAxis = 'horizontal';
-    const fake = new FakeAdapter({ s: tree }, 's');
-    fake.keyboard = undefined;
-    fake.viewportSize = IPHONE_17;
-    const look = lookOn(fake, tree);
-    const ground: DismissalGround = { look, screen: await usableScreen(fake, look), ambiguous: 'first', target };
-    const [, ...own] = dismissalStrategies([TITLE], { fallbacks: true });
-    const first = await nextMove(own, ground);
-    expect(first.move?.move).toEqual({ kind: 'tap', what: "a blank point of the target's scroll view", at: { x: 201, y: 126 } });
-    const second = await nextMove(first.move!.rest, ground);
-    expect(second).toEqual({ skipped: [{ line: "a drag: the target's scroll view scrolls sideways", origin: 'fallback' }] });
+    [...everyNode(tree)].find((n) => n.role === 'scrollable')!.scrollAxis = 'horizontal';
+    expect(await dragOn({ tree, target })).toEqual(["a drag: the target's scroll view scrolls sideways"]);
   });
 });
 
@@ -251,16 +243,9 @@ describe('the configured ones, each its own strategy: a second is tried once the
   });
 });
 
-describe('the list itself', () => {
-  it('averi\'s own follow the configured ones, and only when some are configured and the caller can anchor them (the guard; never the post-fill dismissal)', () => {
-    const names = (list: ReturnType<typeof dismissalStrategies>) => list.map((s) => `${s.origin}:${s.name}`);
-    expect(names(dismissalStrategies([TITLE, { kind: 'accessory' }], { fallbacks: true }))).toEqual([
-      'configured:tap text:"Transfer details"',
-      'configured:accessory',
-      'fallback:a blank point',
-      'fallback:a drag',
-    ]);
-    expect(names(dismissalStrategies([], { fallbacks: true }))).toEqual([]);
-    expect(names(dismissalStrategies([TITLE], { fallbacks: false }))).toEqual(['configured:tap text:"Transfer details"']);
+describe('the lists themselves', () => {
+  it('the configured ones in the config\'s order; averi\'s own the drag alone — no tap of its own', () => {
+    expect(configuredStrategies([TITLE, { kind: 'accessory' }]).map((s) => s.name)).toEqual(['tap text:"Transfer details"', 'accessory']);
+    expect(AVERIS_OWN.map((s) => s.name)).toEqual(['a drag']);
   });
 });

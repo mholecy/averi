@@ -5,9 +5,11 @@ import { cannotHide } from '../ui-tree/soft-keyboard.js';
 import { usableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
 import {
-  dismissalStrategies,
+  AVERIS_OWN,
+  configuredStrategies,
   moved,
   movedAt,
+  movedNoted,
   movedPassive,
   moving,
   nextMove,
@@ -15,7 +17,6 @@ import {
   type DismissalGround,
   type DismissalMove,
   type DismissalStrategy,
-  type Skip,
 } from './keyboard-dismissal.js';
 import {
   confirmHidden,
@@ -121,7 +122,7 @@ export class KeyboardWithoutDismissal extends KeyboardGuardError implements Refu
  * Anything that went wrong AFTER the in-tree guard moved to hide the keyboard — the sibling of AfterKeyboardDismissal
  * (keyboard-window.ts) for this model: there the irreversible side effect is a `back`, here it is the moves of the
  * dismissal strategies tried (keyboard-dismissal.ts: a tap on an element the config named, the accessory toolbar's
- * button, then averi's own blank-point tap and drag), each confirmed before the next. A move cannot be taken back, and
+ * button, then — after a configured move left the keyboard up — averi's own upward drag), each confirmed before the next. A move cannot be taken back, and
  * whether it hid the keyboard, did something of its own, or both, is only known from the look after it: still covered
  * once every strategy has had its turn → this, with the band and every move made; the target not coming back → this,
  * at once, wrapping the resolution's error as `cause` (after the post-fill dismissal's move, a confirming read that
@@ -151,20 +152,20 @@ const mayHaveChanged = (moves: readonly DismissalMove[]): string =>
 /** `tapping id:"login_title" at (201,303)`, `…, then dragging the target's scroll view up from (201,502) to (201,382)` — what was done, as the failed-look sentences say it. */
 const movesDoing = (moves: readonly DismissalMove[]): string => moves.map((m) => `${moving(m)} ${movedAt(m)}`).join(', then ');
 
-/** `Tapped id:"login_title" at (201,303)`, `…, then tapped a blank point of the target's scroll view at (201,124)` — a still-up refusal's opening. */
+/** `Tapped id:"login_title" at (201,303)`, `…, then dragged the target's scroll view up from (201,502) to (201,382)` — a still-up refusal's opening. */
 const movesDone = (moves: readonly DismissalMove[]): string => {
   const text = moves.map((m) => `${moved(m)} ${movedAt(m)}`).join(', then ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
-/** `tapped id:"login_title"`, `tapped id:"login_title", tapped a blank point of the target's scroll view` — the trace's. */
+/** `tapped id:"login_title"`, `tapped id:"login_title", dragged the target's scroll view up` — the trace's. */
 const movesTrace = (moves: readonly DismissalMove[]): string => moves.map(moved).join(', ');
 
 /** `nothing else was tapped`, or `done` once a drag was among the moves. */
 const nothingElse = (moves: readonly DismissalMove[]): string => `nothing else was ${moves.some((m) => m.kind === 'drag') ? 'done' : 'tapped'}`;
 
 /** ` (passed over: <skip lines>)` — why each strategy judged after the first move was passed over — or nothing when none was. */
-const passedOver = (skipped: readonly Skip[]): string => (skipped.length === 0 ? '' : ` (passed over: ${skipped.map((s) => s.line).join('; ')})`);
+const passedOver = (skipped: readonly string[]): string => (skipped.length === 0 ? '' : ` (passed over: ${skipped.join('; ')})`);
 
 /**
  * THE wrap for a look that failed after a dismissal move — the one owner of "a read after the dismissal failed", for
@@ -186,16 +187,9 @@ const afterMoveFailed =
       { cause: e },
     );
 
-/**
- * The sentence a refusal or a warning ends with when nothing was moved: which strategies there were and why each was
- * passed over — the configured ones, then averi's own when they were judged (the guard's, with some configured).
- */
-const nothingPicked = (dismissals: readonly KeyboardDismissal[], skipped: readonly Skip[]): string => {
-  if (dismissals.length === 0) return 'no dismissal is configured';
-  const lines = (origin: Skip['origin']) => skipped.filter((s) => s.origin === origin).map((s) => s.line).join('; ');
-  const own = lines('fallback');
-  return `none of the configured dismissals is usable on this screen (${lines('configured')})${own === '' ? '' : `, and neither is averi's own (${own})`}`;
-};
+/** The sentence a refusal or a warning ends with when nothing was moved: which strategies there were and why each was passed over. */
+const nothingPicked = (dismissals: readonly KeyboardDismissal[], skipped: readonly string[]): string =>
+  dismissals.length === 0 ? 'no dismissal is configured' : `none of the configured dismissals is usable on this screen (${skipped.join('; ')})`;
 
 // ─── The model ───────────────────────────────────────────────────────────────
 
@@ -224,11 +218,10 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      *     the keyboard is gone (no band) or still up but no longer over the
      *     target (a band elsewhere: the layout re-flowed).
      *   covering                                  → the dismissal strategies, or refuse (with the band)
-     *     The strategies (keyboard-dismissal.ts#dismissalStrategies: the configured ones,
-     *     `GuardOptions.dismissals`, then — some being configured — averi's
-     *     own blank-point tap and drag) are judged on this look's tree, the
-     *     one that just read the keyboard covering, the guarded target their
-     *     anchor: none chooses a move — KeyboardWithoutDismissal, nothing
+     *     The configured strategies (keyboard-dismissal.ts#configuredStrategies,
+     *     `GuardOptions.dismissals`) are judged on this look's tree, the one
+     *     that just read the keyboard covering: none chooses a move —
+     *     KeyboardWithoutDismissal, nothing
      *     moved, the message naming the configured list (or that none is
      *     configured) beside `cannotHide` (ui-tree/soft-keyboard.ts: "this
      *     adapter cannot hide it on its own", then the adapter's `advice` on
@@ -237,8 +230,11 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      *     proceeds with the note `…; hidden by tapping <strategy> before
      *     tapping`, or `…; tapped <strategy>, and the keyboard is still up but
      *     no longer over it` when the band stayed and the target moved). Still
-     *     covering on the last look, the strategies after it are judged on
-     *     THAT look and the next move is the next Hiding (`stillCovering`),
+     *     covering on the last look, the strategies after it — the configured
+     *     ones left, then averi's own (keyboard-dismissal.ts#AVERIS_OWN, the
+     *     drag anchored on the guarded target), which follow only a configured
+     *     move that left the keyboard up — are judged on THAT look and the
+     *     next move is the next Hiding (`stillCovering`),
      *     its note saying which moves left the keyboard up; every strategy
      *     spent — AfterDismissalTap, naming every move; the target not coming
      *     back on any look — AfterDismissalTap at once.
@@ -286,7 +282,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       const { point } = second;
       const dismissals = opts.dismissals ?? [];
       const groundOf = (resolved: SeenLook): DismissalGround => ({ look: resolved.look, screen, ambiguous: opts.ambiguous, target: resolved.node });
-      const first = await nextMove(dismissalStrategies(dismissals, { fallbacks: true }), groundOf(second.resolved));
+      const first = await nextMove(configuredStrategies(dismissals), groundOf(second.resolved));
       if (first.move === undefined) {
         // Names MCP tools and "a flow" — the deliberate exception recorded at
         // the window model's "back did not close it" error. The platform's
@@ -307,7 +303,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       }
       // One Hiding per move: `before` the moves already made (each confirmed to have left the keyboard up), `skipped`
       // every skip line so far.
-      const hidingOf = (before: readonly DismissalMove[], { move, rest }: { move: DismissalMove; rest: readonly DismissalStrategy[] }, skipped: readonly Skip[]): Hiding => {
+      const hidingOf = (before: readonly DismissalMove[], { move, rest }: { move: DismissalMove; rest: readonly DismissalStrategy[] }, skipped: readonly string[]): Hiding => {
         const moves = [...before, move];
         const left = before.length === 0 ? '' : `${movesTrace(before)}, the keyboard stayed up; `;
         return {
@@ -329,7 +325,9 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           // the target now clear of it, is said as such — the move moved the
           // layout, or something else did; it did not hide the keyboard.
           hidden: (after) =>
-            after.kind === 'clear' ? `${covered}; ${left}${moved(move)}, and the keyboard is still up but no longer over it` : `${covered}; ${left}hidden by ${moving(move)} before tapping`,
+            after.kind === 'clear'
+              ? `${covered}; ${left}${movedNoted(move)}, and the keyboard is still up but no longer over it`
+              : `${covered}; ${left}hidden by ${moving(move)}${move.kind === 'drag' ? ` ${movedAt(move)}` : ''} before tapping`,
           async stillCovering(seen, looks) {
             const next = await nextMove(rest, groundOf(seen.resolved));
             const passed = [...skipped, ...next.skipped];
@@ -344,7 +342,8 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           },
         };
       };
-      return { hiding: hidingOf([], first.move, []) };
+      // Averi's own follow a configured move, never stand in for one (ADR 0022): they join the list only behind it.
+      return { hiding: hidingOf([], { move: first.move.move, rest: [...first.move.rest, ...AVERIS_OWN] }, []) };
     },
 
     /**
@@ -353,8 +352,8 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
      * password field (K5d, the bug note), so a `fill { dismissKeyboard: true }`
      * on iOS would be a submit nobody asked for. Both directions: with a
      * band in the tree the configured dismissals are tried in order
-     * (keyboard-dismissal.ts, the guard's list without averi's own fallbacks:
-     * they are found by a target, and a fill's dismissal has none) — the
+     * (keyboard-dismissal.ts#configuredStrategies; never averi's own drag:
+     * it is anchored on a target, and a fill's dismissal has none) — the
      * first usable one is moved, then up to KEYBOARD_HIDE_CONFIRM_LOOKS
      * re-reads, KEYBOARD_HIDE_DELAY_MS before each, confirm the band is gone
      * (`confirmHidden`, shared with the guard); a band still up on the last
@@ -387,12 +386,12 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
       let look = lookOn(adapter, await adapter.uiTree());
       if ((await look.reading.anywhere()) !== 'shown') return {};
       const groundOf = async (on: Look): Promise<DismissalGround> => ({ look: on, screen: await usableScreen(adapter, on), ambiguous });
-      let next = await nextMove(dismissalStrategies(dismissals, { fallbacks: false }), await groundOf(look));
+      let next = await nextMove(configuredStrategies(dismissals), await groundOf(look));
       if (next.move === undefined) {
         return { warning: `the soft keyboard is up and was left up: ${nothingPicked(dismissals, next.skipped)} — the next tap under it will be refused` };
       }
       const moves: DismissalMove[] = [];
-      const skipped: Skip[] = [];
+      const skipped: string[] = [];
       for (;;) {
         const { move, rest } = next.move;
         moves.push(move);

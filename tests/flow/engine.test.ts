@@ -3817,7 +3817,7 @@ ${steps}
     it('a tap: with every configured dismissal absent from the screen: the refusal lists them', async () => {
       const fake = iosFake();
       const error = (await FlowEngine.run(configured('      - tap: { id: login_submit }', '[{ tap: { id: twofactor_title } }, { accessory: true }]'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
-      expect(error.message).toMatch(/and none of the configured dismissals is usable on this screen \(tap id:"twofactor_title": not found; accessory: no accessory toolbar on screen\), and neither is averi's own \(a blank point: no scroll view holds the target; a drag: no blank point to drag from\)\. Nothing was tapped/);
+      expect(error.message).toMatch(/and none of the configured dismissals is usable on this screen \(tap id:"twofactor_title": not found; accessory: no accessory toolbar on screen\)\. Nothing was tapped/);
       expect(error.trace[1]).toEqual({ action: '⚠ tap', detail: 'the soft keyboard covered id:"login_submit"; no dismissal, nothing sent' });
       expect(fake.taps).toEqual([]);
     });

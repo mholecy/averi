@@ -12,39 +12,39 @@ import { tapStandings } from './tap-judgement.js';
 import { coverName, cutSliverText } from './target-text.js';
 
 /**
- * HOW the in-tree model hides a soft keyboard: an ORDERED LIST OF NAMED STRATEGIES, each judged on one look and either
+ * HOW the in-tree model hides a soft keyboard: ORDERED LISTS OF NAMED STRATEGIES, each judged on one look and either
  * choosing ONE move — a tap at a point, or a drag — or saying why it passes. The in-tree model
- * (interact/keyboard-in-tree.ts) walks the list: the first strategy that chooses a move is performed, the keyboard read
+ * (interact/keyboard-in-tree.ts) walks them: the first strategy that chooses a move is performed, the keyboard read
  * again, and only when it is still up is the next strategy judged — on the look that found it still up, never the
- * one before the move. What the list holds, in its order (`dismissalStrategies`):
+ * one before the move. Two named lists:
  *
- * 1. THE CONFIGURED ones (`app.ios.keyboardDismiss`, flow/config.ts), in the config's order: a `tap` on an app element
- *    the author named as neutral (a title), and the input-accessory toolbar's trailing button (`accessory`). Judged as
- *    the picker judged them since stage B (ADR 0016: the tap's standing, the explicit refusal), each its own entry —
- *    so a second configured dismissal is tried when the first, tapped, left the keyboard up.
- * 2. AVERI'S OWN FALLBACKS (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md), only
- *    after the configured ones and only where some are configured (the author's opt-in that averi may touch the
- *    screen to hide the keyboard on this app; with none, the guard refuses and touches nothing, as before), and only
- *    for the guard, which has a target to anchor them: the post-fill dismissal has none, and tries the configured
- *    ones alone.
- *    - `a blank point`: a tap on a point of the target's own scroll view, above the keyboard, where the tree lists
- *      nothing but bare wrappers in a square around it (`blankPoint`) — an app that ends the editing on a tap outside
- *      the field (the common `hideKeyboardWhenTappedAround`) hides it there; one that does not is left as it was.
- *    - `a drag`: the target's scroll view dragged UP by DRAG_LENGTH (or what lifts the target clear of the
- *      keyboard), from the blank point nearest the keyboard
- *      (`BLANK_DRAG`) — a scroll view whose `keyboardDismissMode` is `onDrag`/`interactive` (SwiftUI's
- *      `scrollDismissesKeyboard`) hides the keyboard on it: measured on the Contacts "New Contact" sheet, 3 of 3
- *      (docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md); one that does not is scrolled toward its end by up to
- *      the drag's length, or does not move. Never DOWN: at the top of a sheet's scroll view a downward drag pulls the
- *      sheet itself down — a swipe that dismisses it.
+ * 1. THE CONFIGURED ones (`configuredStrategies`: `app.ios.keyboardDismiss`, flow/config.ts), in the config's order: a
+ *    `tap` on an app element the author named as neutral (a title), and the input-accessory toolbar's trailing button
+ *    (`accessory`). Judged as the picker judged them since stage B (ADR 0016: the tap's standing, the explicit
+ *    refusal), each its own entry — so a second configured dismissal is tried when the first, tapped, left the
+ *    keyboard up. The guard and the post-fill dismissal both walk them.
+ * 2. AVERI'S OWN (`AVERIS_OWN`, docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md):
+ *    walked by the guard only, and only after a configured strategy PERFORMED a move that its looks confirmed left the
+ *    keyboard up — the author opted into touching this screen to hide the keyboard, and the configured touch was not
+ *    enough. With nothing configured, or nothing configured usable on this screen, the guard refuses and moves nothing.
+ *    The post-fill dismissal has no target to drag by and walks none of them.
+ *    - `a drag` (`THE_DRAG`): the target's scroll view dragged UP — DRAG_LENGTH, or what lifts the target's centre
+ *      clear of the keyboard — from its blank point nearest the keyboard (`blankPoint`), at DRAG_SPEED. A scroll view
+ *      whose `keyboardDismissMode` is `onDrag` hides the keyboard on it (measured on the Contacts "New Contact" sheet,
+ *      3 of 3; `interactive` is unmeasured); one that keeps it is scrolled toward its end, the target lifted out from
+ *      under the keyboard (measured: the lab's form-keyboard, k2 and k3,
+ *      docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md); one that does not scroll does not move. Never DOWN: at
+ *      the top of a sheet's scroll view a downward drag pulls the sheet itself down — a swipe that dismisses it.
  *
  * What is NOT on the list, and why — the decision's evidence:
  * - the keyboard's own return key (labelled `return`, `done`, `go`, …): measured to SUBMIT the finportal login from
  *   the password field, the key labelled `done` (K5d, docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md). Its
  *   label does not say what the app does on it, so no single-line field makes it safe; never pressed.
  * - WebDriverAgent's `/wda/keyboard/dismiss`: measured to fail ("Did not know how to dismiss the keyboard", K5a).
- * - a tap on any node that is not bare: a control would be pressed (ADR 0016's explicit refusal), and a text or an
- *   image may carry a gesture the tree does not show.
+ * - a tap on a "blank" point: WDA lists a tappable row (`Cell`) and an RN Pressable without a label as bare
+ *   containers, so no point the tree calls empty is known not to be a control — and no tap there was measured to hide
+ *   a keyboard (the lab form and the Contacts sheet both kept it). Owed before one returns: a lab cell whose container
+ *   ends editing on a tap, and a rule that tells it from a row.
  *
  * Every move is irreversible and none is repeated; what the looks after a move find, and what the reply says, is the
  * in-tree model's. Nothing here asks the device.
@@ -60,45 +60,32 @@ export interface DismissalGround {
 
 /**
  * The one side effect a strategy chose. `what` is the thing moved, as every sentence names it: `id:"login_title"` (with
- * `(N matches, the first)` under `first` mode when several matched), `the accessory toolbar's "Done"`, `a blank point
- * of the target's scroll view`, `the target's scroll view`.
+ * `(N matches, the first)` under `first` mode when several matched), `the accessory toolbar's "Done"`, `the target's
+ * scroll view`.
  */
 export type DismissalMove =
   | { readonly kind: 'tap'; readonly what: string; readonly at: Point }
   | { readonly kind: 'drag'; readonly what: string; readonly from: Point; readonly to: Point };
 
-/**
- * One named way to hide the keyboard: `name` is how a skip line names it (`tap id:"login_title"`, `accessory`, `a
- * blank point`, `a drag`); `origin` whether the author configured it or it is averi's own fallback.
- */
+/** One named way to hide the keyboard: `name` is how a skip line names it (`tap id:"login_title"`, `accessory`, `a drag`). */
 export interface DismissalStrategy {
   readonly name: string;
-  readonly origin: 'configured' | 'fallback';
   choose(ground: DismissalGround): Promise<DismissalMove | { readonly skipped: string }>;
 }
 
-/** The list for a configured dismissal list: the configured strategies in order, then — `fallbacks`, and only when some are configured — averi's own two. */
-export function dismissalStrategies(configured: readonly KeyboardDismissal[], { fallbacks }: { readonly fallbacks: boolean }): readonly DismissalStrategy[] {
-  const own = configured.map(configuredStrategy);
-  return fallbacks && own.length > 0 ? [...own, BLANK_TAP, BLANK_DRAG] : own;
-}
+/** The configured dismissals as strategies, in the config's order. */
+export const configuredStrategies = (configured: readonly KeyboardDismissal[]): readonly DismissalStrategy[] => configured.map(configuredStrategy);
 
-/** A strategy passed over: its skip line, `<name>: <why>`, and whose strategy it was. */
-export interface Skip {
-  readonly line: string;
-  readonly origin: DismissalStrategy['origin'];
-}
-
-/** What walking a list on one ground found: the first move and the strategies after its own, or none; and one skip per strategy passed over on the way. */
-export type NextMove = { readonly move?: { readonly move: DismissalMove; readonly rest: readonly DismissalStrategy[] }; readonly skipped: readonly Skip[] };
+/** What walking a list on one ground found: the first move and the strategies after its own, or none; and one skip line per strategy passed over on the way, `<name>: <why>`. */
+export type NextMove = { readonly move?: { readonly move: DismissalMove; readonly rest: readonly DismissalStrategy[] }; readonly skipped: readonly string[] };
 
 /** The first strategy of `strategies` that chooses a move on `ground`, and why each one before it passed. */
 export async function nextMove(strategies: readonly DismissalStrategy[], ground: DismissalGround): Promise<NextMove> {
-  const skipped: Skip[] = [];
+  const skipped: string[] = [];
   for (const [i, strategy] of strategies.entries()) {
     const chosen = await strategy.choose(ground);
     if ('skipped' in chosen) {
-      skipped.push({ line: `${strategy.name}: ${chosen.skipped}`, origin: strategy.origin });
+      skipped.push(`${strategy.name}: ${chosen.skipped}`);
       continue;
     }
     return { move: { move: chosen, rest: strategies.slice(i + 1) }, skipped };
@@ -106,9 +93,9 @@ export async function nextMove(strategies: readonly DismissalStrategy[], ground:
   return { skipped };
 }
 
-/** The move, sent: one tap, or one drag of DRAG_MS. */
+/** The move, sent: one tap, or one drag at DRAG_SPEED (`dragMs`). */
 export function perform(adapter: Pick<DeviceAdapter, 'tap' | 'swipe'>, move: DismissalMove): Promise<void> {
-  return move.kind === 'tap' ? adapter.tap(move.at.x, move.at.y) : adapter.swipe(move.from, move.to, DRAG_MS);
+  return move.kind === 'tap' ? adapter.tap(move.at.x, move.at.y) : adapter.swipe(move.from, move.to, dragMs(move));
 }
 
 /** `tapping id:"login_title"`, `dragging the target's scroll view up` — the fragment after `hidden by `. */
@@ -116,6 +103,9 @@ export const moving = (m: DismissalMove): string => (m.kind === 'tap' ? `tapping
 
 /** `tapped id:"login_title"`, `dragged the target's scroll view up`. */
 export const moved = (m: DismissalMove): string => (m.kind === 'tap' ? `tapped ${m.what}` : `dragged ${m.what} ${direction(m)}`);
+
+/** `tapped id:"login_title"`, `dragged the target's scroll view up from (201,502) to (201,382)` — a note's words: a drag says where, a tap's element is its place. */
+export const movedNoted = (m: DismissalMove): string => (m.kind === 'tap' ? moved(m) : `${moved(m)} ${movedAt(m)}`);
 
 /** `at (201,303)`, `from (201,502) to (201,382)`. */
 export const movedAt = (m: DismissalMove): string => (m.kind === 'tap' ? `at ${pointText(m.at)}` : `from ${pointText(m.from)} to ${pointText(m.to)}`);
@@ -173,7 +163,6 @@ const describeDismissal = (d: KeyboardDismissal): string => (d.kind === 'tap' ? 
 function configuredStrategy(d: KeyboardDismissal): DismissalStrategy {
   return {
     name: describeDismissal(d),
-    origin: 'configured',
     async choose({ look, screen, ambiguous }) {
       const { tree, reading: keyboard } = look;
       if (d.kind === 'accessory') {
@@ -246,52 +235,51 @@ function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
 // ─── Averi's own fallbacks ────────────────────────────────────────────────────
 
 /**
- * Half the side of the square around a blank point that must hold nothing but bare wrappers: 8 pt — a tap is exact
- * on the simulator, so the margin is against a frame's rounding and a control's touch padding, not a finger; and the
- * step between the points tried, so no gap wider than the square is missed.
+ * Half the side of the square around the drag's start that must hold nothing but bare wrappers: 8 pt — a touch is
+ * exact on the simulator, so the margin is against a frame's rounding and a control's touch padding, not a finger; and
+ * the step between the points tried, so no gap wider than the square is missed.
  */
 export const BLANK_MARGIN = 8;
 
 /** How far from the screen's left and right edges a blank point keeps: 24 pt, clear of where iOS starts its edge gestures (the back swipe) — a drag that began there could be read as one. */
 export const SCREEN_EDGE = 24;
 
-/** How long the fallback's drag takes: slow enough not to fling (interact/scroll-rounds.ts measured a 300-ms stroke flinging a SwiftUI form 729–970 pt), the drag's length read as a scroll. */
-export const DRAG_MS = 500;
+/**
+ * How fast the fallback's drag moves: 240 pt/s, the speed measured to hide the Contacts form's keyboard (120 pt in
+ * 500 ms, 3 of 3) — the drag's length read as a scroll, not a flick: interact/scroll-rounds.ts measured a 300-ms
+ * stroke at 1147 pt/s flinging a SwiftUI form 729–970 pt, and a fling would carry the target past where the drag
+ * lifted it. The duration follows from the length (`dragMs`), so a longer lift is no faster.
+ */
+export const DRAG_SPEED = 240;
+
+/** How long a drag takes at DRAG_SPEED, in ms. */
+export const dragMs = (m: Extract<DismissalMove, { kind: 'drag' }>): number => Math.round((Math.abs(m.from.y - m.to.y) / DRAG_SPEED) * 1000);
 
 /**
  * How far the fallback's drag moves at least, in points: the 120-pt drag measured to hide the keyboard on the Contacts
  * form (ADR 0022), far past a tap's slop and a fraction of a screen of scroll. Further when the target's centre lies
  * deeper under the keyboard: the drag then also LIFTS it — its centre to BLANK_MARGIN above the keyboard's top, as far
  * as the area above the keyboard reaches — so a scroll view that does not hide the keyboard on a drag still brings the
- * target out from under it (measured: the lab's form-keyboard, k2 — the 120-pt drag lifted `vs` clear and it was
- * tapped, the keyboard still up).
+ * target out from under it (measured: the lab's form-keyboard, k2 and k3 — `vs` lifted 120 pt, `note` 278 pt).
  */
 export const DRAG_LENGTH = 120;
 
-/** A tap on a blank point of the target's scroll view (`blankPoint`). */
-const BLANK_TAP: DismissalStrategy = {
-  name: 'a blank point',
-  origin: 'fallback',
-  async choose(ground) {
-    const found = await blankPoint(ground, 'top');
-    return 'skipped' in found ? found : { kind: 'tap', what: "a blank point of the target's scroll view", at: found.at };
-  },
-};
-
 /** The target's scroll view dragged up — DRAG_LENGTH, or what lifts the target's centre clear of the keyboard — from its blank point nearest the keyboard, kept inside the area the point was sought in (never past the status band). */
-const BLANK_DRAG: DismissalStrategy = {
+const THE_DRAG: DismissalStrategy = {
   name: 'a drag',
-  origin: 'fallback',
   async choose(ground) {
-    const found = await blankPoint(ground, 'bottom');
-    if ('skipped' in found) return { skipped: 'no blank point to drag from' };
-    if (scrollAxis(found.scroller, ground.look.tree.unclippedFrames === true) === 'horizontal') return { skipped: 'the target\'s scroll view scrolls sideways' };
+    const found = await blankPoint(ground);
+    if ('skipped' in found) return found;
+    if (scrollAxis(found.scroller, ground.look.tree.unclippedFrames === true) === 'horizontal') return { skipped: "the target's scroll view scrolls sideways" };
     const lift = Math.max(DRAG_LENGTH, found.centre.y - (found.bottom - BLANK_MARGIN));
     const to = { x: found.at.x, y: Math.max(found.at.y - lift, found.top) };
     if (found.at.y - to.y < 2 * BLANK_MARGIN) return { skipped: 'no room to drag above the keyboard' };
     return { kind: 'drag', what: "the target's scroll view", from: found.at, to };
   },
 };
+
+/** Averi's own strategies, in order: the guard walks them after a configured move left the keyboard up (the module's doc). */
+export const AVERIS_OWN: readonly DismissalStrategy[] = [THE_DRAG];
 
 /** A blank point found: where, in which scroll view, the top and bottom of the area it was sought in (below the status band, above the keyboard's top), and the target's centre. */
 interface BlankPoint {
@@ -304,14 +292,12 @@ interface BlankPoint {
 }
 
 /**
- * THE BLANK POINT: a point of the guarded target's nearest scroll view — the surface the target lies on, so on the
- * target's own layer: never a scrim, a sheet's backdrop or a bar, whose taps do things — where nothing but bare
- * wrappers lie in the BLANK_MARGIN square around it. Sought only when the target's own tap standing is `reachable`
- * (nothing but the keyboard over it: under WDA the band's line is witnessed, and the standing refuses nothing for it),
- * in the part of the scroll view on the screen, below the status band, above the keyboard's top and SCREEN_EDGE in from
- * its sides, row by row from the
- * top (the tap's: far from the field being edited) or from the bottom (the drag's: room above it), and, in a row, from
- * the middle outward.
+ * THE DRAG'S START, a blank point: a point of the guarded target's nearest scroll view — the surface the target lies
+ * on, so on the target's own layer: never a scrim, a sheet's backdrop or a bar — where nothing but bare wrappers lie in
+ * the BLANK_MARGIN square around it. Sought only when the target's own tap standing is `reachable` (nothing but the
+ * keyboard over it: under WDA the band's line is witnessed, and the standing refuses nothing for it), in the part of the
+ * scroll view on the screen, below the status band, above the keyboard's top and SCREEN_EDGE in from its sides, row by
+ * row from the bottom (room above it for the drag) and, in a row, from the middle outward.
  *
  * A node in the square lets the point be when it is the scroll view or one of its ancestors (they hold the point), a
  * hidden subtree's (WDA's `isVisible="0"` subtree, drawn nowhere: adapters/types.ts#UiNode.hidden), the keyboard's own
@@ -321,10 +307,11 @@ interface BlankPoint {
  * scroll view, a scroll indicator (labelled), an identified view (an RN `testID`, a navigation bar), and a bare LEAF
  * outside the scroll view — a dimming view or a decoration drawn over it.
  *
- * What it cannot see: a gesture recogniser on a bare wrapper (ADR 0016's residual for the picker, the same here). The
- * tap is still no press of anything the tree lists, and the reply names the point.
+ * Bare is not inert: WDA lists a tappable row (`Cell`) and an RN Pressable without a label as bare containers. A drag
+ * that touches down on one is a scroll — UIKit cancels the row's touch once the scroll view takes the pan — so the rule
+ * keeps the drag off what the tree names, and no TAP is ever sent here (the module's doc).
  */
-async function blankPoint({ look, screen, target }: DismissalGround, from: 'top' | 'bottom'): Promise<BlankPoint | { readonly skipped: string }> {
+async function blankPoint({ look, screen, target }: DismissalGround): Promise<BlankPoint | { readonly skipped: string }> {
   if (target === undefined) return { skipped: 'no target to find it by' };
   const path = pathTo(look.tree, target);
   let at = -1;
@@ -368,7 +355,7 @@ async function blankPoint({ look, screen, target }: DismissalGround, from: 'top'
   }
   const rows: number[] = [];
   for (let y = area.y + BLANK_MARGIN; y <= bottom - BLANK_MARGIN; y += BLANK_MARGIN) rows.push(y);
-  if (from === 'bottom') rows.reverse();
+  rows.reverse();
   for (const y of rows) for (const x of columns) if (clear({ x, y })) return { at: { x, y }, scroller, top: area.y, bottom, centre: tapPoint(target) };
   return { skipped: 'none in the target\'s scroll view above the keyboard' };
 }

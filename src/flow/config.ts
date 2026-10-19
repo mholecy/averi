@@ -43,10 +43,11 @@ interface FillSpec extends ElementSpec {
  * soft-keyboard.md, K5b) — or `accessory: true`, the input-accessory
  * toolbar's trailing button (the app's "Done" above a number pad, K4). The
  * list is ordered: the first entry whose element is on screen is used, and
- * — since 2026-10-18 — the next one when that left the keyboard up; a
- * non-empty list also opts the guard into averi's own fallbacks after it
- * (a blank point of the target's scroll view, then a drag of it:
- * docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md).
+ * — since 2026-10-18 — the next one when that left the keyboard up. Once an
+ * entry WAS tapped and left the keyboard up, the guard follows it with
+ * averi's own fallback, an upward drag of the target's scroll view
+ * (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md);
+ * an entry that is not on screen, or none at all, moves nothing.
  * Opt-in and app-specific on purpose: which element is neutral is the
  * app's business, and the keyboard's own return key SUBMITS (K5d). A `tap`
  * must resolve to a NON-INTERACTIVE element: the guard drops interactive

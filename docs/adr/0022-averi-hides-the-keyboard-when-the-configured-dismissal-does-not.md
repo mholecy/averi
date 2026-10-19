@@ -17,47 +17,45 @@ keyboard.
 
 ## Decision
 
-The in-tree model's dismissal is ONE ordered list of named strategies (`interact/keyboard-dismissal.ts`), walked one
-move at a time: the first strategy that chooses a move on the current look is performed, the keyboard read again
+The in-tree model's dismissal is ordered lists of named strategies (`interact/keyboard-dismissal.ts`), walked one move
+at a time: the first strategy that chooses a move on the current look is performed, the keyboard read again
 (`KEYBOARD_HIDE_CONFIRM_LOOKS` looks, as before), and only when it is still up is the NEXT strategy judged — on the
-look that found it still up, never the one before the move. The list:
+look that found it still up, never the one before the move. The lists:
 
-1. **Every configured entry, in the config's order** — judged exactly as ADR 0016's picker judged them. New: a second
-   configured entry is tried when the first, tapped, left the keyboard up (both the guard and the post-fill
-   `dismissKeyboard`).
-2. **Averi's own two fallbacks** — only after the configured ones, only when some are configured (the author's
-   opt-in that averi may touch the screen to hide the keyboard on this app), and only in the guard, which has the
-   target to anchor them (the post-fill dismissal has none):
-   - **a blank point** — a tap on a point of the target's nearest scroll view, below the status band and above the
-     keyboard's top, where every node in an 8-pt square around it (`BLANK_MARGIN`) is a bare wrapper (a structural
-     role with no label, identifier or value) that has children or lies inside that scroll view, an ancestor of the
-     scroll view, a hidden subtree's, or the keyboard's own; sought row by row from the top, from the middle of a row
-     outward; and only when the target's own tap standing is `reachable` (nothing but the keyboard over it — so the
-     scroll view is the top layer's, never a scrim or a sheet's backdrop beneath one). An app that ends editing on a
-     tap outside the field hides the keyboard there; one that does not is left as it was.
+1. **Every configured entry, in the config's order** (`configuredStrategies`) — judged exactly as ADR 0016's picker
+   judged them. New: a second configured entry is tried when the first, tapped, left the keyboard up (both the guard
+   and the post-fill `dismissKeyboard`).
+2. **Averi's own** (`AVERIS_OWN`) — walked by the guard only, and only AFTER a configured strategy performed a move
+   that its looks confirmed left the keyboard up (review round 1, the orchestrator's decision): the author opted into
+   touching this screen and the configured touch was not enough. Nothing configured, or nothing configured usable on
+   this screen, moves nothing — the refusal as before. The post-fill dismissal has no target to anchor them and walks
+   none. One strategy:
    - **a drag** — the target's scroll view dragged UP by `DRAG_LENGTH` (120 pt) — or, when the target's centre lies
-     deeper under the keyboard, by what lifts that centre to `BLANK_MARGIN` above the keyboard's top — over `DRAG_MS`
-     (500 ms, slow enough not to fling), from its blank point nearest the keyboard (the same rule, rows from the
-     bottom), never past the status band. Two ways it gets the target clear: a scroll view whose
-     `keyboardDismissMode` is `onDrag` or `interactive` (SwiftUI `scrollDismissesKeyboard`) hides the keyboard on
-     it; one that does not is scrolled toward its end, the target with it, out from under the keyboard (the note
-     then says the keyboard is still up but no longer over it) — or it does not move. The guard resolves the target
-     again where it now is, as after every move. This is the one place averi scrolls a screen to clear the keyboard
-     — rejected as a FIRST move (interact/keyboard.ts), kept as the last, after the dismissals the author opted
-     into. **Never down**: at the top of a sheet's scroll view a downward drag pulls the sheet itself down — the
-     swipe that dismisses a sheet.
-
-   Both keep `SCREEN_EDGE` (24 pt) from the screen's sides, clear of where iOS starts its edge gestures.
+     deeper under the keyboard, by what lifts that centre to `BLANK_MARGIN` above the keyboard's top, never past the
+     status band — at `DRAG_SPEED` (240 pt/s: the speed measured to hide the Contacts keyboard, 120 pt in 500 ms; the
+     duration follows from the length, so a long lift is no faster and no fling — a 300-ms stroke at 1147 pt/s was
+     measured to fling a SwiftUI form 729–970 pt). It touches down on the blank point nearest the keyboard: a point
+     of the target's nearest scroll view, below the status band, above the keyboard's top and `SCREEN_EDGE` (24 pt)
+     in from the screen's sides (clear of iOS's edge gestures), whose 8-pt square (`BLANK_MARGIN`) holds only bare
+     wrappers that have children or lie inside that scroll view, an ancestor of it, a hidden subtree's, or the
+     keyboard's own; sought only when the target's own tap standing is `reachable` (nothing but the keyboard over
+     it, so the scroll view is the top layer's). Two ways it gets the target clear: a scroll view whose
+     `keyboardDismissMode` is `onDrag` hides the keyboard on it (measured on Contacts; `interactive` is unmeasured);
+     one that keeps it is scrolled toward its end, the target with it, out from under the keyboard — the note then
+     says where the drag went and that the keyboard is still up but no longer over it — or it does not move. The
+     guard resolves the target again where it now is, as after every move. This is the one place averi scrolls a
+     screen to clear the keyboard — rejected as a FIRST move (interact/keyboard.ts), kept as the last, after a
+     dismissal the author configured. **Never down**: at the top of a sheet's scroll view a downward drag pulls the
+     sheet itself down — the swipe that dismisses a sheet.
 
 Every move is irreversible and none is repeated. The target not coming back after a move ends the walk at once
 (`AfterDismissalTap`, naming every move so far): a screen the target has left is no screen to judge another strategy
 on. Every strategy spent with the keyboard still up is today's honest refusal, extended: `AfterDismissalTap` naming
-each move in order and why each later strategy was passed over. No dismissal configured is today's refusal unchanged
-(`KeyboardWithoutDismissal`, nothing moved) — the live case k1 pins it.
+each move in order and why each later strategy was passed over.
 
-The reply says which move hid the keyboard and which left it up:
-`the soft keyboard covered id:lab.form-keyboard.vs; tapped text:"Transfer details", the keyboard stayed up; hidden by
-tapping a blank point of the target's scroll view before tapping`.
+The reply says which move left the keyboard up and which got the target clear:
+`the soft keyboard covered id:lab.form-keyboard.vs; tapped text:"Transfer details", the keyboard stayed up; dragged
+the target's scroll view up from (201,502) to (201,382), and the keyboard is still up but no longer over it`.
 
 ## What is never on the list, and why
 
@@ -68,6 +66,11 @@ tapping a blank point of the target's scroll view before tapping`.
   provably safe, and the rule is "never a fallback that could submit a form". (ADR 0017's "the keyboard's own UI stays
   per verb" is unchanged: no strategy touches the keyboard's own nodes; the accessory Done stays opt-in config.)
 - **WebDriverAgent's `/wda/keyboard/dismiss`**: measured to fail (K5a).
+- **A tap on a "blank" point** (in the first version of this decision; dropped in review round 1): WDA lists a tappable
+  row (`Cell`, mapped to `container`) and an RN Pressable without an accessibility label as bare containers, so a
+  point the tree calls empty may be a control — the review found an unlabelled "From account" row tapped mid-row — and
+  no such tap was measured to hide a keyboard (the lab form and the Contacts sheet both kept it). Owed before a blank
+  tap returns: a lab cell whose container ends editing on a tap, and a rule that tells such a container from a row.
 - **A tap on any node that is not bare**: a control would be pressed (ADR 0016's explicit refusal), and a text or an
   image may carry a gesture the tree does not show — the very gesture the configured title tap relies on.
 
@@ -95,19 +98,21 @@ averi taps / fills it, saying the keyboard is still up but no longer over it; no
 
 ## Residuals accepted
 
-1. **A gesture recogniser on a bare wrapper** is not seen by the tree. The blank-point tap could trigger one (ADR
-   0016's residual for the picker, the same here). It presses nothing the tree lists, and the reply names the point.
-2. **The drag scrolls the scroll view** toward its end by up to the drag's length when it does not hide the
-   keyboard. The target is resolved again after it, the note says the scroll view was dragged, and a refusal after
-   it says a drag may have scrolled the content.
-3. **The post-fill dismissal has no fallbacks**: it has no target to anchor a blank point. A fill whose dismissal
-   leaves the keyboard up still throws `AfterDismissalTap`; the next step's guard, with its target, tries them.
-4. **No configured dismissal, no fallback.** Opt-in on purpose (the config's doc): an app whose author configured
-   nothing gets the refusal, not an unasked touch.
-5. **iOS only under WDA**, as the guard: under idb no band is marked and no guard acts (ADR 0006).
-6. **The blank-point tap hid nothing measured.** No app measured so far ends editing on a tap outside the field; it
-   is kept, before the drag, as the one move that changes no layout where it does nothing, for the apps that do (the
-   common `hideKeyboardWhenTappedAround`). A device case of it is owed (a lab cell with a tap-to-dismiss container).
+1. **The drag may touch down on an unlabelled control.** Its start keeps off every node the tree names, but WDA lists a
+   tappable row (`Cell`) and an unlabelled RN Pressable as bare containers. A drag that begins on one is a scroll —
+   UIKit cancels the row's touch once the scroll view takes the pan — so nothing is pressed; a gesture recogniser on a
+   bare wrapper that fires on touch-down is not seen (ADR 0016's residual for the picker).
+2. **The drag scrolls the scroll view** toward its end when it does not hide the keyboard — that is how it lifts the
+   target. The target is resolved again after it, the note says where the drag went, and a refusal after it says a
+   drag may have scrolled the content.
+3. **An upward drag on a sheet at a medium detent expands it** (UIKit's `prefersScrollingExpandsWhenScrolledToEdge`,
+   on by default) before it scrolls. Unmeasured; the guard resolves the target on the expanded sheet, and the note
+   names the drag.
+4. **The post-fill dismissal has no fallback**: it has no target to anchor the drag. A fill whose dismissal leaves the
+   keyboard up still throws `AfterDismissalTap`; the next step's guard, with its target, tries it.
+5. **No configured move, no fallback.** Nothing configured, or nothing configured usable on this screen, is the
+   refusal, not an unasked touch.
+6. **iOS only under WDA**, as the guard: under idb no band is marked and no guard acts (ADR 0006).
 
 ## Supersedes
 
