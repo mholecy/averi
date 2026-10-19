@@ -1166,7 +1166,10 @@ export const drawnOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): 
  * `drawnOverText` takes in the same sentences (ui-tree/standing.ts#coverClause chooses).
  */
 export const orderUntoldText = (cover: QuotedNode, centre?: Point, reach?: Rect): string =>
-  `overlapped by ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, the two listed in reading order: which is drawn on top is not told`;
+  `overlapped by ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, ${ORDER_UNTOLD}`;
+
+/** Why a cover named by `orderUntoldText` (and the pixel assert's covered sentence) is not said to be drawn over the target. */
+export const ORDER_UNTOLD = 'the two listed in reading order: which is drawn on top is not told';
 
 /**
  * A cover as a sentence names it, with where it presses when that is not its rect (draw-order.ts#Exposure.reaches: a

@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { coverText, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, nodeText, ORDER_UNTOLD, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import { pollTree } from '../ui-tree/read-tree.js';
@@ -537,7 +537,7 @@ async function judgeOver(
     case 'covered': {
       const named = coverText(standing.cover, standing.reach);
       // A cover whose order against the element the tree does not tell (listed in reading order) is said as such.
-      const over = standing.facts.unordered?.includes(standing.cover) === true ? `overlaps the element ${at}), the two listed in reading order: which is drawn on top is not told` : `is drawn over the element ${at})`;
+      const over = standing.facts.unordered?.includes(standing.cover) === true ? `overlaps the element ${at}), ${ORDER_UNTOLD}` : `is drawn over the element ${at})`;
       return `${named} ${over} — ${coverRemedy(standing.remedy)}`;
     }
     default: {
@@ -618,7 +618,7 @@ const coverRemedy = (remedy: CoverRemedy): string => {
     case 'scroll':
       return scroll;
     case 'unordered':
-      return `the capture may show it, not the element; ${unorderedRemedy('the element')}`;
+      return `the capture may show it, not the element; ${unorderedRemedy('pixel')}`;
   }
 };
 

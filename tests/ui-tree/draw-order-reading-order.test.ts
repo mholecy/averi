@@ -4,11 +4,13 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { node } from '../helpers/fake.js';
 
 /**
- * A control listed BEFORE a control target it overlaps, in a listing given in READING order (idb's flat list; a WDA
- * sibling run sorted by top — SwiftUI's), is a cover of it: the order does not say which is drawn on top, and the
- * cover is named `unordered`. A target pinned at the screen's bottom keeps its place on top; a run not sorted by top
+ * The controls listed BEFORE a control target it overlaps, in a listing given in READING order (idb's flat list; a WDA
+ * sibling run sorted by top — SwiftUI's), are covers of it when one holds its centre: the order does not say which is
+ * drawn on top, and the cover is named `unordered` — as is an overlapping control listed after it (a cover by draw
+ * order). A target pinned at the screen's bottom keeps its place on top; a run not sorted by top
  * keeps its order as draw order.
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  * docs/adr/0015-flat-list-reading-order-break.md
@@ -36,17 +38,33 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     expect(seen.tapAt).toBeUndefined();
   });
 
-  it("blur-menu: W's covers (C, listed after it, as draw order) are no unordered ones — W stays refused under C (ADR 0015's residual)", async () => {
-    const t = await idb('blur-menu.idb.json');
+  it.each([
+    ['blur-menu.idb.json', () => idb('blur-menu.idb.json')],
+    ['blur-menu.wda.json', () => wda('blur-menu.wda.json')],
+  ])("%s: W's cover C, listed after it, is one whose order is not told either — W stays covered (ADR 0015's residual), named so", async (_n, tree) => {
+    const t = await tree();
+    const c = byId(t, 'lab.blur-menu.C');
     const seen = drawOrder(t).exposure(byId(t, 'lab.blur-menu.W'), IPHONE);
-    expect(seen.covers).toEqual([byId(t, 'lab.blur-menu.C')]);
+    expect(seen.covers).toEqual([c]);
+    expect(seen.unordered).toEqual([c]);
+  });
+
+  it('a control listed before that only overlaps the edge of a target, clear of its centre, is no cover of it: two cards 4 pt over each other', () => {
+    const card = (label: string, y: number): UiNode => node({ role: 'button', label, rect: { x: 16, y, width: 370, height: 120 } });
+    const first = card('Card 1', 100);
+    const second = card('Card 2', 216);
+    const t = node({ role: 'other', rect: { ...IPHONE }, children: [node({ role: 'other', rect: { ...IPHONE }, readingOrder: true, children: [first, second] })] });
+    const seen = drawOrder(t).exposure(second, IPHONE);
+    expect(seen.covers).toEqual([]);
     expect(seen.unordered).toEqual([]);
+    expect(seen.shows).toBe(1);
   });
 
   it("mp-native's chooser (idb, ADR 0015's capture): the transaction row listed after the card's rows lies under them", () => {
     const t = parseIdbDescribeAll(JSON.stringify(MODAL.screens.chooser));
     const row = [...everyNode(t)].find((n) => n.label?.startsWith('Loan repayment'))!;
     const seen = drawOrder(t).exposure(row, IPHONE);
+    // SWIFT payment (45,453 312x52) holds its centre (201,461); To my account (45,397 312x52) its top 14 pt — both covers.
     expect(seen.covers.map((n) => n.label)).toEqual(['To my account', 'SWIFT payment']);
     expect(seen.unordered).toEqual(seen.covers);
     expect(seen.tapAt).toBeUndefined();

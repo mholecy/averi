@@ -489,13 +489,16 @@ export const presentedStop = (layer?: MarkedLayer): string => {
 
 /**
  * THE remedy's words for a node under a cover whose order against it the tree does not tell (`Remedy`'s `unordered`),
- * the node named as `what` — as `presentedRemedy`'s: no scroll tells which of the two is drawn on top, so none is
- * advised (a stroke beside an in-screen menu may close it); a screenshot shows it, and a menu or popover drawn over
- * the node is closed first.
+ * for a touch (the tap, `scroll_until`) or the pixel assert — as `presentedRemedy`'s: no scroll tells which of the two
+ * is drawn on top, so none is advised (a stroke beside an in-screen menu may close it); a screenshot shows it — a menu
+ * or popover drawn over the node is closed first; and, the node on top (the listing does not tell, so a cover may lie
+ * beneath it), the way out: a tap by coordinates, or an assert on a part of it clear of the other.
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  */
-export const unorderedRemedy = (what: 'it' | 'the element'): string =>
-  `no scroll tells which is on top: see a screenshot — if the other is drawn over ${what} (a menu, a popover), close it first`;
+export const unorderedRemedy = (purpose: 'touch' | 'pixel'): string =>
+  purpose === 'touch'
+    ? 'no scroll tells which is on top: see a screenshot — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates'
+    : 'no scroll tells which is on top: see a screenshot — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other';
 
 /**
  * How a sentence says `cover`, one of `facts.covers`, lies over the node — at its centre when `centre` is given: drawn

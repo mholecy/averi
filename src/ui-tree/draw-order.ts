@@ -29,8 +29,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * list, a WDA run of siblings sorted by top): there a control drawn on top
  * may be listed BEFORE the control it is drawn over (the lab's menu row W
  * `51,448`, `zIndex` over C `51,470`), so for a control target such a
- * listing gives the overlapping controls listed before it as covers too,
- * whose order it does not tell (`readingOrderCovers`, `Exposure.unordered`).
+ * listing gives the overlapping controls listed before it as covers too
+ * when one holds its centre, and every overlapping control of it, before or after, as a
+ * cover whose order it does not tell (`readingOrderPeers`, `Exposure.unordered`).
  *
  * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
@@ -131,7 +132,7 @@ export interface DrawOrder {
    * floating tab bar's items listed before it, when it lies outside the bar
    * (`tabBarsOf`: idb lists the bar first; a nested tree's order is its draw
    * order), and, in a listing given in reading order, the controls listed
-   * before a control target that overlap it (`readingOrderCovers`) — that draw for a
+   * before a control target when one holds its centre (`readingOrderPeers`) — that draw for a
    * target (`NOT_DRAWN`'s `target` column) and share area with the part of
    * `node` inside `within` — a cover's rect, or, for a node pinned at the
    * bottom of idb's flat list, that rect run down to the screen's bottom
@@ -323,12 +324,12 @@ export const minTapPiece = (screen: { readonly width: number; readonly height: n
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
   readonly shows: number;
-  /** The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before it among them, `tabBarsOf`; in a reading-order listing, the controls listed before it that overlap it, `readingOrderCovers`); empty when none. */
+  /** The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before it among them, `tabBarsOf`; in a reading-order listing, the controls listed before it that overlap it when one holds its centre, `readingOrderPeers`); empty when none. */
   readonly covers: readonly UiNode[];
   /**
-   * The covers whose ORDER against the node the listing does not tell, in `covers`' order: the controls listed before
-   * it in a run given in reading order (`readingOrderCovers`, `UiNode.readingOrder`) — the one drawn on top may be
-   * either; empty when none. What the sentences read: such a cover is named as overlapping the node, which of the two
+   * The covers whose ORDER against the node the listing does not tell, in `covers`' order: the controls of a run given
+   * in reading order that overlap it, listed before it or after (`readingOrderPeers`, `UiNode.readingOrder`) — the one
+   * drawn on top may be either; empty when none. What the sentences read: such a cover is named as overlapping the node, which of the two
    * is on top not told, and no scroll is advised (ui-tree/standing.ts#Remedy's `unordered`).
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    */
@@ -1374,7 +1375,7 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * it, reads as pinned — it reaches down over what lies below it in its
  * column (on screen, only content listed before it: a false refusal, the
  * safe direction). Asked of a flat list for its covers' reach (`pinned`); of a
- * nested tree only for `readingOrderCovers`' guard (`pinnedTargets`: the same
+ * nested tree only for `readingOrderPeers`' guard (`pinnedTargets`: the same
  * shape, read in pre-order — a pinned target keeps its place on top), never
  * for a reach there.
  */
@@ -1559,48 +1560,58 @@ export function listsUnclippedFrames(tree: UiNode): boolean {
 /**
  * Whether the tree's source lists `parent`'s children in READING order (`UiNode.readingOrder`: idb's flat list, a WDA
  * run sorted by top), not in draw order — the third reader of the tree's dialect (`listsAncestry`'s doc), asked by
- * `readingOrderCovers` alone.
+ * `readingOrderPeers` alone.
  */
 function listsInReadingOrder(parent: UiNode): boolean {
   return parent.readingOrder === true;
 }
 
 /**
- * The CONTROLS LISTED BEFORE a control `target` that cover it in a listing given in reading order
- * (`listsInReadingOrder` of its parent): its earlier siblings that are interactive and overlap it past
+ * The controls whose ORDER against a control target a listing given in reading order does not tell
+ * (`listsInReadingOrder` of the target's parent, `about.target`): its siblings that are interactive and overlap it past
  * geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a control's own wrapper, its own
  * title) — in idb's flat list from its content on (`contentFrom`: the top bar's are chrome before content, ADR 0004)
- * and none of its bottom chrome (`bottomChrome`: a tab bar's items are covers by their own rule). Such a listing does
- * not tell which of two overlapping controls is drawn on top, so a cover drawn after the target and one drawn before
- * it are alike there: each covers the other (`Exposure.unordered`). Measured: the lab's in-screen menu, idb and WDA
- * (`A 110, B 290, K 380, W 448, C 470, D 650`): W, drawn on top by `zIndex`, is listed before C, whose centre
- * (201,502) lies on W — read clear, C was `Tapped` there and the tap fired W; mp-native's payment-type chooser (ADR
- * 0015's capture), `Loan repayment` listed after the card's `To my account` and `SWIFT payment` rows it lies under.
- * Never for a target PINNED at the screen's bottom (`pinnedTargets`): a pinned bar is drawn over what scrolls under it,
- * listed before it or not (the pinned-bar cell's Continue, idb and WDA). Residual, stated: a menu row listed BEFORE the
- * row it is drawn over is still covered by that row as draw order (ADR 0015's) — a false refusal, the safe direction.
+ * and none of its bottom chrome (`bottomChrome`: a tab bar's items are covers by their own rule), nor, on a nested
+ * tree, a control pinned at the screen's bottom (`pinnedTargets`). Such a listing does not tell which of two
+ * overlapping controls is drawn on top, so each is a cover of the other whose order is not told (`Exposure.unordered`):
+ * - `before`: the ones listed BEFORE the target, when one of them holds its centre (`tapPoint`) — covers the draw
+ *   order alone would not give. Measured: the lab's in-screen menu, idb and WDA (`A 110, B 290, K 380, W 448, C 470, D 650`): W, drawn
+ *   on top by `zIndex`, is listed before C, whose centre (201,502) lies on W — read clear, C was `Tapped` there and the
+ *   tap fired W; mp-native's payment-type chooser (ADR 0015's capture), `Loan repayment` listed after the card's
+ *   `To my account` and `SWIFT payment` rows it lies under (SWIFT payment over its centre). Only when one holds the
+ *   centre: siblings that only overlap the target's edges by a few points (a card's shadow, an avatar stack, a badge)
+ *   would else fail its colour assert and every `fully` stop on a cover that may lie beneath it.
+ * - `untold`: those and the ones listed AFTER it (which the draw order already gives as covers): W, under C listed
+ *   after it, is refused naming C as overlapping it, its order not told — not as drawn over it, with a scroll advised.
+ * None for a target PINNED at the screen's bottom (`pinnedTargets`): a pinned bar is drawn over what scrolls under it,
+ * listed before it or not (the pinned-bar cell's Continue, idb and WDA).
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  */
-function readingOrderCovers(
+function readingOrderPeers(
   order: readonly Placed[],
-  target: Placed,
-  { flatList, contentFrom, bottomChrome, pinnedTargets }: { readonly flatList: boolean; readonly contentFrom: number; readonly bottomChrome: ReadonlySet<Placed>; readonly pinnedTargets: () => ReadonlyMap<Placed, number> },
-): readonly Placed[] {
+  about: SeenFor,
+  pinnedTargets: () => ReadonlyMap<Placed, number>,
+): { readonly before: readonly Placed[]; readonly untold: ReadonlySet<Placed> } {
+  const { target, flatList, contentFrom, bottomChrome } = about;
+  const none = { before: [], untold: new Set<Placed>() };
   const t = target.node;
   const parent = target.parent;
-  if (parent === undefined || !listsInReadingOrder(parent.node) || !isInteractive(t) || (flatList && target.at < contentFrom)) return [];
-  const before = order.filter(
+  if (parent === undefined || !listsInReadingOrder(parent.node) || !isInteractive(t) || (flatList && target.at < contentFrom)) return none;
+  const peers = order.filter(
     (p) =>
+      p !== target &&
       p.parent === parent &&
-      p.at < target.at &&
-      (!flatList || (p.at >= contentFrom && !bottomChrome.has(p))) &&
+      (flatList ? p.at >= contentFrom && !bottomChrome.has(p) : !pinnedTargets().has(p)) &&
       isInteractive(p.node) &&
       overlapsPastSlack(p.node.rect, t.rect) &&
       !rectWithin(t.rect, p.node.rect) &&
       !rectWithin(p.node.rect, t.rect) &&
       !sameRectWithinPixel(p.node.rect, t.rect),
   );
-  return before.length === 0 || pinnedTargets().has(target) ? [] : before;
+  if (peers.length === 0 || pinnedTargets().has(target)) return none;
+  const centre = tapPoint(t);
+  const before = peers.filter((p) => p.at < target.at);
+  return { before: before.some((p) => containsPoint(p.node.rect, centre)) ? before : [], untold: new Set(peers) };
 }
 
 export function drawOrder(tree: UiNode): DrawOrder {
@@ -1622,7 +1633,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
   const tabItems = new Map(tabBarsOf(order, screen, keyboard?.keys ?? new Set()).flatMap((bar) => [...bar.items].map((item) => [item, bar] as const)));
   /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`) — a floating tab bar's items included. */
   const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? []), ...tabItems.keys()]);
-  /** The controls pinned at the screen's bottom, of a flat list (`pinned`) or of a nested tree by the same shape (`bottomPinned`) — `readingOrderCovers`' guard, read on first use. */
+  /** The controls pinned at the screen's bottom, of a flat list (`pinned`) or of a nested tree by the same shape (`bottomPinned`) — `readingOrderPeers`' guard, read on first use. */
   let pinnedNested: ReadonlyMap<Placed, number> | undefined;
   const pinnedTargets = (): ReadonlyMap<Placed, number> => (flatList ? pinned : (pinnedNested ??= bottomPinned(order, screen, undefined)));
   /**
@@ -1777,9 +1788,10 @@ export function drawOrder(tree: UiNode): DrawOrder {
       // tree's order IS its draw order (an action sheet listed after the bar is drawn over it), so there only the items listed after the target count.
       // A flat list has no nesting, so no item listed before the target is its ancestor.
       const tabsBefore = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
-      // In a listing given in reading order, the controls listed before it that overlap it: their order is not told.
-      const unordered = new Set(places.length === 0 ? [] : readingOrderCovers(order, places[0], { flatList, contentFrom, bottomChrome, pinnedTargets }));
-      const before = [...tabsBefore, ...unordered].sort((a, b) => a.at - b.at);
+      // In a listing given in reading order, the controls that overlap it whose order is not told: those listed before it over its centre are
+      // covers too.
+      const peers = about === undefined ? undefined : readingOrderPeers(order, about, pinnedTargets);
+      const before = [...tabsBefore, ...(peers?.before ?? [])].sort((a, b) => a.at - b.at);
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
       // A presented layer's cover reaches the whole screen and draws whatever the rows say (presentation.ts#PresentedOver).
       const wholeScreen = (p: Placed): boolean => about?.over.wholeScreen(p) === true;
@@ -1814,7 +1826,7 @@ export function drawOrder(tree: UiNode): DrawOrder {
         ...(largest !== undefined && { largest: { ...largest } }),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        unordered: over.filter((c) => unordered.has(c.placed)).map((c) => c.node),
+        unordered: over.filter((c) => peers?.untold.has(c.placed) === true).map((c) => c.node),
         presented: over.filter((c) => c.wholeScreen || about?.over.surface(c.placed) !== undefined).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,

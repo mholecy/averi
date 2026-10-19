@@ -109,9 +109,7 @@ interface IdbElement {
 /**
  * `idb ui describe-all --json` returns a FLAT array of elements, not a tree —
  * normalize under a synthetic root with all elements as direct children,
- * marked `flatList` (UiNode.flatList: ui-tree/draw-order.ts reads the list's
- * order by a rule of its own) and `readingOrder` (UiNode.readingOrder: idb
- * lists in reading order, not draw order). (ui-tree/geometry.ts relies on that root
+ * marked with idb's dialect (`markIdbDialect`). (ui-tree/geometry.ts relies on that root
  * being 0x0: it infers the screen size from the children, never from a
  * wrapper.)
  */
@@ -126,6 +124,19 @@ function idbElements(json: string): IdbElement[] {
   return elements;
 }
 
+/**
+ * The idb source's dialect, marked on its flat list's root: a flat list (UiNode.flatList: ui-tree/draw-order.ts reads
+ * the list's order by a rule of its own) listed in READING order, not draw order (UiNode.readingOrder,
+ * docs/adr/0015-flat-list-reading-order-break.md). THE marks: the parser sets them on every tree, and an idb
+ * `ui_snapshot` capture that lacks them (older captures do) is given them with this
+ * (scripts/differential/recorded-source.ts), so it is judged as the live source's tree. Returns `tree`.
+ */
+export function markIdbDialect<T extends UiNode>(tree: T): T {
+  tree.flatList = true;
+  tree.readingOrder = true;
+  return tree;
+}
+
 function idbTree(elements: IdbElement[]): UiNode {
   const children: UiNode[] = elements.map((el) =>
     normalizeIosElement(
@@ -135,17 +146,15 @@ function idbTree(elements: IdbElement[]): UiNode {
     ),
   );
   attachFieldErrors(children);
-  return {
+  return markIdbDialect({
     role: 'container',
     label: null,
     identifier: null,
     value: null,
     rect: zeroRect(),
     children,
-    flatList: true,
-    readingOrder: true,
     ...(listsPresentedLayer(elements) && { presentation: 'screen' as const }),
-  };
+  });
 }
 
 /** The identifier UIKit gives the dimming view it lays under a sheet or a popover presented over a screen (idb's `AXUniqueId`, WDA's `name`). */

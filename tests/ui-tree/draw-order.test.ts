@@ -1135,13 +1135,12 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
           expect(seen.tapAt).toBeUndefined();
         });
 
-        it('…the reviewer\'s probe on it: a row at 24,570 354x60 between the form and CONTINUE is never tapped on key "2" (201,600) — it is refused, under CONTINUE\'s reach and the keys (and value_date_select 24,545 354x52, listed before it, which it overlaps: in a reading-order list their order is not told)', () => {
+        it('…the reviewer\'s probe on it: a row at 24,570 354x60 between the form and CONTINUE is never tapped on key "2" (201,600) — it is refused, under CONTINUE\'s reach and the keys', () => {
           const tree = pad();
           const row = uiNode({ role: 'button', label: 'Fees', rect: rect(24, 570, 354, 60) });
           tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, row);
           const seen = drawOrder(tree).exposure(row, IPHONE);
-          expect(labels(seen.covers)).toEqual(['swift_payment.form.value_date_select', 'swift_payment.form.continue_button', '1', '2', '3']);
-          expect(labels(seen.unordered)).toEqual(['swift_payment.form.value_date_select']);
+          expect(labels(seen.covers)).toEqual(['swift_payment.form.continue_button', '1', '2', '3']);
           expect(seen.tapAt).toBeUndefined();
         });
 

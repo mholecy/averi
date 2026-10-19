@@ -450,15 +450,11 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         };
       }
       if (short.of === 'covered') {
-        // A cover whose order the tree does not tell (listed in reading order) is no layout defect it can name.
-        const why =
-          judged.standing.kind !== 'reachable' && judged.standing.remedy.of === 'unordered'
-            ? `Which of the two is drawn on top the tree does not tell — ${unorderedRemedy('it')}.`
-            : 'The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes.';
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. ${why} ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
+              `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
         };
       }
       // Clipped at the keyboard's edge at the end of the content: the
@@ -547,6 +543,18 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       return {
         message:
           `scroll_until ${describe} stopped ${when} — ${where} — ${presentedStop(layer)}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
+            `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
+      };
+    }
+    case 'unordered': {
+      // Under a cover whose order the tree does not tell (ui-tree/standing.ts#Remedy's `unordered`): stopped without a
+      // swipe, as under a presented screen. A plain Error, as `stuck`: the element was there and seen.
+      const { judged, viewport } = o;
+      const when = o.swipes === 0 ? 'before any swipe' : `after ${swipesText(o.swipes)}, without swiping further`;
+      return {
+        message:
+          `scroll_until ${describe} stopped ${when} — element is in the viewport but ${coverClause(judged.standing.facts, o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ` +
+            `${percent(judged.standing.facts.shows)}% of it shows — ${unorderedRemedy('touch')}, so ${o.swipes === 0 ? 'none' : 'no further swipe'} was sent. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

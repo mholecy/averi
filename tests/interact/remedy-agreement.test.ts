@@ -694,19 +694,31 @@ describe('one remedy for a target under a cover whose order is not told — the 
     }
   });
 
-  it('word for word: overlapped, the order not told, no scroll advised', async () => {
+  it("the menu row W, under C listed after it: refused the same way — overlapped, the order not told, no scroll advised (ADR 0015's residual: still refused)", async () => {
     for (const [, tree] of await trees()) {
-      expect(await tapSaid(tree, c(tree))).toBe(`id:t is ${OVERLAPPED}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('it')}; nothing was tapped`);
+      const w = [...everyNode(tree)].find((n) => n.identifier === 'lab.blur-menu.W')!;
+      expect(await tapSaid(tree, w)).toBe(
+        'id:t is overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading order: which is drawn on top is not told; ' +
+          `only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('touch')}; nothing was tapped`,
+      );
+      const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [{ tree, found: [w], screen: USABLE }]), 'id:t').message;
+      expect(failure).toMatch(/^scroll_until id:t stopped before any swipe — element is in the viewport but overlapped by button "Target C" .* so none was sent\./);
+    }
+  });
+
+  it('word for word: overlapped, the order not told, no scroll advised — scroll_until stops before any swipe', async () => {
+    for (const [, tree] of await trees()) {
+      expect(await tapSaid(tree, c(tree))).toBe(`id:t is ${OVERLAPPED}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('touch')}; nothing was tapped`);
       expect(await colourSaid(tree, c(tree))).toBe(
         'button "Target W" (51,448 300x64) overlaps the element (element 51,470 300x64), the two listed in reading order: which is drawn on top is not told — ' +
-          `the capture may show it, not the element; ${unorderedRemedy('the element')}`,
+          `the capture may show it, not the element; ${unorderedRemedy('pixel')}`,
       );
-      // Read unchanged after every swipe: the content is exhausted, as on the lab's screen.
       const row: Row = { tree, found: [c(tree)], screen: USABLE };
-      const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, Array(4).fill(row)), 'id:t').message;
-      expect(failure).toContain(`element is in the viewport but ${OVERLAPPED} — 34% of it shows`);
-      expect(failure).toContain(`Which of the two is drawn on top the tree does not tell — ${unorderedRemedy('it')}.`);
-      expect(failure).not.toContain('layout defect');
+      const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row]), 'id:t').message;
+      expect(failure).toBe(
+        `scroll_until id:t stopped before any swipe — element is in the viewport but ${OVERLAPPED} — 34% of it shows — ${unorderedRemedy('touch')}, so none was sent. ` +
+          'Last rect {"x":51,"y":470,"width":300,"height":64} in a 402x874 viewport',
+      );
     }
   });
 });

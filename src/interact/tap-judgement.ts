@@ -346,7 +346,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
           : `only a ${standing.largest.width}x${standing.largest.height} part of it shows${above}, under the ${minPiece}x${minPiece} a tap may be moved to`;
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint — or, under
       // a cover whose order the tree does not tell, no scroll.
-      const remedy = advice(standing.remedy, (r) => (r.of === 'unordered' ? unorderedRemedy('it') : (positionerRemedy(standing.cover) ?? 'scroll_until it first')));
+      const remedy = advice(standing.remedy, (r) => (r.of === 'unordered' ? unorderedRemedy('touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first')));
       throw new CoveredRefusal(told.refusal(`${coverClause(standing.facts, standing.cover, centre)}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':

@@ -525,14 +525,17 @@ export interface UiNode {
    * Set on a node whose CHILDREN its source lists in READING ORDER — by their frames' tops — and so not as their draw
    * order: iOS's accessibility lists a SwiftUI container's elements so (the bug note below: the lab's in-screen menu
    * row W `51,448`, drawn on top by `zIndex`, is listed BEFORE the row C `51,470` it is drawn over, in idb's flat list
-   * and in WDA's one `Other` alike). Set by the idb parser on its flat list's root (adapters/ios-tree-source.ts#idbTree:
-   * idb lists in reading order, docs/adr/0015-flat-list-reading-order-break.md) and by the WDA parser on every node
-   * whose two or more children's tops never decrease in the order listed (adapters/wda-source.ts#markWdaDialect) — a
-   * run listed otherwise is no reading order, and keeps its order as draw order (Contacts' new-contact photo
-   * `Add photo 113,132` listed before `Remove photo 235,129`). Read by ui-tree/draw-order.ts#listsInReadingOrder: a
-   * control listed BEFORE a control target in such a run, overlapping it, is a cover of it whose order the listing
-   * does not tell (`Exposure.unordered`). A mark of the source, like `flatList`: ui-tree knows no platform. Absent on
-   * Android's trees (uiautomator's order is not measured to be reading order, draw-order.ts's doc).
+   * and in WDA's one `Other` alike). Set by the idb parser on its flat list's root (adapters/ios-tree-source.ts#
+   * markIdbDialect: idb lists in reading order, docs/adr/0015-flat-list-reading-order-break.md) and by the WDA parser on
+   * every node whose two or more children's tops never decrease in the order listed (adapters/wda-source.ts#
+   * markWdaDialect). On WDA it is a SORT CHECK, not a fact WDA states: most top-to-bottom layouts pass it, UIKit's (which
+   * lists in draw order) included; a run listed out of top order is surely no reading order and keeps its order as draw
+   * order (Contacts' new-contact form, tests/fixtures/wda-capture-contacts-new-contact.json: its run lists an image at
+   * y 62 after a button at y 319). Read by ui-tree/draw-order.ts#listsInReadingOrder alone, for one question: which
+   * of two overlapping CONTROLS of such a run is drawn on top is not told (`Exposure.unordered`) — so those listed
+   * before a control target cover it when one of them holds its centre. A mark of the source, like `flatList`: ui-tree
+   * knows no platform. Absent on Android's trees (uiautomator's order is not measured to be reading order,
+   * draw-order.ts's doc). Printed by `ui_snapshot` with the node.
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    */
   readingOrder?: true;

@@ -227,6 +227,13 @@ export type ScrollOutcome = (
   | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
   | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; layer?: MarkedLayer; next?: undefined }
   | { kind: 'presented'; swipes: number; judged: Judged | undefined; viewport: Rect; next: PresentedTouchDown }
+  /**
+   * Under a cover whose order against it the tree does not tell (ui-tree/standing.ts#Remedy's `unordered`: the two
+   * listed in reading order): stopped without a swipe — no scroll tells which is drawn on top, and a stroke beside an
+   * in-screen menu lands on its backdrop.
+   * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+   */
+  | { kind: 'unordered'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode }
   | {
       kind: 'bound';
       swipes: number;
@@ -1448,6 +1455,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
     if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    // Under a cover whose order the tree does not tell (listed in reading order), no swipe tells which is on top: stop.
+    if (best.standing.kind === 'covered' && best.standing.remedy.of === 'unordered') return stop(s, { kind: 'unordered', swipes: s.swipes, judged: best, viewport, cover: best.standing.cover });
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.
     // The stuck turn: the

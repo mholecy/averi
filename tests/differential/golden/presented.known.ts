@@ -130,15 +130,16 @@ export const presented: KnownFile = {
     ...[`${IOS}/blur-menu.idb.json`, `${IOS}/blur-menu.wda.json`, `${IOS}/blur-menu-grouped.idb.json`].flatMap((file) => [
       ...keys(file, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused as overlapped by the menu row W listed before it, the order not told; the backdrop has no node', as: BLUR }),
       ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails as overlapped by the menu row W, the order not told; the backdrop has no node', as: BLUR }),
-      ...keys(file, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'strokes for C overlapped by the menu row W; the backdrop has no node', as: BLUR }),
+      ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'refused', calls: [], note: 'stops before any swipe, overlapped by the menu row W, the order not told; the backdrop has no node', as: BLUR }),
     ]),
     // LAB FINDING (calibration.json L4, its residual): the menu row W, listed in reading order just before C, which it
-    // is drawn over, still reads as covered by C under idb and WDA (C listed after it, read as draw order; no reading
-    // break, ADR 0015) — a false refusal, the safe direction: the listing does not tell which of the two is on top.
+    // is drawn over, still reads as covered by C under idb and WDA (C listed after it; no reading break, ADR 0015) — a
+    // false refusal, the safe direction: the listing does not tell which of the two is on top, and the replies say so
+    // (no scroll advised, none sent).
     ...['idb', 'wda'].flatMap((src) => [
-      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: 'lab finding: the menu row read as under the row it is drawn over', as: LAB_MENU }),
-      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: 'lab finding: the menu row read as under the row it is drawn over', as: LAB_MENU }),
-      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'lab finding: strokes for the menu row read as under the row it is drawn over', as: LAB_MENU }),
+      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: 'lab finding: the menu row read as overlapped by the row it is drawn over, the order not told', as: LAB_MENU }),
+      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: 'lab finding: the menu row read as overlapped by the row it is drawn over, the order not told', as: LAB_MENU }),
+      ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: [], note: 'lab finding: stops before any swipe, the menu row read as overlapped by the row it is drawn over, the order not told', as: LAB_MENU }),
     ]),
   ]),
   counts: {

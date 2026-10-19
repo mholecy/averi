@@ -1,4 +1,4 @@
-import type { ApplicationLabel, IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { markIdbDialect, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { markWdaDialect } from '../../src/adapters/wda-source.js';
 import type { Recording } from './corpus.js';
@@ -24,10 +24,9 @@ import type { Recording } from './corpus.js';
  *    UiNode.readingOrder on its runs sorted by top, with this checkout's
  *    src/adapters/wda-source.ts#markWdaDialect; older `ui_snapshot` captures
  *    lack them), so the sweep judges it as the live source's tree; a side
- *    that does not know a field ignores it. A normalized idb capture older
- *    than its root's `readingOrder` mark is served without it (the
- *    reading-order cover rule is not asked of it): the truth corpus holds
- *    raw idb payloads only.
+ *    that does not know a field ignores it. A normalized idb tree is given
+ *    the idb parser's marks likewise (UiNode.flatList and
+ *    UiNode.readingOrder on its root, src/adapters/ios-tree-source.ts#markIdbDialect).
  * A RAW idb capture does not: idb's source has a narrower seam already — its
  * `exec` — so it is replayed by the side's own IdbTreeSource over the fake
  * device (fake-device.ts answers `ui describe-all`), empty-tree error and
@@ -58,7 +57,7 @@ export class RecordedTreeSource implements IosTreeSource {
     this.onRead(`${this.kind} tree read (${this.recording.form})`);
     const value: unknown = JSON.parse(this.recording.payload);
     if (this.recording.form === 'raw') return this.parseWdaSourceValue(value);
-    return this.kind === 'wda' ? markWdaDialect(value as UiNode) : (value as UiNode);
+    return this.kind === 'wda' ? markWdaDialect(value as UiNode) : markIdbDialect(value as UiNode);
   }
 
   /** As WdaTreeSource answers (declined, no read); a normalized tree keeps no element types to answer from. */
