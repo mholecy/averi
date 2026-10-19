@@ -31,8 +31,9 @@ look that found it still up, never the one before the move. The lists:
    this screen, moves nothing — the refusal as before. The post-fill dismissal has no target to anchor them and walks
    none. One strategy:
    - **a drag** — the target's scroll view dragged UP by `DRAG_LENGTH` (120 pt) — or, when the target's centre lies
-     deeper under the keyboard, by what lifts that centre to `BLANK_MARGIN` above the keyboard's top, never past the
-     status band — at `DRAG_SPEED` (240 pt/s: the speed measured to hide the Contacts keyboard, 120 pt in 500 ms; the
+     deeper under the keyboard, by what lifts that centre to `BLANK_MARGIN` above the keyboard's top plus `PAN_SLOP`
+     (16 pt: a scroll view starts its pan only past its slop — a 278-pt drag moved `note` 267 pt, 3 pt short), never
+     past the status band — at `DRAG_SPEED` (240 pt/s: the speed measured to hide the Contacts keyboard, 120 pt in 500 ms; the
      duration follows from the length, so a long lift is no faster and no fling — a 300-ms stroke at 1147 pt/s was
      measured to fling a SwiftUI form 729–970 pt). It touches down on the blank point nearest the keyboard: a point
      of the target's nearest scroll view, below the status band, above the keyboard's top and `SCREEN_EDGE` (24 pt)

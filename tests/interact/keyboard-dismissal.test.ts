@@ -83,10 +83,10 @@ describe('the guard: when the configured dismissal leaves the keyboard up, averi
     );
   });
 
-  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre above the keyboard\'s top — 278 pt, not only DRAG_LENGTH — at the same speed, so it takes longer (k3)', async () => {
+  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre above the keyboard\'s top, plus the pan\'s slop — 294 pt, not only DRAG_LENGTH — at the same speed, so it takes longer (k3)', async () => {
     const fake = labFake();
     await tapElement(fake, 'id:lab.form-keyboard.note', { ...FAST, dismissals: [TITLE] }).catch(() => undefined);
-    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,224) 1158ms'); // 843 − (573 − 8) = 278 pt at 240 pt/s
+    expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,208) 1225ms'); // 843 − (573 − 8) + 16 = 294 pt at 240 pt/s
   });
 
   it('the title already hides it: no drag at all', async () => {
@@ -189,7 +189,7 @@ describe('the drag: where it touches down and how far it goes (keyboard-dismissa
   });
 
   it('never past the status band: a lift longer than the room above stops at the area\'s top', async () => {
-    // A keyboard (with an accessory bar) up to y 200: the target's centre 621 asks a lift of 621 − 192 = 429 pt.
+    // A keyboard (with an accessory bar) up to y 200: the target's centre 621 asks a lift of 621 − 192 + 16 = 445 pt.
     const { tree, target } = screenWith([], [], { x: 0, y: 200, width: 402, height: 674 });
     expect(await dragOn({ tree, target })).toEqual({ from: { x: 201, y: 190 }, to: { x: 201, y: 62 } });
   });

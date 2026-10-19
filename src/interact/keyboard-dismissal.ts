@@ -258,11 +258,19 @@ export const dragMs = (m: Extract<DismissalMove, { kind: 'drag' }>): number => M
 /**
  * How far the fallback's drag moves at least, in points: the 120-pt drag measured to hide the keyboard on the Contacts
  * form (ADR 0022), far past a tap's slop and a fraction of a screen of scroll. Further when the target's centre lies
- * deeper under the keyboard: the drag then also LIFTS it — its centre to BLANK_MARGIN above the keyboard's top, as far
- * as the area above the keyboard reaches — so a scroll view that does not hide the keyboard on a drag still brings the
- * target out from under it (measured: the lab's form-keyboard, k2 and k3 — `vs` lifted 120 pt, `note` 278 pt).
+ * deeper under the keyboard: the drag then also LIFTS it — its centre to BLANK_MARGIN above the keyboard's top, plus
+ * PAN_SLOP, as far as the area above the keyboard reaches — so a scroll view that does not hide the keyboard on a drag
+ * still brings the target out from under it (measured: the lab's form-keyboard, k2 and k3).
  */
 export const DRAG_LENGTH = 120;
+
+/**
+ * What of a drag a scroll view does not follow: 16 pt, added to a lift. A UIScrollView starts its pan only once the touch
+ * has moved past its slop, so the content moves the drag's length less that. Measured on the lab's form-keyboard at
+ * DRAG_SPEED: a 278-pt drag moved `note` 267 pt (its centre 843 → 576, still 3 pt under the keyboard's top at 573) —
+ * 11 pt lost; 16 keeps a margin over it.
+ */
+export const PAN_SLOP = 16;
 
 /** The target's scroll view dragged up — DRAG_LENGTH, or what lifts the target's centre clear of the keyboard — from its blank point nearest the keyboard, kept inside the area the point was sought in (never past the status band). */
 const THE_DRAG: DismissalStrategy = {
@@ -271,7 +279,7 @@ const THE_DRAG: DismissalStrategy = {
     const found = await blankPoint(ground);
     if ('skipped' in found) return found;
     if (scrollAxis(found.scroller, ground.look.tree.unclippedFrames === true) === 'horizontal') return { skipped: "the target's scroll view scrolls sideways" };
-    const lift = Math.max(DRAG_LENGTH, found.centre.y - (found.bottom - BLANK_MARGIN));
+    const lift = Math.max(DRAG_LENGTH, found.centre.y - (found.bottom - BLANK_MARGIN) + PAN_SLOP);
     const to = { x: found.at.x, y: Math.max(found.at.y - lift, found.top) };
     if (found.at.y - to.y < 2 * BLANK_MARGIN) return { skipped: 'no room to drag above the keyboard' };
     return { kind: 'drag', what: "the target's scroll view", from: found.at, to };
