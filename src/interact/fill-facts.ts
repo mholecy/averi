@@ -134,6 +134,15 @@ export interface FillResult {
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
+   * The read-back landed only after the field's DROPPED TAIL was typed again
+   * (interact/fill-type.ts, 2026-10-19): each retyped tail by its length, in
+   * order; absent when nothing was typed again. A field that keeps a strict
+   * prefix of the typing — React Native's controlled single-line TextInput
+   * under `idb ui text`, docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-
+   * text-in-a-react-native-single-line-field.md. A length, never content.
+   */
+  retyped?: number[];
+  /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
    * text is an input whatever its role (an iOS search field reads `other`).
@@ -236,7 +245,9 @@ export type ReadBack =
  *   as FillResult.notInput); `retried` when that retry ran (`clear`) —
  *   `wiped` when it deleted what the field held first, else it only typed
  *   again (the field showed nothing, or its placeholder) — so the error
- *   says the read-back is the second (round 8's D3 nit, 2026-10-12).
+ *   says the read-back is the second (round 8's D3 nit, 2026-10-12);
+ *   `retyped` when a dropped tail was typed again before it (each by its
+ *   length — FillResult.retyped), so the error says what was sent.
  */
 export type FillFailure =
   | { code: 'reread-failed'; target: string; cause: string }
@@ -248,6 +259,7 @@ export type FillFailure =
       differs: Difference;
       notInput?: { role: string; input: NearbyInput | 'none' | 'unread' };
       retried?: { wiped: boolean };
+      retyped?: number[];
     };
 
 /**

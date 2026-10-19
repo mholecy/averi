@@ -41,6 +41,20 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     expect(both('id:amount', fact({ typed: 4, readBack: landed, cleared: 1 })).reply).toBe('Filled id:amount (4 characters, cleared 1 character first)');
   });
 
+  it('a dropped tail typed again is said after the clear, on both media; a second retype as `then the last M`', () => {
+    expect(both('id:name', fact({ typed: 9, readBack: landed, retyped: [6] }), 'Jan Novak')).toEqual({
+      reply: 'Filled id:name (9 characters, the last 6 characters typed again after the field dropped them)',
+      flow: [['fill', 'id:name = Jan Novak (the last 6 characters typed again after the field dropped them)']],
+    });
+    expect(both('id:name', fact({ typed: 9, readBack: landed, cleared: 4, retyped: [6, 1] }), 'Jan Novak')).toEqual({
+      reply: 'Filled id:name (9 characters, cleared 4 characters first, the last 6 characters typed again after the field dropped them, then the last character)',
+      flow: [['fill', 'id:name = Jan Novak (cleared 4 characters first, the last 6 characters typed again after the field dropped them, then the last character)']],
+    });
+    expect(both('id:name', fact({ typed: 9, readBack: landed, retyped: [1] })).reply).toBe(
+      'Filled id:name (9 characters, the last character typed again after the field dropped it)',
+    );
+  });
+
   it('a clear that sent no delete says nothing of clearing, on either medium', () => {
     expect(both('id:amount', fact({ typed: 4, readBack: landed, cleared: 0 }), '2.50')).toEqual({
       reply: 'Filled id:amount (4 characters)',
@@ -272,6 +286,17 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(fillFailureText({ code: 'clear-twice', left: 1, rounds: 2 })).toBe('fill: field still shows 1 character after clearing twice');
     expect(fillFailureText({ code: 'clear-twice', left: 4, rounds: 2 })).toBe('fill: field still shows 4 characters after clearing twice');
     expect(fillFailureText({ code: 'clear-twice', left: 9, rounds: 3 })).toBe('fill: field still shows 9 characters after clearing 3 times');
+  });
+
+  it('a mismatch after retypes says what was sent again: the clear\'s retry, then the dropped tails', () => {
+    const f = (extra: Partial<Extract<FillFailure, { code: 'mismatch' }>>) =>
+      fillFailureText({ code: 'mismatch', typed: 9, shows: 5, differs: { kind: 'length' }, ...extra });
+    expect(f({ retyped: [6, 3] })).toBe(
+      'fill: typed 9 characters (the last 6 characters typed again after the field dropped them, then the last 3 characters) but the field shows 5 (content withheld from this error)',
+    );
+    expect(f({ retried: { wiped: true }, retyped: [2] })).toBe(
+      'fill: typed 9 characters (after one wipe and retype; the last 2 characters typed again after the field dropped them) but the field shows 5 (content withheld from this error)',
+    );
   });
 
   it('a mismatch: the two lengths, then what differs — masked, case, same length, or the lengths alone', () => {

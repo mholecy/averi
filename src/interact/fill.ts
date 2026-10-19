@@ -9,6 +9,7 @@ import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
 import { differenceOf } from './fill-verdict.js';
+import { typeAndConfirm } from './fill-type.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -113,6 +114,11 @@ function screenSignature(tree: UiNode): string {
  * - type without clear: the typed value must appear IN the field (contiguous
  *   insert at the cursor); no destructive retry — clear stays opt-in, so a
  *   mismatch throws instead of corrupting content the field came with.
+ * - either way, a field that kept a strict prefix of what it should hold
+ *   (React Native's single-line TextInput dropping the end of idb's burst,
+ *   2026-10-19) gets the dropped tail typed again, bounded, and the result
+ *   says so (`retyped`). Typing, the read-back and every retry are
+ *   interact/fill-type.ts's (`typeAndConfirm`); this function drives it.
  * A non-input node that never exposes text is NOT verified, and the result
  * says so (`readBack: 'no-value'`) — until 2026-10-08 it passed as landed,
  * and a floating-label `text` node on iOS idb was reported filled with
@@ -173,7 +179,7 @@ export async function fillField(
   let screenBeforeTyping: string | null | undefined;
   // Why the newest refetch found nothing (undefined: it found the field) —
   // the read-back's `lost` when the poll ends on such a read (2026-10-08).
-  // pollValue sees only the node; the clear reads `lost` off refetch's own
+  // The read-back (fill-type.ts) sees only the text; the clear reads `lost` off refetch's own
   // answer, which carries the why with the missing field.
   let lostOnLastRead: LostWhy | undefined;
   const isInput = node.role === INPUT_ROLE;
@@ -307,11 +313,11 @@ export async function fillField(
   // An input's null is "" here too (valueOf), so a field that stays empty
   // reads "did not change".
   const shownBeforeTyping = valueOf(current) ?? null;
-  await startTyping(value);
   // Nothing typed: the clear's lost field is the read-back's (nothing saw it
   // empty); a clear that ended on its placeholder is reported as a fact
   // (`clearPlaceholder`) and judged by judgeFill.
   let readBack: ReadBack = value === '' && clearEnd?.kind === 'lost' ? { kind: 'lost', why: clearEnd.why } : { kind: 'nothing-typed' };
+  let retyped: number[] = [];
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -331,90 +337,47 @@ export async function fillField(
     }
     return { input: nearestInput(tree, node) };
   };
-  if (value !== '') {
-    // A masked (secure) field shows one bullet per character to uiautomator
-    // and WDA alike, so its content can never EQUAL the value — measured
-    // 2026-09-17 (finportal login): `typed 16 characters but the field shows
-    // 16` on both platforms, for a fill that had landed. Its LENGTH still says
-    // whether every keystroke arrived, which is the check that matters on a
-    // loaded emulator (dropped characters there surfaced as a backend
-    // `invalid_grant`), so a bullets-only read-back is compared by count,
-    // never by content. The rule detects the SHORT direction only — dropped
-    // keystrokes; without `clear` the field must show at least what it held
-    // after focus plus what was typed. It cannot tell a correct append from
-    // typing onto an autofilled password (both read `held + typed`); that
-    // case is `maskedAppend` above, not a failure.
-    // A non-input proves it took the text only by CHANGING to show it: a WDA
-    // StaticText exposes its label as its value, and "Meno".includes("e") is
-    // no fill; a label that changes on focus (`Name` → `Name*`) is no fill
-    // either, and the mismatch retry below would delete ITS length into the
-    // focused field (review 2026-10-08, rounds 1 and 2). An input-like node
-    // of another role (an iOS search field reads `other`) shows the typed
-    // text, so it still gets the retry. Masked values cannot show it: for
-    // them the change alone is the proof, as their length is for inputs.
-    const tookText = (observed: string) =>
-      isInput || (observed !== node.value && (isMaskedValue(observed) || observed.includes(value)));
-    const landed = (observed: string) =>
-      tookText(observed) &&
-      (isMaskedValue(observed)
-        ? clear
-          ? observed.length === value.length
-          : observed.length >= maskedHeld + value.length
-        : clear
-          ? observed === value
-          : // A placeholder is not content: on an empty field showing
-            // `Search`, nothing typed must not pass for a typed `ear`.
-            // Raw equality first: a value equal to the placeholder is the
-            // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
-            observed === value || heldText(observed, placeholder).includes(value));
-    let observed = await pollValue(refetchValue, landed, pollMs);
-    // undefined: the node withholds its text (a non-input: an input's null
-    // is "", see valueOf) — nothing to compare. Since
-    // 2026-10-08 that is SAID (readBack 'no-value'), never passed as landed;
-    // and when the last read did not find the field at all, that is said
-    // as such (readBack 'lost', iOS device check the same day) — the node
-    // was not seen, so it is not blamed for showing nothing.
-    // A non-input that never changed is not the field: said too, never
-    // wiped (its length is not the field's) and never a failure — the text
-    // may well have reached the field the tap focused.
-    if (observed !== undefined && !tookText(observed)) {
-      readBack = { kind: 'not-taken' };
-    } else if (observed !== undefined && !landed(observed)) {
-      let retried: { wiped: boolean } | undefined;
-      if (clear) {
-        // What the field holds: a field showing only its placeholder (the
-        // typing never landed) gets no deletes.
-        const wipe = heldText(observed, placeholder).length;
-        if (wipe > 0) await adapter.clearText(wipe);
-        retried = { wiped: wipe > 0 };
-        await adapter.typeText(value);
-        observed = await pollValue(refetchValue, landed, pollMs);
-      }
-      if (observed !== undefined && !landed(observed)) {
-        const wrong = await notInput();
-        throw failure({
-          code: 'mismatch',
-          typed: value.length,
-          shows: observed.length,
-          differs: differenceOf({ observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
-          notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
-          ...(retried !== undefined && { retried }),
-        });
-      }
+  if (value === '') {
+    await startTyping(value);
+  } else {
+    // Typing, the read-back and what is sent again are interact/fill-type.ts's
+    // (typeAndConfirm): a masked field compared by length, a non-input proven
+    // only by changing to show the text, a dropped tail typed again, the
+    // clear's one wipe and retype. Here the outcome becomes the read-back fact
+    // or the mismatch error.
+    const typed = await typeAndConfirm(
+      { type: startTyping, wipe: (count) => adapter.clearText(count), read: refetchValue },
+      { value, clear: clear === true, isInput, resolvedValue: node.value, before: shownBeforeTyping, placeholder, maskedHeld, pollMs },
+    );
+    if (typed.kind === 'missed') {
+      const wrong = await notInput();
+      throw failure({
+        code: 'mismatch',
+        typed: value.length,
+        shows: typed.observed.length,
+        differs: differenceOf({ observed: typed.observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
+        notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
+        ...(typed.retried !== undefined && { retried: typed.retried }),
+        ...(typed.retyped.length > 0 && { retyped: typed.retyped }),
+      });
     }
-    if (readBack.kind !== 'not-taken') {
-      readBack =
-        observed !== undefined
+    if (typed.kind === 'landed') retyped = typed.retyped;
+    readBack =
+      typed.kind === 'not-taken'
+        ? { kind: 'not-taken' }
+        : typed.kind === 'landed'
           ? // The value IS the named placeholder's text, and the field shows
             // it: typed, or empty with the typing dropped — the tree cannot
             // tell (review of this branch, probe B). Not verified.
-            placeholder !== undefined && observed === placeholder
+            placeholder !== undefined && typed.observed === placeholder
             ? { kind: 'placeholder' }
             : { kind: 'landed' }
-          : lostOnLastRead !== undefined
+          : // No reading: when the last read did not find the field at all,
+            // that is said as such (iOS device check 2026-10-08) — the node
+            // was not seen, so it is not blamed for showing nothing.
+            lostOnLastRead !== undefined
             ? { kind: 'lost', why: lostOnLastRead }
             : { kind: 'no-value' };
-    }
   }
   return {
     note,
@@ -427,6 +390,7 @@ export async function fillField(
     clearUnchanged,
     clearPlaceholder: clearEnd?.kind === 'empty' ? clearEnd.placeholder : undefined,
     readBack,
+    ...(retyped.length > 0 && { retyped }),
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };
 }
@@ -465,36 +429,4 @@ export class FillValueFailure extends Error {
 /** A fill's error: its words are fill-text.ts's, like every fill sentence. */
 function failure(f: FillFailure): Error {
   return new FillValueFailure(fillFailureText(f), 'did-not-land');
-}
-
-/**
- * Poll the field until its exposed value satisfies `ok`; returns the last observation.
- *
- * It does NOT stop early on a stable mismatch (considered 2026-10-09: the
- * auto-capitalised fill in docs/bugs/2026-10-09-fill-mismatch-error-says-
- * equal-counts-when-app-transforms-text.md ran its whole budget, 36 s on a
- * WDA tree that reads in ~4 s). Two equal reads 400 ms apart are what a field
- * still waiting on its input looks like too: the reason this poll exists is
- * synthetic input arriving late (Compose async state, an IME queue on a
- * loaded emulator — 3 of 11 characters measured landed at first, 2026-08-05),
- * and a stop on "unchanged" would fail exactly those fills, or with clear
- * wipe and retype them. The cost of a transformed value is paid on a fill
- * that fails anyway; the price of stopping early would be paid by ones
- * that pass.
- */
-async function pollValue(
-  read: () => Promise<string | undefined>,
-  ok: (observed: string) => boolean,
-  pollMs: number,
-): Promise<string | undefined> {
-  let observed: string | undefined;
-  for (let i = 0; i < 5; i++) {
-    observed = await read();
-    if (observed !== undefined && ok(observed)) return observed;
-    // No text (a non-input withholding it) or no field — stop waiting. An
-    // empty input reads "" and keeps the five rounds: its text may be late.
-    if (observed === undefined && i >= 1) return undefined;
-    await sleep(pollMs);
-  }
-  return observed;
 }

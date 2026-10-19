@@ -1313,3 +1313,111 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     expect(fake.deletes).toEqual([3, 6, 6]);
   });
 });
+
+describe('fillField — a field that drops the tail of the typing gets the tail typed again', () => {
+  // docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md: React Native's
+  // controlled single-line TextInput kept a prefix of an `idb ui text` burst in 6 of 12 fills (`Jan` of `Jan Novak`).
+  /** typeText lands only the first `keep(text)` characters of each typing, in order of the calls. */
+  const dropping = (fake: FakeAdapter, ...keeps: number[]) => {
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      const keep = keeps.shift() ?? text.length;
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + text.slice(0, keep);
+    };
+  };
+
+  it('types only the missing tail, once, and says so: `Filled … (9 characters, the last 6 characters typed again …)`', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3);
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak']);
+    expect(fake.focused?.value).toBe('Jan Novak');
+    expect(result.retyped).toEqual([6]);
+    expect(result.readBack).toEqual({ kind: 'landed' });
+    expect(fillReply(result, 'id:amount_input')).toBe(
+      'Filled id:amount_input (9 characters, the last 6 characters typed again after the field dropped them)',
+    );
+  });
+
+  it('a retyped tail that loses its own end is typed again once more — never past the bound', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 3);
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'vak']);
+    expect(result.retyped).toEqual([6, 3]);
+  });
+
+  it('after two retypes the field still short is the mismatch, and the error says what was typed again', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 1, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow(
+      'fill: typed 9 characters (the last 6 characters typed again after the field dropped them, then the last 5 characters) but the field shows 5',
+    );
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'Novak']);
+  });
+
+  it('a retype that moved nothing is not repeated (a field at its maxLength keeps a prefix too)', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 0);
+    await expect(fillField(fake, { id: 'amount_input' }, 'abcde', FAST)).rejects.toThrow(/typed 5 characters \(the last 2 characters typed again after the field dropped them\) but the field shows 3/);
+    expect(fake.typed).toEqual(['abcde', 'de']);
+  });
+
+  it('with clear the tail is typed again too — no wipe: the clear deletes once, the prefix stays', async () => {
+    const fake = formFake('9.99');
+    dropping(fake, 2);
+    const result = await fillField(fake, { id: 'amount_input' }, '12.34', { ...FAST, clear: true });
+    expect(fake.deletes).toEqual([4]);
+    expect(fake.typed).toEqual(['12.34', '.34']);
+    expect(result.retyped).toEqual([3]);
+  });
+
+  it('without clear the tail is what the field misses of its earlier text plus the value', async () => {
+    const fake = formFake('9.99');
+    dropping(fake, 2);
+    const result = await fillField(fake, { id: 'amount_input' }, '12.34', FAST);
+    expect(fake.focused?.value).toBe('9.9912.34');
+    expect(fake.typed).toEqual(['12.34', '.34']);
+    expect(result.retyped).toEqual([3]);
+  });
+
+  it('nothing of the typing landed: nothing is typed again (the focus may not be in the field)', async () => {
+    const fake = formFake('9.99');
+    dropping(fake, 0);
+    await expect(fillField(fake, { id: 'amount_input' }, '12.34', FAST)).rejects.toThrow(/the field did not change/);
+    expect(fake.typed).toEqual(['12.34']);
+  });
+
+  it('a reading that is no prefix (the app changed the text) is not typed into again', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = 'Jan';
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, 'jan novak', FAST)).rejects.toThrow(/typed 9 characters but the field shows 3/);
+    expect(fake.typed).toEqual(['jan novak']);
+  });
+
+  it('a masked field that dropped characters is never typed into again — bullets show no prefix', async () => {
+    const fake = formFake(null);
+    appendBullets(fake, 2);
+    await expect(fillField(fake, { id: 'amount_input' }, '12345', FAST)).rejects.toThrow(/typed 5 characters but the field shows 3/);
+    expect(fake.typed).toEqual(['12345']);
+  });
+
+  it('a prefix still growing at the end of the poll is not typed again (a late keystroke would be sent twice)', async () => {
+    const fake = formFake(null);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = 'J';
+    };
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      // after the typing, one more character arrives before every read: the reading never holds still
+      if (fake.typed.length > 0 && fake.focused && (fake.focused.value ?? '').length < 8) fake.focused.value = 'Jan Novak'.slice(0, (fake.focused.value ?? '').length + 1);
+      return real();
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow('fill: typed 9 characters but the field shows 6 (content withheld from this error)');
+    expect(fake.typed).toEqual(['Jan Novak']);
+  });
+});
