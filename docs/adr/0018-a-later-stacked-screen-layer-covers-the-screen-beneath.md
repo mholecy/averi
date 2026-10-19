@@ -907,14 +907,19 @@ reached as before (the whole list is the layer's own; nothing listed is covered 
 **Decision 2 — the stop (detect).** `scroll_until` stops when THE SCREEN CHANGED UNDER THE STROKE
 (interact/scroll-rounds.ts#ScreenChange): the first read that reads after the strokes since the last one lists none of
 the ids that read listed (ui-tree/read-tree.ts#ScreenIdentity, `anotherScreen` — the concept fill's read-back already
-asked as `sameScreen`, now one owner), and none of those strokes touched down on content that read listed (a node of no
-structural role holding the touch-down). A plain failure, never absence, whether the target is on the new screen or
+asked as `sameScreen`, now one owner), and none of those strokes touched down on content that read listed (a node
+holding the touch-down, the root aside, that scrolls — scroll-containers.ts#scrolls, uiautomator's `scrollable` too — or
+names itself by an identifier or a label, unless it is a structural frame the size of the screen that does not scroll:
+idb's `Application`, a window, a dim). A plain failure, never absence, whether the target is on the new screen or
 not: "stopped after 1 swipe — the swipe CHANGED THE SCREEN: none of the 1 element the read before it listed by id
 (button:lab.sheet-background.S) is in the tree after it, and it touched down at (201,175) on nothing that read listed
 — it most likely dismissed a sheet or a modal presented over the screen (nothing was found beneath it), or the app left
 the screen. The element is in the tree only after that change, on the new screen: not judged, not claimed visible, and
 no further swipe was sent. If a sheet or a modal was open, it is gone: reopen it …". The touch-down condition keeps a
-fling through a list of identified rows (every row replaced, the stroke on one of them) a scroll.
+fling through a list of identified rows (every row replaced, the stroke on one of them or on the list) a scroll,
+whatever the rows' role: a Compose LazyColumn's testTagged `View` rows (`container`) inside its `scrollable` list, an
+RN row idb lists as `Other`, a SwiftUI `Group` (review round 1 of the slice found the first rule — any node of no
+structural role — calling those "changed": fixed before merge).
 
 **Measured.** Golden over truth/round-7's captures (`--side` arch/r23-idb-sheet): 243 → 225 mismatches — the 18 `tap`
 and `scroll_until` rows of sheet-medium.idb (A–D) and sheet-medium-edges.idb (H, G, E, F, M) green, every other reply
@@ -925,11 +930,13 @@ tree per case, so Decision 2 shows only live (below).
 **Residuals.** A presentation UIKit lays with no dimming view — a large-detent or full-screen sheet (sheet-background:
 the sheet's button alone), an alert, a transparent cover — is no presented layer on idb: its targets are still stroked
 for (residual 6 stands there), and where a stroke dismisses it Decision 2 says so, the stroke already sent. A sheet
-whose reads list no id (label-only content, idb's UIKit rows, NI1) is never told changed. A stroke on a bare gap of a
-list that lists only what shows, flung past every listed row, reads as changed — a loud stop where the scroll could go
-on. A dismiss region short of the whole screen (a popover's on an iPad?) is unmeasured, as is idb listing the screen
-beneath the region too (it would read as the layer's own). WDA and uiautomator trees list a scroll view or a window
-under every touch-down, so Decision 2 rarely holds there: their presented layers are their marks' to stop for.
+whose reads list no id (label-only content, idb's UIKit rows, NI1) is never told changed. A stroke on an unnamed,
+unscrolling gap of a list that lists only what shows and is listed as no scroll view (idb's flat list lists none),
+flung past every listed row, reads as changed — a loud stop where the scroll could go on. A stroke on a named node of
+a sheet that it dismisses (the sheet's own button, a labelled bare surface) is a scroll, as before. A dismiss region short of the whole screen (a popover's on an iPad?) is unmeasured, as is idb listing the screen
+beneath the region too (it would read as the layer's own). On WDA and uiautomator trees, which list nesting, a
+touch-down almost always lands on a scroll view, a named row or a named frame, so Decision 2 holds there only over an
+unnamed, unscrolling surface — their presented layers are their marks' to stop for.
 
 ## Residuals accepted
 

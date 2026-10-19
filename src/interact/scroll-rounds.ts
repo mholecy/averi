@@ -1,6 +1,7 @@
-import { everyNode, rectArea, STRUCTURAL_ROLES, type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { everyNode, rectArea, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
+import { axisOfEdge, containsPoint, flushEdges, quoted, rectIntersection, sameRectWithinPixel, screenOf, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
+import { scrolls } from '../ui-tree/scroll-containers.js';
 import { anotherScreen, screenIdentity, type ScreenIdentity, type SheetDetent } from '../ui-tree/read-tree.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
@@ -239,8 +240,8 @@ export type ScrollOutcome = (
  * THE SCREEN CHANGED UNDER THE STROKE (round 7's A5, iOS point 4 of docs/truth/live-ios-2026-10-18-visibility.md;
  * ADR 0018 residual 6): the first read that reads after the strokes since the last one is ANOTHER SCREEN than that
  * read — by identity, none of its identified nodes is listed any more (ui-tree/read-tree.ts#anotherScreen) — and no
- * stroke among them touched down on content that read listed (a node of no structural role, the root aside, holding
- * the touch-down: `touchedListed`). Then what the strokes moved was not content but the screen itself: a sheet or a
+ * stroke among them touched down on content that read listed (a node holding the touch-down that scrolls or names
+ * itself — an identifier or a label — the root and a screen-sized frame aside: `touchedListed`). Then what the strokes moved was not content but the screen itself: a sheet or a
  * modal they touched down on dismissed, the app gone elsewhere — and a target found now is found on that other
  * screen, not brought into view. Measured under idb: beneath the lab's large sheet (sheet-background), whose tree
  * lists the sheet's button alone and no sign of the sheet, `scroll_until` for A stroked from (201,175) on the sheet's
@@ -250,14 +251,22 @@ export type ScrollOutcome = (
  * list holding UIKit's dismiss region, adapters/ios-tree-source.ts#listsPresentedLayer).
  *
  * Why both conditions: ids alone are not enough — a fling through a list whose rows carry ids of their own (row_1 …
- * row_40) can carry every listed row off a list that lists only what shows; but such a stroke touched down ON a row,
- * which the read listed. The touch-down alone neither: a stroke on a list's gap moves it all the same. Residuals,
- * stated: a screen whose reads list no id at all (idb's UIKit table rows, NI1) is never told changed; a stroke
- * touching down on a bare gap of a list that lists only what shows and flinging it past every listed row reads as
- * changed (a loud stop where the scroll could have gone on); a presented layer that shares an id with the screen
- * beneath, or a keyboard's ids listed at both reads, keeps it unchanged; a WDA or uiautomator tree, which lists a
- * scroll view or a window holding every touch-down, never meets the second condition — their presented layers are
- * their marks' to stop for.
+ * row_40) can carry every listed row off a list that lists only what shows (a Compose LazyColumn, a UIKit table, an
+ * RN FlatList); but such a stroke touched down ON a row, or on the list itself, which the read listed — a row of any
+ * role (a Compose row is a `container` View with a testTag, an RN row idb's `Other` with an id), the list by
+ * scrolling (scroll-containers.ts#scrolls: a scroll view's role, uiautomator's `scrollable` as `clipsDescendants`).
+ * The touch-down alone neither: a stroke on a list's gap moves it all the same. What a touch-down on is NOT listed
+ * content: the root, a node of no area, a node that neither scrolls nor names itself, and a STRUCTURAL frame the size
+ * of the screen that does not scroll (`SCREEN_SIZED_FRACTION`: idb's `Application`, a window, UIKit's dismiss region) — named or not, it is
+ * the frame every screen has, and the measured shape is exactly that: sheet-background's (201,175) lies on idb's
+ * `Application 'AveriLab'` alone. Residuals, stated: a screen whose reads list no id at all (idb's UIKit table rows,
+ * NI1) is never told changed; a stroke touching down on an unnamed, unscrolling gap of a list that lists only what
+ * shows and is no scroll view (idb's flat list lists none) and flinging it past every listed row reads as changed (a
+ * loud stop where the scroll could have gone on); a presented layer that shares an id with the screen beneath, or a
+ * keyboard's ids listed at both reads, keeps it unchanged; a touch-down on a named node of a sheet that the stroke
+ * dismisses (its own button, a labelled bare surface) is a scroll, as before — the stop is for what the tree cannot
+ * show. On WDA and uiautomator trees a touch-down lands on a scroll view, a named row or a named frame almost always
+ * (they list nesting), so the stop is rare there — their presented layers are their marks' to stop for.
  */
 export interface ScreenChange {
   /** Where the strokes since the read before touched down, in order — none of them on content that read listed. */
@@ -1747,12 +1756,19 @@ function screenChangedUnder(before: { readonly tree: UiNode; readonly identity: 
 }
 
 /**
- * A touch-down at `point` lands on content `tree` lists: a node of it holding the point, of some area, neither the
- * root nor of a structural role (`STRUCTURAL_ROLES`: a frame, a dim, a window, idb's `Application` — what no stroke
- * scrolls by itself). A list's row, a button, a text, a scroll view: a stroke there drags what is listed.
+ * A touch-down at `point` lands on content `tree` lists (`ScreenChange`): a node of it holding the point, of some
+ * area, not the root, that SCROLLS (scroll-containers.ts#scrolls) or NAMES itself (an identifier or a label) — a row of
+ * any role, a button, a text, a list — a list whatever its size (a full-screen LazyColumn is 91 % of a Pixel's
+ * screen); a node that only names itself counts unless it is a structural frame the size of the screen
+ * (`SCREEN_SIZED_FRACTION` of the tree's screen: idb's `Application`, a window, a dim), which every screen has: a
+ * stroke on listed content drags what is listed.
  */
-const touchedListed = (tree: UiNode, point: Point): boolean =>
-  [...everyNode(tree)].some((n) => n !== tree && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && containsPoint(n.rect, point));
+function touchedListed(tree: UiNode, point: Point): boolean {
+  const screenArea = rectArea(screenOf(tree));
+  const frame = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) >= screenArea * SCREEN_SIZED_FRACTION;
+  const listed = (n: UiNode): boolean => scrolls(n) || ((n.identifier !== null || n.label !== null) && !frame(n));
+  return [...everyNode(tree)].some((n) => n !== tree && rectArea(n.rect) > 0 && containsPoint(n.rect, point) && listed(n));
+}
 
 /** The top sheet's detent at the first read that read against the last (`DetentMove`): both read, as many grabbers, values differing. */
 function detentMove({ detents }: State): DetentMove | undefined {
