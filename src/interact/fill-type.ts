@@ -30,7 +30,8 @@
  *      Android a late key could be doubled), and the typing provably stayed
  *      in the field (`whereTyped`: every other input the screen showed before
  *      the typing is there with its value — an auto-advancing code box that
- *      moved the focus would get the tail too). Only the missing tail is typed, up to
+ *      moved the focus would get the tail too; a sibling the app recomputed
+ *      proves nothing either way, and stops the tail too). Only the missing tail is typed, up to
  *      `MAX_TAIL_RETYPES` times, and again only while each retype moved the
  *      field. Never on a reading with a bullet (a masked field's content
  *      cannot be compared, so a prefix cannot be seen), never when nothing of
@@ -43,8 +44,9 @@
  *      the short value; the measurements that chose this remedy over chunked typing are the ADR's.
  *   2. With clear only: one wipe of what the field holds and a retype of the
  *      whole value — the content is ours (since 2026-08-05: Compose async
- *      state swallowing synthetic input). Not when another input changed
- *      while typing (2026-10-19): its deletes and its typing would go there.
+ *      state swallowing synthetic input). Not when another input provably
+ *      took part of the typing (2026-10-19, `elsewhere`): its deletes and its
+ *      typing would go there; a sibling the app recomputed does not stop it.
  *   Without clear and without a prefix nothing is sent again: the field came
  *   with content that is not ours to delete.
  */
@@ -160,7 +162,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
     if (again.length === 0 && !tookText(observed)) return { kind: 'not-taken', observed };
     if (landed(observed)) return { kind: 'landed', observed, again };
-    const where = whereTyped(others, io.screen());
+    const where = whereTyped(others, io.screen(), missingOf(observed, intent));
     const tail =
       intent.delivery === 'on-return' && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES
         ? droppedTail(observed, intent)
@@ -202,22 +204,48 @@ function inputsOf(tree: UiNode, except?: string): OtherInputs {
  * Where the typing went, as far as the screen proves (2026-10-19, review of this branch: an auto-advancing code box
  * moved the focus to the next box, and a tail typed again went into the note below — `34234`):
  * - `field`: every input the screen had when typing began is there with the value it had — nothing else took it;
- * - `elsewhere`: one of them changed — the focus left the field;
- * - `unproven`: nothing was read before typing, the read-back's tree is missing, or an input of then is gone.
- * The residual: an input the tree does not list (off the screen, or none before typing) can take the focus unseen.
+ * - `elsewhere`: one of them GAINED typed text — its old value is a prefix of its new one, and what was appended is
+ *   part of what the field is missing of the typing (`missing`): the typing provably went there (the code boxes:
+ *   `2` and `34`, both inside the missing `234`);
+ * - `unproven`: any other change — a sibling the app recomputed, replaced or shortened (review round 2: an exchange
+ *   form's `converted` amount, set to twice the `amount` typed, made a clear fill that had always recovered fail) —
+ *   or nothing read before typing, the read-back's tree missing, an input of then gone or moved, or no `missing`
+ *   to compare with (the field's reading is no prefix of what it should hold).
+ * The residuals: an input the tree does not list (off the screen, or none before typing) can take the focus unseen;
+ * a sibling the app changes by appending, by coincidence, a part of the missing text reads `elsewhere` — the fill
+ * then sends nothing again and fails loudly, the safe direction.
  */
 type Whereabouts = { kind: 'field' } | { kind: 'elsewhere'; input: OtherInput } | { kind: 'unproven' };
 
-function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined): Whereabouts {
+function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, missing: string | undefined): Whereabouts {
   if (before === undefined || now === undefined) return { kind: 'unproven' };
   const after = inputsOf(now);
-  let gone = false;
+  let unproven = false;
   for (const [key, was] of before) {
     const is = after.get(key);
-    if (is === undefined) gone = true;
-    else if (is.value !== was.value) return { kind: 'elsewhere', input: was.input };
+    if (is === undefined) {
+      unproven = true;
+      continue;
+    }
+    if (is.value === was.value) continue;
+    const old = was.value ?? '';
+    const gained = (is.value ?? '').startsWith(old) ? (is.value ?? '').slice(old.length) : '';
+    if (gained !== '' && missing !== undefined && missing.includes(gained)) return { kind: 'elsewhere', input: was.input };
+    unproven = true;
   }
-  return gone ? { kind: 'unproven' } : { kind: 'field' };
+  return unproven ? { kind: 'unproven' } : { kind: 'field' };
+}
+
+/**
+ * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
+ * when its reading is a prefix of that and shows no bullet — else undefined. Pure.
+ */
+function missingOf(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
+  const held = heldText(observed, intent.placeholder);
+  const prior = intent.clear ? '' : heldText(intent.before, intent.placeholder);
+  const whole = prior + intent.value;
+  if (hasBullet(held) || hasBullet(prior) || held.length >= whole.length || !whole.startsWith(held)) return undefined;
+  return whole.slice(held.length);
 }
 
 /**
@@ -227,13 +255,9 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined): W
  * content). Pure.
  */
 export function droppedTail(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
-  if (hasBullet(observed)) return undefined;
-  const held = heldText(observed, intent.placeholder);
   const prior = intent.clear ? '' : heldText(intent.before, intent.placeholder);
-  if (hasBullet(prior)) return undefined;
-  const whole = prior + intent.value;
-  if (held.length <= prior.length || held.length >= whole.length || !whole.startsWith(held)) return undefined;
-  return whole.slice(held.length);
+  if (heldText(observed, intent.placeholder).length <= prior.length) return undefined;
+  return missingOf(observed, intent);
 }
 
 /**

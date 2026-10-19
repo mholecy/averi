@@ -1454,6 +1454,49 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(note.value).toBe('34');
   });
 
+  /**
+   * An exchange form: the amount typed, and a sibling the app recomputes from it (twice the amount) — the bank app's
+   * send/receive pairs. The first typing lands only `keep` characters of the amount.
+   */
+  const fxFake = (sibling: (amount: string) => string | null, keep = 2) => {
+    resetLayout();
+    const amount = el({ role: 'textfield', identifier: 'amount', value: null });
+    const converted = el({ role: 'textfield', identifier: 'converted', value: null });
+    const fake = new FakeAdapter({ form: screen(amount, converted) }, 'form');
+    let first = true;
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      amount.value = (amount.value ?? '') + (first ? text.slice(0, keep) : text);
+      first = false;
+      converted.value = sibling(amount.value);
+    };
+    return { fake, amount, converted };
+  };
+  const doubled = (a: string) => String(Number(a) * 2);
+
+  it('a sibling the app recomputes proves nothing of where the typing went: with clear, the wipe and retype runs as it always did', async () => {
+    // Review round 2: `converted` going "" → "24" read as the focus moving, and a clear fill that recovered failed.
+    const { fake, amount } = fxFake(doubled);
+    const result = await fillField(fake, { id: 'amount' }, '1234', { ...FAST, clear: true });
+    expect(fake.typed).toEqual(['1234', '1234']);
+    expect(fake.deletes).toEqual([2]);
+    expect(amount.value).toBe('1234');
+    expect(result.readBack).toEqual({ kind: 'landed' });
+  });
+
+  it('without clear the recomputed sibling stops the tail too, and the error does not claim the focus moved', async () => {
+    const { fake } = fxFake(doubled);
+    await expect(fillField(fake, { id: 'amount' }, '1234', FAST)).rejects.toThrow(/^fill: typed 4 characters but the field shows 2 \(content withheld from this error\)$/);
+    expect(fake.typed).toEqual(['1234']);
+  });
+
+  it('a sibling that by coincidence gains a part of the missing text reads as the typing gone there: nothing is sent again, the fill fails loudly', async () => {
+    const { fake } = fxFake((a) => (a.length >= 2 ? '3' : null));
+    await expect(fillField(fake, { id: 'amount' }, '1234', { ...FAST, clear: true })).rejects.toThrow(/the typing left the field: textfield id:"converted"/);
+    expect(fake.typed).toEqual(['1234']);
+    expect(fake.deletes).toEqual([]);
+  });
+
   it('a prefix still growing at the end of the poll is not typed again (a late keystroke would be sent twice)', async () => {
     const fake = formFake(null);
     fake.typeText = async (text: string) => {

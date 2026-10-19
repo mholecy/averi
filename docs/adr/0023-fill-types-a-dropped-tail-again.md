@@ -56,15 +56,20 @@ at ~220 ms a character on every iOS fill.
    be in the field); never when the field's earlier text changed. A strict prefix proves which characters are missing,
    so a retype can only add them — to the field, if the typing went there:
 3. **Only while the typing provably stayed in the field.** Before typing, every OTHER input of the newest tree read
-   (by role, identifier and rect; the tree that resolved the field when nothing was read after the focus tap) is noted
-   with its value; on the read-back's tree each must be there with the same value (`fill-type.ts#whereTyped`). One that
-   changed means the focus left the field — an auto-advancing code box handing it to the next (review of this branch:
-   `1234` into the first of two OTP boxes left `1`, `2` and `34` in the note below, and the tail `234` typed again made
-   the note `34234`, the reply saying the field had dropped them) — and then nothing is sent again: no tail, and no
-   clear's wipe-and-retype either (its deletes and its typing would go there too). The mismatch error names that
-   input (`… the typing left the field: textfield id:"otp2" (x,y wxh) changed while it typed (the focus moved), so
-   nothing was typed again`). One that is gone or moved, or no read before the typing, proves nothing: no tail (the
-   clear's retype is still sent, as before).
+   (by role, identifier and rect) is noted with its value — when nothing was read after the focus tap, the tree that
+   resolved the field, before the tap: a weaker baseline, since a change between the resolution and the typing (an
+   autofill on focus, the app's own update) reads as a change while typing and so only ever stops a retype. On the
+   read-back's tree each must be there with the same value (`fill-type.ts#whereTyped`). One that GAINED typed text —
+   its old value a prefix of its new, the appended part inside what the field is missing of the typing — proves the
+   focus left the field: an auto-advancing code box handing it to the next (review of this branch: `1234` into the
+   first of two OTP boxes left `1`, `2` and `34` in the note below, and the tail `234` typed again made the note
+   `34234`, the reply saying the field had dropped them; `2` and `34` both lie inside the missing `234`). Then nothing
+   is sent again: no tail, and no clear's wipe-and-retype either (its deletes and its typing would go there too), and
+   the mismatch error names that input (`… the typing left the field: textfield id:"otp2" (x,y wxh) changed while it
+   typed (the focus moved), so nothing was typed again` — said only on that proof). Any other change proves nothing
+   either way — a sibling the app recomputed, replaced or shortened (review round 2: an exchange form's `converted`
+   amount, twice the `amount` typed, made a clear fill that had always recovered fail) — and neither does an input
+   that is gone or moved, or no read before the typing: no tail, while the clear's wipe-and-retype is sent as before.
 4. **Said, not hidden.** A fill that landed after a retype says so in the reply and the flow line
    (`Filled id:"x" (9 characters, the last 6 characters typed again after the field dropped them)`); a fill still short
    after the retypes is the mismatch error, which says what was sent again in the order sent. Lengths only, never
@@ -84,9 +89,13 @@ at ~220 ms a character on every iOS fill.
   both sources, ios-rn-forms-a9-4…5.json: 11 single-line fills typed, every one whole, 6 with a tail typed again; run
   4's first case under idb typed nothing — the freshly booted simulator's accessibility named no frontmost
   application, and the field never appeared).
-- A fill that hits a field's maxLength (it keeps a prefix too) types the rest once more, sees the field unmoved and
-  fails as before — one poll later, and its error says the tail was typed again.
 - A field that drops the tail of a retype as well, twice, still fails loudly.
+- A field that trims or refuses input (a trailing space, its maxLength) also keeps a strict prefix: it gets one retype
+  that changes nothing, then the mismatch error — whose words say the tail was typed again "after the field dropped
+  them", where the field refused them. Accepted: one more call and poll on a fill that fails anyway, and the error
+  stays a failure.
+- Residual: a sibling the app changes by APPENDING, by coincidence, a part of the missing text reads as the typing gone
+  there — nothing is sent again and the fill fails loudly (the safe direction).
 - Residual: an input the tree does not list — off the screen, or a screen with no input of its own before the typing
   — can take the focus unseen; the retype then goes there, and the read-back of the field alone cannot tell.
 - Residual: an app that changes another input by itself while the fill types (a mirrored field, a formatter on a

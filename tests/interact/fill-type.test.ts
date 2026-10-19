@@ -46,10 +46,10 @@ describe('droppedTail — a strict prefix with some of the typing in it, else no
  * A scripted field: `typeText` lands what `keep` lets through of each typing (in order), a read returns the field's
  * text, and the screen is the field and one other input whose value the script may change while typing.
  */
-function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean } = {}) {
+function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string } = {}) {
   const keeps = [...(opts.keep ?? [])];
   const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
-  const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: null });
+  const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: opts.otherHeld ?? null });
   const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, other] });
   const typed: string[] = [];
   let pending = ''; // `grows`: one more character of the typing arrives per read
@@ -143,6 +143,25 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
       elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } },
     });
     expect(typed).toEqual(['Jan Novak']);
+  });
+
+  it('a sibling the app replaced or recomputed proves nothing: no tail, and the clear\'s wipe and retype still runs', async () => {
+    const recomputed = scripted({ keep: [3], elsewhere: () => 'EUR 18' });
+    expect(await typeAndConfirm(recomputed.io, recomputed.intent)).toEqual({ kind: 'missed', observed: 'Jan', again: [] });
+    expect(recomputed.typed).toEqual(['Jan Novak']);
+    const cleared = scripted({ keep: [3], elsewhere: () => 'EUR 18' });
+    expect(await typeAndConfirm(cleared.io, { ...cleared.intent, clear: true })).toEqual({
+      kind: 'landed',
+      observed: 'Jan Novak',
+      again: [{ kind: 'whole', wiped: true }],
+    });
+  });
+
+  it('only an APPENDED part of the missing text is proof: a sibling shortened to such a part, or one that gained it after other text, is not', async () => {
+    const shrunk = scripted({ keep: [3], otherHeld: 'Novak!', elsewhere: () => 'Nov' });
+    expect((await typeAndConfirm(shrunk.io, { ...shrunk.intent, clear: true })).kind).toBe('landed'); // the wipe and retype ran
+    const appended = scripted({ keep: [3], otherHeld: 'x', elsewhere: () => 'x Nov' });
+    expect(await typeAndConfirm(appended.io, { ...appended.intent, clear: true })).toMatchObject({ kind: 'missed', again: [], elsewhere: { identifier: 'o' } });
   });
 
   it('an input of then that the read-back cannot find again (moved, gone) proves nothing: no tail typed again', async () => {
