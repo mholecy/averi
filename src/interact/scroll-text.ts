@@ -532,16 +532,19 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
  */
 function changedText(o: Extract<ScrollOutcome, { kind: 'changed' }>, describe: string): string {
   const { touchDowns, gone } = o.change;
-  const shown = gone.slice(0, CHANGED_IDS_QUOTED).join(', ');
-  const ids = `${countOf(gone.length, 'element')} the read before it listed by id (${shown}${gone.length > CHANGED_IDS_QUOTED ? ', …' : ''})`;
+  const shown = `${gone.slice(0, CHANGED_IDS_QUOTED).map((id) => `id:${JSON.stringify(id)}`).join(', ')}${gone.length > CHANGED_IDS_QUOTED ? ', …' : ''}`;
+  const ids =
+    gone.length === 1
+      ? `the one element the read before it listed by id (${shown}) is not in the tree after it`
+      : `none of the ${gone.length} elements the read before it listed by id (${shown}) is in the tree after it`;
   const at = touchDowns.map(pointText).join(', ');
   const target = o.found
     ? 'The element is in the tree only after that change, on the new screen: not judged, not claimed visible'
     : 'The element is not in the tree after it either';
   return (
-    `scroll_until ${describe} stopped after ${swipesText(o.swipes)} — the swipe CHANGED THE SCREEN: none of the ${ids} is in the tree after it, ` +
-    `and it touched down at ${at} on nothing that read listed — it most likely dismissed a sheet or a modal presented over the screen ` +
-    `(nothing was found beneath it), or the app left the screen. ${target}, and no further swipe was sent. ` +
+    `scroll_until ${describe} stopped after ${swipesText(o.swipes)} — the swipe CHANGED THE SCREEN: ${ids}, ` +
+    `and it touched down at ${at} on nothing that read listed — it most likely dismissed a sheet or a modal presented over the screen, ` +
+    `or the app left the screen. ${target}, and no further swipe was sent. ` +
     'If a sheet or a modal was open, it is gone: reopen it if the flow needs it — a target beneath one is reached by closing it first, never by scroll_until'
   );
 }

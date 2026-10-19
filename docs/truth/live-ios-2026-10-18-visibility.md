@@ -138,7 +138,9 @@ Reproduce (outside the sandbox):
   but the reply is no longer a claimed stop: "stopped after 1 swipe — the swipe CHANGED THE SCREEN: none of the 1
   element the read before it listed by id (button:lab.sheet-background.S) is in the tree after it, and it touched down
   at (201,175) on nothing that read listed — it most likely dismissed a sheet or a modal presented over the screen
-  (nothing was found beneath it) … not claimed visible, and no further swipe was sent". The judge reads them
+  (nothing was found beneath it) … not claimed visible, and no further swipe was sent" (worded since, on the slice's
+  review: the one id quoted as `id:"lab.sheet-background.S"`, "the one element … is not in the tree after it", the
+  parenthesis dropped — the same stop, rejudged the same). The judge reads them
   `presented-fired` (a stroke dismissed the layer), not `presented-stop` — still MISMATCH, live-known's entries
   (`presented-stop`, `visible`) to move to it. C, D: two strokes at (201,699) on the large sheet, nothing dismissed,
   "never appeared" — as before (residual 6 stands where the tree shows no layer).

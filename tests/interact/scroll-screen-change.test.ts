@@ -36,13 +36,13 @@ describe('scroll_until: a stroke that changed the screen stops the scroll, the t
     const after = host();
     const played = play(UP, [{ tree: sheet(), found: [] }, { tree: after, found: [byId(after, 'lab.sheet-background.A')] }]);
     expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(1);
-    expect(played.outcome).toMatchObject({ kind: 'changed', swipes: 1, found: true, change: { gone: ['button:lab.sheet-background.S'] } });
+    expect(played.outcome).toMatchObject({ kind: 'changed', swipes: 1, found: true, change: { gone: ['lab.sheet-background.S'] } });
     const failure = failureOf(played, A);
     expect(failure).not.toBeInstanceOf(ElementNotFoundError);
     expect(failure.message).toBe(
-      'scroll_until id:"lab.sheet-background.A" stopped after 1 swipe — the swipe CHANGED THE SCREEN: none of the 1 element the read before it listed by id ' +
-        '(button:lab.sheet-background.S) is in the tree after it, and it touched down at (201,175) on nothing that read listed — it most likely dismissed a ' +
-        'sheet or a modal presented over the screen (nothing was found beneath it), or the app left the screen. The element is in the tree only after that ' +
+      'scroll_until id:"lab.sheet-background.A" stopped after 1 swipe — the swipe CHANGED THE SCREEN: the one element the read before it listed by id ' +
+        '(id:"lab.sheet-background.S") is not in the tree after it, and it touched down at (201,175) on nothing that read listed — it most likely dismissed a ' +
+        'sheet or a modal presented over the screen, or the app left the screen. The element is in the tree only after that ' +
         'change, on the new screen: not judged, not claimed visible, and no further swipe was sent. If a sheet or a modal was open, it is gone: reopen it if ' +
         'the flow needs it — a target beneath one is reached by closing it first, never by scroll_until',
     );
@@ -163,5 +163,18 @@ describe('…on Android\'s lists, every row recycled by one fling', () => {
     const target = byId(after, 'row_45');
     const played = play(DOWN_PHONE, [{ tree: before, found: [] }, { tree: after, found: [target] }]);
     expect(played.outcome?.kind).not.toBe('changed');
+  });
+});
+
+describe('the changed stop\'s words for several ids', () => {
+  it('none of the N elements, the first three quoted as selectors, then an ellipsis', () => {
+    const many: unknown[] = [
+      { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
+      ...['a', 'b', 'c', 'd'].map((id, i) => ({ type: 'Button', AXLabel: null, AXUniqueId: `sheet.${id}`, frame: { x: 51, y: 500 + 70 * i, width: 300, height: 64 } })),
+    ];
+    const played = play(UP, [{ tree: parse(many), found: [] }, { tree: host(), found: [] }]);
+    expect(failureOf(played, A).message).toContain(
+      'the swipe CHANGED THE SCREEN: none of the 4 elements the read before it listed by id (id:"sheet.a", id:"sheet.b", id:"sheet.c", …) is in the tree after it,',
+    );
   });
 });

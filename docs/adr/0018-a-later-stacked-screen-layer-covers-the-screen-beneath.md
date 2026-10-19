@@ -911,10 +911,9 @@ asked as `sameScreen`, now one owner), and none of those strokes touched down on
 holding the touch-down, the root aside, that scrolls — scroll-containers.ts#scrolls, uiautomator's `scrollable` too — or
 names itself by an identifier or a label, unless it is a structural frame the size of the screen that does not scroll:
 idb's `Application`, a window, a dim). A plain failure, never absence, whether the target is on the new screen or
-not: "stopped after 1 swipe — the swipe CHANGED THE SCREEN: none of the 1 element the read before it listed by id
-(button:lab.sheet-background.S) is in the tree after it, and it touched down at (201,175) on nothing that read listed
-— it most likely dismissed a sheet or a modal presented over the screen (nothing was found beneath it), or the app left
-the screen. The element is in the tree only after that change, on the new screen: not judged, not claimed visible, and
+not: "stopped after 1 swipe — the swipe CHANGED THE SCREEN: the one element the read before it listed by id
+(id:"lab.sheet-background.S") is not in the tree after it, and it touched down at (201,175) on nothing that read
+listed — it most likely dismissed a sheet or a modal presented over the screen, or the app left the screen. The element is in the tree only after that change, on the new screen: not judged, not claimed visible, and
 no further swipe was sent. If a sheet or a modal was open, it is gone: reopen it …". The touch-down condition keeps a
 fling through a list of identified rows (every row replaced, the stroke on one of them or on the list) a scroll,
 whatever the rows' role: a Compose LazyColumn's testTagged `View` rows (`container`) inside its `scrollable` list, an

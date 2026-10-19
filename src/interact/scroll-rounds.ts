@@ -271,7 +271,7 @@ export type ScrollOutcome = (
 export interface ScreenChange {
   /** Where the strokes since the read before touched down, in order — none of them on content that read listed. */
   readonly touchDowns: readonly Point[];
-  /** The ids that read listed (`role:identifier`, ui-tree/read-tree.ts#ScreenIdentity), none of them listed after — what the sentence quotes. */
+  /** The identifiers that read listed (ui-tree/read-tree.ts#ScreenIdentity), each once, in tree order, none of them listed after — what the sentence quotes, as selectors (`id:"…"`). */
   readonly gone: readonly string[];
 }
 
@@ -1752,7 +1752,7 @@ function turnAtEnd(s: Mutable<State>, view: UiNode): void {
  */
 function screenChangedUnder(before: { readonly tree: UiNode; readonly identity: ScreenIdentity }, after: ScreenIdentity, touchDowns: readonly Point[]): ScreenChange | undefined {
   if (touchDowns.length === 0 || touchDowns.some((p) => touchedListed(before.tree, p)) || !anotherScreen(before.identity, after)) return undefined;
-  return { touchDowns, gone: [...before.identity.ids] };
+  return { touchDowns, gone: [...new Set([...everyNode(before.tree)].flatMap((n) => (n.identifier === null ? [] : [n.identifier])))] };
 }
 
 /**
