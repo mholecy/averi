@@ -92,9 +92,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     // round 7's React Native lab app (rn-field, `--app react-native`, the record keeping its app): the forms cases
     // rn1–rn6 and the label and icon taps; LOUD where WDA (LR1) and uiautomator (LR2) refuse a label under its own field,
-    // and where idb's typing lost a fill's last character in the RN field (averi said so: "the field shows 8")
+    // and where a fill into an RN single-line field lost the tail of its text (averi said so: "the field shows 8").
+    // 055c666: M's field laid to the box's foot (before review round 1); 97de1b9: laid as N's, the bar over its label.
     ['ios-rn-field-055c666.json', 'forms,visibility', { cases: 18, ok: 13, loud: 5, mismatches: 0 }],
     ['android-rn-field-055c666.json', 'forms,visibility', { cases: 9, ok: 6, loud: 3, mismatches: 0 }],
+    ['ios-rn-field-97de1b9.json', 'forms,visibility', { cases: 18, ok: 11, loud: 7, mismatches: 0 }],
+    ['android-rn-field-97de1b9.json', 'forms,visibility', { cases: 9, ok: 6, loud: 3, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

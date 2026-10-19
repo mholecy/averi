@@ -518,7 +518,7 @@
         "ios-iphone17-ios27/own-parts.idb.json N tap",
         "ios-iphone17-ios27/own-parts.idb.json N scroll_until"
       ],
-      "needs": "Round 7 (fixtures/apps/rn, rn-field; RN 0.88.0, iOS 27.0): RN's MULTILINE TextInput (a UITextView) lists the indicator under the field, after its floating label, over the label's centre — WDA `TextView 69,492 264x38` → `Other 'Horizontal scroll bar, 1 page'` value `0 %` `69,508 264x19` with one bare thumb, M's label `69,491 175x23` (tests/fixtures/truth/ios-rn-iphone17-ios27/rn-field.wda.json); RN's single-line TextInput (a UITextField) lists none, as the lab's UIKit field. At HEAD the bar is excused (`scrollIndicator`, its parent a text input): no reply names it. M's rows are red all the same, for the field itself — WDA lists RN's input inside an unnamed wrapper of its own rect, no sibling of its label (LR1) — so they cannot calibrate the indicator half: its fix (81a7d62) and the wrapper both decide those rows. A row isolating the bar needs LR1 fixed first, then rn-field's M under WDA at d2b7744 vs 81a7d62.",
+      "needs": "Round 7 (fixtures/apps/rn, rn-field; RN 0.88.0, new architecture, iOS 27.0) reproduces the indicator's geometry on RN's MULTILINE TextInput (a UITextView), laid as the SWIFT field: WDA `TextView 69,492 264x20` → `Other 'Horizontal scroll bar, 1 page'` value `0 %` `69,499 264x10` (one bare thumb `72,506 258x3`), after M's label `69,491 174.3x22.3` (centre y 502.2) and over its centre — mp-native's `textfield 42,447 318x20` → bar `42,454 318x10` over its label's centre 457 (tests/fixtures/truth/ios-rn-iphone17-ios27/rn-field.wda.json). RN 0.88's single-line TextInput (a UITextField) lists no bar, where mp-native's single-line field does (tests/fixtures/wda-capture-swift-form-pushed.json), and RN 0.88 lists every input inside an unnamed wrapper of its rect, where mp-native's is the label's direct sibling — most likely the new architecture's (mp-native's build is older; not measured). At HEAD the bar is excused (`scrollIndicator`, its parent a text input): no reply names it. M's rows are red all the same, for the field itself (the wrapper: LR1) — so they cannot calibrate the indicator half: the indicator's fix (81a7d62) and the wrapper both decide them. A row isolating the bar needs LR1 fixed first, then rn-field's M under WDA at d2b7744 vs 81a7d62; mp-native's own shape (no wrapper, a single-line field) needs a lab app on the bank app's older RN.",
       "regressions": [
         {
           "rows": [
@@ -1451,6 +1451,14 @@
     {
       "note": "2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md",
       "why": "lab finding LV6: WDA parks a below-the-fold row's elements at the sheet's origin moved by the table's offset, above the screen once it has scrolled — live only (live.ts --udid, case carry:sheet-long-list.L under WDA, round 6's Row30): the golden captures each cell at rest, where the parked frame lies inside the table"
+    },
+    {
+      "note": "2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md",
+      "why": "flow: typing (`idb ui text` into a React Native single-line field loses the tail of the text, 6 of 12 fills in round 7's two live runs, ios-rn-field-055c666.json and ios-rn-field-97de1b9.json) — averi's read-back reports it; not a visibility judgement, no golden row"
+    },
+    {
+      "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
+      "why": "lab finding LR3: WDA lists RN sibling views by their frames' tops, not their draw order — measured on rn-field's M before 843229f; no golden row yet (rn-field's fields no longer hit it): the note names the react-native cell that would reproduce it"
     }
   ]
 }
