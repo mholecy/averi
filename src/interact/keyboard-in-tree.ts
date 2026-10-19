@@ -7,13 +7,9 @@ import { sleep } from '../util/sleep.js';
 import {
   AVERIS_OWN,
   configuredStrategies,
-  moved,
-  movedAt,
-  movedNoted,
-  movedPassive,
-  moving,
   nextMove,
   perform,
+  wordsOf,
   type DismissalGround,
   type DismissalMove,
   type DismissalStrategy,
@@ -150,16 +146,16 @@ const mayHaveChanged = (moves: readonly DismissalMove[]): string =>
     : 'Those moves may have changed the screen (the keyboard was raised again, an element tapped did something of its own, or a drag scrolled the content) — look at it (ui_snapshot / screenshot)';
 
 /** `tapping id:"login_title" at (201,303)`, `…, then dragging the target's scroll view up from (201,502) to (201,382)` — what was done, as the failed-look sentences say it. */
-const movesDoing = (moves: readonly DismissalMove[]): string => moves.map((m) => `${moving(m)} ${movedAt(m)}`).join(', then ');
+const movesDoing = (moves: readonly DismissalMove[]): string => moves.map((m) => `${wordsOf(m).moving} ${wordsOf(m).at}`).join(', then ');
 
 /** `Tapped id:"login_title" at (201,303)`, `…, then dragged the target's scroll view up from (201,502) to (201,382)` — a still-up refusal's opening. */
 const movesDone = (moves: readonly DismissalMove[]): string => {
-  const text = moves.map((m) => `${moved(m)} ${movedAt(m)}`).join(', then ');
+  const text = moves.map((m) => `${wordsOf(m).moved} ${wordsOf(m).at}`).join(', then ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
 /** `tapped id:"login_title"`, `tapped id:"login_title", dragged the target's scroll view up` — the trace's. */
-const movesTrace = (moves: readonly DismissalMove[]): string => moves.map(moved).join(', ');
+const movesTrace = (moves: readonly DismissalMove[]): string => moves.map((m) => wordsOf(m).moved).join(', ');
 
 /** `nothing else was tapped`, or `done` once a drag was among the moves. */
 const nothingElse = (moves: readonly DismissalMove[]): string => `nothing else was ${moves.some((m) => m.kind === 'drag') ? 'done' : 'tapped'}`;
@@ -309,7 +305,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
         return {
           // ONE move — this model's side effect, never repeated; the next strategy's move is the next Hiding's.
           perform: () => perform(adapter, move),
-          sent: `${moves.map(movedPassive).join(', then ')} to hide the soft keyboard`,
+          sent: `${moves.map((m) => wordsOf(m).passive).join(', then ')} to hide the soft keyboard`,
           // The keyboard-avoiding layout moves things when the keyboard goes
           // (the 2FA screen grows from h 518 back to 874): each look resolves
           // the target again and reads the band off that look.
@@ -326,8 +322,8 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           // layout, or something else did; it did not hide the keyboard.
           hidden: (after) =>
             after.kind === 'clear'
-              ? `${covered}; ${left}${movedNoted(move)}, and the keyboard is still up but no longer over it`
-              : `${covered}; ${left}hidden by ${moving(move)}${move.kind === 'drag' ? ` ${movedAt(move)}` : ''} before tapping`,
+              ? `${covered}; ${left}${wordsOf(move).movedNoted}, and the keyboard is still up but no longer over it`
+              : `${covered}; ${left}hidden by ${wordsOf(move).movingNoted} before tapping`,
           async stillCovering(seen, looks) {
             const next = await nextMove(rest, groundOf(seen.resolved));
             const passed = [...skipped, ...next.skipped];
@@ -417,7 +413,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           const after = lookOn(adapter, reread);
           const cover = await after.reading.cover();
           return cover === undefined
-            ? { gone: { hiddenBy: moves.length === 1 ? moving(move) : `${moving(move)}, after ${moves.slice(0, -1).map(moving).join(', ')} left it up` } }
+            ? { gone: { hiddenBy: moves.length === 1 ? wordsOf(move).moving : `${wordsOf(move).moving}, after ${moves.slice(0, -1).map((m) => wordsOf(m).moving).join(', ')} left it up` } }
             : { stillUp: { frame: cover.band, look: after } };
         });
         if ('gone' in seen) return seen.gone;
