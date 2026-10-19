@@ -37,7 +37,6 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md': "LV3: the turned stroke's touch-down, live only (idb: fixed under WDA)",
   '2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md': 'LV4: no turn after strokes that moved nothing, live only (a replayed tree never moves)',
   '2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md': "a carousel card's stop on a read still moving, live only (and intermittent)",
-  '2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md': "LV6: a scrolled table's parked rows, live only (the golden captures at rest)",
 };
 
 /**

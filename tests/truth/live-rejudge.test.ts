@@ -9,10 +9,9 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; android-vis-dialogs*.json, round
- * 7's presented windows the parser does not mark; ios-vis.json and
+ * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; ios-vis.json and
  * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-scroll-bounded-wda-2725e76-*.json, round
- * 5's) judged again by this checkout's
+ * 5's; round 7's records of the src before LV6's and LW1's fixes, below) judged again by this checkout's
  * judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the
  * records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not
  * explain, no known case not intermittent ok), no case not known, and the counts of the summary's header.
@@ -66,11 +65,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // strokes and reaching F
     ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
     ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
-    // round 7's lab fixes (T3, truth/r7-lab-fixes): sheet-long-list at 56 rows, its target L past one carry and before
-    // the end — L's carry and scroll cases under WDA LV6's (turned three times; its scroll case's turns merged into one
-    // stroke in the second run, read not-reached), F and L under idb never in the tree (no identifier): LOUD
-    ['ios-long-list-r7-lab-1.json', 'visibility', { cases: 17, ok: 10, loud: 5, mismatches: 2 }],
-    ['ios-long-list-r7-lab-2.json', 'visibility', { cases: 17, ok: 10, loud: 6, mismatches: 1 }],
     // …and the forms with the lab model's fix (a field reported from the binding's write): no fill lost one of 30
     // (b1, b4, p2 five times under each source); c2–c4 ok under both sources (idb: not in its tree, all it can say);
     // b1d and b7 (idb ui text has no keycode for them), p5 (the secure field iOS clears) and k2/k3 under WDA LOUD; the
@@ -81,12 +75,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-forms-r7-lab-4.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-5.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-picker.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
-    // round 7's presented windows the parser does not mark (T2, truth/r7-dialogs' src = arch/round-23's): both cells'
-    // taps, scroll_until and colour asserts, then their eight scroll cases twice more — LW1's four and residual 19's
-    // four, the same in every run
-    ['android-vis-dialogs.json', 'visibility', { cases: 26, ok: 18, loud: 0, mismatches: 8 }],
-    ['android-vis-dialogs-scroll-run2.json', 'visibility', { cases: 8, ok: 0, loud: 0, mismatches: 8 }],
-    ['android-vis-dialogs-scroll-run3.json', 'visibility', { cases: 8, ok: 0, loud: 0, mismatches: 8 }],
     // round 5's two reruns of scroll-bounded under WDA, at ios-vis-2725e76.json's src: LV5's case ok in both, LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
@@ -153,6 +141,43 @@ describe('live.ts --rejudge over the committed iOS record of round 5\'s src (a -
     expect(out).toMatch(/^# Live golden: 350 cases, 270 ok, 15 loud, 65 mismatches \(2 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([a-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual(['b4', 'p2']);
+    expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the committed records of the src before LV6\'s fix (round 7\'s lab fixes, truth/r7-lab-fixes)', () => {
+  // sheet-long-list at 56 rows, its target L past one carry and before the end. L's carry and scroll cases under WDA
+  // were LV6's (its parked label read above the screen: turned three times; the scroll case's turns merged into one
+  // stroke in the second run, read not-reached) until round 7's A2 fixed it (a1b0b82) and their entries were struck
+  // off: here they read as recorded, not known — the src before the fix, a calibration of it now, not HEAD's KNOWN:
+  // exit 1, as recorded. F and L under idb never in the tree (no identifier): LOUD.
+  it.each([
+    ['ios-long-list-r7-lab-1.json', { cases: 17, ok: 10, loud: 5, mismatches: 2, notKnown: 2 }, ['carry:sheet-long-list.L', 'scroll:sheet-long-list.L']],
+    ['ios-long-list-r7-lab-2.json', { cases: 17, ok: 10, loud: 6, mismatches: 1, notKnown: 1 }, ['carry:sheet-long-list.L']],
+  ] as const)('%s: L\'s WDA cases not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want, unknownIds) => {
+    const { code, out } = await rejudge(record, 'visibility');
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown.sort()).toEqual([...unknownIds].sort());
+    expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the committed records of the src before LW1\'s fix (round 7\'s T2, truth/r7-dialogs)', () => {
+  // Round 7's presented windows the parser did not mark: both cells' taps, scroll_until and colour asserts, then their
+  // eight scroll cases twice more — the same in every run. Beneath the full-screen Compose Dialog residual 19's four,
+  // known; beneath the Views BottomSheetDialog LW1's four (A's and B's stroke up on the scrim dismissing the sheet and
+  // claiming the stop, C's and D's two strokes on it), whose entries round 7's A7 struck off (f924893e: the window
+  // marked by Material's ids): not known here — the src before the fix, a calibration of it now: exit 1, as recorded.
+  it.each([
+    ['android-vis-dialogs.json', { cases: 26, ok: 18, loud: 0, mismatches: 8, notKnown: 4 }],
+    ['android-vis-dialogs-scroll-run2.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 4 }],
+    ['android-vis-dialogs-scroll-run3.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 4 }],
+  ] as const)('%s: LW1\'s four scroll cases not known, residual 19\'s known', { timeout: 60_000 }, async (record, want) => {
+    const { code, out } = await rejudge(record, 'visibility');
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown.sort()).toEqual(['A', 'B', 'C', 'D'].map((t) => `scroll:bottom-sheet-dialog.${t}`));
     expect(code).toBe(1);
   });
 });

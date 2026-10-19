@@ -58,7 +58,9 @@ lab cell can measure it yet.
    full stroke. That final-approach cut on a long list is inferred, not measured (LV5 measured `lower`, 180 pt): the
    device check runs a long-list live case under WDA (a row far down a full-height list — the lab app's
    `sheet-long-list`, or a cell like it) beside `scroll-bounded`'s, and judges that the cut stroke lands the row in its
-   window without an extra stroke or turn.
+   window without an extra stroke or turn. Measured 2026-10-19 (round 7, once LV6 was fixed): the cut lands the row,
+   but a fling varies run to run around the largest carry sampled, so the rest can fall a few points past the window
+   — residual 1.
 
 ## Where it applies, and where not
 
@@ -135,4 +137,19 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
   row 30 with its own identifier (whole over the offsets 1172–1920, the table's end at 2772): a full final stroke
   overshoots its window, so the carry case (`carry:sheet-long-list.L`) can now fail on a missing cut. Live it still
   reads LV6 (three turns, two runs of two); the long-list half stays unmeasured until LV6's fix.
+  **LV6 fixed (round 7's A2, a1b0b82; docs/truth/live-ios-2026-10-18-visibility.md, its round-7 section):** in three
+  runs (docs/truth/live-records/ios-wda-long-list-parked-1…3.json) L was reached after 2 strokes down, no turn, every
+  run; the final approach rested L at 1917.3 and 1903.3, inside its window 1172–1920, and once at 1933.7 — 14 pt past
+  it, L 78% shown, the reply honest ("CLIPPED at top, 78% of it is in the viewport"). The long-list half holds in kind:
+  no extra stroke, no turn; its margin is residual 1.
+
+## Residuals accepted
+
+1. **The final approach's carry on a long WDA list can rest a row a few points past its window** (recorded
+   2026-10-19 at round 7's integration, pending the owner). The cut stroke is planned over the largest carry sampled
+   (decision 4), and a fling is not exactly proportional run to run: on the lab's 56-row table it brought L to rest
+   14 pt past its window in one run of three (1933.7 against 1920), the row still 78% shown with its centre clear. The
+   reply says so ("CLIPPED at top, … % of it is in the viewport"), so a caller asking `fully` is told; no stop is
+   claimed on a row not shown, no extra stroke or turn spent. The live golden files the carry case as this residual,
+   intermittent (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.L`, R-direction on `visible`).
 

@@ -43,8 +43,7 @@ const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const CAROUSEL_FLING = 'bug:2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md';
-const LV6 = 'bug:2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md';
-const SHEET_DIALOG = 'bug:2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md';
+const CARRY_MARGIN = 'residual:ADR 0021 residual 1 — the final approach\'s carry on a long WDA list can rest a row a few points past its window';
 const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** Round 6's iOS device check's WDA smoke run at round 6's src (truth/round-6 11683c3). */
 const R6_SMOKE = 'ios-wda-bounded-long-list-11683c3-1.json';
@@ -96,12 +95,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', { intermittent: true }),
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the
-  // same in all three runs). LW1: beneath the Views BottomSheetDialog, A's and B's stroke up touches down on the
-  // touch_outside scrim, dismisses the sheet, and the stop is claimed on the screen it uncovered; C's and D's two strokes
-  // land on the sheet. Beneath the full-screen Compose Dialog every target's two strokes land on the dialog (nothing
-  // dismissed: it has no outside) — residual 19, accepted with the hint every reply carries.
-  ...each('android uiautomator', ['scroll:bottom-sheet-dialog.A', 'scroll:bottom-sheet-dialog.B'], SHEET_DIALOG, 'presented-stop', 'visible'),
-  ...each('android uiautomator', ['scroll:bottom-sheet-dialog.C', 'scroll:bottom-sheet-dialog.D'], SHEET_DIALOG, 'presented-stroke', 'not found'),
+  // same in all three runs). Beneath the full-screen Compose Dialog every target's two strokes land on the dialog
+  // (nothing dismissed: it has no outside) — residual 19, accepted with the hint every reply carries. (LW1's four
+  // scroll cases beneath the Views BottomSheetDialog — A's and B's stroke up on the touch_outside scrim dismissing the
+  // sheet, C's and D's two strokes on it — struck off by round 7's A7, f924893e: the window marked presented by
+  // Material's ids, scroll_until stops before any stroke, ok in three runs of three: android-vis-sheet-dialog-run1…3.json.)
   ...each('android uiautomator', ['A', 'B', 'C', 'D'].map((t) => `scroll:dialog-fullscreen.${t}`), UNMARKED_WINDOW, 'presented-stroke', 'not found'),
   // iOS, idb: no scroll view listed
   ...each('ios idb', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O'], LE2, 'stop-claim', 'visible'),
@@ -143,12 +141,14 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // LV5's `ios wda scroll:scroll-bounded.F` struck off by round 6's iOS device check: ok in all four runs at 11683c3
   // (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json: `lower` at rest at 915–981, inside F's 884–1000
   // window), where round 5's src overshot to 1052 in one run of three and to 1006 (F cut, a plain stop) today.
-  // The long-list carry case (live-visibility.ts#CARRY): round 6's Row 30, round 7's target L of the 56-row table — its
-  // parked label read above the screen once the table has scrolled, turned three times (the touch log and the reply
-  // agree) and failed at maxSwipes, in every run (ios-long-list-r7-lab-1.json, -2.json). L's own scroll case the same,
-  // its turns merged into one stroke in one run of two (read not-reached: -2.json).
-  ...each('ios wda', ['carry:sheet-long-list.L'], LV6, 'R-direction', 'refused'),
-  ...each('ios wda', ['scroll:sheet-long-list.L'], LV6, 'R-direction', 'refused', { also: [{ cls: 'not-reached', kind: 'refused', record: 'ios-long-list-r7-lab-2.json' }] }),
+  // The long-list carry case (live-visibility.ts#CARRY): round 6's Row 30, round 7's target L of the 56-row table. LV6's
+  // two entries (its parked label read above the screen once the table had scrolled, three turns: ios-long-list-r7-lab-
+  // 1.json, -2.json) struck off by round 7's A2 (a1b0b82: the parked frame of a scrolled table) — L's scroll case ok in
+  // three runs of three (ios-wda-long-list-parked-1…3.json), two strokes down, no turn. What the carry case measures since
+  // is ADR 0021 decision 4's final approach: L reached after 2 swipes in every run, at rest inside its window 1172–1920
+  // in two (1917.3, 1903.3) and 14 pt past it in one (1933.7: -1.json), the reply honest — "CLIPPED at top, 78% of it is
+  // in the viewport" — but the stroke carried it past its window: R-direction on `visible`, intermittent.
+  ...each('ios wda', ['carry:sheet-long-list.L'], CARRY_MARGIN, 'R-direction', 'visible', { intermittent: true }),
   // carousel-in-list's C: one sideways stroke flings the carousel 447–532 pt, C's centre inside over 177–531 only; at
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
   ...each('ios wda', ['scroll:carousel-in-list.C'], CAROUSEL_FLING, 'stop-claim', 'visible', { intermittent: true }),
