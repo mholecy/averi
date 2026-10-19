@@ -176,7 +176,9 @@ export function sameRect(a: Rect, b: Rect): boolean {
  * 0,380 402x1301 — and the end proof that needs it unmoved
  * (interact/scroll-rounds.ts#Observed.ends) came one to three strokes late.
  * A real motion of one unit is read as none: no stroke moves content that
- * little. Exact equality stays the question for `sameRect`'s callers: there
+ * little. The settle confirm forgives it too, on every source (Android's and
+ * idb's included): a target creeping a unit a read is taken as still — no
+ * stroke's fling moves that little, an animation may. Exact equality stays the question for `sameRect`'s callers: there
  * a one-unit change IS the finding.
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
  */
