@@ -288,14 +288,25 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(fillFailureText({ code: 'clear-twice', left: 9, rounds: 3 })).toBe('fill: field still shows 9 characters after clearing 3 times');
   });
 
-  it('a mismatch after retypes says what was sent again: the clear\'s retry, then the dropped tails', () => {
+  it('a mismatch after retypes says what was sent again, in the order sent — a run of tails, the clear\'s retry', () => {
     const f = (extra: Partial<Extract<FillFailure, { code: 'mismatch' }>>) =>
       fillFailureText({ code: 'mismatch', typed: 9, shows: 5, differs: { kind: 'length' }, ...extra });
-    expect(f({ retyped: [6, 3] })).toBe(
+    expect(f({ again: [{ kind: 'tail', length: 6 }, { kind: 'tail', length: 3 }] })).toBe(
       'fill: typed 9 characters (the last 6 characters typed again after the field dropped them, then the last 3 characters) but the field shows 5 (content withheld from this error)',
     );
-    expect(f({ retried: { wiped: true }, retyped: [2] })).toBe(
+    expect(f({ again: [{ kind: 'whole', wiped: true }, { kind: 'tail', length: 2 }] })).toBe(
       'fill: typed 9 characters (after one wipe and retype; the last 2 characters typed again after the field dropped them) but the field shows 5 (content withheld from this error)',
+    );
+    expect(f({ again: [{ kind: 'tail', length: 4 }, { kind: 'whole', wiped: true }] })).toBe(
+      'fill: typed 9 characters (the last 4 characters typed again after the field dropped them; after one wipe and retype) but the field shows 5 (content withheld from this error)',
+    );
+  });
+
+  it('a mismatch whose typing left the field names the input that changed, never its value, and says nothing was typed again', () => {
+    expect(
+      fillFailureText({ code: 'mismatch', typed: 4, shows: 1, differs: { kind: 'length' }, elsewhere: { role: 'textfield', identifier: 'otp2', rect: { x: 100, y: 200, width: 40, height: 40 } } }),
+    ).toBe(
+      'fill: typed 4 characters but the field shows 1 (content withheld from this error); the typing left the field: textfield id:"otp2" (100,200 40x40) changed while it typed (the focus moved), so nothing was typed again',
     );
   });
 
@@ -316,10 +327,10 @@ describe('fillFailureText — every error a fill throws', () => {
   });
 
   it('a mismatch after the clear-fill\'s one retry says so — a wipe and a retype, or a retype alone when the field held nothing (round 8\'s D3 nit: "typed 3 but shows 4" read as the first typing)', () => {
-    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, retried: { wiped: true } })).toBe(
+    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, again: [{ kind: 'whole', wiped: true }] })).toBe(
       'fill: typed 3 characters (after one wipe and retype) but the field shows 4 (content withheld from this error)',
     );
-    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 0, differs: { kind: 'unchanged' }, retried: { wiped: false } })).toMatch(
+    expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 0, differs: { kind: 'unchanged' }, again: [{ kind: 'whole', wiped: false }] })).toMatch(
       /^fill: typed 3 characters \(after typing it once more\) but the field shows 0 — the field did not change/,
     );
   });

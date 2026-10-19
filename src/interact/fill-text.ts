@@ -53,7 +53,7 @@
 import { INPUT_ROLE } from '../adapters/types.js';
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
-import type { Difference, FillFailure, FillResult, LostWhy } from './fill-facts.js';
+import type { Difference, FillFailure, FillResult, LostWhy, SentAgain } from './fill-facts.js';
 import { judgeFill, type Caveat, type FillVerdict, type Reason, type Sent } from './fill-verdict.js';
 
 /** One flow trace line: the action column and its text. */
@@ -270,19 +270,38 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
     'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
     'xcrun simctl list), then retry with clear: true so the field is reset',
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
-  mismatch: ({ typed, shows, differs, notInput, retried, retyped }) =>
-    `fill: typed ${charactersText(typed)}${mismatchAside(retried, retyped)} but the field shows ${shows}` +
+  mismatch: ({ typed, shows, differs, notInput, again, elsewhere }) =>
+    `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${shows}` +
     DIFFERENCE_TEXT[differs.kind](differs as never) +
+    (elsewhere === undefined
+      ? ''
+      : `; the typing left the field: ${elsewhere.role}${elsewhere.identifier === null ? '' : ` id:"${elsewhere.identifier}"`} ` +
+        `(${rectText(elsewhere.rect)}) changed while it typed (the focus moved), so nothing was typed again`) +
     (notInput === undefined ? '' : `; ${caveatText({ code: 'not-input', role: notInput.role, typed: true, input: notInput.input })}`),
 };
 
-/** What was sent again before the mismatch's read-back: the clear's retry, then the dropped tails, in brackets. */
-function mismatchAside(retried: { wiped: boolean } | undefined, retyped: readonly number[] | undefined): string {
-  const parts = [
-    ...(retried === undefined ? [] : [retried.wiped ? 'after one wipe and retype' : 'after typing it once more']),
-    ...(retyped === undefined || retyped.length === 0 ? [] : [retypedText(retyped)]),
-  ];
-  return parts.length === 0 ? '' : ` (${parts.join('; ')})`;
+/**
+ * What was sent again before the mismatch's read-back, in the order sent: a run of dropped tails as `retypedText`
+ * words it, the clear's retype as `after one wipe and retype` (or `after typing it once more`, nothing wiped), joined
+ * by `; `.
+ */
+function againText(again: readonly SentAgain[]): string {
+  const parts: string[] = [];
+  let tails: number[] = [];
+  const flush = () => {
+    if (tails.length > 0) parts.push(retypedText(tails));
+    tails = [];
+  };
+  for (const a of again) {
+    if (a.kind === 'tail') {
+      tails.push(a.length);
+      continue;
+    }
+    flush();
+    parts.push(a.wiped ? 'after one wipe and retype' : 'after typing it once more');
+  }
+  flush();
+  return parts.join('; ');
 }
 
 /**

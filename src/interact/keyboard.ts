@@ -187,7 +187,14 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
 
 /** The guard's answer: the look the tap goes to, with what its judgement aimed at. */
 function clearOf(r: ClearedLook, { point, moved }: Aim): ResolvedClear {
-  return { node: r.node, note: r.note, ...(r.keyboardHidden !== undefined && { keyboardHidden: r.keyboardHidden }), point, ...(moved !== undefined && { moved }) };
+  return {
+    node: r.node,
+    note: r.note,
+    ...(r.keyboardHidden !== undefined && { keyboardHidden: r.keyboardHidden }),
+    point,
+    ...(moved !== undefined && { moved }),
+    tree: r.look.tree,
+  };
 }
 
 /**

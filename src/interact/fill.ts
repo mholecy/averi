@@ -116,7 +116,9 @@ function screenSignature(tree: UiNode): string {
  *   mismatch throws instead of corrupting content the field came with.
  * - either way, a field that kept a strict prefix of what it should hold
  *   (React Native's single-line TextInput dropping the end of idb's burst,
- *   2026-10-19) gets the dropped tail typed again, bounded, and the result
+ *   2026-10-19) gets the dropped tail typed again, bounded — on an adapter
+ *   whose typing has arrived when its call returns, and only while no other
+ *   input changed (the focus did not move) — and the result
  *   says so (`retyped`). Typing, the read-back and every retry are
  *   interact/fill-type.ts's (`typeAndConfirm`); this function drives it.
  * A non-input node that never exposes text is NOT verified, and the result
@@ -168,7 +170,7 @@ export async function fillField(
   }
   const { clear } = opts;
   const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
-  const { node, note: resolutionNote, keyboardHidden, point, moved } = await resolveClearOfKeyboard(adapter, target, opts);
+  const { node, note: resolutionNote, keyboardHidden, point, moved, tree: resolvedIn } = await resolveClearOfKeyboard(adapter, target, opts);
   // A focus tap moved off a covered centre (tap-judgement.ts#TapJudge.aim) is said in the note, after what the
   // resolution said.
   const note = focusTapNote(resolutionNote, moved);
@@ -346,8 +348,19 @@ export async function fillField(
     // clear's one wipe and retype. Here the outcome becomes the read-back fact
     // or the mismatch error.
     const typed = await typeAndConfirm(
-      { type: startTyping, wipe: (count) => adapter.clearText(count), read: refetchValue },
-      { value, clear: clear === true, isInput, resolvedValue: node.value, before: shownBeforeTyping, placeholder, maskedHeld, pollMs },
+      { type: startTyping, wipe: (count) => adapter.clearText(count), read: refetchValue, screen: () => lastTree ?? resolvedIn },
+      {
+        value,
+        clear: clear === true,
+        isInput,
+        resolvedValue: node.value,
+        before: shownBeforeTyping,
+        placeholder,
+        maskedHeld,
+        pollMs,
+        field: current ?? node,
+        delivery: adapter.typingDelivery ?? 'may-arrive-late',
+      },
     );
     if (typed.kind === 'missed') {
       const wrong = await notInput();
@@ -357,11 +370,11 @@ export async function fillField(
         shows: typed.observed.length,
         differs: differenceOf({ observed: typed.observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
         notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
-        ...(typed.retried !== undefined && { retried: typed.retried }),
-        ...(typed.retyped.length > 0 && { retyped: typed.retyped }),
+        ...(typed.again.length > 0 && { again: typed.again }),
+        ...(typed.elsewhere !== undefined && { elsewhere: typed.elsewhere }),
       });
     }
-    if (typed.kind === 'landed') retyped = typed.retyped;
+    if (typed.kind === 'landed') retyped = typed.again.flatMap((a) => (a.kind === 'tail' ? [a.length] : []));
     readBack =
       typed.kind === 'not-taken'
         ? { kind: 'not-taken' }

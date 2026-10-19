@@ -1373,6 +1373,8 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
   });
 
   it('without clear the tail is what the field misses of its earlier text plus the value', async () => {
+    // Nothing is read after the focus tap here (the field held text, no clear): the tree that resolved it is the
+    // proof of what the other inputs held before the typing.
     const fake = formFake('9.99');
     dropping(fake, 2);
     const result = await fillField(fake, { id: 'amount_input' }, '12.34', FAST);
@@ -1403,6 +1405,53 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     appendBullets(fake, 2);
     await expect(fillField(fake, { id: 'amount_input' }, '12345', FAST)).rejects.toThrow(/typed 5 characters but the field shows 3/);
     expect(fake.typed).toEqual(['12345']);
+  });
+
+  it('an adapter whose keys may arrive late (Android\'s IME queue) gets no retype: a short reading proves no drop', async () => {
+    const fake = formFake(null);
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 3);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow('fill: typed 9 characters but the field shows 3 (content withheld from this error)');
+    expect(fake.typed).toEqual(['Jan Novak']);
+  });
+
+  /** Two auto-advancing one-digit code boxes and a note under them: a box that has its digit moves the focus on. */
+  const otpFake = () => {
+    resetLayout();
+    const otp1 = el({ role: 'textfield', identifier: 'otp1', value: null });
+    const otp2 = el({ role: 'textfield', identifier: 'otp2', value: null });
+    const note = el({ role: 'textfield', identifier: 'note', value: null });
+    const fake = new FakeAdapter({ form: screen(otp1, otp2, note) }, 'form');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      for (const ch of text) {
+        const box = fake.focused;
+        if (box === undefined) return;
+        box.value = (box.value ?? '') + ch;
+        if (box === otp1) fake.focused = otp2;
+        else if (box === otp2) fake.focused = note;
+      }
+    };
+    return { fake, otp2, note };
+  };
+
+  it('typing that moved the focus to another input is never typed again — it would go there too — and the error names that input', async () => {
+    // Review of this branch: `1234` into otp1 left `1` there, `2` in otp2 and `34` in the note, and the tail `234`
+    // typed again made the note `34234`, the reply saying the field had dropped them.
+    const { fake, otp2, note } = otpFake();
+    await expect(fillField(fake, { id: 'otp1' }, '1234', FAST)).rejects.toThrow(
+      /^fill: typed 4 characters but the field shows 1 .*; the typing left the field: textfield id:"otp2" \(0,40 100x10\) changed while it typed \(the focus moved\), so nothing was typed again$/,
+    );
+    expect(fake.typed).toEqual(['1234']);
+    expect([otp2.value, note.value]).toEqual(['2', '34']);
+  });
+
+  it('with clear, the clear\'s wipe and retype is not sent either: its deletes and its typing would go into the other input', async () => {
+    const { fake, note } = otpFake();
+    await expect(fillField(fake, { id: 'otp1' }, '1234', { ...FAST, clear: true })).rejects.toThrow(/the typing left the field: textfield id:"otp2"/);
+    expect(fake.typed).toEqual(['1234']);
+    expect(fake.deletes).toEqual([]);
+    expect(note.value).toBe('34');
   });
 
   it('a prefix still growing at the end of the poll is not typed again (a late keystroke would be sent twice)', async () => {
