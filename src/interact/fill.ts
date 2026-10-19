@@ -1,5 +1,6 @@
 import { everyNode, INPUT_ROLE, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
+import { sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
@@ -65,28 +66,16 @@ function rectGap(a: Rect, b: Rect): number {
  * (`TextFieldWithComponentStyle`), so a NEXT screen with a field at the same
  * rect is a twin too (review 2026-10-08: typing that navigated read the next
  * screen's field). After typing, fillField therefore asks it only while
- * `screenSignature` still equals the last pre-typing read's — and not at all
- * when nothing was read before typing. The limit: a next screen with the
- * very same set of identified nodes still passes.
+ * the screen's identity (ui-tree/read-tree.ts#ScreenIdentity) is still the
+ * last pre-typing read's (`sameScreen`) — and not at all when nothing was read
+ * before typing. The limit: a next screen with the very same set of
+ * identified nodes still passes.
  */
 function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {
   const twins = [...everyNode(tree)].filter(
     (n) => n.role === chosen.role && n.identifier === chosen.identifier && sameRect(n.rect, chosen.rect),
   );
   return twins.length === 1 ? twins[0] : undefined;
-}
-
-/**
- * A cheap "same screen" witness for sameField: the set of `role:identifier`
- * pairs of every identified node. Values and rects are left out — typing
- * changes the one and the keyboard the other. A node appearing with an id
- * of its own (an inline error label) changes it: the fallback then refuses,
- * and the read-back is NOT verified rather than wrong.
- */
-function screenSignature(tree: UiNode): string {
-  const ids = new Set<string>();
-  for (const n of everyNode(tree)) if (n.identifier !== null) ids.add(`${n.role}:${n.identifier}`);
-  return [...ids].sort().join('\n');
 }
 
 /**
@@ -178,7 +167,7 @@ export async function fillField(
   // sameField's guard (see there): before typing, the identity fallback is
   // asked freely (a clear's deletes do not navigate); after it, only on the
   // screen the last pre-typing read saw. `null`: typing started with no read.
-  let screenBeforeTyping: string | null | undefined;
+  let screenBeforeTyping: ScreenIdentity | null | undefined;
   // Why the newest refetch found nothing (undefined: it found the field) —
   // the read-back's `lost` when the poll ends on such a read (2026-10-08).
   // The read-back (fill-type.ts) sees only the text; the clear reads `lost` off refetch's own
@@ -199,7 +188,7 @@ export async function fillField(
     lostOnLastRead = undefined;
     const bySelector = resolveNow(tree, target, opts)?.node;
     if (bySelector !== undefined) return { node: bySelector };
-    const screenChanged = typeof screenBeforeTyping === 'string' && screenSignature(tree) !== screenBeforeTyping;
+    const screenChanged = screenBeforeTyping !== undefined && screenBeforeTyping !== null && !sameScreen(screenIdentity(tree), screenBeforeTyping);
     const twin = screenBeforeTyping === undefined || (screenBeforeTyping !== null && !screenChanged) ? sameField(tree, node) : undefined;
     if (twin !== undefined) return { node: twin };
     lostOnLastRead = screenChanged ? 'screen-changed' : 'unmatched';
@@ -216,7 +205,7 @@ export async function fillField(
   const valueOf = (n: UiNode | undefined): string | undefined => (n === undefined ? undefined : (n.value ?? (isInput ? '' : undefined)));
   const refetchValue = async (): Promise<string | undefined> => valueOf(await refetchNode());
   const startTyping = async (text: string): Promise<void> => {
-    screenBeforeTyping ??= lastTree === undefined ? null : screenSignature(lastTree);
+    screenBeforeTyping ??= lastTree === undefined ? null : screenIdentity(lastTree);
     await adapter.typeText(text);
   };
   await adapter.tap(point.x, point.y);

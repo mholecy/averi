@@ -165,7 +165,7 @@ export type ClearPlaceholder = 'shown' | 'prefix' | 'other';
 /**
  * Why a `lost` read-back did not find the field:
  * - `screen-changed`: after typing, the screen's set of identified nodes
- *   (screenSignature) was no longer the one read before typing, so the
+ *   (ui-tree/read-tree.ts#ScreenIdentity) was no longer the one read before typing, so the
  *   identity fallback refused — the measured case (an inline error label
  *   going away, a notice or the keyboard's own ids arriving).
  * - `unmatched`: the selector no longer matches and no single node of the

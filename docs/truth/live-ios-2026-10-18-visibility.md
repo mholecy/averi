@@ -162,6 +162,39 @@ ios-wda-vis-parked.json (the whole WDA visibility group, once). Reproduce: `node
   scroll cases), the menu row W (LOUD), LV4's turn and LE3's sticky row — each KNOWN as before; carousel C ok this run
   (its triage entry intermittent).
 
+# 2026-10-19 — round 7's A5: idb's presented layer and the screen-changed stop (point 4)
+
+arch/r23-idb-sheet (from arch/round-23 bd43fc66), `--side` from truth/round-7 94bcfad5's harness, idb only (its own
+companion on gRPC 10887; the default one read "no frontmost application" until the simulator was rebooted once), the
+lab app as installed on the lab simulator. ADR 0018's amendment "idb's presented layer".
+Reproduce (outside the sandbox):
+  node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb --groups visibility [--cells sheet-medium,sheet-background] --side <checkout> --record <file>
+
+- sheet-medium and sheet-background, twice (docs/truth/live-records/ios-idb-sheet-a5-1.json, -2.json): 18 cases, 14 ok,
+  0 loud, 4 mismatches each run, identical. sheet-medium's list holds UIKit's dismiss region, now the presented mark:
+  A–D `scroll_until` stop before any swipe ("stopped before any swipe — element is not in the tree, and the next swipe
+  would touch down at (201,175) on other "dismiss popup" (-402,-874 1206x2622) — a screen is presented over it …"),
+  no touch logged, the sheet kept — the four were MISMATCH (A, B "fully visible after 1 swipe" after the stroke
+  dismissed the sheet; C, D two strokes on it); A–D taps "… is not in the tree, which lists only the layer presented
+  on top (the tree source lists nothing beneath a presented layer) — a screen is presented over it (a modal or a
+  sheet) — close it first …" (ok before too, as "to appear"); S tapped. sheet-background's list shows no sign of the
+  sheet: A and B still stroke once at (201,175), the stroke still dismisses the sheet (the app logs `dismissed sheet`),
+  but the reply is no longer a claimed stop: "stopped after 1 swipe — the swipe CHANGED THE SCREEN: none of the 1
+  element the read before it listed by id (button:lab.sheet-background.S) is in the tree after it, and it touched down
+  at (201,175) on nothing that read listed — it most likely dismissed a sheet or a modal presented over the screen
+  (nothing was found beneath it) … not claimed visible, and no further swipe was sent" (worded since, on the slice's
+  review: the one id quoted as `id:"lab.sheet-background.S"`, "the one element … is not in the tree after it", the
+  parenthesis dropped — the same stop, rejudged the same). The judge reads them
+  `presented-fired` (a stroke dismissed the layer), not `presented-stop` — still MISMATCH, live-known's entries
+  (`presented-stop`, `visible`) to move to it. C, D: two strokes at (201,699) on the large sheet, nothing dismissed,
+  "never appeared" — as before (residual 6 stands where the tree shows no layer).
+- The visibility group under idb, once (docs/truth/live-records/ios-idb-vis-a5.json): 145 cases, 100 ok, 6 loud, 39
+  mismatches (2 not known: sheet-background A and B above). Against ios-vis.json's idb cases: sheet-medium A–D and
+  sheet-medium-edges H, G `scroll_until` turned ok (KNOWN as residual 6 until now: strike off), sheet-background A, B
+  `presented-stop` → `presented-fired`; every other case as before but sheet-long-list's F (R-direction → LOUD
+  not-reached) and its new L — truth/round-7's long table (T3), not this change: their replies are the bound's, with no
+  screen change said. "CHANGED THE SCREEN" was said by no other case.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

@@ -30,9 +30,9 @@ const modalShape = (root: Partial<UiNode> = {}) => {
 };
 
 describe('the fallback: which adapter infers presented screens where the source did not judge them', () => {
-  it('a judged tree (`presentationsJudged`) has none — only the marks; a root listing the active window only (`activeWindowOnly`) the uiautomator adapter; any other tree the shape', () => {
+  it('a judged tree (`presentationsJudged`) has none — only the marks; any other tree the shape, a root listing the active window only (`activeWindowOnly`) too', () => {
     expect(presentationOf(modalShape({ presentationsJudged: true }).tree).fallback).toBeUndefined();
-    expect(presentationOf(modalShape({ activeWindowOnly: true }).tree).fallback).toBe('uiautomator');
+    expect(presentationOf(modalShape({ activeWindowOnly: true }).tree).fallback).toBe('shape');
     // Compose's padded touch targets are another mark of the same source, read for the padded shape alone.
     expect(presentationOf(modalShape({ paddedTouchTargets: true }).tree).fallback).toBe('shape');
     expect(presentationOf(modalShape().tree).fallback).toBe('shape');
@@ -59,7 +59,7 @@ describe('the fallback: which adapter infers presented screens where the source 
 
   // Its own question — the window listed alone, lab note L1 — is pinned over the lab's captures in
   // tests/adapters/android-presented-window.test.ts.
-  it('the uiautomator adapter, its window unmarked, answers as the shape does: the same surface, the same give-way, no layer at a point, none alone', () => {
+  it('a root listing the active window only, unmarked, answers as the shape does: the same surface, the same give-way, no layer at a point, none alone', () => {
     const { tree, row, dim } = modalShape({ activeWindowOnly: true });
     const { presentation, at } = read(tree);
     expect(presentation.over(row).surface(at(dim))).toBe('inferred');

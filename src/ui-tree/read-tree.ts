@@ -338,6 +338,46 @@ export function showsProgress(tree: UiNode): boolean {
   return false;
 }
 
+/**
+ * THE SCREEN'S IDENTITY: the `role:identifier` pair of every node that carries an identifier — what of a read says WHICH
+ * screen it is, as opposed to where its content lies. Values, labels and rects are left out: typing changes the one,
+ * a scroll or the keyboard the others, while an identified node keeps its id wherever it is moved. Two questions are
+ * asked of two reads' identities, by the two verbs that act between them:
+ * - `sameScreen` (fill's read-back, interact/fill.ts#sameField): every id of the one is the other's and back — a
+ *   node appearing with an id of its own (an inline error label) changes it, so the identity fallback refuses rather
+ *   than read a next screen's twin field;
+ * - `anotherScreen` (`scroll_until`'s stroke, interact/scroll-rounds.ts#screenChangedUnder): each read lists ids and
+ *   NONE of the one is the other's — not the content moved, which keeps the ids of what still shows (and on idb's
+ *   SwiftUI lists, of what lies off the screen too), but the screen replaced: a sheet or a modal dismissed, the app
+ *   gone to another screen. A read with no id at all says nothing either way.
+ * One walk.
+ */
+export interface ScreenIdentity {
+  /** Every `role:identifier` pair the read lists. */
+  readonly ids: ReadonlySet<string>;
+  /** The bare identifiers, each once, in tree order — as a sentence quotes them (`id:"…"`). */
+  readonly identifiers: readonly string[];
+}
+
+/** The identity of the screen `tree` shows (`ScreenIdentity`). */
+export function screenIdentity(tree: UiNode): ScreenIdentity {
+  const ids = new Set<string>();
+  const identifiers = new Set<string>();
+  for (const n of everyNode(tree)) {
+    if (n.identifier === null) continue;
+    ids.add(`${n.role}:${n.identifier}`);
+    identifiers.add(n.identifier);
+  }
+  return { ids, identifiers: [...identifiers] };
+}
+
+/** `a` and `b` are the same screen by identity: the very same ids (`ScreenIdentity`). */
+export const sameScreen = (a: ScreenIdentity, b: ScreenIdentity): boolean => a.ids.size === b.ids.size && [...a.ids].every((id) => b.ids.has(id));
+
+/** `after` is ANOTHER screen than `before` by identity: both list ids, and none of `before`'s is `after`'s (`ScreenIdentity`). */
+export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): boolean =>
+  before.ids.size > 0 && after.ids.size > 0 && ![...before.ids].some((id) => after.ids.has(id));
+
 /** The accessibility label iOS gives a sheet's grabber — WDA's `label`, idb's `AXLabel` — whose value is the sheet's detent. */
 const SHEET_GRABBER = 'Sheet Grabber';
 

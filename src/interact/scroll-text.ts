@@ -1,5 +1,6 @@
 import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { axisOfEdge, containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import type { EyesFinding, SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
@@ -8,7 +9,7 @@ import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '.
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { shortOf, type Cover, type Judged } from './scroll-read.js';
+import { fullyClaimed, shortOf, type Cover, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
@@ -95,6 +96,14 @@ export interface ScrollUntilResult {
    * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    */
   covered?: { by: QuotedNode; shows: number };
+  /**
+   * Set on a stop whose "fully visible" claim the eyes looked at (ui-tree/eyes.ts) and did not confirm: the target lies
+   * flush with `neighbour` at `edge`, a node drawn after it outside its scroll view, and the screenshot showed a band
+   * of the surface around that node over the target (`surface` — only on a plain stop the band leaves the centre of:
+   * `fully: true` does not stop so, nor the plain stop with the band over its centre) or could not tell (`unjudged`).
+   * The reply says so; absent when the eyes saw its own colour to every edge, or were not asked.
+   */
+  eyes?: EyesFinding;
   /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
   /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (scroll-rounds.ts#EndTurn); the reply says so. */
@@ -139,6 +148,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
     ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
+    ...(o.eyes !== undefined && { eyes: o.eyes }),
     ...(o.detent !== undefined && { detent: o.detent }),
     ...(o.endTurn !== undefined && { endTurn: o.endTurn }),
   };
@@ -192,18 +202,39 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   // clean `fully: true` stop (scroll-rounds.ts#round).
   const topCover = r.keyboard?.state === 'shown' ? r.keyboard.frame : undefined;
   const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
-  if (r.clipped.length === 0 && r.covered === undefined) {
+  const surface = r.eyes?.sees === 'surface' ? r.eyes : undefined;
+  if (fullyClaimed({ clipped: r.clipped, covered: r.covered !== undefined }) && surface === undefined) {
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
-    return `fully visible after ${n}${above}${flushText(r.flush)}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+    // The eyes could not tell (ui-tree/eyes.ts): the claim is the tree's, and what it cannot see is said.
+    const unjudged = r.eyes?.sees === 'unjudged' ? r.eyes : undefined;
+    const claim = unjudged === undefined ? `fully visible after ${n}` : `fully visible by the tree after ${n}`;
+    const eyes = unjudged === undefined ? '' : `; ${unjudgedText(unjudged)}`;
+    return `${claim}${above}${flushText(r.flush)}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
   }
   // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.
   const covered =
     r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
+  // Partly under a surface the tree does not list, the eyes saw (ui-tree/eyes.ts): said as a cover is.
+  const unlisted = surface === undefined ? undefined : `PARTLY UNDER a surface the tree does not list: ${surfaceText(surface)}, its centre clear`;
   const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
-  return `visible after ${n} — ${[clip, covered].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+  return `visible after ${n} — ${[clip, covered, unlisted].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+}
+
+/**
+ * What the eyes saw over the target's edge (ui-tree/eyes.ts, `surface`): `its bottom 28 px show #F2F2F7, the colour
+ * beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own #FFFFFF (a screenshot)`.
+ * In tree units, which on Android (the only source the trigger fires on) are pixels.
+ */
+function surfaceText({ edge, neighbour, depth, surface, own }: SurfaceFinding): string {
+  return `its ${edge} ${depth} px show ${surface}, the colour beside ${nodeText(neighbour)} drawn after it, not its own ${own} (a screenshot)`;
+}
+
+/** The eyes could not tell (`unjudged`): the edge flush with that node, what may lie there, and why no screenshot settled it. */
+function unjudgedText({ edge, neighbour, why }: Extract<EyesFinding, { sees: 'unjudged' }>): string {
+  return `its ${edge} edge lies flush with ${nodeText(neighbour)}, drawn after it outside its scroll view, whose surface may draw past that node over it — the tree lists none there, and a screenshot could not tell (${why})`;
 }
 
 /** `1 swipe up did not move it`, `2 swipes up did not move it`, or — some of them moved it — `3 swipes up, the last of which did not move it` / `…, the last 2 of which did not move it`. */
@@ -402,6 +433,22 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
               `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutRemedy(short.cut.edge)}). ${last}`,
         };
       }
+      // A band of a surface the tree does not list, the eyes saw (ui-tree/eyes.ts), at the end of the content: the rest
+      // of it stays under that surface — with the keyboard up and the node riding on it, dismiss it first.
+      if (short.of === 'unlisted') {
+        // The keyboard as the round's reading offered it, unwitnessed (the band was moot: the match lies above it) — so an "if".
+        const keyboard = ridingKeyboard(short.finding.neighbour, short.offered, judged.standing.facts.minPiece ?? 0);
+        const away = o.otherWay === 'outward' ? `, and swiping ${back} would only push it further under that surface` : neither;
+        const why =
+          keyboard === undefined
+            ? 'a layout defect (no clearance for a pinned bar?)'
+            : `if the soft keyboard is still up (the window state reads its top edge at y ${keyboard.lineY}, that node riding on it), dismiss it first (${hideClause(keyboard.remedy)}) — a bar riding on it goes down with it — and scroll again; else a layout defect (no clearance for a pinned bar?)`;
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is in the viewport but ${surfaceText(short.finding)} — and the content is exhausted: ` +
+              `swiping ${o.lastStroke} no longer moves it${away}. That surface stays over it at the end of the content — ${why}. ${last}`,
+        };
+      }
       if (short.of === 'covered') {
         return {
           message:
@@ -519,8 +566,38 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedRemedy('it', o.presented.layer)}`;
       return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
+    case 'changed':
+      return { message: changedText(o, describe) };
   }
 }
+
+/**
+ * The `changed` stop (scroll-rounds.ts#ScreenChange): the swipe CHANGED THE SCREEN — said loud, with its evidence (the
+ * ids gone, where it touched down), what it likely was, and that nothing found after it is claimed. A plain Error,
+ * never absence: the scroll did not look and miss, its own stroke replaced the screen, and an `optional:` step must
+ * not skip it as "(not present)".
+ */
+function changedText(o: Extract<ScrollOutcome, { kind: 'changed' }>, describe: string): string {
+  const { touchDowns, gone } = o.change;
+  const shown = `${gone.slice(0, CHANGED_IDS_QUOTED).map((id) => `id:${JSON.stringify(id)}`).join(', ')}${gone.length > CHANGED_IDS_QUOTED ? ', …' : ''}`;
+  const ids =
+    gone.length === 1
+      ? `the one element the read before it listed by id (${shown}) is not in the tree after it`
+      : `none of the ${gone.length} elements the read before it listed by id (${shown}) is in the tree after it`;
+  const at = touchDowns.map(pointText).join(', ');
+  const target = o.found
+    ? 'The element is in the tree only after that change, on the new screen: not judged, not claimed visible'
+    : 'The element is not in the tree after it either';
+  return (
+    `scroll_until ${describe} stopped after ${swipesText(o.swipes)} — the swipe CHANGED THE SCREEN: ${ids}, ` +
+    `and nothing it touched down on at ${at} is still listed — it most likely dismissed a sheet or a modal presented over the screen, ` +
+    `or the app left the screen. ${target}, and no further swipe was sent. ` +
+    'If a sheet or a modal was open, it is gone: reopen it if the flow needs it — a target beneath one is reached by closing it first, never by scroll_until'
+  );
+}
+
+/** How many of the ids gone the `changed` stop quotes. */
+const CHANGED_IDS_QUOTED = 3;
 
 /**
  * Why a judged match was NOT judged in the viewport, for the `presented` stop whose next swipe would have touched
@@ -638,6 +715,8 @@ function shortText(short: Shortfall): string {
       const { judged } = short;
       return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
+    case 'unlisted':
+      return `element reached the viewport but stayed PARTLY UNDER a surface the tree does not list: ${surfaceText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
     case 'systemBar': {
       const { judged } = short;
       const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;

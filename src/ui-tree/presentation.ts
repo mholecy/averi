@@ -10,22 +10,20 @@ import { scrolls } from './scroll-containers.js';
  * (draw-order.ts#drawOrder) asks it beside its rows, as it asks the keyboard band, and hands the answer on to the
  * standing (standing.ts#Scene.presentedAt, #remedied) through `DrawOrder.presentation`.
  *
- * Behind its small interface sit THREE ADAPTERS, one per kind of evidence a tree can carry:
+ * Behind its small interface sit TWO ADAPTERS, one per kind of evidence a tree can carry:
  * - BY MARKS (`byMarks`): the layers the tree SOURCE marks presented (`UiNode.presentation` on the layer,
  *   `UiNode.presentationElement` on a typed layer's element) — the WDA parser's facts (adapters/wda-source.ts#
- *   presentedLayers, by element type and by WDA's own visibility flags) and the uiautomator parser's (adapters/
- *   android.ts#presentedWindow: the one window it dumps, on its root, a `dialog` or a `screen`); read on every tree,
- *   since a flagless WDA payload still types an alert. idb's describe-all marks nothing, so on its trees this adapter
- *   answers nothing.
+ *   presentedLayers, by element type and by WDA's own visibility flags), the uiautomator parser's (adapters/
+ *   android.ts#presentedWindow: the one window it dumps, on its root, a `dialog` or a `screen`) and idb's
+ *   (adapters/ios-tree-source.ts#listsPresentedLayer: its flat list, on its root, a `screen` when UIKit's dismiss
+ *   region lies over the whole screen); read on every tree, since a flagless WDA payload still types an alert. A
+ *   ROOT the source marks is a presented layer listed ALONE — the screen beneath it is not in the tree, so a target
+ *   missing from it may lie there, unlisted (`alone`; lab note L1, iOS point 4).
  * - BY SHAPE (`byShape`): the FALLBACK for a tree whose source did not judge presented layers (no
  *   `UiNode.presentationsJudged` on its root): a later screen-sized layer stacked over the target's own screen inside
- *   one window, carrying content — idb's flat list (where it never holds), a flagless WDA payload, a normalized
- *   snapshot printed without the mark. Never asked of a judged tree: there the marks are the presented layers, and a
- *   layer the source did not mark presents nothing.
- * - BY UIAUTOMATOR (`byUiautomator`): the fallback for a tree whose source lists the ACTIVE WINDOW ONLY (the
- *   uiautomator root's mark, `UiNode.activeWindowOnly`): the shape adapter's answers, and the one question such a
- *   listing adds — whether the window it lists is a presented one, so a target missing from it may lie beneath, unlisted
- *   (`alone`; lab note L1).
+ *   one window, carrying content — idb's flat list (where it never holds), Android's window, a flagless WDA payload,
+ *   a normalized snapshot printed without the mark. Never asked of a judged tree: there the marks are the presented
+ *   layers, and a layer the source did not mark presents nothing.
  *
  * The interface (`Presentation`):
  * - `over(node)` — what presentation says of the nodes drawn after a TARGET (`PresentedOver`): which of them a
@@ -37,10 +35,10 @@ import { scrolls } from './scroll-containers.js';
  *   views: draw order's `markedAt`, `scroll_until`'s stroke for a target not in the tree.
  * - `press(surface)` — a presented surface as a sentence quotes it (`PresentedPress`): where it presses and, when it
  *   is a marked layer's cover, what that layer is (`MarkedLayer`) — the verbs' one view of a source's mark.
- * - `alone` — the presented layer the tree lists ALONE: a source that lists only the active window, and that window
- *   marked presented — the screen beneath it is not in the tree, so a target not found may lie there (the tap's wait,
- *   interact/resolve.ts, says close it first instead of "to appear").
- * - `fallback` — which adapter infers what the source did not judge (`shape`, `uiautomator`), none on a judged tree.
+ * - `alone` — the presented layer the tree lists ALONE: its root, which the source marks presented — the screen
+ *   beneath it is not in the tree, so a target not found may lie there (the tap's wait, interact/resolve.ts, says
+ *   close it first instead of "to appear").
+ * - `fallback` — whether the shape adapter infers what the source did not judge (`shape`), none on a judged tree.
  *
  * The policy is ADR 0018's and unchanged by where it lives: the source's marks first, the shape only as the fallback
  * of a tree whose source did not judge; the target's own visibility is never evidence alone.
@@ -48,16 +46,18 @@ import { scrolls } from './scroll-containers.js';
  */
 export interface Presentation {
   /**
-   * The adapter that infers presented screens on this tree (`byShape`, `byUiautomator`): undefined on a tree whose
-   * source judged presented layers itself (`UiNode.presentationsJudged`), which no shape is asked of. No production
-   * caller reads it: it is the test surface for which adapter a tree gets (tests/ui-tree/presentation.test.ts).
+   * The adapter that infers presented screens on this tree (`byShape`): undefined on a tree whose source judged
+   * presented layers itself (`UiNode.presentationsJudged`), which no shape is asked of. No production caller reads
+   * it: it is the test surface for which adapters a tree gets (tests/ui-tree/presentation.test.ts).
    */
-  readonly fallback: 'shape' | 'uiautomator' | undefined;
+  readonly fallback: 'shape' | undefined;
   /**
-   * The presented layer the tree lists ALONE, as a sentence names it (`MarkedLayer`): its source lists the active
-   * window only (`UiNode.activeWindowOnly`) and marks that window — the tree's root — presented, so the screen beneath
+   * The presented layer the tree lists ALONE, as a sentence names it (`MarkedLayer`): the source marks the tree's ROOT
+   * presented — uiautomator's one window (it lists the active window only, `UiNode.activeWindowOnly`), idb's flat list
+   * holding UIKit's dismiss region (it lists only what a presentation leaves to accessibility) — so the screen beneath
    * it is not in the tree and a target not found may lie there. Undefined on any other tree: one that lists every
-   * window (WDA's), where a target missing beside a marked alert is missing, and one whose window is not presented.
+   * window (WDA's, which marks layers, never its root), where a target missing beside a marked alert is missing, and
+   * one whose root is not marked.
    */
   readonly alone: MarkedLayer | undefined;
   /** What presentation says of the nodes drawn after `node` as a TARGET (`PresentedOver`); a node not in the tree has nothing presented over it. */
@@ -146,9 +146,9 @@ export interface PresentedTop {
   readonly at: readonly Placed[];
 }
 
-/** One adapter's answers (`byMarks`, `byShape`, `byUiautomator`); `presentationOf` composes them. */
+/** One adapter's answers (`byMarks`, `byShape`); `presentationOf` composes them. */
 interface PresentationAdapter {
-  /** `Presentation.alone`: only the uiautomator adapter's to answer. */
+  /** `Presentation.alone`: only the marks adapter's to answer. */
   readonly alone?: MarkedLayer;
   over(places: readonly Placed[]): PresentedOver;
   topmostAt(point: Point): PresentedTop | undefined;
@@ -161,19 +161,15 @@ const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => fals
 
 /**
  * The presentation of `tree`, over its walk (`order`, placed.ts#walkOf — draw order hands its own, so the tree is
- * walked once): the marks adapter on every tree, and the fallback (`Presentation.fallback`) only on a tree whose
- * source did not judge presented layers — the uiautomator adapter on a tree that lists the active window only
- * (`UiNode.activeWindowOnly`, Android's), the shape adapter on any other.
+ * walked once): the marks adapter on every tree, and the shape fallback (`Presentation.fallback`) only on a tree whose
+ * source did not judge presented layers.
  * The tree must not change while the answer is in use.
  */
 export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(tree)): Presentation {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
-  const fallback = tree.presentationsJudged === true ? undefined : tree.activeWindowOnly === true ? ('uiautomator' as const) : ('shape' as const);
-  const adapters: readonly PresentationAdapter[] = [
-    byMarks(order, screen),
-    ...(fallback === 'uiautomator' ? [byUiautomator(order, screenArea)] : fallback === 'shape' ? [byShape(screenArea)] : []),
-  ];
+  const fallback = tree.presentationsJudged === true ? undefined : ('shape' as const);
+  const adapters: readonly PresentationAdapter[] = [byMarks(order, screen), ...(fallback === 'shape' ? [byShape(screenArea)] : [])];
   return {
     fallback,
     alone: adapters.reduce<MarkedLayer | undefined>((found, a) => found ?? a.alone, undefined),
@@ -235,22 +231,30 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * popover) through its element alone, its one cover; a `screen` layer (one WDA's visibility flags show presented)
  * reaching the whole screen with its own nodes covering where they draw — each that screen's surface. No
  * stacked-screens, window or bare-frame condition: those are the shape fallback's inferences (`byShape`), which the
- * mark makes moot.
+ * mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's one window, idb's flat list —
+ * nothing of the tree lies outside it, so it covers no target, and for no target its cover takes every touch-down
+ * (`topmostAt`).
  */
 function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
   /**
    * The marked layers whose cover lies ON the screen, in the walk's order: one whose rect shares no area with the
    * screen (0x0, or wholly off it — WDA keeps a dismissed alert in its tree) presents nothing. Judged by the rect alone,
    * never by WDA's visibility flags (`UiNode.hidden`): an alert mid-animation may read hidden while it already takes
-   * every touch.
+   * every touch. A root of no area is the exception: idb's flat list hangs under a 0x0 root (adapters/ios-tree-source.ts
+   * #parseIdbDescribeAll), and a mark on it is the whole listing's, which lies where its nodes do — on the screen.
    */
   const marked = order.flatMap((p) => {
     const layer = markOf(p, order);
     if (layer === undefined) return [];
-    const on = rectIntersection(layer.cover.node.rect, screen);
+    const rect = layer.cover.node.rect;
+    if (p.parent === undefined && rectArea(rect) === 0) return [layer];
+    const on = rectIntersection(rect, screen);
     return on !== undefined && rectArea(on) > 0 ? [layer] : [];
   });
+  const root = order.at(0);
+  const alone = root === undefined ? undefined : marked.find(({ layer }) => layer === root)?.named;
   return {
+    ...(alone !== undefined && { alone }),
     /**
      * The marked layers over the target at `places`: each drawn after it and OUTSIDE it — never one holding it (a
      * layer's own nodes are not beneath it: the popover's `dismiss popup` is the way to close it), nor one in its
@@ -357,7 +361,7 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
  * THE SHAPE ADAPTER: a PRESENTED SCREEN INFERRED FROM SHAPE, the fallback asked only of a tree whose source did not
  * judge presented layers itself (no `UiNode.presentationsJudged` on its root): idb's flat list, a WDA payload carrying
  * no visibility flags, and a normalized snapshot whose root carries no such mark (as the snapshots kept as fixtures and
- * in the differential corpus do not) — and, through the uiautomator adapter (`byUiautomator`), Android's tree. A tree
+ * in the differential corpus do not) — and Android's tree, whose parser marks only the one window it dumps. A tree
  * whose source judged never reaches it: there the marked layers are the presented ones (`byMarks`), and a later
  * screen-sized layer the source did not mark presents nothing.
  *
@@ -411,37 +415,4 @@ function byShape(screenArea: number): PresentationAdapter {
     topmostAt: () => undefined,
     layerOf: () => undefined,
   };
-}
-
-// ── By uiautomator: a tree that lists the active window only ─────────────────────────────────────────────────
-
-/**
- * THE UIAUTOMATOR ADAPTER: the fallback for a tree whose source lists the ACTIVE WINDOW ONLY (`UiNode.activeWindowOnly`
- * on its root, set by the uiautomator parser — adapters/android.ts#parseUiautomatorXml). `uiautomator dump` lists the
- * window that has focus: with a Compose `AlertDialog` up the dump IS the dialog's window (`[155,851][925,1368]` of
- * 1080x2220), with a `ModalBottomSheet` up the sheet's full-screen window, its scrim first — and the screen beneath is
- * not in the tree at all, so no target of it is ever found and "covered" is not the question; "the tree IS a presented
- * window" is (lab note L1, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md).
- *
- * Whether it is, the PARSER decides, from the raw dump (adapters/android.ts#presentedWindow: a window floating off the
- * screen's top and left edges is a `dialog`; a full-screen one whose clickable scrim lies above its sheet — a labelled
- * scrim, or a Views `BottomSheetDialog`'s `touch_outside` by Material's view ids — a `screen`) and marks on the root
- * (`UiNode.presentation`) — as the WDA parser marks WDA's layers, since the scrim's `clickable` never reaches the
- * tree. The marks adapter (`byMarks`) reads that mark as any other: the window, the tree's first layer, is over no
- * target in it (every node of the tree is the window's own), and for NO target its cover takes every touch-down — the
- * dim outside the dialog, which dismisses it on a touch; the sheet, which a stroke drags to full height — unless the
- * point lies on a scroll view of the window's own (a search inside the sheet's list): `scroll_until` for a target not
- * in the tree stops before any stroke, "close it first" (standing.ts#Scene.presentedAt, through draw order's
- * `markedAt`), as under a WDA-marked layer.
- *
- * What this adapter adds is the one question such a listing raises (`alone`): the root's mark, when it has one — the
- * presented layer listed alone, the screen beneath unlisted — so the tap's wait for a target "to appear" says close it
- * first (interact/resolve.ts). Otherwise it answers as the shape adapter (`byShape`) — what Android got before: a
- * screen-sized layer stacked over the target's own inside one window read as presented by shape (on the corpus it
- * fires only on SystemUI's notification shade, a misreading).
- */
-function byUiautomator(order: readonly Placed[], screenArea: number): PresentationAdapter {
-  const window = order.at(0);
-  const alone = window === undefined || window.parent !== undefined ? undefined : markOf(window, order)?.named;
-  return { ...byShape(screenArea), ...(alone !== undefined && { alone }) };
 }
