@@ -2095,6 +2095,36 @@ describe('exposure — a React Native field\'s floating label is its own field\'
     expect(exposed(tree).covers).toContain(banner);
   });
 
+  it('…and a text a field merely lies over, in a screen-sized parent, still covers — the label must span the field\'s height: a chat composer over a message, a search field over a header title, the composer in an unnamed wrapper of its rect, an editor of 0.8 of the screen over "Draft saved", a label at the top of a tall multiline field', () => {
+    const screen = (...children: UiNode[]) => uiNode({ role: 'container', rect: IPHONE_BOX, children: [uiNode({ role: 'container', rect: IPHONE_BOX, children })] });
+    const field = (r: ReturnType<typeof rect>) => uiNode({ role: 'textfield', rect: r });
+    const cases: [UiNode, UiNode, UiNode][] = [];
+    const message = uiNode({ role: 'text', label: 'See you at 6', rect: rect(16, 800, 140, 20) });
+    const composer = field(rect(0, 790, 402, 44));
+    cases.push([message, composer, composer]);
+    const title = uiNode({ role: 'text', label: 'Payments', rect: rect(16, 104, 90, 22) });
+    const search = field(rect(8, 100, 386, 36));
+    cases.push([title, search, search]);
+    const message2 = uiNode({ role: 'text', label: 'See you at 6', rect: rect(16, 800, 140, 20) });
+    const inner = field(rect(0, 790, 402, 44));
+    cases.push([message2, uiNode({ role: 'container', rect: rect(0, 790, 402, 44), children: [inner] }), inner]);
+    const saved = uiNode({ role: 'text', label: 'Draft saved', rect: rect(16, 400, 100, 20) });
+    const editor = field(rect(0, 87, 402, 700));
+    cases.push([saved, editor, editor]);
+    // A label at the top of a tall multiline field, its top at the field's: the residual, a cover (unmeasured).
+    const hint = uiNode({ role: 'text', label: 'Message', rect: rect(16, 501, 140, 20) });
+    const multiline = field(rect(0, 500, 402, 120));
+    cases.push([hint, multiline, multiline]);
+    for (const [text, later, cover] of cases) expect(drawOrder(screen(text, later)).exposure(text, IPHONE_BOX).covers).toContain(cover);
+  });
+
+  it('…and a text input filling the screen covers a label spanning its height', () => {
+    const label = uiNode({ role: 'text', label: 'Write here', rect: rect(0, 1, 402, 872) });
+    const input = uiNode({ role: 'textfield', rect: IPHONE_BOX });
+    const tree = uiNode({ role: 'container', rect: IPHONE_BOX, children: [uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: [label, input] })] });
+    expect(drawOrder(tree).exposure(label, IPHONE_BOX).covers).toContain(input);
+  });
+
   it('Android (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md): the label 3 px — 1 dp — past its EditText above and below is the field\'s: nothing over it, tapped at its centre', async () => {
     const tree = await xml();
     expect(byId(tree, 'lab.rn-field.N').rect).toEqual(rect(177, 360, 255, 61));

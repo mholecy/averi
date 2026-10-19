@@ -546,16 +546,29 @@ const ownButton = (control: Placed, { target, screenArea, paddedTouchTargets }: 
 /**
  * The `ownControl` row's text input: `placed` is an unlabelled one (`inputOf`: it, or the one it is nothing but),
  * that input holds `target`'s centre and holds its rect whole once grown by the label overhang (`labelOverhang`) on
- * every side, and its outermost self (`outermostSelf`) is `target`'s sibling — in any parent: React Native lays its
- * fields in the screen's own view (round 7's RN lab app, Android and WDA alike), and a text input that tight on a
- * label is no scrim, whatever its parent's size.
+ * every side, the label SPANS ITS HEIGHT — its top and bottom each within the overhang of the input's (`spansHeight`)
+ * — and the input's outermost self (`outermostSelf`) is `target`'s sibling, in any parent. The label's shape is the
+ * evidence, not the parent's size: a placeholder or floating label lies in its field's line, its top and bottom at
+ * the field's (the SWIFT form 446–468 over 447–467, the RN lab app's WDA 131–154 over 132–152, its Android 360–421
+ * over 363–418), while a text a field merely lies over — a message under a chat composer `0,790 402x44`, a header
+ * title under a search field `8,100 386x36` — is shorter than the field it lies in. React Native lays its fields in
+ * the screen's own view (round 7's RN lab app, Android and WDA alike), which the button shapes' screen-sized-parent
+ * rule would refuse.
  */
 const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor): boolean => {
   const input = inputOf(placed.node);
   if (input === undefined || !unlabelledControl(input) || !containsPoint(input.rect, rectCentre(target.node.rect))) return false;
   const { x, y, width, height } = input.rect;
-  return rectWithin(target.node.rect, { x: x - overhang, y: y - overhang, width: width + 2 * overhang, height: height + 2 * overhang }) && siblingOf(outermostSelf(placed), target);
+  return (
+    rectWithin(target.node.rect, { x: x - overhang, y: y - overhang, width: width + 2 * overhang, height: height + 2 * overhang }) &&
+    spansHeight(target.node.rect, input.rect, overhang) &&
+    siblingOf(outermostSelf(placed), target)
+  );
 };
+
+/** `label` spans `field`'s height: its top and its bottom each within `overhang` of the field's (`ownField`). */
+const spansHeight = (label: Rect, field: Rect, overhang: number): boolean =>
+  Math.abs(label.y - field.y) <= overhang && Math.abs(label.y + label.height - (field.y + field.height)) <= overhang;
 
 /**
  * `row`'s frame excuse of `placed` (placed.ts#FRAME_EXCUSES: `structural`, `screenSizedHost`, `contentFramed`, whose
@@ -972,7 +985,8 @@ const NOT_DRAWN = {
    * exactly (`spansWidth`) — or is PADDED in it on all four sides, evenly and
    * centred on the target (`paddedOn`) — `ownButton`; or a TEXT INPUT holding
    * the target's centre, the target overhanging it by at most the label
-   * overhang, its outermost self the target's sibling (`ownField`, below);
+   * overhang and spanning its height, its outermost self the target's
+   * sibling (`ownField`, below);
    * the parent of the first two not the screen's size (`screenSized`), and
    * no control filling the screen. `target` only (the bug note above,
    * `onTarget`'s, a regression of this column's first form):
@@ -1058,8 +1072,8 @@ const NOT_DRAWN = {
    * unlabelled, unvalued text
    * input that holds the label's centre, the label overhanging it by at
    * most the label overhang on any side (`labelOverhang`: 2 pt or dp, as a
-   * share of the screen) — neither spanning its parent nor padded in it
-   * (`ownField`). Measured under WDA on the SWIFT form: `container
+   * share of the screen) and spanning its height (`spansHeight`) — neither
+   * spanning its parent nor padded in it (`ownField`). Measured under WDA on the SWIFT form: `container
    * swift_payment.form.payee_name_input 24,431 354x52` → `text 'Payee’s
    * name' 42,446 103x22`, then `textfield 42,447 318x20` — the label 1 pt
    * taller than the field above and below, so not held whole, and the field

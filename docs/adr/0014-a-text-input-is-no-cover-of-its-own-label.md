@@ -42,10 +42,16 @@ Decided (the orchestrator's, round 7):
    whose only child it is, of its rect to a sub-unit — are one node to the label (`draw-order.ts#outermostSelf`,
    `inputOf`): the sibling test asks the outermost, and the wrapper is excused with the input. A wrapper named,
    interactive, of another rect or holding anything else is a node of its own, and the input inside it still covers.
-2. **The parent's size is not asked of the field.** React Native lays its fields in the screen's own view (both
-   platforms), which `screenSized` read as a scrim's parent. The rule against a screen-sized parent guards the
-   width and padded shapes (a backdrop spanning its container); a text input holding a label's centre within the
-   overhang is no scrim. The control itself filling the screen still covers.
+2. **The label's shape, not the parent's size, is the field's evidence.** React Native lays its fields in the
+   screen's own view (both platforms), which `screenSized` read as a scrim's parent, so the field shape no longer asks
+   it. In its place the label must SPAN THE FIELD'S HEIGHT: its top and its bottom each within the overhang of the
+   field's (`draw-order.ts#spansHeight`). A placeholder or floating label lies in its field's line — every measured
+   one does: the SWIFT form 446–468 over 447–467, the RN lab app's WDA 131–154 over 132–152, its Android 360–421 over
+   363–418 — while a text a field merely lies over is shorter than the field: a chat composer `0,790 402x44` over a
+   message text `16,800 140x20`, a search field `8,100 386x36` over a header title `16,104 90x22`, an editor of 0.8
+   of the screen over "Draft saved" (the round-7 review's cases, each a cover at the base and still one). The width
+   and padded shapes keep the screen-sized-parent rule (a backdrop spanning its container); a control filling the
+   screen still covers in every shape.
 3. **The overhang is a physical size: 2 pt or dp**, as half a percent of the screen's shorter side
    (`draw-order.ts#labelOverhang`, `LABEL_OVERHANG_FRACTION`), as `minTapPiece` is scaled — 2 pt on every iPhone
    (320–440 pt), 5 px on the 1080-px averi_lab (1.8 dp), 7 px on a 1440-px phone at 3.5, 4 px on a 720-px one at 2.
@@ -53,8 +59,12 @@ Decided (the orchestrator's, round 7):
    reads for the system bands at `viewport()`, after the tree — but the draw order is a function of the tree alone
    (memoized per tree, and judged inside the uiautomator parser's widening, before any such read), and no tree
    carries its density. Carrying it would put a device read on every tree read, or make the draw order depend on
-   which read came first. A phone's shorter side in pt or dp is narrow enough (320–440) that the share is 2 pt or dp
-   to the rounding.
+   which read came first. Nor stamped on the tree's root by the source, as `paddedTouchTargets` is: that mark is a
+   constant of uiautomator's dialect, while the density is a device's value the parser never sees — the adapter
+   would have to read the dump before every first tree read (one more adb call on the tree's path, and a timeout
+   there to decide) and the golden harness's fake device to serve it per capture, for an allowance the screen's
+   share already gives within the rounding. A phone's shorter side in pt or dp is narrow enough (320–440) that the
+   share is 2 pt or dp to the rounding.
 
 ## Residuals accepted
 
@@ -62,7 +72,10 @@ Decided (the orchestrator's, round 7):
 - A labelled or valued field still covers. A placeholder label that WDA keeps listing over a filled field is refused.
 - Any other control of that shape (a button) still covers.
 - On a tablet the overhang is wider in its own units: 4 pt on an 820-pt iPad, 4 dp on an 800-dp tablet.
-- A text input in a screen-sized parent is excused like any other (refinement 2); one filling the screen is not.
+- A text input in a screen-sized parent is excused like any other when the label spans its height (refinement 2);
+  one filling the screen is not.
+- A label not spanning its field's height — at the top of a tall multiline field — is still covered (unmeasured; the
+  safe direction).
 
 ## Bug notes
 
