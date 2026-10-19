@@ -1,5 +1,6 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, type Cut } from '../ui-tree/geometry.js';
+import type { SurfaceFinding } from '../ui-tree/eyes.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { lookAt, type Look } from '../ui-tree/look.js';
@@ -414,7 +415,9 @@ export type InFrameShort =
   | { of: 'covered'; judged: Judged; cover: UiNode }
   /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
   | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
-  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number };
+  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number }
+  /** A `fully: true` stop the eyes refused (ui-tree/eyes.ts): a band of a surface the tree does not list over the match's edge — never `shortOf`'s, the round's (scroll-rounds.ts#round). */
+  | { of: 'unlisted'; judged: Judged; finding: SurfaceFinding };
 
 /**
  * What a judged match in the frame is short of a stop (`stops`) — the one
@@ -428,7 +431,7 @@ export type InFrameShort =
  * that does not stop the round: a match that stops it is reported before
  * any stuck or bound test — a broken invariant, and throws.
  */
-export function shortOf(j: Judged): InFrameShort {
+export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' }> {
   const s = j.standing;
   switch (s.kind) {
     case 'clipped':

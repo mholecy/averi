@@ -1,4 +1,5 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
+import type { Eyes } from '../ui-tree/eyes.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
@@ -26,6 +27,12 @@ export interface ScrollOptions {
   timeoutMs?: number;
   /** Pause after each swipe before the next read. Default 400. */
   settleMs?: number;
+  /**
+   * The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition
+   * root hands in — mcp/tools.ts, flow/engine.ts). Absent: a claim the eyes would be asked of is said as the tree's,
+   * unchecked ("fully visible by the tree … a screenshot could not tell (no screenshot was taken)").
+   */
+  eyes?: Eyes;
 }
 
 /**
@@ -229,6 +236,13 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * Nothing is judged against it — there is no frame — and nothing is
  * pressed. Not on a default clean stop: a witness query on every one buys a
  * sentence nobody acts on.
+ *
+ * The eyes (ui-tree/eyes.ts; live case k7, ADR 0013): a stop about to say
+ * "fully visible" on a target laid flush with a node drawn after it outside
+ * its scroll view asks `ScrollOptions.eyes` once — one screenshot — whether
+ * a surface of that node the tree does not list lies over the target's edge;
+ * the round decides what the answer means (scroll-rounds.ts#round). Every
+ * other stop takes none.
  */
 export async function scrollUntilVisible(
   adapter: ScrollAdapter,
@@ -318,6 +332,7 @@ export async function scrollUntilVisible(
     let next = round(state, { ...seen, elapsedMs: Date.now() - started });
     while (next.step.do === 'ask') {
       if (next.step.what === 'witness') seen.corroborated = reading !== undefined && (await reading.corroborated());
+      else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? { sees: 'unjudged', why: 'no screenshot was taken' } : await opts.eyes(next.step.question);
       else seen.unlocated = reading !== undefined && (await reading.unlocated());
       next = round(state, { ...seen, elapsedMs: Date.now() - started });
     }
