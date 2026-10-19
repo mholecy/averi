@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { coverText, drawnOverSeenText, nodeText, overlapsUntoldText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, drawnOverSeenText, mayRunOnUnderText, nodeText, overlapsUntoldText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { judgedWithOrder, type OrderEyes, type OrderQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
@@ -8,7 +8,7 @@ import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { orderUntold, outsideItsScrollView, presentedRemedy, seenOver, seenOverRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { orderUntold, outsideItsScrollView, overlaidBy, presentedRemedy, seenOver, seenOverRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
@@ -578,12 +578,16 @@ async function judgeOver(
     case 'covered': {
       const named = coverText(standing.cover, standing.reach);
       // A cover whose order against the element the tree does not tell (listed in reading order) is said as such.
-      // …and one a screenshot saw drawn over it, as such.
-      const over = orderUntold(standing.facts, standing.cover)
-        ? overlapsUntoldText(`the element ${at})`)
-        : seenOver(standing.facts, standing.cover)
-          ? drawnOverSeenText(`the element ${at})`)
-          : `is drawn over the element ${at})`;
+      // …and one a screenshot saw drawn over it, as such; one the tree shows only by the cut (its overlaid edge), as that cut.
+      const overlaid = overlaidBy(standing.facts, standing.cover);
+      const over =
+        overlaid !== undefined
+          ? `meets the element's ${overlaid.edge} edge ${at}), drawn after it — ${mayRunOnUnderText(standing.cover, 'the element')}`
+          : orderUntold(standing.facts, standing.cover)
+            ? overlapsUntoldText(`the element ${at})`)
+            : seenOver(standing.facts, standing.cover)
+              ? drawnOverSeenText(`the element ${at})`)
+              : `is drawn over the element ${at})`;
       return `${named} ${over} — ${coverRemedy(standing.remedy)}`;
     }
     default: {

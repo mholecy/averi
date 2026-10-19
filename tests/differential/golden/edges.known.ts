@@ -14,7 +14,6 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
 const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
-const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (201,699)';
 
 export const edges: KnownFile = {
@@ -63,11 +62,10 @@ export const edges: KnownFile = {
       ...keys(file, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the pinned header, listed first, is no cover of what the colour samples', as: LE3 }),
       ...keys(file, ['R'], ['fully'], { cls: 'fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the pinned header is no cover for fully: true', as: LE3 }),
     ]),
-    // LAB FINDING VA1 — Compose cuts a row (and its content) at a sticky header that is one accessibility element: the
-    // tree's row 128,457 825x110 begins at the header's bottom, its content cut alike, so nothing in it reaches under the
-    // header — averi samples the cut rect (a PASS on R's own colour) and calls it fully visible.
-    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the row cut at the header, its content too — the sample is the cut rect', as: VA1 }),
-    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['fully'], { cls: 'fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the row cut at the header reads whole', as: VA1 }),
+    // LAB FINDING VA1 — fixed on fix/r9-b4l1 with B4-L1 (ui-tree/standing.ts#OverlaidEdge): Compose cuts the row (and
+    // its content) at a sticky header that is one accessibility element; the header, pinned at its list's top, reaches
+    // past the row at both ends — an overlay — so the colour assert fails closed and `fully` never stops naming it. Both
+    // rows green, struck off here, calibrated in scripts/truth/calibration.json.
   ]),
   // scroll-top-edge(-end)'s T, in the status band and its scroll view, is asked R-fully too (7 rows, 6 before round 5):
   // the target contract asks `fully` of a band target in a scroll view (scripts/truth/target-contract.ts#fullyAsked),

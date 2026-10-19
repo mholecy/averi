@@ -32,6 +32,22 @@ const k7 = (): Promise<FakeAdapter> => fakeOf('android-lab-form-keyboard-k7-stop
 const SURFACE =
   'its bottom 28 px show #F2F2F7, the colour beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own #FFFFFF (a screenshot)';
 
+/** A row in a clipping list (to 2000), flush with a full-width `bar` 0,1832 1080x168 laid outside it: the row's x and width as given. */
+const barOver = ({ x, width }: { x: number; width: number }): FakeAdapter => {
+  const row = node({ role: 'textfield', identifier: 'row', rect: { x, y: 1700, width, height: 132 } });
+  const tree = node({
+    role: 'container',
+    rect: { x: 0, y: 0, width: 1080, height: 2220 },
+    children: [
+      node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 0, width: 1080, height: 2000 }, children: [row] }),
+      node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 1832, width: 1080, height: 168 } }),
+    ],
+  });
+  const fake = new FakeAdapter({ s: tree }, 's');
+  fake.viewportSize = { width: 1080, height: 2220 };
+  return fake;
+};
+
 describe('scroll_until — the eyes confirm a fully claim', () => {
   it('k7, the plain stop: stops (its centre is clear) and says the 28 px of the bar\'s padding over it — not "fully visible"; one screenshot', async () => {
     const fake = await k7();
@@ -137,19 +153,17 @@ describe('scroll_until — no screenshot on an ordinary stop (the trigger is nar
     expect(asked).toBe(1);
   });
 
-  it('a bar as wide as the screen flush with the row: not asked, the tree\'s claim as before', async () => {
-    const row = node({ role: 'textfield', identifier: 'row', rect: { x: 40, y: 1700, width: 1000, height: 132 } });
-    const tree = node({
-      role: 'container',
-      rect: { x: 0, y: 0, width: 1080, height: 2220 },
-      children: [
-        node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 0, width: 1080, height: 2000 }, children: [row] }),
-        node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 1832, width: 1080, height: 168 } }),
-      ],
-    });
-    const fake = new FakeAdapter({ s: tree }, 's');
-    fake.viewportSize = { width: 1080, height: 2220 };
+  it('a bar as wide as the screen flush with a row as wide: not asked, the tree\'s claim as before (no screen beside the bar to read its surface from, and no end of the bar past the row\'s)', async () => {
+    const fake = barOver({ x: 0, width: 1080 });
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }))).toBe('fully visible after 0 swipes');
+    expect(fake.screenshots).toHaveLength(0);
+  });
+
+  it('the same bar over an INSET row, reaching past it at both ends: an overlay the source cut the row at (ui-tree/standing.ts#OverlaidEdge) — no "fully visible", no screenshot', async () => {
+    const fake = barOver({ x: 40, width: 1000 });
+    const failure = (await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }).catch((e: unknown) => e)) as Error;
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.message).toContain("element is in the viewport but cut at its bottom edge by button id:bar (0,1832 1080x168), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of it may lie under that button");
     expect(fake.screenshots).toHaveLength(0);
   });
 });

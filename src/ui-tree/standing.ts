@@ -16,6 +16,7 @@ import {
   clippedEdges,
   clipsOf,
   containsPoint,
+  cutAtLaterText,
   drawnOverText,
   drawnPart,
   orderUntoldText,
@@ -137,7 +138,9 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     one over the centre: the one on top at its centre, else the last
  *     drawn, with its `reach` — and `overRoot` when the node is a flat
  *     list's screen-sized root (draw-order.ts#listsAncestry, read here so
- *     the pixel assert does not).
+ *     the pixel assert does not); with no pixel cover, the node at its
+ *     overlaid edge (`OverlaidEdge`: one the tree shows only by the cut),
+ *     its rect the reach.
  *     docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
  *   The keyboard's band is drawn on `oriented`, the box judged (not the
  *   tree's own screen), so a device wider than the tree quotes the device's
@@ -164,7 +167,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     frame first (`clipped`, only this purpose's); no cut — a stop flush
  *     with a clipping container is scroll_until's flush probe's
  *     (interact/scroll-rounds.ts#PROBE_REACH); any cover covers (the one
- *     over the centre, else the last drawn); the system bands judged as a
+ *     over the centre, else the last drawn, else — none found — the node
+ *     at its overlaid edge, `OverlaidEdge`); the system bands judged as a
  *     region (below, Why so; `systemBar.band`, only this purpose's); and,
  *     beside the standing, the far edge's frames cut above the navigation
  *     band when that region refused it at the bottom (`farEdgeFrames`).
@@ -343,6 +347,34 @@ export interface FlushNeighbour {
 }
 
 /**
+ * AN OVERLAID EDGE: a top or bottom edge of a node's bounds that the tree's source cut at a node DRAWN OVER IT — so an
+ * unknown run of the node lies under `by`. On a tree whose source cuts a node's bounds at a node drawn after it
+ * (`cutsAtLater`, Android's: Compose leaves out of a node's bounds what a later node covers), `by` is the node laid
+ * flush against that edge along the node's whole width, drawn after it outside its subtree (`laterAcross`, the cut's
+ * and the flush neighbour's evidence), that also REACHES PAST THE NODE AT BOTH ENDS of the edge: an overlay laid over
+ * content with margins of its own (the lab's pinned `Continue` 66..1014 over its row 127..952; a full-bleed sticky
+ * header over an inset row), where a sibling laid beside it in a column shares an alignment line with it at one end at
+ * least (a list's next row, a field under its title, a touch target exactly as wide). In the node's own scroll view,
+ * only a `by` pinned at that scroll view's edge on its far side counts (a sticky header at the list's top, a footer at
+ * its bottom): a next section's header laid flush under a row scrolls with it. Top and bottom only: every measured
+ * Compose cut is vertical, and sideways a row's padded overflow icon reaches past its neighbour's ends (Contacts' "Save"
+ * beside its 132-px touch target). Decided from the tree alone — no screenshot sees under an opaque node.
+ *
+ * Unlike `FlushNeighbour` (whose question is the neighbour's SURFACE past its node, for a node in a scroll view: the
+ * eyes'), here the neighbour's own node is the cover. Asked where nothing else covers: the `fully` stop and the pixel
+ * assert name it as their cover (`StandingFacts.overlaid`), and a node with no control role but not a text, cut by it
+ * to a strip under the tap minimum, is a sliver (`cutByLater`). The tap and the plain stop judge the centre, which the
+ * cut leaves clear unless it is a sliver.
+ * docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
+ * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
+ * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (refined 2026-10-20)
+ */
+export interface OverlaidEdge {
+  readonly edge: 'top' | 'bottom';
+  readonly by: UiNode;
+}
+
+/**
  * What a verb means to do with the node — `scroll_until`'s plain stop
  * (`stop`), its `fully: true` stop (`fully`), a tap, or the pixel assert's
  * read (`PixelPurpose`) — and the soft
@@ -440,6 +472,13 @@ export interface StandingFacts {
   readonly minPiece?: number;
   /** The node's cut to a sliver under `minPiece` — by its scroll container (geometry.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
+  /**
+   * The edge the tree's source cut it at a node drawn over it (`OverlaidEdge`), when a `fully` stop or the pixel assert
+   * found no other cover and took that node as its cover (`covered`, unless THE ORDER ended before the covers: the
+   * `fully` stop's is asked before it, the pixel's only for its cover). Absent otherwise. Its sentences say the node may
+   * run on under that node (`coverClause`, `overlaidBy`), not how much of it shows.
+   */
+  readonly overlaid?: OverlaidEdge;
   /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
 }
@@ -527,11 +566,22 @@ export const seenOverRemedy = (purpose: 'touch' | 'pixel'): string =>
 /**
  * How a sentence says `cover`, one of `facts.covers`, lies over the node — at its centre when `centre` is given: drawn
  * over it (geometry.ts#drawnOverText), or, one of `facts.unordered`, overlapping it in an order the tree does not tell
- * (geometry.ts#orderUntoldText). The one choice of the two for the tap's refusal and move, and `scroll_until`'s
+ * (geometry.ts#orderUntoldText), or, the node's overlaid edge (`facts.overlaid`), cut at that edge by it and maybe
+ * running on under it (geometry.ts#cutAtLaterText). The one choice for the tap's refusal and move, and `scroll_until`'s
  * covered sentences.
  */
-export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered' | 'seenOver'>, cover: UiNode, centre?: Point): string =>
-  (orderUntold(facts, cover) ? orderUntoldText : seenOver(facts, cover) ? seenOverText : drawnOverText)(cover, centre, reachOf(facts, cover));
+export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered' | 'seenOver' | 'overlaid'>, cover: UiNode, centre?: Point): string => {
+  const overlaid = overlaidBy(facts, cover);
+  if (overlaid !== undefined) return cutAtLaterText(overlaid.edge, cover);
+  return (orderUntold(facts, cover) ? orderUntoldText : seenOver(facts, cover) ? seenOverText : drawnOverText)(cover, centre, reachOf(facts, cover));
+};
+
+/**
+ * The node's overlaid edge (`StandingFacts.overlaid`) when `cover` is the node over it — the cover the tree shows only
+ * by the cut, of which a sentence says the node may run on under it, not how much of it shows; undefined for any other
+ * cover. `orderUntold`'s sibling, asked by `coverClause`, `scroll_until`'s covered failure and the pixel assert's.
+ */
+export const overlaidBy = (facts: Pick<StandingFacts, 'overlaid'>, cover: UiNode): OverlaidEdge | undefined => (facts.overlaid?.by === cover ? facts.overlaid : undefined);
 
 /**
  * Whether `cover`, one of `facts.covers`, is one whose ORDER against the node the tree does not tell
@@ -1191,20 +1241,29 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * give that case its way past, a coordinate tap (interact/target-text.ts#wholeThinWayPast), as the container's cut
  * gives its own (`OWN_CUT_WAY_PAST`); a text that is no control (a field's title cut to 14 px at the same bar) is
  * tapped as before; and, the second residual, a clickable with no role — Compose's `Modifier.clickable` without one
- * dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is still tapped on the strip,
- * and in an app whose bar takes the touch that tap is reported done and reaches nothing (the owner's "accidentally
- * submitted" risk). Not widened on purpose: the gate is the control roles (selectors.ts#isInteractive), and a role-less
- * node is as often a layout wrapper as a clickable — refusing those would refuse wrappers and containers that are no
- * target.
+ * dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is refused only on an OVERLAY's
+ * evidence (`OverlaidEdge`: the node that cut it reaches past it at both ends of its top or bottom edge, as the lab's
+ * pinned `Continue` does past text-under-bar's `P`), which a layout wrapper laid beside its siblings does not have; cut
+ * by a node exactly as wide, or at a side, it is still tapped on the strip, and in an app whose bar takes the touch that
+ * tap is reported done and reaches nothing (the owner's "accidentally submitted" risk, narrowed).
+ * docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  * A bar riding on the keyboard whose cutting node (interact/target-text.ts#ridingKeyboard) ends more than the tap
  * minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is
  * the scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather
  * than one that misleads.
  * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
  */
-function cutByLater({ scene, node, cutsAtLater }: Judged, minPiece: number): Cut | undefined {
-  if (!cutsAtLater || !isInteractive(node) || rectArea(node.rect) === 0) return undefined;
+function cutByLater(judged: Judged, minPiece: number): Cut | undefined {
+  const { scene, node, cutsAtLater } = judged;
+  if (!cutsAtLater || rectArea(node.rect) === 0) return undefined;
   const r = node.rect;
+  if (!isInteractive(node)) {
+    // No control role: a sliver only on an OVERLAY's evidence (`OverlaidEdge`), which a wrapper laid beside its
+    // siblings does not have — never a text, which is tapped as before.
+    if (node.role === 'text' || r.height >= minPiece) return undefined;
+    const overlaid = overlaidEdge(judged);
+    return overlaid === undefined ? undefined : { edge: overlaid.edge, container: { ...overlaid.by.rect }, depth: across(r, overlaid.edge), by: overlaid.by };
+  }
   for (const edge of EDGES) {
     const depth = across(r, edge);
     if (depth >= minPiece) continue;
@@ -1232,6 +1291,30 @@ function laterAcross(scene: Scene, node: UiNode, edge: Edge): UiNode | undefined
     right: { x: r.x + r.width, y: r.y, width: 1, height: r.height },
   }[edge];
   return scene.order.coversOf(node, strip).find((c) => rectWithin(strip, c.rect) && !rectWithin(r, c.rect));
+}
+
+/**
+ * The node's overlaid edge (`OverlaidEdge`), top before bottom, or undefined: on a tree whose source cuts a node's bounds
+ * at a node drawn after it (`cutsAtLater`), the node laid flush across that edge (`laterAcross`) reaching past the
+ * node at both of its ends — and, in the node's own scroll view, pinned at that scroll view's far edge. At most two
+ * `coversOf` questions; asked only where it decides (`cutByLater` for a role-less strip, the `fully` stop and the pixel
+ * assert with no other cover).
+ */
+function overlaidEdge({ scene, node, cutsAtLater }: Judged): OverlaidEdge | undefined {
+  if (!cutsAtLater || rectArea(node.rect) === 0) return undefined;
+  const r = node.rect;
+  const own = scene.clips.scrollersOf(node)[0];
+  for (const edge of ['top', 'bottom'] as const) {
+    const by = laterAcross(scene, node, edge);
+    if (by === undefined) continue;
+    const c = by.rect;
+    // An overlay's own margins: past the node at both ends, not on an alignment line it shares with it.
+    if (c.x >= r.x || c.x + c.width <= r.x + r.width) continue;
+    // In its own scroll view, only pinned at that scroll view's far edge (a sticky header or footer).
+    const sameView = own !== undefined && scene.clips.scrollersOf(by).some((s) => sameRect(s, own));
+    if (!sameView || (edge === 'top' ? c.y === own.y : c.y + c.height === own.y + own.height)) return { edge, by };
+  }
+  return undefined;
 }
 
 /**
@@ -1335,7 +1418,8 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judge
  * no container's sliver (a stop flush with a clipping container is scroll_until's flush
  * probe's, interact/scroll-rounds.ts#PROBE_REACH), a sliver cut by a node
  * drawn after it all the same (`cutByLater`: no probe sees it); any cover covers (the
- * one over the centre, else the last drawn); and the system bands judged as
+ * one over the centre, else the last drawn, else the node at its overlaid edge,
+ * `OverlaidEdge`, carried as `facts.overlaid`); and the system bands judged as
  * a REGION past the slack (`systemBandOver`), the band's rect carried —
  * except for content no scroll lifts out of a band (`pinnedSurface`).
  */
@@ -1352,7 +1436,10 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judg
   const placed = place === 'on' && pinnedSurface(judged.node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(judged.node.rect, box, bands) ?? place) : place;
   // A cut by a node drawn after it, which no flush probe sees: its rest lies under that node (`cutByLater`).
   const cutBy = facts.sliver?.by === undefined ? undefined : sliverCut(facts, facts.sliver);
-  return stopOrdered(facts, placed, cutBy, facts.centreCover ?? facts.covers.at(-1), line);
+  // Any cover the exposure found, else the overlay the source cut it at, which the tree shows only by the cut (`OverlaidEdge`).
+  const cover = facts.centreCover ?? facts.covers.at(-1);
+  const overlaid = cover === undefined ? overlaidEdge(judged) : undefined;
+  return stopOrdered(overlaid === undefined ? facts : { ...facts, overlaid }, placed, cutBy, cover ?? overlaid?.by, line);
 }
 
 /**
@@ -1423,7 +1510,9 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
  * region's (`regionPlace`); cut only at the navigation bar, flush, for a
  * reader of glyphs (`cutAtNavigationBar`); covered by a PIXEL cover
  * (draw-order.ts#paintsOver) — the one on top at its centre, else the last
- * drawn. `flat`: the tree lists no ancestry (draw-order.ts#listsAncestry).
+ * drawn; with none, the node at its overlaid edge (`OverlaidEdge`, carried as
+ * `facts.overlaid`), its rect the reach. `flat`: the tree lists no ancestry
+ * (draw-order.ts#listsAncestry).
  */
 function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: JudgedBoxes | undefined, purpose: PixelRead, flat: boolean): PixelJudgement {
   const { scene, node } = judged;
@@ -1438,7 +1527,11 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Jud
     const covers = scene.order.paintsOver(node, read);
     const centre = rectCentre(node.rect);
     const over = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
-    if (over === undefined) return undefined;
+    if (over === undefined) {
+      // No pixel cover: the overlay the source cut it at, which the tree shows only by the cut (`OverlaidEdge`), its rect the reach.
+      const overlaid = overlaidEdge(judged);
+      return overlaid === undefined ? undefined : { facts: { ...facts, overlaid }, kind: 'covered', cover: overlaid.by, aboveKeyboard: false, reach: { ...overlaid.by.rect } };
+    }
     const overRoot = flat && screenSized(node.rect, box);
     return { facts, kind: 'covered', cover: over.node, aboveKeyboard: false, reach: over.reach, ...(overRoot && { overRoot: true as const }) };
   };
