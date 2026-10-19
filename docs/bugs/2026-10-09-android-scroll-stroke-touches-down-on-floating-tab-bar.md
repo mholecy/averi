@@ -124,3 +124,89 @@ Measured 12:52–12:59 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, 
   id:transactions.list.row_2 fully visible after 1 swipe` (7.5 s), `input swipe 540 1284 540 940 345` — box cut at the IME top only
   (825 + 0.8 × 573 = 1283); the bar node (top 1840, below the IME top) did not cut it further, as the cover rule says. No other screen
   with a bar or FAB over a list above the open keyboard was found (the SWIFT form's CONTINUE sits below its container).
+
+## Device check (2026-10-09 Android, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47831, cwd mp-native). Strokes and taps from
+the `adb` shim; page placement, bar show/hide and Gboard mode by hand with the real `adb`.
+
+Round-5 handoff §2 (round-4 items 1.1–1.4) on `dd50327`. Account Detail, tab-bar host `66,1840 948x248`.
+
+- **Holds (1.1) — touch-down above the bar.** List at the top, bar shown, 15:37:57 `scroll_until { selector:
+  "id:transactions.list.row_36", fully: true }` (default budget) → `scroll_until id:transactions.list.row_36 failed after 15000ms (timeout) —
+  element never appeared in the tree` (15.3 s). Shim: `input swipe 540 1638 540 1028 611` (cut above the bar, as at 86eb42d), then
+  `540 1804 540 752 1054` ×2 — **the bar hid after the first drag this time** (at 86eb42d it stayed shown under the same 611-ms stroke),
+  so the next strokes were uncut. List moved on each (row_9…row_17 on screen after). Continued with `timeoutMs: 60000, maxSwipes: 20`
+  (15:38:29) → `Element id:transactions.list.row_36 fully visible after 5 swipes` (27.6 s), `540 1804 540 752 1054` ×5; row_36 `66,1904
+  948x143`, bar hidden. No touch-down at y ≥ 1840. The handoff's "possibly one more swipe" under C3 did not apply: the bar was hidden at the stop.
+- **Holds (1.2) — after a page scroll, bar shown.** Page scrolled (list container `0,401 1080x1819`), bar shown, 15:40:58 `row_36`,
+  `fully: true`, `timeoutMs: 90000, maxSwipes: 25` → `fully visible after 8 swipes` (39.2 s). Shim: `540 1553 540 689 865` (401 + 0.8 ×
+  (1840 − 401), as at 86eb42d), then the bar hid and `540 1804 540 752 1054` ×7.
+- **Holds (1.3) — fast fail, bar hidden.** List at its end, bar hidden, 15:39:10 `scroll_until … row_40` → `scroll_until
+  id:transactions.list.row_40 failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or
+  the swipes were not taken) — element never appeared in the tree` (11.1 s), `540 1804 540 752 1054` ×2, no node named.
+  Bar SHOWN at the end (15:39:38, shown by a hand flick): `failed after 15000ms (timeout) — element never appeared in the tree` (15.5 s),
+  `540 1553 540 689 865` then (bar hid) `540 1804 540 752 1054` ×2 — the first stroke moved the list (the bar's hiding changed the screen), so
+  the 15 s ran out before two unmoved strokes; the budget (see the default-budget note), not the rule. No node named.
+- **Holds (1.4) — content-up uncut.** Bar shown, list at its end, 15:40:07 `scroll_until { selector: "id:transactions.list.row_0", direction:
+  "up", timeoutMs: 90000, maxSwipes: 25 }` → `Element id:transactions.list.row_0 fully visible after 7 swipes` (36.7 s), `540 765 540 1857
+  1094` ×7 — byte-identical to 86eb42d (page scrolled, so 765 not ~1104), uncut.
+
+## Device check (2026-10-09 Android, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:33 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47841, cwd mp-native). Strokes and taps from the
+`adb` shim; placement and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's `averi.yaml` untouched.
+
+Round-4 items 1.1–1.4 through the round-5 re-run. Account Detail, tab-bar host `66,1840 948x248`.
+
+- **Holds (1.1).** List at the top, bar shown, 18:18:01 `scroll_until { selector: "id:transactions.list.row_36", fully: true }` (default
+  budget) → `failed after 15000ms (timeout) — element never appeared in the tree` (15.2 s): `input swipe 540 1638 540 1028 611`, then
+  `540 1553 540 689 865` ×3 (the bar stayed shown this time); row_14…row_20 on screen after. Continued with `timeoutMs: 60000, maxSwipes:
+  20` → `Element id:transactions.list.row_36 fully visible after 5 swipes` (21.2 s), `540 1553 540 689 865` ×5; row_36 `66,1697 948x143` —
+  its bottom exactly at the host's top 1840 (C3: not stopped while it overlapped the host). No touch-down at y ≥ 1840.
+- **Holds (1.2):** the `540 1553 540 689 865` strokes above, after the page had scrolled.
+- **Holds (1.3), bar SHOWN.** List at its end (row_36 the last row), 18:18:51 `scroll_until … row_40` → `failed after 2 swipes (the last 2,
+  swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the
+  tree` (8.7 s), `540 1553 540 689 865` ×2, no node named.
+- **Holds (1.4).** Bar shown, 18:19:07 `scroll_until { selector: "id:transactions.list.row_0", direction: "up", timeoutMs: 90000, maxSwipes:
+  25 }` → `fully visible after 7 swipes` (29.4 s), `input swipe 540 765 540 1857 1094` ×7, uncut.
+
+## Device check (2026-10-09 Android, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:19 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/`, stdio via the HTTP daemon on port 47851, cwd mp-native). Strokes and taps from the
+`adb` shim (`run9-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only
+(`cfg-opt-bank`, `cfg-opt-contacts`, `cfg-optional`, new `cfg-fill`, `cfg-fill-bank`); mp-native's `averi.yaml` untouched.
+
+Round-4 items 1.1–1.4. Account Detail, tab-bar host `66,1840 948x248`.
+
+- **Holds (1.1).** List at the top, bar shown, 20:45:31 `scroll_until { selector: "id:transactions.list.row_36", fully: true }` (default
+  budget) → `failed after 15000ms (timeout) — element never appeared in the tree` (15.4 s): `input swipe 540 1638 540 1028 611`, then
+  `540 1804 540 752 1054` ×2 — **the bar hid after the first stroke this time** (list container `0,401 1080x1753`, no `nav.tab_*` in the tree),
+  so the box ran to the list's bottom instead of round 6's `540 1553 …` (bar shown). Continued with `timeoutMs: 60000, maxSwipes: 20` →
+  `fully visible after 6 swipes` (31.0 s), `540 1804 540 752 1054` ×6; row_36 `66,1631 948x143`. No touch-down at y ≥ 1840 with the bar shown.
+- **1.2 — Not reproduced as written:** the bar stayed hidden after the page scrolled, so the `540 1553` strokes (bar shown) did not occur;
+  the bar-hidden strokes `540 1804` are the uncut box. Not a regression.
+- **Holds (1.3), bar hidden.** 20:46:38 `row_40` → `failed after 2 swipes (the last 2, swiping down, did not change the screen: content
+  exhausted, still loading, or the swipes were not taken) — element never appeared in the tree` (11.7 s), `540 1804 540 752 1054` ×2, no node named.
+- **Holds (1.4).** 20:46:55 `row_0`, `direction: "up"`, `timeoutMs: 90000, maxSwipes: 25` → `fully visible after 8 swipes` (40.7 s): one
+  `540 752 540 1804 1054` (bar still hidden), then `540 765 540 1857 1094` ×7 (bar back), uncut.
+
+## Device check (2026-10-10 Android, re-run at 35d5997)
+
+Measured 2026-10-10 06:16–06:47 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-7` @ `35d5997` (`dist/`, stdio via the HTTP daemon on port 47861, cwd mp-native). Strokes and taps from the
+`adb` shim (`run10-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's
+`averi.yaml` untouched.
+
+**Holds.** `scroll_until row_3 fully` from under the tab-bar host → 1 stroke `540 1616 540 942 675`, touching down above the bar (1840);
+`row_36` strokes `540 1553 540 689 865`; back up `540 765 540 1857 1094`. No stroke touched down on the bar.
+
+
+## Device check (2026-10-14 Android, re-run at ebe6822)
+
+Round 16 Android device check, 2026-10-14 17:07:57–17:21:08 UTC, emulator-5554 (Pixel_3a AVD, Android 13 / API 33, 1080x2220, gesture navigation, `navigation_mode` = 2 before and after). averi built from `~/dev/mobile-verify` `arch/round-16` at `ebe6822`, checked with `git rev-parse --short HEAD` → `ebe6822` (read-only, detached), daemon on port 47911 via `$R/c`. Apps: mp-native `com.finshape.skeleton.dev` (first, already logged in by the owner, on Account Detail), Google Clock `com.google.android.deskclock`, Settings `com.android.settings`. **No PIN re-login was needed:** mp-native stayed logged in for the whole run. No `ensure_state`/`run_flow`, no `login` rung, no registration, no credentials typed, no `clearState`. **Backend: working.** Account Detail loaded balances (1,121.00 CZK / 2,000.00 CZK, "Account 1 of 4") and a full transaction list. Two transaction details opened with data. The SWIFT form loaded the debit account. No "Mandatory data not loaded" screen appeared. Calls #2–#92 are in `session.log`. The shim log `adb-input.log` has 66 lines, and every line cited below is quoted from it.
+
+**R15 D.3 ordinary `scroll_until`. Holds.** Settings at its top (`settings1.txt` #91). #92 `scroll_until text:"About emulated device"` → `Element text:"About emulated device" fully visible after 3 swipes` (15.5 s), with strokes `17:20:42 input swipe 540 1736 540 484 1254`, `17:20:46 input swipe 540 1783 540 669 1116` and `17:20:50 input swipe 540 1783 540 669 1116`.

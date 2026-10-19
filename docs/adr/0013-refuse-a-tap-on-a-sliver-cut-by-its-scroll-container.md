@@ -1,6 +1,7 @@
 # 13. Refuse a tap on a sliver cut by its scroll container
 
-Status: accepted, 2026-10-10 (owner).
+Status: accepted, 2026-10-10 (owner). Refined 2026-10-17 (owner, lab note F2A1). Decided 2026-10-18 (owner): F2A1's
+way past kept after the remedy, a fill into the strip refused by design, k7's "fully" a residual (below).
 
 ## Context
 
@@ -54,10 +55,36 @@ that misleads.
 
 Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
 
+## Decided 2026-10-18 (owner, on round 6's Android device check)
+
+Three points the device check left open (docs/truth/live-android-2026-10-18-visibility.md):
+
+1. **The way past stays, after the remedy.** "only if a screenshot shows it whole — … no scroll shows more: tap by
+   coordinates" is KEPT; in every reply of the family — a control cut by a node drawn after it (with the keyboard up
+   or down: `interact/target-text.ts#cutByRemedy`, `#wholeThinWayPast`; `scroll_until`'s stuck failure and its bound,
+   scroll-text.ts) and a sliver of its scroll container (`interact/tap-judgement.ts#OWN_CUT_WAY_PAST`,
+   `INHERITED_CUT_WAY_PAST`) — every remedy it names (dismiss the keyboard first, scroll) comes BEFORE the coordinate
+   escape, which closes its sentence. Every reply already so ordered; pinned over the lab's real form-keyboard captures
+   (tests/helpers/escape-order.ts, read by tests/interact/tap-judgement.test.ts and scroll.test.ts). A later
+   sentence of its own — `scroll_until`'s note on the rounds judged above the IME ("… hide it first … and scroll
+   again") — may follow it.
+2. **A fill into such a strip is refused by design.** `fill` taps its field first, so the cut-by refusal holds for it
+   as for the tap: note's 14-px strip under the bar after `back` (live case k3) is refused naming the remedy, the field
+   untouched — no typing through a strip the dump cannot prove is the field. The live judge reads that as ok
+   (scripts/truth/live.ts k3).
+3. **"fully visible" with part of the target under a node-less surface is a known residual** (below).
+
 ## Residuals accepted
 
 - A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;
   the refusal names a child or a coordinate tap as the way past it.
+- **"fully visible" while a surface with no node lies over part of the target** (live case k7, round 6's Android
+  device check; accepted 2026-10-18). After one stroke the lab's phone field (`1129–1228`) lay with its centre clear of
+  the bar riding on the IME, and averi stopped "fully visible after 1 swipe" — but the bar's top padding, a surface
+  Compose dumps no node for, still covered 18 px of its bottom (of 99). The tree cannot see what has no node (ADR
+  0018's residual 9 is the same class); the plain stop is right (its centre is clear, a tap there focuses phone), the
+  word "fully" overstates by those 18 px. A future "eyes" item (docs/plans/2026-10-15-ground-truth-lab-app.md): verify
+  a "fully" claim with pixels where a node-less sibling's padding may lie over the target.
 
 ## Bug note
 

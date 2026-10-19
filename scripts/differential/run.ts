@@ -1,11 +1,12 @@
-import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, realpathSync, symlinkSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadCorpus, runLines, type Recording } from './corpus.js';
+import { codeRoot } from './checkout.js';
 import { groupDiffs, type RecordingResult, type ToolName } from './differential.js';
 
 /**
@@ -101,28 +102,13 @@ async function shard(): Promise<void> {
 
 // --- the parent: resolve OLD, run the shards, merge ---
 
-/**
- * A side's code root: a path that holds averi's src/, or a git ref checked out detached in a worktree under
- * `worktrees` (named for its role, so OLD and NEW at one commit are two checkouts), node_modules linked in. Only a
- * worktree this run created is removed afterwards — one found in place is someone's, and stays.
- */
-function codeRoot(spec: string, role: 'old' | 'new', worktrees: string): { root: string; cleanup?: () => void } {
-  if (existsSync(join(spec, 'src/mcp/tools.ts'))) return { root: resolve(spec) };
-  const sha = execFileSync('git', ['-C', REPO, 'rev-parse', '--short', `${spec}^{commit}`], { encoding: 'utf8' }).trim();
-  const root = join(worktrees, `differential-${role}-${sha}`);
-  if (existsSync(root)) return { root };
-  execFileSync('git', ['-C', REPO, 'worktree', 'add', '--detach', root, sha], { stdio: 'ignore' });
-  symlinkSync(realpathSync(join(REPO, 'node_modules')), join(root, 'node_modules'));
-  return { root, cleanup: () => execFileSync('git', ['-C', REPO, 'worktree', 'remove', '--force', root], { stdio: 'ignore' }) };
-}
-
 async function parent(): Promise<void> {
   if (values.old === undefined || values.corpus === undefined) throw new Error('usage: run.ts --old <ref|path> [--new <path>] --corpus <dir> [--out <dir>] [--shards N] …');
   const worktrees = resolve(values.worktrees ?? tmpdir());
   const out = resolve(values.out ?? join(tmpdir(), `averi-differential-${Date.now()}`));
   await mkdir(out, { recursive: true });
-  const old = codeRoot(values.old, 'old', worktrees);
-  const neu = codeRoot(values.new ?? REPO, 'new', worktrees);
+  const old = codeRoot(REPO, values.old, 'old', worktrees);
+  const neu = codeRoot(REPO, values.new ?? REPO, 'new', worktrees);
   const newRoot = neu.root;
   // One checkout on both sides shares its modules: the run would compare a module with itself, and say nothing.
   if (realpathSync(old.root) === realpathSync(newRoot)) {

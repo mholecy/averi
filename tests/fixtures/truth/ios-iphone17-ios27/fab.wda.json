@@ -1,0 +1,467 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 0}, {402, 874}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 0}, {402, 874}}",
+              "isVisible": "1",
+              "type": "ScrollView",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 0}, {402, 874}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 0}, {402, 874}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 0}, {402, 102}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{0, 0}, {402, 102}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 0,
+                   "x": 0,
+                   "width": 402,
+                   "height": 102
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 0}, {402, 874}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 0}, {402, 874}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 62}, {402, 1178}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 62}, {402, 1178}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{51, 496}, {300, 64}}",
+                  "label": "Target W",
+                  "rawIdentifier": "lab.fab.W",
+                  "traits": "Button",
+                  "frame": "{{51, 496}, {300, 64}}",
+                  "isVisible": "1",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "lab.fab.W",
+                  "rect": {
+                   "y": 496,
+                   "x": 51,
+                   "width": 300,
+                   "height": 64
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{16, 728}, {121, 64}}",
+                  "label": "Target L",
+                  "rawIdentifier": "lab.fab.L",
+                  "traits": "Button",
+                  "frame": "{{16, 728}, {121, 64}}",
+                  "isVisible": "1",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "lab.fab.L",
+                  "rect": {
+                   "y": 728,
+                   "x": 16,
+                   "width": 121,
+                   "height": 64
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{265, 728}, {121, 64}}",
+                  "label": "Target K",
+                  "rawIdentifier": "lab.fab.K",
+                  "traits": "Button",
+                  "frame": "{{265, 728}, {121, 64}}",
+                  "isVisible": "1",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "lab.fab.K",
+                  "rect": {
+                   "y": 728,
+                   "x": 265,
+                   "width": 121,
+                   "height": 64
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 62,
+                 "x": 0,
+                 "width": 402,
+                 "height": 1178
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{369, 62}, {30, 750}}",
+                "label": "Vertical scroll bar, 2 pages",
+                "rawIdentifier": null,
+                "traits": "Adjustable",
+                "frame": "{{369, 62}, {30, 750}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": "0 %",
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{396, 64.999999999999972}, {3, 510.33333333333326}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{396, 64}, {3, 512}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 64,
+                   "x": 396,
+                   "width": 3,
+                   "height": 512
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "Vertical scroll bar, 2 pages",
+                "rect": {
+                 "y": 62,
+                 "x": 369,
+                 "width": 30,
+                 "height": 750
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{369, 62}, {30, 750}}",
+                "label": "Vertical scroll bar, 2 pages",
+                "rawIdentifier": null,
+                "traits": "Adjustable",
+                "frame": "{{369, 62}, {30, 750}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": "0 %",
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{396, 64.999999999999972}, {3, 510.33333333333326}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{396, 64}, {3, 512}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 64,
+                   "x": 396,
+                   "width": 3,
+                   "height": 512
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "Vertical scroll bar, 2 pages",
+                "rect": {
+                 "y": 62,
+                 "x": 369,
+                 "width": 30,
+                 "height": 750
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 0,
+               "x": 0,
+               "width": 402,
+               "height": 874
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{153, 712}, {96, 96}}",
+              "label": null,
+              "rawIdentifier": "lab.fab.host",
+              "traits": "",
+              "frame": "{{153, 712}, {96, 96}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{153, 712}, {96, 96}}",
+                "label": "Add",
+                "rawIdentifier": "lab.fab.fab",
+                "traits": "Button",
+                "frame": "{{153, 712}, {96, 96}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "lab.fab.fab",
+                "rect": {
+                 "y": 712,
+                 "x": 153,
+                 "width": 96,
+                 "height": 96
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": "lab.fab.host",
+              "rect": {
+               "y": 712,
+               "x": 153,
+               "width": 96,
+               "height": 96
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

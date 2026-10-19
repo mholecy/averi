@@ -1,0 +1,117 @@
+{
+  "cell": "dim-cover",
+  "layer": "dim-cover",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.dim-cover.A",
+      "color": "#E53935",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 110
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,142.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#892220"
+    },
+    {
+      "tag": "B",
+      "id": "lab.dim-cover.B",
+      "color": "#1E88E5",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 290
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,322.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#125289"
+    },
+    {
+      "tag": "C",
+      "id": "lab.dim-cover.C",
+      "color": "#43A047",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 470
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,502.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#28602B"
+    },
+    {
+      "tag": "D",
+      "id": "lab.dim-cover.D",
+      "color": "#FB8C00",
+      "declared": "presented-over",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 650
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,682.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#975400"
+    },
+    {
+      "tag": "S",
+      "id": "lab.dim-cover.S",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 405
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,437.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#8E24AA"
+    }
+  ]
+}

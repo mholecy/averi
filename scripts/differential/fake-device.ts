@@ -1,8 +1,11 @@
 import childProcess from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join, sep } from 'node:path';
 import { PNG } from 'pngjs';
 import type { Platform, Screen } from './corpus.js';
+import type { ImeCapture } from '../truth/schema.js';
 
 /**
  * The fake device of the differential harness: the PROCESS boundary, faked
@@ -37,11 +40,20 @@ import type { Platform, Screen } from './corpus.js';
  *    region (docked or floating Gboard, tests/helpers/android-dumps.ts's
  *    measurements), `screencap -p` the frame, every `input` accepted — and
  *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
- *    running (`pidof`), no log.
+ *    running (`pidof`), no log. A ground-truth capture with the IME up serves
+ *    the device's own keyboard answers instead (DeviceProfile.ime), and a
+ *    capture's own `dumpsys window displays` with the IME down is served
+ *    while the keyboard is hidden (DeviceProfile.windowDisplays: its system
+ *    bands, the navigation mode's own).
  *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
- *    caller asks — what a colour assert on that rect must sample.
+ *    caller asks — what a colour assert on that rect must sample; or, for
+ *    a ground-truth capture (golden.ts), the screenshot the device showed.
  *  - `swiftc` compiles nothing (an empty file where the binary goes), and
- *    the "recognizer" reads no text in any region.
+ *    the "recognizer" reads no text in any region — unless the real one is
+ *    asked for (useRecognizer('vision'), the golden mode's OCR rows, phase 4):
+ *    then `swiftc` and the compiled recognizer (averi's own, under
+ *    `averi-ocr-bin`) are the host's, run as they are — macOS Vision reading
+ *    the screenshot the fake serves. Nothing else reaches a process.
  */
 
 /** The soft keyboard: hidden, docked (the API 33 band), or floating (Gboard's panel over a collapsed strip). */
@@ -57,12 +69,34 @@ export interface DeviceProfile {
   idbPayload?: string;
   /** Android raw: what `uiautomator dump /dev/tty` prints (the status line is appended). */
   dumpXml?: string;
-  /** Android: the soft keyboard at the start of each call. */
+  /** Android: the soft keyboard at the start of each call — `shown` by default with `ime`, else `hidden`. */
   keyboard?: KeyboardState;
   /** Android: whose `dumpsys window displays` — the API 33 Pixel_3a (default) or the API 36 device with no IME source. */
   displays?: 'api33' | 'api36';
   /** iOS: the app's display name `simctl appinfo` answers. */
   app?: string;
+  /** The captured screenshot (PNG): answered as it is, in place of the grey frame — `frame` must be its size. */
+  screenshot?: Buffer;
+  /**
+   * Android, a ground-truth capture with the IME up (scripts/truth/schema.ts#ImeCapture): the device's own answers to
+   * the keyboard queries, served in place of the stock dumps — `shown` while the keyboard is (the profile's keyboard
+   * unless it says otherwise), `hidden`'s witness once a `back` hid it; `dumpsys window displays` then is
+   * windowDisplays (CellTruth.displays), else the stock dump.
+   */
+  ime?: ImeCapture;
+  /**
+   * Android, a ground-truth capture with the IME up: the dump of the screen after one `back` hid it
+   * (CellTruth.afterBack) — answered for `uiautomator dump` once `input keyevent 4` has been sent in the call, as the
+   * layout the app takes then (the bar back at the bottom). Only the dump is swapped: the screenshot stays the IME-up
+   * one, so no colour row may rely on the screen after back.
+   */
+  afterBackXml?: string;
+  /**
+   * Android, a ground-truth capture (scripts/truth/schema.ts#CellTruth.displays): the device's own `dumpsys window
+   * displays` with the IME down, answered in place of the stock dump while the keyboard is hidden — its system bands
+   * (a three-button capture's navigation bar from 2088, not the stock gesture band from 2154).
+   */
+  windowDisplays?: string;
 }
 
 /** A rect of the frame, in its pixels, painted one colour. */
@@ -74,15 +108,38 @@ export interface Paint {
 interface DeviceState {
   profile: DeviceProfile;
   keyboard: KeyboardState;
+  /** The dump answered now: the profile's, until a `back` swaps in its afterBackXml. */
+  dumpXml?: string;
   paint?: Paint;
   calls: string[];
 }
 
 let current: DeviceState | undefined;
 
+/**
+ * Who reads text off a frame: `none` the fake recognizer (no text in any region, the differential's default), `vision`
+ * the host's — the side's own recognizer compiled by the real `swiftc` and run on the frame the fake serves (the golden
+ * mode's `ocr` rows, judged against real pixels: golden.ts#ocrAvailability). Set for the whole process.
+ */
+export type Recognizer = 'none' | 'vision';
+let recognizer: Recognizer = 'none';
+export function useRecognizer(r: Recognizer): void {
+  recognizer = r;
+}
+/**
+ * Where averi caches its compiled recognizer (src/verify/ocr.ts#VisionOcr: `<tmpdir>/averi-ocr-bin/recognizer-<key>`) —
+ * a path prefix, so no other command whose name merely mentions it is taken for the recognizer.
+ */
+const RECOGNIZER_DIR = join(tmpdir(), 'averi-ocr-bin') + sep;
+/** The averi OCR recognizer binary (RECOGNIZER_DIR). */
+export const isRecognizerBinary = (cmd: string) => cmd.startsWith(RECOGNIZER_DIR);
+/** The OCR recognizer's commands: its compiler, and the binary averi caches (isRecognizerBinary). */
+const isRecognizer = (cmd: string) => cmd === 'swiftc' || isRecognizerBinary(cmd);
+
 /** Point the fake at a device for the calls that follow; the call log, the keyboard and the paint start over. */
 export function useDevice(profile: DeviceProfile): void {
-  current = { profile, keyboard: profile.keyboard ?? 'hidden', calls: [] };
+  if (profile.screenshot !== undefined) servedScreenshot(profile.frame, profile.screenshot);
+  current = { profile, keyboard: profile.keyboard ?? (profile.ime !== undefined ? 'shown' : 'hidden'), calls: [], ...(profile.dumpXml !== undefined && { dumpXml: profile.dumpXml }) };
 }
 
 /** Paint `paint.rect` of every frame until the next reset (one call). */
@@ -121,7 +178,22 @@ export function resetDevice(): void {
 // --- PNG frames, built once per size and paint ---
 
 const frames = new Map<string, Buffer>();
-function frame(screen: Screen, paint: Paint | undefined): Buffer {
+/** A PNG's size, from its IHDR chunk (bytes 16–23, big-endian). */
+export const pngSize = (png: Buffer): Screen => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
+/**
+ * A captured screenshot, checked against the profile's frame: the tools read the size from the PNG they are served, so a
+ * profile whose frame says otherwise would describe one device and serve another. Asserted when the profile is set
+ * (useDevice) and again when the frame is served.
+ */
+function servedScreenshot(screen: Screen, screenshot: Buffer): Buffer {
+  const size = pngSize(screenshot);
+  if (size.width !== screen.width || size.height !== screen.height) {
+    throw new Error(`differential: the captured screenshot is ${size.width}x${size.height}, the profile's frame ${screen.width}x${screen.height}`);
+  }
+  return screenshot;
+}
+function frame(screen: Screen, paint: Paint | undefined, screenshot?: Buffer): Buffer {
+  if (screenshot !== undefined) return servedScreenshot(screen, screenshot);
   const key = `${screen.width}x${screen.height} ${JSON.stringify(paint ?? null)}`;
   let png = frames.get(key);
   if (png === undefined) {
@@ -159,7 +231,12 @@ const TOUCHABLE: Record<KeyboardState, string> = {
   floating: '  touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))\n',
 };
 
+/** The captured IME readings for the keyboard's state now (DeviceProfile.ime), when the profile has them. */
+const captured = (profile: DeviceProfile, keyboard: KeyboardState) => profile.ime?.[keyboard === 'hidden' ? 'hidden' : 'shown'];
+
 function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
+  if (profile.ime !== undefined && keyboard !== 'hidden') return profile.ime.shown.displays;
+  if (profile.windowDisplays !== undefined && keyboard === 'hidden') return profile.windowDisplays;
   if (profile.displays === 'api36') return API36;
   return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;
 }
@@ -183,7 +260,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     writeFileSync(out, '');
     return '';
   }
-  if (cmd.includes('averi-ocr-bin')) {
+  if (isRecognizerBinary(cmd)) {
     const regions = (JSON.parse(stdin ?? '{}') as { regions?: { id: string }[] }).regions ?? [];
     return JSON.stringify({ results: regions.map((r) => ({ id: r.id, lines: [] })) });
   }
@@ -200,7 +277,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     const [, verb, , ...rest] = args;
     if (verb === 'io' && rest[0] === 'screenshot') {
       device.calls.push('simctl screenshot');
-      writeFileSync(rest[1], frame(profile.frame, device.paint));
+      writeFileSync(rest[1], frame(profile.frame, device.paint, profile.screenshot));
       return '';
     }
     if (verb === 'spawn' && rest[0] === 'launchctl') return 'PID\tStatus\tLabel\n1\t0\tUIKitApplication:differential.app[1][rb-legacy]\n';
@@ -236,12 +313,12 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     const line = argv.join(' ');
     if (argv[0] === 'exec-out' && argv[1] === 'uiautomator') {
       device.calls.push('adb uiautomator dump');
-      if (profile.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
-      return `${profile.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
+      if (device.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
+      return `${device.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
     }
     if (argv[0] === 'exec-out' && argv[1] === 'screencap') {
       device.calls.push('adb screencap');
-      return frame(profile.frame, device.paint);
+      return frame(profile.frame, device.paint, profile.screenshot);
     }
     if (argv[0] === 'get-state') {
       device.calls.push(`adb ${line}`);
@@ -262,11 +339,16 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     }
     if (shell === 'dumpsys window displays') return displays(profile, keyboard);
     if (shell.startsWith('dumpsys input_method')) {
+      const ime = captured(profile, keyboard);
+      if (ime !== undefined) return shell.includes('touchable region') ? ime.touchable : ime.inputShown;
       const shown = keyboard !== 'hidden';
       return shell.includes('touchable region') ? inputShown(shown) + TOUCHABLE[keyboard] : inputShown(shown);
     }
     if (argv[1] === 'input') {
-      if (shell === 'input keyevent 4') device.keyboard = 'hidden';
+      if (shell === 'input keyevent 4') {
+        device.keyboard = 'hidden';
+        if (profile.afterBackXml !== undefined) device.dumpXml = profile.afterBackXml;
+      }
       return '';
     }
     device.calls.pop();
@@ -281,6 +363,13 @@ type ExecFileCallback = (err: (Error & { code?: number | string; killed?: boolea
 
 function fakeExecFile(cmd: string, args: readonly string[] | undefined, opts: unknown, cb?: ExecFileCallback) {
   const callback = (typeof opts === 'function' ? opts : cb) as ExecFileCallback;
+  // The real recognizer (useRecognizer): the host's swiftc and the binary it built, in the host's environment (the fake
+  // DEVELOPER_DIR would send swiftc nowhere).
+  if (recognizer === 'vision' && isRecognizer(cmd) && realExecFile !== undefined) {
+    const given = typeof opts === 'object' && opts !== null ? (opts as Record<string, unknown>) : {};
+    const run = realExecFile as unknown as (file: string, args: string[], options: object, callback: ExecFileCallback) => unknown;
+    return run(cmd, [...(args ?? [])], { ...given, env: hostEnv() }, callback);
+  }
   let stdin: string | undefined;
   const child = {
     stdin: {
@@ -307,6 +396,29 @@ const refuse = (name: string) => () => {
 };
 
 let installed = false;
+/** The host's execFile and DEVELOPER_DIR, kept by installFakeDevice for the real recognizer (useRecognizer). */
+let realExecFile: typeof childProcess.execFile | undefined;
+let hostDeveloperDir: string | undefined;
+const hostEnv = (): NodeJS.ProcessEnv => {
+  const env = { ...process.env };
+  if (hostDeveloperDir === undefined) delete env.DEVELOPER_DIR;
+  else env.DEVELOPER_DIR = hostDeveloperDir;
+  return env;
+};
+
+/**
+ * The host's own exec, for the one thing the harness itself runs on the host: golden.ts's probe of the recognizer
+ * (ocrAvailability). Rejects as adapters/exec.ts does (an Error with its stderr), resolves stdout and stderr.
+ */
+export function hostExec(cmd: string, args: string[], stdin?: string): Promise<{ stdout: Buffer; stderr: string }> {
+  const run = realExecFile ?? childProcess.execFile;
+  return new Promise((resolve, reject) => {
+    const child = run(cmd, args, { encoding: 'buffer', maxBuffer: 64 << 20, timeout: 180_000, env: hostEnv() }, (err, stdout, stderr) =>
+      err ? reject(Object.assign(new Error(`${cmd}: ${err.message} ${stderr.toString('utf8')}`.trim()), { code: (err as { code?: unknown }).code })) : resolve({ stdout, stderr: stderr.toString('utf8') }),
+    );
+    if (stdin !== undefined) child.stdin?.end(stdin);
+  });
+}
 
 /**
  * Replace the process functions — before either side is imported, so their
@@ -319,6 +431,8 @@ export function installFakeDevice(): void {
   if (installed) return;
   installed = true;
   const cp = childProcess as unknown as Record<string, unknown>;
+  realExecFile = childProcess.execFile;
+  hostDeveloperDir = process.env.DEVELOPER_DIR;
   cp.execFile = fakeExecFile;
   for (const name of ['spawn', 'exec', 'execSync', 'execFileSync', 'spawnSync', 'fork']) cp[name] = refuse(name);
   syncBuiltinESMExports();

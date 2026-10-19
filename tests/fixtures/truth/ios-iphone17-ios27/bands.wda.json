@@ -1,0 +1,257 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 21}, {300, 20}}",
+              "label": "Target S",
+              "rawIdentifier": "lab.bands.S",
+              "traits": "Button",
+              "frame": "{{51, 21}, {300, 20}}",
+              "isVisible": "0",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.bands.S",
+              "rect": {
+               "y": 21,
+               "x": 51,
+               "width": 300,
+               "height": 20
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 58}, {300, 64}}",
+              "label": "Target O",
+              "rawIdentifier": "lab.bands.O",
+              "traits": "Button",
+              "frame": "{{51, 58}, {300, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.bands.O",
+              "rect": {
+               "y": 58,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 405}, {300, 64}}",
+              "label": "Target W",
+              "rawIdentifier": "lab.bands.W",
+              "traits": "Button",
+              "frame": "{{51, 405}, {300, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.bands.W",
+              "rect": {
+               "y": 405,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 780}, {300, 64}}",
+              "label": "Target Q",
+              "rawIdentifier": "lab.bands.Q",
+              "traits": "Button",
+              "frame": "{{51, 780}, {300, 64}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.bands.Q",
+              "rect": {
+               "y": 780,
+               "x": 51,
+               "width": 300,
+               "height": 64
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{51, 847}, {300, 20}}",
+              "label": "Target N",
+              "rawIdentifier": "lab.bands.N",
+              "traits": "Button",
+              "frame": "{{51, 847}, {300, 20}}",
+              "isVisible": "1",
+              "type": "Button",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "1",
+              "isNativeAccessibilityElement": "1",
+              "isFocused": "0",
+              "name": "lab.bands.N",
+              "rect": {
+               "y": 847,
+               "x": 51,
+               "width": 300,
+               "height": 20
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

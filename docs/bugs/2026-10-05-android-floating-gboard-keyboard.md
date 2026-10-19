@@ -243,3 +243,93 @@ every earlier check). Keys/taps from the `adb` shim. Round-4 handoff §5.
   `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-69-0.png` (flagged "did not settle" — the caret/teardrop handle) shows it clear of the panel, IBAN unchanged.
 - `server-stderr.log`: only the `.env.averi` load line; no refusal notice.
 - Gboard restored to docked at 13:03:00 (`touchable region=SkRegion((0,1398,1080,2220))`).
+
+## Device check (2026-10-09 Android, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47831, cwd mp-native). Strokes and taps from
+the `adb` shim; page placement, bar show/hide and Gboard mode by hand with the real `adb`.
+
+Google Contacts "Create contact" (the SWIFT form was left by then), Gboard → grid → Floating at ~15:58:40: `touchable
+region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))`, `ITYPE_IME frame=[0,2088][1080,2220]` (as in every earlier check).
+
+- **Holds — tap under the panel.** 15:59:02 `tap { selector: 'role:textfield text:"+1"' }` (`132,1305 816x176`, centre (540,1393) under the
+  panel) → `Tapped role:textfield text:"+1" (the soft keyboard covered role:textfield text:"+1"; hidden before tapping)` (12.2 s). Shim:
+  `keyevent 4`, then `input tap 540 1393` — back first, then the field (focused, panel floating again, same region).
+- **Holds — scroll with the panel up.** 15:59:20 `scroll_until { selector: 'text:"Notes"', fully: true }` → `scroll_until text:"Notes" failed
+  after 4 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
+  intersected the 1080x1269 screen above the soft keyboard over [359,1269][1040,1912] …` (17.9 s), `input swipe 540 1064 540 448 617` ×4 —
+  identical to 347e70d/86eb42d, both ends above the panel top 1269. `Notes` ended at `176,1516 118x66`, BESIDE the panel (x < 359) and
+  visible in the screenshot (`run7-android/kb4.png`): the stated full-width-cut residual of this note's fix, not a regression.
+- Gboard restored to docked at ~16:00:00 (`touchable region=SkRegion((0,1398,1080,2220))`).
+
+## Device check (2026-10-09 Android, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:33 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47841, cwd mp-native). Strokes and taps from the
+`adb` shim; placement and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's `averi.yaml` untouched.
+
+Contacts "Create contact", `First name` focused, Gboard → grid → Floating (~18:25:40): `touchable region=SkRegion((359,1269,1040,1912)(0,2088,
+1080,2220))`, as in every earlier check.
+
+- **Holds — tap under the panel.** 18:26:09 `tap { selector: 'role:textfield text:"+1"' }` (`132,1527 816x176`, centre under the panel) →
+  `Tapped role:textfield text:"+1" (the soft keyboard covered role:textfield text:"+1"; hidden before tapping)` (11.4 s); shim `keyevent 4`,
+  then `input tap 540 1615`.
+- **Holds — scroll with the panel up.** 18:26:21 `scroll_until { selector: 'text:"Notes"', fully: true }` → `failed after 4 swipes (the last
+  2, swiping down, did not move it: …) — element in tree but never intersected the 1080x1269 screen above the soft keyboard over
+  [359,1269][1040,1912] (last rect {"x":176,"y":1516,"width":118,"height":66}) …` (17.5 s), `input swipe 540 1064 540 448 617` ×4 — identical
+  to 347e70d / 86eb42d / dd50327; `Notes` beside the panel (the stated full-width-cut residual).
+- Gboard restored to docked (~18:27:20): `touchable region=SkRegion((0,1398,1080,2220))`.
+
+## Device check (2026-10-09 Android, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:19 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/`, stdio via the HTTP daemon on port 47851, cwd mp-native). Strokes and taps from the
+`adb` shim (`run9-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only
+(`cfg-opt-bank`, `cfg-opt-contacts`, `cfg-optional`, new `cfg-fill`, `cfg-fill-bank`); mp-native's `averi.yaml` untouched.
+
+Contacts "Create contact", phone field focused, Gboard → grid → Floating (~21:05:40; the phone pad, then qwerty on the Email field).
+
+- **Holds — tap under the panel.** 21:05:51 `tap { selector: 'text:"Add email"' }` (`495,1334 179x55`, centre under the panel) → `Tapped
+  text:"Add email" (the soft keyboard covered text:"Add email"; hidden before tapping)` (12.5 s); shim `keyevent 4`, then `input tap 585 1362`;
+  an Email field was added.
+- **Holds — scroll with the panel up.** 21:06:13 `scroll_until { selector: 'text:"Notes"', fully: true }` → `failed after 3 swipes (the last
+  2, swiping down, did not move it: …) — element in tree but never intersected the 1080x1269 screen above the soft keyboard over
+  [359,1269][1040,1912] (last rect {"x":176,"y":1516,"width":118,"height":66}) …` (14.6 s), `input swipe 540 1064 540 448 617` ×3 — the same
+  stroke as every earlier check; `Notes` beside the panel (the stated full-width-cut residual).
+- Gboard restored to docked (~21:06:45): `touchable region=SkRegion((0,1398,1080,2220))`.
+
+
+## Device check (2026-10-13 Android, re-run at 20307d2)
+
+Measured 2026-10-13 17:10–17:58 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, gesture navigation — `settings get secure
+navigation_mode` = 2, `ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true`; Gboard docked unless stated), averi = mobile-verify
+`arch/round-12` @ `20307d2` (detached; `dist/` built 17:07 UTC after the commit; stdio via the HTTP daemon on port 47881, cwd mp-native).
+Strokes, taps and keys from the `adb` shim (`run12-android/adb-input.log`, times UTC); stagings by hand with the real `adb` (slow `input
+swipe` drags, not in the shim log). Every call is in `run12-android/session.log` (`#N` below = call number there; images `img-N-0.png`).
+At start mp-native showed the inactivity "Logged out" screen: LOGIN → Welcome → SIGN IN → `run_flow login_pin_android_here` (approved rung,
+no `requires:`), done at 17:11. Scratch configs only; mp-native's `averi.yaml` untouched. Round 9's §3–4, round 10's §2–3, round 11's §3
+and round 12's §3 were all run at this one hash. **Environment break at 17:33 UTC:** mp-native's backend began answering every GraphQL read
+with `{"data":null,"errors":[{"message":"Received empty response body from subgraph \"gds-business\"","extensions":{"code":
+"SUBGRAPH_RESPONSE_BODY_EMPTY"}}]}` (HTTP 200, `get_logs` #161, #180) — "Mandatory data not loaded / TRY AGAIN" on every tab, also after a
+fresh PIN login (#223, 17:43). Not averi, not the VPN (no 403). The mp-native items not run before 17:33 (SWIFT form: A2, D1.2, smoke 1's
+SWIFT field, D7.3) are Not reached on mp-native; on the owner's instruction (17:51) they were re-run on Google Contacts and on Finportal
+(`sk.finportal.myport`, Expo dev build on Metro; its `~/dev/finportal/app/averi.yaml` passed as `configPath`; never logged in, nothing
+submitted) where an equivalent shape exists — see `## Re-runs on Contacts / Finportal` below. The data also changed since round 8:
+Account Detail now lists `row_0`…`row_36` (37 rows, was 31), so the handoffs' `row_29/30` / `row_30` shapes were measured on the rows that
+now sit there (`row_35/36`).
+
+Round 10 D2.7 (Android floating Gboard, regression) — **Holds.** Contacts Create contact, First name focused, Gboard → grid → Floating at
+~17:34:30: `touchableRegion=SkRegion((359,1203,1040,1846))`, `ITYPE_IME frame=[0,2088][1080,2220]` (the panel sat higher than in earlier
+rounds' `(359,1269,1040,1912)`; it later read `(359,1145,1040,1846)`).
+- #168 `tap role:textfield label:"Last name"` (`132,1409 816x160`, centre (540,1489) under the panel) → `Tapped role:textfield label:"Last name"
+  (the soft keyboard covered role:textfield label:"Last name"; hidden before tapping)` (9.6 s); shim `17:34:55 keyevent 4`, `17:35:00 input tap
+  540 1489` — Back first, then the field.
+- #169 `scroll_until text:"Notes" fully: true` → `failed after 5 swipes (the last 2, swiping down, did not move it: content exhausted, or the
+  swipes were not taken) — element in tree but never intersected the 1080x1211 screen above the soft keyboard over [359,1211][1040,1912] (last
+  rect {"x":176,"y":1516,"width":118,"height":66}). The soft keyboard was up over [359,1211][1040,1912] in 6 of the 6 rounds read: …` (17.7 s);
+  strokes `540 1064 540 448 617` ×2 then `540 1018 540 436 583` ×3 — every one above the panel's top. `Notes` lay BESIDE the panel (x < 359,
+  `img-170-0.png`): the stated full-width-cut residual, as in every earlier round. The reply's keyboard rect (`[359,1211][1040,1912]`) is not
+  the one `dumpsys input_method` printed just before/after (`1203…1846`, `1145…1846`) — the panel was moving; noted, not judged.
+- Gboard restored to docked at ~17:35:40 (grid → Floating): `touchableRegion=SkRegion((0,1219,1080,2022))` with the panel's toolbar,
+  `(0,1332,1080,2022)` on the next field focus — the same as before the switch.

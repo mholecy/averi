@@ -146,3 +146,57 @@ nothing else. Screenshot after (`run6-ios/img-48-0.png`, 13:12): visually the sa
 stock Contacts "New Contact" sheet a title tap is not a usable dismissal at all; the reply says so and points at the
 alternatives. (Duration: 16 s from the call to the title tap — WDA reads; then ~13 s of re-looks.) Sheet closed with
 `tap role:button text:"close"` (WDA config, 6.6 s), nothing saved.
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+Setup: keyboard prefs `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` toggled YES→NO (the HID typing in the bank app had
+parked the keyboard again), Contacts `terminate_app` + `launch_app` (15:49:10, 3.3 s, one line), `tap role:button text:"Add"` → New
+Contact with the software keyboard up (screenshot `run7-ios/img-164-0.png`; WDA `keyboard 0,573 402x301`). Scratch `cfg-c-wda`.
+
+**2.1 — Holds as at 86eb42d (refusal gone; the title tap does not hide this keyboard).**
+
+```
+15:49:33 tap { selector: 'role:text text:"add pronouns"', configPath: <cfg-c-wda> }                                 (27.6 s)
+→ [isError] Tapped text:"New Contact" role:"text" at (201,100) to hide the soft keyboard covering role:text text:"add pronouns", but
+  it is still up: the band [0,573][402,874] still contains the tap point (223,726) on 2 looks 300ms apart; nothing else was tapped.
+  That tap may have changed the screen … — look at it (ui_snapshot / screenshot) before retrying. …
+```
+
+Shim: one `idb ui tap 201 100`. **2.2 — measured again: no**, the same as 86eb42d.
+
+**C3-6 Contacts "New Contact" sheet, WDA — Holds, no false refusal.** Keyboard still up:
+`tap id:"First name"` → `Tapped id:"First name"` (6.9 s, shim `201 417`), `id:"Last name"` → `Tapped` (`201 470`), `id:Company` →
+`Tapped` (`201 523`), `role:button text:close` (Cancel) → `Tapped role:button text:close` (`38 100`), the sheet closed to the list.
+All at their centre; the sheet's four `toolbar 'Toolbar'` nodes (`0,0 402x874` ×3, `0,83 402x48`, `0,62 402x812`) excused, no
+"under …" note.
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+Setup: keyboard prefs `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` YES → NO (restored at the end), Contacts `terminate_app` +
+`launch_app`, `tap role:button text:"Add"` → New Contact with the software keyboard up (screenshot `run8-ios/img-228-0.png`). Scratch
+`cfg-c-wda`.
+
+**2.1 — Holds as at 86eb42d / dd50327 (no toolbar refusal; the title tap does not hide this keyboard).**
+
+```
+18:30:1x tap { selector: 'role:text text:"add pronouns"', configPath: <cfg-c-wda> }                                 (28.0 s)
+→ [isError] Tapped text:"New Contact" role:"text" at (201,100) to hide the soft keyboard covering role:text text:"add pronouns", but
+  it is still up: the band [0,573][402,874] still contains the tap point (223,726) on 2 looks 300ms apart; nothing else was tapped. …
+```
+
+Shim: one `idb ui tap 201 100`. **2.2 — measured again: no.**
+
+**C3-6 Contacts "New Contact" sheet — Holds, no false refusal.** WDA, keyboard up: `tap id:"First name"` → `Tapped` (7.3 s, `201 417`),
+`id:"Last name"` → `Tapped` (`201 470`), `id:Company` → `Tapped` (`201 523`), `role:button text:close` (Cancel) → `Tapped` (`38 100`), the
+sheet closed. idb (`cfg-contacts-idb`; idb lists only the sheet, not the list behind it): `id:"Last name"` → `Tapped` (`201 447`),
+`id:Company` → `Tapped` (`201 500`), `role:button text:"Add photo"` (under the sheet's `other 'Toolbar' 0,83 402x48`, listed after it) →
+`Tapped` (`202 197`, the photo picker opened; `tap id:OnboardingCancelButton` → `Tapped`, `38 84`, closed it).

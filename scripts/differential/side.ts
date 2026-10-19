@@ -15,7 +15,8 @@ import { RecordedTreeSource } from './recorded-source.js';
  * plus the iOS adapter and its WDA parser to put a recorded source behind:
  *
  *   src/mcp/tools.ts          createAveriServer (the tool handlers)
- *   src/mcp/registry.ts       AdapterRegistry, defaultFactory (the live wiring)
+ *   src/mcp/registry.ts       AdapterRegistry, defaultFactory (the live wiring) — the registry built through
+ *                             `registry` below, which also takes the constructor an older side had
  *   src/adapters/ios.ts       IosAdapter (takes any IosTreeSource)
  *   src/adapters/wda-source.ts parseWdaSourceValue (WdaTreeSource's parser)
  *
@@ -26,10 +27,21 @@ import { RecordedTreeSource } from './recorded-source.js';
 export interface Side {
   root: string;
   createAveriServer: typeof createAveriServer;
-  AdapterRegistry: new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   defaultFactory: AdapterFactory;
   IosAdapter: new (opts: ConstructorParameters<typeof IosAdapter>[0]) => DeviceAdapter;
   parseWdaSourceValue: (value: unknown) => UiNode;
+  /**
+   * The side's registry over `deps`, whichever constructor the side has: since 8413120 (2026-10-08) it takes
+   * `{ factory, discovery }`; before, the factory alone, and devices were listed by an UNBOUND adapter's
+   * `listDevices()` — so an older side gets a factory that answers an unbound call with the discovery. Which one is
+   * told by the constructor's own behaviour (`takesDeps`), not by what else the module exports.
+   */
+  registry(deps: { factory: AdapterFactory; discovery: DeviceDiscovery }): AdapterRegistry;
+  /**
+   * The side's iOS tree-source seam (src/adapters/ios-tree-source.ts#createIosTreeSource), when it has one — what the
+   * live golden (scripts/truth/live.ts `--side`) builds a real WDA or idb source with; the replay does not use it.
+   */
+  createIosTreeSource?: (kind: 'idb' | 'wda', udid: string, deps: { port?: number; derivedDataPath?: string }) => unknown;
 }
 
 export async function loadSide(root: string): Promise<Side> {
@@ -45,14 +57,49 @@ export async function loadSide(root: string): Promise<Side> {
     at('src/adapters/ios.ts', ['IosAdapter']),
     at('src/adapters/wda-source.ts', ['parseWdaSourceValue']),
   ]);
+  // Optional: a side without the seam loads all the same (the replay never needs it).
+  const treeSource = (await import(pathToFileURL(resolve(root, 'src/adapters/ios-tree-source.ts')).href).catch(() => ({}))) as Record<string, unknown>;
+  const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
+  const discoverySeam = await takesDeps(Registry);
   return {
     root: resolve(root),
     createAveriServer: tools.createAveriServer as Side['createAveriServer'],
-    AdapterRegistry: registry.AdapterRegistry as Side['AdapterRegistry'],
     defaultFactory: registry.defaultFactory as Side['defaultFactory'],
     IosAdapter: ios.IosAdapter as Side['IosAdapter'],
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
+    ...(typeof treeSource.createIosTreeSource === 'function' && { createIosTreeSource: treeSource.createIosTreeSource as NonNullable<Side['createIosTreeSource']> }),
+    registry: (deps) => {
+      if (discoverySeam) return new Registry(deps);
+      const legacy = Registry as unknown as new (factory: AdapterFactory) => AdapterRegistry;
+      return new legacy((platform, deviceId, opts) =>
+        deviceId === undefined ? ({ listDevices: () => deps.discovery(platform) } as unknown as DeviceAdapter) : deps.factory(platform, deviceId, opts),
+      );
+    },
   };
+}
+
+/**
+ * Whether a registry constructor takes `{ factory, discovery }`: one built so lists its devices through that
+ * discovery. The old constructor keeps the object as its factory, and its listing calls it — a TypeError, caught (or
+ * caught by `listAll` itself) — so the discovery is never asked. Nothing is bound and no adapter is built.
+ */
+export async function takesDeps(Registry: new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry): Promise<boolean> {
+  let asked = false;
+  const probe = new Registry({
+    factory: () => {
+      throw new Error('side.ts: the registry probe builds no adapter');
+    },
+    discovery: async () => {
+      asked = true;
+      return [];
+    },
+  });
+  try {
+    await probe.listAll();
+  } catch {
+    // the old constructor's listing: `this.factory is not a function`
+  }
+  return asked;
 }
 
 export const IOS_UDID = 'differential-simulator';
