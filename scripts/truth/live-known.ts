@@ -25,9 +25,9 @@ import type { ReplyKind } from './replies.js';
  * d043e65), read `visible` in all six — ok in four, a stop-claim in two: the timing moves the outcome, not the kind;
  * LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
  * b71cbbb's src): `refused` where it is not reached, ok in two.
- * A run that reads another kind for a known case fails as NOT known, naming both: refile it, or widen the entry (`also`:
- * the other rule and kind, with the committed record that reads it — round 6's iOS device check, where the runs of one
- * commit differ in which shows) only once the note explains that reply too.
+ * A run that reads another kind for a known case fails as NOT known, naming both: refile it. (An entry could once list
+ * other rules and kinds its runs read, `also`, each with its record — LV4's turn spending its budget, the only one; it
+ * left with LV4's entry at round 7's A1, and the mechanism with it at round 7's integration 3.)
  */
 
 const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
@@ -56,22 +56,10 @@ export interface KnownLive {
   kind: ReplyKind;
   /** Runs of the same commit differ: an ok run of it is no fix (see the header). */
   intermittent?: true;
-  /**
-   * The other rule and kind a committed record of the same commit reads for the case, each with that record
-   * (docs/truth/live-records): the note explains both, runs differ in which one shows (the header's widening).
-   */
-  also?: readonly Alternative[];
-}
-
-/** A rule and kind a known case also fails by, and the committed record that reads it. */
-export interface Alternative {
-  cls: VerdictClass;
-  kind: ReplyKind;
-  record: string;
 }
 
 /** The entries `<prefix> <id>` of every id, each known by `note`, `cls` and `kind`, with KnownLive's optional facts as given. */
-const each = (prefix: string, ids: readonly string[], note: string, cls: VerdictClass, kind: ReplyKind, more: Pick<KnownLive, 'intermittent' | 'also'> = {}) =>
+const each = (prefix: string, ids: readonly string[], note: string, cls: VerdictClass, kind: ReplyKind, more: Pick<KnownLive, 'intermittent'> = {}) =>
   ids.map((id) => [`${prefix} ${id}`, { note, cls, kind, ...more }] as const);
 
 export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntries([
@@ -173,13 +161,9 @@ export const knownEntry = (platform: string, source: string, id: string): KnownL
 
 /**
  * The note a live case's failure is known by — undefined unless it failed by the rule, on the kind of reply, its entry
- * pins (or one of its `also`).
+ * pins.
  */
 export const knownLive = (platform: string, source: string, id: string, cls: VerdictClass | undefined, kind: ReplyKind | undefined): string | undefined => {
   const e = knownEntry(platform, source, id);
-  return e !== undefined && explains(e, cls, kind) ? e.note : undefined;
+  return e !== undefined && e.cls === cls && e.kind === kind ? e.note : undefined;
 };
-
-/** Whether an entry explains a failure by `cls` on `kind`: its own pair, or one of its `also` — each rule with its kind. */
-export const explains = (e: Pick<KnownLive, 'cls' | 'kind' | 'also'>, cls: VerdictClass | undefined, kind: ReplyKind | undefined): boolean =>
-  [e, ...(e.also ?? [])].some((x) => x.cls === cls && x.kind === kind);

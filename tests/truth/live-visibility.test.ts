@@ -1,17 +1,14 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
-import { explains, knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
+import { knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 
 // The live golden's visibility judges (scripts/truth/live-visibility.ts): pure over the lab app's state — its tap log,
 // its scroll offsets and strokes, its frames — so they are pinned here without a device. iOS units: the iPhone 17's
 // 402x874 pt, its status band 62 pt.
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SCREEN = { x: 0, y: 0, width: 402, height: 874 };
 const at = 1;
 
@@ -347,34 +344,6 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
   it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
     const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
     expect(bad).toEqual([]);
-  });
-  it('an `also` explains its own rule on its own kind only — never its rule on the entry\'s kind, nor another rule on its kind', () => {
-    const e = { cls: 'not-reached' as const, kind: 'refused' as const, also: [{ cls: 'stop-claim' as const, kind: 'visible' as const, record: 'r.json' }] };
-    expect(explains(e, 'not-reached', 'refused')).toBe(true);
-    expect(explains(e, 'stop-claim', 'visible')).toBe(true);
-    expect(explains(e, 'stop-claim', 'refused')).toBe(false);
-    expect(explains(e, 'not-reached', 'visible')).toBe(false);
-    expect(explains({ cls: 'R-direction', kind: 'visible' }, 'R-direction', 'refused')).toBe(false);
-  });
-  // Each `also` names the committed record that reads it: the record exists, and its case, judged again by this
-  // checkout's judge (visibilityCases over the case's static truth), fails by that rule on that kind. None today: the
-  // only one, LV4's turn spending its budget (`refused`), left with its entry when round 7's A1 fixed the turn.
-  it('every `also` names a committed record whose case reads that rule and kind', () => {
-    const alsos = Object.entries(LIVE_KNOWN).flatMap(([key, e]) => (e.also ?? []).map((a) => ({ key, ...a })));
-    for (const { key, cls, kind, record } of alsos) {
-      const [platform, source, id] = key.split(' ');
-      const file = `${ROOT}docs/truth/live-records/${record}`;
-      expect(existsSync(file), `${key}: ${record}`).toBe(true);
-      const rec = JSON.parse(readFileSync(file, 'utf8')) as { platform: string; results: { source: string; id: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState }[] };
-      const r = rec.results.find((x) => x.source === source && x.id === id);
-      expect(r, `${key}: not in ${record}`).toBeDefined();
-      const cell = id.split(':')[1].replace(/\.[^.]+(\.fully)?$/, '');
-      const run = platform === 'ios' ? 'ios-iphone17-ios27' : 'android-averi_lab-api33';
-      const truth = JSON.parse(readFileSync(`${ROOT}tests/fixtures/truth/${run}/${cell}.truth.json`, 'utf8')) as CellTruth;
-      const c = visibilityCases(truth, platform as 'ios' | 'android').find((x) => x.id === id)!;
-      const v = c.judge(r!.state, r!.replies, r!.launched, source, r!.after);
-      expect({ key, cls: v.cls, kind: v.kind }).toEqual({ key, cls, kind });
-    }
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
   it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {
