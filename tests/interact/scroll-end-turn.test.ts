@@ -167,7 +167,8 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(describeScrollResult(resultOf(played))).toMatch(/; 3 swipes up, the last of which did not move it — the tree lists the content of scrollable \(0,380 402x180\) ending at its top — so averi turned down/);
   });
 
-  it('a read a whole point off, as WDA rounds a list resting a third of a point off its top, is a read that did not move: the end proven after ONE stroke (measured live, round 7)', () => {
+  it('a read a whole point off, as WDA rounds a list resting a third of a point off its top, is a read that did not move: the end proven after ONE stroke (measured live)', () => {
+    // Round 7 (A1).
     // Measured on the lab simulator, one stroke up at `lower`'s top each: F 51,1381 300x64 over content 0,381 402x1300
     // (the origin rounded up), or F 51,1380 300x65 over 0,380 402x1301 (the size rounded up) — never more than a point.
     const grown = (offset: number): Row => {

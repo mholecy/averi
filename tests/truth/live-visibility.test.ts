@@ -182,7 +182,8 @@ describe('visibilityCases', () => {
   });
 });
 
-describe('the long-list carry case (LV5): target L, row 30 of sheet-long-list, under WDA', () => {
+// LV5.
+describe('the long-list carry case: target L, row 30 of sheet-long-list, under WDA', () => {
   // The table: 0,62 402x812, 56 rows of 64 pt; L at content y 1920, whole over offsets 1172–1920 — its frame the app's,
   // the clip moved by its place and the table's offset.
   const table = (over: Partial<LabState> = {}) => {
