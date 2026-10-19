@@ -254,6 +254,40 @@ this run's own on gRPC 10891 (`IDB_COMPANION=localhost:10891`). Reproduce (outsi
   refused under Continue (`only a 362x1 part of it shows above the soft keyboard`), k7 one stroke at (201,413), the same
   rest — as before the fix (WDA marks its keyboard; the fix is idb's flat list only). No submit in any run.
 
+# Round 8, L4's fix: the blur menus on iOS, 2026-10-19
+
+fix/r8-l4 (src 37bf5a15: draw-order.ts#readingOrderCovers — in a listing the parsers mark as reading order, a control
+listed before a control target that overlaps it covers it, its order not told;
+docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md), run from
+that checkout; the lab app as round 7's final device check installed it (no app change since). The averi-lab iPhone 17
+simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 in the lab's own derived data, idb through a companion of this
+run's own on gRPC 10893 (`IDB_COMPANION=localhost:10893`). Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb,wda --groups visibility
+--cells blur-menu,blur-menu-grouped [--side <checkout>] --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r8-l4-before.json | fix/round-8 e0c2587e, `--side` | 40 | 7 | 2 | 31 (6 not known since the fix) |
+| ios-vis-r8-l4-1.json, -2.json | 37bf5a15 | 40 each | 10 | 2 | 28 (all known) |
+
+- **Before:** `tap C` answered `Tapped id:"lab.blur-menu.C"` and the app logged `tap W` — the menu row fired — under
+  idb and WDA on blur-menu, and under idb on blur-menu-grouped (WDA lists W after C there and refused it already);
+  `scroll_until C` "fully visible after 0 swipes".
+- **After**, both runs: `tap C` refused, nothing fired — `ERROR id:"lab.blur-menu.C" is overlapped by button "Target W"
+  (51,448 300x64) at its centre (201,502), the two listed in reading order: which is drawn on top is not told; only a
+  300x22 part of it shows, under the 24x24 a tap may be moved to — no scroll tells which is on top: see a screenshot —
+  if the other is drawn over it (a menu, a popover), close it first; nothing was tapped` (blur-menu under both
+  sources, blur-menu-grouped under idb; the grouped cell's WDA reply as before, under W drawn over it). Their entries
+  struck from live-known.ts.
+- `scroll_until C`: failed after 3 swipes, overlapped by W, no layout-defect wording — the three strokes touch down on
+  the blur at (201,699) ×2 and (201,175) (WDA's grouped run the other way round, as before) and **do not close the
+  menu**: the app logs touches and no `dismissed` in any of the six (two runs × three cells-and-sources). Refiled as
+  residual 9's `presented-stroke` on `refused` (the backdrop has no node, so no "close it first"), as blur-menu-grouped's
+  WDA entry was.
+- `tap W` stays LOUD on blur-menu under both sources (refused under C, listed after it): the fix's residual (ADR 0015's
+  amendment). The other cases as before: A, B, D beneath the blur Tapped / fully visible (residual 9, each tap logging
+  `dismissed menu`), K and the grouped W Tapped.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

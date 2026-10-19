@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -119,8 +119,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // changed the screen and claimed nothing), C and D two strokes on the layer, residual 6's
     ['ios-idb-sheet-a5-1.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
     ['ios-idb-sheet-a5-2.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
-    // …and the whole visibility group under idb once: sheet-medium-edges' H and G ok too
-    ['ios-idb-vis-a5.json', 'visibility', { cases: 145, ok: 100, loud: 8, mismatches: 37 }],
+    // (…and the whole visibility group under idb once, ios-idb-vis-a5.json: below, before L4's fix)
     // round 7's A6 (src arch/r23-eyes through --side; docs/truth/live-android-2026-10-18-visibility.md): k7 with the
     // eyes — "visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px …", the band
     // named, ok — three runs, once more after its review round 1; and the forms group once (b1d, b7 LOUD: adb's input
@@ -137,8 +136,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // under idb once all ok — rn4 and the taps of N and M no longer refused (LR1); Android — the visibility group with
     // T2's dialog cells (bottom-sheet-dialog's scroll cases ok: A7's), the forms with k7 naming the band, the RN app
     // three times all ok (LR2), the two dialog cells once more
-    ['ios-wda-vis-r7final.json', 'visibility', { cases: 146, ok: 129, loud: 1, mismatches: 16 }],
-    ['ios-idb-vis-r7final.json', 'visibility', { cases: 145, ok: 100, loud: 8, mismatches: 37 }],
+    // (its visibility groups, ios-wda-vis-r7final.json and ios-idb-vis-r7final.json: below, before L4's fix)
     ['ios-wda-dismissal-r7final.json', 'dismissal', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
     ['ios-idb-dismissal-r7final.json', 'dismissal', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
     ['ios-wda-forms-r7final.json', 'forms', { cases: 23, ok: 20, loud: 3, mismatches: 0 }],
@@ -162,6 +160,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-forms-r8-l2-1.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-2.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-3.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
+    // round 8's L4 fix (fix/r8-l4 37bf5a15; docs/truth/live-ios-2026-10-18-visibility.md, its round-8 L4 section): the
+    // blur-menu cells under idb and WDA twice — C's tap refused as overlapped by the menu row W listed before it,
+    // nothing fired (blur-menu under both, the grouped variant under idb); C's scroll_until three strokes on the blur,
+    // no dismissal logged (residual 9's); W's tap still refused under C (LOUD: the residual of the fix)
+    ['ios-vis-r8-l4-1.json', 'visibility', { cases: 40, ok: 10, loud: 2, mismatches: 28 }],
+    ['ios-vis-r8-l4-2.json', 'visibility', { cases: 40, ok: 10, loud: 2, mismatches: 28 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -218,8 +222,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
     // strokes and reaching F
     ['ios-wda-bounded-long-list-11683c3-2.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
     ['ios-wda-bounded-long-list-11683c3-3.json', 'visibility', { cases: 15, ok: 14, loud: 0, mismatches: 1 }],
-    // round 7's A2's whole WDA visibility group (ios-wda-long-list-parked-1…3.json's src, above: LV6 fixed, A1 not)
-    ['ios-wda-vis-parked.json', 'visibility', { cases: 146, ok: 128, loud: 1, mismatches: 17 }],
+    // (round 7's A2's whole WDA visibility group, ios-wda-vis-parked.json: below, before L4's fix too)
     // round 5's two reruns of scroll-bounded under WDA, at ios-vis-2725e76.json's src: LV5's case ok in both, LV4's not
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
@@ -240,6 +243,40 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
  */
 const A5_IDB = [...['A', 'B', 'C', 'D'].map((t) => `scroll:sheet-medium.${t}`), 'scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G', 'scroll:sheet-background.A', 'scroll:sheet-background.B'];
 
+/**
+ * The blur menus' C as it read before round 8's L4 fix (37bf5a15): Tapped at its centre, which fired the menu row W
+ * drawn over it, and scroll_until "fully visible after 0 swipes" — idb's on both cells, WDA's on blur-menu (WDA lists
+ * W after C on the grouped cell, which it refused). Known as residual 9's (`tap-claim`, `presented-stop`) until L4's fix
+ * struck the taps off and re-classed the scroll cases as three strokes on the blur, refused (`presented-stroke`).
+ */
+const L4_IDB = ['tap:blur-menu.C', 'scroll:blur-menu.C', 'tap:blur-menu-grouped.C', 'scroll:blur-menu-grouped.C'];
+const L4_WDA = ['tap:blur-menu.C', 'scroll:blur-menu.C'];
+
+// L4's fix (37bf5a15), round 8.
+describe('live.ts --rejudge over the committed iOS records of the src before L4\'s reading-order covers', () => {
+  // C's cases beneath the blur menus, as above: in these records, each an older src's, they read as recorded — a tap
+  // that fired W, a stop claimed at once — not known: a calibration of that src now, not HEAD's KNOWN: exit 1, as
+  // recorded. Everything else as HEAD knows it.
+  it.each([
+    // round 7's A5 (src arch/r23-idb-sheet through --side): the whole visibility group under idb once — sheet-medium-edges' H and G ok too
+    ['ios-idb-vis-a5.json', { cases: 145, ok: 100, loud: 8, mismatches: 37 }, L4_IDB],
+    // round 7's final device check (truth/round-7 836e04b1): the visibility groups, as the records pinned above
+    ['ios-wda-vis-r7final.json', { cases: 146, ok: 129, loud: 1, mismatches: 16 }, L4_WDA],
+    ['ios-idb-vis-r7final.json', { cases: 145, ok: 100, loud: 8, mismatches: 37 }, L4_IDB],
+    // round 7's A2's whole WDA visibility group (ios-wda-long-list-parked-1…3.json's src: LV6 fixed, A1 not) — WDA's
+    // turn of F not known there as well (the one-stroke stop's block above)
+    ['ios-wda-vis-parked.json', { cases: 146, ok: 128, loud: 1, mismatches: 17 }, ['turn:scroll-bounded.F', ...L4_WDA]],
+    // round 8's own --side run of fix/round-8 e0c2587e, the src before the fix: C's tap fired W under both sources
+    ['ios-vis-r8-l4-before.json', { cases: 40, ok: 7, loud: 2, mismatches: 31 }, [...L4_IDB, ...L4_WDA]],
+  ] as const)('%s: C\'s cases beneath the blur menus not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want, unknownIds) => {
+    const { code, out } = await rejudge(record, 'visibility');
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknownIds.length} not known\\), 0 skipped$`, 'm'));
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown.sort()).toEqual([...unknownIds].sort());
+    expect(code).toBe(1);
+  });
+});
+
 // A5's fix (a1261499), round 7.
 describe('live.ts --rejudge over the committed iOS records of the src before idb\'s presented layer', () => {
   // The live entries of idb's cases beneath the medium sheet, struck off by round 7's A5, and the re-classed two of the
@@ -249,20 +286,21 @@ describe('live.ts --rejudge over the committed iOS records of the src before idb
   it.each([
     // …the whole visibility group under both sources at e687fe83 (A1's src before the 108-pt floor); its carry case
     // (Row 30 of the 40-row table) no case since round 7's 56-row table, so 286 of the 287 recorded
-    ['ios-vis-r23-ios-stop-e687fe83.json', 'visibility', { cases: 286, ok: 219, loud: 6, mismatches: 61 }, A5_IDB],
+    ['ios-vis-r23-ios-stop-e687fe83.json', 'visibility', { cases: 286, ok: 219, loud: 6, mismatches: 61 }, [...A5_IDB, ...L4_IDB, ...L4_WDA]],
     // re-recorded by round 6's iOS device check (src 11683c3; the forms group run too, judged apart): the presented
     // refusal cases new (WDA ok, idb residual 6, the blur residual 9), round 6's new cells' cases new (carousel-in-list
     // C under idb LE2), LV4's turn `visible` (its entry's primary kind until A1 struck it off). Its long-list carry
     // case (LV6: Row 30 of the 40-row table, asked by its text) is no case since round 7 (the table 56 rows, the carry
     // asked of target L), so not judged: 311 cases and 64 mismatches until then. idb's scroll case of F (R-direction
     // until then) LOUD since: round 7's recapture records F unlisted under idb, its strokes unjudged.
-    ['ios-vis.json', 'visibility,dismissal', { cases: 310, ok: 242, loud: 6, mismatches: 62 }, [...A5_IDB, 'turn:scroll-bounded.F']],
+    ['ios-vis.json', 'visibility,dismissal', { cases: 310, ok: 242, loud: 6, mismatches: 62 }, [...A5_IDB, 'turn:scroll-bounded.F', ...L4_IDB, ...L4_WDA]],
     // round 5's own run (src b71cbbb, harness 2725e76: ios-vis.json until round 6 re-recorded it): LV5's failing run
     // reads LOUD, its entry struck off since (round 6: ok four times at 11683c3); no sheet-medium or sheet-background
     // cell then, sheet-medium-edges' H and G alone of A5's
-    // (idb's scroll case of F LOUD since round 7's recapture, as above: 6 loud, 30 mismatches until then)
-    ['ios-vis-2725e76.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 7, mismatches: 29 }, ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G', 'turn:scroll-bounded.F']],
-  ] as const)('%s (--groups %s): idb\'s presented-layer cases not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want, unknownIds) => {
+    // (idb's scroll case of F LOUD since round 7's recapture, as above: 6 loud, 30 mismatches until then); no scroll case
+    // of the blur menus then, so of L4's only C's taps
+    ['ios-vis-2725e76.json', 'visibility,dismissal', { cases: 248, ok: 212, loud: 7, mismatches: 29 }, ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G', 'turn:scroll-bounded.F', 'tap:blur-menu.C', 'tap:blur-menu-grouped.C', 'tap:blur-menu.C']],
+  ] as const)('%s (--groups %s): idb\'s presented-layer cases (and L4\'s C) not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want, unknownIds) => {
     const { code, out } = await rejudge(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknownIds.length} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
@@ -334,15 +372,16 @@ describe('live.ts --rejudge over the committed iOS record of a --side run of b71
   // known are two forms fills whose model lost the IBAN's last digit (lab note
   // 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md): a forms case has no KNOWN, so exit 1 — and,
   // since round 7's A1 struck their entries off, WDA's turn of F (LV4) and carousel C's stop claimed on a read still
-  // moving, as recorded at that src; since A5's, idb's presented-layer cases (A5_IDB, above).
+  // moving, as recorded at that src; since A5's, idb's presented-layer cases (A5_IDB, above); since L4's, C's cases
+  // beneath the blur menus (L4_IDB, L4_WDA).
   // The visibility cases A1 and A5 fixed since.
   it('ios-vis-b71cbbb.json: forms b4 and p2 not known, and the visibility cases the one-stroke stop and idb\'s presented layer fixed since', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
     // (351 cases, 14 loud, 67 mismatches until round 7: its carry case, Row 30 of the 40-row table, no case since; idb's
     // scroll case of F LOUD, F recorded unlisted under idb.)
-    expect(out).toMatch(/^# Live golden: 350 cases, 270 ok, 15 loud, 65 mismatches \(12 not known\), 0 skipped$/m);
+    expect(out).toMatch(/^# Live golden: 350 cases, 270 ok, 15 loud, 65 mismatches \(18 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
-    expect(unknown.sort()).toEqual(['b4', 'p2', 'scroll:carousel-in-list.C', 'turn:scroll-bounded.F', ...A5_IDB].sort());
+    expect(unknown.sort()).toEqual(['b4', 'p2', 'scroll:carousel-in-list.C', 'turn:scroll-bounded.F', ...A5_IDB, ...L4_IDB, ...L4_WDA].sort());
     expect(code).toBe(1);
   });
 });
@@ -390,17 +429,18 @@ describe('live.ts --rejudge over the committed records of the src before the Vie
 });
 
 describe('live.ts: a known case not intermittent that comes out ok fails the run (live-known.ts\'s ratchet)', () => {
-  it('idb tap:blur-menu-grouped.C read as WDA read it (refused, nothing fired): FIXED, exit 1', { timeout: 60_000 }, async () => {
+  // (Until round 8's L4 fix struck it off, the example was idb's tap:blur-menu-grouped.C read as WDA read it.)
+  it('idb scroll:tabbar-floating.R read as WDA read it (LV3 fixed under WDA: the stop on it, the tap firing it): FIXED, exit 1', { timeout: 60_000 }, async () => {
     type Rec = { platform: string; side: string; results: { source: string; id: string }[] };
     const ios = JSON.parse(readFileSync(`${ROOT}docs/truth/live-records/ios-vis.json`, 'utf8')) as Rec;
-    const wda = ios.results.find((r) => r.source === 'wda' && r.id === 'tap:blur-menu-grouped.C')!;
+    const wda = ios.results.find((r) => r.source === 'wda' && r.id === 'scroll:tabbar-floating.R')!;
     const dir = await mkdtemp(join(tmpdir(), 'live-rejudge-'));
     try {
       const file = join(dir, 'fixed.json');
       await writeFile(file, JSON.stringify({ ...ios, results: [{ ...wda, source: 'idb' }] }));
       const { code, out } = await rejudge(file, 'visibility');
       expect(out).toMatch(/^# Live golden: 1 cases, 1 ok, 0 loud, 0 mismatches \(0 not known\)/m);
-      expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb tap:blur-menu-grouped.C');
+      expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb scroll:tabbar-floating.R');
       expect(code).toBe(1);
       // the same read as a --side run's record: a calibration, not held to HEAD's KNOWN
       await writeFile(file, JSON.stringify({ ...ios, side: '/some/differential-cal-checkout', results: [{ ...wda, source: 'idb' }] }));
