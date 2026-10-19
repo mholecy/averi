@@ -1,6 +1,6 @@
 import { INPUT_ROLE, rectArea, rectIntersection, sameRect, sameRectWithinPixel, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
-import { FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
@@ -517,12 +517,9 @@ const inputOf = (node: UiNode): UiNode | undefined => {
   return self.role === INPUT_ROLE ? self : undefined;
 };
 
-/** `wrapper` is nothing but `inner`: an unnamed (no label, identifier or value) `container` — never interactive — whose only child it is, of its rect to a sub-unit (`sameRectWithinPixel`). */
+/** `wrapper` is nothing but `inner`: an empty frame (placed.ts#emptyFrame: an unnamed `container` — never interactive) whose only child it is, of its rect to a sub-unit (`sameRectWithinPixel`). */
 const nothingBut = (wrapper: UiNode, inner: UiNode): boolean =>
-  wrapper.role === 'container' &&
-  !wrapper.label &&
-  !wrapper.identifier &&
-  !wrapper.value &&
+  emptyFrame(wrapper) &&
   wrapper.children.length === 1 &&
   wrapper.children[0] === inner &&
   sameRectWithinPixel(wrapper.rect, inner.rect);

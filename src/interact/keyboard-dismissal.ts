@@ -1,6 +1,7 @@
-import { everyNode, rectArea, rectIntersection, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { outsideScrollViewText, screenOf } from '../ui-tree/geometry.js';
 import type { Look } from '../ui-tree/look.js';
+import { isUnnamedWrapper } from '../ui-tree/placed.js';
 import { scrollAxis, scrolls } from '../ui-tree/scroll-containers.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton } from '../ui-tree/soft-keyboard.js';
@@ -310,9 +311,9 @@ interface BlankPoint {
  *
  * A node in the square lets the point be when it is the scroll view or one of its ancestors (they hold the point), a
  * hidden subtree's (WDA's `isVisible="0"` subtree, drawn nowhere: adapters/types.ts#UiNode.hidden), the keyboard's own
- * (its Windows are screen-sized; the band is below the area anyway), or a BARE wrapper — a structural role
- * (`STRUCTURAL_ROLES`) with no label, identifier or value — that has children (what it carries is judged by itself) or
- * lies inside the scroll view (a spacer of its content). Anything else stops it: a control, a text, an image, a nested
+ * (its Windows are screen-sized; the band is below the area anyway), or a BARE wrapper — an unnamed one
+ * (ui-tree/placed.ts#isUnnamedWrapper: a structural role with no label, identifier or value) — that has children (what
+ * it carries is judged by itself) or lies inside the scroll view (a spacer of its content). Anything else stops it: a control, a text, an image, a nested
  * scroll view, a scroll indicator (labelled), an identified view (an RN `testID`, a navigation bar), and a bare LEAF
  * outside the scroll view — a dimming view or a decoration drawn over it.
  *
@@ -348,8 +349,7 @@ async function blankPoint({ look, screen, target }: DismissalGround): Promise<Bl
   const blockers: Rect[] = [];
   const walk = (n: UiNode): void => {
     if (n.hidden === true || look.reading.ofKeyboard(n)) return;
-    const bare = STRUCTURAL_ROLES.has(n.role) && !n.label && !n.identifier && !n.value;
-    if (!holds.has(n) && rectArea(n.rect) > 0 && !(bare && (n.children.length > 0 || inside.has(n)))) blockers.push(n.rect);
+    if (!holds.has(n) && rectArea(n.rect) > 0 && !(isUnnamedWrapper(n) && (n.children.length > 0 || inside.has(n)))) blockers.push(n.rect);
     for (const c of n.children) walk(c);
   };
   walk(look.tree);
