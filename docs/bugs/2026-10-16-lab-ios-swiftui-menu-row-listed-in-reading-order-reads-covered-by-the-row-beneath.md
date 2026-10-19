@@ -1,6 +1,21 @@
 # BUG: an in-screen SwiftUI menu's row, listed in reading order just before a row of the screen it is drawn over, reads as covered by that row — `tap` refuses it ("under button Target C"), the colour assert fails and `scroll_until` swipes, under idb AND WDA, while a raw tap on it fires it; and the row beneath reads as drawn over the menu row — `Tapped` at its centre, which fires the menu row
 
-> **Status (2026-10-19):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
+> **Status (2026-10-19, round 9):** W's half (the false refusal) fixed on `fix/r9-l4w` at `1ef11b9c` (from `fix/round-9`
+> `e52d1797`; docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md): the eyes are asked, once,
+> which of two controls listed in reading order is drawn on top, and judge it on ONE screenshot — the overlap's colour
+> against each control's clear band beside it, the screen's own colour guarded, every rule able only to answer "untold"
+> (`verify/eyes.ts#judgeOrder`; on `blur-menu.png` the overlap `#00897B`, W's band `#00897B`, C's `#347937`: ΔE00 0.00 and
+> 17.69). The answer is an input of the pure draw order (`ui-tree/seen-order.ts`): C, seen under W, is no cover of W;
+> W, seen over C, stays C's cover, named so (`Remedy`'s `seenOver`: close a menu first, no scroll). Measured by the
+> golden (1410 checks, 223 → 217 mismatches, 0 new; W's six rows green — `Tapped` at (201,480), colour PASS on
+> `#00897B`, `fully visible after 0 swipes`; C's nine reworded "under button "Target W" … drawn over it as a screenshot
+> shows (the two are listed in reading order)", still red as ADR 0018's residual 9), by
+> tests/verify/eyes-order.test.ts, tests/ui-tree/draw-order-reading-order.test.ts, tests/interact/remedy-agreement.test.ts
+> and tests/flow/engine.test.ts over these captures, by calibrate (CALIBRATED, the note's second pair), and live on the lab
+> simulator at `1ef11b9c` (`docs/truth/live-records/ios-vis-r9-l4w-1.json`, `-2.json`): W's tap `Tapped`, W alone fired,
+> under idb and WDA, both runs; C's tap and `scroll_until` refused as under W, seen so, nothing fired or stroked.
+
+> **Status (2026-10-19, round 8):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
 > (its review's fixes; from `fix/round-8` `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual, now
 > worded as the Expected's fallback. In a listing given in reading order — idb's flat list, a WDA run of siblings sorted
 > by top (`UiNode.readingOrder`, the parsers' mark; on WDA a sort check) — the controls listed BEFORE a control target

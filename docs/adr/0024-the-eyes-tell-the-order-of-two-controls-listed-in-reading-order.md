@@ -45,7 +45,9 @@ dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
 - the colour and ocr asserts (`verify/pixel-poll.ts`): the round's one capture is taken on first need — for the order
   question before the standing is decided, else after — and the order is judged on that same settled, decoded frame
   (`verify/eyes.ts#orderOfFrame`): ZERO extra captures (tests/verify/eyes-order.test.ts counts two, the settled pair).
-  A frame that did not settle reads `untold`.
+  A frame that did not settle reads `untold`. The cost moves instead: an element still covered after the eyes looked
+  (C) now captures each round of its poll before missing, as any element that is measured and fails does — where a
+  covered miss took none before.
 - Wired at the composition roots with `verify/eyes.ts#eyesOn` (`mcp/tools.ts#guardOpts`, `flow/engine.ts`'s
   `acting`), as the first question is; interact/ imports no verify/.
 

@@ -5,7 +5,7 @@ import type { UiNode } from '../adapters/types.js';
  * two is drawn on top in their overlap (draw-order.ts#Exposure.unordered; docs/adr/0015-flat-list-reading-order-break.md,
  * amended). The eyes' second question answers it (ui-tree/eyes.ts#Eyes.order, judged by verify/eyes.ts#judgeOrder);
  * this module holds the answer as the draw order takes it — an INPUT of the pure draw order
- * (draw-order.ts#drawOrder's `seen`), so the draw order stays synchronous and replayable, and a tree-only caller, which
+ * (draw-order.ts#drawOrder's `orderSeen`), so the draw order stays synchronous and replayable, and a tree-only caller, which
  * hands in none, keeps the listing's untold order.
  *
  * Why: SwiftUI lists a container's elements in reading order, by their tops — the lab's menu row W (`51,448 300x64`,

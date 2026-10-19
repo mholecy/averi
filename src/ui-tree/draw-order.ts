@@ -33,7 +33,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * listing gives the overlapping controls listed before it as covers too
  * when one holds its centre, and every overlapping control of it, before or after, as a
  * cover whose order it does not tell (`readingOrderPeers`, `Exposure.unordered`) — unless a screenshot
- * told it: the order SEEN is an input (`drawOrder`'s `seen`, ui-tree/seen-order.ts), a peer seen under the
+ * told it: the order SEEN is an input (`drawOrder`'s `orderSeen`, ui-tree/seen-order.ts), a peer seen under the
  * target no cover of it, one seen over it a cover named so (`Exposure.seenOver`).
  *
  * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
@@ -339,7 +339,7 @@ export interface Exposure {
   readonly unordered: readonly UiNode[];
   /**
    * The covers whose order the listing did not tell and a screenshot did — seen drawn over the node in their overlap
-   * (`drawOrder`'s `seen`, ui-tree/seen-order.ts) — in `covers`' order; empty when none. What the sentences read: such a
+   * (`drawOrder`'s `orderSeen`, ui-tree/seen-order.ts) — in `covers`' order; empty when none. What the sentences read: such a
    * cover is named as drawn over the node, a screenshot showing it on top, and no scroll is advised
    * (ui-tree/standing.ts#Remedy's `seenOver`). A peer seen UNDER the node is no cover, nor in `aimedClearOf`.
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md

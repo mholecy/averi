@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -166,6 +166,11 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // stopped before any swipe, nothing stroked (the same three); W's tap refused under C, the order not told (LOUD: the
     // residual of the fix). Its first run, -3.json, is pinned below: idb's first case timed out there, vacuous.
     ['ios-vis-r8-l4-4.json', 'visibility', { cases: 40, ok: 13, loud: 2, mismatches: 25 }],
+    // round 9's L4 fix, its remaining half (fix/r9-l4w 1ef11b9c, ADR 0024; docs/truth/live-ios-2026-10-18-visibility.md,
+    // its round-9 section): the eyes tell the menu row W drawn over C — W's tap Tapped, W alone fired, under idb and
+    // WDA; C's tap and scroll_until refused as under W, seen so, nothing fired or stroked. Its first run, -1.json, is
+    // pinned below: idb's first case timed out there, vacuous, as round 8's -3.json.
+    ['ios-vis-r9-l4w-2.json', 'visibility', { cases: 40, ok: 15, loud: 0, mismatches: 25 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -215,6 +220,21 @@ describe('live.ts --rejudge over the committed iOS records of L4\'s fix before i
     const { code, out } = await rejudge('ios-vis-r8-l4-3.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 40 cases, 14 ok, 2 loud, 24 mismatches \(0 not known\), 0 skipped$/m);
     expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
+    expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb tap:blur-menu.A\n');
+    expect(code).toBe(1);
+  });
+});
+
+// L4's remaining half (round 9): the first run at its src.
+describe('live.ts --rejudge over the first committed iOS record of L4\'s remaining half', () => {
+  // fix/r9-l4w 1ef11b9c's first run: every case as -2.json reads it but idb's tap of blur-menu's A, again the run's
+  // first case on a freshly booted simulator — the wait for A timed out with no tree, nothing tapped: ok, vacuously, so
+  // its entry reads FIXED here; it read Tapped (the menu dismissed) in -2.json, so the entry stays: exit 1, as recorded.
+  it('ios-vis-r9-l4w-1.json: idb\'s tap of A ok by a timeout, so FIXED; W tapped under both sources', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudge('ios-vis-r9-l4w-1.json', 'visibility');
+    expect(out).toMatch(/^# Live golden: 40 cases, 16 ok, 0 loud, 24 mismatches \(0 not known\), 0 skipped$/m);
+    expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
+    expect(out.match(/^- ok tap:blur-menu\.W blur-menu: tap W \(open\): fires it alone — Tapped id:"lab\.blur-menu\.W"$/gm)).toHaveLength(2);
     expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb tap:blur-menu.A\n');
     expect(code).toBe(1);
   });
