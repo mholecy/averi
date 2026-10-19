@@ -125,8 +125,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // ios-wda-bounded-long-list-11683c3-2.json, -3.json), 4 in the other (the budget spent, `refused`: -1.json). Each a
   // second unmoved stroke not turned back: R-direction still. (Round 5's record, ios-vis-2725e76.json, and the
   // b71cbbb run read `refused` too: no turn at all there.) LV4's `ios wda turn:scroll-bounded.F` struck off by round 7's
-  // A1 (480660a4: a read within a point is unmoved, so the turn comes after ONE unmoved stroke): ok in five runs of five
-  // (ios-wda-stop-carousel-r23-1…4.json, ios-wda-scroll-cells-659fdf00.json; docs/truth/live-ios-2026-10-18-one-stroke-stop.md).
+  // A1 (480660a4: a read within a point is unmoved, so the turn comes after ONE unmoved stroke): ok in six runs of six
+  // (ios-wda-stop-carousel-r23-1…4.json, ios-vis-r23-ios-stop-e687fe83.json, ios-wda-scroll-cells-659fdf00.json;
+  // docs/truth/live-ios-2026-10-18-one-stroke-stop.md).
   // LV5's `ios wda scroll:scroll-bounded.F` struck off by round 6's iOS device check: ok in all four runs at 11683c3
   // (ios-vis.json, ios-wda-bounded-long-list-11683c3-1…3.json: `lower` at rest at 915–981, inside F's 884–1000
   // window), where round 5's src overshot to 1052 in one run of three and to 1006 (F cut, a plain stop) today.
@@ -141,7 +142,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // carousel-in-list's C: one sideways stroke flings the carousel 447–532 pt, C's centre inside over 177–531 only; at
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
   // Its intermittent entry struck off by round 7's A1 (f76be36a, e687fe83, 659fdf00: the unmeasured first stroke cut to
-  // 126 pt, the stop judged on the read the fling rests in): C ok, settled, in five runs of five (the same records).
+  // 126 pt, the stop judged on the read the fling rests in): C ok, settled, in six runs of six (the same records).
   // blur-menu-grouped's C: WDA lists the menu row W over it, so the stop is refused — after three strokes on the blur
   // (no node: residual 9), "content exhausted … a layout defect".
   ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
