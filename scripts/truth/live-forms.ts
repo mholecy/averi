@@ -1,6 +1,6 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
+import { ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
 import type { LabState, Rect } from './schema.js';
 
 /**
@@ -135,11 +135,14 @@ export const judgeUnderSheet =
 
 /**
  * c5–c7: an element assert, a colour assert and a flow's `wait:` on name beneath form-picker's sheet, open at launch
- * and fully expanded (the not-founds round 7's A3 asked by a scratch driver: docs/truth/live-android-2026-10-19-hint-everywhere.md). name lies
- * beneath the sheet, so the call must FAIL — an assert's `N/M asserts FAILED`, the flow's `ERROR Timed out …`; a pass
- * (or a flow done) is a MISMATCH — nothing may fire, and its not-found says the sheet's remedy exactly once
- * (`remedyUnderSheet`): none, or "close it first" twice, is LOUD. The why quotes an assert's verdict line, not its
- * summary.
+ * and fully expanded (the not-founds round 7's A3 asked by a scratch driver:
+ * docs/truth/live-android-2026-10-19-hint-everywhere.md). name lies beneath the sheet, so the call must fail on not
+ * finding it (replies.ts#missedTarget: the assert's `not found within …`, the flow's `Timed out … waiting for element`),
+ * nothing may fire, and the not-found says the sheet's remedy exactly once (`remedyUnderSheet`): none, or "close it
+ * first" twice, is LOUD. A MISMATCH otherwise: a pass or a flow done; an assert that FAILED on an element it found (the
+ * colour wrong) — averi resolved an element beneath the sheet; and an ERROR that is no wait for the target (a flow the
+ * config lacks, a bad argument) — a harness fault, named so, never an honest LOUD. The why quotes an assert's verdict
+ * line, not its summary.
  */
 export const judgeMissUnderSheet =
   (tag: string) =>
@@ -148,6 +151,11 @@ export const judgeMissUnderSheet =
     const logged = loggedSince(s, launched);
     if (!ASSERTS_FAILED.test(reply) && !isError(reply)) return { outcome: 'MISMATCH', kind, why: `averi says ${firstLine(reply)} — ${tag} lies beneath the picker sheet; the app logged ${logged.join(', ') || 'nothing'}` };
     if (logged.length > 0) return { outcome: 'MISMATCH', kind, why: `failed, but the app logged ${logged.join(', ')} — averi: ${firstLine(reply)}` };
+    if (!missedTarget(reply)) {
+      return ASSERTS_FAILED.test(reply)
+        ? { outcome: 'MISMATCH', kind, why: `averi found ${tag} beneath the picker sheet and failed it on what it read there: ${firstLine(reply)}` }
+        : { outcome: 'MISMATCH', kind, why: `a harness fault, not a verdict on ${tag}: ${firstLine(reply)}` };
+    }
     const { said, times } = remedyUnderSheet(reply, source);
     if (times > 1) return { outcome: 'LOUD', kind, why: `failed, nothing fired, but "close it first" said ${times} times: ${firstLine(reply)}` };
     if (said === undefined) return { outcome: 'LOUD', kind, why: `failed, nothing fired, but no "close it first": ${firstLine(reply)}` };

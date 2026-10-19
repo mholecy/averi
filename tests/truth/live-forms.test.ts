@@ -117,6 +117,13 @@ describe('c5–c7: an assert and a flow\'s wait: on name beneath form-picker\'s 
     expect(judge(launched, ['All 1 asserts passed\nPASS  element id:"lab.form-picker.name" exists'], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/lies beneath the picker sheet/) });
     expect(judge(launched, ['flow wait_name: start\nwait: element id:"lab.form-picker.name"\nflow wait_name: done'], 'uiautomator', launched).outcome).toBe('MISMATCH');
   });
+  it('an assert that found name beneath the sheet and failed it on its colour: MISMATCH — averi resolved an element beneath the sheet', () => {
+    const found = '1/1 asserts FAILED\nFAIL  element id:"lab.form-picker.name" fill within dE00 8 of #FFFFFF — measured #F2F2F7 (dE00 4.1) over its region';
+    expect(judge(launched, [found], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi found name beneath the picker sheet and failed it/) });
+  });
+  it('an ERROR that is no wait for the target (a flow the config lacks): MISMATCH named a harness fault, never LOUD', () => {
+    expect(judge(launched, ['ERROR Unknown flow "wait_name" — averi.yaml defines none'], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^a harness fault, not a verdict on name: /) });
+  });
   it('the not-found without the hint, or with "close it first" twice: LOUD', () => {
     expect(judge(launched, [asserted.replace(` (${ACTIVE_WINDOW_HINT})`, '')], 'uiautomator', launched)).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/no "close it first"/) });
     expect(judge(launched, [`${waited}\n  (${ACTIVE_WINDOW_HINT})`], 'uiautomator', launched)).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/said 2 times/) });
