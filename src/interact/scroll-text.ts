@@ -1,11 +1,11 @@
 import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, coverText, drawnOverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { EyesFinding, SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { outsideItsScrollView, presentedRemedy, presentedStop, reachOf } from '../ui-tree/standing.js';
+import { coverClause, outsideItsScrollView, presentedRemedy, presentedStop, unorderedRemedy } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
@@ -165,7 +165,7 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  */
 function underText({ judged, cover }: Extract<Shortfall, { of: 'covered' }>): string {
   const { centreCover, shows } = judged.standing.facts;
-  return `${drawnOverText(cover, cover === centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, cover))} — ${percent(shows)}% of it shows`;
+  return `${coverClause(judged.standing.facts, cover, cover === centreCover ? tapPoint(judged.node) : undefined)} — ${percent(shows)}% of it shows`;
 }
 
 /** The soft keyboard a match was judged under (`Judged.under`), as a cut-by remedy names it (target-text.ts#cutByRemedy). */
@@ -450,11 +450,15 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         };
       }
       if (short.of === 'covered') {
+        // A cover whose order the tree does not tell (listed in reading order) is no layout defect it can name.
+        const why =
+          judged.standing.kind !== 'reachable' && judged.standing.remedy.of === 'unordered'
+            ? `Which of the two is drawn on top the tree does not tell — ${unorderedRemedy('it')}.`
+            : 'The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes.';
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${underText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. The app draws that over it at the end of the content — a layout defect ` +
-              `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${neither}. ${why} ${last}`,
         };
       }
       // Clipped at the keyboard's edge at the end of the content: the
@@ -538,7 +542,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       const where =
         next === undefined
-          ? `element is in the viewport but ${drawnOverText(o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined, reachOf(judged.standing.facts, o.cover))} — ${percent(judged.standing.facts.shows)}% of it shows`
+          ? `element is in the viewport but ${coverClause(judged.standing.facts, o.cover, o.cover === judged.standing.facts.centreCover ? tapPoint(judged.node) : undefined)} — ${percent(judged.standing.facts.shows)}% of it shows`
           : `${notInViewportText(judged, viewport)}${touchDownText(next)}`;
       return {
         message:

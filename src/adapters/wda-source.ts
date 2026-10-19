@@ -126,16 +126,25 @@ export function parseWdaSourceValue(value: unknown): UiNode {
   if (judged) tree.presentationsJudged = true;
   // Nested tree, flat rule: rects are absolute, so a walk is all it takes.
   attachFieldErrors(everyNode(tree));
-  return markUnclippedFrames(tree);
+  return markWdaDialect(tree);
 }
 
 /**
- * The WDA source's dialect, marked on its tree's root (UiNode.unclippedFrames): every frame as laid out, a scroll
- * view's content past its frame too. THE mark: the parser sets it on every tree, and a WDA `ui_snapshot` capture that
- * lacks it (older captures do) is given it with this, so it is judged as the live source's tree. Returns `tree`.
+ * The WDA source's dialect, marked on its tree: on its root, every frame as laid out, a scroll view's content past its
+ * frame too (UiNode.unclippedFrames); and on every node whose two or more children's tops never decrease in the order
+ * listed, that run listed in READING order (UiNode.readingOrder) — SwiftUI's: the lab's in-screen menu lists its six
+ * buttons `A 110, B 290, K 380, W 448, C 470, D 650` as siblings of one `Other`, W drawn over C by `zIndex`. A run
+ * listed out of that order is not reading order, so its order is kept as draw order. THE marks: the parser sets them
+ * on every tree, and a WDA `ui_snapshot` capture that lacks them (older captures do) is given them with this, so it is
+ * judged as the live source's tree. Returns `tree`.
+ * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  */
-export function markUnclippedFrames<T extends UiNode>(tree: T): T {
+export function markWdaDialect<T extends UiNode>(tree: T): T {
   tree.unclippedFrames = true;
+  for (const node of everyNode(tree)) {
+    const tops = node.children.map((child) => child.rect.y);
+    if (tops.length >= 2 && tops.every((top, i) => i === 0 || top >= tops[i - 1])) node.readingOrder = true;
+  }
   return tree;
 }
 

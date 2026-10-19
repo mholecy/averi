@@ -330,7 +330,9 @@ describe('tool descriptions on a screen presented over the target', () => {
   });
 
   it('tap: the general remedy defers to it, and its refusal says to close the screen first; a host with children is no such screen', () => {
-    expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below). ');
+    expect(description('tap')).toContain('with less showing it is REFUSED, naming the cover, nothing tapped — scroll_until it first, unless the cover is a screen presented over the target (below); ');
+    // …or a cover whose order the tree does not tell (iOS's reading order): no scroll advised either.
+    expect(description('tap')).toContain('"overlapped by …, the two listed in reading order: which is drawn on top is not told" and advises a screenshot, not a scroll. ');
     expect(description('tap')).toContain('fully: true when the next step measures it), unless a screen is presented over the target (below); ');
     expect(description('tap')).toContain(
       'Under a screen presented over the target — iOS wda: a layer WebDriverAgent shows presented (see ui_snapshot\'s "presentation"; an alert, an action sheet or a popover is named as ui_snapshot says); elsewhere (Android): a modal\'s full-screen dimming view or a sheet\'s scroll view, laid after the target\'s screen in the same window — the refusal says so instead of "scroll_until it first" or the status bar\'s advice, whatever else keeps the target from a tap — its centre under that screen, off the screen or under the status bar (wholly too: the screen is judged presented over the target itself, wherever it lies), or a cut at its scroll container\'s edge: ' +

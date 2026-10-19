@@ -117,8 +117,9 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
     // RESIDUAL #31 (ADR 0018 residual 9): the blur menu's backdrop has no node in either tree — A, B, D beneath it read
-    // as open. C's centre lies under the menu row W (its probe fires W): on the grouped variant's WDA tree C is refused
-    // under W, truly, but not "close it first" (#31's); elsewhere C reads as open — L4's misreading, below.
+    // as open. C's centre lies under the menu row W (its probe fires W): C is refused under W, truly, but not "close it
+    // first" (#31's) — on the grouped variant's WDA tree as W is listed after it, elsewhere since L4's fix (a control
+    // listed before it in reading order, overlapping it, is a cover whose order is not told, ADR 0015's amendment).
     ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'D']),
@@ -126,15 +127,14 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused under the menu row W drawn over its centre; the backdrop has no node', as: BLUR }),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the menu row W; the backdrop has no node', as: BLUR }),
     ...keys(`${IOS}/blur-menu-grouped.wda.json`, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: 'strokes for C under the menu row W; the backdrop has no node', as: BLUR }),
-    // LAB FINDING (calibration.json L4): the menu row W, listed in reading order just before C, which it is drawn over,
-    // reads as covered by C under idb and WDA (no reading break, ADR 0015) — a false refusal; and C, listed after W,
-    // reads as drawn over W: Tapped at its centre, which fires W, a colour PASS on W's colour, fully visible — the unsafe
-    // direction (also on the grouped variant's idb list, where W's rows are right).
     ...[`${IOS}/blur-menu.idb.json`, `${IOS}/blur-menu.wda.json`, `${IOS}/blur-menu-grouped.idb.json`].flatMap((file) => [
-      ...keys(file, ['C'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: [SLOT_TAP.C], note: 'lab finding: C read as drawn over the menu row W over its centre — the tap fires W', as: LAB_MENU }),
-      ...keys(file, ['C'], ['colour'], { cls: `passed on ${BLURRED.C}`, kind: 'PASS', calls: [], note: "lab finding: W's colour measured as C's", as: LAB_MENU }),
-      ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'visible', calls: [], note: 'lab finding: C fully visible under the menu row W', as: LAB_MENU }),
+      ...keys(file, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused as overlapped by the menu row W listed before it, the order not told; the backdrop has no node', as: BLUR }),
+      ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails as overlapped by the menu row W, the order not told; the backdrop has no node', as: BLUR }),
+      ...keys(file, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_STROKE, IDB_STROKE, IDB_UP], note: 'strokes for C overlapped by the menu row W; the backdrop has no node', as: BLUR }),
     ]),
+    // LAB FINDING (calibration.json L4, its residual): the menu row W, listed in reading order just before C, which it
+    // is drawn over, still reads as covered by C under idb and WDA (C listed after it, read as draw order; no reading
+    // break, ADR 0015) — a false refusal, the safe direction: the listing does not tell which of the two is on top.
     ...['idb', 'wda'].flatMap((src) => [
       ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: 'lab finding: the menu row read as under the row it is drawn over', as: LAB_MENU }),
       ...keys(`${IOS}/blur-menu.${src}.json`, ['W'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: 'lab finding: the menu row read as under the row it is drawn over', as: LAB_MENU }),

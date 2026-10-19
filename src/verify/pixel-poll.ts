@@ -6,7 +6,7 @@ import { lookOn, type Look } from '../ui-tree/look.js';
 import { pollTree } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { outsideItsScrollView, presentedRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame } from './capture.js';
@@ -536,7 +536,9 @@ async function judgeOver(
     }
     case 'covered': {
       const named = coverText(standing.cover, standing.reach);
-      return `${named} is drawn over the element ${at}) — ${coverRemedy(standing.remedy)}`;
+      // A cover whose order against the element the tree does not tell (listed in reading order) is said as such.
+      const over = standing.facts.unordered?.includes(standing.cover) === true ? `overlaps the element ${at}), the two listed in reading order: which is drawn on top is not told` : `is drawn over the element ${at})`;
+      return `${named} ${over} — ${coverRemedy(standing.remedy)}`;
     }
     default: {
       // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).
@@ -615,6 +617,8 @@ const coverRemedy = (remedy: CoverRemedy): string => {
       return `${scroll} — or, if no scroll moves it out from under that, ${CLEAR_CHILD}`;
     case 'scroll':
       return scroll;
+    case 'unordered':
+      return `the capture may show it, not the element; ${unorderedRemedy('the element')}`;
   }
 };
 

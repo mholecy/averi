@@ -110,7 +110,8 @@ interface IdbElement {
  * `idb ui describe-all --json` returns a FLAT array of elements, not a tree —
  * normalize under a synthetic root with all elements as direct children,
  * marked `flatList` (UiNode.flatList: ui-tree/draw-order.ts reads the list's
- * order by a rule of its own). (ui-tree/geometry.ts relies on that root
+ * order by a rule of its own) and `readingOrder` (UiNode.readingOrder: idb
+ * lists in reading order, not draw order). (ui-tree/geometry.ts relies on that root
  * being 0x0: it infers the screen size from the children, never from a
  * wrapper.)
  */
@@ -142,6 +143,7 @@ function idbTree(elements: IdbElement[]): UiNode {
     rect: zeroRect(),
     children,
     flatList: true,
+    readingOrder: true,
     ...(listsPresentedLayer(elements) && { presentation: 'screen' as const }),
   };
 }

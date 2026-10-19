@@ -1,6 +1,6 @@
 import type { ApplicationLabel, IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
-import { markUnclippedFrames } from '../../src/adapters/wda-source.js';
+import { markWdaDialect } from '../../src/adapters/wda-source.js';
 import type { Recording } from './corpus.js';
 
 /**
@@ -19,11 +19,15 @@ import type { Recording } from './corpus.js';
  *    WdaServer.source()'s `res.json()`. WDA has no narrower seam to replay
  *    at: below WdaTreeSource is WdaServer's process lifecycle.
  *  - a NORMALIZED capture of either kind (a `ui_snapshot` tree): served as
- *    it is; the parser is not exercised — but a WDA tree's root is given the
- *    mark the WDA parser sets on every tree (UiNode.unclippedFrames, with
- *    this checkout's src/adapters/wda-source.ts#markUnclippedFrames; older
- *    `ui_snapshot` captures lack it), so the sweep judges it as the live
- *    source's tree; a side that does not know the field ignores it.
+ *    it is; the parser is not exercised — but a WDA tree is given the marks
+ *    the WDA parser sets on every tree (UiNode.unclippedFrames on its root,
+ *    UiNode.readingOrder on its runs sorted by top, with this checkout's
+ *    src/adapters/wda-source.ts#markWdaDialect; older `ui_snapshot` captures
+ *    lack them), so the sweep judges it as the live source's tree; a side
+ *    that does not know a field ignores it. A normalized idb capture older
+ *    than its root's `readingOrder` mark is served without it (the
+ *    reading-order cover rule is not asked of it): the truth corpus holds
+ *    raw idb payloads only.
  * A RAW idb capture does not: idb's source has a narrower seam already — its
  * `exec` — so it is replayed by the side's own IdbTreeSource over the fake
  * device (fake-device.ts answers `ui describe-all`), empty-tree error and
@@ -54,7 +58,7 @@ export class RecordedTreeSource implements IosTreeSource {
     this.onRead(`${this.kind} tree read (${this.recording.form})`);
     const value: unknown = JSON.parse(this.recording.payload);
     if (this.recording.form === 'raw') return this.parseWdaSourceValue(value);
-    return this.kind === 'wda' ? markUnclippedFrames(value as UiNode) : (value as UiNode);
+    return this.kind === 'wda' ? markWdaDialect(value as UiNode) : (value as UiNode);
   }
 
   /** As WdaTreeSource answers (declined, no read); a normalized tree keeps no element types to answer from. */

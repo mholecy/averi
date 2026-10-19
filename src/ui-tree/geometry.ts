@@ -1160,6 +1160,15 @@ export const drawnOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): 
   `under ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
 
 /**
+ * How a sentence says a cover whose ORDER against the target the tree does not tell lies over it
+ * (draw-order.ts#Exposure.unordered — the two listed in reading order): `overlapped by button "Target W" (51,448
+ * 300x64) at its centre (201,502), the two listed in reading order: which is drawn on top is not told` — the place
+ * `drawnOverText` takes in the same sentences (ui-tree/standing.ts#coverClause chooses).
+ */
+export const orderUntoldText = (cover: QuotedNode, centre?: Point, reach?: Rect): string =>
+  `overlapped by ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, the two listed in reading order: which is drawn on top is not told`;
+
+/**
  * A cover as a sentence names it, with where it presses when that is not its rect (draw-order.ts#Exposure.reaches: a
  * pinned bar run down to the screen's bottom, a tab bar's item raised by its lift, an alert over the whole screen):
  * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the

@@ -15,7 +15,9 @@ import {
   clippedEdges,
   clipsOf,
   containsPoint,
+  drawnOverText,
   drawnPart,
+  orderUntoldText,
   overlapsPastSlack,
   PIXEL_OVERLAP_SLACK,
   rectWithin,
@@ -422,6 +424,8 @@ export interface StandingFacts {
   readonly centreExcused: readonly UiNode[];
   /** draw-order.ts#Exposure's: the covers that are the surface of a screen presented over the node (a modal's dim, a sheet's form); absent when none. */
   readonly presented?: readonly UiNode[];
+  /** draw-order.ts#Exposure's: the covers whose order against the node the tree does not tell (listed in reading order); absent when none. */
+  readonly unordered?: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -483,6 +487,25 @@ export const presentedStop = (layer?: MarkedLayer): string => {
   return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };
 
+/**
+ * THE remedy's words for a node under a cover whose order against it the tree does not tell (`Remedy`'s `unordered`),
+ * the node named as `what` — as `presentedRemedy`'s: no scroll tells which of the two is drawn on top, so none is
+ * advised (a stroke beside an in-screen menu may close it); a screenshot shows it, and a menu or popover drawn over
+ * the node is closed first.
+ * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+ */
+export const unorderedRemedy = (what: 'it' | 'the element'): string =>
+  `no scroll tells which is on top: see a screenshot — if the other is drawn over ${what} (a menu, a popover), close it first`;
+
+/**
+ * How a sentence says `cover`, one of `facts.covers`, lies over the node — at its centre when `centre` is given: drawn
+ * over it (geometry.ts#drawnOverText), or, one of `facts.unordered`, overlapping it in an order the tree does not tell
+ * (geometry.ts#orderUntoldText). The one choice of the two for the tap's refusal and move, and `scroll_until`'s
+ * covered sentences.
+ */
+export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered'>, cover: UiNode, centre?: Point): string =>
+  (facts.unordered?.includes(cover) === true ? orderUntoldText : drawnOverText)(cover, centre, reachOf(facts, cover));
+
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
 
@@ -508,18 +531,23 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  *    dim), else the last presented surface among its covers, else the last drawn over it. `layer`: the presented
  *    layer the tree source marks when that surface is its element (presentation.ts#Presentation.press), which
  *    `presentedRemedy` names.
- * 2. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
+ * 2. `unordered` — `covered` by a cover whose order against the node the tree does not tell (`facts.unordered`,
+ *    draw-order.ts#Exposure.unordered: the two listed in reading order): which is drawn on top is not told, and no
+ *    scroll tells it — a screenshot does (`unorderedRemedy`). Not `scroll`: a stroke for the lab's menu row's
+ *    neighbour would land on the menu's backdrop, which closes it.
+ *    docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+ * 3. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
- * 3. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
+ * 4. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
  *    — under a system bar, content no scroll lifts out of a band (`pinnedSurface`: the screen itself, a full-bleed
  *    header or footer); under a cover, idb's flat-list root (`covered.overRoot`, `root`), a screen-sized element
  *    (`screen`) or a full-bleed header (`header`). Act on something in it clear of that.
- * 4. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
+ * 5. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
  *    (geometry.ts#Clips.inScroller false): no scroll moves it out.
- * 5. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
+ * 6. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
  *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
  *    the cover's reach holds it whole.
- * 6. `scroll` — a scroll moves it into reach: off the screen, clipped (a `fully` stop), cut to a sliver (toward the
+ * 7. `scroll` — a scroll moves it into reach: off the screen, clipped (a `fully` stop), cut to a sliver (toward the
  *    standing's `cut.edge`), under a cover over its centre (the touch purposes: the tap may refine it, its
  *    positioner hint, interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
  *
@@ -541,6 +569,7 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  */
 export type Remedy =
   | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: MarkedLayer }
+  | { readonly of: 'unordered' }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
   | { readonly of: 'pinned' }
@@ -550,7 +579,7 @@ export type Remedy =
 /** One case of `Remedy`. */
 type RemedyCase<O extends Remedy['of']> = Extract<Remedy, { readonly of: O }>;
 
-/** 4.–6. of THE PRECEDENCE: what a scroll may do for a node under a bar or (the pixel assert's) a cover (`scrollable`). */
+/** 5.–7. of THE PRECEDENCE: what a scroll may do for a node under a bar or (the pixel assert's) a cover (`scrollable`). */
 export type ScrollableRemedy = RemedyCase<'pinned' | 'stuck' | 'scroll'>;
 
 /** The remedies each touch kind (the tap, the stops) can carry — `fixed` never: only the pixel assert's region judges it. */
@@ -559,7 +588,7 @@ interface TouchRemedies {
   readonly systemBar: RemedyCase<'presented'> | ScrollableRemedy;
   readonly clipped: RemedyCase<'presented' | 'scroll'>;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
-  readonly covered: RemedyCase<'presented' | 'scroll'>;
+  readonly covered: RemedyCase<'presented' | 'unordered' | 'scroll'>;
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
@@ -568,7 +597,7 @@ interface PixelRemedies {
   readonly offScreen: RemedyCase<'presented' | 'scroll'>;
   readonly systemBar: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
-  readonly covered: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
+  readonly covered: RemedyCase<'presented' | 'unordered' | 'fixed'> | ScrollableRemedy;
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
@@ -738,15 +767,17 @@ function remedied(
   if ('touch' in judging) {
     const touch = judging.touch;
     switch (touch.kind) {
-      // 2. The keyboard.
+      // 3. The keyboard.
       case 'underKeyboard':
         return { ...touch, remedy: { of: 'keyboard' } };
-      // 6. What a scroll brings within reach whatever lies around it — and a touch's cover over the centre: scroll it
-      // clear (the stop's stuck sentence names a cover no scroll clears).
+      case 'covered':
+        // 2. Under a cover whose order the tree does not tell: no scroll tells it. 7. Else a touch's cover over the
+        // centre: scroll it clear (the stop's stuck sentence names a cover no scroll clears).
+        return { ...touch, remedy: touch.facts.unordered?.includes(touch.cover) === true ? { of: 'unordered' } : { of: 'scroll' } };
+      // 7. What a scroll brings within reach whatever lies around it.
       case 'offScreen':
       case 'clipped':
       case 'cut':
-      case 'covered':
         return { ...touch, remedy: { of: 'scroll' } };
       case 'systemBar':
         return { ...touch, remedy: scrollable(scene.clips.inScroller(node), false) };
@@ -758,22 +789,24 @@ function remedied(
   }
   const { pixel, box, bands } = judging;
   switch (pixel.kind) {
-    // 2. The keyboard.
+    // 3. The keyboard.
     case 'underKeyboard':
       return { ...pixel, remedy: { of: 'keyboard' } };
-    // 6. What a scroll brings within reach whatever lies around it.
+    // 7. What a scroll brings within reach whatever lies around it.
     case 'offScreen':
     case 'cut':
       return { ...pixel, remedy: { of: 'scroll' } };
     case 'systemBar': {
-      // 3. Content no scroll lifts out of a band — the pixel assert's region only.
+      // 4. Content no scroll lifts out of a band — the pixel assert's region only.
       const fixed = pinnedSurface(node, box, bands, scene.clips);
       if (fixed !== undefined) return { ...pixel, remedy: { of: 'fixed', what: fixed } };
       // Laid from the box's top edge under the status bar: a scroll may not move it (a pinned header's place).
       return { ...pixel, remedy: scrollable(scene.clips.inScroller(node), pixel.bar.edge === 'top' && node.rect.y <= box.y) };
     }
     case 'covered':
-      // 3. No scroll ever moves the screen itself out from under anything — idb's flat-list root, a screen-sized
+      // 2. Under a cover whose order the tree does not tell: no scroll tells it.
+      if (pixel.facts.unordered?.includes(pixel.cover) === true) return { ...pixel, remedy: { of: 'unordered' } };
+      // 4. No scroll ever moves the screen itself out from under anything — idb's flat-list root, a screen-sized
       // element — nor an element laid from the screen's top edge at full width (a full-bleed header: iOS's, or
       // Android 15+'s edge-to-edge app bar).
       if (pixel.overRoot === true) return { ...pixel, remedy: { of: 'fixed', what: 'root' } };
@@ -788,7 +821,7 @@ function remedied(
 }
 
 /**
- * 4.–6. of THE PRECEDENCE for a node under a bar or a cover: `pinned` in no scroll view; `stuck` where the tree
+ * 5.–7. of THE PRECEDENCE for a node under a bar or a cover: `pinned` in no scroll view; `stuck` where the tree
  * cannot say (idb's flat list), or where `stuckInPlace` — the pixel assert's node laid from the box's top edge under
  * the status bar, or held whole by its cover's reach — a scroll in a scroll view may still not move it out; else
  * `scroll`.
@@ -1171,6 +1204,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
     centreExcused: seen.centreExcused,
     ...(seen.presented.length > 0 && { presented: seen.presented }),
+    ...(seen.unordered.length > 0 && { unordered: seen.unordered }),
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),

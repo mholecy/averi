@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { lookAt, lookOn } from '../../src/ui-tree/look.js';
-import { presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, sceneOf, unorderedRemedy } from '../../src/ui-tree/standing.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { judgeTap } from '../../src/interact/tap-judgement.js';
@@ -11,6 +11,7 @@ import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { node } from '../helpers/fake.js';
@@ -663,5 +664,49 @@ describe('a target not in the tree beneath a marked presented screen — scroll_
     const played = play(RULES, [row, row, row]);
     expect(played.steps.some((s) => s.do === 'stroke')).toBe(true);
     expect(played.outcome?.kind).not.toBe('presented');
+  });
+});
+
+// A cover whose order against the target the tree does not tell (draw-order.ts#Exposure.unordered: the lab's in-screen
+// menu row W, listed before the row C it is drawn over, in reading order) is said as overlapping it, and no verb
+// advises a scroll for it — one stroke beside the menu lands on its backdrop, which closes it (Remedy's `unordered`).
+// docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+describe('one remedy for a target under a cover whose order is not told — the tap, the pixel assert and scroll_until agree', () => {
+  const lab = async (name: string) => readFile(new URL(`../fixtures/truth/ios-iphone17-ios27/${name}`, import.meta.url), 'utf8');
+  const trees = async (): Promise<[string, UiNode][]> => [
+    ['idb', parseIdbDescribeAll(await lab('blur-menu.idb.json'))],
+    ['wda', parseWdaSource(await lab('blur-menu.wda.json'))],
+  ];
+  const c = (tree: UiNode) => [...everyNode(tree)].find((n) => n.identifier === 'lab.blur-menu.C')!;
+  const OVERLAPPED = 'overlapped by button "Target W" (51,448 300x64) at its centre (201,502), the two listed in reading order: which is drawn on top is not told';
+
+  it('the standing carries `unordered` for every purpose', async () => {
+    for (const [name, tree] of await trees()) {
+      const scene = sceneOf(tree);
+      const of = (s: { kind: string; remedy?: { of: string } }) => (s.kind === 'reachable' ? 'reachable' : s.remedy?.of);
+      expect({
+        name,
+        tap: of(scene.standing(c(tree), USABLE, { of: 'tap' })),
+        stop: of(scene.standing(c(tree), USABLE, { of: 'stop' })),
+        fully: of(scene.standing(c(tree), USABLE, { of: 'fully' })),
+        pixel: of(scene.standing(c(tree), USABLE, { of: 'pixel', reads: colorSampleRect, glyphs: false })),
+      }).toEqual({ name, tap: 'unordered', stop: 'unordered', fully: 'unordered', pixel: 'unordered' });
+    }
+  });
+
+  it('word for word: overlapped, the order not told, no scroll advised', async () => {
+    for (const [, tree] of await trees()) {
+      expect(await tapSaid(tree, c(tree))).toBe(`id:t is ${OVERLAPPED}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('it')}; nothing was tapped`);
+      expect(await colourSaid(tree, c(tree))).toBe(
+        'button "Target W" (51,448 300x64) overlaps the element (element 51,470 300x64), the two listed in reading order: which is drawn on top is not told — ' +
+          `the capture may show it, not the element; ${unorderedRemedy('the element')}`,
+      );
+      // Read unchanged after every swipe: the content is exhausted, as on the lab's screen.
+      const row: Row = { tree, found: [c(tree)], screen: USABLE };
+      const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, Array(4).fill(row)), 'id:t').message;
+      expect(failure).toContain(`element is in the viewport but ${OVERLAPPED} — 34% of it shows`);
+      expect(failure).toContain(`Which of the two is drawn on top the tree does not tell — ${unorderedRemedy('it')}.`);
+      expect(failure).not.toContain('layout defect');
+    }
   });
 });

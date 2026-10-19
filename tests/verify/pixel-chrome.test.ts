@@ -91,6 +91,8 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
     expect(coversNamed(misses)).toEqual({
       'button "Continue to summary" (24,512 354x44, reaching 24,512 354x77)': 1,
       'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)': 20,
+      // mp-native's payment-type chooser row over `Loan repayment` (24,435), listed after it in idb's reading order (L4's rule).
+      'button "SWIFT payment" (45,453 312x52)': 1,
       'button (948,99 110x110)': 2, // Compose's top-bar button over the screen-sized root
       'container "!, Open debugger to view warnings." (10,787 382x49)': 4,
       'container (154,88 407x132)': 2,
@@ -125,6 +127,8 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'button "Priority*, Standard" (24,399 354x52)': 1,
       'button "Priority*, Standard" (24,406 354x52)': 1,
       'button "Priority*, Standard" (24,414 354x52)': 1,
+      // mp-native's payment-type chooser row over `Loan repayment` (24,435), listed after it in idb's reading order (L4's rule).
+      'button "SWIFT payment" (45,453 312x52)': 1,
       'text "Payee’s bank street & no.*" (42,759 192x20)': 1,
       'text "Payee’s city" (42,724 87x20)': 1,
       'text "The IBAN belongs to a country outside the SEPA area" (24,640 354x40)': 1,
