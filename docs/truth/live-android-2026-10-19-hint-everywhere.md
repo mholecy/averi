@@ -72,3 +72,22 @@ the `(the tree lists only the window presented on top (the tree source lists the
 presented over it — close it first)` the alert-dim replies above (and the e726c77 record) quote. The tap's headline,
 the form-picker replies and the active-window hint are unchanged; the records predate the rewording and were not
 re-run (golden carries the new words: alert-dim and sheet-medium A–D colour).
+
+# 2026-10-19: c5–c7, the harness cases (round 7's code review, truth/r7-cr)
+
+The harness case proposed above, in scripts/truth/live.ts beside c2–c4 (Android only): with form-picker's sheet open
+at launch and fully expanded, c5 an element assert on name, c6 a colour assert on it (`#FFFFFF`), c7 `run_flow` of a
+flow whose one step is `wait:` on it (the case's own averi.yaml `flows`, which live.ts#configFor now writes). The
+judge, scripts/truth/live-forms.ts#judgeMissUnderSheet: the call must FAIL (a pass, or a flow done, is a MISMATCH —
+name lies beneath the sheet), the app log nothing (no event, no focus), and the not-found say the sheet's remedy —
+the presented remedy or the active-window hint — exactly once; none, or "close it first" twice, is LOUD
+(tests/truth/live-forms.test.ts).
+
+    node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups forms --cases c2,c3,c4,c5,c6,c7 --record <file>
+
+Run on averi_lab (emulator-5554, booted `-no-snapshot-save -no-window`), this checkout's src (truth/r7-cr, harness
+5c738b36), the lab app as installed on the AVD; record docs/truth/live-records/android-hint-c5c7-r7cr.json: **6 cases,
+6 ok, 0 loud, 0 mismatches** — c2–c4 as before; c5 `FAIL  element id:"lab.form-picker.name" exists — not found within
+3 s (the tree lists only the active window: …)`, c6 the same after `fill within dE00 8 of #FFFFFF — not found within
+5 s`, c7 `ERROR Timed out after 3000ms waiting for element id:"lab.form-picker.name"` with the hint beneath it once.
+Nothing fired in any. Pinned in tests/truth/live-rejudge.test.ts.

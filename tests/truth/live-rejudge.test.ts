@@ -76,6 +76,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // form-picker's c2–c4 with every not-found carrying the miss note — the replies of the taps unchanged, ok
     ['android-hint-everywhere-9fa59ae-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-hint-everywhere-e726c77-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    // round 7's code review (truth/r7-cr, this checkout): c2–c4 again and c5–c7, an assert, a colour assert and a
+    // flow's wait: on name beneath the sheet — each failed, the active-window hint once, nothing fired
+    ['android-hint-c5c7-r7cr.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     // round 7's React Native lab app (rn-field, `--app react-native`, the record keeping its app): the forms cases
     // rn1–rn6 and the label and icon taps; LOUD where WDA (LR1) and uiautomator (LR2) refuse a label under its own field,
     // and where a fill into an RN single-line field lost the tail of its text (averi said so: "the field shows 8").
