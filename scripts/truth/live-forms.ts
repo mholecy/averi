@@ -1,6 +1,6 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { claimsDone, claimsTap, isError, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
+import { ASSERTS_FAILED, claimsDone, claimsTap, isError, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
 import type { LabState, Rect } from './schema.js';
 
 /**
@@ -8,7 +8,7 @@ import type { LabState, Rect } from './schema.js';
  * form model, so they are pinned without a device (tests/truth/live-forms.test.ts). `holds` is every fill case's;
  * the two below it are lab note F2A1's form-keyboard cases, whose submit bar riding on the IME has no node — the app's
  * frames (`submit.bar`) say what of a field it covers, which the tree cannot; `judgeUnderSheet` is the taps beneath
- * form-picker's sheet.
+ * form-picker's sheet, `judgeMissUnderSheet` the asserts and the flow's `wait:` there.
  */
 
 export const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
@@ -92,31 +92,63 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
 }
 
 /**
+ * What a reply beneath form-picker's sheet must say, once, per tree source — as much as the source can know: WDA marks
+ * the sheet, so the presented remedy ("close it first"); uiautomator's dump marks no presented window here (no scrim:
+ * ADR 0018's residual 18, accepted with the active-window hint), so the hint (src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT);
+ * idb lists the presented sheet alone and carries no mark (ADR 0018, "iOS unchanged"; measured live 2026-10-19,
+ * docs/truth/live-ios-2026-10-19-lab-fixes.md), so the target not in its tree is all it can say. `said` names which,
+ * undefined when the reply says none of them; `times` how often it says "close it first" (once is the rule).
+ */
+function remedyUnderSheet(reply: string, source: string): { said?: string; times: number } {
+  const times = reply.split('close it first').length - 1;
+  const said =
+    presentedRemedySaid(reply) ? 'the presented remedy, once'
+    : windowHintSaid(reply) ? 'the active-window hint, once'
+    : source === 'idb' && replyKind(reply) === 'not found' ? "not in idb's tree (it lists the presented sheet alone)"
+    : undefined;
+  return { said, times };
+}
+
+/** What the app logged beneath the sheet since the launch: an event (a row selected, the sheet dismissed, a submit) or a field focused. */
+function loggedSince(s: LabState, launched: LabState): string[] {
+  const focused = s.focus != null && s.focus !== launched.focus ? s.focus : undefined;
+  return [...firedSince(s, launched).map((e) => `${e.kind} ${e.tag}`), ...(focused === undefined ? [] : [`focus ${focused}`])];
+}
+
+/**
  * c2–c4: a tap on form-picker's name, country or submit beneath the picker sheet, open at launch and fully expanded.
- * Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and no `Tapped`. What the
- * reply must say then is per tree source, as much as the source can know: WDA marks the sheet, so the presented remedy
- * ("close it first", once); uiautomator's dump marks no presented window here (no scrim: ADR 0018's residual 18,
- * accepted with the active-window hint), so the hint (src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT), once; idb lists the
- * presented sheet alone and carries no mark (ADR 0018, "iOS unchanged"; measured live 2026-10-19,
- * docs/truth/live-ios-2026-10-19-lab-fixes.md), so the target not in its tree — "Timed out … to appear" — is all it
- * can say, and is ok. Anything else, or "close it first" said twice, is LOUD.
+ * Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and no `Tapped`; the reply
+ * says the sheet's remedy once (`remedyUnderSheet`). Anything else, or "close it first" said twice, is LOUD.
  */
 export const judgeUnderSheet =
   (tag: string) =>
   (s: LabState, [reply]: string[], source: string, launched: LabState): LiveVerdict => {
     const kind = replyKind(reply);
-    const fired = firedSince(s, launched);
-    const focused = s.focus != null && s.focus !== launched.focus ? s.focus : undefined;
-    const logged = [...fired.map((e) => `${e.kind} ${e.tag}`), ...(focused === undefined ? [] : [`focus ${focused}`])];
+    const logged = loggedSince(s, launched);
     if (claimsTap(reply)) return { outcome: 'MISMATCH', kind, why: `averi says ${short(reply)} — ${tag} lies beneath the picker sheet; the app logged ${logged.join(', ') || 'nothing'}` };
     if (logged.length > 0) return { outcome: 'MISMATCH', kind, why: `refused, but the app logged ${logged.join(', ')} — averi: ${short(reply)}` };
-    const by =
-      presentedRemedySaid(reply) ? 'the presented remedy, once'
-      : windowHintSaid(reply) ? 'the active-window hint, once'
-      : source === 'idb' && kind === 'not found' ? "not in idb's tree (it lists the presented sheet alone)"
-      : undefined;
-    const times = reply.split('close it first').length - 1;
-    if (by === undefined) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but no "close it first": ${short(reply)}` };
+    const { said, times } = remedyUnderSheet(reply, source);
     if (times > 1) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but "close it first" said ${times} times: ${short(reply)}` };
-    return { outcome: 'ok', kind, why: `not tapped, nothing fired; ${by}: ${short(reply)}` };
+    if (said === undefined) return { outcome: 'LOUD', kind, why: `not tapped, nothing fired, but no "close it first": ${short(reply)}` };
+    return { outcome: 'ok', kind, why: `not tapped, nothing fired; ${said}: ${short(reply)}` };
+  };
+
+/**
+ * c5–c7: an element assert, a colour assert and a flow's `wait:` on name beneath form-picker's sheet, open at launch
+ * and fully expanded (the not-founds round 7's A3 asked by a scratch driver: docs/truth/live-android-2026-10-19-hint-everywhere.md). name lies
+ * beneath the sheet, so the call must FAIL — an assert's `N/M asserts FAILED`, the flow's `ERROR Timed out …`; a pass
+ * (or a flow done) is a MISMATCH — nothing may fire, and its not-found says the sheet's remedy exactly once
+ * (`remedyUnderSheet`): none, or "close it first" twice, is LOUD.
+ */
+export const judgeMissUnderSheet =
+  (tag: string) =>
+  (s: LabState, [reply]: string[], source: string, launched: LabState): LiveVerdict => {
+    const kind = replyKind(reply);
+    const logged = loggedSince(s, launched);
+    if (!ASSERTS_FAILED.test(reply) && !isError(reply)) return { outcome: 'MISMATCH', kind, why: `averi says ${short(reply)} — ${tag} lies beneath the picker sheet; the app logged ${logged.join(', ') || 'nothing'}` };
+    if (logged.length > 0) return { outcome: 'MISMATCH', kind, why: `failed, but the app logged ${logged.join(', ')} — averi: ${short(reply)}` };
+    const { said, times } = remedyUnderSheet(reply, source);
+    if (times > 1) return { outcome: 'LOUD', kind, why: `failed, nothing fired, but "close it first" said ${times} times: ${short(reply)}` };
+    if (said === undefined) return { outcome: 'LOUD', kind, why: `failed, nothing fired, but no "close it first": ${short(reply)}` };
+    return { outcome: 'ok', kind, why: `failed, nothing fired; ${said}: ${short(reply)}` };
   };
