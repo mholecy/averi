@@ -87,7 +87,11 @@ moves the adapter sends), each from a fresh launch:
   presented and the form scrolled 120 pt — 3 of 3. A downward drag was not sent there: a sheet at its scroll top would
   have been pulled down.
 
-The live k1–k3 and dismissal cases at this src: docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md.
+**Live, at this src** (docs/truth/live-ios-2026-10-18-keyboard-fallbacks.md, records
+docs/truth/live-records/ios-keyboard-fallbacks-*.json): k2 and k3 — LOUD before — ok 3 of 3 each: the title and the
+blank point leave the keyboard up, the drag lifts the target clear of it (120 pt for `vs`, 278 pt for `note`) and
+averi taps / fills it, saying the keyboard is still up but no longer over it; no submit, no other field touched. k1
+(nothing configured) refused as before, 3 of 3; the dismissal group 24 of 24 ok.
 
 ## Residuals accepted
 
