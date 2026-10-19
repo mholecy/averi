@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, sheetDetent, showsProgress, treeFingerprint } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, screenChangedUnder, screenIdentity, sheetDetent, showsProgress, treeFingerprint, type IdentifiedRead } from '../../src/ui-tree/read-tree.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -362,5 +364,35 @@ describe('sheetDetent — the detent a sheet\'s grabber reports', () => {
     expect(sheetDetent(screen())).toBeUndefined();
     expect(sheetDetent(screen(grabber(null)))).toBeUndefined();
     expect(sheetDetent(screen(grabber('Expanded'), grabber(null)))).toBeUndefined();
+  });
+});
+
+// THE SCREEN CHANGED UNDER THE STROKE, asked of two reads directly (ui-tree/read-tree.ts#screenChangedUnder): the lab's
+// large sheet as idb lists it (sheet-background.idb.json) and the plain host (open.idb.json), which share no id.
+describe('screenChangedUnder — another screen by identity, and nothing the strokes touched down on still listed', () => {
+  const TRUTH = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
+  const read = (cell: string): IdentifiedRead => {
+    const tree = parseIdbDescribeAll(readFileSync(new URL(`${cell}.idb.json`, TRUTH), 'utf8'));
+    return { tree, identity: screenIdentity(tree) };
+  };
+  const node = (role: string, label: string | null, identifier: string | null, rect: UiNode['rect'], children: UiNode[] = []): UiNode => ({ role, label, identifier, value: null, rect, children });
+  const screen = { x: 0, y: 0, width: 402, height: 874 };
+  const listRead = (from: number): IdentifiedRead => {
+    const tree = node('application', 'App', null, screen, [
+      node('scrollable', null, null, { x: 0, y: 100, width: 402, height: 700 }, Array.from({ length: 4 }, (_, i) => node('button', null, `row_${from + i}`, { x: 0, y: 100 + 64 * i, width: 402, height: 64 }))),
+    ]);
+    return { tree, identity: screenIdentity(tree) };
+  };
+
+  it("the sheet, then the host, a stroke from (201,175) on idb's screen-sized Application alone: changed, the sheet's id gone", () => {
+    expect(screenChangedUnder(read('sheet-background'), read('open'), [{ x: 201, y: 175 }])).toEqual({ touchDowns: [{ x: 201, y: 175 }], gone: ['lab.sheet-background.S'] });
+  });
+
+  it('the same two reads with no stroke between them: no change told', () => {
+    expect(screenChangedUnder(read('sheet-background'), read('open'), [])).toBeUndefined();
+  });
+
+  it('a list that keeps its scroll view at the very same rect while every row id changes: a scroll, not a change', () => {
+    expect(screenChangedUnder(listRead(0), listRead(40), [{ x: 201, y: 600 }])).toBeUndefined();
   });
 });

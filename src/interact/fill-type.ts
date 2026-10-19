@@ -18,7 +18,7 @@
  *   the text only by CHANGING to show it (`tookText`). The history of each
  *   clause is in the comments below; they moved here unchanged from fill.ts
  *   (2026-10-19).
- * - the poll: five reads at `pollMs` until the reading lands, never stopping
+ * - the poll: READ_BACK_POLLS (five) reads at `pollMs` until the reading lands, never stopping
  *   early on an unchanged mismatch (`pollValue`).
  * - what is sent again, bounded, in this order:
  *   1. A DROPPED TAIL (2026-10-19, docs/bugs/2026-10-19-ios-fill-loses-the-
@@ -201,13 +201,13 @@ function inputsOf(tree: UiNode, except?: string): OtherInputs {
 }
 
 /**
- * Where the typing went, as far as the screen proves (2026-10-19, review of this branch: an auto-advancing code box
- * moved the focus to the next box, and a tail typed again went into the note below — `34234`):
+ * Where the typing went, as far as the screen proves (2026-10-19, docs/adr/0023-fill-types-a-dropped-tail-again.md:
+ * an auto-advancing code box moved the focus to the next box, and a tail typed again went into the note below — `34234`):
  * - `field`: every input the screen had when typing began is there with the value it had — nothing else took it;
  * - `elsewhere`: one of them GAINED typed text — its old value is a prefix of its new one, and what was appended is
  *   part of what the field is missing of the typing (`missing`): the typing provably went there (the code boxes:
  *   `2` and `34`, both inside the missing `234`);
- * - `unproven`: any other change — a sibling the app recomputed, replaced or shortened (review round 2: an exchange
+ * - `unproven`: any other change — a sibling the app recomputed, replaced or shortened (ADR 0023: an exchange
  *   form's `converted` amount, set to twice the `amount` typed, made a clear fill that had always recovered fail) —
  *   or nothing read before typing, the read-back's tree missing, an input of then gone or moved, or no `missing`
  *   to compare with (the field's reading is no prefix of what it should hold).
@@ -236,13 +236,16 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
   return unproven ? { kind: 'unproven' } : { kind: 'field' };
 }
 
+/** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
+const priorText = (intent: Pick<TypingIntent, 'clear' | 'before' | 'placeholder'>): string => (intent.clear ? '' : heldText(intent.before, intent.placeholder));
+
 /**
  * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
  * when its reading is a prefix of that and shows no bullet — else undefined. Pure.
  */
 function missingOf(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
   const held = heldText(observed, intent.placeholder);
-  const prior = intent.clear ? '' : heldText(intent.before, intent.placeholder);
+  const prior = priorText(intent);
   const whole = prior + intent.value;
   if (hasBullet(held) || hasBullet(prior) || held.length >= whole.length || !whole.startsWith(held)) return undefined;
   return whole.slice(held.length);
@@ -255,8 +258,7 @@ function missingOf(observed: string, intent: Pick<TypingIntent, 'value' | 'clear
  * content). Pure.
  */
 export function droppedTail(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
-  const prior = intent.clear ? '' : heldText(intent.before, intent.placeholder);
-  if (heldText(observed, intent.placeholder).length <= prior.length) return undefined;
+  if (heldText(observed, intent.placeholder).length <= priorText(intent).length) return undefined;
   return missingOf(observed, intent);
 }
 
@@ -270,6 +272,9 @@ interface PollEnd {
   steady: boolean;
   prior?: string;
 }
+
+/** How many reads `pollValue` takes of the field at most, `pollMs` apart — a round count, not a deadline (ui-tree/read-tree.ts's module doc says why). */
+const READ_BACK_POLLS = 5;
 
 /**
  * Poll the field until its exposed value satisfies `ok`; returns the last observation.
@@ -289,12 +294,12 @@ interface PollEnd {
 async function pollValue(read: () => Promise<string | undefined>, ok: (observed: string) => boolean, pollMs: number): Promise<PollEnd> {
   let observed: string | undefined;
   let previous: string | undefined;
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < READ_BACK_POLLS; i++) {
     previous = observed;
     observed = await read();
     if (observed !== undefined && ok(observed)) return { observed, steady: false };
     // No text (a non-input withholding it) or no field — stop waiting. An
-    // empty input reads "" and keeps the five rounds: its text may be late.
+    // empty input reads "" and keeps every round: its text may be late.
     if (observed === undefined && i >= 1) return { observed, steady: false };
     await sleep(pollMs);
   }

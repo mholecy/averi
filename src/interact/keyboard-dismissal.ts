@@ -1,6 +1,7 @@
-import { everyNode, rectArea, rectIntersection, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { outsideScrollViewText, screenOf } from '../ui-tree/geometry.js';
 import type { Look } from '../ui-tree/look.js';
+import { isUnnamedWrapper } from '../ui-tree/placed.js';
 import { scrollAxis, scrolls } from '../ui-tree/scroll-containers.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton } from '../ui-tree/soft-keyboard.js';
@@ -47,7 +48,7 @@ import { coverName, cutSliverText } from './target-text.js';
  *   ends editing on a tap, and a rule that tells it from a row.
  *
  * Every move is irreversible and none is repeated; what the looks after a move find, and what the reply says, is the
- * in-tree model's. Nothing here asks the device.
+ * in-tree model's. Nothing here reads the device; `perform` sends the one move.
  */
 
 /** Where a strategy is judged: one look, the screen the guard judges on, the ambiguity policy, and the target the guard protects (absent on the post-fill dismissal). */
@@ -98,23 +99,44 @@ export function perform(adapter: Pick<DeviceAdapter, 'tap' | 'swipe'>, move: Dis
   return move.kind === 'tap' ? adapter.tap(move.at.x, move.at.y) : adapter.swipe(move.from, move.to, dismissalDragMs(move));
 }
 
-/** `tapping id:"login_title"`, `dragging the target's scroll view up` — the fragment after `hidden by `. */
-export const moving = (m: DismissalMove): string => (m.kind === 'tap' ? `tapping ${m.what}` : `dragging ${m.what} ${direction(m)}`);
+/**
+ * A move as every sentence words it, one record per kind (`wordsOf`): a tap names its element, which is its place; a
+ * drag names what it dragged and which way, and says where only where a note asks (`…Noted`).
+ */
+export interface MoveWords {
+  /** `tapping id:"login_title"`, `dragging the target's scroll view up` — the fragment after `hidden by `. */
+  readonly moving: string;
+  /** `tapped id:"login_title"`, `dragged the target's scroll view up`. */
+  readonly moved: string;
+  /** `at (201,303)`, `from (201,502) to (201,382)`. */
+  readonly at: string;
+  /** `tapping id:"login_title"`, `dragging the target's scroll view up from (201,502) to (201,382)` — `moving` as a note says it. */
+  readonly movingNoted: string;
+  /** `tapped id:"login_title"`, `dragged the target's scroll view up from (201,502) to (201,382)` — `moved` as a note says it. */
+  readonly movedNoted: string;
+  /** `id:"login_title" was tapped at (201,303)`, `the target's scroll view was dragged up from (201,502) to (201,382)`. */
+  readonly passive: string;
+}
 
-/** `tapped id:"login_title"`, `dragged the target's scroll view up`. */
-export const moved = (m: DismissalMove): string => (m.kind === 'tap' ? `tapped ${m.what}` : `dragged ${m.what} ${direction(m)}`);
-
-/** `tapped id:"login_title"`, `dragged the target's scroll view up from (201,502) to (201,382)` — a note's words: a drag says where, a tap's element is its place. */
-export const movedNoted = (m: DismissalMove): string => (m.kind === 'tap' ? moved(m) : `${moved(m)} ${movedAt(m)}`);
-
-/** `at (201,303)`, `from (201,502) to (201,382)`. */
-export const movedAt = (m: DismissalMove): string => (m.kind === 'tap' ? `at ${pointText(m.at)}` : `from ${pointText(m.from)} to ${pointText(m.to)}`);
-
-/** `id:"login_title" was tapped at (201,303)`, `the target's scroll view was dragged up from (201,502) to (201,382)`. */
-export const movedPassive = (m: DismissalMove): string => (m.kind === 'tap' ? `${m.what} was tapped ${movedAt(m)}` : `${m.what} was dragged ${direction(m)} ${movedAt(m)}`);
+/** The words of `m` (`MoveWords`). */
+export function wordsOf(m: DismissalMove): MoveWords {
+  if (m.kind === 'tap') {
+    const at = `at ${pointText(m.at)}`;
+    return { moving: `tapping ${m.what}`, moved: `tapped ${m.what}`, at, movingNoted: `tapping ${m.what}`, movedNoted: `tapped ${m.what}`, passive: `${m.what} was tapped ${at}` };
+  }
+  const way = m.to.y >= m.from.y ? 'down' : 'up';
+  const at = `from ${pointText(m.from)} to ${pointText(m.to)}`;
+  return {
+    moving: `dragging ${m.what} ${way}`,
+    moved: `dragged ${m.what} ${way}`,
+    at,
+    movingNoted: `dragging ${m.what} ${way} ${at}`,
+    movedNoted: `dragged ${m.what} ${way} ${at}`,
+    passive: `${m.what} was dragged ${way} ${at}`,
+  };
+}
 
 const pointText = ({ x, y }: Point): string => `(${x},${y})`;
-const direction = (m: Extract<DismissalMove, { kind: 'drag' }>): string => (m.to.y >= m.from.y ? 'down' : 'up');
 
 // ─── The configured strategies ────────────────────────────────────────────────
 
@@ -310,9 +332,9 @@ interface BlankPoint {
  *
  * A node in the square lets the point be when it is the scroll view or one of its ancestors (they hold the point), a
  * hidden subtree's (WDA's `isVisible="0"` subtree, drawn nowhere: adapters/types.ts#UiNode.hidden), the keyboard's own
- * (its Windows are screen-sized; the band is below the area anyway), or a BARE wrapper — a structural role
- * (`STRUCTURAL_ROLES`) with no label, identifier or value — that has children (what it carries is judged by itself) or
- * lies inside the scroll view (a spacer of its content). Anything else stops it: a control, a text, an image, a nested
+ * (its Windows are screen-sized; the band is below the area anyway), or a BARE wrapper — an unnamed one
+ * (ui-tree/placed.ts#isUnnamedWrapper: a structural role with no label, identifier or value) — that has children (what
+ * it carries is judged by itself) or lies inside the scroll view (a spacer of its content). Anything else stops it: a control, a text, an image, a nested
  * scroll view, a scroll indicator (labelled), an identified view (an RN `testID`, a navigation bar), and a bare LEAF
  * outside the scroll view — a dimming view or a decoration drawn over it.
  *
@@ -348,8 +370,7 @@ async function blankPoint({ look, screen, target }: DismissalGround): Promise<Bl
   const blockers: Rect[] = [];
   const walk = (n: UiNode): void => {
     if (n.hidden === true || look.reading.ofKeyboard(n)) return;
-    const bare = STRUCTURAL_ROLES.has(n.role) && !n.label && !n.identifier && !n.value;
-    if (!holds.has(n) && rectArea(n.rect) > 0 && !(bare && (n.children.length > 0 || inside.has(n)))) blockers.push(n.rect);
+    if (!holds.has(n) && rectArea(n.rect) > 0 && !(isUnnamedWrapper(n) && (n.children.length > 0 || inside.has(n)))) blockers.push(n.rect);
     for (const c of n.children) walk(c);
   };
   walk(look.tree);
@@ -371,7 +392,13 @@ async function blankPoint({ look, screen, target }: DismissalGround): Promise<Bl
   return { skipped: 'none in the target\'s scroll view above the keyboard' };
 }
 
-/** The nodes from `root` down to `node`, both included, by identity; undefined when `node` is not in the tree. */
+/**
+ * The nodes from `root` down to `node`, both included, by identity; undefined when `node` is not in the tree. The blank
+ * point reads the target's nearest scroll view off it, and the scroll view's ancestors (`holds`). Not
+ * geometry.ts#Clips.drawnIn's `scrollers`: that is kept only on a tree that lists ancestry and unclipped frames, and
+ * passes over a scroll view of no area, so it would answer otherwise wherever either fails — and the path is needed
+ * for `holds` anyway.
+ */
 function pathTo(root: UiNode, node: UiNode): UiNode[] | undefined {
   if (root === node) return [root];
   for (const c of root.children) {

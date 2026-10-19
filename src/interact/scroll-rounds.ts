@@ -1,9 +1,8 @@
-import { everyNode, rectArea, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, flushEdges, quoted, rectIntersection, sameRectWithinPixel, screenOf, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
+import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
-import { isScrollViewOf, scrolls } from '../ui-tree/scroll-containers.js';
-import { anotherScreen, screenIdentity, type ScreenIdentity, type SheetDetent } from '../ui-tree/read-tree.js';
-import { eyesQuestion, type EyesAnswer, type EyesFinding, type EyesQuestion, type SurfaceFinding } from '../ui-tree/eyes.js';
+import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
+import { askedOf, eyesQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion } from '../ui-tree/eyes.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
@@ -198,7 +197,7 @@ export type RoundStep =
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
- * - `changed`: the screen changed under the strokes (`ScreenChange`) — the
+ * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is
  *   in it (`found`) or not.
@@ -244,50 +243,6 @@ export type ScrollOutcome = (
     }
   | { kind: 'changed'; swipes: number; change: ScreenChange; found: boolean }
 ) & { detent?: DetentMove; endTurn?: EndTurn };
-
-/**
- * THE SCREEN CHANGED UNDER THE STROKE (round 7's A5, iOS point 4 of docs/truth/live-ios-2026-10-18-visibility.md;
- * ADR 0018 residual 6): the first read that reads after the strokes since the last one is ANOTHER SCREEN than that
- * read — by identity, none of its identified nodes is listed any more (ui-tree/read-tree.ts#anotherScreen) — and no
- * stroke among them touched down on a node of that read that the read after STILL LISTS (`touchedPersists`: a
- * labelled node by role and label, a scroll view by its rect; the root and a screen-sized frame aside). Then what the strokes moved was not content but the screen itself: a sheet or a
- * modal they touched down on dismissed, the app gone elsewhere — and a target found now is found on that other
- * screen, not brought into view. Measured under idb: beneath the lab's large sheet (sheet-background), whose tree
- * lists the sheet's button alone and no sign of the sheet, `scroll_until` for A stroked from (201,175) on the sheet's
- * bare surface, the stroke DISMISSED it, and the next read listed the host's A–D: "fully visible after 1 swipe". Now
- * it stops there, saying so, and sends nothing more onto the new screen. averi never claims a stop after its own
- * stroke changed the presented layer; where the tree shows the layer, no stroke is sent at all (the marks: an idb
- * list holding UIKit's dismiss region, adapters/ios-tree-source.ts#listsPresentedLayer).
- *
- * Why both conditions: ids alone are not enough — a fling through a list whose rows carry ids of their own (row_1 …
- * row_40) can carry every listed row off a list that lists only what shows (a Compose LazyColumn, a UIKit table, an
- * RN FlatList). What tells such a fling from a dismissal is what the stroke TOUCHED: a list keeps its frame through the
- * fling (uiautomator's `scrollable` list, WDA's scroll view, at the very same rect after), a section header it touched
- * keeps its label; a dismissed sheet's own row, list or labelled surface is not listed after at all. So the excuse is
- * persistence, not being named: the slice's review round 2 found "the touched node names itself" excusing exactly the
- * sheet whose rows carry ids (sheet-long-list's rows given ids, stroked from (201,175) and dismissed — read visible),
- * and replaced it. Never excused: the root, and a structural frame the size of the screen that does not scroll
- * (`SCREEN_SIZED_FRACTION`: idb's `Application`, a window, a dim) — every screen of the app has it, so it persists
- * across any change; sheet-background's (201,175) lies on idb's `Application 'AveriLab'` alone. Residuals, stated:
- * - a screen whose reads list no id at all (idb's UIKit table rows, NI1) is never told changed;
- * - RECYCLED ROWS give a loud stop: under idb, which lists no scroll view, a fling that replaces every identified row
- *   it lists — touching down on a row or a gap — reads `changed` (the stop where the scroll could have gone on: the
- *   failure the decision prefers to a claimed stop); a list that also lists a node the read after keeps under the
- *   touch-down (a labelled header, a scroll view) is a scroll;
- * - a stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by role and label (a
- *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists —
- *   keeps it unchanged, the stop claimed as before;
- * - a presented layer that shares an id with the screen beneath, or a keyboard's ids listed at both reads, keeps it
- *   unchanged.
- * Source-agnostic: on WDA and uiautomator trees a fling keeps its scroll view's rect, so it is excused; a dismissal
- * there is their marks' to stop for first.
- */
-export interface ScreenChange {
-  /** Where the strokes since the read before touched down, in order — none of them on a node the read after still lists. */
-  readonly touchDowns: readonly Point[];
-  /** The identifiers that read listed (ui-tree/read-tree.ts#ScreenIdentity), each once, in tree order, none of them listed after — what the sentence quotes, as selectors (`id:"…"`). */
-  readonly gone: readonly string[];
-}
 
 /**
  * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below;
@@ -492,7 +447,7 @@ export interface PastSide {
  * A FLING STILL SLOWING spends none of them (`Observed.slowing`): a confirming read that found the target — the
  * same node — moved less over its settle pause than the read before found it moved over its own is read again
  * free, until the deadline. A fling slows read for read; an animation moves as much at every read and spends the
- * budget as before. Measured under WDA (round 7, the lab app's `carousel-in-list`, C a card as wide as its
+ * budget as before. Measured under WDA (the lab app's `carousel-in-list`, C a card as wide as its
  * carousel): one 212-pt stroke flung the carousel 447–532 pt over ~2.5 s, and the reads after it, 0.47 s apart,
  * found C moving 54, 21, 8 pt (66, 24, 10 in another run) — the third confirming read still 8–10 pt from rest, so
  * the stop was claimed "still moving"; in the run that flung 532 pt it was claimed on a read with C's centre inside
@@ -686,12 +641,12 @@ interface State {
   /** A `stop` was returned: no further round. */
   readonly done: boolean;
   /**
-   * The last `fully: true` claim the eyes refused (THE EYES, `round`): the question's region and neighbour, and the
-   * shortfall it left. A read after the next stroke that finds both where they were is refused again at once — no
+   * The last `fully: true` claim the eyes refused (THE EYES, `round`): the question as asked (ui-tree/eyes.ts#EyesAsked:
+   * its region and its neighbours' rects), and the shortfall it left. A read after the next stroke that finds both where they were is refused again at once — no
    * confirming read, no second screenshot: nothing moved, so the pixels did not — and is that stroke's read, which
    * the stuck test counts. Undefined until a refusal.
    */
-  readonly eyesRefused: EyesRefusal | undefined;
+  readonly eyesRefused: { readonly asked: EyesAsked; readonly short: Extract<InFrameShort, { of: 'unlisted' }> } | undefined;
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
   readonly owesDrawn: boolean;
   /**
@@ -811,8 +766,8 @@ interface State {
   readonly treeUnmovedStrokes: number;
   /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
   readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
-  /** The last read that read, its tree and the screen's identity — what `screenChangedUnder` compares the next one with; undefined until a read reads. */
-  readonly screenBefore: { readonly tree: UiNode; readonly identity: ScreenIdentity } | undefined;
+  /** The last read that read, its tree and the screen's identity — what ui-tree/read-tree.ts#screenChangedUnder compares the next one with; undefined until a read reads. */
+  readonly screenBefore: IdentifiedRead | undefined;
   /** Where each stroke drawn since that read touched down (`RoundSeen.drawn`'s `from`), in order. */
   readonly touchDowns: readonly Point[];
 }
@@ -1330,35 +1285,6 @@ const motionOf = (from: Rect, to: Rect): number => Math.max(Math.abs(to.x - from
 /** The same size within a pixel each way: a node that grew or shrank (a header collapsing) did not just move. */
 const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 
-/** A claim the eyes refused (`State.eyesRefused`): the question's region and its neighbours' rects, and the shortfall it left. */
-interface EyesRefusal {
-  readonly region: Rect;
-  readonly neighbours: readonly Rect[];
-  readonly short: Extract<InFrameShort, { of: 'unlisted' }>;
-}
-
-/** The question asks of the target and neighbours the refusal was made of, each within a pixel: nothing moved, so the pixels did not. */
-const sameAsked = (refused: EyesRefusal, q: EyesQuestion): boolean =>
-  sameRectWithinPixel(refused.region, q.region) && refused.neighbours.length === q.flush.length && q.flush.every((f, i) => sameRectWithinPixel(refused.neighbours[i]!, f.by.rect));
-
-/**
- * The band reaches the centre the next tap presses (selectors.ts#tapPoint) along its edge's axis — measured from the
- * edge of `region` (the question's) inward by its depth: the bar's padding over a 42-px label 23 px deep from its bottom
- * (1971–1993 of 1952–1993) reaches its centre at 1973.
- */
-function bandOverCentre({ edge, depth }: SurfaceFinding, region: Rect, centre: Point): boolean {
-  switch (edge) {
-    case 'bottom':
-      return region.y + region.height - depth <= centre.y;
-    case 'top':
-      return region.y + depth > centre.y;
-    case 'right':
-      return region.x + region.width - depth <= centre.x;
-    case 'left':
-      return region.x + depth > centre.x;
-  }
-}
-
 /** How far `to` lies from `from` the way content moves for a stroke toward `toward` (for `down`, up the screen): negative when the other way. */
 function motionToward(from: Rect, to: Rect, toward: Direction): number {
   switch (toward) {
@@ -1384,7 +1310,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     throw new Error(input.owesDrawn ? 'scroll round after a stroke without the stroke drawn' : 'scroll round with a stroke drawn but none asked for');
   }
   const s: Mutable<State> = { ...input, owesDrawn: false };
-  const ask = (what: 'witness' | 'unlocated'): Next => ({ state, step: { do: 'ask', what } });
+  // An ask step (`RoundStep`'s `ask`): the witness, the unlocated row, or the eyes' question; the state as it came in.
+  const ask = (asked: 'witness' | 'unlocated' | EyesQuestion): Next => ({ state, step: typeof asked === 'string' ? { do: 'ask', what: asked } : { do: 'ask', what: 'eyes', question: asked } });
   const { fully } = s.rules;
   const current = s.since;
   if (seen.drawn !== undefined) {
@@ -1403,7 +1330,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (found.length > 0) s.everFound = true;
   const viewport = s.frame.box;
 
-  // The screen changed under the strokes since the last read that read (`ScreenChange`): nothing of this read is judged
+  // The screen changed under the strokes since the last read that read (ui-tree/read-tree.ts#ScreenChange): nothing of this read is judged
   // — a target in it lies on another screen than the one stroked — and nothing more is stroked onto it. Asked before
   // the judgement, so no witness is asked of a read that is not judged.
   if (read !== undefined) {
@@ -1463,7 +1390,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
     // last refused them — no confirm, no screenshot; this stroke's read, short as before.
     const refused = s.eyesRefused;
-    const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameAsked(refused, question);
+    const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameQuestion(refused.asked, question);
     if (refusedAgain) unlisted = { ...refused.short, judged: best };
     if (stops(best) && !refusedAgain) {
       // The probe moved nothing: the match is where it was sent from — the
@@ -1504,13 +1431,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // (`unlisted`). A band short of the centre: the plain stop stops and says what lies over it. What the eyes could
       // not judge is said with the tree's claim.
       const eyes = question === undefined ? undefined : seen.eyes;
-      if (question !== undefined && eyes === undefined) return { state, step: { do: 'ask', what: 'eyes', question } };
+      if (question !== undefined && eyes === undefined) return ask(question);
       const finding: EyesFinding | undefined = eyes === undefined || eyes.sees === 'own' ? undefined : eyes;
-      if (finding?.sees !== 'surface' || !(fully || bandOverCentre(finding, question?.region ?? best.node.rect, tapPoint(best.node)))) {
+      if (finding?.sees !== 'surface' || !(fully || reachesPoint(finding, question?.region ?? best.node.rect, tapPoint(best.node)))) {
         return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }), ...(finding !== undefined && { eyes: finding }) });
       }
       unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
-      if (question !== undefined) s.eyesRefused = { region: { ...question.region }, neighbours: question.flush.map((f) => ({ ...f.by.rect })), short: unlisted };
+      if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
     }
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
@@ -1821,46 +1748,6 @@ function turnAtEnd(s: Mutable<State>, view: UiNode): void {
   s.seenShort = true;
   s.carriedPast = false;
   s.lastPast = undefined;
-}
-
-/** One read as `screenChangedUnder` compares it: its tree and the screen's identity (ui-tree/read-tree.ts#ScreenIdentity). */
-interface IdentifiedRead {
-  readonly tree: UiNode;
-  readonly identity: ScreenIdentity;
-}
-
-/**
- * The screen changed under the strokes (`ScreenChange`): `touchDowns` is not empty, the read after is another screen
- * by identity (ui-tree/read-tree.ts#anotherScreen), and no touch-down lies on a node of the read before that the read
- * after still lists (`touchedPersists`). Undefined otherwise — no stroke between the two reads, an id kept, or a
- * stroke that dragged what is still there.
- */
-function screenChangedUnder(before: IdentifiedRead, after: IdentifiedRead, touchDowns: readonly Point[]): ScreenChange | undefined {
-  if (touchDowns.length === 0 || !anotherScreen(before.identity, after.identity) || touchDowns.some((p) => touchedPersists(before.tree, after, p))) return undefined;
-  return { touchDowns, gone: before.identity.identifiers };
-}
-
-/**
- * A touch-down at `point` lay on a node of `tree` (the read before) that PERSISTS in `after` — what the stroke dragged
- * is still there, so it scrolled rather than replaced the screen. The node: not the root, of some area, holding the
- * point, and no structural frame the size of the screen that does not scroll (`SCREEN_SIZED_FRACTION` of the tree's
- * screen: idb's `Application 'AveriLab'`, a window, a dim — the frame every screen of the app has, persisting across
- * any change). It persists when `after` lists:
- * - for a node with a label and no identifier, a node of the same role and label, unidentified too;
- * - for a node that SCROLLS (scroll-containers.ts#scrolls), a scroll view of the very same rect
- *   (scroll-containers.ts#isScrollViewOf) — a list keeps its frame through a fling that recycles every row.
- * Not by its identifier: this is asked only of two reads that share none (`anotherScreen`), so an identified node
- * never persists. A sheet's own row, its list, its labelled surface are gone once the stroke dismissed the sheet: no
- * excuse.
- */
-function touchedPersists(tree: UiNode, after: IdentifiedRead, point: Point): boolean {
-  const screenArea = rectArea(screenOf(tree));
-  const frame = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.role) && !scrolls(n) && rectArea(n.rect) >= screenArea * SCREEN_SIZED_FRACTION;
-  const afterNodes = [...everyNode(after.tree)];
-  const persists = (n: UiNode): boolean =>
-    (n.identifier === null && n.label !== null && afterNodes.some((m) => m.role === n.role && m.identifier === null && m.label === n.label)) ||
-    (scrolls(n) && afterNodes.some((m) => isScrollViewOf(m, n.rect)));
-  return [...everyNode(tree)].some((n) => n !== tree && rectArea(n.rect) > 0 && containsPoint(n.rect, point) && !frame(n) && persists(n));
 }
 
 /** The top sheet's detent at the first read that read against the last (`DetentMove`): both read, as many grabbers, values differing. */
