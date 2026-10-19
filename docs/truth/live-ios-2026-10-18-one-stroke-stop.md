@@ -55,3 +55,18 @@ parked rows). `turn:scroll-bounded.F` "fully visible after 5 swipes; 1 swipe up 
 stroke); carousel C `visible after 1 swipe — CLIPPED at right, 84%`, settled; S `fully: true` first stroke the full
 108 pt again (`lower 0→190.3`, past the window, turned back to 147: 3 swipes — the full stroke's own spread; round 6
 read 2 at 0→170); no "still moving" in any reply.
+
+## The keyboard forms (review round 1, MAJOR-1; 2026-10-19, merged src 0eb344b5 against arch/round-23 e0452376)
+
+The first-stroke cut changes the replayed first stroke of every WDA keyboard-form scroll (form-keyboard vs/ks/ss/note
+310 → 108–188 pt, toolbar-dismiss -bar/-short 344 → 108–211). Measured live, the lab app built from truth/round-7
+5c711585's fixtures, both srcs as `--side`:
+- `--sources wda --groups forms` (records ios-wda-forms-r23-ios-stop.json, ios-wda-forms-r23.json): 23 cases, 18 ok,
+  5 loud, 0 mismatches at both; every reply the same (b1d, b7 differ in a timestamp only).
+- No live case scrolls those cells (k7, the phone scroll, is Android's), so five probes ran from a scratch copy of the
+  harness (`scroll_until` vs, ks, ss, note, submit on form-keyboard, the keyboard up; not committed to the harness),
+  twice at each src (ios-wda-kbscroll-{r23-ios-stop,r23}-{1,2}.json): `fully visible after 1 swipe` for vs, ks, ss,
+  note and `after 0 swipes` for submit, the same at both srcs, every run — no extra stroke, no turn.
+- The visibility cells whose replayed first stroke changed (form-keyboard, toolbar-dismiss*, scroll-top-edge*,
+  sheet-long-list-short; ios-wda-cut-cells-*.json): 16 cases, 16 ok at both, the same swipe counts.
+The prior is kept as it is: no measured case needs more strokes under it.
