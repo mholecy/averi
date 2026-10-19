@@ -1050,7 +1050,19 @@
           "why": "fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and until 837ec3e"
         }
       ],
-      "remark": "Fixed by round 8, 837ec3e on fix/r8-l2 (soft-keyboard.ts#flatListKeyboardBand: a node is of the keyboard's run when its part on the screen lies inside the background — idb's `Next keyboard`, parsed to end at 875 of 874, cut the run short, so Continue lifted onto the keyboard read as no cover; ADR 0007 amended): the pair is 837ec3e and its parent 6f3a633 (fix/round-8's src). Before: tap Tapped, sending `idb ui tap 201 547` (a submit); scroll_until fully visible after 0 swipes. After: both refused under Continue, no tap sent. Live (round 8, docs/truth/live-records/ios-forms-r8-l2-*.json): at 6f3a633 idb's k6 SUBMITTED the form; at 837ec3e no submit in three runs under idb and WDA. Not a gap that was always there — a twice-regressed row."
+      "remark": "Fixed by round 8, 837ec3e on fix/r8-l2 (soft-keyboard.ts#flatListKeyboardBand: a node is of the keyboard's run when its part on the screen lies inside the background — idb's `Next keyboard`, parsed to end at 875 of 874, cut the run short, so Continue lifted onto the keyboard read as no cover; ADR 0007 amended): the pair is 837ec3e and its parent 6f3a633 (fix/round-8's src). Before: tap Tapped, sending `idb ui tap 201 547` (a submit); scroll_until fully visible after 0 swipes. After: both refused under Continue, no tap sent. Not a gap that was always there — a twice-regressed row.",
+      "live": [
+        {
+          "platform": "ios",
+          "sources": ["idb"],
+          "before": "6f3a633",
+          "after": "837ec3e",
+          "cases": ["k6", "k7"],
+          "verdict": "CALIBRATED",
+          "remark": "Before (docs/truth/live-records/ios-forms-r8-l2-before.json, idb only): k6 Tapped and the app logged a SUBMIT; k7 fully visible after 0 swipes, phone's centre under the bar. After (ios-forms-r8-l2-1…3.json, idb and WDA): no submit in any run; idb's k6 refused under Continue in runs 2 and 3 (run 1: idb's describe-all failed, no frontmost application — timed out, nothing fired, vacuous), k7 one stroke to phone clear of the bar.",
+          "summary": "docs/truth/live-ios-2026-10-18-visibility.md"
+        }
+      ]
     },
     {
       "n": "L3",

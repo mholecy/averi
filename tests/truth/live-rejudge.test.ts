@@ -156,8 +156,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-rn-r7final-3.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['android-vis-dialogs-r7final.json', 'visibility', { cases: 26, ok: 22, loud: 0, mismatches: 4 }],
     // round 8's L2 fix (fix/r8-l2; docs/truth/live-ios-2026-10-18-visibility.md, its round-8 section): k6 and k7, opened
-    // to iOS, under idb and WDA three times — no submit; idb's k6 refused under Continue (run 1: phone not yet in idb's
-    // first tree, the wait timed out), k7 one stroke to phone clear of the bar
+    // to iOS, under idb and WDA three times — no submit; idb's k6 refused under Continue in runs 2 and 3 (run 1: idb's
+    // describe-all failed, no frontmost application, so no tree — the wait timed out, nothing fired: vacuous for the
+    // fix), k7 one stroke to phone clear of the bar
     ['ios-forms-r8-l2-1.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-2.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-3.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],

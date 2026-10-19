@@ -50,7 +50,7 @@ open note on the working tree. See the script for the verdicts.
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
 | TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
 | L1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | b71cbbb → d43df5d | CALIBRATED (partial: AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) is ADR 0018's residual 18, accepted by the owner 2026-10-18 with the active-window hint — its six rows filed as that residual) |
-| L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | calibrate | 6f3a633 → 837ec3e | CALIBRATED |
+| L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | calibrate | 6f3a633 → 837ec3e | CALIBRATED; live ios: CALIBRATED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | open | working tree | OPEN-RED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
@@ -977,7 +977,9 @@ Regressions recorded:
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at b75b8b5, fixed at 8c0fb41 — first-parent bisect: refused at 13d68a2, Tapped from b75b8b5 (fix/r5-cr)
 - ios-iphone17-ios27/form-keyboard.idb.json phone tap, ios-iphone17-ios27/form-keyboard.idb.json phone scroll_until: broke at 8a55d2b, fixed at 837ec3e — fix/r6b-idb (ADR 0015's idb flat-list reading): refused at 20053ae, Tapped at 8a55d2b and until 837ec3e
 
-Fixed by round 8, 837ec3e on fix/r8-l2 (soft-keyboard.ts#flatListKeyboardBand: a node is of the keyboard's run when its part on the screen lies inside the background — idb's `Next keyboard`, parsed to end at 875 of 874, cut the run short, so Continue lifted onto the keyboard read as no cover; ADR 0007 amended): the pair is 837ec3e and its parent 6f3a633 (fix/round-8's src). Before: tap Tapped, sending `idb ui tap 201 547` (a submit); scroll_until fully visible after 0 swipes. After: both refused under Continue, no tap sent. Live (round 8, docs/truth/live-records/ios-forms-r8-l2-*.json): at 6f3a633 idb's k6 SUBMITTED the form; at 837ec3e no submit in three runs under idb and WDA. Not a gap that was always there — a twice-regressed row.
+Live (phase 5, ios idb): **CALIBRATED**, 6f3a633 → 837ec3e, k6, k7 — Before (docs/truth/live-records/ios-forms-r8-l2-before.json, idb only): k6 Tapped and the app logged a SUBMIT; k7 fully visible after 0 swipes, phone's centre under the bar. After (ios-forms-r8-l2-1…3.json, idb and WDA): no submit in any run; idb's k6 refused under Continue in runs 2 and 3 (run 1: idb's describe-all failed, no frontmost application — timed out, nothing fired, vacuous), k7 one stroke to phone clear of the bar. (docs/truth/live-ios-2026-10-18-visibility.md)
+
+Fixed by round 8, 837ec3e on fix/r8-l2 (soft-keyboard.ts#flatListKeyboardBand: a node is of the keyboard's run when its part on the screen lies inside the background — idb's `Next keyboard`, parsed to end at 875 of 874, cut the run short, so Continue lifted onto the keyboard read as no cover; ADR 0007 amended): the pair is 837ec3e and its parent 6f3a633 (fix/round-8's src). Before: tap Tapped, sending `idb ui tap 201 547` (a submit); scroll_until fully visible after 0 swipes. After: both refused under Continue, no tap sent. Not a gap that was always there — a twice-regressed row.
 
 ## L3: CALIBRATED
 

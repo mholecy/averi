@@ -63,7 +63,7 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the
  * screen's size), listed right AFTER the keys — the node listed just before
- * it lies wholly inside it (without the keys the shape alone is a bottom sheet's unlabelled background, which
+ * it lies wholly inside it, by its part on the screen as every member below (without the keys the shape alone is a bottom sheet's unlabelled background, which
  * pre-order lists BEFORE its own rows — a band at the sheet's top, with no
  * keyboard on screen, cut the strokes and the taps there); the keyboard is
  * that node and the run of nodes listed beside it (before and after, in the
@@ -73,8 +73,9 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * (origin and size rounded apart) to end at 875 on an 874-pt screen, and a
  * run cut there left it and `Dictate` out, so the submit lifted onto the
  * keyboard read as no cover and its tap submitted the form
- * (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md)
- * — `from` to `to`, the walk indexes
+ * (docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md;
+ * the three toolbar-dismiss captures carry the same `Next keyboard 8,806 68x69`, their runs now reaching
+ * `Dictate` too, no reply changed) — `from` to `to`, the walk indexes
  * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
@@ -97,6 +98,10 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * content behind it that lies inside the sheet, or a tab bar's unlabelled
  * background listed after its buttons (no idb dump has either), reads as a
  * band — its top then ends the strokes and cuts a moved tap, the safe way.
+ * Residual, stated: a node of no area has no part on the screen, so one listed inside the band cuts the run there
+ * (an area-less key is nothing idb has listed: none in the committed idb captures); and a node overhanging the
+ * screen's bottom or side whose on-screen part lies inside the band joins the run as a key — idb drops an app node
+ * whose centre lies under the band (ADR 0007's residuals), so only the keyboard's own bottom row has that shape.
  */
 export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, barLine: number): { readonly top: number; readonly from: number; readonly to: number; readonly at: number } | undefined {
   const bottom = screen.y + screen.height;

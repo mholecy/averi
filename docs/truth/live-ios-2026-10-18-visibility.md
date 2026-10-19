@@ -247,7 +247,9 @@ this run's own on gRPC 10891 (`IDB_COMPANION=localhost:10891`). Reproduce (outsi
   `fully visible after 0 swipes`, phone's centre under the bar, no stroke.
 - **After**, idb: k6 refused — `under button "Continue" (20,517 362x46, reaching 20,517 362x73) at its centre (201,547),
   drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was tapped` (runs 2, 3;
-  run 1, the first launch after boot: phone not yet in idb's tree, `Timed out … to appear`, nothing fired); k7 one
+  run 1, the first launch after boot: idb's `describe-all` FAILED — "The simulator's accessibility service named no
+  frontmost application" — so there was no tree, the wait timed out `… to appear`, nothing fired: ok by the judge but
+  vacuous for the fix, which idb's k6 exercised in runs 2 and 3 only); k7 one
   stroke touching down at (201,472), phone at rest 149–183 clear of the bar, `fully visible after 1 swipe`. WDA: k6
   refused under Continue (`only a 362x1 part of it shows above the soft keyboard`), k7 one stroke at (201,413), the same
   rest — as before the fix (WDA marks its keyboard; the fix is idb's flat list only). No submit in any run.
