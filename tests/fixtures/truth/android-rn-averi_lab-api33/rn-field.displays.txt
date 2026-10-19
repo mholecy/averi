@@ -3,15 +3,15 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
     init=1080x2220 440dpi mMinSizeOfResizeableTaskDp=220 cur=1080x2220 app=1080x2154 rng=1080x948-2220x2088
     deferred=false mLayoutNeeded=false mTouchExcludeRegion=SkRegion((0,0,1080,2220))
 
-  mLastOrientationSource=WindowedMagnification:0:31@179309802
-  deepestLastOrientationSource=ActivityRecord{a78e41f u0 dev.averi.lab.rn/.MainActivity} t1298}
-  overrideConfig={1.0 310mcc260mnc [en_US] ldltr sw393dp w393dp h759dp 440dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2220) mAppBounds=Rect(0, 0 - 1080, 2154) mMaxBounds=Rect(0, 0 - 1080, 2220) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.4 s.66 fontWeightAdjustment=0}
-  mLayoutSeq=268
-  mCurrentFocus=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-  mFocusedApp=ActivityRecord{a78e41f u0 dev.averi.lab.rn/.MainActivity} t1298}
+  mLastOrientationSource=WindowedMagnification:0:31@66327768
+  deepestLastOrientationSource=ActivityRecord{1bf5ad u0 dev.averi.lab.rn/.MainActivity} t1312}
+  overrideConfig={1.0 310mcc260mnc [en_US] ldltr sw393dp w393dp h759dp 440dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2220) mAppBounds=Rect(0, 0 - 1080, 2154) mMaxBounds=Rect(0, 0 - 1080, 2220) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.3 s.71 fontWeightAdjustment=0}
+  mLayoutSeq=119
+  mCurrentFocus=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+  mFocusedApp=ActivityRecord{1bf5ad u0 dev.averi.lab.rn/.MainActivity} t1312}
 
   mHoldScreenWindow=null
-  mObscuringWindow=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+  mObscuringWindow=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
   mLastWakeLockHoldingWindow=null
   mLastWakeLockObscuringWindow=null
 
@@ -66,22 +66,22 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
   Task display areas in top down Z order:
     TaskDisplayArea DefaultTaskDisplayArea
       overrideConfig={0.0 ?mcc?mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mMaxBounds=Rect(0, 0 - 0, 0) mDisplayRotation=undefined mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=undefined} ?fontWeightAdjustment}
-      mPreferredTopFocusableRootTask=Task{a850279 #1298 type=standard A=10175:dev.averi.lab.rn}
-      mLastFocusedRootTask=Task{a850279 #1298 type=standard A=10175:dev.averi.lab.rn}
+      mPreferredTopFocusableRootTask=Task{7401cf5 #1312 type=standard A=10175:dev.averi.lab.rn}
+      mLastFocusedRootTask=Task{7401cf5 #1312 type=standard A=10175:dev.averi.lab.rn}
       Application tokens in top down Z order:
-      * Task{a850279 #1298 type=standard A=10175:dev.averi.lab.rn U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+      * Task{7401cf5 #1312 type=standard A=10175:dev.averi.lab.rn U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
         bounds=[0,0][1080,2220]
-        * ActivityRecord{a78e41f u0 dev.averi.lab.rn/.MainActivity} t1298}
-      * Task{d3b2151 #1 type=home U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        * ActivityRecord{1bf5ad u0 dev.averi.lab.rn/.MainActivity} t1312}
+      * Task{f5d8497 #1 type=home U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
         bounds=[0,0][1080,2220]
-        * Task{418dca5 #1292 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        * Task{abb7e18 #1311 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
           bounds=[0,0][1080,2220]
-          * ActivityRecord{133d82b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t1292}
-      * Task{ca574d #3 type=undefined U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=2}
+          * ActivityRecord{4f663c4 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t1311}
+      * Task{f4b65da #3 type=undefined U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=2}
         bounds=[0,0][1080,2220]
-        * Task{7c5316f #5 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+        * Task{1914301 #5 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
           bounds=[0,2220][1080,3330]
-        * Task{ec96d50 #4 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+        * Task{d0200e8 #4 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
           bounds=[0,0][1080,2220]
 
   no ScreenRotationAnimation 
@@ -106,23 +106,23 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
     mLastAppearance=LIGHT_NAVIGATION_BARS
     mLastBehavior=DEFAULT
     mShowingDream=false mDreamingLockscreen=false
-    mStatusBar=Window{fe82fd9 u0 StatusBar}
-    mExpandedPanel=Window{a1de787 u0 NotificationShade}
+    mStatusBar=Window{c30b1a1 u0 StatusBar}
+    mExpandedPanel=Window{1cd88f0 u0 NotificationShade}
     isKeyguardShowing=false
-    mNavigationBar=Window{4243d93 u0 NavigationBar0}
+    mNavigationBar=Window{cebbbe1 u0 NavigationBar0}
     mNavBarOpacityMode=2
     mNavigationBarCanMove=false
     mNavigationBarPosition=4
-    mFocusedWindow=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-    mTopFullscreenOpaqueWindowState=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-    mSystemBarColorApps={ActivityRecord{a78e41f u0 dev.averi.lab.rn/.MainActivity} t1298}}
-    mNavBarColorWindowCandidate=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-    mNavBarBackgroundWindow=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+    mFocusedWindow=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+    mTopFullscreenOpaqueWindowState=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+    mSystemBarColorApps={ActivityRecord{1bf5ad u0 dev.averi.lab.rn/.MainActivity} t1312}}
+    mNavBarColorWindowCandidate=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+    mNavBarBackgroundWindow=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
     mLastStatusBarAppearanceRegions=
       AppearanceRegion{ bounds=[0,0][1080,2220]}
     mLastLetterboxDetails=
     mStatusBarBackgroundWindows=
-      Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+      Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
     mTopIsFullscreen=false
     mForceShowNavigationBarEnabled=false mAllowLockscreenWhenOn=false
     mRemoteInsetsControllerControlsSystemBars=false
@@ -136,8 +136,9 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
       mSwipeStartThreshold=Rect(66, 66 - 66, 66)
       mSwipeDistanceThreshold=66
     Looper state:
-      Looper (android.ui, tid 19) {c52825d}
-        (Total messages: 0, polling=true, quitting=false)
+      Looper (android.ui, tid 19) {7657021}
+        Message 0: { when=-20ms what=31 target=com.android.server.am.ActivityManagerService$UiHandler }
+        (Total messages: 1, polling=false, quitting=false)
 
   DisplayRotation
     mCurrentAppOrientation=SCREEN_ORIENTATION_UNSPECIFIED
@@ -158,7 +159,7 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
         mLastFilteredX=0.0
         mLastFilteredY=9.776321
         mLastFilteredZ=0.812345
-        mLastFilteredTimestampNanos=151782276544 (31.421236ms ago)
+        mLastFilteredTimestampNanos=17102188836 (64.992004ms ago)
         mTiltHistory={last: 5.0}
         mFlat=false
         mSwinging=false
@@ -174,7 +175,7 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
     mFixedToUserRotation=false
 
   InputConsumers:
-    name=recents_animation_input_consumer pid=1013 user=UserHandle{0}
+    name=recents_animation_input_consumer pid=997 user=UserHandle{0}
 
   WindowInsetsStateController
     InsetsState
@@ -191,66 +192,66 @@ WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
         InsetsSource type=ITYPE_BOTTOM_MANDATORY_GESTURES frame=[0,2132][1080,2220] visible=true insetsRoundedCornerFrame=false
         InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
         InsetsSource type=ITYPE_BOTTOM_TAPPABLE_ELEMENT frame=[0,0][0,0] visible=true insetsRoundedCornerFrame=false
-        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=false insetsRoundedCornerFrame=false
     Control map:
-      ITYPE_IME -> Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-      ITYPE_NAVIGATION_BAR -> Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-      ITYPE_STATUS_BAR -> Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+      ITYPE_IME -> Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+      ITYPE_NAVIGATION_BAR -> Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+      ITYPE_STATUS_BAR -> Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
     InsetsSourceProviders:
       ImeInsetsSourceProvider
-        mSource=InsetsSource type=ITYPE_IME frame=[0,0][0,0] visibleFrame=[0,2088][1080,2220] visible=false insetsRoundedCornerFrame=false
-        mSourceFrame=Rect(0, 2088 - 1080, 2220)
-        mControl=InsetsSourceControl type=ITYPE_IME mLeash=Surface(name=Surface(name=948ac4f InputMethod)/@0xd8dbe6b - animation-leash of insets_animation)/@0xb13e341 mInitiallyVisible=false mSurfacePosition=Point(0, 66) mInsetsHint=Insets{left=0, top=0, right=0, bottom=822} mSkipAnimationOnce=false
+        mSource=InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=false insetsRoundedCornerFrame=false
+        mSourceFrame=Rect(100, 2088 - 980, 2220)
+        mControl=InsetsSourceControl type=ITYPE_IME mLeash=Surface(name=Surface(name=afecfb7 InputMethod)/@0xf215e8d - animation-leash of insets_animation)/@0x8e0fc46 mInitiallyVisible=false mSurfacePosition=Point(100, 2088) mInsetsHint=Insets{left=0, top=0, right=0, bottom=0} mSkipAnimationOnce=false
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{948ac4f u0 InputMethod}
-        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=948ac4f InputMethod)/@0xd8dbe6b - animation-leash of insets_animation)/@0xb13e341
-        mControlTarget=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
-        mImeShowing=true
+        mWindowContainer=Window{afecfb7 u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=afecfb7 InputMethod)/@0xf215e8d - animation-leash of insets_animation)/@0x8e0fc46
+        mControlTarget=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+        mImeShowing=false
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_BOTTOM_TAPPABLE_ELEMENT frame=[0,0][0,0] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 0 - 0, 0)
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{4243d93 u0 NavigationBar0}
+        mWindowContainer=Window{cebbbe1 u0 NavigationBar0}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 0 - 1080, 66)
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{fe82fd9 u0 StatusBar}
+        mWindowContainer=Window{c30b1a1 u0 StatusBar}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_BOTTOM_MANDATORY_GESTURES frame=[0,2132][1080,2220] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 2132 - 1080, 2220)
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{4243d93 u0 NavigationBar0}
+        mWindowContainer=Window{cebbbe1 u0 NavigationBar0}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 0 - 1080, 66)
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{fe82fd9 u0 StatusBar}
+        mWindowContainer=Window{c30b1a1 u0 StatusBar}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_RIGHT_GESTURES frame=[998,0][1080,2220] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(998, 0 - 1080, 2220)
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{4243d93 u0 NavigationBar0}
+        mWindowContainer=Window{cebbbe1 u0 NavigationBar0}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_LEFT_GESTURES frame=[0,0][82,2220] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 0 - 82, 2220)
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{4243d93 u0 NavigationBar0}
+        mWindowContainer=Window{cebbbe1 u0 NavigationBar0}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080,2220] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 2154 - 1080, 2220)
         mOverrideFrames={2011=Rect(0, 2088 - 1080, 2220)}
-        mControl=InsetsSourceControl type=ITYPE_NAVIGATION_BAR mLeash=Surface(name=Surface(name=4243d93 NavigationBar0)/@0x437e5db - animation-leash of insets_animation)/@0xbfbc0e6 mInitiallyVisible=true mSurfacePosition=Point(0, 2088) mInsetsHint=Insets{left=0, top=0, right=0, bottom=66} mSkipAnimationOnce=false
+        mControl=InsetsSourceControl type=ITYPE_NAVIGATION_BAR mLeash=Surface(name=Surface(name=cebbbe1 NavigationBar0)/@0x987351d - animation-leash of insets_animation)/@0x8ccee07 mInitiallyVisible=true mSurfacePosition=Point(0, 2088) mInsetsHint=Insets{left=0, top=0, right=0, bottom=66} mSkipAnimationOnce=false
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{4243d93 u0 NavigationBar0}
-        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=4243d93 NavigationBar0)/@0x437e5db - animation-leash of insets_animation)/@0xbfbc0e6
-        mControlTarget=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+        mWindowContainer=Window{cebbbe1 u0 NavigationBar0}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=cebbbe1 NavigationBar0)/@0x987351d - animation-leash of insets_animation)/@0x8ccee07
+        mControlTarget=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
       WindowContainerInsetsSourceProvider
         mSource=InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false
         mSourceFrame=Rect(0, 0 - 1080, 66)
-        mControl=InsetsSourceControl type=ITYPE_STATUS_BAR mLeash=Surface(name=Surface(name=fe82fd9 StatusBar)/@0x646584c - animation-leash of insets_animation)/@0x6db6627 mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=66, right=0, bottom=0} mSkipAnimationOnce=false
+        mControl=InsetsSourceControl type=ITYPE_STATUS_BAR mLeash=Surface(name=Surface(name=c30b1a1 StatusBar)/@0x87b3252 - animation-leash of insets_animation)/@0x31ab34 mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=66, right=0, bottom=0} mSkipAnimationOnce=false
         mIsLeashReadyForDispatching=true
-        mWindowContainer=Window{fe82fd9 u0 StatusBar}
-        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=fe82fd9 StatusBar)/@0x646584c - animation-leash of insets_animation)/@0x6db6627
-        mControlTarget=Window{23868da u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
+        mWindowContainer=Window{c30b1a1 u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=c30b1a1 StatusBar)/@0x87b3252 - animation-leash of insets_animation)/@0x31ab34
+        mControlTarget=Window{cf2c194 u0 dev.averi.lab.rn/dev.averi.lab.rn.MainActivity}
 
