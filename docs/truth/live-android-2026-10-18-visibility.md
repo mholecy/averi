@@ -122,7 +122,7 @@ partial records are: 24 cases, 21 ok, 1 loud, 2 mismatches):
 ADR 0013's residual (decision point 4 above; the owner's 2026-10-18 point 5): k7's "fully visible after 1 swipe" with
 18 px of phone under the bar's node-less padding. arch/r23-eyes (from arch/round-23 `bd43fc66`) checks such a claim
 with one screenshot (src/ui-tree/eyes.ts, src/verify/eyes.ts): a stop about to say "fully visible" on a target laid
-flush with a node drawn after it outside its scroll view (`Scene.flushNeighbour`) reads the target's rows from that
+flush with a node drawn after it outside its scroll view (`Scene.flushNeighbours`) reads the target's rows from that
 edge inward against the colour beside that node and its own. Run on averi_lab (emulator-5554, API 33, the lab app as
 installed for round 7), harness truth/round-7 `b191055d`, `--side` the branch:
 

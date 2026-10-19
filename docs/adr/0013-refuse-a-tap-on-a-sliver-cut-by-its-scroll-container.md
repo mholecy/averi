@@ -79,46 +79,74 @@ Three points the device check left open (docs/truth/live-android-2026-10-18-visi
 ## Refined 2026-10-19 (orchestrator, round 7 A6): the eyes confirm a fully claim
 
 The owner's 2026-10-18 point 5 asked for pixels where the tree cannot see. A stop about to say "fully visible" —
-nothing of the target clipped, nothing listed over it — on a target with a FLUSH NEIGHBOUR
-(`ui-tree/standing.ts#Scene.flushNeighbour`: a node drawn after it, outside the clipping scroll view it lies in, laid
-flush against one of its edges along its whole extent, on a tree that cuts bounds at a later node — Android's; the
-shape Compose's cut leaves under a pinned or IME-riding bar) is first checked with ONE screenshot
-(`ui-tree/eyes.ts`, the question and answer; `verify/eyes.ts#judgeEyes`, the judge; asked through
-`interact/scroll-rounds.ts#round`'s `ask eyes`, wired at `mcp/tools.ts` and `flow/engine.ts`). The judge reads, over
-the target's pixel region (`Scene.pixelRegion`), the colour of the screen BESIDE that node on its rows (where its
-surface draws if it draws past its node), the target's own colour (the half away from the edge, the sampler's 12 %
-inset), and then the target's rows from the edge inward: a row of one colour (90 %) within ΔE00 1.0 of the surface's
-is the surface's. A band deeper than the pixel slack (ADR 0002) is said:
+nothing of the target clipped, nothing listed over it (`interact/scroll-read.ts#fullyClaimed`, the round's and the
+reply's one predicate) — on a target with a FLUSH NEIGHBOUR (`ui-tree/standing.ts#Scene.flushNeighbours`: a node drawn
+after it, outside the clipping scroll view it lies in, laid flush against one of its edges along its whole extent, on a
+tree that cuts bounds at a later node — Android's; the shape Compose's cut leaves under a pinned or IME-riding bar),
+NARROWER than the screen along that edge, is first checked with ONE screenshot per claimed stop (`ui-tree/eyes.ts`,
+the question and answer; `verify/eyes.ts#judgeEyes`, the judge; asked through `interact/scroll-rounds.ts#round`'s
+`ask eyes`, wired at `mcp/tools.ts` and `flow/engine.ts`). Every flush edge is judged on that one screenshot; the
+deepest band any edge shows is the answer. Per edge, over the target's pixel region (`Scene.pixelRegion`):
 
-- the plain stop stops (its centre is clear) and says `PARTLY UNDER a surface the tree does not list: its bottom 28 px
-  show #F2F2F7, the colour beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own
-  #FFFFFF (a screenshot), its centre clear` — live k7 ×3, docs/truth/live-android-2026-10-18-visibility.md;
-- `fully: true` does not stop: the strokes go on as for a cover; a read after a stroke that finds target and neighbour
-  where the eyes refused them is refused again with no confirming read and no second screenshot; stuck on strokes that
-  lift it out from under that surface, it is not turned back (that only pushes it further under: measured live, the
-  stroke back laid phone under the bar again); the failure names the surface and, when the window state reads the
-  keyboard the node rides on, "if the soft keyboard is still up … dismiss it first", else a layout defect.
+1. the SURFACE's colour: the screen beside the neighbour on its own rows (where its surface draws if it draws past its
+   node), every such strip one colour, all of them one;
+2. the BAND: the target's lines from the edge inward while a line is one colour with the surface's;
+3. the target's OWN colour: the dominant of what of the region lies past the band (never the band's rows: a band two
+   thirds of a label deep leaves the label's glyphs), at least ΔE00 2.0 from the surface's;
+4. its OWN MARGIN: Android dumps a control's touch target, bigger than what it draws, so a band of the colour the
+   screen shows around the target may be its margin over that background — the screen beside the target, on the lines
+   past the band, must not be one colour with the surface's (and there must be some screen beside it).
+
+"One colour" is counted pixel by pixel, unbucketed: 90 % of the pixels within ΔE00 1.0 of the reference (never the
+colour sampler's 4-bit buckets, which put `#FFFFFF` and `#F2F2F7` in one). A band deeper than the pixel slack (ADR
+0002) is said:
+
+- the plain stop stops when the band leaves its centre clear, and says `PARTLY UNDER a surface the tree does not list:
+  its bottom 28 px show #F2F2F7, the colour beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after
+  it, not its own #FFFFFF (a screenshot), its centre clear` — live k7 ×3, docs/truth/live-android-2026-10-18-visibility.md;
+- a band over the centre the next tap presses is no plain stop — as a cover over the centre is none (the pinned-chrome
+  rule, docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md) — and `fully: true` never stops on a
+  band: the strokes go on as for a cover; a read after a stroke that finds target and neighbours where the eyes refused
+  them is refused again with no confirming read and no second screenshot; stuck on strokes that lift it out from under
+  that surface, it is not turned back (that only pushes it further under: measured live, the stroke back laid phone
+  under the bar again); the failure names the surface and, when the window state reads the keyboard the node rides on,
+  "if the soft keyboard is still up … dismiss it first", else a layout defect.
 
 What the screenshot cannot tell is said with the tree's claim — `fully visible by the tree after N swipes; its bottom
 edge lies flush with <node>, drawn after it outside its scroll view, whose surface may draw past that node over it —
-the tree lists none there, and a screenshot could not tell (<why>)`: no plain surface beside the node (one as wide as
-the screen), the two colours within ΔE00 2.0, a screenshot that fails or does not decode, a scale the tree refuses.
+the tree lists none there, and a screenshot could not tell (<why>)`: no plain surface beside the node, the two colours
+within ΔE00 2.0, the screen beside the target that surface's colour too (or no screen beside it), a band to the far
+edge, a screenshot that fails or does not decode, a scale the tree refuses.
 
 Measured on k7's stop (tests/fixtures/android-lab-form-keyboard-k7-stop.{xml,png}): the bar's padding rows 1210–1237
-are exactly `#F2F2F7` across the screen (ΔE00 0.00 to the colour beside `Continue`), the field's rows `#FFFFFF`, ΔE00
-3.64 apart — under the colour assert's own tolerance (8) and in one 4-bit bucket of its sampler, so a colour ASSERT
-could not tell them; the row-by-row reading against the two references can, a screenshot of a drawn surface being
-pixel-exact. The threshold pair (1.0 same, 2.0 apart) leaves no row that reads as both.
+are exactly `#F2F2F7` across the screen (ΔE00 0.00 to the colour beside `Continue`), the field's rows and the screen
+beside the field `#FFFFFF`, ΔE00 3.64 apart — under the colour assert's own tolerance (8) and in one 4-bit bucket of
+its sampler, so a colour ASSERT could not tell them; the pixel-by-pixel reading against the two references can, a
+screenshot of a drawn surface being pixel-exact. The threshold pair (1.0 same, 2.0 apart) leaves no line that reads as
+both.
 
-Cost: one screenshot (adb `screencap`, a PNG decode) only on a claim the trigger applies to; every other stop takes
-none (tests/interact/scroll-eyes.test.ts counts the adapter's screenshots). Golden byte-identical (no capture in the
-corpus meets the trigger at a claim).
+ONE UNSETTLED CAPTURE, by design: the eyes take a single screenshot, not `verify/capture.ts`'s settled pair, and only
+after the stop was settled by its tree reads (scroll-rounds.ts#SETTLE_CONFIRM_READS) — the cost the owner asked for
+(one screenshot, never on every round). ARCHITECTURE.md says the exception where it says a frame is settled.
 
-Residuals, stated: the trigger is Android's dialect only (WDA reports frames unclipped: the same lab cell lists phone
-whole under the bar, covered at its centre — a cover the tree sees; idb's flat list has no "drawn after"); a surface
-the same colour as the target (within ΔE00 2.0) or a neighbour spanning the screen is `unjudged`, said; the band is
-measured on the dumped node (k7: 28 px of its touch target, of which 18 px are the drawn field's); a surface with no
-flush node at all (a node-less bar over a target no later node touches) is not looked for — no trigger, no screenshot.
+Cost and bound: one screenshot (adb `screencap`, a PNG decode) per claimed stop the trigger applies to — at most one
+per swipe plus one in a `fully: true` call whose refused target moves between claims, none for an unmoved one; every
+other stop takes none (tests/interact/scroll-eyes.test.ts counts the adapter's screenshots). Golden byte-identical (no
+capture in the corpus meets the trigger at a claim).
+
+Residuals, stated:
+- the trigger is Android's dialect only (WDA reports frames unclipped: the same lab cell lists phone whole under the
+  bar, covered at its centre — a cover the tree sees; idb's flat list has no "drawn after");
+- a neighbour as wide as the screen along its edge (a Scaffold's top app bar or bottom bar flush with a row) is NOT
+  asked: no screen beside it to read its surface from, so the eyes could only say "could not tell" — the tree's plain
+  claim stands, as before the eyes, and a padding of such a bar is not seen;
+- one unsettled capture: an IME or a bar still animating when it is taken could be misread (a band too shallow or too
+  deep), though the stop's tree had settled;
+- a surface the same colour as the target (within ΔE00 2.0), or the target on a background of the surface's colour, is
+  `unjudged`, said;
+- the band is measured on the dumped node (k7: 28 px of its touch target, of which 18 px are the drawn field's);
+- a surface with no flush node at all (a node-less bar over a target no later node touches) is not looked for — no
+  trigger, no screenshot.
 
 ## Residuals accepted
 
