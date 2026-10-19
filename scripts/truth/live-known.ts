@@ -41,7 +41,6 @@ const MENU = 'bug:2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-re
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
-const CARRY_MARGIN = 'residual:ADR 0021 residual 1 — the final approach\'s carry on a long WDA list can rest a row a few points past its window';
 const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
@@ -137,8 +136,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // three runs of three (ios-wda-long-list-parked-1…3.json), two strokes down, no turn. What the carry case measures since
   // is ADR 0021 decision 4's final approach: L reached after 2 swipes in every run, at rest inside its window 1172–1920
   // in two (1917.3, 1903.3) and 14 pt past it in one (1933.7: -1.json), the reply honest — "CLIPPED at top, 78% of it is
-  // in the viewport" — but the stroke carried it past its window: R-direction on `visible`, intermittent.
-  ...each('ios wda', ['carry:sheet-long-list.L'], CARRY_MARGIN, 'R-direction', 'visible', { intermittent: true }),
+  // in the viewport" — but the stroke carried it past its window: R-direction on `visible`, intermittent (ADR 0021
+  // residual 1). Struck off by round 7's final device check (truth/round-7 836e04b1, A1's src in): L at rest
+  // at 1635, 1869.3, 1853.3 and 1590 — 51–330 pt inside its window, fully visible after 2 swipes, in four runs of four
+  // (ios-wda-vis-r7final.json, ios-wda-long-list-r7final-1…3.json).
   // carousel-in-list's C: one sideways stroke flings the carousel 447–532 pt, C's centre inside over 177–531 only; at
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
   // Its intermittent entry struck off by round 7's A1 (f76be36a, e687fe83, 659fdf00: the unmeasured first stroke cut to

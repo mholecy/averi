@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-vis-parked.json, round 7's A2; ios-wda-stop-carousel-r23-*.json, ios-vis-r23-ios-stop-e687fe83.json,
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
- * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's;
+ * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
  * ios-scroll-bounded-wda-2725e76-*.json, round 5's) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
@@ -51,9 +51,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-hint-ea070d2.json', 'forms,visibility', { cases: 24, ok: 21, loud: 1, mismatches: 2 }],
     // round 7's A2 (LV6 fixed: src arch/r23-parked a1b0b82 through --side, the lab app truth/round-7 461d6fd): L's
     // scroll case ok in all three runs, two strokes down, no turn; its carry case reached likewise, at rest inside L's
-    // window in runs 2 and 3 (ok, its entry intermittent) and 14 pt past it in run 1 — the reply "CLIPPED at top, 78%",
-    // R-direction on `visible`: ADR 0021 residual 1
-    ['ios-wda-long-list-parked-1.json', 'visibility', { cases: 6, ok: 5, loud: 0, mismatches: 1 }],
+    // window in runs 2 and 3 (ok; run 1's overshoot, ADR 0021 residual 1, is pinned below since its entry was struck)
     ['ios-wda-long-list-parked-2.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-long-list-parked-3.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     // …and the forms with the lab model's fix (a field reported from the binding's write): no fill lost one of 30
@@ -132,6 +130,31 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-k7-eyes-3.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['android-k7-eyes-r1.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['android-forms-eyes.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0 }],
+    // round 7's final device check (truth/round-7 836e04b1, every app rebuilt from it; the summaries' "Round 7 final
+    // device check, 2026-10-19" sections): iOS — WDA's and idb's visibility groups as A2's and A5's records but LV4's
+    // turn ok and the carry case at rest inside L's window (its entry struck off: three more runs of sheet-long-list),
+    // dismissal 12/12 under each source, WDA's forms with k2 and k3 ok (A4's), the RN app under WDA three times and
+    // under idb once all ok — rn4 and the taps of N and M no longer refused (LR1); Android — the visibility group with
+    // T2's dialog cells (bottom-sheet-dialog's scroll cases ok: A7's), the forms with k7 naming the band, the RN app
+    // three times all ok (LR2), the two dialog cells once more
+    ['ios-wda-vis-r7final.json', 'visibility', { cases: 146, ok: 129, loud: 1, mismatches: 16 }],
+    ['ios-idb-vis-r7final.json', 'visibility', { cases: 145, ok: 100, loud: 8, mismatches: 37 }],
+    ['ios-wda-dismissal-r7final.json', 'dismissal', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
+    ['ios-idb-dismissal-r7final.json', 'dismissal', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
+    ['ios-wda-forms-r7final.json', 'forms', { cases: 23, ok: 20, loud: 3, mismatches: 0 }],
+    ['ios-rn-wda-r7final-1.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['ios-rn-wda-r7final-2.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['ios-rn-wda-r7final-3.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['ios-rn-idb-r7final.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['ios-wda-long-list-r7final-1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-wda-long-list-r7final-2.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-wda-long-list-r7final-3.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['android-vis-r7final.json', 'visibility', { cases: 137, ok: 120, loud: 3, mismatches: 14 }],
+    ['android-forms-r7final.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0 }],
+    ['android-rn-r7final-1.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['android-rn-r7final-2.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['android-rn-r7final-3.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
+    ['android-vis-dialogs-r7final.json', 'visibility', { cases: 26, ok: 22, loud: 0, mismatches: 4 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -140,6 +163,21 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ ...want, notKnown: 0, skipped: 0 });
     expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
     expect(code, out.slice(-2000)).toBe(0);
+  });
+});
+
+// A1's fix reaching the long list (round 7's carry); struck at round 7's final device check.
+describe('live.ts --rejudge over the committed iOS record of the src before the one-stroke stop reached the long list', () => {
+  // The long-list carry case was known as ADR 0021 residual 1 (intermittent) until round 7's final device check struck
+  // it off: at truth/round-7 836e04b1 L rested 51–330 pt inside its window in four runs of four (the records pinned
+  // above). A2's run 1 (src a1b0b82, before A1's src reached it) rested L 14 pt past its window: it reads
+  // as recorded, not known — a calibration of that src now: exit 1, as recorded.
+  it('ios-wda-long-list-parked-1.json: the carry case not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudge('ios-wda-long-list-parked-1.json', 'visibility');
+    expect(out).toMatch(/^# Live golden: 6 cases, 5 ok, 0 loud, 1 mismatches \(1 not known\), 0 skipped$/m);
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown).toEqual(['carry:sheet-long-list.L']);
+    expect(code).toBe(1);
   });
 });
 

@@ -191,6 +191,12 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
    (decision 4), and a fling is not exactly proportional run to run: on the lab's 56-row table it brought L to rest
    14 pt past its window in one run of three (1933.7 against 1920), the row still 78% shown with its centre clear. The
    reply says so ("CLIPPED at top, … % of it is in the viewport"), so a caller asking `fully` is told; no stop is
-   claimed on a row not shown, no extra stroke or turn spent. The live golden files the carry case as this residual,
-   intermittent (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.L`, R-direction on `visible`).
+   claimed on a row not shown, no extra stroke or turn spent. The live golden filed the carry case as this residual,
+   intermittent (scripts/truth/live-known.ts, `ios wda carry:sheet-long-list.L`, R-direction on `visible`), until
+   round 7's final device check (2026-10-19, truth/round-7 836e04b1: A1's src in, A2's runs were before it): L at rest at
+   1635, 1869.3, 1853.3 and 1590 — 51–330 pt inside its window, "fully visible after 2 swipes" — in four runs of four
+   (docs/truth/live-records/ios-wda-vis-r7final.json, ios-wda-long-list-r7final-1…3.json); the entry struck off. The
+   residual stays as the mechanism's bound — the cut is still planned over the largest carry sampled — but its measured
+   margin is now 51 pt inside, not 14 pt past (the lab logs the table's offset after the strokes, not per stroke, so
+   which of A1's changes moved it is not measured).
 
