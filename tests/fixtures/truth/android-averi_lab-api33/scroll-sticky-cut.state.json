@@ -1,0 +1,42 @@
+{
+  "cell": "scroll-sticky-cut",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "frames": {
+    "R": {
+      "x": 128,
+      "y": 391,
+      "width": 825,
+      "height": 176
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "list": {
+      "x": 0,
+      "y": 303,
+      "width": 1080,
+      "height": 1238
+    }
+  },
+  "chrome": {
+    "stickyHeader": {
+      "x": 0,
+      "y": 303,
+      "width": 1080,
+      "height": 154
+    }
+  }
+}

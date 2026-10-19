@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architecture review — averi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+</script>
+<style>
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+  .schem { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+<header class="space-y-3">
+  <h1 class="font-serif text-4xl">averi: architecture review</h1>
+  <p class="text-sm text-slate-500">branch <code>fix/ios-idb-and-keyboard-2026-10-07</code> · 2026-10-07 · tsc ✓ · vitest 1492/1492 ✓</p>
+  <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+    <span><span class="inline-block w-3 h-3 border border-slate-500 align-middle"></span> module</span>
+    <span><span class="inline-block w-6 border-t-2 border-dashed border-slate-500 align-middle"></span> seam</span>
+    <span><span class="inline-block w-6 border-t-2 border-red-600 align-middle"></span> leak / drift</span>
+    <span><span class="inline-block w-3 h-3 deep align-middle"></span> deep module</span>
+  </div>
+  <p class="text-sm text-slate-600">Hot spot: keyboard guard (<code>interact/keyboard.ts</code>, 968 lines) a jeho okolie. Platform branche mimo <code>adapters/</code> neunikajú, takže problém nie je v tom. Je v prepínači medzi dvomi keyboard modelmi, v zdvojenom protokole a v remedy textoch, ktoré po stage B zastarali.</p>
+</header>
+
+<section id="candidates" class="space-y-10">
+
+<!-- 1 -->
+<article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+  <h2 class="font-serif text-2xl">1 · Jeden in-tree „hide + confirm“ protokol</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100">in-process / local-substitutable</span><span class="px-2 py-0.5 rounded bg-red-100 text-red-800">obsahuje bug</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/interact/keyboard.ts:697-731 (guard)</li><li>src/interact/keyboard.ts:942-959 (dismissKeyboard)</li><li>src/interact/keyboard.ts:656, 710, 815 (after-X error wrap ×3)</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border p-4"><div class="schem text-slate-500 mb-2">Before</div>
+<pre class="mermaid">
+flowchart TB
+  G[resolveClearOfKeyboard] --> P1[pickDismissal]
+  G --> T1[tap + confirm loop]
+  T1 --> W1[wrap → AfterDismissalTap]
+  D[dismissKeyboard] --> P2[pickDismissal]
+  D --> T2[tap + confirm loop]
+  T2 -.raw throw.-> X[(engine trace: no tap logged)]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class T2,X leak
+</pre></div>
+    <div class="rounded-lg border p-4"><div class="schem text-slate-500 mb-2">After</div>
+<pre class="mermaid">
+flowchart TB
+  G[guard] --> H
+  D[dismissKeyboard] --> H
+  H["hideInTree(look)<br/>pick · tap · N looks · wrap"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a,stroke-width:3px;
+  class H deep
+</pre></div>
+  </div>
+  <p><b>Problem:</b> Protokol „tapni dismissal a potvrď, že klávesnica zmizla“ je napísaný dvakrát a kópie sa už rozišli. V <code>dismissKeyboard</code> nie je confirm read po tape obalený, takže keď zlyhá, vyletí raw error. Nie je to <code>KeyboardGuardError</code> a trace nespomenie, že tap bol odoslaný.</p>
+  <p><b>Solution:</b> Jedna operácia pick → tap → N looks → wrap. Guard aj <code>dismissKeyboard</code> jej odovzdajú svoj „look“ callback. Wrap „After X: headline. hint“ bude mať jedného vlastníka.</p>
+  <ul class="text-sm list-disc pl-5"><li>locality: after-tap chyba na jednom mieste</li><li>leverage: jeden protokol, dvaja volajúci</li><li>−3 kópie error wrapu</li><li>chýbajúci test: confirm read throws</li></ul>
+</article>
+
+<!-- 2 -->
+<article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+  <h2 class="font-serif text-2xl">2 · Keyboard guard: dve implementácie za jedným interface</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100">ports &amp; adapters (2 reálne adaptery)</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/interact/keyboard.ts:617-867, 392-489, 926-933</li><li>src/ui-tree/soft-keyboard.ts:147-172</li><li>src/interact/tap.ts:30-39 · src/interact/fill.ts:88,105</li><li>ARCHITECTURE.md:62</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border p-4"><div class="schem text-slate-500 mb-2">Before: model switch na 3 miestach</div>
+      <div class="space-y-1 text-xs">
+        <div class="border-l-4 border-red-500 bg-red-50 px-2 py-1">readSoftKeyboard: „THE one switch“</div>
+        <div class="border-l-4 border-red-500 bg-red-50 px-2 py-1">resolveClearOfKeyboard: <code>if (oracle === undefined)</code>, 250 riadkov</div>
+        <div class="border-l-4 border-red-500 bg-red-50 px-2 py-1">dismissKeyboard: <code>if (oracle !== undefined)</code> + keyboardInTree</div>
+        <div class="border-l-4 border-slate-300 px-2 py-1">firstLook · recheck · afterBack ≡ inTreeLook · windowOver (len pre testy)</div>
+        <div class="border-l-4 border-slate-300 px-2 py-1">tap.ts: resolve → tapPoint → tap (volajúci drží invariant)</div>
+      </div></div>
+    <div class="rounded-lg border p-4"><div class="schem text-slate-500 mb-2">After</div>
+      <div class="deep text-white rounded-lg p-3 space-y-2">
+        <div class="schem">guard: look → hide → confirm → node | refusal</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="border border-dashed border-slate-500 rounded p-2 text-slate-300">window model<br/>witness · veto · back</div>
+          <div class="border border-dashed border-slate-500 rounded p-2 text-slate-300">in-tree model<br/>band · dismissals · tap (#1)</div>
+        </div>
+        <div class="text-xs text-slate-400">výber modelu raz, podľa prítomnosti oracle</div>
+      </div></div>
+  </div>
+  <p><b>Problem:</b> Ak chceš pochopiť otázku „je tento bod pod klávesnicou a čo s tým“, musíš prejsť 4 moduly a každý si sám zisťuje, v ktorom modeli je. Window a in-tree model po prvom pohľade nemajú nič spoločné, no žijú v jednej funkcii. Pure „decisions“ sú shallow, exportujú sa len kvôli testom a bugy sú v tom, ako sa volajú.</p>
+  <p><b>Solution:</b> Keyboard-guard module s malým interface a s implementáciou pre každý model. <code>dismissKeyboard</code> = „hide bez targetu“. Guard robí aj samotný tap, takže invariant „tapni presne bod, ktorý si overil“ je vnútri neho. <code>back</code> ostáva viazaný na oracle, takže to neotvára 2026-10-05 rozhodnutie proti „dismiss-key property“.</p>
+  <ul class="text-sm list-disc pl-5"><li>locality: jeden model, jeden súbor</li><li>interface sa zmenší, decisions budú vnútri</li><li>keyboard.test.ts sa rozdelí podľa modelu</li><li>tap.ts zanikne (deletion test: shallow)</li></ul>
+  <div class="rounded bg-amber-50 border border-amber-200 px-3 py-2 text-sm">Nie je v rozpore s 2026-10-05 („one back, one owner“). Implementácia window modelu zostane bajtovo rovnaká.</div>
+</article>
+
+<!-- 3 -->
+<article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+  <h2 class="font-serif text-2xl">3 · Remedy veta podľa capability aj configu</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100">in-process</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/ui-tree/soft-keyboard.ts:121-139 (DismissalMeans)</li><li>src/verify/pixel-poll.ts:123-128, 289-294</li><li>src/adapters/ios.ts:332-338 (keyboardAdvice)</li><li>src/adapters/ios-tree-source.ts:159-162</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border p-4"><div class="schem text-slate-500 mb-2">Before</div>
+<pre class="mermaid">
+flowchart BT
+  A["adapters/ios.ts<br/>spells app.ios.keyboardDismiss"] -.config leak.-> C[(averi.yaml)]
+  O[adapter.keyboard?] --> M["DismissalMeans<br/>'back' | 'none'"]
+  M --> PP["pixel-poll: 'this adapter<br/>cannot hide it'"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class A,PP leak
+</pre></div>
+    <div class="rounded-lg border p-4"><div class="schem text-slate-500 mb-2">After</div>
+<pre class="mermaid">
+flowchart BT
+  A[adapter: len platform facts] --> R
+  C[(configured dismissals)] --> R
+  R["remedy owner<br/>(guard module / flow)"] --> PP[pixel-poll]
+  R --> G[guard refusals]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a,stroke-width:3px;
+  class R deep
+</pre></div>
+  </div>
+  <p><b>Problem:</b> Od stage B závisí remedy od configu, ale rozhoduje sa iba podľa prítomnosti oracle. Na iOS s nastaveným <code>keyboardDismiss</code> pixel assert stále tvrdí „cannot hide it“ a cituje vetu o guarde, ktorý v asserte nie je. Adapter pritom pozná YAML kľúče a MCP tool names.</p>
+  <p><b>Solution:</b> Remedy vetu bude skladať jeden vlastník, ktorý pozná capability adaptera aj nakonfigurované dismissals. Adapter si nechá iba platform facts.</p>
+  <ul class="text-sm list-disc pl-5"><li>DismissalMeans zanikne</li><li>config vocabulary sa vráti nad seam</li><li>remedy text bude pravdivý v každom kontexte</li></ul>
+</article>
+
+<!-- 4 -->
+<article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+  <h2 class="font-serif text-2xl">4 · Prázdny secret: jeden vlastník</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">Worth exploring</span><span class="px-2 py-0.5 rounded bg-slate-100">in-process</span><span class="px-2 py-0.5 rounded bg-red-100 text-red-800">2 malé díry</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/flow/credentials.ts:104-130</li><li>src/flow/engine.ts:704-728 (runTypePin)</li><li>src/adapters/ios.ts:285 · src/interact/fill.ts:112,133-161</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border p-4 text-xs space-y-1"><div class="schem text-slate-500 mb-2">Before: 4 miesta, 2 díry</div>
+      <div class="border-l-4 border-emerald-500 px-2 py-1"><code>${VAR}</code> empty → refused ✓</div>
+      <div class="border-l-4 border-red-500 bg-red-50 px-2 py-1"><code>credentials: {password: ""}</code> → píše sa ticho „nič“</div>
+      <div class="border-l-4 border-red-500 bg-red-50 px-2 py-1">type_pin bez číslic → „0 digits“, pass</div>
+      <div class="border-l-4 border-slate-300 px-2 py-1">ios typeText "" no-op · fill skip read-back</div></div>
+    <div class="rounded-lg border p-4 text-xs"><div class="schem text-slate-500 mb-2">After</div>
+      <div class="deep text-white rounded p-3">credentials.resolve: secret nesmie byť prázdny, nech príde z ktorejkoľvek cesty</div>
+      <div class="mt-2 border-l-4 border-emerald-500 px-2 py-1">type_pin: 0 digits → refused</div></div>
+  </div>
+  <p><b>Problem:</b> Ide presne o ten tvar „step prejde, banka odmietne login o obrazovku neskôr“, ktorému má credentials.ts zabrániť. Literálny prázdny credential je asi zriedkavý, type_pin s nulou číslic je reálnejší.</p>
+  <p><b>Solution:</b> Credentials prevezme pravidlo „secret ≠ ''“ pre template aj literál a type_pin odmietne prázdny PIN.</p>
+  <ul class="text-sm list-disc pl-5"><li>locality: jedno pravidlo pre secret</li><li>stačia dva malé unit testy</li></ul>
+</article>
+
+<!-- 5 -->
+<article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+  <h2 class="font-serif text-2xl">5 · Jeden tvar pre „dismissals + ambiguity policy“</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">Worth exploring</span><span class="px-2 py-0.5 rounded bg-slate-100">in-process</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/flow/config.ts (keyboardDismissals doc)</li><li>src/flow/load.ts:184 · src/flow/engine.ts:242</li><li>src/interact/keyboard.ts:924, 936-937</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border p-4 text-xs space-y-2"><div class="schem text-slate-500">Before</div>
+      <div class="border rounded p-2">engine → posiela všade, spolieha sa, že interact/ ignoruje list na Androide</div>
+      <div class="border rounded p-2">MCP → filtruje podľa platformy vopred</div>
+      <div class="border border-red-400 rounded p-2"><code>GuardOptions.dismissals</code> vs <code>opts?: {dismissals?, ambiguous}</code></div></div>
+    <div class="rounded-lg border p-4 text-xs"><div class="schem text-slate-500 mb-2">After</div>
+      <div class="deep text-white rounded p-3">jeden binding pre každého volajúceho (engine, MCP call) → rovnaký tvar pre tap / fill / dismiss</div></div>
+  </div>
+  <p><b>Problem:</b> Dnes je to správne, no každá cesta stojí na inom invariante. Pre tú istú konfiguráciu existujú dva option tvary.</p>
+  <p><b>Solution:</b> Jeden typ na bindovanie, aby jedna z tých dvoch policies zanikla. Prirodzene sa to rieši spolu s #2.</p>
+</article>
+
+<!-- 6 -->
+<article id="c6" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+  <h2 class="font-serif text-2xl">6 · Pravidlo „rect má plochu“ napísané tromi spôsobmi</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700">Speculative</span><span class="px-2 py-0.5 rounded bg-slate-100">in-process</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/adapters/wda-source.ts:320-321, 241-242</li><li>src/adapters/types.ts:53 · src/ui-tree/soft-keyboard.ts:113</li></ul>
+  <p><b>Problem / Solution:</b> <code>usableRect</code> sa dá napísať pomocou <code>rectArea</code>. Komentár „written here rather than imported“ už platí len napoly. Do toho istého upratania patrí aj <code>frameText</code> vs <code>rectText</code> (dva formáty rectu, iOS body v dumpsys tvare).</p>
+</article>
+
+</section>
+
+<section id="corrections" class="rounded-xl border border-slate-200 bg-white p-6 space-y-3">
+  <h2 class="font-serif text-2xl">Drobné korekcie (stale komentáre, dead exports, doc drift)</h2>
+  <ol class="list-decimal pl-5 text-sm space-y-1">
+    <li><code>keyboard.ts:563-565</code>: zvyšok po edite, „Inside it, with the oracle: / (or hidden, or unknown): done…“, duplikuje :538.</li>
+    <li><code>keyboard.ts:41-44</code>: „Unmeasured on iOS“, ale 040e343 to zmeral (hidden on first look).</li>
+    <li><code>keyboard.ts:145-146</code>: „generic dismissal is stage B's question“, pritom stage B je hotový.</li>
+    <li><code>adapters/types.ts:385</code>: „owns the blind dismissal key“, no enter už neexistuje.</li>
+    <li><code>adapters/ios.ts:308-311</code>: veta o „covered target is refused“ vynecháva stage B.</li>
+    <li><code>ARCHITECTURE.md:274</code>: „dismissKeyboard (which presses enter there)“ je stale.</li>
+    <li><code>pixel-poll.ts:123-126</code>: „rather than naming back or dismissKeyboard“ je po stage B stale (#3).</li>
+    <li><code>soft-keyboard.ts:147-155</code> + <code>ARCHITECTURE.md:62</code>: „THE one place the two models meet“ nie je pravda (#2).</li>
+    <li><code>keyboard.ts:506</code> <code>frameText</code> vs <code>geometry.ts:380</code> <code>rectText</code>, „the one way“ (#6).</li>
+    <li>Nepoužité exporty: <code>DismissalDecision</code>, <code>ResolvedClear</code>, <code>SoftKeyboardReading</code>, <code>KeyboardDismissStrategy</code>, <code>IosTreeSourceDeps</code>, <code>ResolveOptions</code>, <code>PixelMeasureInput</code>, <code>PixelPollSpec</code>, <code>FillSpec</code>.</li>
+    <li>Exporty iba pre testy: <code>firstLook/recheck/afterBack/inTreeLook/windowOver</code>, <code>KEYBOARD_*</code>, 3 podtriedy <code>KeyboardGuardError</code>, <code>MAX_BAND_FRACTION</code>.</li>
+    <li><code>keyboard.ts:949</code>: neobalený confirm read v <code>dismissKeyboard</code>, bez testu (#1).</li>
+    <li><code>ios-tree-source.ts:159</code>, <code>ios.ts:336</code>: adapter pomenúva MCP tools a YAML kľúče. Výnimka nie je nikde zaznamenaná (keyboard.ts:841 ju pre seba má).</li>
+  </ol>
+  <p class="text-xs text-slate-500">Netestované: throw v dismissKeyboard po tape · literálny prázdny credential · type_pin bez číslic · pixel-poll 'none' s nastaveným keyboardDismiss.</p>
+</section>
+
+<section id="top-recommendation" class="rounded-xl deep text-white p-8 space-y-3">
+  <div class="schem text-emerald-300">Top recommendation</div>
+  <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-emerald-400">#1: jeden in-tree hide protokol</a>, potom #2</h2>
+  <p class="text-slate-300">Je malý, opravuje reálnu medzeru (raw throw bez trace po dismissal tape) a vytvorí presne tú operáciu, ktorú by in-tree implementácia z #2 aj tak obsahovala. Je to teda prvý krok k veľkému deepeningu, nie slepá ulička. Korekcie 1–9 sa dajú spraviť v tom istom commite.</p>
+</section>
+
+</main>
+</body>
+</html>

@@ -159,3 +159,69 @@ Same keys and quoting as `simctl appinfo` (347e70d a1), one level deeper. Contac
 CFBundleName = Contacts;` — it reads Info.plist like appinfo, which under German still listed "Contacts" (347e70d a5; listapps not run
 under German), so a5 would presumably not be caught by it. For case 1 it would have named "Skeleton Internal" as com.finshape.dbosbanking's in one 0.13 s call. Full output
 `run6-ios/listapps-1.txt`.
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+**3.1 app not launched by averi — Not reached (no note).** By hand `xcrun simctl launch … com.apple.MobileAddressBook` (15:52:39,
+pid 28702, already running from an averi launch earlier) then `… com.finshape.dbosbanking` (15:52:43), bank in front, logged in,
+3 min 09 s:
+
+```
+15:55:52 launch_app { platform: ios, appId: com.apple.MobileAddressBook } → Launched com.apple.MobileAddressBook on ios     (2.0 s)
+```
+
+No `⚠`; the next `ui_snapshot` → `other 'Contacts'`. (Round 4's firing came from a stuck empty-tree Contacts process; this time
+Contacts' process was healthy.)
+
+**3.2 app launched by averi — Not reached naturally (1 try).** `launch_app com.finshape.dbosbanking` (15:56:02, 1.2 s), Account
+Detail, 3 min 03 s, `launch_app com.apple.MobileAddressBook` (15:59:05, 2.0 s) → one line, no `⚠`; tree `other 'Contacts'`.
+
+**3.4 `xcrun simctl listapps` — measured, unchanged.** `real 0.12` s (user 0.05, sys 0.04), 42 apps, old-style plist keyed by bundle
+id; Contacts `CFBundleDisplayName = Contacts; CFBundleName = Contacts;`, bank `CFBundleDisplayName = "Skeleton Internal";
+CFBundleName = Internal;` (`run7-ios/listapps-1.txt`).
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+**3.2 app launched by averi — fired naturally, twice, exact text (first time reached naturally).** The bank had been launched by averi
+(`launch_app`, 18:11:5x); then:
+
+```
+18:30:0x terminate_app com.apple.MobileAddressBook; launch_app { platform: ios, appId: com.apple.MobileAddressBook }     (3.8 s)
+→ Launched com.apple.MobileAddressBook on ios
+  ⚠ 3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — iOS can hand
+  idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app (an absent check passes on
+  it). "Skeleton Internal" is the name of com.finshape.dbosbanking, which averi launched earlier, not of com.apple.MobileAddressBook: the
+  tree is still that app's, even if the screenshot already shows com.apple.MobileAddressBook (it switches before idb's tree does) — read
+  again before trusting what the tree says
+```
+
+The next read: Contacts (`BackButton`, `Dictate`, `Add`). The same branch for Settings (`18:35:5x terminate_app` + `launch_app
+com.apple.Preferences` → `… ("Settings"), the UI tree was still the app labelled "Skeleton Internal" … which averi launched earlier …`).
+Both after a `terminate_app` of the launched app — a cold start.
+
+**3.1 app not launched by averi — Not reached (no note, 2 tries).** Server restarted (18:38:32), bank brought to front by hand (`xcrun simctl launch … com.finshape.dbosbanking`, logged in, Account Detail); `launch_app com.apple.MobileAddressBook` at 18:39:26 (54 s — too early, recorded only) → one line, no `⚠`, next read `other 'Contacts'`. Again: server restarted 18:39:40, bank by hand, 2 min 11 s, `18:41:51 launch_app com.apple.MobileAddressBook` (2.1 s) → `Launched com.apple.MobileAddressBook on ios`, no `⚠`; next read `other 'Contacts'`. (The 3-minute stay of the handoff was not met on the second try: 2 min 11 s.)
+
+**3.4 `xcrun simctl listapps` — measured, unchanged.** `0.126 s total` (user 0.05, sys 0.05), 42 apps, Contacts `CFBundleDisplayName =
+Contacts; CFBundleName = Contacts;`.
+
+## Device check (2026-10-09 iOS, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/` built 22:41 local, stdio via the HTTP daemon on port 47853, cwd mp-native),
+mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only (`cfg-swift-wda`, `cfg-swift-idb`, `cfg-c-wda`,
+`cfg-contacts-idb`, `cfg-bank-idb`, `cfg-set-wda`, `cfg-optfill-ios`, `cfg-optfill-bank`), `idb` PATH shim logging every
+`idb ui tap|swipe|text`. Comparisons with `2f98900` ran on a scratch worktree build of that hash (port 47855, removed afterwards) on the
+same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags (`run9-ios/manual.log`). Run folder:
+`scratchpad/averi-repo/run9-ios`.
+
+**Holds.** See the 5e5a3d1 section of `2026-10-09-ios-launch-app-reads-previous-apps-tree.md`: every launch (bank ×9, Contacts ×6,
+Settings ×1) returned one line and a populated tree; no `⚠`, no empty `Application`. No launch code changed between `2f98900` and `5e5a3d1`.

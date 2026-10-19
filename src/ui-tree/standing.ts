@@ -10,6 +10,7 @@ import type { MarkedLayer, PresentedPress } from './presentation.js';
 import {
   aboveNavigationBand,
   across,
+  axisOfEdge,
   belowStatusBand,
   clippedEdges,
   clipsOf,
@@ -1212,7 +1213,7 @@ function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: Standing
   const line = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);
   const edges = facts.clipped.filter((edge) => line(facts.screen, edge) === line(frame, edge) && line(box, edge) !== line(frame, edge));
   if (edges.length === 0) return undefined;
-  const across = (edge: Edge): boolean => edge === 'top' || edge === 'bottom';
+  const across = (edge: Edge): boolean => axisOfEdge(edge) === 'vertical';
   // Longer than what of the drawn frame is judged in (`facts.screen`: the box's part of it, above any keyboard line).
   const shown = facts.screen;
   const longer =

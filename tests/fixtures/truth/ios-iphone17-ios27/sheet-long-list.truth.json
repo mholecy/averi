@@ -1,0 +1,82 @@
+{
+  "cell": "sheet-long-list",
+  "layer": "sheet-list",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "R",
+      "id": "lab.sheet-long-list.R",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 402,
+        "x": 0,
+        "y": 126
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,158.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5",
+      "geometry": "whole",
+      "visible": {
+        "x": 0,
+        "y": 126,
+        "width": 402,
+        "height": 64
+      },
+      "piece": {
+        "x": 0,
+        "y": 126,
+        "width": 402,
+        "height": 64
+      },
+      "scrollView": "list"
+    },
+    {
+      "tag": "F",
+      "id": "lab.sheet-long-list.F",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 402,
+        "x": 0,
+        "y": 1342
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "list",
+      "unprobed": "its centre (201,1374) lies off the 402x874 screen"
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "list": {
+      "height": 812,
+      "width": 402,
+      "x": 0,
+      "y": 62
+    }
+  }
+}

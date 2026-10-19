@@ -1,0 +1,146 @@
+{
+  "cell": "text-under-bar",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "S",
+      "id": "lab.text-under-bar.S",
+      "text": "Zostatok 1 234,56 €",
+      "color": "#FFF3E0",
+      "declared": "open",
+      "frame": {
+        "x": 0,
+        "y": 11,
+        "width": 1080,
+        "height": 44
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0.876,
+      "seen": "#FFF3E0",
+      "geometry": "status-band",
+      "visible": {
+        "x": 0,
+        "y": 11,
+        "width": 1080,
+        "height": 44
+      },
+      "piece": null,
+      "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "W",
+      "id": "lab.text-under-bar.W",
+      "text": "Šťastný účet",
+      "color": "#E8F5E9",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 692,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,780"
+        }
+      ],
+      "drawn": 0.979,
+      "seen": "#E8F5E9",
+      "geometry": "whole",
+      "visible": {
+        "x": 127,
+        "y": 692,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 127,
+        "y": 692,
+        "width": 825,
+        "height": 176
+      },
+      "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "P",
+      "id": "lab.text-under-bar.P",
+      "text": "Pokračovať na súhrn",
+      "color": "#FCE4EC",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 1934,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,2022"
+        },
+        {
+          "kind": "button",
+          "tag": "pinned.continue"
+        }
+      ],
+      "drawn": 0.125,
+      "seen": "#263238",
+      "geometry": "under-chrome:pinned",
+      "visible": {
+        "x": 127,
+        "y": 1934,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 127,
+        "y": 1934,
+        "width": 825,
+        "height": 22
+      },
+      "listed": {
+        "uiautomator": true
+      },
+      "textListed": {
+        "uiautomator": false
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "chrome": {
+    "pinned": {
+      "x": 66,
+      "y": 1956,
+      "width": 948,
+      "height": 154
+    }
+  },
+  "navigation": "gesture",
+  "displays": "text-under-bar.displays.txt"
+}

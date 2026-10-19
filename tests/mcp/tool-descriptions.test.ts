@@ -480,3 +480,33 @@ describe('troubleshooting on a scroll_until timeout', () => {
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(`\`scroll_until … failed ${rendered} — …\``);
   });
 });
+
+/**
+ * scroll_until's end proof, the fully probe's `axis` clause and the presented touch-down on a dialog's dim
+ * (interact/scroll-text.ts#endTurnText, #boundText, #flushText, #touchDownText): the troubleshooting reference quotes
+ * one rendering of each, derived here from the owner — the scroll view or container elided where the entry says
+ * `<scroll view>` — so an entry cannot drift from the reply.
+ */
+describe('troubleshooting on scroll_until\'s end proof, unchecked axis and the dim outside a dialog', () => {
+  const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+  const lower = node({ role: 'scrollable', rect: { x: 0, y: 380, width: 402, height: 180 } });
+
+  it('the end turn\'s clause and the one-stroke stop\'s failure, as the code words them', async () => {
+    const { endTurnText, boundText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const { nodeText } = await vi.importActual<typeof import('../../src/ui-tree/geometry.js')>('../../src/ui-tree/geometry.js');
+    const elide = (text: string): string => text.replace(nodeText(lower), '<scroll view>');
+    expect(TROUBLESHOOTING).toContain(`- **\`scroll_until\` reply or failure has \`${elide(endTurnText({ way: 'up', to: 'down', after: 1, unmoved: 1, scrollView: lower }))}\`**`);
+    expect(TROUBLESHOOTING).toContain(`\`${elide(endTurnText({ way: 'up', to: 'down', after: 3, unmoved: 1, scrollView: lower })).split(' — ')[0].slice(2)}\` means`);
+    const proven = boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'matches', ends: { way: 'up', unmoved: 1, scrollView: lower } }, 1);
+    expect(TROUBLESHOOTING).toContain(`- **\`scroll_until … failed ${elide(proven)} — …\`**`);
+  });
+
+  it('the fully probe unchecked for its axis, and the swipe that would touch down on the dim outside a dialog', async () => {
+    const { flushText, touchDownText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const axis = flushText({ edge: 'top', container: { x: 66, y: 380, width: 948, height: 234 }, checked: false, why: 'axis' });
+    expect(TROUBLESHOOTING).toContain(`\`… ${axis.slice(axis.indexOf('and every scroll container'))}\`**`);
+    const dialog = { x: 155, y: 851, width: 770, height: 517 };
+    const dim = touchDownText({ touchDown: { x: 540, y: 1776 }, surface: node({ role: 'container', rect: dialog }), reach: dialog });
+    expect(TROUBLESHOOTING).toContain(`\`…${dim} — a dialog is presented over it …\``);
+  });
+});

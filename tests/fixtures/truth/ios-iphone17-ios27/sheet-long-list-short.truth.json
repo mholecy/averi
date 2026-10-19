@@ -1,0 +1,94 @@
+{
+  "cell": "sheet-long-list-short",
+  "layer": "sheet-list-short",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "R",
+      "id": "lab.sheet-long-list-short.R",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 402,
+        "x": 0,
+        "y": 126
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,158.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5",
+      "geometry": "whole",
+      "visible": {
+        "x": 0,
+        "y": 126,
+        "width": 402,
+        "height": 64
+      },
+      "piece": {
+        "x": 0,
+        "y": 126,
+        "width": 402,
+        "height": 64
+      },
+      "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": false
+      }
+    },
+    {
+      "tag": "F",
+      "id": "lab.sheet-long-list-short.F",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 402,
+        "x": 0,
+        "y": 574
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,606.0"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#CFD8DC",
+      "geometry": "outside-scroll-view",
+      "visible": null,
+      "piece": null,
+      "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": false
+      }
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "list": {
+      "height": 384,
+      "width": 402,
+      "x": 0,
+      "y": 62
+    }
+  }
+}

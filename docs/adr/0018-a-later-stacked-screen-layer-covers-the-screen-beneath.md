@@ -833,7 +833,9 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    Golden: wording only — the 24 Android rows that end "to appear" or "never appeared in the tree" (form-picker's
    name, country, submit and country.ST; scroll-bounded O, F; carousel-in-list B, U; scroll-top-edge(-end) A;
    tabbar-floating F; text-under-bar P — tap and scroll_until each); form-picker's three taps, which the presented row
-   judges for "close it first", now read it and are refused as vacuous (`not in the tree`) instead; no verdict moved.
+   judges for the presented remedy, carry only the hint's conditional "close it first" — classed `not in the tree
+   (active-window hint)` (scripts/truth/replies.ts tells the two apart: #presentedRemedySaid, #windowHintSaid; read as
+   vacuous `not in the tree` until round 6's closing review), still red as residual 18; no verdict moved.
 
 **Residuals** 18 and 19 ("Residuals accepted" below — accepted by the owner 2026-10-18, with decision 5's hint): a fully
 expanded sheet is no presented window; the shapes are measured on one AVD and Material 3 only.
@@ -887,6 +889,12 @@ expanded sheet is no presented window; the shapes are measured on one AVD and Ma
      (Q-A option (b), judging the touch-down against surfaces presented over the stroked container's screen, was not
      taken: a search whose target lies in the presented sheet itself, stroked over a container picked from the screen
      beneath, would stop); a bound that ends such a scroll says nothing of it either;
+     measured live under idb (round 6's iOS device check, 2026-10-18, docs/truth/live-records/ios-vis.json and
+     ios-vis-b71cbbb.json, docs/truth/live-ios-2026-10-18-visibility.md): idb lists the presented layer alone, so a
+     target beneath it is never in the tree — in sheet-medium and sheet-background, A and B, the first stroke (touching
+     down at (201,175)) DISMISSED the sheet and the next read found the target: "fully visible after 1 swipe" claimed;
+     beneath alert-dim and dim-cover (A–D) and the two sheets (C, D), two strokes on the layer, nothing dismissed,
+     "never appeared in the tree". WDA, whose tree marks those layers, stops before any swipe on every one;
    - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
      target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
      hidden twin `PopoverDismissRegion` of the sheet's dim in the form's own layer; scroll_until to it, judged either

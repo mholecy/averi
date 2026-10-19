@@ -1,5 +1,15 @@
 # BUG: under WDA, `scroll_until` for a row far down a short (180-pt) scroll view carries the list past it with momentum, turns once at the last swipe, and fails at maxSwipes with the row 18 % drawn — one run in three
 
+> **Status (2026-10-18, round 6's iOS device check):** fixed live at truth/round-6's src (11683c3). `ios wda
+> scroll:scroll-bounded.F` ok in all four runs (docs/truth/live-records/ios-vis.json,
+> ios-wda-bounded-long-list-11683c3-1…3.json): four swipes, touch-downs at (201,524), `lower` at rest at 957.7, 915.3,
+> 947.7, 980.7 — inside F's 884–1000 window every time; "fully visible after 4 swipes", Tapped, fired. The same day at
+> b71cbbb (ios-vis-b71cbbb.json) the full strokes came to rest at 1005.7, F cut (a plain stop, ok). Its live KNOWN entry
+> struck off. The app logs the four strokes as one (sent while `lower` still decelerates), so the cut final stroke's
+> own length is not in the log; its landing is. The long-list half of the carry model (ADR 0021 decision 4) is
+> unmeasured: the carry case meant for it is blocked by lab note LV6
+> (docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md).
+>
 > **Status (2026-10-18):** fixed under WDA at `fe31a3c` on `arch/r22-lv4` (the carry model reworked by review round 1, ADR 0021); unmeasured on a
 > device — the live KNOWN `ios wda scroll:scroll-bounded.F` (intermittent) is the device check's to judge, over several
 > runs. Diagnosis from this note's measurements: the strokes' reach is not the fault (60 % of `lower`, 108 pt), the
@@ -24,7 +34,7 @@
 Lab note LV5. **Found 2026-10-17** by round 5's device check: the live golden (`scripts/truth/live.ts --udid
 <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`, then `--sources wda --cells
 scroll-bounded` twice) on the `averi-lab iPhone 17` simulator (iOS 27.0, 402x874), averi = `arch/round-21`'s `src/`
-(`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port 8120. Records: docs/truth/live-records/ios-vis.json (the
+(`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port 8120. Records: docs/truth/live-records/ios-vis-2725e76.json (the
 failing run) and ios-scroll-bounded-wda-2725e76-1.json, -2.json (two ok runs). Summary:
 docs/truth/live-ios-2026-10-17-visibility.md.
 
@@ -38,7 +48,7 @@ offset lies in 884–1000 (a 116-pt window). One stroke (`201 524 → 416`, a 10
 (O's case: 0→258.7); the app logs the strokes sent while it still decelerates as one.
 
 ```
-run 1 (ios-vis.json)  touches (201,524) ×4, (201,525), (201,416)   strokes lower 0→1052.3 (one)   F 51,327.7 (18 % drawn)
+run 1 (ios-vis-2725e76.json)  touches (201,524) ×4, (201,525), (201,416)   strokes lower 0→1052.3 (one)   F 51,327.7 (18 % drawn)
 → ERROR scroll_until id:"lab.scroll-bounded.F" failed after 6 swipes (maxSwipes) — element reached the viewport but
   stayed CLIPPED at top, 18% of it is in the viewport (last rect {"x":51,"y":327,"width":300,"height":65}). It was
   turned round 1 time: a swipe carried it past the viewport (a fling), …, so the next was drawn the other way
