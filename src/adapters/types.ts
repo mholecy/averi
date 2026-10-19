@@ -847,6 +847,20 @@ export interface LaunchOutcome {
   note?: string;
 }
 
+/**
+ * When typed text has reached the focused field:
+ * - `on-return`: all of it has when `typeText` returns, so what a field still
+ *   lacks after the read-back's poll was DROPPED, not delayed. iOS (`idb ui
+ *   text`, HID events): measured 2026-10-19 on the React Native lab field —
+ *   45 typings that kept a prefix had their tail typed again 1.5 s later, and
+ *   none read a character twice (a late arrival would have).
+ * - `may-arrive-late`: keystrokes may still be queued when the call returns —
+ *   Android's IME, Compose's async state (3 of 11 characters landed at first,
+ *   2026-08-05) — so a short reading proves no drop, and typing its "tail"
+ *   again could double it.
+ */
+export type TypingDelivery = 'on-return' | 'may-arrive-late';
+
 export interface DeviceAdapter {
   readonly platform: Platform;
   /**
@@ -990,6 +1004,13 @@ export interface DeviceAdapter {
    * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
    */
   readonly dragSpeed?: number;
+  /**
+   * When text sent by `typeText` has reached the focused field
+   * (`TypingDelivery`) — the platform fact the fill's retype of a dropped
+   * tail asks (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
+   * tail-again.md). Absent: `may-arrive-late`, the retype never sent.
+   */
+  readonly typingDelivery?: TypingDelivery;
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;

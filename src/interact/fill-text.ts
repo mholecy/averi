@@ -53,7 +53,7 @@
 import { INPUT_ROLE } from '../adapters/types.js';
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
-import type { Difference, FillFailure, FillResult, LostWhy } from './fill-facts.js';
+import type { Difference, FillFailure, FillResult, LostWhy, SentAgain } from './fill-facts.js';
 import { judgeFill, type Caveat, type FillVerdict, type Reason, type Sent } from './fill-verdict.js';
 
 /** One flow trace line: the action column and its text. */
@@ -95,14 +95,14 @@ export interface FillStepText {
  */
 export function fillReply(fill: FillResult, selector: string): string {
   const v = judgeFill(fill);
-  const { w, sent, unverified } = clausesOf(v);
+  const { w, aside, unverified } = clausesOf(v);
   // One row per head verb: a new `did` without its row does not compile
   // (until review round 1 of 2026-10-09 the last branch was a catch-all,
   // so a new verb would have rendered silently as "Focused").
   const head: Record<FillVerdict['did'], () => string> = {
-    filled: () => `Filled ${selector} (${w.typed}${sent(', ', '')})`,
-    typed: () => `Typed ${w.typed} into ${selector}${sent(' (', ')')}${unverified}`,
-    cleared: () => `Cleared ${selector}${sent(' (', ')')}${unverified}`,
+    filled: () => `Filled ${selector} (${w.typed}${aside(', ', '')})`,
+    typed: () => `Typed ${w.typed} into ${selector}${aside(' (', ')')}${unverified}`,
+    cleared: () => `Cleared ${selector}${aside(' (', ')')}${unverified}`,
     focused: () => `Focused ${selector}${unverified}`,
   };
   return head[v.did]() + (v.note ? ` (${v.note})` : '') + w.caveats.map((c) => `\n⚠ ${c}`).join('');
@@ -134,23 +134,25 @@ export function focusTapNote(resolved: string | undefined, moved: string | undef
  */
 export function fillStepText(fill: FillResult, as: { step: string; shown: string }): FillStepText {
   const v = judgeFill(fill);
-  const { w, sent, unverified } = clausesOf(v);
+  const { w, aside, unverified } = clausesOf(v);
   return {
     caveats: w.caveats.map((c) => ({ action: '⚠ fill', text: `${as.step}: ${c}` })),
-    line: { action: v.did === 'filled' ? 'fill' : '⚠ fill', text: `${as.step} = ${as.shown}${sent(' (', ')')}${unverified}` },
+    line: { action: v.did === 'filled' ? 'fill' : '⚠ fill', text: `${as.step} = ${as.shown}${aside(' (', ')')}${unverified}` },
   };
 }
 
 /**
- * The clauses both media place — the verdict's wording, the `sent` clause
- * in the caller's brackets, the ` — NOT verified: …` tail — built in one
- * place so the reply and the trace line cannot spell them apart.
+ * The clauses both media place — the verdict's wording, the aside (the
+ * `sent` clause, then the `retyped` one, joined by `, `) in the caller's
+ * brackets, the ` — NOT verified: …` tail — built in one place so the reply
+ * and the trace line cannot spell them apart.
  */
-function clausesOf(v: FillVerdict): { w: FillWording; sent: (open: string, close: string) => string; unverified: string } {
+function clausesOf(v: FillVerdict): { w: FillWording; aside: (open: string, close: string) => string; unverified: string } {
   const w = wordingOf(v);
+  const parts = [w.sent, w.retyped].filter((p) => p !== undefined);
   return {
     w,
-    sent: (open, close) => (w.sent === undefined ? '' : `${open}${w.sent}${close}`),
+    aside: (open, close) => (parts.length === 0 ? '' : `${open}${parts.join(', ')}${close}`),
     unverified: w.unverified === undefined ? '' : ` — ${w.unverified}`,
   };
 }
@@ -160,6 +162,9 @@ function clausesOf(v: FillVerdict): { w: FillWording; sent: (open: string, close
  * - `typed`: `N character(s)`;
  * - `sent`: `cleared N character(s) first` | `N delete(s) sent`, present
  *   with the verdict's `sent`;
+ * - `retyped`: `the last N characters typed again after the field dropped
+ *   them` (`, then the last M` per further retype), present with the
+ *   verdict's `retyped`;
  * - `unverified`: `NOT verified: ` and every reason's sentence joined by
  *   `; `, present ⇔ the verdict has reasons;
  * - `caveats`: one sentence per caveat, in the verdict's order.
@@ -167,6 +172,7 @@ function clausesOf(v: FillVerdict): { w: FillWording; sent: (open: string, close
 export interface FillWording {
   typed: string;
   sent?: string;
+  retyped?: string;
   unverified?: string;
   caveats: string[];
 }
@@ -176,9 +182,21 @@ export function wordingOf(v: FillVerdict): FillWording {
   return {
     typed: charactersText(v.typed),
     sent: v.sent === undefined ? undefined : SENT_SENTENCE[v.sent.what](v.sent.n),
+    retyped: v.retyped === undefined ? undefined : retypedText(v.retyped),
     unverified: v.reasons.length === 0 ? undefined : `NOT verified: ${v.reasons.map(reasonText).join('; ')}`,
     caveats: v.caveats.map(caveatText),
   };
+}
+
+/**
+ * The dropped tails typed again (FillResult.retyped), by length: `the last 6
+ * characters typed again after the field dropped them`, `, then the last 2`
+ * for a second retype. Lengths only, never which characters.
+ */
+export function retypedText(lengths: readonly number[]): string {
+  const last = (n: number) => (n === 1 ? 'the last character' : `the last ${n} characters`);
+  const [first, ...then] = lengths;
+  return `${last(first)} typed again after the field dropped ${first === 1 ? 'it' : 'them'}${then.map((n) => `, then ${last(n)}`).join('')}`;
 }
 
 /** One caveat's sentence. */
@@ -252,11 +270,39 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
     'The field was tapped and may hold partial text; check the device is still online (adb devices / ' +
     'xcrun simctl list), then retry with clear: true so the field is reset',
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
-  mismatch: ({ typed, shows, differs, notInput, retried }) =>
-    `fill: typed ${charactersText(typed)}${retried === undefined ? '' : retried.wiped ? ' (after one wipe and retype)' : ' (after typing it once more)'} but the field shows ${shows}` +
+  mismatch: ({ typed, shows, differs, notInput, again, elsewhere }) =>
+    `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${shows}` +
     DIFFERENCE_TEXT[differs.kind](differs as never) +
+    (elsewhere === undefined
+      ? ''
+      : `; the typing left the field: ${elsewhere.role}${elsewhere.identifier === null ? '' : ` id:"${elsewhere.identifier}"`} ` +
+        `(${rectText(elsewhere.rect)}) changed while it typed (the focus moved), so nothing was typed again`) +
     (notInput === undefined ? '' : `; ${caveatText({ code: 'not-input', role: notInput.role, typed: true, input: notInput.input })}`),
 };
+
+/**
+ * What was sent again before the mismatch's read-back, in the order sent: a run of dropped tails as `retypedText`
+ * words it, the clear's retype as `after one wipe and retype` (or `after typing it once more`, nothing wiped), joined
+ * by `; `.
+ */
+function againText(again: readonly SentAgain[]): string {
+  const parts: string[] = [];
+  let tails: number[] = [];
+  const flush = () => {
+    if (tails.length > 0) parts.push(retypedText(tails));
+    tails = [];
+  };
+  for (const a of again) {
+    if (a.kind === 'tail') {
+      tails.push(a.length);
+      continue;
+    }
+    flush();
+    parts.push(a.wiped ? 'after one wipe and retype' : 'after typing it once more');
+  }
+  flush();
+  return parts.join('; ');
+}
 
 /**
  * What the mismatch error adds after the two lengths. Until 2026-10-09 a
