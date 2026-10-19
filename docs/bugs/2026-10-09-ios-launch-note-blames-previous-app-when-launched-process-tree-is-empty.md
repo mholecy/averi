@@ -74,3 +74,36 @@ reply were already the empty tree.
    lone 0×0 `Application` with Contacts' pid. (Naturally: any app process started after a WDA session and before averi's next launch.)
 3. Bring the bank app to front (through averi for the owner branch), then `launch_app { appId: com.apple.MobileAddressBook }` →
    the `still the app labelled "Skeleton Internal"` note; the following reads are the empty tree, never "Contacts".
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+**Did not recur** (not fixed in round 5; recorded per R-1). Every `launch_app`/flow `launch:` of this run (Contacts: 11 `launch_app` +
+2 flow `launch:`; the bank: 11 + 1; Settings: 1) read a populated tree of the launched app; no empty `Application` read, no empty-tree error. The only
+`⚠` notes fired were the German "Kontakte" ones (the third branch, correctly).
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+**Did not recur.** Every `launch_app` / flow `launch:` of this run (Contacts ×11, the bank ×9, Settings ×1) read a populated tree; no empty
+`Application` read. The `⚠` notes that fired were the 3.2 branch (twice, after a `terminate_app`) and the German "Kontakte" (twice).
+
+## Device check (2026-10-09 iOS, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/` built 22:41 local, stdio via the HTTP daemon on port 47853, cwd mp-native),
+mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only (`cfg-swift-wda`, `cfg-swift-idb`, `cfg-c-wda`,
+`cfg-contacts-idb`, `cfg-bank-idb`, `cfg-set-wda`, `cfg-optfill-ios`, `cfg-optfill-bank`), `idb` PATH shim logging every
+`idb ui tap|swipe|text`. Comparisons with `2f98900` ran on a scratch worktree build of that hash (port 47855, removed afterwards) on the
+same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags (`run9-ios/manual.log`). Run folder:
+`scratchpad/averi-repo/run9-ios`.
+
+**Holds.** See the 5e5a3d1 section of `2026-10-09-ios-launch-app-reads-previous-apps-tree.md`: every launch (bank ×9, Contacts ×6,
+Settings ×1) returned one line and a populated tree; no `⚠`, no empty `Application`. No launch code changed between `2f98900` and `5e5a3d1`.

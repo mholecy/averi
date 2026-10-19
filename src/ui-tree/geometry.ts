@@ -735,29 +735,31 @@ export interface Clips {
    */
   axesOf(container: Rect): ScrollAxes | undefined;
   /**
-   * The scroll view of rect `scroller` (within a pixel; the first in tree order that scrolls), when the tree shows its
+   * The scroll view of rect `scroller` (found as `axesOf` finds its scroll view: scroll-containers.ts#isScrollViewOf,
+   * that exact rect — the one the stroke plan remembered and drew over, whose cut and axes the same read finds by it
+   * exactly; one moved by a pixel is found by none of them, and no proof is the safe answer), when the tree shows its
    * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
    * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`drawnIn`'s
    * dialect, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
-   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container at
-   * 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
+   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container
+   * at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
    * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts every rect to its scroll
    * container, so content past an edge reads flush with it (or is not listed at all), and idb's flat list lists no
    * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
-   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG
-   * that edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
+   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG that
+   * edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
    * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
    * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
    * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
-   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual, stated as it is: a lazy list (a
-   * table) lists only the rows it has laid out, so one resting EXACTLY on a row boundary with its earlier rows dropped
-   * (a sticky section header pinned at its top reads the same) lists nothing past its top and reads as ending there.
-   * Nothing in the reads rules that out: interact/scroll-rounds.ts asks this only of a read a stroke left unmoved, but
-   * a stroke not taken leaves it unmoved too — so a stroke not taken over a lazy list resting on a boundary is a false
-   * proof (one stroke, then a turn or a failure that calls the content exhausted). What makes it rare, not impossible:
-   * a list at rest lies on a boundary by chance (a flung list stops anywhere along a row), and the stroke must also go
-   * untaken, with nothing drawn over its touch-down (that withholds the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most
-   * once a round, after a stroke).
+   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual,
+   * stated as it is: a lazy list (a table) lists only the rows it has laid out, so one resting EXACTLY on a row
+   * boundary with its earlier rows dropped (a sticky section header pinned at its top reads the same) lists nothing
+   * past its top and reads as ending there. Nothing in the reads rules that out: interact/scroll-rounds.ts asks this
+   * only of a read a stroke left unmoved, but a stroke not taken leaves it unmoved too — so a stroke not taken over a
+   * lazy list resting on a boundary is a false proof (one stroke, then a turn or a failure that calls the content
+   * exhausted). What makes it rare, not impossible: a list at rest lies on a boundary by chance (a flung list stops
+   * anywhere along a row), and the stroke must also go untaken, with nothing drawn over its touch-down (that withholds
+   * the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most once a round, after a stroke).
    */
   endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
 }
@@ -885,12 +887,12 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     axes.set(found, facts);
     return facts;
   };
-    const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
+  const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
     if (!ancestry || !unclipped) return undefined;
-    const view = [...everyNode(tree)].find((n) => scrolls(n) && sameRectWithinPixel(n.rect, scroller));
+    const view = [...everyNode(tree)].find((n) => isScrollViewOf(n, scroller));
     if (view === undefined) return undefined;
     // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
-    if (scrollAxis(view, unclipped) !== (edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal')) return undefined;
+    if (scrollAxis(view, unclipped) !== axisOfEdge(edge)) return undefined;
     const r = view.rect;
     const past: Record<Edge, (d: Rect) => boolean> = {
       top: (d) => d.y < r.y - 1,
@@ -906,7 +908,16 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
 export function across(rect: Rect, edge: Edge): number {
-  return edge === 'top' || edge === 'bottom' ? rect.height : rect.width;
+  return axisOfEdge(edge) === 'vertical' ? rect.height : rect.width;
+}
+
+/**
+ * The axis along which content comes in through `edge`: `vertical` for the top or bottom, `horizontal` for a side —
+ * the one edge → axis mapping, read by `Clips.endsAt` and scroll_until's sentences (interact/scroll-text.ts), and by
+ * interact/swipe.ts#axisOf for a direction (through its EDGE_TOWARD), so ui-tree imports nothing of interact.
+ */
+export function axisOfEdge(edge: Edge): ScrollAxis {
+  return edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal';
 }
 
 /**
@@ -1045,13 +1056,13 @@ function evidentCut(node: UiNode, chain: readonly Rect[]): Cut | undefined {
     }[edge];
     // Dumped wholly past this edge and clamped onto it (UiNode.clippedOut): past-the-edge evidence with no area left to show it.
     if (rectArea(d) === 0) return clippedOut === edge && Math.abs(near) <= 1;
-    const fromInside = (edge === 'top' || edge === 'bottom') && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
+    const fromInside = axisOfEdge(edge) === 'vertical' && far - near >= MIN_INSIDE_EVIDENCE && near <= 1 && far < nodeFar - 1;
     return near < -1 || fromInside;
   };
   let shallowest: Cut | undefined;
   for (const container of chain) {
     for (const edge of flushEdges(n, container)) {
-      const depth = edge === 'top' || edge === 'bottom' ? n.height : n.width;
+      const depth = across(n, edge);
       if (shallowest !== undefined && depth >= shallowest.depth) continue;
       for (const d of everyNode(node)) {
         if (d !== node && runsOnPast(d, container, edge)) {
@@ -1109,6 +1120,12 @@ export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;
 }
 
+/** A node as a sentence quotes it (`nodeText`): its role, label, id and rect — not its subtree, which is no fact of a sentence. */
+export type QuotedNode = Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
+
+/** What a sentence keeps of `n` (`QuotedNode`), its rect copied. */
+export const quoted = ({ role, label, identifier, rect }: QuotedNode): QuotedNode => ({ role, label, identifier, rect: { ...rect } });
+
 /**
  * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
  * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
@@ -1117,7 +1134,7 @@ export function rectText(r: Rect): string {
  * miss heads (verify/pixel-poll.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole by the tool
  * description, end with the same words.
  */
-export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, where = 'outside'): string =>
+export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): string =>
   `${where} its scroll view ${nodeText(scroller)}`;
 
 /**
@@ -1128,7 +1145,7 @@ export const outsideScrollViewText = (scroller: Pick<UiNode, 'role' | 'label' | 
  * sentences (interact/scroll-text.ts) share it. The dismissal picker's skip
  * line names a cover shorter, on purpose (interact/target-text.ts#coverName).
  */
-export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>): string =>
+export const nodeText = (n: QuotedNode): string =>
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
 
 /**
@@ -1139,7 +1156,7 @@ export const nodeText = (n: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect
  * chrome refusal and move (interact/tap-judgement.ts#TapJudge.aim) and
  * `scroll_until`'s covered sentences (interact/scroll-text.ts).
  */
-export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, centre?: Point, reach?: Rect): string =>
+export const drawnOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): string =>
   `under ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
 
 /**
@@ -1148,7 +1165,7 @@ export const drawnOverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier
  * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the
  * cover's own rect still lies on what it names. One spelling for the tap, `scroll_until` and the pixel assert.
  */
-export const coverText = (cover: Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>, reach?: Rect): string =>
+export const coverText = (cover: QuotedNode, reach?: Rect): string =>
   reach === undefined || sameRect(reach, cover.rect) ? nodeText(cover) : `${nodeText(cover).slice(0, -1)}, reaching ${rectText(reach)})`;
 
 /**

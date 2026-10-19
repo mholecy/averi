@@ -1,0 +1,129 @@
+{
+  "cell": "sheet-medium",
+  "layer": "sheet-medium",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.sheet-medium.A",
+      "color": "#E53935",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 303,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,391"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "sheet"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#9B2724"
+    },
+    {
+      "tag": "B",
+      "id": "lab.sheet-medium.B",
+      "color": "#1E88E5",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,886"
+        },
+        {
+          "kind": "dismissed",
+          "tag": "sheet"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#145C9B"
+    },
+    {
+      "tag": "C",
+      "id": "lab.sheet-medium.C",
+      "color": "#43A047",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 1293,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1381"
+        },
+        {
+          "kind": "tap",
+          "tag": "S"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#8E24AA"
+    },
+    {
+      "tag": "D",
+      "id": "lab.sheet-medium.D",
+      "color": "#FB8C00",
+      "declared": "presented-over",
+      "frame": {
+        "x": 127,
+        "y": 1788,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1876"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#F7F2FA"
+    },
+    {
+      "tag": "S",
+      "id": "lab.sheet-medium.S",
+      "color": "#8E24AA",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 1353,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,1441"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#8E24AA"
+    }
+  ]
+}

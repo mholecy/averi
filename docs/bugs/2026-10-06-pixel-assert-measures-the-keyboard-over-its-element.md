@@ -128,3 +128,75 @@ Results:
 - **iOS:** no oracle and no soft keyboard (hardware keyboard), so behaviour is unchanged. PASS, with no covered sentence.
 
 Not exercised: a floating or split IME, API 34+, multi-display (the recorded residuals).
+
+## Device check (2026-10-09 Android, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:01 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47831, cwd mp-native). Strokes and taps from
+the `adb` shim; page placement, bar show/hide and Gboard mode by hand with the real `adb`.
+
+mp-native SWIFT form, `my_note_input` focused (IME `[0,1398]`, `mInputShown=true`), CONTINUE moved up by the resize to `66,1488 948x132`, under
+the keyboard.
+
+- **Holds — keyboard up.** 15:49:58 `assert` color (`#8F8F99`, dE 8) and ocr (`CONTINUE`) on `id:swift_payment.form.continue_button`,
+  `timeout: "4s"` each → `2/2 asserts FAILED`, each `— the soft keyboard covers the element (element 66,1488 948x132, keyboard 0,1398
+  1080x822) — dismiss it (e.g. \`dismissKeyboard: true\` on the fill, or press back) and re-run; failing closed, color unchecked` / `…
+  rendered text unchecked` (11.3 s). No keyboard pixels reported.
+- **Holds — keyboard hidden** (`press_key back`, `mInputShown=false`): ocr `CONTINUE` PASS. Timing, recorded only: the first ocr call of the
+  server took 37.1 s against `timeout: "6s"` and passed (the recognizer's first build, presumably); the next with `6s` failed `element found,
+  but no time was left within 6 s to capture a settled frame (the slowest round … 4.048 s here) — raise this assert timeout` (7.1 s); with the
+  default budget PASS in 4.7 s.
+
+## Device check (2026-10-09 Android, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:33 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47841, cwd mp-native). Strokes and taps from the
+`adb` shim; placement and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's `averi.yaml` untouched.
+
+SWIFT form, `my_note_input` focused (IME `[0,1398]`), CONTINUE at `66,1488 948x132` under the keyboard.
+
+- **Holds — keyboard up.** 18:15:29 color (`#8F8F99`, dE 8) and ocr (`CONTINUE`) on `id:swift_payment.form.continue_button`, `timeout: "4s"`
+  → `2/2 asserts FAILED`, each `— the soft keyboard covers the element (element 66,1488 948x132, keyboard 0,1398 1080x822) — dismiss it …;
+  failing closed, color unchecked` / `… rendered text unchecked` (8.7 s).
+- **Holds — keyboard hidden** (`press_key back`): 18:15:44 ocr `CONTINUE`, default budget → `PASS … read "CONTINUE"` (6.2 s). The first OCR
+  of this server took 6.2 s (dd50327's 37 s first OCR not repeated).
+
+## Device check (2026-10-09 Android, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:19 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/`, stdio via the HTTP daemon on port 47851, cwd mp-native). Strokes and taps from the
+`adb` shim (`run9-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only
+(`cfg-opt-bank`, `cfg-opt-contacts`, `cfg-optional`, new `cfg-fill`, `cfg-fill-bank`); mp-native's `averi.yaml` untouched.
+
+SWIFT form, `my_note_input` focused (IME `[0,1398]`), CONTINUE at `66,1488 948x132` under the keyboard.
+
+- **Holds — keyboard up.** 20:57:37 color (`#8F8F99`, dE 8) and ocr (`CONTINUE`) on `id:swift_payment.form.continue_button`, `timeout: "4s"`
+  → `2/2 asserts FAILED`, each `— the soft keyboard covers the element (element 66,1488 948x132, keyboard 0,1398 1080x822) — dismiss it …;
+  failing closed, color unchecked` / `… rendered text unchecked` (11.2 s).
+- **Holds — keyboard hidden** (`press_key back`): 20:57:54 ocr `CONTINUE` → `PASS … read "CONTINUE"` (4.9 s).
+
+## Device check (2026-10-10 Android, re-run at 35d5997)
+
+Measured 2026-10-10 06:16–06:47 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard docked unless stated), averi =
+mobile-verify `fix/round-7` @ `35d5997` (`dist/`, stdio via the HTTP daemon on port 47861, cwd mp-native). Strokes and taps from the
+`adb` shim (`run10-android/adb-input.log`); stagings and Gboard mode by hand with the real `adb`. Scratch configs only; mp-native's
+`averi.yaml` untouched.
+
+**Holds.** SWIFT form, `amount_input` focused (IME `0,1398 1080x822`; the form did not resize this time, CONTINUE `66,1979 948x132`): 06:43:10
+ocr `CONTINUE` on `id:swift_payment.form.continue_button`, `timeout: "4s"` → `1/1 asserts FAILED` / `… the soft keyboard covers the element
+(element 66,1979 948x132, keyboard 0,1398 1080x822) — dismiss it (e.g. dismissKeyboard: true on the fill, or press back) and re-run; failing
+closed, rendered text unchecked` (4.4 s). Tap under the IME: `tap id:value_date_select` (`66,1375 948x143`) → `Tapped … (the soft keyboard
+covered id:"swift_payment.form.value_date_select"; hidden before tapping)`, `keyevent 4` then `input tap 540 1447`, the picker opened.
+
+## Device check (2026-10-12 Android, re-run at 0ff6df3)
+
+Measured 2026-10-12 09:49–10:25 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, gesture navigation, Gboard docked), averi =
+mobile-verify `fix/round-8` @ `0ff6df3` (`dist/`, stdio via the HTTP daemon on port 47871, cwd mp-native). Strokes and taps from the
+`adb` shim (`run11-android/adb-input.log`); stagings by hand with the real `adb` (slow `input swipe` drags). The Mac had rebooted since
+round 7: the emulator was cold-booted and mp-native showed the registered Welcome (SIGN IN / RESET). Scratch configs only
+(`run11-android/cfg-d3.yaml`); mp-native's `averi.yaml` untouched.
+
+Still fails closed (round 8, R-6.3). Contacts › Create contact, First name focused (Gboard up, container `0,242 1080x1156`): colour on
+`label:"Last name"` (`132,1409 816x160`) → `FAIL … — the soft keyboard covers the element (element 132,1409 816x160, keyboard 0,1398
+1080x822) — dismiss it (e.g. dismissKeyboard: true on the fill, or press back) and re-run; failing closed, color unchecked`; OCR → the
+same, `rendered text unchecked`. (The focused `First name` field's OCR read "Hirst name" — the caret over the F; its own content.)

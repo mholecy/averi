@@ -1,0 +1,103 @@
+{
+  "cell": "pinned-bar",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "W",
+      "id": "lab.pinned-bar.W",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 285
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,317.0"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#43A047",
+      "geometry": "whole",
+      "visible": {
+        "x": 51,
+        "y": 285,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 285,
+        "width": 300,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "P",
+      "id": "lab.pinned-bar.P",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 728
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,760.0"
+        }
+      ],
+      "drawn": 0.625,
+      "seen": "#E53935",
+      "geometry": "chrome-overlap:pinned",
+      "visible": {
+        "x": 51,
+        "y": 728,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 728,
+        "width": 300,
+        "height": 40
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "chrome": {
+    "pinned": {
+      "height": 56,
+      "width": 354,
+      "x": 24,
+      "y": 768
+    }
+  }
+}

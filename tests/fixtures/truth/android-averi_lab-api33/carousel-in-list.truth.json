@@ -1,0 +1,106 @@
+{
+  "cell": "carousel-in-list",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "C",
+      "id": "lab.carousel-in-list.C",
+      "color": "#D81B60",
+      "declared": "open",
+      "frame": {
+        "x": 1014,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#EEEEEE",
+      "geometry": "outside-scroll-view",
+      "visible": null,
+      "piece": null,
+      "scrollView": "carousel",
+      "listed": {
+        "uiautomator": true
+      },
+      "unprobed": "its centre (1488,497) lies off the 1080x2220 screen"
+    },
+    {
+      "tag": "B",
+      "id": "lab.carousel-in-list.B",
+      "color": "#00ACC1",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 2915,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "uiautomator": false
+      },
+      "unprobed": "its centre (541,3003) lies off the 1080x2220 screen"
+    },
+    {
+      "tag": "U",
+      "id": "lab.carousel-in-list.U",
+      "color": "#7CB342",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": -550,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "uiautomator": false
+      },
+      "unprobed": "its centre (541,-462) lies off the 1080x2220 screen"
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "page": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    },
+    "carousel": {
+      "x": 66,
+      "y": 380,
+      "width": 948,
+      "height": 234
+    }
+  },
+  "navigation": "gesture",
+  "displays": "carousel-in-list.displays.txt"
+}

@@ -1,0 +1,245 @@
+{
+  "cell": "form-basic",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [],
+  "navigation": "gesture",
+  "form": {
+    "fields": [
+      {
+        "tag": "name",
+        "id": "lab.form-basic.name",
+        "kind": "text",
+        "title": "Recipient’s name & surname",
+        "titleId": "lab.form-basic.name.title",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 314,
+          "width": 453,
+          "height": 66
+        }
+      },
+      {
+        "tag": "email",
+        "id": "lab.form-basic.email",
+        "kind": "email",
+        "title": "E-mail for “receipts”",
+        "titleId": "lab.form-basic.email.title",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 496,
+          "width": 321,
+          "height": 66
+        }
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-basic.iban",
+        "kind": "iban",
+        "title": "IBAN – account number",
+        "titleId": "lab.form-basic.iban.title",
+        "frame": {
+          "x": 55,
+          "y": 750,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 678,
+          "width": 383,
+          "height": 66
+        }
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-basic.amount",
+        "kind": "amount",
+        "title": "Amount in EUR (max 10 000)",
+        "titleId": "lab.form-basic.amount.title",
+        "frame": {
+          "x": 55,
+          "y": 932,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 860,
+          "width": 460,
+          "height": 66
+        }
+      },
+      {
+        "tag": "pin",
+        "id": "lab.form-basic.pin",
+        "kind": "pin",
+        "title": "PIN…",
+        "titleId": "lab.form-basic.pin.title",
+        "frame": {
+          "x": 55,
+          "y": 1114,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 1042,
+          "width": 83,
+          "height": 66
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "name",
+        "id": "lab.form-basic.name",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,436"
+          }
+        ]
+      },
+      {
+        "tag": "email",
+        "id": "lab.form-basic.email",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,618"
+          }
+        ]
+      },
+      {
+        "tag": "iban",
+        "id": "lab.form-basic.iban",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 750,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,800"
+          }
+        ]
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-basic.amount",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 932,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,982"
+          }
+        ]
+      },
+      {
+        "tag": "pin",
+        "id": "lab.form-basic.pin",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 1114,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,1164"
+          }
+        ]
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-basic.submit",
+        "kind": "button",
+        "frame": {
+          "x": 55,
+          "y": 1246,
+          "width": 970,
+          "height": 132
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,1312"
+          }
+        ]
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "cell": "scroll-top-edge",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "frames": {
+    "A": {
+      "x": 128,
+      "y": -825,
+      "width": 825,
+      "height": 176
+    },
+    "T": {
+      "x": 128,
+      "y": -55,
+      "width": 825,
+      "height": 176
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "page": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    }
+  }
+}

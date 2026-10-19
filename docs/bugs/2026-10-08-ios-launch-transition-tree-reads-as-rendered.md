@@ -241,3 +241,40 @@ Screenshot `run5-ios/img-82-0.png`: the PIN screen, rendered. The 3.5 s is the f
 not printed, so the two did not double up. Other cold launches in the run: Contacts 11:28:50 (3.4 s), 11:29:33 (3.2 s),
 11:32:28 (3.5 s), all without ⚠, first reads Contacts'. The PIN login then ran (`login_pin_ios_here`, 7.7 s, `branch: matched
 state logged_in`).
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+**Holds; the launch reply is one line (C1).** `terminate_app com.finshape.dbosbanking` + `launch_app` (15:36:19, 3.9 s) →
+`Launched com.finshape.dbosbanking on ios` (one line), and a `ui_snapshot` sent right after it (0.3 s) already read the PIN screen
+(`other 'Skeleton Internal'`, `button 'Password login'`, `text 'Log in'`, the keypad — 21 nodes), never SpringBoard's launch tree;
+again at 15:42:09 (2.8 s, PIN screen). Every other `launch_app` of the run (Contacts, Settings, bank) answered one line, with no
+wipe line (no `clearState` was ever sent).
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+**Holds; the launch reply is one line (C1).** `terminate_app com.finshape.dbosbanking` + `launch_app` (18:11:3x, 3.9 s; and 18:32:2x, 3.1 s)
+→ `Launched com.finshape.dbosbanking on ios` (one line), and a `ui_snapshot` sent right after it (0.4–0.5 s) read the PIN screen
+(`other 'Skeleton Internal'`, `button 'Password login'`, `text 'Log in'`, `Enter your PIN to log in`, the keypad), never `[]` nor
+SpringBoard's launch tree. No `launch_app` of the run carried a wipe line (no `clearState` sent).
+
+## Device check (2026-10-09 iOS, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/` built 22:41 local, stdio via the HTTP daemon on port 47853, cwd mp-native),
+mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only (`cfg-swift-wda`, `cfg-swift-idb`, `cfg-c-wda`,
+`cfg-contacts-idb`, `cfg-bank-idb`, `cfg-set-wda`, `cfg-optfill-ios`, `cfg-optfill-bank`), `idb` PATH shim logging every
+`idb ui tap|swipe|text`. Comparisons with `2f98900` ran on a scratch worktree build of that hash (port 47855, removed afterwards) on the
+same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags (`run9-ios/manual.log`). Run folder:
+`scratchpad/averi-repo/run9-ios`.
+
+**Holds.** See the 5e5a3d1 section of `2026-10-09-ios-launch-app-reads-previous-apps-tree.md`: every launch (bank ×9, Contacts ×6,
+Settings ×1) returned one line and a populated tree; no `⚠`, no empty `Application`. No launch code changed between `2f98900` and `5e5a3d1`.
