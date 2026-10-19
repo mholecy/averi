@@ -1,0 +1,108 @@
+{
+  "cell": "form-basic",
+  "events": [],
+  "fields": {
+    "amount": {
+      "error": null,
+      "focused": false,
+      "value": ""
+    },
+    "email": {
+      "error": null,
+      "focused": false,
+      "value": ""
+    },
+    "iban": {
+      "error": null,
+      "focused": false,
+      "value": ""
+    },
+    "name": {
+      "error": null,
+      "focused": false,
+      "value": ""
+    },
+    "pin": {
+      "error": null,
+      "focused": false,
+      "value": ""
+    }
+  },
+  "frames": {
+    "amount": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 382
+    },
+    "amount.title": {
+      "height": 18,
+      "width": 197.66666666666666,
+      "x": 20,
+      "y": 358
+    },
+    "email": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 234
+    },
+    "email.title": {
+      "height": 18,
+      "width": 138.66666666666666,
+      "x": 20,
+      "y": 210
+    },
+    "iban": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 308
+    },
+    "iban.title": {
+      "height": 18,
+      "width": 162.66666666666666,
+      "x": 20,
+      "y": 284
+    },
+    "name": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 160
+    },
+    "name.title": {
+      "height": 18,
+      "width": 194.66666666666666,
+      "x": 20,
+      "y": 136
+    },
+    "pin": {
+      "height": 34,
+      "width": 362,
+      "x": 20,
+      "y": 456
+    },
+    "pin.title": {
+      "height": 18,
+      "width": 36,
+      "x": 20,
+      "y": 432
+    },
+    "submit": {
+      "height": 46.33333333333326,
+      "width": 362,
+      "x": 20,
+      "y": 514
+    }
+  },
+  "ready": true,
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  },
+  "submits": []
+}

@@ -1,10 +1,9 @@
 {
   "_comment" : [
-      "REAL WebDriverAgent `GET /source?format=json` bytes of the lab app's `carousel-in-list` cell at rest (the page at",
-      "offset 300, the carousel at 0), from the truth lab's corpus (truth/round-7 76451966:",
-      "tests/fixtures/truth/ios-iphone17-ios27/carousel-in-list.wda.json), averi-lab iPhone 17 simulator, iOS 27.0, 402x874 pt.",
-      "UNEDITED below this `_comment` key, which is the only addition (the parser unwraps `value`). The carousel 24,138 354x85",
-      "(a horizontal ScrollView in the vertical page) lists its content 24,138 1062x85: C at 378,138 354x85, wholly right of it."
+      "REAL WebDriverAgent `GET /source?format=json` bytes of the lab app's `carousel-in-list` cell at rest (a SwiftUI list",
+      "holding a horizontal carousel), from the truth lab's corpus (truth/round-6, 7645196: tests/fixtures/truth/ios-iphone17-ios27/",
+      "carousel-in-list.wda.json), averi-lab iPhone 17 simulator, iOS 27.0, 402x874 pt. UNEDITED below this `_comment` key, which",
+      "is the only addition (the parser unwraps `value`). Content scrolled out of its scroller, `isVisible \"0\"`, in no `Cell`."
   ],
  "value": {
   "customActions": null,

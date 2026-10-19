@@ -676,3 +676,148 @@ iPhone 17 simulator iOS 27.0, averi @ `610660f` (`dist/`, stdio), 05:30–05:41 
 - Setup note: raising the keyboard needed an app switch this time (`launch_app` another app, then back) after the prefs
   toggle; toggle + focus change between fields did not raise it after a `fill` (4 tries).
 - Pixel assert over a covered element: not measured (could not raise the keyboard again over a covered row before time ran out).
+
+## Device check (2026-10-09 iOS, re-run at dd50327)
+
+Measured 2026-10-09 15:35–16:02 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `arch/round-5` @ `dd50327` (`dist/`, stdio via the HTTP daemon on port 47833, cwd mp-native, server restarted 15:52:36
+for the launch-note items), mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim.
+
+**R-1 tap under the keyboard — Holds on WDA; on idb the target is absent and the tap times out, as documented.**
+- WDA: see the dd50327 section of 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md (title tap `201 84`, then the
+  row `201 707`; and `fees_select` → `201 639`). No key pressed.
+- idb (mp-native's own `averi.yaml`, no `keyboardDismiss`), decimal pad up on the amount:
+
+```
+15:42:54 tap { selector: "id:swift_payment.form.priority_select" }                                                  (5.7 s)
+→ [isError] Timed out after 5000ms waiting for element id:swift_payment.form.priority_select to appear
+```
+
+  No shim tap — nothing was pressed, no key. The idb tree at that moment (46 nodes) lists the keys (`button '1' 5,596 132x54` …
+  `'Delete' 270,758`), the band `other 0,589 402x285`, `continue_button 24,512 354x44`, `value_date_select 24,545` — and omits every
+  row wholly under the keyboard (`fees_select`, `priority_select`, `PAYMENT DETAILS`, `Payee's name`), while listing rows further
+  down the form (`Payee's street 42,885`). This is the behaviour the `tap` description states (`src/mcp/tools.ts:377`: "measured once
+  (iOS 27), a covered target was absent from the idb tree and the tap timed out waiting for it to appear") — now measured a second
+  time. The handoff's R-1 "the keyboard is hidden first" applies to WDA only; under idb nothing is hidden by design.
+
+## Device check (2026-10-09 iOS, re-run at 2f98900)
+
+Measured 2026-10-09 18:09–18:45 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6` @ `2f98900` (`dist/`, stdio via the HTTP daemon on port 47843, cwd mp-native), mp-native's `averi.yaml`
+untouched (default `treeSource: idb`), scratch configs only, `idb` PATH shim. Comparisons with `dd50327` ran on a scratch worktree
+build of that hash on the same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags.
+
+**R-1 tap under the keyboard — Holds.** WDA: `priority_select` → title `201 84`, then the row `201 707`; `fees_select` → `201 84`, `201
+639` (see the 2f98900 section of `2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md`). idb (mp-native's own
+`averi.yaml`), the software keyboard up on the amount:
+
+```
+18:34:1x tap { selector: "id:swift_payment.form.priority_select" }                                                  (5.8 s)
+→ [isError] Timed out after 5000ms waiting for element id:swift_payment.form.priority_select to appear
+```
+
+No shim tap — nothing pressed, no key; the covered row absent from idb's tree, as `src/mcp/tools.ts` states (third measurement).
+
+## Device check (2026-10-09 iOS, re-run at 5e5a3d1)
+
+Measured 2026-10-09 20:42–21:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
+mobile-verify `fix/round-6b` @ `5e5a3d1` (`dist/` built 22:41 local, stdio via the HTTP daemon on port 47853, cwd mp-native),
+mp-native's `averi.yaml` untouched (default `treeSource: idb`), scratch configs only (`cfg-swift-wda`, `cfg-swift-idb`, `cfg-c-wda`,
+`cfg-contacts-idb`, `cfg-bank-idb`, `cfg-set-wda`, `cfg-optfill-ios`, `cfg-optfill-bank`), `idb` PATH shim logging every
+`idb ui tap|swipe|text`. Comparisons with `2f98900` ran on a scratch worktree build of that hash (port 47855, removed afterwards) on the
+same device and screen. Positions set by hand with slow `idb ui swipe … --duration 2.5` drags (`run9-ios/manual.log`). Run folder:
+`scratchpad/averi-repo/run9-ios`.
+
+**R-1 — Holds.** idb (mp-native's `averi.yaml`), number pad up on the amount: 21:14:47 `tap id:swift_payment.form.fees_select` →
+`Timed out after 5000ms waiting for element id:swift_payment.form.fees_select to appear`; no shim tap, no key. The row partly under the
+keys and the lifted CONTINUE (`value_date_select`) is refused naming CONTINUE (see the modal note, M-1.4). WDA keyboard taps not re-run
+(keyboard code unchanged since 2f98900).
+
+
+## Device check (2026-10-13 iOS, re-run at 20307d2)
+
+Measured 2026-10-13 17:10–17:37 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt; booted
+headless, the only booted simulator), averi = mobile-verify `arch/round-12` @ `20307d2` (`dist/`, stdio via the HTTP daemon on port
+47883, cwd mp-native), mp-native's `averi.yaml` untouched (default `treeSource: idb`); scratch configs in `run12-ios`: `cfg-wda.yaml`
+(`treeSource: wda`, otherwise a copy), plus `keyboardDismiss` variants `cfg-wda-title.yaml` (`tap: {id: swift_payment.form.title}`),
+`cfg-wda-payee.yaml` (`label: "Payee’s name"`), `cfg-wda-iban.yaml` (`label: "IBAN*"`), `cfg-wda-iban-title.yaml` (IBAN*, then the
+title), `cfg-wda-contacts.yaml` (`text: "New Contact"`). `idb` PATH shim logging every `idb ui tap|swipe|text|key` (`idb-calls.log`;
+PIN-pad lines 7–10 and 34–37 are the two `login_pin_ios_here` runs, not quoted). Positions set by hand with slow `idb ui swipe …
+--duration 2.5` drags at x 380 (`manual.log`). The software keyboard was raised by setting `com.apple.keyboard.preferences`
+`AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` to false and relaunching mp-native (17:18:37); both restored to 1 at
+17:36:59. mp-native logged in twice by the owner-approved `login_pin_ios_here` (17:12:19 after Account Detail showed "That's an
+error" on every reload; 17:18:49 after the prefs relaunch), never the `login` rung. WDA started by averi on the first `cfg-wda` call
+(17:13:44, port 8100) and stopped at 17:37 (xcodebuild killed, port 8100 closed). Local web pages `www/a.html` (link to B) and
+`www/b.html` (60 links) served on 127.0.0.1:47891, stopped 17:33:05. Note: the SWIFT form's layout differs from round 8 (at rest
+`priority_select 24,681` — clear of CONTINUE — not `24,771`), so the "`priority_select` under CONTINUE" shape was rebuilt with
+`payee_country_select` dragged to `24,775`; the handoff's status-band shape `24,-20` was reached by `priority_select` itself.
+
+**D2 (round 10) — idb keyboard band, at 20307d2.** Number pad up on the amount (idb band `other 0,589 402x285`, keys `1 2 3` at 596;
+`D2-idb-numpad.json`), QWERTY up on Payee’s name (`D2-idb-qwerty.json`, band `0,590 402x284`).
+- **D2.1 — Not reached (idb drops the shape).** idb omits every node whose centre lies under the band: `priority_select` dragged to
+  top 567 (centre 593, 22 pt above the band) and `fees_select` at 571 are absent from the tree; rows wholly under the keys too
+  (`fees/priority/Payee’s street/city/country` vanish at rest, while rows further down off screen, `Payee’s street 42,885`, stay listed).
+  17:20:50 `tap id:swift_payment.form.priority_select` → `Timed out after 5000ms waiting for element id:swift_payment.form.priority_select
+  to appear` (5.7 s, no shim tap). Every row partly above the band also lies in CONTINUE's reach (`24,512 354x44, reaching 24,512
+  354x77`, i.e. to 589), so the band never decides a tap here: 17:22:14 `priority_select 24,540 354x52` → `… is under button "Continue
+  to summary" (24,512 354x44) at its centre (201,566), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first;
+  nothing was tapped`; 17:19:55 `value_date_select 24,503` → `… at its centre (201,529) … only a 354x9 part of it shows above the soft
+  keyboard, under the 24x24 a tap may be moved to — scroll_until it first; nothing was tapped`. No shim tap for any.
+- **D2.2 — Not reached.** No field + placeholder pair under the band is ever listed (idb drops them; Contacts' fields are single
+  nodes). `Payee’s street` field+placeholder sat at `42,549` (above the band, under CONTINUE).
+- **D2.3 — Holds.** Number pad: `tap role:button text:"5"` → `Tapped` (shim l.46 `204 677`, amount `5`). QWERTY: `tap role:button
+  text:"Q"` → `Tapped` (l.53 `25 624`), `tap id:space` → `Tapped` (l.54 `202 786`), `tap id:shift` → `Tapped` (l.55 `31 732`); field
+  value `Q `.
+- **D2.4 — QuickType never showed** (SWIFT Payee’s name, Contacts New Contact). Seen instead: Contacts' edit callout `text 'Paste'
+  20,347 70x44`, `text 'AutoFill' 90,347 83x44` (above the band, not exercised), and iOS's one-off "slide to type" tip inside the
+  keyboard area (`text 'Speed up your typing…' 24,754 354x40`, `button 'Continue' 77,809 248x33`, idb listed NO band node with it) →
+  `tap role:button text:"Continue"` → `Tapped` (l.80 `201 826`); `kb-tip-idb.json`.
+- **D2.6 — Holds.** 17:22:09 colour on `priority_select 24,540 354x52` (meets the band by 3 pt, centre under CONTINUE) → `the soft
+  keyboard covers the element (element 24,540 354x52, keyboard 0,589 402x285) — hide it first and re-run (…); failing closed, color
+  unchecked` (4.7 s) — the keyboard first, never `covered by key …`. Colour on `value_date_select 24,503 354x52` (clear of the band) →
+  `button "Continue to summary" (24,512 354x44, reaching 24,512 354x77) is drawn over the element …; failing closed` (round 8's wording).
+- **D2.7 WDA — Holds (SWIFT form; the RN login is unreachable).** `cfg-wda`, number pad up (WDA `keyboard 0,572 402x302`), 17:22:44
+  `tap label:"Payee’s name"` → `The soft keyboard covers label:"Payee’s name": the band it draws over [0,572][402,874] contains the tap
+  point (94,686) on two looks 300ms apart; … and no dismissal is configured. Nothing was tapped …` (6.7 s, no shim tap).
+
+
+## Device check (2026-10-14 iOS, re-run at d407256)
+
+Measured 2026-10-14 22:05–22:27 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt; the only
+booted simulator), averi = mobile-verify `arch/round-13` @ `d407256` (`dist/`, stdio via the HTTP daemon on port 47893, cwd
+mp-native; `git rev-parse --short HEAD` printed `d407256`). mp-native's `averi.yaml` untouched (default `treeSource: idb`). Scratch
+configs in `run13-ios`: `cfg-wda.yaml` (`treeSource: wda`), `cfg-wda-title.yaml` and `cfg-wda-iban.yaml` (copied from round 12:
+`keyboardDismiss` `tap {id: swift_payment.form.title}` / `label "IBAN*"`), and Finportal's `fp-cfg.yaml` (= `~/dev/finportal/app/averi.yaml`,
+`treeSource: wda`) with the round-12 variants `fp-title`, `fp-wrappers`, `fp-wrappers-title`, `fp-label`. The `idb` PATH shim logged
+every `idb ui tap|swipe` to `idb-calls.log` (53 lines). Lines 34–37 are the `login_pin_ios_here` PIN pad and are not quoted. WDA
+(port 8100) was started by averi on the first `cfg-wda`/`fp-cfg` call (xcodebuild pid 59210, 22:06:04). It was stopped at 22:27:12
+(xcodebuild killed, 8100 closed). The software keyboard was raised by setting `com.apple.keyboard.preferences`
+`AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` to false at 22:08 and relaunching Finportal, then Contacts, then mp-native.
+Both prefs were restored to 1 at 22:26:50. Local pages `www/a.html`/`b.html` were served on 127.0.0.1:47895, not 47891, which is the
+Android agent's port; the server was stopped at 22:19:24. One manual slow drag (`idb ui swipe 380 600 380 440 --duration 2.5`, shim
+l.32, `manual.log`) set up W.2. mp-native showed "That's an error" on Home/Account Detail at 22:19, and TRY AGAIN (l.33) did not
+help. I terminated and launched it, saw the PIN prompt ("Enter your PIN to log in", `img-122-0.png`), and ran `login_pin_ios_here`
+once (22:20:36, `branch: matched state logged_in`). That was its only login; the `login` rung was never run. Finportal was never
+logged in, nothing was submitted, and its language stayed English. Metro on :8081 was left alone.
+
+**B.2: the new advice text holds where reached. The tap path was not reached.**
+
+- **Tap on a field under the band (idb): not reached.** idb omits every on-screen node whose centre lies under its band, as in round 12:
+  - Finportal QWERTY up: `tap id:login_support_text` and its `text:"If you have a problem …"` → `Timed out after 5000ms waiting for
+    element … to appear` (#32, #33).
+  - Contacts QWERTY up: rows under 590 are absent while rows below the fold stay listed (`D25-idb-contacts-kb.json`).
+  - SWIFT number pad up: `tap id:swift_payment.form.priority_select` → `Timed out …` (#166).
+  - Growing Contacts' Notes with return taps (draft discarded) did not help: iOS keeps the field clear of the band (`B2-idb-notes2.json`,
+    block ends at 552).
+- **The idb keyboard advice, reached through the colour-assert path** (22:26:07, 3.5 s, #164). SWIFT form, number pad up,
+  `value_date_select 24,545 354x52` reaches into idb's band `0,589 402x285`:
+  `FAIL … — the soft keyboard covers the element (element 24,545 354x52, keyboard 0,589 402x285) — hide it first and re-run (in a flow:
+  a tap: step on an element that hides it, such as the screen title, before this assert, or `dismissKeyboard: true` on a fill that leaves
+  it up); this adapter cannot hide it on its own (… — tap one yourself first: with treeSource: idb no guard acts, so app.ios.keyboardDismiss
+  is inert (with treeSource: wda the guard taps its first on-screen entry before a covered target); typing with a hardware keyboard keeps
+  the software keyboard from showing); failing closed, color unchecked`.
+  It does not say "name them under app.ios.keyboardDismiss". The idb tap on the same row → `… is under button "Continue to summary"
+  (24,512 354x44) at its centre (201,571), drawn over it; nothing of it shows above the soft keyboard — scroll_until it first; nothing was
+  tapped` (#165, no advice clause).
+- **Contrast, WDA:** the same advice under WDA still says `… name them under app.ios.keyboardDismiss in averi.yaml (tap: { id: <title> },
+  accessory: true) and the guard taps the first one on screen before a covered target …` (#40, #150). That is correct for WDA.

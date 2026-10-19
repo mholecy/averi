@@ -1,0 +1,40 @@
+{
+  "cell": "pinned-bar",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "frames": {
+    "W": {
+      "x": 127,
+      "y": 692,
+      "width": 825,
+      "height": 176
+    },
+    "P": {
+      "x": 127,
+      "y": 1846,
+      "width": 825,
+      "height": 176
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "chrome": {
+    "pinned": {
+      "x": 66,
+      "y": 1956,
+      "width": 948,
+      "height": 154
+    }
+  }
+}

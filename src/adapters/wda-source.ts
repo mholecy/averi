@@ -277,9 +277,9 @@ function isTextEcho(el: WdaElement, node: UiNode): boolean {
 /**
  * The rect a PARKED element of a cell is placed at — its nearest `Cell` ancestor's — or undefined when it is not
  * parked. Parked — the measured shape, each rect of area, shared area as `rectsOverlap` asks it (an edge in common is
- * none): the element is `isVisible="0"` and shares no area with its cell, and shares area with the scroll view the
- * cell lies in (the cell's nearest `Table`, `CollectionView` or `ScrollView` ancestor), while the cell shares none with
- * that scroll view.
+ * none): the element is `isVisible="0"` and shares no area with its cell, and lies at the PARKED FRAME of the scroll
+ * view the cell lies in (the cell's nearest `Table`, `CollectionView` or `ScrollView` ancestor; `atParkedFrame`),
+ * while the cell shares no area with that scroll view.
  *
  * Measured on stock Contacts' New Contact sheet (iPhone 17 simulator, iOS 27.0, WDA 16.1.7, twice;
  * tests/fixtures/wda-capture-contacts-new-contact.json): UIKit has not laid out the cells below the
@@ -314,6 +314,9 @@ function isTextEcho(el: WdaElement, node: UiNode): boolean {
  *   whether the cell is laid out — not the element's own nearest: a below-the-fold cell holding a scroller of its own
  *   parks that scroller's content all the same.
  * - Whatever lies between the element and its cell: the nearest `Cell` ancestor decides, through any wrapper.
+ * - A SCROLLED table parks the same content ABOVE it (2026-10-18, `atParkedFrame`): the parked frame is the scroll
+ *   view's content origin, which the table's offset moves up past its top.
+ *   docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md
  *
  * Residuals: a parked element that happens to meet its cell's rect (a cell parked near the sheet's origin) keeps its
  * parked frame — a part of it may be wrong by up to the cell's size; content parked in a container that is not a
@@ -326,7 +329,34 @@ function parkedIn(el: WdaElement, cell: CellPlace | undefined): Rect | undefined
   const at = usableRect(cell.at);
   const view = usableRect(cell.in);
   if (own === undefined || at === undefined || view === undefined) return undefined;
-  return !rectsOverlap(own, at) && rectsOverlap(own, view) && !rectsOverlap(at, view) ? at : undefined;
+  return !rectsOverlap(own, at) && atParkedFrame(own, view) && !rectsOverlap(at, view) ? at : undefined;
+}
+
+/**
+ * Does an element lie at the PARKED FRAME of a scroll view — where WDA lists the content of a cell UIKit has not laid
+ * out? The parked frame is the scroll view's CONTENT ORIGIN, the element's size: the view's top-left moved up by its
+ * offset. At rest it lies inside the scroll view (shares area with it); once the view has scrolled further than the
+ * element is tall, it lies wholly above it, at its left edge (its x the view's, its bottom at or above the view's top).
+ *
+ * Measured (iPhone 17 simulator, iOS 27.0, WDA 16.1.7):
+ * - at rest, inside: Contacts' New Contact sheet, 41 elements per capture at `0,62 …`, the `Table 0,62 402x812`'s
+ *   top-left, and its two scroll-bar indicators elsewhere inside it (`297,62 30x22`, `0,70 330x11`); the lab's
+ *   `sheet-long-list` at offset 0, every below-the-fold row's text and wrappers at `0,62 402x64`.
+ * - scrolled, above: the same lab table after 273 pt, every unlaid row's content at `0,-212 402x65` (62 − 273, Row 0's
+ *   own place), after 522 pt at `0,-460 402x64`; Row 30's cell at `0,1708` and `0,1460`
+ *   (tests/fixtures/wda-capture-lab-sheet-long-list-scrolled-{273,522}.json). Taken at face value, `scroll_until
+ *   text:"Row 30"` down read the row above the screen after its first stroke and turned up, three times, until the
+ *   budget ran out. docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md
+ *
+ * Why so narrow (docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md, "Amendment: the parked frame of a
+ * scrolled table"): the scroll-view shape was added against content scrolled out SIDEWAYS read as parked (a carousel's
+ * chip past its scroller); outside the view, only the content origin's column above it is taken — an unlaid cell's
+ * element above the view off its left edge, or beside or below the view, keeps its rect. Both are pinned on SYNTHETIC
+ * trees: no real capture holds a cell such content lies in (the lab's carousel has no `Cell`; its form-picker's cells
+ * are all on screen). Unmeasured, so not taken: a horizontally scrolled view's parked frame (moved left, not up).
+ */
+function atParkedFrame(own: Rect, view: Rect): boolean {
+  return rectsOverlap(own, view) || (own.x === view.x && own.y + own.height <= view.y);
 }
 
 /**

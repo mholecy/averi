@@ -1,0 +1,2485 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 0}, {402, 874}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 0}, {402, 874}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 62}, {402, 54}}",
+                "label": null,
+                "rawIdentifier": "SWIFT payment",
+                "traits": "",
+                "frame": "{{0, 62}, {402, 54}}",
+                "isVisible": "1",
+                "type": "NavigationBar",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{138, 73.666666666666657}, {125.66666666666669, 20.666666666666671}}",
+                  "label": "SWIFT payment",
+                  "rawIdentifier": null,
+                  "traits": "Header, StaticText",
+                  "frame": "{{138, 73}, {126, 22}}",
+                  "isVisible": "1",
+                  "type": "StaticText",
+                  "value": "SWIFT payment",
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{138, 73.666666666666657}, {125.66666666666669, 20.666666666666671}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{138, 73}, {126, 22}}",
+                    "isVisible": "0",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "children": [
+                     {
+                      "customActions": null,
+                      "nativeFrame": "{{138, 73.833333333333329}, {125.66666666666663, 20.333333333333329}}",
+                      "label": "SWIFT payment",
+                      "rawIdentifier": "lab.toolbar-dismiss-bar.title",
+                      "traits": "StaticText",
+                      "frame": "{{138, 73}, {126, 22}}",
+                      "isVisible": "1",
+                      "type": "StaticText",
+                      "value": "SWIFT payment",
+                      "isEnabled": "1",
+                      "isAccessible": "1",
+                      "isNativeAccessibilityElement": "1",
+                      "isFocused": "0",
+                      "name": "lab.toolbar-dismiss-bar.title",
+                      "rect": {
+                       "y": 73,
+                       "x": 138,
+                       "width": 126,
+                       "height": 22
+                      }
+                     }
+                    ],
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 73,
+                     "x": 138,
+                     "width": 126,
+                     "height": 22
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "SWIFT payment",
+                  "rect": {
+                   "y": 73,
+                   "x": 138,
+                   "width": 126,
+                   "height": 22
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "SWIFT payment",
+                "rect": {
+                 "y": 62,
+                 "x": 0,
+                 "width": 402,
+                 "height": 54
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 0}, {402, 874}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 0}, {402, 874}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 0}, {402, 874}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{0, 0}, {402, 874}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{0, 0}, {402, 874}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{0, 0}, {402, 874}}",
+                    "isVisible": "1",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "children": [
+                     {
+                      "customActions": null,
+                      "nativeFrame": "{{0, 0}, {402, 874}}",
+                      "label": null,
+                      "rawIdentifier": null,
+                      "traits": "",
+                      "frame": "{{0, 0}, {402, 874}}",
+                      "isVisible": "0",
+                      "type": "Other",
+                      "value": null,
+                      "isEnabled": "1",
+                      "children": [
+                       {
+                        "customActions": null,
+                        "nativeFrame": "{{0, 0}, {402, 874}}",
+                        "label": null,
+                        "rawIdentifier": null,
+                        "traits": "",
+                        "frame": "{{0, 0}, {402, 874}}",
+                        "isVisible": "1",
+                        "type": "ScrollView",
+                        "value": null,
+                        "isEnabled": "1",
+                        "children": [
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{0, 0}, {402, 874}}",
+                          "label": null,
+                          "rawIdentifier": null,
+                          "traits": "",
+                          "frame": "{{0, 0}, {402, 874}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": null,
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{0, 0}, {402, 156}}",
+                            "label": null,
+                            "rawIdentifier": null,
+                            "traits": "",
+                            "frame": "{{0, 0}, {402, 156}}",
+                            "isVisible": "1",
+                            "type": "Other",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "0",
+                            "isNativeAccessibilityElement": "0",
+                            "isFocused": "0",
+                            "name": null,
+                            "rect": {
+                             "y": 0,
+                             "x": 0,
+                             "width": 402,
+                             "height": 156
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": null,
+                          "rect": {
+                           "y": 0,
+                           "x": 0,
+                           "width": 402,
+                           "height": 874
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{0, 0}, {402, 874}}",
+                          "label": null,
+                          "rawIdentifier": null,
+                          "traits": "",
+                          "frame": "{{0, 0}, {402, 874}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": null,
+                          "isEnabled": "1",
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": null,
+                          "rect": {
+                           "y": 0,
+                           "x": 0,
+                           "width": 402,
+                           "height": 874
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{0, 116}, {402, 834.33333333333326}}",
+                          "label": null,
+                          "rawIdentifier": null,
+                          "traits": "",
+                          "frame": "{{0, 116}, {402, 835}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": null,
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 136}, {129, 18}}",
+                            "label": "Payment reference",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.reference.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 136}, {129, 18}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Payment reference",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.reference.title",
+                            "rect": {
+                             "y": 136,
+                             "x": 20,
+                             "width": 129,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 160}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.reference",
+                            "traits": "",
+                            "frame": "{{20, 160}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.reference",
+                            "rect": {
+                             "y": 160,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 210}, {174.33333333333331, 18}}",
+                            "label": "Message for the recipient",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.message.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 210}, {175, 18}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Message for the recipient",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.message.title",
+                            "rect": {
+                             "y": 210,
+                             "x": 20,
+                             "width": 175,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 234}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.message",
+                            "traits": "",
+                            "frame": "{{20, 234}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.message",
+                            "rect": {
+                             "y": 234,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 284}, {113, 18}}",
+                            "label": "Street & number",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.street.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 284}, {113, 18}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Street & number",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.street.title",
+                            "rect": {
+                             "y": 284,
+                             "x": 20,
+                             "width": 113,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 308}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.street",
+                            "traits": "",
+                            "frame": "{{20, 308}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.street",
+                            "rect": {
+                             "y": 308,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 358}, {73, 18}}",
+                            "label": "City / town",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.city.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 358}, {73, 18}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "City / town",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.city.title",
+                            "rect": {
+                             "y": 358,
+                             "x": 20,
+                             "width": 73,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 382}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.city",
+                            "traits": "",
+                            "frame": "{{20, 382}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.city",
+                            "rect": {
+                             "y": 382,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 432}, {64.666666666666657, 18}}",
+                            "label": "Postcode",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.postcode.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 432}, {65, 18}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Postcode",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.postcode.title",
+                            "rect": {
+                             "y": 432,
+                             "x": 20,
+                             "width": 65,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 456}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.postcode",
+                            "traits": "",
+                            "frame": "{{20, 456}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.postcode",
+                            "rect": {
+                             "y": 456,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 506}, {115, 18}}",
+                            "label": "Phone – optional",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.phone.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 506}, {115, 18}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Phone – optional",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.phone.title",
+                            "rect": {
+                             "y": 506,
+                             "x": 20,
+                             "width": 115,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 530}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.phone",
+                            "traits": "",
+                            "frame": "{{20, 530}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.phone",
+                            "rect": {
+                             "y": 530,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 580}, {108.33333333333331, 18}}",
+                            "label": "Variable symbol",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.vs.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 580}, {109, 18}}",
+                            "isVisible": "0",
+                            "type": "StaticText",
+                            "value": "Variable symbol",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.vs.title",
+                            "rect": {
+                             "y": 580,
+                             "x": 20,
+                             "width": 109,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 604}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.vs",
+                            "traits": "",
+                            "frame": "{{20, 604}, {362, 34}}",
+                            "isVisible": "0",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.vs",
+                            "rect": {
+                             "y": 604,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 654}, {115.66666666666666, 18}}",
+                            "label": "Constant symbol",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.ks.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 654}, {116, 18}}",
+                            "isVisible": "0",
+                            "type": "StaticText",
+                            "value": "Constant symbol",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.ks.title",
+                            "rect": {
+                             "y": 654,
+                             "x": 20,
+                             "width": 116,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 678}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.ks",
+                            "traits": "",
+                            "frame": "{{20, 678}, {362, 34}}",
+                            "isVisible": "0",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.ks",
+                            "rect": {
+                             "y": 678,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 728}, {108.33333333333331, 18}}",
+                            "label": "Specific symbol",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.ss.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 728}, {109, 18}}",
+                            "isVisible": "0",
+                            "type": "StaticText",
+                            "value": "Specific symbol",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.ss.title",
+                            "rect": {
+                             "y": 728,
+                             "x": 20,
+                             "width": 109,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 752}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.ss",
+                            "traits": "",
+                            "frame": "{{20, 752}, {362, 34}}",
+                            "isVisible": "0",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.ss",
+                            "rect": {
+                             "y": 752,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 802}, {94.666666666666657, 18}}",
+                            "label": "Note “for me”",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.note.title",
+                            "traits": "StaticText",
+                            "frame": "{{20, 802}, {95, 18}}",
+                            "isVisible": "0",
+                            "type": "StaticText",
+                            "value": "Note “for me”",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.note.title",
+                            "rect": {
+                             "y": 802,
+                             "x": 20,
+                             "width": 95,
+                             "height": 18
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 826}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.note",
+                            "traits": "",
+                            "frame": "{{20, 826}, {362, 34}}",
+                            "isVisible": "0",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.note",
+                            "rect": {
+                             "y": 826,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 884}, {362, 46.333333333333371}}",
+                            "label": "Continue to summary",
+                            "rawIdentifier": "lab.toolbar-dismiss-bar.submit",
+                            "traits": "Button",
+                            "frame": "{{20, 884}, {362, 47}}",
+                            "isVisible": "0",
+                            "type": "Button",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.toolbar-dismiss-bar.submit",
+                            "rect": {
+                             "y": 884,
+                             "x": 20,
+                             "width": 362,
+                             "height": 47
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": null,
+                          "rect": {
+                           "y": 116,
+                           "x": 0,
+                           "width": 402,
+                           "height": 835
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{369, 116}, {30, 457}}",
+                          "label": "Vertical scroll bar, 2 pages",
+                          "rawIdentifier": null,
+                          "traits": "Adjustable",
+                          "frame": "{{369, 116}, {30, 457}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": "0 %",
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{396, 119}, {3, 315}}",
+                            "label": null,
+                            "rawIdentifier": null,
+                            "traits": "",
+                            "frame": "{{396, 119}, {3, 315}}",
+                            "isVisible": "1",
+                            "type": "Other",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "0",
+                            "isNativeAccessibilityElement": "0",
+                            "isFocused": "0",
+                            "name": null,
+                            "rect": {
+                             "y": 119,
+                             "x": 396,
+                             "width": 3,
+                             "height": 315
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": "Vertical scroll bar, 2 pages",
+                          "rect": {
+                           "y": 116,
+                           "x": 369,
+                           "width": 30,
+                           "height": 457
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{369, 116}, {30, 457}}",
+                          "label": "Vertical scroll bar, 2 pages",
+                          "rawIdentifier": null,
+                          "traits": "Adjustable",
+                          "frame": "{{369, 116}, {30, 457}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": "0 %",
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{396, 119}, {3, 315}}",
+                            "label": null,
+                            "rawIdentifier": null,
+                            "traits": "",
+                            "frame": "{{396, 119}, {3, 315}}",
+                            "isVisible": "1",
+                            "type": "Other",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "0",
+                            "isNativeAccessibilityElement": "0",
+                            "isFocused": "0",
+                            "name": null,
+                            "rect": {
+                             "y": 119,
+                             "x": 396,
+                             "width": 3,
+                             "height": 315
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": "Vertical scroll bar, 2 pages",
+                          "rect": {
+                           "y": 116,
+                           "x": 369,
+                           "width": 30,
+                           "height": 457
+                          }
+                         }
+                        ],
+                        "isAccessible": "0",
+                        "isNativeAccessibilityElement": "0",
+                        "isFocused": "0",
+                        "name": null,
+                        "rect": {
+                         "y": 0,
+                         "x": 0,
+                         "width": 402,
+                         "height": 874
+                        }
+                       }
+                      ],
+                      "isAccessible": "0",
+                      "isNativeAccessibilityElement": "0",
+                      "isFocused": "0",
+                      "name": null,
+                      "rect": {
+                       "y": 0,
+                       "x": 0,
+                       "width": 402,
+                       "height": 874
+                      }
+                     }
+                    ],
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 0,
+                     "x": 0,
+                     "width": 402,
+                     "height": 874
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 0,
+                   "x": 0,
+                   "width": 402,
+                   "height": 874
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 0}, {402, 874}}",
+                "label": "Toolbar",
+                "rawIdentifier": "Toolbar",
+                "traits": "",
+                "frame": "{{0, 0}, {402, 874}}",
+                "isVisible": "0",
+                "type": "Toolbar",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 0}, {402, 874}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{0, 0}, {402, 874}}",
+                  "isVisible": "0",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 0,
+                   "x": 0,
+                   "width": 402,
+                   "height": 874
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "Toolbar",
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 0,
+               "x": 0,
+               "width": 402,
+               "height": 874
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 65}, {402, 48}}",
+              "label": "Toolbar",
+              "rawIdentifier": "Toolbar",
+              "traits": "",
+              "frame": "{{0, 65}, {402, 48}}",
+              "isVisible": "1",
+              "type": "Toolbar",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 65}, {402, 48}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 65}, {402, 48}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 65,
+                 "x": 0,
+                 "width": 402,
+                 "height": 48
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": "Toolbar",
+              "rect": {
+               "y": 65,
+               "x": 0,
+               "width": 402,
+               "height": 48
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   },
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "0",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "0",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "0",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       },
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 573}, {402, 301}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 573}, {402, 301}}",
+        "isVisible": "0",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 573}, {402, 301}}",
+          "label": null,
+          "rawIdentifier": "inputView",
+          "traits": "",
+          "frame": "{{0, 573}, {402, 301}}",
+          "isVisible": "0",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": "inputView",
+          "rect": {
+           "y": 573,
+           "x": 0,
+           "width": 402,
+           "height": 301
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 573,
+         "x": 0,
+         "width": 402,
+         "height": 301
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   },
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 573}, {402, 301}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 573}, {402, 301}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 573}, {402, 302}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 573}, {402, 302}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 573}, {402, 302}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 573}, {402, 302}}",
+            "isVisible": "1",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 573}, {402, 302}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 573}, {402, 302}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 573,
+               "x": 0,
+               "width": 402,
+               "height": 302
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 573,
+             "x": 0,
+             "width": 402,
+             "height": 302
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 573,
+           "x": 0,
+           "width": 402,
+           "height": 302
+          }
+         },
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 590}, {402, 226}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 590}, {402, 226}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 590}, {402, 226}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 590}, {402, 226}}",
+            "isVisible": "1",
+            "type": "Keyboard",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 590}, {402, 226}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 590}, {402, 226}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 590}, {402, 226}}",
+                "label": null,
+                "rawIdentifier": "UIKeyboardLayoutStar Preview",
+                "traits": "",
+                "frame": "{{0, 590}, {402, 226}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 590}, {0, 0}}",
+                  "label": "Padding-Left",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{0, 590}, {0, 0}}",
+                  "isVisible": "0",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Padding-Left",
+                  "rect": {
+                   "y": 590,
+                   "x": 0,
+                   "width": 0,
+                   "height": 0
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{4.6666666666666572, 597}, {39.333333333333336, 54}}",
+                  "label": "q",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{4, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "q",
+                  "rect": {
+                   "y": 597,
+                   "x": 4,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{44, 597}, {39.666666666666657, 54}}",
+                  "label": "w",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{44, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "w",
+                  "rect": {
+                   "y": 597,
+                   "x": 44,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{83.666666666666657, 597}, {39.333333333333343, 54}}",
+                  "label": "e",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{83, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "e",
+                  "rect": {
+                   "y": 597,
+                   "x": 83,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{122.99999999999999, 597}, {39.666666666666671, 54}}",
+                  "label": "r",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{122, 597}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "r",
+                  "rect": {
+                   "y": 597,
+                   "x": 122,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{162.66666666666666, 597}, {39.333333333333343, 54}}",
+                  "label": "t",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{162, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "t",
+                  "rect": {
+                   "y": 597,
+                   "x": 162,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{202, 597}, {39.666666666666657, 54}}",
+                  "label": "y",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{202, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "y",
+                  "rect": {
+                   "y": 597,
+                   "x": 202,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{241.66666666666669, 597}, {39.333333333333314, 54}}",
+                  "label": "u",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{241, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "u",
+                  "rect": {
+                   "y": 597,
+                   "x": 241,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{281, 597}, {39.666666666666686, 54}}",
+                  "label": "i",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{281, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "i",
+                  "rect": {
+                   "y": 597,
+                   "x": 281,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{320.66666666666663, 597}, {39.333333333333314, 54}}",
+                  "label": "o",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{320, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "o",
+                  "rect": {
+                   "y": 597,
+                   "x": 320,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{360, 597}, {39.666666666666686, 54}}",
+                  "label": "p",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{360, 597}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "p",
+                  "rect": {
+                   "y": 597,
+                   "x": 360,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 590}, {0, 0}}",
+                  "label": "Padding-Right",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{0, 590}, {0, 0}}",
+                  "isVisible": "0",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Padding-Right",
+                  "rect": {
+                   "y": 590,
+                   "x": 0,
+                   "width": 0,
+                   "height": 0
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 590}, {0, 0}}",
+                  "label": "Padding-Left",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{0, 590}, {0, 0}}",
+                  "isVisible": "0",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Padding-Left",
+                  "rect": {
+                   "y": 590,
+                   "x": 0,
+                   "width": 0,
+                   "height": 0
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{24.333333333333318, 651}, {39.333333333333343, 54}}",
+                  "label": "a",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{24, 651}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "a",
+                  "rect": {
+                   "y": 651,
+                   "x": 24,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{63.666666666666657, 651}, {39.666666666666657, 54}}",
+                  "label": "s",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{63, 651}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "s",
+                  "rect": {
+                   "y": 651,
+                   "x": 63,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{103.33333333333331, 651}, {39.333333333333343, 54}}",
+                  "label": "d",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{103, 651}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "d",
+                  "rect": {
+                   "y": 651,
+                   "x": 103,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{142.66666666666666, 651}, {39.666666666666657, 54}}",
+                  "label": "f",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{142, 651}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "f",
+                  "rect": {
+                   "y": 651,
+                   "x": 142,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{182.33333333333334, 651}, {39.333333333333343, 54}}",
+                  "label": "g",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{182, 651}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "g",
+                  "rect": {
+                   "y": 651,
+                   "x": 182,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{221.66666666666666, 651}, {39.666666666666657, 54}}",
+                  "label": "h",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{221, 651}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "h",
+                  "rect": {
+                   "y": 651,
+                   "x": 221,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{261.33333333333326, 651}, {39.333333333333314, 54}}",
+                  "label": "j",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{261, 651}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "j",
+                  "rect": {
+                   "y": 651,
+                   "x": 261,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{300.66666666666663, 651}, {39.666666666666686, 54}}",
+                  "label": "k",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{300, 651}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "k",
+                  "rect": {
+                   "y": 651,
+                   "x": 300,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{340.33333333333326, 651}, {39.333333333333314, 54}}",
+                  "label": "l",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{340, 651}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "l",
+                  "rect": {
+                   "y": 651,
+                   "x": 340,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 590}, {0, 0}}",
+                  "label": "Padding-Right",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{0, 590}, {0, 0}}",
+                  "isVisible": "0",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Padding-Right",
+                  "rect": {
+                   "y": 590,
+                   "x": 0,
+                   "width": 0,
+                   "height": 0
+                  }
+                 },
+                 {
+                  "customActions": "Caps Lock",
+                  "nativeFrame": "{{4.6666666666666572, 705}, {51.333333333333336, 54}}",
+                  "label": "shift",
+                  "rawIdentifier": "shift",
+                  "traits": "PlaysSound, KeyboardKey, Button",
+                  "frame": "{{4, 705}, {52, 54}}",
+                  "isVisible": "1",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "shift",
+                  "rect": {
+                   "y": 705,
+                   "x": 4,
+                   "width": 52,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 590}, {0, 0}}",
+                  "label": "Padding-Left",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{0, 590}, {0, 0}}",
+                  "isVisible": "0",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Padding-Left",
+                  "rect": {
+                   "y": 590,
+                   "x": 0,
+                   "width": 0,
+                   "height": 0
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{63.666666666666657, 705}, {39.666666666666657, 54}}",
+                  "label": "z",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{63, 705}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "z",
+                  "rect": {
+                   "y": 705,
+                   "x": 63,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{103.33333333333331, 705}, {39.333333333333343, 54}}",
+                  "label": "x",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{103, 705}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "x",
+                  "rect": {
+                   "y": 705,
+                   "x": 103,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{142.66666666666666, 705}, {39.666666666666657, 54}}",
+                  "label": "c",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{142, 705}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "c",
+                  "rect": {
+                   "y": 705,
+                   "x": 142,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{182.33333333333334, 705}, {39.333333333333343, 54}}",
+                  "label": "v",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{182, 705}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "v",
+                  "rect": {
+                   "y": 705,
+                   "x": 182,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{221.66666666666666, 705}, {39.666666666666657, 54}}",
+                  "label": "b",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{221, 705}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "b",
+                  "rect": {
+                   "y": 705,
+                   "x": 221,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{261.33333333333326, 705}, {39.333333333333314, 54}}",
+                  "label": "n",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{261, 705}, {40, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "n",
+                  "rect": {
+                   "y": 705,
+                   "x": 261,
+                   "width": 40,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{300.66666666666663, 705}, {39.666666666666686, 54}}",
+                  "label": "m",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{300, 705}, {41, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "m",
+                  "rect": {
+                   "y": 705,
+                   "x": 300,
+                   "width": 41,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 590}, {0, 0}}",
+                  "label": "Padding-Right",
+                  "rawIdentifier": null,
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{0, 590}, {0, 0}}",
+                  "isVisible": "0",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": "Padding-Right",
+                  "rect": {
+                   "y": 590,
+                   "x": 0,
+                   "width": 0,
+                   "height": 0
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{348, 705}, {51.666666666666686, 54}}",
+                  "label": "delete",
+                  "rawIdentifier": "delete",
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{348, 705}, {52, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "delete",
+                  "rect": {
+                   "y": 705,
+                   "x": 348,
+                   "width": 52,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{4.6666666666666572, 759}, {49.333333333333336, 54}}",
+                  "label": "numbers",
+                  "rawIdentifier": "more",
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{4, 759}, {50, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "more",
+                  "rect": {
+                   "y": 759,
+                   "x": 4,
+                   "width": 50,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{53.999999999999986, 759}, {49.333333333333329, 54}}",
+                  "label": "Emoji",
+                  "rawIdentifier": "emoji",
+                  "traits": "PlaysSound, KeyboardKey, Button",
+                  "frame": "{{53, 759}, {51, 54}}",
+                  "isVisible": "1",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "emoji",
+                  "rect": {
+                   "y": 759,
+                   "x": 53,
+                   "width": 51,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{103.3333333333333, 759}, {197.33333333333331, 54}}",
+                  "label": "space",
+                  "rawIdentifier": "space",
+                  "traits": "PlaysSound, KeyboardKey",
+                  "frame": "{{103, 759}, {198, 54}}",
+                  "isVisible": "1",
+                  "type": "Key",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "space",
+                  "rect": {
+                   "y": 759,
+                   "x": 103,
+                   "width": 198,
+                   "height": 54
+                  }
+                 },
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{300.66666666666663, 759}, {99, 54}}",
+                  "label": "return",
+                  "rawIdentifier": "Return",
+                  "traits": "PlaysSound, KeyboardKey, Button",
+                  "frame": "{{300, 759}, {100, 54}}",
+                  "isVisible": "1",
+                  "type": "Button",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "Return",
+                  "rect": {
+                   "y": 759,
+                   "x": 300,
+                   "width": 100,
+                   "height": 54
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "UIKeyboardLayoutStar Preview",
+                "rect": {
+                 "y": 590,
+                 "x": 0,
+                 "width": 402,
+                 "height": 226
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 590,
+               "x": 0,
+               "width": 402,
+               "height": 226
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 590,
+             "x": 0,
+             "width": 402,
+             "height": 226
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 590,
+           "x": 0,
+           "width": 402,
+           "height": 226
+          }
+         },
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 590}, {402, 284}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 590}, {402, 284}}",
+          "isVisible": "0",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{8.4772656811592597, 805.69895679985711}, {68.085295847508604, 68.735163935050991}}",
+            "label": "Next keyboard",
+            "rawIdentifier": null,
+            "traits": "KeyboardKey, Button",
+            "frame": "{{8, 805}, {69, 70}}",
+            "isVisible": "1",
+            "type": "Button",
+            "value": "Slovenčina",
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{8.4772656811592597, 805.69895679985711}, {0, 0}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "StaticText",
+              "frame": "{{8, 805}, {1, 1}}",
+              "isVisible": "0",
+              "type": "StaticText",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 805,
+               "x": 8,
+               "width": 1,
+               "height": 1
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "1",
+            "isFocused": "0",
+            "name": "Next keyboard",
+            "rect": {
+             "y": 805,
+             "x": 8,
+             "width": 69,
+             "height": 70
+            }
+           },
+           {
+            "customActions": null,
+            "nativeFrame": "{{325.43743847133214, 805.36562346652386}, {68.085295847508633, 68.735163935050991}}",
+            "label": "Dictate",
+            "rawIdentifier": "dictation",
+            "traits": "KeyboardKey, Button",
+            "frame": "{{325, 805}, {69, 70}}",
+            "isVisible": "1",
+            "type": "Button",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{325.43743847133214, 805.36562346652386}, {0, 0}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "StaticText",
+              "frame": "{{325, 805}, {1, 1}}",
+              "isVisible": "0",
+              "type": "StaticText",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 805,
+               "x": 325,
+               "width": 1,
+               "height": 1
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "1",
+            "isFocused": "0",
+            "name": "dictation",
+            "rect": {
+             "y": 805,
+             "x": 325,
+             "width": 69,
+             "height": 70
+            }
+           },
+           {
+            "customActions": null,
+            "nativeFrame": "{{325.43743847133214, 805.36562346652386}, {68.085295847508633, 68.735163935050991}}",
+            "label": "Dictate",
+            "rawIdentifier": "dictation",
+            "traits": "KeyboardKey, Button",
+            "frame": "{{325, 805}, {69, 70}}",
+            "isVisible": "1",
+            "type": "Button",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{325.43743847133214, 805.36562346652386}, {0, 0}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "StaticText",
+              "frame": "{{325, 805}, {1, 1}}",
+              "isVisible": "0",
+              "type": "StaticText",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 805,
+               "x": 325,
+               "width": 1,
+               "height": 1
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "1",
+            "isFocused": "0",
+            "name": "dictation",
+            "rect": {
+             "y": 805,
+             "x": 325,
+             "width": 69,
+             "height": 70
+            }
+           }
+          ],
+          "isAccessible": "1",
+          "isNativeAccessibilityElement": "1",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 590,
+           "x": 0,
+           "width": 402,
+           "height": 284
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 573,
+         "x": 0,
+         "width": 402,
+         "height": 301
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

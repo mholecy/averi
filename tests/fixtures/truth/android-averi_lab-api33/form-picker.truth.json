@@ -1,0 +1,167 @@
+{
+  "cell": "form-picker",
+  "layer": "sheet-large",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [],
+  "navigation": "gesture",
+  "form": {
+    "fields": [
+      {
+        "tag": "name",
+        "id": "lab.form-picker.name",
+        "kind": "text",
+        "title": "Bank name",
+        "titleId": "lab.form-picker.name.title",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 314,
+          "width": 179,
+          "height": 66
+        }
+      },
+      {
+        "tag": "country",
+        "id": "lab.form-picker.country",
+        "kind": "country",
+        "title": "Bank’s country",
+        "titleId": "lab.form-picker.country.title",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 496,
+          "width": 235,
+          "height": 66
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "name",
+        "id": "lab.form-picker.name",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "presented-over",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,436"
+          },
+          {
+            "kind": "select",
+            "tag": "AX"
+          }
+        ]
+      },
+      {
+        "tag": "country",
+        "id": "lab.form-picker.country",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "presented-over",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,618"
+          },
+          {
+            "kind": "select",
+            "tag": "AD"
+          }
+        ]
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-picker.submit",
+        "kind": "button",
+        "frame": {
+          "x": 55,
+          "y": 700,
+          "width": 970,
+          "height": 132
+        },
+        "situation": "presented-over",
+        "reached": false,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,766"
+          },
+          {
+            "kind": "select",
+            "tag": "AT"
+          }
+        ]
+      },
+      {
+        "tag": "country.AL",
+        "id": "lab.form-picker.country.AL",
+        "kind": "row",
+        "frame": {
+          "x": 0,
+          "y": 221,
+          "width": 1080,
+          "height": 143
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,293"
+          }
+        ]
+      },
+      {
+        "tag": "country.ST",
+        "id": "lab.form-picker.country.ST",
+        "kind": "row",
+        "situation": "not-rendered",
+        "reached": false,
+        "probe": []
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": [],
+    "sheet": {
+      "x": 0,
+      "y": 133,
+      "width": 1080,
+      "height": 2021
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "cell": "text-nav-cut",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "T": {
+      "x": 108,
+      "y": 2105,
+      "width": 864,
+      "height": 74
+    },
+    "T.box": {
+      "x": 108,
+      "y": 2105,
+      "width": 864,
+      "height": 74
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  }
+}

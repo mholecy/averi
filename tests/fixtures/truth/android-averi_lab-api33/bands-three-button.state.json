@@ -1,0 +1,51 @@
+{
+  "cell": "bands-three-button",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "S": {
+      "x": 127,
+      "y": 11,
+      "width": 825,
+      "height": 44
+    },
+    "O": {
+      "x": 127,
+      "y": 55,
+      "width": 825,
+      "height": 176
+    },
+    "W": {
+      "x": 127,
+      "y": 1022,
+      "width": 825,
+      "height": 176
+    },
+    "Q": {
+      "x": 127,
+      "y": 1923,
+      "width": 825,
+      "height": 176
+    },
+    "N": {
+      "x": 127,
+      "y": 2132,
+      "width": 825,
+      "height": 44
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 132,
+    "right": 0
+  }
+}

@@ -25,43 +25,11 @@ import { describe, expect, it } from 'vitest';
 const ROOT = join(import.meta.dirname, '..', '..');
 
 /**
- * Bug notes the source cites that git does not track yet. The owner has not
- * decided whether these notes are committed or the references to them are
- * dropped; until then exactly these paths are let through, and a NEW
- * untracked reference still fails. Remove a line once its note is tracked
- * (the test then says so) or its references are gone.
+ * Bug notes the source cites that git does not track yet: exactly these paths are let through, and a NEW untracked
+ * reference still fails. Empty since the notes untracked in the main checkout were committed (83059cb,
+ * docs/device-checks-r5-r20). Remove a line once its note is tracked (the test then says so) or its references are gone.
  */
-const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set([
-  'docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md',
-  'docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-reads-exposes-no-value.md',
-  'docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md',
-  'docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md',
-  'docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md',
-  'docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md',
-  'docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md',
-  'docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md',
-  'docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md',
-  'docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md',
-  'docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md',
-  'docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md',
-  'docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md',
-  'docs/bugs/2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md',
-  // Tracked on docs/device-check-r5-r12 (5f1996e), not yet on this branch's base; cited by ADR 0018.
-  'docs/bugs/2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md',
-  'docs/bugs/2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md',
-  // Untracked in the main checkout, not yet on this branch's base; cited by ADR 0018's amendment and residual 9.
-  'docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md',
-  'docs/bugs/2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md',
-  // Untracked in the main checkout, not yet on this branch's base; cited by draw-order's `hidden` row, UiNode.hidden and ADR 0019.
-  'docs/bugs/2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md',
-  // Untracked in the main checkout; cited by ADR 0018's amendment "No stroke onto a presented screen".
-  'docs/bugs/2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md',
-  // Untracked in the main checkout; cited by ADR 0018's amendment "presented judged of the node" and capture.ts#clipThenInset.
-  'docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md',
-  'docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md',
-  // Untracked in the main checkout; cited by the decision record's amendment "a layer holding an alert".
-  'docs/bugs/2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md',
-]);
+const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set<string>([]);
 
 const filesUnder = (dir: string): string[] =>
   readdirSync(join(ROOT, dir)).flatMap((name) => {

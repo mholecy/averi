@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flow engine review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+  <style>
+    .seam { border-style: dashed; }
+    .leak { color: #dc2626; }
+    .deep { background: linear-gradient(135deg, #0f172a, #1e293b); color: #f8fafc; }
+    .mermaid { background: #fff; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+  </style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+
+<header class="space-y-3">
+  <p class="text-xs uppercase tracking-wider text-slate-500">averi · architecture review · 2026-10-07 · vetva architecture/keyboard-model-2026-10-07 @ 33bae01</p>
+  <h1 class="font-serif text-4xl">Flow engine: kde unikajú stavy, behy a „nie je tu“</h1>
+  <p class="text-sm text-slate-600">Oblasť: <code>src/flow/engine.ts</code> (1286 riadkov, 40 commitov, 20 od 2026-10-01), <code>flow/config.ts</code> (Condition, Step, predikáty), <code>flow/load.ts</code>, <code>flow/credentials.ts</code>, volajúci v <code>run/commands.ts</code> a <code>run/verify.ts</code>, testy v <code>tests/flow/</code> (engine.test.ts 2731 riadkov + dva ladder súbory).</p>
+  <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border-2 border-slate-500 bg-white"></span>module</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-8 border-t-2 border-dashed border-slate-500"></span>seam</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-8 border-t-2 border-red-600"></span>leakage</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep"></span>deep module</span>
+  </div>
+  <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+    Nezopakované (už pokryté): C1–C10, V1–V8, šesť kandidátov po iOS/idb opravách, K1–K3 a zamietnutý „detect-probe module out of engine.ts“. Kandidát 2 sa ho dotýka iba okrajovo; rozdiel a nový dôkaz sú uvedené priamo v jeho karte.
+  </div>
+</header>
+
+<section id="candidates" class="space-y-10">
+
+<!-- ============ 1 ============ -->
+<article id="c1" class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-5 shadow-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="font-serif text-2xl mr-2">1 · Jedno volanie nástroja = jeden beh enginu</h2>
+    <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1">Strong</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-3 py-1">in-process</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/flow/engine.ts:195-205 (clearStateCount, resetClearStateCount), :262-327 (per-call polia, dva vstupy), :1176-1191 (guard)</li>
+    <li>src/run/verify.ts:455-458 (ensureState + runFlow na jednej inštancii)</li>
+    <li>src/run/commands.ts:66-76 (runOnEngine)</li>
+    <li>tests/flow/{engine,unread-tree-ladder,bare-tree-ladder}.test.ts (8× resetClearStateCount)</li>
+  </ul>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Pred</p>
+      <pre class="mermaid">
+flowchart TD
+  V["run/verify.ts runOne"] --> ES["engine.ensureState<br/>trace = [] · recoveryUsed = false<br/>environment line"]
+  V --> RF["engine.runFlow<br/>trace = [] · recoveryUsed = false<br/>environment line"]
+  ES --> T1[("trace A")]
+  RF --> T2[("trace B")]
+  RF -. "FlowError nesie len B" .-> X["FAILED sekcia<br/>bez state / clearState riadkov"]
+  G[["modul: let clearStateCount<br/>+ reset pre testy"]] -.-> ES
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class X,G leak
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Po</p>
+      <pre class="mermaid">
+flowchart TD
+  V["run/verify.ts"] --> R["engine.run · state?, flow?"]
+  C["run/commands.ts"] --> R
+  S["session · clearStates counter"] -. "EngineOptions" .-> R
+  subgraph RUN["jeden beh"]
+    R --> L["jedna environment line"]
+    R --> GU["jeden guard · jeden trace"]
+    R --> RP["jeden recovery budget"]
+  end
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class R deep
+      </pre>
+    </div>
+  </div>
+
+  <dl class="grid sm:grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
+    <dt class="font-semibold">Problém</dt>
+    <dd>Interface <code>FlowEngine</code> obsahuje nevyslovené pravidlo: „jedna inštancia, jeden vstup“. Každý vstup resetuje <code>trace</code> a <code>recoveryUsed</code> (engine.ts:314-316, :322-324), no <code>run/verify.ts:457-458</code> volá oba vstupy za sebou. Overené skriptom: keď flow zlyhá, <code>FlowError</code> nesie iba trace flowu. Riadok <code>state ready: already active</code> (a po rebríku aj <code>⚠ clearState</code>) v sekcii <code>FAILED</code> chýba, environment line sa vypíše dvakrát a „one recovery pass per tool call“ (:264, :582-584) platí dvakrát. Počítadlo wipe-ov je navyše modulový global s exportovaným resetom pre testy (:201-205).</dd>
+    <dt class="font-semibold">Riešenie</dt>
+    <dd>Jeden vstup <code>run({ state?, flow? })</code>: jeden trace, jeden <code>guard</code>, jeden recovery budget a jedna environment line na volanie. <code>ensureState</code>/<code>runFlow</code> sa buď zrušia, alebo z neho zostanú tenké aliasy. Počítadlo <code>clearState</code> sa podáva zvonka ako závislosť session, rovnako ako <code>env</code> od 2026-10-04.</dd>
+    <dt class="font-semibold">Deletion test</dt>
+    <dd>Po zmazaní <code>trace.push(...)</code> v run/verify.ts:457-458 sa zložitosť nepresunie, ale zmizne. Konkatenácia dvoch behov je kód, ktorý by v hlbšom module vôbec nevznikol.</dd>
+    <dt class="font-semibold">Wins</dt>
+    <dd><ul class="list-disc pl-5 space-y-0.5">
+      <li>locality: chybová správa nesie celý beh</li>
+      <li>leverage: tri volajúce miesta, jeden vstup</li>
+      <li>interface sa zúži o pravidlo poradia</li>
+      <li>modulový global a jeho test reset zmiznú</li>
+      <li>test: state+flow zlyhanie cez jeden interface</li>
+    </ul></dd>
+  </dl>
+</article>
+
+<!-- ============ 2 ============ -->
+<article id="c2" class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-5 shadow-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="font-serif text-2xl mr-2">2 · Condition ako jeden modul, ktorý vie povedať „na tomto strome sa to nedá zistiť“</h2>
+    <span class="rounded-full bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1">Worth exploring</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-3 py-1">in-process</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/flow/config.ts:25-32 (Condition), :128-144 (schema), :677-686 (validateReferences: iba existencia)</li>
+    <li>src/flow/engine.ts:1096-1120 (matches), :648-700 (detects, bare sa pýta „iba na strome, ktorý minul“ :649-653), :1122-1129 (waitFor), :949-962 (runBranch), :1269-1275 (describeCondition), :162 (isTerminal)</li>
+    <li>src/verify/assert.ts:502-515 (assertAbsent: vlastné vyhodnotenie absent)</li>
+    <li>src/ui-tree/bare-tree.ts:87-96 (isBareTree)</li>
+    <li>docs/bugs/2026-10-06-second-look-reads-android-decor-as-not-in-state.md:82-83 („Out of scope, pre-existing“)</li>
+  </ul>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Pred</p>
+      <pre class="mermaid">
+flowchart TD
+  D["detects"] --> M["matches → boolean"]
+  W["waitFor"] --> M
+  B["runBranch"] --> M
+  A["Verifier.assertAbsent"] --> AV["absentFromViewport"]
+  M --> AV
+  D --> BT["isBareTree<br/>len po miss"]
+  M -. "absent na dekore = true" .-> OK1["wait / branch / detect: áno"]
+  AV -. "absent na dekore = PASS" .-> OK2["assert PASS"]
+  CY["state A → state B → state A"] -. "RangeError, nie SetupError" .-> M
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class OK1,OK2,CY leak
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Po</p>
+      <pre class="mermaid">
+flowchart TD
+  D["detects"] --> E
+  W["waitFor"] --> E
+  B["runBranch"] --> E
+  A["Verifier absent"] --> E
+  subgraph CM["flow/condition"]
+    E["evaluate → yes · no · bare"]
+    E --- I1["absentFromViewport"]
+    E --- I2["isBareTree"]
+    CK["checkConditions: odkazy + cykly"]
+    DS["describe"]
+  end
+  P["parseConfig"] --> CK
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class E deep
+      </pre>
+    </div>
+  </div>
+
+  <dl class="grid sm:grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
+    <dt class="font-semibold">Problém</dt>
+    <dd><code>matches</code> vracia iba boolean, preto pravidlo „holý strom nie je poznanie“ žije len v <code>detects</code>, a aj tam sa pýta iba na strom, ktorý minul. <code>absent</code> detect, <code>wait</code>, <code>branch</code> aj <code>assert</code> preto na androidovom dekore (~9 s cold launchu) alebo na WDA splashi odpovedia „áno/PASS“. Bug doc to eviduje ako mimo rozsahu. Idb diera bola zavretá iba tak, že adapter prázdny strom hádže ako read error (1e0501d); pre holý strom taká oprava neexistuje. Tú istú gramatiku validuje config.ts a vyhodnocuje engine.ts: cyklus <code>states.a.detect: {state: b}</code> ↔ <code>b → a</code> prejde <code>parseConfig</code> a overený beh skončil <code>FlowError: Maximum call stack size exceeded</code>. Vo vnorenom rebríku (<code>requires:</code>) to nie je <code>isTerminal</code> (:162), takže vonkajší rebrík eskaluje na ďalší rung.</dd>
+    <dt class="font-semibold">Riešenie</dt>
+    <dd>Zlúčiť všetko, čo sa pýta <em>na</em> Condition, do jedného modulu: vyhodnotenie nad stromom s trojhodnotovou odpoveďou (<code>bare</code> = holý strom a podmienka ho nevie rozhodnúť), popis a kontrolu odkazov a cyklov pri parse. Volajúci si len vyberú politiku: detect vráti <code>bare</code>, wait a branch pollujú ďalej, assert hlási „could not verify“. Tú vetu už pre idb používa (unread-tree-ladder.test.ts:380).</dd>
+    <dt class="font-semibold">Vzťah k zamietnutému</dt>
+    <dd>Zamietnutý „detect-probe module“ chcel z engine.ts vytiahnuť <em>probe a rebrík</em>. Tento kandidát ich nechá v engine a posunie pravidlo <em>pod</em> probe, do vyhodnotenia, kde sa rozhoduje <code>absent</code>. Nový dôkaz: diera <code>absent</code> na holom strome mimo detectu (wait, branch, assert) a pád pri cykle. Ani jedno z toho vtedajšia karta nespomína.</dd>
+    <dt class="font-semibold">Deletion test</dt>
+    <dd>Po zmazaní <code>matches</code> by sa vyhodnotenie objavilo v štyroch volajúcich a absent pravidlo je dnes aj tak napísané dvakrát (engine :1104, assert :512). Modul si teda svoje miesto zaslúži; dnes je však shallow a private, takže sa testuje iba cez FakeAdapter a celý engine.</dd>
+    <dt class="font-semibold">Wins</dt>
+    <dd><ul class="list-disc pl-5 space-y-0.5">
+      <li>locality: absent × bare na jednom mieste</li>
+      <li>tabuľkové testy bez FakeAdapter</li>
+      <li>cyklus odmietnutý pri parse</li>
+      <li>leverage: štyria volajúci, jeden interface</li>
+    </ul></dd>
+  </dl>
+  <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">Zmena správania: <code>absent</code> wait na holom strome bude pollovať, nie hneď prejde. Pred implementáciou treba rozhodnutie vlastníka a kontrolu na zariadení (cold launch Android + WDA).</div>
+</article>
+
+<!-- ============ 3 ============ -->
+<article id="c3" class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-5 shadow-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="font-serif text-2xl mr-2">3 · interact povie, či prvok našiel; <code>optional</code> to prestane hádať</h2>
+    <span class="rounded-full bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1">Worth exploring</span>
+    <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-3 py-1">in-process</span>
+  </div>
+  <ul class="font-mono text-sm text-slate-700 space-y-0.5">
+    <li>src/flow/engine.ts:993-1027 (runOptionalSteps: flag <code>present</code>, <code>instanceof KeyboardGuardError</code>)</li>
+    <li>src/interact/resolve.ts:150-180 (resolveSettled: plain Error, jedna veta pre „nikdy nenájdený“ aj „nikdy sa neustálil“)</li>
+    <li>src/interact/fill.ts:97, :154, :191 (fill hádže až po nájdení poľa)</li>
+    <li>src/flow/config.ts:78-91 (TapSpec.timeout: dva významy)</li>
+    <li>tests/flow/engine.test.ts:1779-1797 (pinuje „skipped step (not present)“ pre nájdené pole), :2263, :2314, :2336, :2586</li>
+  </ul>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Pred: engine dedukuje z chýbajúceho dôkazu</p>
+      <div class="space-y-1 text-xs">
+        <div class="border-l-4 border-slate-400 bg-slate-50 px-3 py-2"><b>tap</b> · vlastný presence poll (resolveNow) → <code>present = true</code></div>
+        <div class="border-l-4 border-slate-400 bg-slate-50 px-3 py-2"><b>tap</b> · tapSpec → resolveSettled od nuly (druhý poll)</div>
+        <div class="border-l-4 border-red-500 bg-red-50 px-3 py-2"><b>fill / wait / assert</b> · hocijaká chyba → „(not present)“…</div>
+        <div class="border-l-4 border-red-500 bg-red-50 px-3 py-2">…okrem <code>KeyboardGuardError</code>, jedinej chyby, o ktorej engine vie, že prvok našla</div>
+        <div class="border-l-4 border-red-500 bg-red-50 px-3 py-2 leak">fill s nájdeným poľom, text nedopadol → „skipped step (not present)“ (pinnuté testom)</div>
+      </div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Po: fakt prichádza z interact</p>
+      <div class="space-y-1 text-xs">
+        <div class="deep rounded px-3 py-3"><span class="uppercase tracking-wider">interact · resolveSettled</span><br/>hádže <code>ElementNotFound</code> iba vtedy, keď žiadne kolo neresolvovalo cieľ; „found, never settled“ a chyby po nájdení zostávajú inými chybami</div>
+        <div class="border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2">optional: <code>ElementNotFound</code> → „(not present)“, inak headline. Rovnako pre tap, fill aj vnorené kroky</div>
+        <div class="border-l-4 border-slate-300 px-3 py-2 text-slate-500">flag <code>present</code> a <code>instanceof KeyboardGuardError</code> zmiznú; presence budget pre tap zostáva</div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="grid sm:grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
+    <dt class="font-semibold">Problém</dt>
+    <dd>Dôvod preskočenia <code>optional</code> skladá engine z nepriamych stôp: pri tape z vlastného presence pollu, pri ostatných krokoch z jedinej známej triedy chyby. Fakt „prvok sa našiel“ však vlastní interact, nie engine. Výsledkom je, že fill, ktorého pole bolo nájdené a text naň nedopadol, sa loguje ako „(not present)“ a test na :1779-1797 to pinuje. Túto vetvu už záplatovali dve review kolá (2026-10-03, stage B) a pri každej novej chybe „po nájdení“ treba ďalší <code>instanceof</code>.</dd>
+    <dt class="font-semibold">Riešenie</dt>
+    <dd><code>resolveSettled</code> rozlíši „nikdy nenájdený“ typovanou chybou (aj jej veta môže prestať tvrdiť „visible and settled“). <code>runOptionalSteps</code> číta iba tento jeden fakt. Presence poll pre tap a jeho budget (bug z 2026-08-19) zostávajú. Ďalší krok, nie súčasť tejto karty: appear budget priamo v interact by odstránil druhý poll.</dd>
+    <dt class="font-semibold">Deletion test</dt>
+    <dd>Po zmazaní flagu <code>present</code> a <code>instanceof</code> sa zložitosť nepresunie inam, ak interact povie, čo vie. Dnes sa tá istá znalosť odvodzuje v engine a pri každom novom type chyby sa odvodí nanovo.</dd>
+    <dt class="font-semibold">Wins</dt>
+    <dd><ul class="list-disc pl-5 space-y-0.5">
+      <li>locality: „nájdený“ vlastní interact</li>
+      <li>nepravdivý „(not present)“ zmizne</li>
+      <li>engine prestane poznať triedy interact chýb</li>
+      <li>test: jeden fakt, jedna tabuľka</li>
+    </ul></dd>
+  </dl>
+</article>
+
+</section>
+
+<section id="checked" class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-3">
+  <h2 class="font-serif text-2xl">Preskúmané a v poriadku</h2>
+  <ul class="text-sm space-y-2 list-disc pl-5">
+    <li><b>Reach ladder</b> (<code>ensureStateInner</code>, <code>salvageThrowingLastRung</code>, <code>recoveryPass</code>, <code>detects</code>, <code>UnreadTreeRefusal</code>; engine.ts:67-176, :344-700). Zamietnutý dnes s podmienkou „revisit at the next behaviour change to the ladder“. Od ed19b3d sa správanie nezmenilo, takže nový dôkaz chýba a kandidát sa neopakuje. Kandidát 2 sa ho nedotýka, presúva iba vyhodnotenie podmienky.</li>
+    <li><b>dispatchStep ako if-chain</b> (engine.ts:736-762). Rozhodnutie z 2026-10-03 aj C4 NO-GO platia; reťaz sama je pass-through a zúženie typu cez <code>'x' in step</code> je hodnota.</li>
+    <li><b>pollUntil / waitFor / detects nad pollTree</b> (engine.ts:1131-1150, ui-tree/read-tree.ts). Jedna poll primitive, timeout wording má jedného vlastníka (<code>pollTimeoutMessage</code>), read error sa nikdy neprehltne.</li>
+    <li><b>flow/credentials.ts</b>. Deep module (dva vstupy, interface s dvoma členmi, testy s plain objektmi); <code>resolveValue</code> v engine registruje tajomstvá pred logom. Lazy resolve per step je zdokumentované pravidlo, nie leak.</li>
+    <li><b>flow/load.ts</b>. I/O vlastní jeden modul; <code>iosToolSettingsFor</code> po K3 robí jedno čítanie.</li>
+    <li><b>flowIsDestructive vs flowItselfIsDestructive</b> (config.ts:562-624). Dva predikáty s dvoma politikami, obe zdokumentované a pinnuté v config.test.ts:410.</li>
+    <li><b>EngineOptions (9 polí)</b>. Produkcia stále podáva iba <code>{ env, environment }</code> a zvyšok je časovanie pre testy popri mocknutom <code>util/sleep</code>. Platí verdikt z 2026-10-04 „mention, not a card“.</li>
+    <li><b>Keyboard trace v runFill / tracingDismissal / tracingGuardFailure</b> (engine.ts:874-915, :1070-1094). Jeden catch po 0fd8c50; obsahovo patrí do K1–K3 a do vlastníka remedy vety.</li>
+    <li><b>waitTimeoutHint / idbContainerIdHint</b> (engine.ts:1236-1267). Čistá funkcia, testovaná bez enginu, s jasne zdôvodneným miestom (rada pre flow krok).</li>
+    <li><b>stepSummary a ⚠/✗ glyfy</b>. Pokrýva C4/C5 NO-GO, preto sa neotvára.</li>
+  </ul>
+</section>
+
+<section id="top-recommendation" class="rounded-xl deep p-6 sm:p-8 space-y-3">
+  <p class="text-xs uppercase tracking-wider text-slate-300">Top recommendation</p>
+  <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-emerald-400">1 · Jedno volanie nástroja = jeden beh enginu</a></h2>
+  <p class="text-slate-200">Je malý a subtraktívny a zatvára overenú stratu trace: <code>verify_both</code> so <code>state</code> + <code>flow</code> zahodí riadky stavu a wipe-u z chybovej správy, a práve trace je hlavný debugovací povrch produktu. Interface enginu sa zúži o pravidlo poradia, ktoré dnes nikde nie je napísané. Potom 2, ktorý však najprv potrebuje rozhodnutie o <code>absent</code> na holom strome a beh na zariadení, a nakoniec 3.</p>
+</section>
+
+<p class="text-xs text-slate-500">Vocabulary z codebase-design: module · interface · implementation · depth · seam · adapter · leverage · locality. Overenia (cyklus stavov, strata trace pri dvoch vstupoch) bežali ako jednorazové tsx skripty mimo repa.</p>
+</main>
+</body>
+</html>

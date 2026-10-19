@@ -1,0 +1,179 @@
+{
+  "cell": "form-errors",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "frames": {
+    "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 453,
+      "height": 66
+    },
+    "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+    },
+    "email.title": {
+      "x": 55,
+      "y": 568,
+      "width": 321,
+      "height": 66
+    },
+    "email": {
+      "x": 55,
+      "y": 640,
+      "width": 970,
+      "height": 99
+    },
+    "amount.title": {
+      "x": 55,
+      "y": 822,
+      "width": 460,
+      "height": 66
+    },
+    "amount": {
+      "x": 55,
+      "y": 894,
+      "width": 970,
+      "height": 99
+    },
+    "pin.title": {
+      "x": 55,
+      "y": 1076,
+      "width": 83,
+      "height": 66
+    },
+    "pin": {
+      "x": 55,
+      "y": 1148,
+      "width": 970,
+      "height": 99
+    },
+    "iban.title": {
+      "x": 55,
+      "y": 1330,
+      "width": 383,
+      "height": 66
+    },
+    "iban": {
+      "x": 55,
+      "y": 1402,
+      "width": 970,
+      "height": 99
+    },
+    "submit": {
+      "x": 55,
+      "y": 1606,
+      "width": 970,
+      "height": 132
+    },
+    "name.error": {
+      "x": 55,
+      "y": 491,
+      "width": 440,
+      "height": 66
+    },
+    "email.error": {
+      "x": 55,
+      "y": 745,
+      "width": 611,
+      "height": 66
+    },
+    "amount.error": {
+      "x": 55,
+      "y": 999,
+      "width": 556,
+      "height": 66
+    },
+    "pin.error": {
+      "x": 55,
+      "y": 1253,
+      "width": 408,
+      "height": 66
+    },
+    "iban.error": {
+      "x": 55,
+      "y": 1507,
+      "width": 405,
+      "height": 66
+    },
+    "screenError": {
+      "x": 55,
+      "y": 1859,
+      "width": 919,
+      "height": 66
+    }
+  },
+  "events": [
+    {
+      "kind": "submit",
+      "tag": "invalid",
+      "at": 1792141815.482
+    }
+  ],
+  "fields": {
+    "name": {
+      "value": "",
+      "focused": false,
+      "error": {
+        "text": "Enter the recipient’s name",
+        "id": "lab.form-errors.name"
+      }
+    },
+    "email": {
+      "value": "",
+      "focused": false,
+      "error": {
+        "text": "That’s not an e-mail – check the “@”",
+        "id": "lab.form-errors.email_error"
+      }
+    },
+    "amount": {
+      "value": "",
+      "focused": false,
+      "error": {
+        "text": "Amount must be 0,01 – 10 000 €",
+        "id": "lab.form-errors.amount"
+      }
+    },
+    "pin": {
+      "value": "",
+      "focused": false,
+      "error": {
+        "text": "PIN must have 4 digits…",
+        "id": "lab.form-errors.pin-error"
+      }
+    },
+    "iban": {
+      "value": "",
+      "focused": false,
+      "error": {
+        "text": "IBAN “SK00…” isn’t valid",
+        "id": "IbanError"
+      }
+    }
+  },
+  "focus": null,
+  "keyboard": null,
+  "submits": [
+    {
+      "at": 1792141815.482,
+      "valid": false,
+      "values": {
+        "name": "",
+        "email": "",
+        "amount": "",
+        "pin": "",
+        "iban": ""
+      }
+    }
+  ]
+}

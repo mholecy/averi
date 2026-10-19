@@ -1,0 +1,149 @@
+{
+  "cell": "fab",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "W",
+      "id": "lab.fab.W",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 1208,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,1296"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5",
+      "geometry": "whole",
+      "visible": {
+        "x": 127,
+        "y": 1208,
+        "width": 825,
+        "height": 176
+      },
+      "piece": {
+        "x": 127,
+        "y": 1208,
+        "width": 825,
+        "height": 176
+      },
+      "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "L",
+      "id": "lab.fab.L",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "x": 44,
+        "y": 1846,
+        "width": 320,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "204,1934"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#E53935",
+      "geometry": "whole",
+      "visible": {
+        "x": 44,
+        "y": 1846,
+        "width": 320,
+        "height": 176
+      },
+      "piece": {
+        "x": 44,
+        "y": 1846,
+        "width": 320,
+        "height": 176
+      },
+      "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "K",
+      "id": "lab.fab.K",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "x": 716,
+        "y": 1846,
+        "width": 320,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "876,1934"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#FB8C00",
+      "geometry": "whole",
+      "visible": {
+        "x": 716,
+        "y": 1846,
+        "width": 320,
+        "height": 176
+      },
+      "piece": {
+        "x": 716,
+        "y": 1846,
+        "width": 320,
+        "height": 176
+      },
+      "scrollView": "list",
+      "listed": {
+        "uiautomator": true
+      }
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "list": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    }
+  },
+  "chrome": {
+    "fab": {
+      "x": 408,
+      "y": 1802,
+      "width": 264,
+      "height": 264
+    }
+  },
+  "navigation": "gesture"
+}

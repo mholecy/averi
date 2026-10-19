@@ -1,0 +1,141 @@
+{
+  "cell": "text-sample",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "A": {
+      "x": 17,
+      "y": 176,
+      "width": 1045,
+      "height": 176
+    },
+    "A.box": {
+      "x": 17,
+      "y": 176,
+      "width": 1045,
+      "height": 176
+    },
+    "B": {
+      "x": 17,
+      "y": 374,
+      "width": 1045,
+      "height": 176
+    },
+    "B.box": {
+      "x": 17,
+      "y": 374,
+      "width": 1045,
+      "height": 176
+    },
+    "C": {
+      "x": 17,
+      "y": 572,
+      "width": 1045,
+      "height": 176
+    },
+    "C.box": {
+      "x": 17,
+      "y": 572,
+      "width": 1045,
+      "height": 176
+    },
+    "D": {
+      "x": 17,
+      "y": 770,
+      "width": 1045,
+      "height": 176
+    },
+    "D.box": {
+      "x": 17,
+      "y": 770,
+      "width": 1045,
+      "height": 176
+    },
+    "E": {
+      "x": 17,
+      "y": 968,
+      "width": 1045,
+      "height": 176
+    },
+    "E.box": {
+      "x": 17,
+      "y": 968,
+      "width": 1045,
+      "height": 176
+    },
+    "F": {
+      "x": 17,
+      "y": 1166,
+      "width": 1045,
+      "height": 176
+    },
+    "F.box": {
+      "x": 17,
+      "y": 1166,
+      "width": 1045,
+      "height": 176
+    },
+    "G": {
+      "x": 17,
+      "y": 1364,
+      "width": 1045,
+      "height": 176
+    },
+    "G.box": {
+      "x": 17,
+      "y": 1364,
+      "width": 1045,
+      "height": 176
+    },
+    "H": {
+      "x": 17,
+      "y": 1562,
+      "width": 1045,
+      "height": 176
+    },
+    "H.box": {
+      "x": 17,
+      "y": 1562,
+      "width": 1045,
+      "height": 176
+    },
+    "I": {
+      "x": 17,
+      "y": 1760,
+      "width": 1045,
+      "height": 176
+    },
+    "I.box": {
+      "x": 17,
+      "y": 1760,
+      "width": 1045,
+      "height": 176
+    },
+    "J": {
+      "x": 17,
+      "y": 1958,
+      "width": 1045,
+      "height": 176
+    },
+    "J.box": {
+      "x": 17,
+      "y": 1958,
+      "width": 1045,
+      "height": 176
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  }
+}

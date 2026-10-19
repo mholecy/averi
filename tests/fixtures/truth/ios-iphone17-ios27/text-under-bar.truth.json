@@ -1,0 +1,150 @@
+{
+  "cell": "text-under-bar",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "S",
+      "id": "lab.text-under-bar.S",
+      "text": "Zostatok 1 234,56 €",
+      "color": "#FFF3E0",
+      "declared": "open",
+      "frame": {
+        "height": 20,
+        "width": 402,
+        "x": 0,
+        "y": 21
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0.855,
+      "seen": "#FFF3E0",
+      "geometry": "status-band",
+      "visible": {
+        "x": 0,
+        "y": 21,
+        "width": 402,
+        "height": 20
+      },
+      "piece": null,
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "W",
+      "id": "lab.text-under-bar.W",
+      "text": "Šťastný účet",
+      "color": "#E8F5E9",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 285
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,317.0"
+        }
+      ],
+      "drawn": 0.979,
+      "seen": "#E8F5E9",
+      "geometry": "whole",
+      "visible": {
+        "x": 51,
+        "y": 285,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 285,
+        "width": 300,
+        "height": 64
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      }
+    },
+    {
+      "tag": "P",
+      "id": "lab.text-under-bar.P",
+      "text": "Pokračovať na súhrn",
+      "color": "#FCE4EC",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 760
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,792.0"
+        },
+        {
+          "kind": "button",
+          "tag": "pinned.continue"
+        }
+      ],
+      "drawn": 0.125,
+      "seen": "#263238",
+      "geometry": "under-chrome:pinned",
+      "visible": {
+        "x": 51,
+        "y": 760,
+        "width": 300,
+        "height": 64
+      },
+      "piece": {
+        "x": 51,
+        "y": 760,
+        "width": 300,
+        "height": 8
+      },
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "textListed": {
+        "wda": true,
+        "idb": true
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "chrome": {
+    "pinned": {
+      "height": 56,
+      "width": 354,
+      "x": 24,
+      "y": 768
+    }
+  }
+}

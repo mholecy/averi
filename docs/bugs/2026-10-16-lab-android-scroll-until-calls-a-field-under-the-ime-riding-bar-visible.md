@@ -25,6 +25,34 @@
 > submitted" risk). Not widened on purpose: the gate is the control roles (selectors.ts#isInteractive), and a role-less
 > node is as often a layout wrapper as a clickable — refusing those would refuse wrappers and containers that are no
 > target.
+>
+> **Live (2026-10-18, round 6's Android device check):** measured on the emulator at round 5's src (b71cbbb) and at
+> round 6's (e98b87e), by three forms cases of the live golden (scripts/truth/live.ts k5, and k6/k7 added for this
+> note). `tap phone` (IME up): before `Tapped` at `540,1391` — the bar's padding, phone focused, no submit; after
+> refused naming `container id:lab.form-keyboard.submit`, nothing tapped, the focus left on postcode. `tap note` after
+> `back` (k5): before `Tapped` at `540,2133`, note focused; after refused ("cut at its top edge by container …
+> submit … only a 970x14 part of it shows … scroll_until it out from under that container first"), no submit.
+> `scroll_until phone` (k7): before "visible after 0 swipes — CLIPPED at bottom, 67% …" with no stroke, phone's centre
+> under Continue; after ONE stroke (the app's touch-down at `540,1034`) and "fully visible after 1 swipe" — the replay's
+> premise does not hold on the device: the form DOES scroll above the IME, the stroke moved it 167 px (phone 1296 → 1129),
+> leaving phone's centre clear of the bar and of the IME, 18 px of its bottom under the bar's top padding (the surface
+> with no node: averi cannot see those 18 px, so "fully" overstates by them). So the replay's "fails after 3 swipes" (two
+> unmoved strokes and one back) is not what the device does: 1 stroke, a right stop. The "its strokes move nothing on
+> this screen (the form fits)" above is the replay's reading; ADR 0021's one-stroke-stop point is corrected to say so. A consequence of the refusal: live
+> case k3 (fill note under the IME, back hides it) was ok before — the fill tapped the 14-px strip and typed — and is now
+> LOUD, refused for the same strip, the field untouched: an honest refusal the owner's 2026-10-17 decision implies.
+> docs/truth/live-android-2026-10-18-visibility.md.
+>
+> **Decided (2026-10-18, the owner; ADR 0013 "Decided 2026-10-18"):** (1) the way past — "only if a screenshot shows it
+> whole … tap by coordinates" — is KEPT, every remedy before it: pinned over this note's captures
+> (tests/helpers/escape-order.ts: the phone tap with the IME up, the note tap after back, `scroll_until phone` stuck
+> and at its bound, `scroll_until note` stuck — every reply already so ordered, no wording changed); (2) k3, the fill
+> into note's 14-px strip, is REFUSED BY DESIGN — its live judge reads the refusal with the remedy and the field
+> untouched as ok (`live.ts --rejudge docs/truth/live-records/android-vis.json --groups forms,visibility`: k3 ok,
+> 133 cases / 118 ok / 5 loud / 10 mismatches, 0 not known); (3) k7's "fully visible" with 18 px of phone under the
+> bar's node-less padding is a KNOWN residual (ADR 0013's residuals accepted; k7's judge reads the stop ok, its centre
+> clear), with a future "eyes" item in the lab plan: verify a "fully" claim with pixels where a node-less sibling's
+> padding may lie over the target.
 
 Lab note F2A1. **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's
 ground truth (`tests/fixtures/truth/android-averi_lab-api33/form-keyboard.*`, captured by

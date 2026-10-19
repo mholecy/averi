@@ -1,0 +1,814 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 0}, {402, 874}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 0}, {402, 874}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 62}, {402, 54}}",
+                "label": null,
+                "rawIdentifier": "SWIFT payment",
+                "traits": "",
+                "frame": "{{0, 62}, {402, 54}}",
+                "isVisible": "1",
+                "type": "NavigationBar",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{138, 73.666666666666657}, {125.66666666666669, 20.666666666666671}}",
+                  "label": "SWIFT payment",
+                  "rawIdentifier": null,
+                  "traits": "Header",
+                  "frame": "{{138, 73}, {126, 22}}",
+                  "isVisible": "1",
+                  "type": "StaticText",
+                  "value": "SWIFT payment",
+                  "isEnabled": "1",
+                  "isAccessible": "1",
+                  "isNativeAccessibilityElement": "1",
+                  "isFocused": "0",
+                  "name": "SWIFT payment",
+                  "rect": {
+                   "y": 73,
+                   "x": 138,
+                   "width": 126,
+                   "height": 22
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "SWIFT payment",
+                "rect": {
+                 "y": 62,
+                 "x": 0,
+                 "width": 402,
+                 "height": 54
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 0}, {402, 874}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{0, 0}, {402, 874}}",
+                "isVisible": "1",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 0}, {402, 874}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{0, 0}, {402, 874}}",
+                  "isVisible": "1",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "children": [
+                   {
+                    "customActions": null,
+                    "nativeFrame": "{{0, 0}, {402, 874}}",
+                    "label": null,
+                    "rawIdentifier": null,
+                    "traits": "",
+                    "frame": "{{0, 0}, {402, 874}}",
+                    "isVisible": "1",
+                    "type": "Other",
+                    "value": null,
+                    "isEnabled": "1",
+                    "children": [
+                     {
+                      "customActions": null,
+                      "nativeFrame": "{{0, 0}, {402, 874}}",
+                      "label": null,
+                      "rawIdentifier": null,
+                      "traits": "",
+                      "frame": "{{0, 0}, {402, 874}}",
+                      "isVisible": "0",
+                      "type": "Other",
+                      "value": null,
+                      "isEnabled": "1",
+                      "children": [
+                       {
+                        "customActions": null,
+                        "nativeFrame": "{{0, 0}, {402, 874}}",
+                        "label": null,
+                        "rawIdentifier": null,
+                        "traits": "",
+                        "frame": "{{0, 0}, {402, 874}}",
+                        "isVisible": "1",
+                        "type": "ScrollView",
+                        "value": null,
+                        "isEnabled": "1",
+                        "children": [
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{0, 0}, {402, 874}}",
+                          "label": null,
+                          "rawIdentifier": null,
+                          "traits": "",
+                          "frame": "{{0, 0}, {402, 874}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": null,
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{0, 0}, {402, 156}}",
+                            "label": null,
+                            "rawIdentifier": null,
+                            "traits": "",
+                            "frame": "{{0, 0}, {402, 156}}",
+                            "isVisible": "1",
+                            "type": "Other",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "0",
+                            "isNativeAccessibilityElement": "0",
+                            "isFocused": "0",
+                            "name": null,
+                            "rect": {
+                             "y": 0,
+                             "x": 0,
+                             "width": 402,
+                             "height": 156
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": null,
+                          "rect": {
+                           "y": 0,
+                           "x": 0,
+                           "width": 402,
+                           "height": 874
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{0, 0}, {402, 874}}",
+                          "label": null,
+                          "rawIdentifier": null,
+                          "traits": "",
+                          "frame": "{{0, 0}, {402, 874}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": null,
+                          "isEnabled": "1",
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": null,
+                          "rect": {
+                           "y": 0,
+                           "x": 0,
+                           "width": 402,
+                           "height": 874
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{0, 116}, {402, 394.33333333333331}}",
+                          "label": null,
+                          "rawIdentifier": null,
+                          "traits": "",
+                          "frame": "{{0, 116}, {402, 395}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": null,
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{28, 136}, {37, 14.333333333333314}}",
+                            "label": "Value*",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "StaticText",
+                            "frame": "{{28, 136}, {37, 15}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Value*",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 136,
+                             "x": 28,
+                             "width": 37,
+                             "height": 15
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 146}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "",
+                            "frame": "{{20, 146}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 146,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{28, 196}, {34, 14.333333333333314}}",
+                            "label": "IBAN*",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "StaticText",
+                            "frame": "{{28, 196}, {34, 15}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "IBAN*",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 196,
+                             "x": 28,
+                             "width": 34,
+                             "height": 15
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 206}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "",
+                            "frame": "{{20, 206}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 206,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{28, 256}, {25.666666666666664, 14.333333333333371}}",
+                            "label": "BIC*",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "StaticText",
+                            "frame": "{{28, 256}, {26, 15}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "BIC*",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 256,
+                             "x": 28,
+                             "width": 26,
+                             "height": 15
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 266}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "",
+                            "frame": "{{20, 266}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 266,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{28, 316}, {114, 14.333333333333371}}",
+                            "label": "Payee’s bank name*",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "StaticText",
+                            "frame": "{{28, 316}, {114, 15}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Payee’s bank name*",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 316,
+                             "x": 28,
+                             "width": 114,
+                             "height": 15
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 326}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "",
+                            "frame": "{{20, 326}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 326,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{28, 376}, {77.333333333333329, 14.333333333333314}}",
+                            "label": "Payee’s name",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "StaticText",
+                            "frame": "{{28, 376}, {78, 15}}",
+                            "isVisible": "1",
+                            "type": "StaticText",
+                            "value": "Payee’s name",
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 376,
+                             "x": 28,
+                             "width": 78,
+                             "height": 15
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 386}, {362, 34}}",
+                            "label": "",
+                            "rawIdentifier": "lab.form-shared-id.component",
+                            "traits": "",
+                            "frame": "{{20, 386}, {362, 34}}",
+                            "isVisible": "1",
+                            "type": "TextField",
+                            "value": null,
+                            "isEnabled": "1",
+                            "placeholderValue": "",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.component",
+                            "rect": {
+                             "y": 386,
+                             "x": 20,
+                             "width": 362,
+                             "height": 34
+                            }
+                           },
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{20, 444}, {362, 46.333333333333314}}",
+                            "label": "Continue to summary",
+                            "rawIdentifier": "lab.form-shared-id.submit",
+                            "traits": "Button",
+                            "frame": "{{20, 444}, {362, 47}}",
+                            "isVisible": "1",
+                            "type": "Button",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "1",
+                            "isNativeAccessibilityElement": "1",
+                            "isFocused": "0",
+                            "name": "lab.form-shared-id.submit",
+                            "rect": {
+                             "y": 444,
+                             "x": 20,
+                             "width": 362,
+                             "height": 47
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": null,
+                          "rect": {
+                           "y": 116,
+                           "x": 0,
+                           "width": 402,
+                           "height": 395
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{369, 116}, {30, 696}}",
+                          "label": "Vertical scroll bar, 1 page",
+                          "rawIdentifier": null,
+                          "traits": "Adjustable",
+                          "frame": "{{369, 116}, {30, 696}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": "0 %",
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{396, 448.66666666666674}, {3, 360.33333333333326}}",
+                            "label": null,
+                            "rawIdentifier": null,
+                            "traits": "",
+                            "frame": "{{396, 448}, {3, 361}}",
+                            "isVisible": "1",
+                            "type": "Other",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "0",
+                            "isNativeAccessibilityElement": "0",
+                            "isFocused": "0",
+                            "name": null,
+                            "rect": {
+                             "y": 448,
+                             "x": 396,
+                             "width": 3,
+                             "height": 361
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": "Vertical scroll bar, 1 page",
+                          "rect": {
+                           "y": 116,
+                           "x": 369,
+                           "width": 30,
+                           "height": 696
+                          }
+                         },
+                         {
+                          "customActions": null,
+                          "nativeFrame": "{{369, 116}, {30, 696}}",
+                          "label": "Vertical scroll bar, 1 page",
+                          "rawIdentifier": null,
+                          "traits": "Adjustable",
+                          "frame": "{{369, 116}, {30, 696}}",
+                          "isVisible": "1",
+                          "type": "Other",
+                          "value": "0 %",
+                          "isEnabled": "1",
+                          "children": [
+                           {
+                            "customActions": null,
+                            "nativeFrame": "{{396, 448.66666666666674}, {3, 360.33333333333326}}",
+                            "label": null,
+                            "rawIdentifier": null,
+                            "traits": "",
+                            "frame": "{{396, 448}, {3, 361}}",
+                            "isVisible": "1",
+                            "type": "Other",
+                            "value": null,
+                            "isEnabled": "1",
+                            "isAccessible": "0",
+                            "isNativeAccessibilityElement": "0",
+                            "isFocused": "0",
+                            "name": null,
+                            "rect": {
+                             "y": 448,
+                             "x": 396,
+                             "width": 3,
+                             "height": 361
+                            }
+                           }
+                          ],
+                          "isAccessible": "0",
+                          "isNativeAccessibilityElement": "0",
+                          "isFocused": "0",
+                          "name": "Vertical scroll bar, 1 page",
+                          "rect": {
+                           "y": 116,
+                           "x": 369,
+                           "width": 30,
+                           "height": 696
+                          }
+                         }
+                        ],
+                        "isAccessible": "0",
+                        "isNativeAccessibilityElement": "0",
+                        "isFocused": "0",
+                        "name": null,
+                        "rect": {
+                         "y": 0,
+                         "x": 0,
+                         "width": 402,
+                         "height": 874
+                        }
+                       }
+                      ],
+                      "isAccessible": "0",
+                      "isNativeAccessibilityElement": "0",
+                      "isFocused": "0",
+                      "name": null,
+                      "rect": {
+                       "y": 0,
+                       "x": 0,
+                       "width": 402,
+                       "height": 874
+                      }
+                     }
+                    ],
+                    "isAccessible": "0",
+                    "isNativeAccessibilityElement": "0",
+                    "isFocused": "0",
+                    "name": null,
+                    "rect": {
+                     "y": 0,
+                     "x": 0,
+                     "width": 402,
+                     "height": 874
+                    }
+                   }
+                  ],
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 0,
+                   "x": 0,
+                   "width": 402,
+                   "height": 874
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 0}, {402, 874}}",
+                "label": "Toolbar",
+                "rawIdentifier": "Toolbar",
+                "traits": "",
+                "frame": "{{0, 0}, {402, 874}}",
+                "isVisible": "0",
+                "type": "Toolbar",
+                "value": null,
+                "isEnabled": "1",
+                "children": [
+                 {
+                  "customActions": null,
+                  "nativeFrame": "{{0, 0}, {402, 874}}",
+                  "label": null,
+                  "rawIdentifier": null,
+                  "traits": "",
+                  "frame": "{{0, 0}, {402, 874}}",
+                  "isVisible": "0",
+                  "type": "Other",
+                  "value": null,
+                  "isEnabled": "1",
+                  "isAccessible": "0",
+                  "isNativeAccessibilityElement": "0",
+                  "isFocused": "0",
+                  "name": null,
+                  "rect": {
+                   "y": 0,
+                   "x": 0,
+                   "width": 402,
+                   "height": 874
+                  }
+                 }
+                ],
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": "Toolbar",
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 0,
+               "x": 0,
+               "width": 402,
+               "height": 874
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

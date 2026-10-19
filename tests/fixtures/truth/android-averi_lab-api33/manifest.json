@@ -1,0 +1,316 @@
+{
+  "platform": "android",
+  "app": "AveriLab",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "note": "Ground truth: the Android lab app (fixtures/apps/android), captured by scripts/truth/capture-android.ts",
+  "captures": [
+    {
+      "file": "open.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "open.png",
+      "truth": "open.truth.json"
+    },
+    {
+      "file": "sheet-medium.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "sheet-medium.png",
+      "truth": "sheet-medium.truth.json"
+    },
+    {
+      "file": "alert-dim.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "alert-dim.png",
+      "truth": "alert-dim.truth.json"
+    },
+    {
+      "file": "form-basic.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-basic.png",
+      "truth": "form-basic.truth.json"
+    },
+    {
+      "file": "form-errors.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-errors.png",
+      "truth": "form-errors.truth.json"
+    },
+    {
+      "file": "form-keyboard.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-keyboard.png",
+      "truth": "form-keyboard.truth.json"
+    },
+    {
+      "file": "form-keyboard-floating.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-keyboard-floating.png",
+      "truth": "form-keyboard-floating.truth.json"
+    },
+    {
+      "file": "form-prefilled.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-prefilled.png",
+      "truth": "form-prefilled.truth.json"
+    },
+    {
+      "file": "form-picker.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-picker.png",
+      "truth": "form-picker.truth.json"
+    },
+    {
+      "file": "form-shared-id.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-shared-id.png",
+      "truth": "form-shared-id.truth.json"
+    },
+    {
+      "file": "scroll-bounded.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-bounded.png",
+      "truth": "scroll-bounded.truth.json"
+    },
+    {
+      "file": "scroll-sticky.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky.png",
+      "truth": "scroll-sticky.truth.json"
+    },
+    {
+      "file": "scroll-bounded-flush.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-bounded-flush.png",
+      "truth": "scroll-bounded-flush.truth.json"
+    },
+    {
+      "file": "scroll-sticky-cut.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky-cut.png",
+      "truth": "scroll-sticky-cut.truth.json"
+    },
+    {
+      "file": "scroll-sticky-view.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky-view.png",
+      "truth": "scroll-sticky-view.truth.json"
+    },
+    {
+      "file": "scroll-top-edge.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-top-edge.png",
+      "truth": "scroll-top-edge.truth.json"
+    },
+    {
+      "file": "scroll-top-edge-end.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-top-edge-end.png",
+      "truth": "scroll-top-edge-end.truth.json"
+    },
+    {
+      "file": "carousel-in-list.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-in-list.png",
+      "truth": "carousel-in-list.truth.json"
+    },
+    {
+      "file": "scroll-collapsing.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-collapsing.png",
+      "truth": "scroll-collapsing.truth.json"
+    },
+    {
+      "file": "bands.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "bands.png",
+      "truth": "bands.truth.json"
+    },
+    {
+      "file": "bands-three-button.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "bands-three-button.png",
+      "truth": "bands-three-button.truth.json"
+    },
+    {
+      "file": "pinned-bar.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "pinned-bar.png",
+      "truth": "pinned-bar.truth.json"
+    },
+    {
+      "file": "tabbar-floating.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "tabbar-floating.png",
+      "truth": "tabbar-floating.truth.json"
+    },
+    {
+      "file": "fab.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "fab.png",
+      "truth": "fab.truth.json"
+    },
+    {
+      "file": "own-parts.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "own-parts.png",
+      "truth": "own-parts.truth.json"
+    },
+    {
+      "file": "text-sample.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "text-sample.png",
+      "truth": "text-sample.truth.json"
+    },
+    {
+      "file": "text-under-bar.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "text-under-bar.png",
+      "truth": "text-under-bar.truth.json"
+    },
+    {
+      "file": "text-nav-cut.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "text-nav-cut.png",
+      "truth": "text-nav-cut.truth.json"
+    }
+  ]
+}

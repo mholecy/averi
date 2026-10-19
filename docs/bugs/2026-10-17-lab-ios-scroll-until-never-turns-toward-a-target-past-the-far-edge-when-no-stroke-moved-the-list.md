@@ -16,14 +16,30 @@
 > capture (tests/interact/scroll-end-turn.test.ts). The live KNOWN `ios wda turn:scroll-bounded.F` is the harness's to
 > strike.
 >
+> **Status (2026-10-18, round 6's iOS device check):** turns live, but not after ONE unmoved stroke — still KNOWN
+> (`ios wda turn:scroll-bounded.F`, R-direction; scripts/truth/live-known.ts). At truth/round-6's src (11683c3) under
+> WDA averi strokes up, turns down once its proof holds and says so (`… 2 swipes up, the last of which did not move it
+> — the tree lists the content of scrollable (0,380 402x180) ending at its top — so averi turned down, as the tree
+> places the element below it`). In four runs the turn came after 2 unmoved strokes three times (F then reached and
+> tapped: `lower 0→0, 0→0, 0→945.7` in docs/truth/live-records/ios-vis.json, 918 and 926.7 in the reruns
+> ios-wda-bounded-long-list-11683c3-2.json, -3.json) and after 4 once (-1.json: two strokes down left, `lower` at 497,
+> `failed after 6 swipes (maxSwipes)`). The app logs every up stroke from rest to rest at 0. Two is the two-stroke
+> rule's count (`UNMOVED_STROKES_EXHAUST`): the read after the first stroke did not prove the end — ADR 0021's own
+> residual names the likely cause (a 1-px flip of WDA's rects between reads loses the proof: F reads 300x64 at launch
+> and 300x65 after a stroke in these runs) or a read still bouncing at the top; inferred, no trace of averi's reads was
+> kept. At b71cbbb (ios-vis-b71cbbb.json) the same case strokes up 3 times and fails advising `down`, as round 5 found.
+> The one-stroke promise is the owner's/next round's.
+>
 > **Status (2026-10-18):** fixed under WDA at `1a1871f` on `arch/r22-lv4` (rebased onto `arch/round-22` `8b2530c`; review round 1 fixes after it, ADR 0021) (from `arch/round-22` `b71cbbb`), the owner's (b)
 > as decided on 2026-10-17; unmeasured on a device — the live KNOWN `ios wda turn:scroll-bounded.F` is the device
 > check's to judge. The caller's direction is stroked first; the read after the one stroke up finds every match where
 > it was and the tree listing `lower`'s content ending at its top (nothing of it above 380), so the content is PROVEN
 > exhausted up (interact/scroll-rounds.ts#Observed.ends, stroke-plan.ts#strokedEnd, ui-tree/geometry.ts#Clips.endsAt),
 > and F lies past `lower`'s far (bottom) edge inside it: the strokes turn once, down, at full reach, and the reply says
-> so (`; 1 swipe up did not move scrollable (0,380 402x180) — the tree lists its content ending at its top — so averi
-> turned down, as the tree places the element below it`; scroll-rounds.ts#EndTurn). Replayed over this cell's real WDA
+> so (`; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
+> averi turned down, as the tree places the element below it`, the one-stroke stop's wording since round 6's code
+> review, S8; at `1a1871f` it read `did not move scrollable (0,380 402x180) — the tree lists its content ending at its
+> top —`; scroll-rounds.ts#EndTurn). Replayed over this cell's real WDA
 > capture (tests/interact/scroll-end-turn.test.ts): strokes up, down, down … where three ups failed. Under idb nothing
 > changes (no scroll view listed, LE2: `ios idb turn:scroll-bounded.F` stays KNOWN); nor on Android, whose tree cannot
 > list where a list's content ends. Golden over truth/round-6 unchanged (1137/242/0, every row identical: the replay
@@ -38,7 +54,7 @@
 Lab note LV4. **Found 2026-10-17** by round 5's device check: the live golden (`scripts/truth/live.ts --udid
 <averi-lab iPhone 17> --sources idb,wda --groups visibility,dismissal --record …`) on the `averi-lab iPhone 17`
 simulator (iOS 27.0, 402x874), averi = `arch/round-21`'s `src/` (`b71cbbb`, from truth/phase-3 `2725e76`), WDA on port
-8120. Records: docs/truth/live-records/ios-vis.json and ios-scroll-bounded-wda-2725e76-1.json, -2.json (three runs, the
+8120. Records: docs/truth/live-records/ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-1.json, -2.json (three runs, the
 same in each). Summary: docs/truth/live-ios-2026-10-17-visibility.md.
 
 The case was filed under LE4 (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md):

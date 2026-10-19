@@ -8,6 +8,7 @@ import type { Platform, Recording, Screen } from './corpus.js';
 import { resetClock, wallNow } from './clock.js';
 import { deviceCalls, paintFrame, resetDevice, type DeviceProfile, type Paint } from './fake-device.js';
 import { ANDROID_SERIAL, IOS_UDID, recordedAdapter, type Side } from './side.js';
+import type { CellConfig } from '../truth/schema.js';
 
 /**
  * The differential itself: every recording replayed on two sides through the
@@ -176,7 +177,9 @@ interface SnapNode {
 
 interface Target {
   selector: string;
-  /** The assert's element spec — none for a `value:` target: an element spec names no value (verify/element-assert.ts). */
+  /**
+   * The assert's element spec — none for a `value:` target: an element spec names no value (verify/element-assert.ts).
+   */
   element?: Record<string, string>;
   role: string;
   /** The node's rect in the tree that named it (NEW's when both did) — where its colour is painted. */
@@ -320,7 +323,10 @@ function plan(platform: Platform, t: Target, i: number, tools: ReadonlySet<ToolN
   return calls;
 }
 
-/** Per tree: the swipes, the many-matches taps, and on a raw iOS tree the launch (its foreground wait asks the source which app it reads). */
+/**
+ * Per tree: the swipes, the many-matches taps, and on a raw iOS tree the launch (its foreground wait asks the source
+ * which app it reads).
+ */
 function treeCalls(recording: Recording, tools: ReadonlySet<ToolName>, shared: readonly string[]): Call[] {
   const platform = recording.platform;
   const calls: Call[] = [];
@@ -332,9 +338,9 @@ function treeCalls(recording: Recording, tools: ReadonlySet<ToolName>, shared: r
 
 // --- one side's server ---
 
-const BLOCK = '\n⏎\n';
+export const BLOCK = '\n⏎\n';
 
-interface Connection {
+export interface Connection {
   call(call: Call, configPath: string): Promise<Outcome>;
   close(): Promise<void>;
 }
@@ -347,10 +353,10 @@ const untemp = (s: string) => s.replace(TEMP, '<tmp>');
 const imageOf = (b: Buffer) =>
   `${b.length >= 24 && b.readUInt32BE(12) === 0x49484452 ? `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}` : `${b.length} bytes`} sha1:${createHash('sha1').update(b).digest('hex').slice(0, 12)}`;
 
-async function connect(side: Side, recording: Recording, profile: DeviceProfile): Promise<Connection> {
+export async function connect(side: Side, recording: Recording, profile: DeviceProfile): Promise<Connection> {
   const adapter = recordedAdapter(side, recording, profile);
   const device = recording.platform === 'ios' ? IOS_UDID : ANDROID_SERIAL;
-  const registry = new side.AdapterRegistry({
+  const registry = side.registry({
     factory: () => adapter,
     discovery: async (platform) =>
       platform === recording.platform ? [{ id: device, platform, name: 'differential', osVersion: '0', state: 'booted' }] : [],
@@ -388,14 +394,19 @@ async function connect(side: Side, recording: Recording, profile: DeviceProfile)
 let configDir: string | undefined;
 let configs = 0;
 
-async function configFor(recording: Recording, dismiss: unknown[] | undefined): Promise<string> {
+/**
+ * An averi.yaml for one recording: its tree source, the dismissal a variant asks for, and — the golden mode's — a lab
+ * cell's own settings per platform (schema.ts#CellConfig, merged last: a cell's `ios.keyboardDismiss` is its variant).
+ */
+export async function configFor(recording: Recording, dismiss: unknown[] | undefined, cell?: CellConfig): Promise<string> {
   configDir ??= join(tmpdir(), `averi-differential-${process.pid}`);
   await mkdir(configDir, { recursive: true });
   const kind = recording.source === 'uiautomator' ? undefined : recording.source;
-  const ios = { bundleId: 'differential.app', ...(kind !== undefined && { treeSource: kind }), ...(dismiss !== undefined && { keyboardDismiss: dismiss }) };
+  const ios = { bundleId: 'differential.app', ...(kind !== undefined && { treeSource: kind }), ...(dismiss !== undefined && { keyboardDismiss: dismiss }), ...cell?.ios };
+  const android = { package: 'differential.app', ...cell?.android };
   const path = join(configDir, `averi-${configs++}.yaml`);
   // JSON is YAML: the config needs no YAML writer.
-  await writeFile(path, JSON.stringify({ app: { android: { package: 'differential.app' }, ios } }));
+  await writeFile(path, JSON.stringify({ app: { android, ios } }));
   return path;
 }
 
