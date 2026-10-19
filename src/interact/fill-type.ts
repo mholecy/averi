@@ -201,13 +201,13 @@ function inputsOf(tree: UiNode, except?: string): OtherInputs {
 }
 
 /**
- * Where the typing went, as far as the screen proves (2026-10-19, review of this branch: an auto-advancing code box
- * moved the focus to the next box, and a tail typed again went into the note below — `34234`):
+ * Where the typing went, as far as the screen proves (2026-10-19, docs/adr/0023-fill-types-a-dropped-tail-again.md:
+ * an auto-advancing code box moved the focus to the next box, and a tail typed again went into the note below — `34234`):
  * - `field`: every input the screen had when typing began is there with the value it had — nothing else took it;
  * - `elsewhere`: one of them GAINED typed text — its old value is a prefix of its new one, and what was appended is
  *   part of what the field is missing of the typing (`missing`): the typing provably went there (the code boxes:
  *   `2` and `34`, both inside the missing `234`);
- * - `unproven`: any other change — a sibling the app recomputed, replaced or shortened (review round 2: an exchange
+ * - `unproven`: any other change — a sibling the app recomputed, replaced or shortened (ADR 0023: an exchange
  *   form's `converted` amount, set to twice the `amount` typed, made a clear fill that had always recovered fail) —
  *   or nothing read before typing, the read-back's tree missing, an input of then gone or moved, or no `missing`
  *   to compare with (the field's reading is no prefix of what it should hold).

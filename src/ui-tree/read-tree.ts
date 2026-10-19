@@ -389,11 +389,12 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
   before.ids.size > 0 && after.ids.size > 0 && ![...before.ids].some((id) => after.ids.has(id));
 
 /**
- * THE SCREEN CHANGED UNDER THE STROKE (round 7's A5, iOS point 4 of docs/truth/live-ios-2026-10-18-visibility.md;
- * ADR 0018 residual 6): the first read that reads after the strokes since the last one is ANOTHER SCREEN than that
- * read — by identity, none of its identified nodes is listed any more (`anotherScreen`) — and no
- * stroke among them touched down on a node of that read that the read after STILL LISTS (`touchedPersists`: a
- * labelled node by role and label, a scroll view by its rect; the root and a screen-sized frame aside). Then what the strokes moved was not content but the screen itself: a sheet or a
+ * THE SCREEN CHANGED UNDER THE STROKE (iOS point 4 of docs/truth/live-ios-2026-10-18-visibility.md; ADR 0018's
+ * amendment "idb's presented layer", residual 6): the first read that reads after the strokes since the last one is
+ * ANOTHER SCREEN than that read — by identity, none of its identified nodes is listed any more (`anotherScreen`) — and
+ * no stroke among them touched down on a node of that read that the read after STILL LISTS (`touchedPersists`: a
+ * labelled node by role and label, a scroll view by its rect; the root and a screen-sized frame aside). Then what the
+ * strokes moved was not content but the screen itself: a sheet or a
  * modal they touched down on dismissed, the app gone elsewhere — and a target found now is found on that other
  * screen, not brought into view. Measured under idb: beneath the lab's large sheet (sheet-background), whose tree
  * lists the sheet's button alone and no sign of the sheet, `scroll_until` for A stroked from (201,175) on the sheet's
@@ -407,9 +408,8 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
  * RN FlatList). What tells such a fling from a dismissal is what the stroke TOUCHED: a list keeps its frame through the
  * fling (uiautomator's `scrollable` list, WDA's scroll view, at the very same rect after), a section header it touched
  * keeps its label; a dismissed sheet's own row, list or labelled surface is not listed after at all. So the excuse is
- * persistence, not being named: the slice's review round 2 found "the touched node names itself" excusing exactly the
- * sheet whose rows carry ids (sheet-long-list's rows given ids, stroked from (201,175) and dismissed — read visible),
- * and replaced it. Never excused: the root, and a structural frame the size of the screen that does not scroll
+ * persistence, not being named: "the touched node names itself" would excuse exactly the sheet whose rows carry ids
+ * (sheet-long-list's rows given ids, stroked from (201,175) and dismissed — read visible). Never excused: the root, and a structural frame the size of the screen that does not scroll
  * (ui-tree/placed.ts#fillsScreen: idb's `Application`, a window, a dim) — every screen of the app has it, so it persists
  * across any change; sheet-background's (201,175) lies on idb's `Application 'AveriLab'` alone. Residuals, stated:
  * - a screen whose reads list no id at all (idb's UIKit table rows, NI1) is never told changed;

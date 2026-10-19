@@ -447,7 +447,7 @@ export interface PastSide {
  * A FLING STILL SLOWING spends none of them (`Observed.slowing`): a confirming read that found the target — the
  * same node — moved less over its settle pause than the read before found it moved over its own is read again
  * free, until the deadline. A fling slows read for read; an animation moves as much at every read and spends the
- * budget as before. Measured under WDA (round 7, the lab app's `carousel-in-list`, C a card as wide as its
+ * budget as before. Measured under WDA (the lab app's `carousel-in-list`, C a card as wide as its
  * carousel): one 212-pt stroke flung the carousel 447–532 pt over ~2.5 s, and the reads after it, 0.47 s apart,
  * found C moving 54, 21, 8 pt (66, 24, 10 in another run) — the third confirming read still 8–10 pt from rest, so
  * the stop was claimed "still moving"; in the run that flung 532 pt it was claimed on a read with C's centre inside

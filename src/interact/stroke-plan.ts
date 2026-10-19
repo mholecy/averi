@@ -60,14 +60,14 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * belongs to the view the finger first touches, and a carousel touched down on by a vertical drag hands the outer list
  * part of it at most (~51 pt a stroke on iOS, inferred; the stroke keeps off it, so still unmeasured) —
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. The lab's
- * `carousel-in-list` (harness task H2): on Android the carousel is a `HorizontalScrollView`, its
+ * `carousel-in-list`: on Android the carousel is a `HorizontalScrollView`, its
  * axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the stretch
  * below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched down on it
  * on the replay before S4 (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
  * recorded); C, the card past the carousel's right clip, is never stroked there, uiautomator dumping it as a strip at
  * the screen's edge that averi stops on at once (lab finding LE1,
  * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md). Captured on iOS
- * since round 6 (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes
+ * (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes
  * INSIDE the carousel (24,138 354x85), along its axis — the full stroke `307 181 → 95 181`, the first one cut by the
  * carry model to `307 181 → 181 181` (UNMEASURED_CARRY). ADR 0010
  * (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke rules: the candidates — the target's own scroll
@@ -383,7 +383,8 @@ export function strokedEnd(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>
  * model; unmeasured under 108 pt — a residual). On the measured case: three full strokes leave F ~150 pt short of the
  * window's middle, and the fourth travels ~63 pt, landing it mid-window whatever the spread of the runs. Before any
  * stroke over that scroll view was measured the carry is taken as UNMEASURED_CARRY, so a FIRST stroke that would skip
- * the window is cut too (the carousel's card, round 7).
+ * the window is cut too (the carousel's card,
+ * docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md).
  * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md
  */
 export function carried(memory: StrokeMemory, { moved, drawn }: { moved: number; drawn: Stroke }): StrokeMemory {
@@ -428,8 +429,9 @@ export const UNMEASURED_CARRY = 2.8;
 
 /**
  * The shortest drag UNMEASURED_CARRY may cut a first stroke to: 108 pt, the shortest drag any fling was measured at
- * (`lower`'s full stroke). Below it the fling is not proportional to the drag: measured live (round 7, `scroll-bounded`
- * S, `fully: true`, the window 116 pt and S 56 pt past it) a first stroke cut to 41 pt carried `lower` 36 pt — 0.9 a
+ * (`lower`'s full stroke). Below it the fling is not proportional to the drag: measured live
+ * (docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md; `scroll-bounded` S, `fully: true`, the window 116 pt and
+ * S 56 pt past it) a first stroke cut to 41 pt carried `lower` 36 pt — 0.9 a
  * point, not 2.1–2.5 — and the 0.9 then measured cut the next stroke too long, past the window and back: 4 swipes
  * where the full first stroke took 2. A first stroke cut no shorter than this keeps to the measured range; the
  * carousel's, 126 pt, is above it.

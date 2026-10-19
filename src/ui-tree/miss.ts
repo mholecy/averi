@@ -13,7 +13,7 @@ import { presentedLayerName, presentedRemedy } from './standing.js';
  * poll timeout's headline (ui-tree/read-tree.ts#pollTimeoutMessage), or after a one-line not-found in a parenthesis
  * (`withMissNote`).
  *
- * The facts, in the one precedence (ADR 0018 decision 5, round 7):
+ * The facts, in the one precedence (ADR 0018 decision 5):
  * - `unread`: the last read failed — its error is the story, which each reply already words where it puts it (a
  *   note about what an earlier tree held would point the wrong way);
  * - `zeroArea`: the last tree matched the target, but only with zero-area nodes — which says it IS in the tree, so it
