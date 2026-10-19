@@ -566,8 +566,38 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedRemedy('it', o.presented.layer)}`;
       return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
+    case 'changed':
+      return { message: changedText(o, describe) };
   }
 }
+
+/**
+ * The `changed` stop (scroll-rounds.ts#ScreenChange): the swipe CHANGED THE SCREEN — said loud, with its evidence (the
+ * ids gone, where it touched down), what it likely was, and that nothing found after it is claimed. A plain Error,
+ * never absence: the scroll did not look and miss, its own stroke replaced the screen, and an `optional:` step must
+ * not skip it as "(not present)".
+ */
+function changedText(o: Extract<ScrollOutcome, { kind: 'changed' }>, describe: string): string {
+  const { touchDowns, gone } = o.change;
+  const shown = `${gone.slice(0, CHANGED_IDS_QUOTED).map((id) => `id:${JSON.stringify(id)}`).join(', ')}${gone.length > CHANGED_IDS_QUOTED ? ', …' : ''}`;
+  const ids =
+    gone.length === 1
+      ? `the one element the read before it listed by id (${shown}) is not in the tree after it`
+      : `none of the ${gone.length} elements the read before it listed by id (${shown}) is in the tree after it`;
+  const at = touchDowns.map(pointText).join(', ');
+  const target = o.found
+    ? 'The element is in the tree only after that change, on the new screen: not judged, not claimed visible'
+    : 'The element is not in the tree after it either';
+  return (
+    `scroll_until ${describe} stopped after ${swipesText(o.swipes)} — the swipe CHANGED THE SCREEN: ${ids}, ` +
+    `and nothing it touched down on at ${at} is still listed — it most likely dismissed a sheet or a modal presented over the screen, ` +
+    `or the app left the screen. ${target}, and no further swipe was sent. ` +
+    'If a sheet or a modal was open, it is gone: reopen it if the flow needs it — a target beneath one is reached by closing it first, never by scroll_until'
+  );
+}
+
+/** How many of the ids gone the `changed` stop quotes. */
+const CHANGED_IDS_QUOTED = 3;
 
 /**
  * Why a judged match was NOT judged in the viewport, for the `presented` stop whose next swipe would have touched
