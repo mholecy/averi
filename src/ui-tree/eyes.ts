@@ -1,5 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
-import { sameRectWithinPixel, type Edge } from './geometry.js';
+import { axisOfEdge, sameRectWithinPixel, type Edge } from './geometry.js';
 import type { FlushNeighbour, Scene } from './standing.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
@@ -71,7 +71,7 @@ export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: U
 /** The neighbour reaches both ends of the screen along its edge (across it for a top or bottom edge, down it for a side edge): nothing of the screen beside it. */
 function spansScreen({ edge, by }: FlushNeighbour, box: Rect): boolean {
   const r = by.rect;
-  return edge === 'top' || edge === 'bottom' ? r.x <= box.x && r.x + r.width >= box.x + box.width : r.y <= box.y && r.y + r.height >= box.y + box.height;
+  return axisOfEdge(edge) === 'vertical' ? r.x <= box.x && r.x + r.width >= box.x + box.width : r.y <= box.y && r.y + r.height >= box.y + box.height;
 }
 
 /** The eyes' finding a reply or a failure quotes: what they saw that was not the target's own colour. */
