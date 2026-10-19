@@ -281,7 +281,7 @@ run's own on gRPC 10893 (`IDB_COMPANION=localhost:10893`). Reproduce (outside th
   struck from live-known.ts.
 - `scroll_until C`: failed after 3 swipes, overlapped by W, no layout-defect wording — the three strokes touch down on
   the blur at (201,699) ×2 and (201,175) (WDA's grouped run the other way round, as before) and **do not close the
-  menu**: the app logs touches and no `dismissed` in any of the six (two runs × three cells-and-sources). Refiled as
+  menu**: the app logs the touches and no `dismissed` in any of the eight (two runs × both cells × both sources). Refiled as
   residual 9's `presented-stroke` on `refused` (the backdrop has no node, so no "close it first"), as blur-menu-grouped's
   WDA entry was.
 - `tap W` stays LOUD on blur-menu under both sources (refused under C, listed after it): the fix's residual (ADR 0015's
