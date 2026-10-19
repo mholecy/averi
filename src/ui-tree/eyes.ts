@@ -1,5 +1,5 @@
-import type { Rect, UiNode } from '../adapters/types.js';
-import type { Edge } from './geometry.js';
+import type { Point, Rect, UiNode } from '../adapters/types.js';
+import { sameRectWithinPixel, type Edge } from './geometry.js';
 import type { FlushNeighbour, Scene } from './standing.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
@@ -79,3 +79,39 @@ export type EyesFinding = Exclude<EyesAnswer, { readonly sees: 'own' }>;
 
 /** A finding of a band of a surface: what keeps a `fully: true` stop from being claimed, or a plain stop whose centre it reaches. */
 export type SurfaceFinding = Extract<EyesAnswer, { readonly sees: 'surface' }>;
+
+/** A question as asked, in rects (`askedOf`): its region and each flush neighbour's rect, in order — what a later question is compared with. */
+export interface EyesAsked {
+  readonly region: Rect;
+  readonly neighbours: readonly Rect[];
+}
+
+/** `question` as asked (`EyesAsked`), its rects copied. */
+export const askedOf = (question: EyesQuestion): EyesAsked => ({ region: { ...question.region }, neighbours: question.flush.map((f) => ({ ...f.by.rect })) });
+
+/**
+ * `question` is the SAME QUESTION as `asked`: its region and its neighbours' rects, as many, each within a pixel — nothing
+ * moved, so the pixels did not, and the eyes would answer as before (interact/scroll-rounds.ts#round's refused again).
+ */
+export const sameQuestion = (asked: EyesAsked, question: EyesQuestion): boolean =>
+  sameRectWithinPixel(asked.region, question.region) &&
+  asked.neighbours.length === question.flush.length &&
+  question.flush.every((f, i) => sameRectWithinPixel(asked.neighbours[i]!, f.by.rect));
+
+/**
+ * The band the eyes saw REACHES `point` along its edge's axis — measured from the edge of `region` (the question's)
+ * inward by its depth. The round asks it of the centre the next tap presses (selectors.ts#tapPoint): the bar's padding
+ * over a 42-px label 23 px deep from its bottom (1971–1993 of 1952–1993) reaches its centre at 1973.
+ */
+export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, point: Point): boolean {
+  switch (edge) {
+    case 'bottom':
+      return region.y + region.height - depth <= point.y;
+    case 'top':
+      return region.y + depth > point.y;
+    case 'right':
+      return region.x + region.width - depth <= point.x;
+    case 'left':
+      return region.x + depth > point.x;
+  }
+}
