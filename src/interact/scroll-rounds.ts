@@ -1,7 +1,7 @@
-import type { ClippedSide, DeviceScreen, Rect, Stroke, UiNode } from '../adapters/types.js';
-import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { everyNode, rectArea, STRUCTURAL_ROLES, type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
+import { axisOfEdge, containsPoint, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
-import type { SheetDetent } from '../ui-tree/read-tree.js';
+import { anotherScreen, screenIdentity, type ScreenIdentity, type SheetDetent } from '../ui-tree/read-tree.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -188,6 +188,10 @@ export type RoundStep =
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
+ * - `changed`: the screen changed under the strokes (`ScreenChange`) — the
+ *   first read after them is another screen than the read before them; no
+ *   stop is judged on it and no further stroke sent, whether the target is
+ *   in it (`found`) or not.
  *
  * Every kind may carry `detent`: the top sheet — the same sheet at both
  * reads — reported another detent at the last read that read than at the
@@ -228,7 +232,39 @@ export type ScrollOutcome = (
       /** The swipe the bound held back would have touched down on a screen presented over the target's (interact/stroke-plan.ts#PresentedTouchDown). */
       presented?: PresentedTouchDown;
     }
+  | { kind: 'changed'; swipes: number; change: ScreenChange; found: boolean }
 ) & { detent?: DetentMove; endTurn?: EndTurn };
+
+/**
+ * THE SCREEN CHANGED UNDER THE STROKE (round 7's A5, iOS point 4 of docs/truth/live-ios-2026-10-18-visibility.md;
+ * ADR 0018 residual 6): the first read that reads after the strokes since the last one is ANOTHER SCREEN than that
+ * read — by identity, none of its identified nodes is listed any more (ui-tree/read-tree.ts#anotherScreen) — and no
+ * stroke among them touched down on content that read listed (a node of no structural role, the root aside, holding
+ * the touch-down: `touchedListed`). Then what the strokes moved was not content but the screen itself: a sheet or a
+ * modal they touched down on dismissed, the app gone elsewhere — and a target found now is found on that other
+ * screen, not brought into view. Measured under idb: beneath the lab's large sheet (sheet-background), whose tree
+ * lists the sheet's button alone and no sign of the sheet, `scroll_until` for A stroked from (201,175) on the sheet's
+ * bare surface, the stroke DISMISSED it, and the next read listed the host's A–D: "fully visible after 1 swipe". Now
+ * it stops there, saying so, and sends nothing more onto the new screen. averi never claims a stop after its own
+ * stroke changed the presented layer; where the tree shows the layer, no stroke is sent at all (the marks: an idb
+ * list holding UIKit's dismiss region, adapters/ios-tree-source.ts#listsPresentedLayer).
+ *
+ * Why both conditions: ids alone are not enough — a fling through a list whose rows carry ids of their own (row_1 …
+ * row_40) can carry every listed row off a list that lists only what shows; but such a stroke touched down ON a row,
+ * which the read listed. The touch-down alone neither: a stroke on a list's gap moves it all the same. Residuals,
+ * stated: a screen whose reads list no id at all (idb's UIKit table rows, NI1) is never told changed; a stroke
+ * touching down on a bare gap of a list that lists only what shows and flinging it past every listed row reads as
+ * changed (a loud stop where the scroll could have gone on); a presented layer that shares an id with the screen
+ * beneath, or a keyboard's ids listed at both reads, keeps it unchanged; a WDA or uiautomator tree, which lists a
+ * scroll view or a window holding every touch-down, never meets the second condition — their presented layers are
+ * their marks' to stop for.
+ */
+export interface ScreenChange {
+  /** Where the strokes since the read before touched down, in order — none of them on content that read listed. */
+  readonly touchDowns: readonly Point[];
+  /** The ids that read listed (`role:identifier`, ui-tree/read-tree.ts#ScreenIdentity), none of them listed after — what the sentence quotes. */
+  readonly gone: readonly string[];
+}
 
 /**
  * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below;
@@ -745,6 +781,10 @@ interface State {
   readonly treeUnmovedStrokes: number;
   /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
   readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
+  /** The last read that read, its tree and the screen's identity — what `screenChangedUnder` compares the next one with; undefined until a read reads. */
+  readonly screenBefore: { readonly tree: UiNode; readonly identity: ScreenIdentity } | undefined;
+  /** Where each stroke drawn since that read touched down (`RoundSeen.drawn`'s `from`), in order. */
+  readonly touchDowns: readonly Point[];
 }
 
 /**
@@ -801,6 +841,8 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     treeUnmovedStrokes: 0,
     treeMoved: false,
     detents: undefined,
+    screenBefore: undefined,
+    touchDowns: [],
   };
   return state as unknown as Rounds;
 }
@@ -1285,7 +1327,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const ask = (what: 'witness' | 'unlocated'): Next => ({ state, step: { do: 'ask', what } });
   const { fully } = s.rules;
   const current = s.since;
-  if (seen.drawn !== undefined) s.lastDrawn = seen.drawn;
+  if (seen.drawn !== undefined) {
+    s.lastDrawn = seen.drawn;
+    s.touchDowns = [...s.touchDowns, seen.drawn.from];
+  }
 
   const read = 'error' in seen.read ? undefined : seen.read;
   const readError = 'error' in seen.read ? seen.read.error : undefined;
@@ -1297,6 +1342,17 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const found = read?.found ?? [];
   if (found.length > 0) s.everFound = true;
   const viewport = s.frame.box;
+
+  // The screen changed under the strokes since the last read that read (`ScreenChange`): nothing of this read is judged
+  // — a target in it lies on another screen than the one stroked — and nothing more is stroked onto it. Asked before
+  // the judgement, so no witness is asked of a read that is not judged.
+  if (read !== undefined) {
+    const identity = screenIdentity(read.tree);
+    const change = s.screenBefore === undefined ? undefined : screenChangedUnder(s.screenBefore, identity, s.touchDowns);
+    s.screenBefore = { tree: read.tree, identity };
+    s.touchDowns = [];
+    if (change !== undefined) return stop(s, { kind: 'changed', swipes: s.swipes, change, found: found.length > 0 });
+  }
 
   // What this read means (interact/scroll-read.ts#judgeRead): the tree's
   // facts, the cover that applies and the one offered, the best match
@@ -1678,6 +1734,25 @@ function turnAtEnd(s: Mutable<State>, view: UiNode): void {
   s.carriedPast = false;
   s.lastPast = undefined;
 }
+
+/**
+ * The screen changed under the strokes (`ScreenChange`): `touchDowns` is not empty and none of them lies on content
+ * the read before listed (`touchedListed`), and the read after is another screen by identity (ui-tree/read-tree.ts
+ * #anotherScreen). Undefined otherwise — no stroke between the two reads, one touching down on listed content, or an
+ * id kept.
+ */
+function screenChangedUnder(before: { readonly tree: UiNode; readonly identity: ScreenIdentity }, after: ScreenIdentity, touchDowns: readonly Point[]): ScreenChange | undefined {
+  if (touchDowns.length === 0 || touchDowns.some((p) => touchedListed(before.tree, p)) || !anotherScreen(before.identity, after)) return undefined;
+  return { touchDowns, gone: [...before.identity.ids] };
+}
+
+/**
+ * A touch-down at `point` lands on content `tree` lists: a node of it holding the point, of some area, neither the
+ * root nor of a structural role (`STRUCTURAL_ROLES`: a frame, a dim, a window, idb's `Application` — what no stroke
+ * scrolls by itself). A list's row, a button, a text, a scroll view: a stroke there drags what is listed.
+ */
+const touchedListed = (tree: UiNode, point: Point): boolean =>
+  [...everyNode(tree)].some((n) => n !== tree && !STRUCTURAL_ROLES.has(n.role) && rectArea(n.rect) > 0 && containsPoint(n.rect, point));
 
 /** The top sheet's detent at the first read that read against the last (`DetentMove`): both read, as many grabbers, values differing. */
 function detentMove({ detents }: State): DetentMove | undefined {
