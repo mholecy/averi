@@ -2045,7 +2045,7 @@ describe('exposure.centreExcused — the later nodes the target column excused t
   });
 });
 
-describe('exposure — a React Native field\'s floating label is its own field\'s (round 7\'s RN lab app, rn-field\'s N)', () => {
+describe('exposure — a React Native field\'s floating label is its own field\'s (round 7\'s RN lab app, rn-field\'s N and M)', () => {
   /** The RN lab app's rn-field under WDA (iPhone 17, iOS 27): each input inside an unnamed wrapper of its rect. Parsed afresh per case: the negatives edit it. */
   const wda = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-field.json', import.meta.url), 'utf8'));
   /** The same screen under uiautomator (averi_lab, API 33, 1080x2220 at 2.75): the label 3 px past its EditText above and below. */
@@ -2065,6 +2065,9 @@ describe('exposure — a React Native field\'s floating label is its own field\'
     expect(wrapper).toMatchObject({ role: 'container', label: null, identifier: null, rect: field.rect });
     expect(exposed(tree)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 116, y: 143 }, moved: false } });
     expect(exposed(tree).centreExcused).toEqual(expect.arrayContaining([wrapper, field]));
+    // M, the multiline field: its text view's `Horizontal scroll bar` (69,499 264x10) over the label's centre too — no cover.
+    const m = byId(tree, 'lab.rn-field.M');
+    expect(drawOrder(tree).exposure(m, tree.rect)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
   });
 
   it('…and the wrapper stays a node of its own when it is anything more: named, interactive, of another rect, or holding anything else — the field in it covers', async () => {

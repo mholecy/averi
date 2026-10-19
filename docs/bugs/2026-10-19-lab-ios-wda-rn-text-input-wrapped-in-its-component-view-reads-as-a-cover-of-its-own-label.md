@@ -16,11 +16,11 @@ WDA's tree (tests/fixtures/truth/ios-rn-iphone17-ios27/rn-field.wda.json), each 
 StaticText lab.rn-field.N 'Payee’s name'               69,131 94x23
 Other (no name, no label)                              69,132 264x20
   TextField lab.rn-field.N.field (label '')            69,132 264x20
-StaticText lab.rn-field.M 'Message for the recipient'  69,491 175x23
-Other (no name, no label)                              69,492 264x38
-  TextView lab.rn-field.M.field                        69,492 264x38
-    Other 'Horizontal scroll bar, 1 page' '0 %'         69,508 264x19   (one bare thumb 72,524 258x3)
-    Other 'Vertical scroll bar, 1 page' '0 %'           300,492 30x38
+StaticText lab.rn-field.M 'Message for the recipient'  69,491 175x23   (the state: 174.3x22.3, centre y 502.2)
+Other (no name, no label)                              69,492 264x20
+  TextView lab.rn-field.M.field                        69,492 264x20
+    Other 'Vertical scroll bar, 1 page' '0 %'           300,492 30x20   (its bare thumb 327,475 3x34)
+    Other 'Horizontal scroll bar, 1 page' '0 %'         69,499 264x10   (its bare thumb 72,506 258x3)
 ```
 
 A raw `idb ui tap` at each label's centre focuses its field (the app's model: `focus` N, M; the probe in
@@ -41,9 +41,19 @@ The ocr rows fail closed naming the field too. idb lists the same fields flat (n
 input over its own label only as the label's SIBLING (`siblingOf`). React Native's text input component view
 (RCTTextInputComponentView) hosts the UITextField / UITextView as its child, and WDA lists both: the input is the
 label's nephew, behind an unnamed `Other` of exactly its rect. The overhang is within `LABEL_OVERHANG` (1 pt above, 1.3
-below on N); the field holds the label's centre. The indicator half of #18 is not what covers here: the text view's
-`Horizontal scroll bar` lies over M's label's centre and is excused (`scrollIndicator`, its parent a text input) — the
-reply names the field, not the bar.
+below); the field holds the label's centre. #18's indicator is not what covers here: M's `Horizontal scroll bar`
+(499–509) holds its label's centre (502.2), as mp-native's (454–464 over its label's 457), and is excused
+(`scrollIndicator`, its parent a text input) — the reply names the field, not the bar.
+
+## The bank app (mp-native) does not hit it today
+
+mp-native's SWIFT form (tests/fixtures/wda-capture-swift-form-pushed.json, `swift_payment.form.payee_name_input`) lists
+its `TextField 42,817 318x20` as the label's DIRECT sibling — no wrapper — and its single-line field lists the
+`Horizontal scroll bar` (`52,824 298x10`); the lab's RN 0.88 single-line field lists no bar and sits in a wrapper. Both
+differences are most likely RN 0.88's new architecture (Fabric's component view hosting the native input; mp-native's
+build is older or on the legacy architecture — not measured). So LR1 is a defect on RN's new architecture, which the
+bank app will meet when it moves to it, not one it meets now. Reproducing mp-native's own shape would take a lab app on the bank app's RN version and architecture — an older RN
+(RN 0.82 dropped the legacy architecture, so 0.88 cannot switch back), pinned beside this one — round 7 did not try it.
 
 ## Suggested fix (owner's choice)
 

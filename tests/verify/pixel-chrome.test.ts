@@ -103,7 +103,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'text "Phone (Mobile)" (176,725 233x44)': 1,
       // The RN lab app's fields over their own boxes (wda-source-rn-field.json): a field's pixels lie on its card.
       'textfield id:lab.rn-field.I.field (69,312 220x20)': 1,
-      'textfield id:lab.rn-field.M.field (69,492 264x38)': 1,
+      'textfield id:lab.rn-field.M.field (69,492 264x20)': 1,
       'textfield id:lab.rn-field.N.field (69,132 264x20)': 1,
       // Nothing of the node on the screen (below the fold, or in a scroll view's content above it): no capture shows any
       // of it — 105 — or, on the screen, nothing of it drawn: 38 nodes of MyPort's keyboard trees listed below their
@@ -131,7 +131,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'textfield id:TextFieldWithComponentStyle (42,425 318x20)': 2,
       // The RN lab app's fields over their own boxes, and M's over the screen-sized root's sample (wda-source-rn-field.json).
       'textfield id:lab.rn-field.I.field (69,312 220x20)': 1,
-      'textfield id:lab.rn-field.M.field (69,492 264x38)': 2,
+      'textfield id:lab.rn-field.M.field (69,492 264x20)': 2,
       'textfield id:lab.rn-field.N.field (69,132 264x20)': 1,
       'container (154,88 407x132)': 2,
       'container (66,1840 948x248)': 8,

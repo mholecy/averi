@@ -381,11 +381,11 @@
                },
                {
                 "customActions": null,
-                "nativeFrame": "{{69, 492}, {264, 38}}",
+                "nativeFrame": "{{69, 492}, {264, 20}}",
                 "label": null,
                 "rawIdentifier": null,
                 "traits": "",
-                "frame": "{{69, 492}, {264, 38}}",
+                "frame": "{{69, 492}, {264, 20}}",
                 "isVisible": "1",
                 "type": "Other",
                 "value": null,
@@ -393,11 +393,11 @@
                 "children": [
                  {
                   "customActions": null,
-                  "nativeFrame": "{{69, 492}, {264, 38}}",
+                  "nativeFrame": "{{69, 492}, {264, 20}}",
                   "label": null,
                   "rawIdentifier": "lab.rn-field.M.field",
                   "traits": "",
-                  "frame": "{{69, 492}, {264, 38}}",
+                  "frame": "{{69, 492}, {264, 20}}",
                   "isVisible": "1",
                   "type": "TextView",
                   "value": null,
@@ -408,11 +408,11 @@
                   "children": [
                    {
                     "customActions": null,
-                    "nativeFrame": "{{300, 492}, {30, 38}}",
+                    "nativeFrame": "{{300, 492}, {30, 20}}",
                     "label": "Vertical scroll bar, 1 page",
                     "rawIdentifier": null,
                     "traits": "Adjustable",
-                    "frame": "{{300, 492}, {30, 38}}",
+                    "frame": "{{300, 492}, {30, 20}}",
                     "isVisible": "1",
                     "type": "Other",
                     "value": "0 %",
@@ -420,11 +420,11 @@
                     "children": [
                      {
                       "customActions": null,
-                      "nativeFrame": "{{327, 511}, {3, 16}}",
+                      "nativeFrame": "{{327, 475}, {3, 34}}",
                       "label": null,
                       "rawIdentifier": null,
                       "traits": "",
-                      "frame": "{{327, 511}, {3, 16}}",
+                      "frame": "{{327, 475}, {3, 34}}",
                       "isVisible": "0",
                       "type": "Other",
                       "value": null,
@@ -434,10 +434,10 @@
                       "isFocused": "0",
                       "name": null,
                       "rect": {
-                       "y": 511,
+                       "y": 475,
                        "x": 327,
                        "width": 3,
-                       "height": 16
+                       "height": 34
                       }
                      }
                     ],
@@ -449,16 +449,16 @@
                      "y": 492,
                      "x": 300,
                      "width": 30,
-                     "height": 38
+                     "height": 20
                     }
                    },
                    {
                     "customActions": null,
-                    "nativeFrame": "{{69, 508}, {264, 19}}",
+                    "nativeFrame": "{{69, 499}, {264, 10}}",
                     "label": "Horizontal scroll bar, 1 page",
                     "rawIdentifier": null,
                     "traits": "Adjustable",
-                    "frame": "{{69, 508}, {264, 19}}",
+                    "frame": "{{69, 499}, {264, 10}}",
                     "isVisible": "1",
                     "type": "Other",
                     "value": "0 %",
@@ -466,11 +466,11 @@
                     "children": [
                      {
                       "customActions": null,
-                      "nativeFrame": "{{72, 524}, {258, 3}}",
+                      "nativeFrame": "{{72, 506}, {258, 3}}",
                       "label": null,
                       "rawIdentifier": null,
                       "traits": "",
-                      "frame": "{{72, 524}, {258, 3}}",
+                      "frame": "{{72, 506}, {258, 3}}",
                       "isVisible": "0",
                       "type": "Other",
                       "value": null,
@@ -480,7 +480,7 @@
                       "isFocused": "0",
                       "name": null,
                       "rect": {
-                       "y": 524,
+                       "y": 506,
                        "x": 72,
                        "width": 258,
                        "height": 3
@@ -492,10 +492,10 @@
                     "isFocused": "0",
                     "name": "Horizontal scroll bar, 1 page",
                     "rect": {
-                     "y": 508,
+                     "y": 499,
                      "x": 69,
                      "width": 264,
-                     "height": 19
+                     "height": 10
                     }
                    }
                   ],
@@ -505,7 +505,7 @@
                    "y": 492,
                    "x": 69,
                    "width": 264,
-                   "height": 38
+                   "height": 20
                   }
                  }
                 ],
@@ -517,7 +517,7 @@
                  "y": 492,
                  "x": 69,
                  "width": 264,
-                 "height": 38
+                 "height": 20
                 }
                }
               ],
