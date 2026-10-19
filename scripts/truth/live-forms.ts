@@ -91,7 +91,7 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
  * a sheet uiautomator's dump marks no presented window (no scrim: ADR 0018's residual 18, accepted with the
  * active-window hint). Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and
  * no `Tapped`. The reply must then say to close the sheet, once: the presented remedy (a sheet the tree source marks)
- * or the active-window hint (uiautomator: src/ui-tree/standing.ts#ACTIVE_WINDOW_HINT) — ok; neither, or "close it
+ * or the active-window hint (uiautomator: src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT) — ok; neither, or "close it
  * first" said twice, is LOUD (idb lists only the sheet and says nothing of it).
  */
 export const judgeUnderSheet =
