@@ -746,8 +746,16 @@ export interface Clips {
    *   docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md
    * An edge the node runs past by a unit at most (a px on Android, a pt on WDA) is no cut: there the node is flush with
    * it (`overhangAsFlush`).
-   * Undefined for a node under nothing that scrolls, a node of another tree, and on idb's flat list, which lists no
-   * scroll view (a residual: its rows below a short scroll view are judged on the screen alone). Rects stay as listed
+   * Undefined for a node under nothing that scrolls and, on a tree that lists ancestry, a node of another tree: nothing
+   * cuts it. UNTOLD (`DrawnUntold`) for every node asked of a tree that lists no ancestry — idb's flat list, which lists no scroll view, so nothing in it says
+   * whether a scroll view cuts a node, nor where: not "nothing cuts it". Measured: the lab app's `scroll-bounded` (iOS
+   * 27) lists `O` flat at `51,620 300x64`, wholly below `lower` (`0,380 402x180`, which WDA's twin lists and idb does
+   * not); a tap at its centre was reported done on the background, and its colour passed on it. The standing judges an
+   * untold node on the screen alone, as before (the tap, the stops: ADR 0010's residual 5); the eyes ask what the
+   * screenshot shows of it where a claim rests on it — the colour assert's region (verify/eyes.ts#apartOfFrame) and a
+   * `fully: true` claim's edges (ui-tree/eyes.ts#eyesQuestion's clip lines).
+   * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+   * Rects stay as listed
    * (`scroll_until`'s far edge, interact/scroll-rounds.ts#beyondFarEdge, reads a row's rect past the frame); the
    * standing cuts what it judges by this frame (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first
    * ask, its ancestors' frames shared along a branch; each ask then meets them with the node's own rect
@@ -807,14 +815,43 @@ export interface NestedScrollView {
   readonly axis: ScrollAxis | undefined;
 }
 
-/** What of `rect` the drawn frame `drawn` holds (`Clips.drawnIn`): `rect` itself when nothing cuts it; undefined when nothing of it can be drawn. */
+/**
+ * What of `rect` the drawn frame `drawn` holds (`Clips.drawnIn`): `rect` itself when nothing cuts it, or when the tree
+ * cannot tell (`DrawnUntold`: the screen alone judges it); undefined when nothing of it can be drawn.
+ */
 export function drawnPart(rect: Rect, drawn: Drawn | undefined): Rect | undefined {
-  if (drawn === undefined) return rect;
+  if (drawn === undefined || !drawn.told) return rect;
   return drawn.frame === undefined ? undefined : rectIntersection(rect, drawn.frame);
 }
 
+/** The tree cannot tell where the node is drawn (`DrawnUntold`) — not `toldFrame`'s undefined, which nothing scrolling above it says too. */
+export const isUntold = (drawn: Drawn | undefined): drawn is DrawnUntold => drawn?.told === false;
+
+/** The drawn frame where the tree tells one (`DrawnFrame`), else undefined: nothing scrolls above the node, or the tree cannot tell (`DrawnUntold`). */
+export const toldFrame = (drawn: Drawn | undefined): DrawnFrame | undefined => (drawn?.told === true ? drawn : undefined);
+
+/**
+ * Where a node can be drawn as what scrolls above it says (`Clips.drawnIn`): the frame its scrolling ancestors cut it
+ * to (`DrawnFrame`), or UNTOLD (`DrawnUntold`) on a tree that lists no scroll view at all.
+ */
+export type Drawn = DrawnFrame | DrawnUntold;
+
+/**
+ * The tree cannot tell where the node is drawn: it lists no ancestry (idb's flat list), so no scroll view above any
+ * node — not "nothing cuts it", which `Clips.drawnIn`'s undefined says. A named answer, so that every reader decides
+ * what an untold node means for it: the standing judges it on the screen alone (`drawnPart`), the eyes look where a
+ * claim rests on it (ui-tree/eyes.ts#eyesQuestion, verify/eyes.ts#apartOfFrame).
+ */
+export interface DrawnUntold {
+  readonly told: false;
+}
+
+/** The answer of every node of a tree that lists no ancestry (`DrawnUntold`). */
+const UNTOLD: DrawnUntold = { told: false };
+
 /** Where a node can be drawn, as its scrolling ancestors cut it (`Clips.drawnIn`). */
-export interface Drawn {
+export interface DrawnFrame {
+  readonly told: true;
   /** The ancestors' frames intersected; undefined when they share no area — nothing of the node can be drawn. */
   readonly frame: Rect | undefined;
   /** The ancestors that scroll, nearest first: the scroll view a sentence names is one of them. */
@@ -892,29 +929,30 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     }
     return scrolled.get(node);
   };
-  let drawn: Map<UiNode, Omit<Drawn, 'listedWhereItLies'>> | undefined;
+  /** A node's scrolling ancestors as one walk marks them: their frames intersected, the ancestors nearest first. */
+  type Within = Pick<DrawnFrame, 'frame' | 'scrollers'>;
+  let drawn: Map<UiNode, Within> | undefined;
   const drawnIn = (node: UiNode): Drawn | undefined => {
+    if (!ancestry) return UNTOLD;
     if (drawn === undefined) {
-      const found = new Map<UiNode, Omit<Drawn, 'listedWhereItLies'>>();
-      if (ancestry) {
-        const mark = (n: UiNode, within: Omit<Drawn, 'listedWhereItLies'> | undefined): void => {
-          if (within !== undefined) found.set(n, within);
-          // An ancestor of no area cuts nothing: it fails open, as a root of no area does.
-          const below = !scrolls(n) || rectArea(n.rect) === 0
-            ? within
-            : within === undefined
-              ? { frame: { ...n.rect }, scrollers: [n] }
-              : { frame: within.frame === undefined ? undefined : rectIntersection(within.frame, n.rect), scrollers: [n, ...within.scrollers] };
-          for (const child of n.children) mark(child, below);
-        };
-        mark(tree, undefined);
-      }
+      const found = new Map<UiNode, Within>();
+      const mark = (n: UiNode, within: Within | undefined): void => {
+        if (within !== undefined) found.set(n, within);
+        // An ancestor of no area cuts nothing: it fails open, as a root of no area does.
+        const below = !scrolls(n) || rectArea(n.rect) === 0
+          ? within
+          : within === undefined
+            ? { frame: { ...n.rect }, scrollers: [n] }
+            : { frame: within.frame === undefined ? undefined : rectIntersection(within.frame, n.rect), scrollers: [n, ...within.scrollers] };
+        for (const child of n.children) mark(child, below);
+      };
+      mark(tree, undefined);
       drawn = found;
     }
     const within = drawn.get(node);
     if (within === undefined) return undefined;
     const frame = within.frame === undefined ? undefined : overhangAsFlush(node.rect, within.frame);
-    return { frame, scrollers: within.scrollers, listedWhereItLies: unclipped };
+    return { told: true, frame, scrollers: within.scrollers, listedWhereItLies: unclipped };
   };
   const axes = new Map<UiNode, ScrollAxes>();
   const axesOf = (container: Rect): ScrollAxes | undefined => {

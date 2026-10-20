@@ -1,5 +1,5 @@
 import { rectIntersection, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, sameRectWithinPixel, type Edge } from './geometry.js';
+import { axisOfEdge, EDGES, isUntold, sameRectWithinPixel, type Edge } from './geometry.js';
 import { lookTold, type Look, type LookReading } from './look.js';
 import { seenOrderOf, type OrderSeen, type SeenOrder } from './seen-order.js';
 import type { FlushNeighbour } from './later-edges.js';
@@ -8,8 +8,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
 
 /**
  * THE EYES — two questions a screenshot answers where the tree cannot, one capture each: does a surface the tree does
- * not list lie over a `fully visible` claim's edge (`Eyes.fully`, below), and which of two controls the tree lists in
- * reading order is drawn on top (`Eyes.order`, `orderQuestion`: ADR 0024, after the first question's section).
+ * not list lie over a `fully visible` claim's edge, or a clip line cut it (`Eyes.fully`, below), and which of two
+ * controls the tree lists in reading order is drawn on top (`Eyes.order`, `orderQuestion`: ADR 0024, after the first
+ * question's section). A third is asked only of a frame the colour assert captures anyway — whether its region reads
+ * as the screen beside it, on a tree that tells no drawn frame — and lives with its judge (verify/eyes.ts#apartOfFrame).
  *
  * THE EYES CONFIRM A FULLY CLAIM: the question a `fully visible` stop asks of the screenshot before it is claimed, and
  * the answer — the interface of the concept, here below interact/ (which asks) and verify/ (which looks: the one
@@ -34,9 +36,22 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *
  * WHAT is asked (`EyesQuestion`): whether the target's frame, from each flush edge inward, shows the colour of the
  * surface AROUND that neighbour rather than its own — every edge on ONE screenshot, judged by verify/eyes.ts over THE
- * region a pixel measurement reads (ui-tree/standing.ts#Scene.pixelRegion). One capture, unsettled by design: the stop
- * it checks was settled by its tree reads, and a settled pair would double the cost (ADR 0013, "Refined 2026-10-19",
- * states the residual: a bar or an IME still animating could be misread).
+ * region a pixel measurement reads (ui-tree/standing.ts#Scene.pixelRegion).
+ *
+ * AND A CLIP LINE (`ClipLine`), on a tree that cannot tell where the target is drawn (ui-tree/geometry.ts#DrawnUntold:
+ * idb's flat list, which lists no scroll view) — only for a `fully: true` claim (`claim`), the one that promises every
+ * edge drawn: every edge of the target is asked whether a band of it reads as THE SCREEN BESIDE IT, row for row, where
+ * beside its drawn rows the screen reads otherwise — a scroll view's clip, past which what lies beneath shows. The
+ * lab's `scroll-bounded` under idb: P `51,290 300x64`, cut at `upper`'s bottom (330), was "fully visible after 0
+ * swipes"; its bottom 24 pt show the screen's white across its columns and beside them, above that line its blue
+ * beside `upper`'s grey. One screenshot per such claim; the plain stop asks nothing (ADR 0010's residual 5: the tap,
+ * the plain stop and the strokes are judged on the screen alone). A clip line is looked for, not suspected: where the
+ * screenshot cannot tell (none taken, no plain screen beside the target), the claim stands as the tree's, unremarked —
+ * `unseen`.
+ * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+ *
+ * One capture, unsettled by design: the stop it checks was settled by its tree reads, and a settled pair would double
+ * the cost (ADR 0013, "Refined 2026-10-19", states the residual: a bar or an IME still animating could be misread).
  *
  * WHAT A REFUSAL KEEPS, and what a finding reaches — the module's too, so the round (interact/scroll-rounds.ts#round)
  * spells none of it: `EyesAsked` (`askedOf`), a question as asked, in rects; `sameQuestion`, a later question of the
@@ -44,30 +59,48 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * `reachesPoint`, whether a band the eyes saw reaches the point the next tap presses.
  */
 
-/** What the eyes are asked: the target, its region a pixel measurement reads, and its flush neighbours — every edge judged, one screenshot. */
+/** A clip line the eyes look for at an edge of a target whose tree cannot tell where it is drawn (`EyesQuestion`'s doc). */
+export const CLIP_LINE = 'clip line';
+export type ClipLine = typeof CLIP_LINE;
+
+/** An edge the eyes are asked about, and what lies there: a flush neighbour (later-edges.ts#FlushNeighbour's node), or a clip line looked for (`ClipLine`). */
+export interface EyesEdge {
+  readonly edge: Edge;
+  readonly by: UiNode | ClipLine;
+}
+
+/** What the eyes are asked: the target, its region a pixel measurement reads, and the edges to judge — every edge judged, one screenshot. */
 export interface EyesQuestion {
   /** The tree the stop was judged on — the png's scale is derived against it (verify/capture.ts#measuredFrameFor). */
   readonly tree: UiNode;
   readonly node: UiNode;
   /** THE region of the node a pixel measurement reads (ui-tree/standing.ts#Scene.pixelRegion). */
   readonly region: Rect;
-  /** Its flush neighbours narrower than the screen (ui-tree/standing.ts#Scene.flushNeighbours less `spansScreen`), at least one. */
-  readonly flush: readonly FlushNeighbour[];
+  /**
+   * Its flush neighbours narrower than the screen (ui-tree/standing.ts#Scene.flushNeighbours less `spansScreen`), then
+   * — on a tree that cannot tell where it is drawn, for a `fully` claim — a clip line at each of its four edges; at
+   * least one edge.
+   */
+  readonly edges: readonly EyesEdge[];
 }
 
 /**
- * What the eyes saw — over every flush edge of the question, one screenshot:
+ * What the eyes saw — over every edge of the question, one screenshot:
  * - `own`: the target's own colour runs to every edge (no band of a surface past the pixel slack) — the claim stands;
- * - `surface`: at `edge`, its `depth` tree units inward show `surface`, the colour beside `neighbour`, not `own`, its
- *   own — a surface the tree does not list lies over them (the deepest such band, when several edges show one);
+ * - `surface`: at `edge`, its `depth` tree units inward show `surface`, not `own`, its own — `by` a flush neighbour,
+ *   the colour beside it: a surface the tree does not list lies over them; `by` a clip line, the screen's beside the
+ *   band: the target is cut there by a scroll view the tree does not list (the deepest such band, when several edges
+ *   show one);
  * - `unjudged`: at `edge` (the first edge that could not be told, when no edge showed a band), the screenshot could not
  *   tell (`why`: no screenshot, no plain surface beside the neighbour, the two colours too close to tell apart, the
- *   screen beside the target that surface's colour too…) — the reply says the tree's claim and that it was not checked.
+ *   screen beside the target that surface's colour too…) — the reply says the tree's claim and that it was not checked;
+ *   only a flush neighbour's edge is ever unjudged: a clip line is looked for, not suspected, so where it cannot be
+ *   told the answer is `own` (verify/eyes.ts#judgeClipLine).
  */
 export type EyesAnswer =
   | { readonly sees: 'own' }
-  | { readonly sees: 'surface'; readonly edge: Edge; readonly neighbour: UiNode; readonly depth: number; readonly surface: string; readonly own: string }
-  | { readonly sees: 'unjudged'; readonly edge: Edge; readonly neighbour: UiNode; readonly why: string };
+  | { readonly sees: 'surface'; readonly edge: Edge; readonly by: UiNode | ClipLine; readonly depth: number; readonly surface: string; readonly own: string }
+  | { readonly sees: 'unjudged'; readonly edge: Edge; readonly by: UiNode; readonly why: string };
 
 /**
  * The eyes: two questions, each answered from one screenshot (verify/eyes.ts#eyesOn) — `fully`, a `fully visible`
@@ -79,12 +112,28 @@ export interface Eyes {
   readonly order: (question: OrderQuestion) => Promise<readonly OrderSeen[]>;
 }
 
-/** The question a `fully visible` claim on `node` asks, or undefined when the trigger does not apply (no flush neighbour narrower than the screen). */
-export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: UsableScreen | undefined): EyesQuestion | undefined {
+/**
+ * The question a `fully visible` claim on `node` asks — `claim`, the stop that would make it: the plain stop's or
+ * `fully: true`'s — or undefined when the trigger does not apply: no flush neighbour narrower than the screen, and no
+ * clip line to look for (a `fully` claim on a node whose tree cannot tell where it is drawn, geometry.ts#DrawnUntold).
+ */
+export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: UsableScreen | undefined, claim: 'stop' | 'fully'): EyesQuestion | undefined {
   const box = (screen ?? treeScreen(tree)).oriented;
-  const flush = scene.flushNeighbours(node).filter((f) => !spansScreen(f, box));
-  if (flush.length === 0) return undefined;
-  return { tree, node, region: scene.pixelRegion(node, screen), flush };
+  const flush: readonly EyesEdge[] = scene.flushNeighbours(node).filter((f) => !spansScreen(f, box));
+  const clipLines = claim === 'fully' && isUntold(scene.clips.drawnIn(node)) ? EDGES.map((edge): EyesEdge => ({ edge, by: CLIP_LINE })) : [];
+  const edges = [...flush, ...clipLines];
+  if (edges.length === 0) return undefined;
+  return { tree, node, region: scene.pixelRegion(node, screen), edges };
+}
+
+/**
+ * The answer when no screenshot could be judged (`why`: none taken, it failed, it did not decode): the first flush
+ * neighbour's edge `unjudged` — the reply says the tree's claim and that it was not checked; with clip lines alone,
+ * `own`: a clip line is looked for, not suspected, and the claim stands as the tree's, as before the eyes looked.
+ */
+export function unseen(question: EyesQuestion, why: string): EyesAnswer {
+  const first = question.edges.find((e): e is EyesEdge & { readonly by: UiNode } => e.by !== CLIP_LINE);
+  return first === undefined ? { sees: 'own' } : { sees: 'unjudged', edge: first.edge, by: first.by, why };
 }
 
 /** The neighbour reaches both ends of the screen along its edge (across it for a top or bottom edge, down it for a side edge): nothing of the screen beside it. */
@@ -99,23 +148,31 @@ export type EyesFinding = Exclude<EyesAnswer, { readonly sees: 'own' }>;
 /** A finding of a band of a surface: what keeps a `fully: true` stop from being claimed, or a plain stop whose centre it reaches. */
 export type SurfaceFinding = Extract<EyesAnswer, { readonly sees: 'surface' }>;
 
-/** A question as asked, in rects (`askedOf`): its region and each flush neighbour's rect, in order — what a later question is compared with. */
+/** A question as asked, in rects (`askedOf`): its region and, edge by edge in order, the flush neighbour's rect or the clip line looked for — what a later question is compared with. */
 export interface EyesAsked {
   readonly region: Rect;
-  readonly neighbours: readonly Rect[];
+  readonly edges: readonly { readonly edge: Edge; readonly by: Rect | ClipLine }[];
 }
 
 /** `question` as asked (`EyesAsked`), its rects copied. */
-export const askedOf = (question: EyesQuestion): EyesAsked => ({ region: { ...question.region }, neighbours: question.flush.map((f) => ({ ...f.by.rect })) });
+export const askedOf = (question: EyesQuestion): EyesAsked => ({
+  region: { ...question.region },
+  edges: question.edges.map(({ edge, by }) => ({ edge, by: by === CLIP_LINE ? CLIP_LINE : { ...by.rect } })),
+});
 
 /**
- * `question` is the SAME QUESTION as `asked`: its region and its neighbours' rects, as many, each within a pixel — nothing
- * moved, so the pixels did not, and the eyes would answer as before (interact/scroll-rounds.ts#round's refused again).
+ * `question` is the SAME QUESTION as `asked`: its region and its edges, as many — each the same edge, its neighbour's
+ * rect within a pixel or the same clip line — nothing moved, so the pixels did not, and the eyes would answer as before
+ * (interact/scroll-rounds.ts#round's refused again).
  */
 export const sameQuestion = (asked: EyesAsked, question: EyesQuestion): boolean =>
   sameRectWithinPixel(asked.region, question.region) &&
-  asked.neighbours.length === question.flush.length &&
-  question.flush.every((f, i) => sameRectWithinPixel(asked.neighbours[i]!, f.by.rect));
+  asked.edges.length === question.edges.length &&
+  question.edges.every(({ edge, by }, i) => {
+    const was = asked.edges[i]!;
+    if (was.edge !== edge) return false;
+    return by === CLIP_LINE || was.by === CLIP_LINE ? by === was.by : sameRectWithinPixel(was.by, by.rect);
+  });
 
 /**
  * The band the eyes saw REACHES `point` along its edge's axis — measured from the edge of `region` (the question's)

@@ -55,7 +55,7 @@ open note on the working tree. See the script for the verdicts.
 | L4.1 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e0c2587 → bea9769 | CALIBRATED-ON-DEFECT; live ios: CALIBRATED |
 | L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 1ef11b9 | CALIBRATED; live ios: CALIBRATED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | calibrate | caa0f41 → 16ff607 | CALIBRATED |
-| LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
+| LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | calibrate | 3b6d2b0 → 11daf08 | CALIBRATED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
@@ -1096,23 +1096,22 @@ W's half, round 9 (fix/r9-l4w 1ef11b9, its review fixes 85e3621, a374227 and 0f2
 
 Red before the fix (caa0f41b, its first parent), and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes. Fixed by round 14's 16ff607 (the drawn frame, geometry.ts#Clips.drawnIn, on every tree that lists ancestry): S's tap refused outside lower, P and S stroked inside upper/lower and failing clipped at their edge; C's tap refused outside the carousel, its colour failing closed, scroll_until C right stroked 824 497 → 256 497 inside the carousel.
 
-## LE2: OPEN-RED
+## LE2: CALIBRATED
 
-2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md — defect: `fully visible|^Tapped|reached where it is|^passed on|no swipe|touched down outside`
+2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md — defect: `fully visible|^passed on`
 
-- working tree:
+- before 3b6d2b0:
   - RED ios-iphone17-ios27/scroll-bounded.idb.json P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.P" fully visible after 0 swipes
-  - RED ios-iphone17-ios27/scroll-bounded.idb.json S tap — Tapped: Tapped id:"lab.scroll-bounded.S"
-  - RED ios-iphone17-ios27/scroll-bounded.idb.json S scroll_until — reached where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.S" fully visible after 0 swipes
   - RED ios-iphone17-ios27/scroll-bounded.idb.json S fully — fully visible where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.S" fully visible after 0 swipes
-  - RED ios-iphone17-ios27/scroll-bounded.idb.json O tap — Tapped: Tapped id:"lab.scroll-bounded.O"
   - RED ios-iphone17-ios27/scroll-bounded.idb.json O colour — passed on #FFFFFF: PASS  element id:"lab.scroll-bounded.O" fill within dE00 8 of #FFFFFF — sampled #FFFFFF (dominant, 100% of region) vs expected #FFFFFF → dE00 0.00 ≤ 8; scale 3.000
-  - RED ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until — no swipe: Element id:"lab.scroll-bounded.O" fully visible after 0 swipes
-  - RED ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until — touched down outside its scroll view lower at (201,699) (201,699): ERROR scroll_until id:"lab.scroll-bounded.F" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never inter
   - RED ios-iphone17-ios27/carousel-in-list.idb.json C colour — passed on #EEEEEE: PASS  element id:"lab.carousel-in-list.C" fill within dE00 8 of #EEEEEE — sampled #EEEEEE (dominant, 100% of region) vs expected #EEEEEE → dE00 0.00 ≤ 8; scale 3.000; clipped 93% off-png — the remaini
-  - RED ios-iphone17-ios27/carousel-in-list.idb.json C scroll_until — touched down outside its scroll view carousel at (322,437) (322,437) (80,437): ERROR scroll_until id:"lab.carousel-in-list.C" failed after 3 swipes — element is in the viewport but CLIPPED at right, 7% of it is in the viewport, and the content is exhausted: sw
+- after 11daf08:
+  - ok ios-iphone17-ios27/scroll-bounded.idb.json P fully — ERROR scroll_until id:"lab.scroll-bounded.P" failed after 2 swipes — element is in the viewport but its bottom 24 pt read as the screen beside them (#FFFFFF), not its own #1E88E5: cut at the edge of a scroll view the tre
+  - ok ios-iphone17-ios27/scroll-bounded.idb.json S fully — ERROR scroll_until id:"lab.scroll-bounded.S" failed after 2 swipes — element is in the viewport but its bottom 56 pt read as the screen beside them (#FFFFFF), not its own #43A047: cut at the edge of a scroll view the tre
+  - ok ios-iphone17-ios27/scroll-bounded.idb.json O colour — FAIL  element id:"lab.scroll-bounded.O" fill within dE00 8 of #FFFFFF — its region reads as the screen beside it (#FFFFFF): idb lists no scroll view to say it is drawn there — it may lie outside one; measure it under tre
+  - ok ios-iphone17-ios27/carousel-in-list.idb.json C colour — FAIL  element id:"lab.carousel-in-list.C" fill within dE00 8 of #EEEEEE — its region reads as the screen beside it (#EEEEEE): idb lists no scroll view to say it is drawn there — it may lie outside one; measure it under t
 
-No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen — its colour passes on the page's background (#EEEEEE), and scroll_until strokes sideways across the screen's middle (`322 437 → 80 437` twice, then one back), outside the carousel; its tap is refused (off screen at its centre). WDA answers all three rows as the truth does.
+Red before the fix (3b6d2b0a, its first parent; and at every commit before it: src called it a residual, ui-tree/geometry.ts#Clips.drawnIn undefined on idb's flat list). Partly fixed by round 14's 11daf08: the drawn frame is untold on idb (geometry.ts#DrawnUntold) and the eyes look where a claim rests on it — O's and C's colour, their region reading as the screen beside it (#FFFFFF, #EEEEEE), fail closed (verify/eyes.ts#apartOfFrame, no capture added); P's and S's fully: true stops see the clip line (bottom 24 pt, 56 pt) on one screenshot and fail after two unmoved strokes. The rest — S and O Tapped, S and O reached by the plain stop, F's and C's strokes over the screen — is ADR 0010's residual 5, accepted (the owner's delegation, round 14): its six KNOWN rows filed as that residual. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen. WDA answers all of the note's rows as the truth does.
 
 ## LE3: OPEN-RED
 

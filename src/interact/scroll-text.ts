@@ -1,6 +1,6 @@
 import type { DeviceScreen, Point, Rect, UiNode } from '../adapters/types.js';
 import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
-import type { EyesFinding, SurfaceFinding } from '../ui-tree/eyes.js';
+import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
@@ -225,24 +225,31 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   const covered =
     r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
   // Partly under a surface the tree does not list, the eyes saw (ui-tree/eyes.ts): said as a cover is.
-  const unlisted = surface === undefined ? undefined : `PARTLY UNDER a surface the tree does not list: ${surfaceText(surface)}, its centre clear`;
+  const unlisted = surface === undefined ? undefined : `${unlistedText(surface)}, its centre clear`;
   const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
   return `visible after ${n} — ${[clip, covered, unlisted].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
 }
 
 /**
- * What the eyes saw over the target's edge (ui-tree/eyes.ts, `surface`): `its bottom 28 px show #F2F2F7, the colour
- * beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own #FFFFFF (a screenshot)`.
- * In tree units, which on Android (the only source the trigger fires on) are pixels.
+ * What the eyes saw over the target's edge (ui-tree/eyes.ts, `surface`), by a flush neighbour: `its bottom 28 px show
+ * #F2F2F7, the colour beside container id:lab.form-keyboard.submit (55,1238 970x132) drawn after it, not its own
+ * #FFFFFF (a screenshot)` — in tree units, which on Android (the only source with flush neighbours) are pixels; at a
+ * clip line: `its bottom 24 pt read as the screen beside them (#FFFFFF), not its own #1E88E5: cut at the edge of a
+ * scroll view the tree does not list (a screenshot)` — in points: only idb's flat list leaves a clip line untold.
  */
-function surfaceText({ edge, neighbour, depth, surface, own }: SurfaceFinding): string {
-  return `its ${edge} ${depth} px show ${surface}, the colour beside ${nodeText(neighbour)} drawn after it, not its own ${own} (a screenshot)`;
+function surfaceText({ edge, by, depth, surface, own }: SurfaceFinding): string {
+  if (by === CLIP_LINE) return `its ${edge} ${depth} pt read as the screen beside them (${surface}), not its own ${own}: cut at the edge of a scroll view the tree does not list (a screenshot)`;
+  return `its ${edge} ${depth} px show ${surface}, the colour beside ${nodeText(by)} drawn after it, not its own ${own} (a screenshot)`;
 }
 
+/** What the eyes saw, as a shortfall's head: `PARTLY UNDER a surface the tree does not list: …`, or at a clip line `CUT at a line the tree does not list: …` (`surfaceText`). */
+const unlistedText = (finding: SurfaceFinding): string =>
+  `${finding.by === CLIP_LINE ? 'CUT at a line' : 'PARTLY UNDER a surface'} the tree does not list: ${surfaceText(finding)}`;
+
 /** The eyes could not tell (`unjudged`): the edge flush with that node, what may lie there, and why no screenshot settled it. */
-function unjudgedText({ edge, neighbour, why }: Extract<EyesFinding, { sees: 'unjudged' }>): string {
-  return `its ${edge} edge lies flush with ${nodeText(neighbour)}, drawn after it outside its scroll view, whose surface may draw past that node over it — the tree lists none there, and a screenshot could not tell (${why})`;
+function unjudgedText({ edge, by, why }: Extract<EyesFinding, { sees: 'unjudged' }>): string {
+  return `its ${edge} edge lies flush with ${nodeText(by)}, drawn after it outside its scroll view, whose surface may draw past that node over it — the tree lists none there, and a screenshot could not tell (${why})`;
 }
 
 /** `1 swipe up did not move it`, `2 swipes up did not move it`, or — some of them moved it — `3 swipes up, the last of which did not move it` / `…, the last 2 of which did not move it`. */
@@ -451,8 +458,19 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // A band of a surface the tree does not list, the eyes saw (ui-tree/eyes.ts), at the end of the content: the rest
       // of it stays under that surface — with the keyboard up and the node riding on it, dismiss it first.
       if (short.of === 'unlisted') {
+        const neighbour = short.finding.by;
+        // At a clip line the tree does not list (idb's flat list): the strokes went over the screen, which may not be
+        // over the scroll view that holds it — the remedy is the tree source that lists it.
+        if (neighbour === CLIP_LINE) {
+          return {
+            message:
+              `scroll_until ${describe} failed after ${n} — element is in the viewport but ${surfaceText(short.finding)} — and swiping ${o.lastStroke} no longer moves it${neither}. ` +
+                `The tree lists no scroll view, so the strokes went over the screen, perhaps not over the one that holds it — under treeSource: wda the tree lists it, ` +
+                `and scroll_until strokes over it. ${last}`,
+          };
+        }
         // The keyboard as the round's reading offered it, unwitnessed (the band was moot: the match lies above it) — so an "if".
-        const keyboard = ridingKeyboard(short.finding.neighbour, short.offered, judged.standing.facts.minPiece ?? 0);
+        const keyboard = ridingKeyboard(neighbour, short.offered, judged.standing.facts.minPiece ?? 0);
         const away = o.otherWay === 'outward' ? `, and swiping ${back} would only push it further under that surface` : neither;
         const why =
           keyboard === undefined
@@ -726,7 +744,7 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${underText(short)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'unlisted':
-      return `element reached the viewport but stayed PARTLY UNDER a surface the tree does not list: ${surfaceText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
+      return `element reached the viewport but stayed ${unlistedText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
     case 'systemBar': {
       const { judged } = short;
       const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;

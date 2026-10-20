@@ -30,7 +30,8 @@ import type { ReplyKind } from './replies.js';
  * left with LV4's entry at round 7's A1, and the mechanism with it at round 7's integration 3.)
  */
 
-const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
+/** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
+const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md';
@@ -77,10 +78,15 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // sheet, C's and D's two strokes on it — struck off by round 7's A7, f924893e: the window marked presented by
   // Material's ids, scroll_until stops before any stroke, ok in three runs of three: android-vis-sheet-dialog-run1…3.json.)
   ...each('android uiautomator', ['A', 'B', 'C', 'D'].map((t) => `scroll:dialog-fullscreen.${t}`), UNMARKED_WINDOW, 'presented-stroke', 'not found'),
-  // iOS, idb: no scroll view listed
-  ...each('ios idb', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'scroll:scroll-bounded.O'], LE2, 'stop-claim', 'visible'),
-  ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O'], LE2, 'tap-claim', 'Tapped'),
-  ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], LE2, 'R-direction', 'refused'),
+  // iOS, idb: no scroll view listed (LE2, docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md),
+  // partly fixed by round 14's 11daf08 — ADR 0010's residual 5 the rest. P.fully and S.fully no longer claim a stop:
+  // the eyes see the clip line, the stop fails after two strokes over the screen — P's touching down below `lower`,
+  // moving nothing (R-direction on refused); S's case then taps S, Tapped on the background (the tap's residual: a
+  // tap-claim on Tapped). Two runs of two (ios-idb-vis-r14-le2-1.json, -2.json).
+  ...each('ios idb', ['scroll:scroll-bounded.P.fully'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
+  ...each('ios idb', ['scroll:scroll-bounded.S', 'scroll:scroll-bounded.O'], IDB_NO_SCROLL_VIEW, 'stop-claim', 'visible'),
+  ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O', 'scroll:scroll-bounded.S.fully'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
+  ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   // LV3 under idb only (no scroll view listed: its turned stroke still touches down in the header); fixed under WDA.
   ...each('ios idb', ['scroll:tabbar-floating.R'], LV3, 'R-direction', 'refused'),
   // sheet-long-list's F and L: idb lists the table's labels without their identifiers (and no row below the fold), so
@@ -106,8 +112,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:sheet-background.A', 'scroll:sheet-background.B'], NOT_YET_IN_TREE, 'presented-changed', 'refused'),
   ...each('ios idb', ['scroll:sheet-background.C', 'scroll:sheet-background.D', ...['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`])], NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
   // idb lists no carousel (LE2 across, as edges.known.ts files C's replayed rows): strokes across the screen's middle,
-  // none moving the carousel, the reply "content exhausted … a layout defect".
-  ...each('ios idb', ['scroll:carousel-in-list.C'], LE2, 'R-direction', 'refused'),
+  // none moving the carousel, the reply "content exhausted … a layout defect" — ADR 0010's residual 5.
+  ...each('ios idb', ['scroll:carousel-in-list.C'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   // blur-menu-grouped's C under idb: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json,
   // -2.json; no dismissal), struck off at its final src (94fc318b): stopped before any swipe, nothing stroked, in two
   // runs of two (ios-vis-r8-l4-3.json, -4.json).

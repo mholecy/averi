@@ -29,14 +29,14 @@ const byId = (tree: UiNode, id: string): UiNode => {
 describe('the trigger — a flush neighbour (Scene.flushNeighbours), the only shape the eyes are asked of', () => {
   it('k7: phone flush with the submit bar drawn after it, outside its scroll view — asked at its bottom edge, over its pixel region', async () => {
     const tree = await k7Tree();
-    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined);
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop');
     expect(q?.region).toEqual({ x: 55, y: 1113, width: 970, height: 125 });
-    expect(q?.flush.map((f) => [f.edge, f.by.identifier, f.by.rect])).toEqual([['bottom', 'lab.form-keyboard.submit', { x: 55, y: 1238, width: 970, height: 132 }]]);
+    expect(q?.edges.map((f) => [f.edge, (f.by as UiNode).identifier, (f.by as UiNode).rect])).toEqual([['bottom', 'lab.form-keyboard.submit', { x: 55, y: 1238, width: 970, height: 132 }]]);
   });
 
   it('k7: postcode, clear of the bar — no question', async () => {
     const tree = await k7Tree();
-    expect(eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.postcode'), undefined)).toBeUndefined();
+    expect(eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.postcode'), undefined, 'stop')).toBeUndefined();
   });
 
   const list = (rows: UiNode[], extra: UiNode[] = []): UiNode =>
@@ -50,16 +50,16 @@ describe('the trigger — a flush neighbour (Scene.flushNeighbours), the only sh
     const a = node({ role: 'button', identifier: 'a', rect: { x: 0, y: 100, width: 1080, height: 132 } });
     const b = node({ role: 'button', identifier: 'b', rect: { x: 0, y: 232, width: 1080, height: 132 } });
     const tree = list([a, b]);
-    expect(eyesQuestion(sceneOf(tree), tree, a, undefined)).toBeUndefined();
+    expect(eyesQuestion(sceneOf(tree), tree, a, undefined, 'stop')).toBeUndefined();
   });
 
   it('a pinned bar flush with a row, outside the list — asked; the same tree from a source of unclipped frames (WDA\'s) — not', () => {
     const row = node({ role: 'button', identifier: 'row', rect: { x: 40, y: 1700, width: 1000, height: 132 } });
     const bar = node({ role: 'button', identifier: 'bar', rect: { x: 20, y: 1832, width: 1040, height: 168 } });
     const tree = list([row], [bar]);
-    expect(eyesQuestion(sceneOf(tree), tree, row, undefined)?.flush.map((f) => [f.edge, f.by.identifier])).toEqual([['bottom', 'bar']]);
+    expect(eyesQuestion(sceneOf(tree), tree, row, undefined, 'stop')?.edges.map((f) => [f.edge, (f.by as UiNode).identifier])).toEqual([['bottom', 'bar']]);
     const wda = { ...tree, unclippedFrames: true as const };
-    expect(eyesQuestion(sceneOf(wda), wda, row, undefined)).toBeUndefined();
+    expect(eyesQuestion(sceneOf(wda), wda, row, undefined, 'stop')).toBeUndefined();
   });
 });
 
@@ -76,7 +76,7 @@ describe('the trigger — every flush edge, and none of a neighbour spanning the
     const header = node({ role: 'button', identifier: 'header', rect: { x: 20, y: 200, width: 1040, height: 100 } });
     const bar = node({ role: 'button', identifier: 'bar', rect: { x: 20, y: 432, width: 1040, height: 168 } });
     const tree = list([row], [header, bar]);
-    expect(eyesQuestion(sceneOf(tree), tree, row, undefined)?.flush.map((f) => [f.edge, f.by.identifier])).toEqual([
+    expect(eyesQuestion(sceneOf(tree), tree, row, undefined, 'stop')?.edges.map((f) => [f.edge, (f.by as UiNode).identifier])).toEqual([
       ['top', 'header'],
       ['bottom', 'bar'],
     ]);
@@ -85,14 +85,14 @@ describe('the trigger — every flush edge, and none of a neighbour spanning the
   it('a Scaffold bar as wide as the screen flush with the row — nothing beside it to read a surface from: not asked', () => {
     const bar = node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 432, width: 1080, height: 168 } });
     const tree = list([row], [bar]);
-    expect(eyesQuestion(sceneOf(tree), tree, row, undefined)).toBeUndefined();
+    expect(eyesQuestion(sceneOf(tree), tree, row, undefined, 'stop')).toBeUndefined();
   });
 });
 
 describe('judgeEyes — the band of the surface around the neighbour, read row by row', () => {
   it('k7: 28 px of phone\'s bottom show the bar\'s #F2F2F7, not its own #FFFFFF', async () => {
     const tree = await k7Tree();
-    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
     expect(judgeEyes(PNG.sync.read(await k7Png()), 1, q)).toMatchObject({ sees: 'surface', depth: 28, surface: '#F2F2F7', own: '#FFFFFF' });
   });
 
@@ -107,7 +107,7 @@ describe('judgeEyes — the band of the surface around the neighbour, read row b
     }
     const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 100, height: 200 } });
     const target = node({ role: 'textfield', rect: { x: 10, y: 60, width: 80, height: 70 } });
-    const q: EyesQuestion = { tree, node: target, region: target.rect, flush: [{ edge: 'bottom', by: node({ role: 'button', rect: opts.byRect ?? { x: 10, y: 130, width: 80, height: 40 } }) }] };
+    const q: EyesQuestion = { tree, node: target, region: target.rect, edges: [{ edge: 'bottom', by: node({ role: 'button', rect: opts.byRect ?? { x: 10, y: 130, width: 80, height: 40 } }) }] };
     return { png, q };
   };
 
@@ -118,7 +118,7 @@ describe('judgeEyes — the band of the surface around the neighbour, read row b
 
   it('…at scale 2 (a png of twice the tree\'s units): 5 units deep', () => {
     const { png, q } = scene({ bar: [0xf2, 0xf2, 0xf7], barTop: 120 });
-    const half: EyesQuestion = { ...q, region: { x: 5, y: 30, width: 40, height: 35 }, flush: [{ edge: 'bottom', by: { ...q.flush[0]!.by, rect: { x: 5, y: 65, width: 40, height: 20 } } }] };
+    const half: EyesQuestion = { ...q, region: { x: 5, y: 30, width: 40, height: 35 }, edges: [{ edge: 'bottom', by: { ...(q.edges[0]!.by as UiNode), rect: { x: 5, y: 65, width: 40, height: 20 } } }] };
     expect(judgeEyes(png, 2, half)).toMatchObject({ sees: 'surface', depth: 5, surface: '#F2F2F7', own: '#FFFFFF' });
   });
 
@@ -161,7 +161,7 @@ describe('judgeEyes — the band of the surface around the neighbour, read row b
     // The reviewer's shape over the real k7 tree: #F2F2F7 everywhere, phone's field white 1129–1228, no bar padding —
     // Continue drawn on the background; the dumped node's 10-px margin below the field reads the background's grey.
     const tree = parseDump(K7_XML);
-    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
     const png = new PNG({ width: 1080, height: 2220 });
     const fill = (x0: number, y0: number, x1: number, y1: number, c: number[]) => {
       for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) png.data.set([c[0]!, c[1]!, c[2]!, 255], (y * 1080 + x) * 4);
@@ -185,9 +185,9 @@ describe('judgeEyes — the band of the surface around the neighbour, read row b
     const { png, q } = scene({ bar: [0xf2, 0xf2, 0xf7], barTop: 120 });
     for (let y = 0; y < 66; y++) for (let x = 0; x < 100; x++) png.data.set([0xe0, 0xe0, 0xf0, 255], (y * 100 + x) * 4);
     const top = node({ role: 'button', rect: { x: 10, y: 20, width: 80, height: 40 } });
-    const both: EyesQuestion = { ...q, flush: [{ edge: 'top', by: top }, ...q.flush] };
+    const both: EyesQuestion = { ...q, edges: [{ edge: 'top', by: top }, ...q.edges] };
     expect(judgeEyes(png, 1, both)).toMatchObject({ sees: 'surface', edge: 'bottom', depth: 10 });
-    const deeperTop: EyesQuestion = { ...both, flush: [{ edge: 'top', by: top }, { edge: 'bottom', by: q.flush[0]!.by }] };
+    const deeperTop: EyesQuestion = { ...both, edges: [{ edge: 'top', by: top }, { edge: 'bottom', by: q.edges[0]!.by }] };
     for (let y = 60; y < 75; y++) for (let x = 0; x < 100; x++) png.data.set([0xe0, 0xe0, 0xf0, 255], (y * 100 + x) * 4);
     expect(judgeEyes(png, 1, deeperTop)).toMatchObject({ sees: 'surface', edge: 'top', depth: 15, surface: '#E0E0F0' });
   });
@@ -199,7 +199,7 @@ describe('eyesOn — one screenshot, never a throw', () => {
     const fake = new FakeAdapter({ s: tree }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     fake.nextScreenshot = await k7Png();
-    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
     expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'surface', depth: 28 });
     expect(fake.screenshots).toHaveLength(1);
   });
@@ -207,7 +207,7 @@ describe('eyesOn — one screenshot, never a throw', () => {
   it('bytes that are no png — unjudged, said so', async () => {
     const tree = await k7Tree();
     const fake = new FakeAdapter({ s: tree }, 's');
-    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
     expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'unjudged', why: expect.stringMatching(/^the screenshot did not decode: /) });
   });
 
@@ -215,7 +215,7 @@ describe('eyesOn — one screenshot, never a throw', () => {
     const tree = await k7Tree();
     const fake = new FakeAdapter({ s: tree }, 's');
     fake.screenshot = () => Promise.reject(new Error('adb: device offline\nmore'));
-    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined) as EyesQuestion;
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
     expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'unjudged', edge: 'bottom', why: 'the screenshot failed: adb: device offline' });
   });
 });

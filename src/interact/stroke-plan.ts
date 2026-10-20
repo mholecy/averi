@@ -1,5 +1,5 @@
 import { sameRect, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { containsPoint, quoted, rectIntersection, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
+import { containsPoint, quoted, rectIntersection, toldFrame, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -467,7 +467,7 @@ const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined
 function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonly Rect[] {
   const { clips } = facts.scene;
   const chain = clips.scrollersOf(node);
-  return chain.length > 0 ? chain : (clips.drawnIn(node)?.scrollers.map((n) => n.rect) ?? []);
+  return chain.length > 0 ? chain : (toldFrame(clips.drawnIn(node))?.scrollers.map((n) => n.rect) ?? []);
 }
 
 /**

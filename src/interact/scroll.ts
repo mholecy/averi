@@ -1,5 +1,5 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { orderSeenBy, type Eyes, type EyesAnswer, type EyesQuestion } from '../ui-tree/eyes.js';
+import { orderSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
@@ -15,12 +15,6 @@ export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
 
 /** The swipe bound when the caller has none — the MCP scroll_until tool's documented default is derived from it too. */
 export const DEFAULT_MAX_SWIPES = 6;
-
-/** The answer when no eyes were handed in: the first flush edge's, unjudged. */
-function noEyes({ flush }: EyesQuestion): EyesAnswer {
-  const first = flush[0];
-  return first === undefined ? { sees: 'own' } : { sees: 'unjudged', edge: first.edge, neighbour: first.by, why: 'no screenshot was taken' };
-}
 
 export interface ScrollOptions {
   /** Where the CONTENT lies relative to the current view (down = below the fold → finger swipes up). Default down. */
@@ -338,7 +332,7 @@ export async function scrollUntilVisible(
     let next = round(state, { ...seen, elapsedMs: Date.now() - started });
     while (next.step.do === 'ask') {
       if (next.step.what === 'witness') seen.corroborated = reading !== undefined && (await reading.corroborated());
-      else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? noEyes(next.step.question) : await opts.eyes.fully(next.step.question);
+      else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? unseen(next.step.question, 'no screenshot was taken') : await opts.eyes.fully(next.step.question);
       else if (next.step.what === 'order') seen.order = await orderSeenBy(opts.eyes, next.step.question);
       else seen.unlocated = reading !== undefined && (await reading.unlocated());
       next = round(state, { ...seen, elapsedMs: Date.now() - started });

@@ -372,6 +372,40 @@ shut down after. Reproduce (outside the sandbox): `node --import tsx scripts/tru
   stroking the layer (the known `presented-stroke`; sheet-background A, B LOUD `presented-changed`), bands S refused
   under the status bar, every other tap `Tapped`.
 
+# Round 14, LE2: idb's untold drawn frame on iOS, 2026-10-20
+
+bugs/r14-le2 (src `11daf08`, from bugs/round-14 3b6d2b0a: idb's drawn frame is untold, `ui-tree/geometry.ts#DrawnUntold`;
+the colour assert asks whether its region reads as the screen beside it, a `fully: true` claim looks for a clip line —
+ADR 0010's residual 5, ADR 0013 refined 2026-10-20;
+docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md), run from that branch's
+working tree after its code review (the records commit's live-known.ts); the lab app as installed (no app change). The
+averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), idb through a companion of this run's own on gRPC 10913
+(`IDB_COMPANION=localhost:10913`); shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb --groups visibility
+--cells scroll-bounded,carousel-in-list --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-idb-vis-r14-le2-1.json | 11daf08 | 18 | 9 | 0 | 9 (all known since this round's re-filing) |
+| ios-idb-vis-r14-le2-2.json | 11daf08 | 18 | 9 | 0 | 9 (the same case lines) |
+
+Both records replace the two taken at the fix's first draft (src `50144e6`, before its review made "nothing of its own"
+a pixel count, asked the colour question on a frame settled over the region only too, and had a clip line ask every
+strip beside the drawn rows to be a plain colour of its own): every case line of these runs reads as those did.
+
+- **`scroll_until P` with `fully: true`**: no longer "fully visible after 0 swipes" — `ERROR scroll_until
+  id:"lab.scroll-bounded.P" failed after 2 swipes — element is in the viewport but its bottom 24 pt read as the screen
+  beside them (#FFFFFF), not its own #1E88E5: cut at the edge of a scroll view the tree does not list (a screenshot) …
+  under treeSource: wda the tree lists it, and scroll_until strokes over it`. The two strokes (201,699 → 175) touch down
+  below `lower` and move nothing: R-direction on `refused`, re-filed in live-known.ts as ADR 0010's residual 5.
+- **`scroll_until S` with `fully: true`**: likewise ("its bottom 56 pt read as the screen beside them … not its own
+  #43A047"); the case's tap then reads `Tapped`, nothing fired — the tap's residual (tap-claim on `Tapped`), re-filed.
+- As before, ADR 0010's residual 5 (their entries re-filed from LE2 to it): `tap S`, `tap O` Tapped on the background,
+  nothing fired; `scroll_until S` and `scroll_until O` "fully visible after 0 swipes"; F's scroll and turn, and C's,
+  strokes over the screen that move nothing. Ok as before: W, P (tap and plain stop), F's and C's taps refused (off
+  screen), carousel-in-list's B and U reached and tapped.
+- Not run live: O's and C's colour asserts (live.ts has no assert cases); their replayed rows are green.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

@@ -8,10 +8,11 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
 // list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
 // (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
-// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE2–LE3; LE4 is calibrated since
-// round 5's 0a, LE1 since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
+// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE3; LE4 is calibrated since
+// round 5's 0a, LE1 and LE2's fixed half since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
 
-const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
+/** LE2's rest, accepted (ADR 0010's residual 5): with no scroll view listed and no screenshot per tap or stop, the tap, the plain stop and the strokes are judged on the screen alone; treeSource: wda lists the scroll views. */
+const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (201,699)';
@@ -23,25 +24,25 @@ export const edges: KnownFile = {
     // their container (scroll-bounded's P and S) and of a horizontalScroll's card past its carousel (carousel-in-list's
     // C) are judged by what their scroll views draw (ui-tree/geometry.ts#Clips.drawnIn, now on every tree that lists
     // ancestry): all seven rows green, struck off here, calibrated in scripts/truth/calibration.json.
-    // LAB FINDING LE2 — idb lists no scroll view: P, S and O are judged on the screen alone. O (outside its scroll view)
-    // Tapped on the background, its colour PASSES on the background, and the stop calls it visible; S Tapped and
-    // reached; P and S "fully visible". WDA answers every one of these rows as the truth does.
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['P'], ['fully'], { cls: 'fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['fully'], { cls: 'fully visible where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 584'], note: 'lab finding: idb lists no scroll view — Tapped beneath its clip', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['scroll_until'], { cls: 'reached where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 652'], note: 'lab finding: idb lists no scroll view — Tapped on the background', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['colour'], { cls: 'passed on #FFFFFF', kind: 'PASS', calls: [], note: 'lab finding: idb lists no scroll view — the colour measured the background (#29 under idb)', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'lab finding: idb lists no scroll view — visible after 0 swipes', as: LE2 }),
-    ...keys(`${IOS}/scroll-bounded.idb.json`, ['F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'lab finding: idb lists no scroll view — the screen\'s stroke, beside the scroll view holding F', as: LE2 }),
+    // LAB FINDING LE2 — idb lists no scroll view (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md):
+    // partly fixed on bugs/r14-le2 (round 14) — the drawn frame is UNTOLD on idb's flat list (ui-tree/geometry.ts
+    // #DrawnUntold), and the eyes look where a claim rests on it: O's and C's colour, which read as the screen beside
+    // them, fail closed (verify/eyes.ts#apartOfFrame); P's and S's `fully: true` stops see the clip line
+    // (ui-tree/eyes.ts#eyesQuestion) — the four rows green, struck off here, calibrated in scripts/truth/calibration.json.
+    // The rest is ADR 0010's residual 5, accepted: S and O Tapped, S and O reached by the plain stop, F's (and C's,
+    // below) strokes over the screen. WDA answers every one of these rows as the truth does.
+    ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 584'], note: 'idb lists no scroll view — Tapped beneath its clip', as: IDB_NO_SCROLL_VIEW }),
+    ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['scroll_until'], { cls: 'reached where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'idb lists no scroll view', as: IDB_NO_SCROLL_VIEW }),
+    ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 652'], note: 'idb lists no scroll view — Tapped on the background', as: IDB_NO_SCROLL_VIEW }),
+    ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'idb lists no scroll view — visible after 0 swipes', as: IDB_NO_SCROLL_VIEW }),
+    ...keys(`${IOS}/scroll-bounded.idb.json`, ['F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'idb lists no scroll view — the screen\'s stroke, beside the scroll view holding F', as: IDB_NO_SCROLL_VIEW }),
     // LE2 across, on carousel-in-list's C (the card right of the carousel's clip, 378,138 354x85 against its
-    // scrollable 24,138 354x85): idb lists no carousel, so C is judged on the screen alone — its colour, sampled on the
-    // 7 % of it on the screen, PASSES on the page's background; and scroll_until strokes sideways across the SCREEN's
-    // middle (y 437, below the carousel), twice right, then once back, failing "content exhausted". WDA answers all
+    // scrollable 24,138 354x85): idb lists no carousel, so scroll_until strokes sideways across the SCREEN's middle
+    // (y 437, below the carousel), twice right, then once back, failing "content exhausted" — the residual. Its colour
+    // row is green (the 7 % of it on the screen reads as the page's #EEEEEE around it: failed closed). WDA answers all
     // three rows as the truth does: its two strokes 307 181 → 95 181 lie inside the carousel, along its axis (round
     // 6's S4, the measurement this cell was built for).
-    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['colour'], { cls: 'passed on #EEEEEE', kind: 'PASS', calls: [], note: 'lab finding: idb lists no carousel — the colour measured the background on the card\'s 7 % on screen (#29 under idb)', as: LE2 }),
-    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['scroll_until'], { cls: 'touched down outside its scroll view carousel at (322,437) (322,437) (80,437)', kind: 'refused', calls: ['idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 80 437 201 437 --duration 0.3'], note: 'lab finding: idb lists no carousel — the screen\'s sideways stroke, below the carousel holding C', as: LE2 }),
+    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['scroll_until'], { cls: 'touched down outside its scroll view carousel at (322,437) (322,437) (80,437)', kind: 'refused', calls: ['idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 80 437 201 437 --duration 0.3'], note: 'idb lists no carousel — the screen\'s sideways stroke, below the carousel holding C', as: IDB_NO_SCROLL_VIEW }),
     // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
     // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
     // struck off here, calibrated in scripts/truth/calibration.json.

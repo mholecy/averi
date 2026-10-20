@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { coverText, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, isUntold, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { judgedWithOrder, type OrderEyes, type OrderQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
@@ -13,7 +13,7 @@ import { orderRemedyText, outsideItsScrollView, presentedRemedy, type PixelRegio
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
-import { orderOfFrame, untoldAll } from './eyes.js';
+import { apartOfFrame, orderOfFrame, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
 import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } from './poll-verdict.js';
@@ -713,6 +713,27 @@ async function orderOnCapture(question: OrderQuestion, kept: KeptOrder, capture:
 }
 
 /**
+ * THE COLOUR ASSERT'S REGION ON AN UNTOLD TREE (ui-tree/geometry.ts#DrawnUntold: idb's flat list, which lists no
+ * scroll view): the eyes' third question asked of the frame the round measures (verify/eyes.ts#apartOfFrame, no
+ * capture added) — a region that reads as the screen beside it is a miss naming what it read, failed closed: idb
+ * cannot say the element is drawn there, and what the capture shows there may be the background beneath a scroll
+ * view's clip (the lab's `scroll-bounded` O passed on the white background, ADR 0010's residual 5). Undefined —
+ * measure — on a tree that tells where the element is drawn, and where the frame reads it apart or cannot say. Asked
+ * on a frame settled over the region only too: what it reads of the region that frame vouches for, and a strip beside
+ * it still moving is no plain strip (`untold`, measured) — so a background that holds still under the clip while
+ * something elsewhere animates (a spinner, a caret) fails closed as on a still screen; the miss is no final one, so
+ * the poll reads again. Not asked by the ocr assert (`glyphs`): a region of nothing but one colour holds no glyphs,
+ * and that assert fails on it.
+ * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+ */
+function blendsUntold(look: Look, element: UiNode, frame: MeasuredFrame, region: Rect): string | undefined {
+  if (!isUntold(look.scene.clips.drawnIn(element))) return undefined;
+  const seen = apartOfFrame(frame, region);
+  if (seen.seen !== 'blends') return undefined;
+  return `its region reads as the screen beside it (${seen.colour}): idb lists no scroll view to say it is drawn there — it may lie outside one; measure it under treeSource: wda`;
+}
+
+/**
  * A miss no later round can change, carried out of the tree poll to end it
  * at once — a capture the adapter refused (header, "A capture the ADAPTER
  * refuses"), or a `measure` verdict marked `final` (poll-verdict.ts). Private:
@@ -783,7 +804,11 @@ export async function pollPixels(
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
     if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
     // Measured on THE region the standing judged over (Scene.pixelRegion): the part its scroll views draw.
-    const verdict = await measure({ rect: look.scene.pixelRegion(found[0], screen), shot, measured });
+    const region = look.scene.pixelRegion(found[0], screen);
+    // Where the tree cannot tell that (idb's flat list), a colour read on the screen beside it is no measurement of it.
+    const blends = spec.glyphs === true ? undefined : blendsUntold(look, found[0], measured, region);
+    if (blends !== undefined) return { pass: false, detail: failClosed(blends, unchecked) };
+    const verdict = await measure({ rect: region, shot, measured });
     // A failure no later round can change leaves the poll at once, as a refused capture does.
     if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;

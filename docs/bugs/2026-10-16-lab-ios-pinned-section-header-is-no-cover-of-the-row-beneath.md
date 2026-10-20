@@ -66,3 +66,9 @@ sample is the header's grey.
 
 `ios-iphone17-ios27/scroll-sticky.wda.json R colour`, `R fully`; `ios-iphone17-ios27/scroll-sticky.idb.json R colour`,
 `R fully`.
+
+Since round 14's LE2 fix (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md, ADR
+0013's clip line), idb's `R fully` asks the eyes once for a clip line (its tree lists no scroll view) and they answer
+`own`: the header's label crosses R's top line (y 142: 85 % `#455A64`, the label's white and its antialiasing the rest,
+under the line test's 90 %), so no band begins at that edge. The row stays red, this note's — the clip line is no cover
+rule.

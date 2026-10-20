@@ -5,7 +5,8 @@ import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
-import { KEYBOARD_ROLE, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { findBySpec } from '../../src/ui-tree/selectors.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 import { OcrUnavailableError } from '../../src/verify/ocr.js';
@@ -46,6 +47,19 @@ function png(width: number, height: number, paint: (png: PNG) => void = () => {}
   image.data.fill(255);
   paint(image);
   return PNG.sync.write(image);
+}
+
+/**
+ * A capture (402x874, or `width` x `height`) with the element at `rect` drawn in `hex` on a black screen: what a
+ * measured element's capture shows. A screen of one colour reads as the screen beside the element, which under idb —
+ * no scroll view listed to say it is drawn there — fails closed (verify/eyes.ts#apartOfFrame).
+ */
+function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, height: 874 }): Buffer {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return png(width, height, (p) => {
+    for (let o = 0; o < p.data.length; o += 4) [p.data[o], p.data[o + 1], p.data[o + 2]] = [0, 0, 0];
+    for (let y = rect.y; y < rect.y + rect.height; y++) for (let x = rect.x; x < rect.x + rect.width; x++) [p.data[(y * width + x) * 4], p.data[(y * width + x) * 4 + 1], p.data[(y * width + x) * 4 + 2]] = [r!, g!, b!];
+  });
 }
 
 describe('element asserts', () => {
@@ -2439,11 +2453,12 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
       ['valueDatePicker', 'swift_payment.form.value_date_picker'],
       ['valueDatePicker', 'swift_payment.form.fees_select'],
     ] as const) {
-      const fake = new FakeAdapter({ s: parseIdbDescribeAll(JSON.stringify(MODAL[screen])) }, 's');
+      const tree = parseIdbDescribeAll(JSON.stringify(MODAL[screen]));
+      const fake = new FakeAdapter({ s: tree }, 's');
       fake.platform = 'ios';
       fake.keyboard = undefined;
       fake.viewportSize = { ...IPHONE };
-      fake.nextScreenshot = solid('#FDFDFD');
+      fake.nextScreenshot = drawnAt(findBySpec(tree, { id })[0]!.rect, '#FDFDFD');
       const c = await new Verifier(fake, FAST).assert({ element: { id }, color: { expected: '#FDFDFD' } });
       expect([id, c.pass, c.detail]).toEqual([id, true, expect.stringContaining('sampled #FDFDFD')]);
     }
@@ -2459,7 +2474,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
           throw new Error('idb describe: no screen_dimensions');
         };
       }
-      fake.nextScreenshot = shape === 'landscape' ? png(874, 402) : solid('#FDFDFD');
+      fake.nextScreenshot = drawnAt(VALUE_DATE.frame, '#FDFDFD', shape === 'landscape' ? { width: 874, height: 402 } : undefined);
       const c = await new Verifier(fake, FAST).assert({ element: { id: 'swift_payment.form.value_date_select' }, color: { expected: '#FFFFFF' } });
       expect([shape, c.detail]).toEqual([shape, expect.stringContaining('vs expected #FFFFFF')]);
     }
@@ -2467,7 +2482,8 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
 
   it('a finding like the keyboard\'s: an element scrolled out from under CONTINUE between rounds is measured — the cover cost one round, not the verdict', async () => {
     const fake = swiftForm(MESSAGE);
-    fake.nextScreenshot = solid('#FDFDFD');
+    // Drawn where it comes to rest, clear of CONTINUE.
+    fake.nextScreenshot = drawnAt({ ...MESSAGE.frame, y: 700 }, '#FDFDFD');
     let reads = 0;
     const real = fake.uiTree.bind(fake);
     fake.uiTree = async () => {
@@ -2548,6 +2564,7 @@ describe('pixel asserts under idb\'s keyboard band (D2)', async () => {
   });
   it('a key itself is the keyboard\'s own UI: measured', async () => {
     const fake = pad(545);
+    fake.nextScreenshot = drawnAt({ x: 137, y: 650, width: 133, height: 54 }, '#FFFFFF');
     const c = await new Verifier(fake, FAST).assert({ element: { text: '5' }, color: { expected: '#FFFFFF' } });
     expect(c.pass).toBe(true);
   });

@@ -25,10 +25,12 @@ import {
   rectWithin,
   rectCentre,
   sameRect,
+  toldFrame,
   visibleFractionInViewport,
   type Clips,
   type Cut,
   type Drawn,
+  type DrawnFrame,
   type Edge,
 } from './geometry.js';
 import type { KeyboardLine } from './keyboard-position.js';
@@ -81,8 +83,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay the
  *   scroll view out taller; a stop judges it under any line. Where
  *   uiautomator did cut a rect to its scroll view the frame cuts nothing;
- *   idb's flat list (no scroll view listed: a residual) and a node under
- *   nothing that scrolls have none: unchanged. Measured: the at-rest SWIFT
+ *   a node under nothing that scrolls has none, and idb's flat list, which
+ *   lists no scroll view, tells none (geometry.ts#DrawnUntold): judged on
+ *   the screen alone — ADR 0010's residual 5, the eyes looking where a
+ *   claim rests on it (verify/eyes.ts#apartOfFrame for the colour assert,
+ *   ui-tree/eyes.ts#eyesQuestion's clip lines for a `fully: true` claim). Measured: the at-rest SWIFT
  *   form lists `payee_name_input` at `24,801 354x52`, below its `ScrollView
  *   0,0 402x780`; a tap at its centre was reported done on the bare
  *   background. On Android the lab app's `scroll-bounded` lists `S` at
@@ -437,7 +442,7 @@ export interface StandingFacts {
   /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
   /**
-   * With `drawn` only, on a tree whose source lists the node where it lies (geometry.ts#Drawn.listedWhereItLies, WDA's):
+   * With `drawn` only, on a tree whose source lists the node where it lies (geometry.ts#DrawnFrame.listedWhereItLies, WDA's):
    * `drawn` is then the window a row moves through as the content does — the one tree on which `scroll_until`'s carry
    * model measures a stroke's carry (interact/scroll-rounds.ts#stillNeeds).
    */
@@ -751,7 +756,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
       // What it reads is asked of THE region (`pixelRegion`): what is judged over it is what its sampler reads.
       const { drawn, rect } = pixelDrawn(node, usable);
       const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
-      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, drawn), single.box, single, read, !listsAncestry(tree));
+      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, toldFrame(drawn)), single.box, single, read, !listsAncestry(tree));
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
     }
     const touch = touchScreen(screen, tree);
@@ -956,7 +961,7 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * screen, or in a system band, that lies outside what the node's scroll views draw is `outside` the scroll view
  * `scrollerOf` names — off the screen as a touch judges it, its edge the scroll view's: nothing a tap there presses is
  * the node. Off the screen stays off the screen, judged first. idb's flat list and a node under nothing that scrolls
- * have no drawn frame, and a rect uiautomator cut to its scroll view lies in it: `place` as it is. Under a witnessed keyboard
+ * have no drawn frame (idb's tells none: geometry.ts#DrawnUntold), and a rect uiautomator cut to its scroll view lies in it: `place` as it is. Under a witnessed keyboard
  * line too: a stop never stops on a centre its scroll view does not draw — a stroke brings it up into the scroll view
  * laid out above the keyboard. Only the TAP defers it past its keyboard guard
  * (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay that scroll view out taller (React Native's
@@ -964,13 +969,13 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  */
 function drawnPlace(place: PointPlace, { scene, node, centre }: Judged): PointPlace {
   if (place === 'off') return place;
-  const drawn = scene.clips.drawnIn(node);
+  const drawn = toldFrame(scene.clips.drawnIn(node));
   if (drawn === undefined || (drawn.frame !== undefined && containsPoint(drawn.frame, centre))) return place;
   return { outside: scrollerOf(drawn, (frame) => !containsPoint(frame, centre)) };
 }
 
-/** The scroll view a sentence names for a node outside what its scroll views draw (`Drawn`): the nearest whose frame `leaves` it, else the nearest. */
-const scrollerOf = (drawn: Drawn, leaves: (frame: Rect) => boolean): UiNode => drawn.scrollers.find((s) => leaves(s.rect)) ?? drawn.scrollers[0];
+/** The scroll view a sentence names for a node outside what its scroll views draw (`DrawnFrame`): the nearest whose frame `leaves` it, else the nearest. */
+const scrollerOf = (drawn: DrawnFrame, leaves: (frame: Rect) => boolean): UiNode => drawn.scrollers.find((s) => leaves(s.rect)) ?? drawn.scrollers[0];
 
 /**
  * `frame` cut by the node's drawn frame (geometry.ts#drawnPart): `frame` itself when nothing cuts it (the same
@@ -995,7 +1000,7 @@ function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
  * else on the screen.
  */
-function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: JudgedBoxes | undefined, failsOpen: boolean, drawn: Drawn | undefined): RegionPlace {
+function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: JudgedBoxes | undefined, failsOpen: boolean, drawn: DrawnFrame | undefined): RegionPlace {
   const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
   if (on === undefined) return { off: 'wholly' };
   // Outside its scroll view next: on the box, but nothing of it drawn there — what lies there is not the element.
@@ -1206,7 +1211,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
   const { scene, node, centre } = judged;
   const seen = scene.order.exposure(node, exposed);
   const sliver = judgeSliver ? (scene.clips.cutSliver(node, seen.minPiece) ?? cutByLater(judged, seen.minPiece)) : undefined;
-  const within = scene.clips.drawnIn(node);
+  const within = toldFrame(scene.clips.drawnIn(node));
   const drawn = within?.frame;
   const facts: StandingFacts = {
     centre,
@@ -1252,7 +1257,7 @@ function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, 
   if (facts.visible > 0) return { facts };
   // Above the line but nothing of it drawn there: outside its scroll view, which a scroll moves it into.
   const shown = rectIntersection(node.rect, above);
-  const drawn = scene.clips.drawnIn(node);
+  const drawn = toldFrame(scene.clips.drawnIn(node));
   if (shown !== undefined && drawn !== undefined) return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0, scroller: scrollerOf(drawn, (f) => !rectsOverlap(f, shown)) } };
   if (line !== undefined && visibleFractionInViewport(node.rect, box) > 0) return { facts, outside: { facts, kind: 'underKeyboard', line } };
   return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0 } };
@@ -1315,7 +1320,7 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judg
  * keyboard's cut.
  */
 function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: StandingFacts): ScrollViewCut | undefined {
-  const drawn = scene.clips.drawnIn(node);
+  const drawn = toldFrame(scene.clips.drawnIn(node));
   const frame = drawn?.frame;
   if (drawn === undefined || frame === undefined) return undefined;
   const line = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);

@@ -1,5 +1,19 @@
 # BUG: under idb, a row past its scroll view's clip is judged on the screen alone — a row outside the scroll view is `Tapped` on the background and its colour assert PASSES on the background, a sliver is `Tapped`, and both stops call cut rows "fully visible"
 
+> **Status (2026-10-20, round 14): partly fixed; the rest an accepted residual (ADR 0010's residual 5).** Fixed at
+> `11daf08` (bugs/r14-le2), measured by the golden mode (against `3b6d2b0a`: exactly the four rows below changed, all
+> green), calibrate (CALIBRATED, `3b6d2b0` → `11daf08`) and the lab simulator (two runs,
+> docs/truth/live-records/ios-idb-vis-r14-le2-1.json, -2.json). idb's drawn frame is now UNTOLD
+> (`ui-tree/geometry.ts#DrawnUntold`), and the eyes look where a claim rests on it: O's colour (`#FFFFFF`) and C's
+> (`#EEEEEE`), whose region reads as the screen beside it, fail closed — "its region reads as the screen beside it …
+> idb lists no scroll view to say it is drawn there … measure it under treeSource: wda" (`verify/eyes.ts#apartOfFrame`,
+> on the frame the assert measures); P's and S's `fully: true` stops see the clip line on one screenshot (bottom 24 pt,
+> 56 pt) and fail — "cut at the edge of a scroll view the tree does not list". Live, P.fully and S.fully no longer
+> claim a stop (P: two strokes over the screen move nothing; S: the case's tap then Tapped on the background). Accepted
+> (ADR 0010's residual 5, the cost of a screenshot per tap or plain stop under the default tree source): S and O
+> `Tapped` on the background, S and O reached by the plain stop, F's and C's strokes over the screen — their rows filed
+> as that residual; `treeSource: wda` answers every row as the truth does.
+
 > **Status (2026-10-18, round 6's iOS device check):** open; two more rows. carousel-in-list's iOS capture adds C, a
 > card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85) with 7 % of it on the screen: under
 > idb its colour passes on the page's background (#EEEEEE), and scroll_until strokes sideways across the screen's

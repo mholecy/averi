@@ -5,7 +5,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import type { Cover } from '../../src/ui-tree/cover.js';
-import { drawnPart } from '../../src/ui-tree/geometry.js';
+import { drawnPart, toldFrame } from '../../src/ui-tree/geometry.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -1390,7 +1390,7 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     const scene = sceneOf(android);
     for (const [id, scroller, visible] of [['pastpage', 'web', 0], ['fitsrow', 'fits', 50 / 150]] as const) {
       const n = byId(android, id);
-      expect(scene.clips.drawnIn(n)?.frame).toEqual(byId(android, scroller).rect);
+      expect(toldFrame(scene.clips.drawnIn(n))?.frame).toEqual(byId(android, scroller).rect);
       expect(said(scene.standing(n, PIXEL, TAP))).toEqual({ kind: 'offScreen', at: tapPoint(n), visible, scroller });
       // The colour: nothing of the page's row drawn — fails closed; a third of the list's row drawn — measured there.
       expect(said(scene.standing(n, PIXEL, COLOUR(n)))).toMatchObject(visible === 0 ? { kind: 'offScreen', scroller } : { kind: 'reachable' });
@@ -1477,7 +1477,7 @@ describe('Scene.standing — the drawn frame on Android: bounds uiautomator did 
     const tree = await lab('carousel-in-list');
     const c = byId(tree, 'lab.carousel-in-list.C');
     const scene = sceneOf(tree);
-    expect(scene.clips.drawnIn(c)?.frame).toEqual(CAROUSEL);
+    expect(toldFrame(scene.clips.drawnIn(c))?.frame).toEqual(CAROUSEL);
     for (const purpose of [TAP, PLAIN, FULLY] as const) expect(scene.standing(c, PIXEL, purpose)).toMatchObject({ kind: 'offScreen', scroller: { rect: CAROUSEL } });
     expect(scene.standing(c, PIXEL, COLOUR(c))).toMatchObject({ kind: 'offScreen', scroller: { rect: CAROUSEL } });
   });
