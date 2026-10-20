@@ -38,8 +38,10 @@ export interface Cover {
  *   docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  * - `overlaid`: drawn after it, laid flush across its top or bottom `edge`, where the tree's source cut its bounds
  *   (standing.ts#OverlaidEdge, Compose's dialect) — known by that cut alone, so a sentence says how far the target may
- *   run on under it is not told, never how much of it shows. Made only where the draw order found no cover (the
- *   `fully` stop and the pixel assert, `overlaidCover`), so no node is both found and overlaid for one judgement.
+ *   run on under it is not told, never how much of it shows. Made only where the judgement found no cover of its
+ *   own (`overlaidCover`): the `fully` stop where the exposure found none; the pixel assert where no cover paints a
+ *   pixel it reads (draw-order.ts#paintsOver) — so there its node may also be among the exposure's covers, as one that
+ *   paints none. Not a cover the draw order found (`drawOrderFound`).
  *   docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
 export type CoverOrder =
@@ -50,6 +52,9 @@ export type CoverOrder =
 
 /** The cover the tree shows only by the cut at the target's `edge` (`CoverOrder`'s `overlaid`): `by`, pressing where it lies, the surface of no presented screen. */
 export const overlaidCover = (by: UiNode, edge: 'top' | 'bottom'): Cover => ({ node: by, reach: { ...by.rect }, order: { kind: 'overlaid', edge }, presented: false });
+
+/** Whether `cover` is one the draw order found (draw-order.ts#Exposure.covers) — every order but `overlaid`, which the cut alone shows. */
+export const drawOrderFound = (cover: Cover): boolean => cover.order.kind !== 'overlaid';
 
 /** The cover drawn on top at `point` — the last of `covers` whose reach contains it — or undefined. */
 export const coverAtPoint = (covers: readonly Cover[], point: Point): Cover | undefined => covers.filter((c) => containsPoint(c.reach, point)).at(-1);
@@ -76,7 +81,9 @@ export type CoverGrammar = { readonly of: 'touch'; readonly centre?: Point } | {
  * - `seenOver`: drawn over it, as a screenshot shows (`SEEN_OVER`);
  * - `drawn`: drawn over it — `under <cover> at its centre (x,y), drawn over it` in the touch's.
  * A cover has one order, so the precedence the separate lists once needed (overlaid, then untold, then seen over,
- * then drawn) is the record's: the overlaid cover is made only where no other was found.
+ * then drawn) is each judgement's rule, not this switch's: found first, else overlaid — the `fully` stop names the overlaid cover
+ * only where the exposure found none, the pixel assert only where no cover paints a pixel (standing.ts#fullyStanding,
+ * #pixelStanding).
  */
 export function coverClause(cover: Cover, grammar: CoverGrammar): string {
   const { node, reach, order } = cover;

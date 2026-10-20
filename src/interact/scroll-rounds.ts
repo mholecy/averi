@@ -2,7 +2,7 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
-import { lastPresented, type Cover } from '../ui-tree/cover.js';
+import { drawOrderFound, lastPresented, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -1154,9 +1154,9 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, courseOf(s), cover, f));
-    // Only the covers the draw order found, as before the overlaid edge was a cover: the overlaid one (cover.ts#CoverOrder's
-    // `overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
-    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => c.order.kind !== 'overlaid' && overFar(c.reach)));
+    // Only the covers the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover: the overlaid
+    // one (`overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
+    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => drawOrderFound(c) && overFar(c.reach)));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyondFarEdgeIn(farFacts(best), courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
@@ -1410,7 +1410,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
     // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
     const { facts } = best.standing;
-    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.length > 0 }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
+    // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover.
+    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.some(drawOrderFound) }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
     // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
     // last refused them — no confirm, no screenshot; this stroke's read, short as before.
     const refused = s.eyesRefused;

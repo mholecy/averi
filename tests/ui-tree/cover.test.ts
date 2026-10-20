@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect } from '../../src/adapters/types.js';
-import { coverAtPoint, coverClause, lastPresented, overlaidCover, type Cover, type CoverGrammar, type CoverOrder } from '../../src/ui-tree/cover.js';
+import { coverAtPoint, coverClause, drawOrderFound, lastPresented, overlaidCover, type Cover, type CoverGrammar, type CoverOrder } from '../../src/ui-tree/cover.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { node } from '../helpers/fake.js';
 
@@ -52,6 +52,11 @@ describe('overlaidCover — the cover the tree shows only by the cut at the targ
     const button = node({ role: 'button', label: 'Continue', rect: rect(66, 1956, 948, 154) });
     expect(overlaidCover(button, 'bottom')).toEqual({ node: button, reach: rect(66, 1956, 948, 154), order: { kind: 'overlaid', edge: 'bottom' }, presented: false });
     expect(overlaidCover(button, 'top').reach).not.toBe(button.rect);
+  });
+  it('is no cover the draw order found (`drawOrderFound`); every other order is', () => {
+    const button = node({ role: 'button', label: 'Continue', rect: rect(66, 1956, 948, 154) });
+    expect(drawOrderFound(overlaidCover(button, 'bottom'))).toBe(false);
+    for (const kind of ['drawn', 'untold', 'seenOver'] as const) expect(drawOrderFound(cover('Bar', button.rect, { order: { kind } })), kind).toBe(true);
   });
 });
 

@@ -110,6 +110,37 @@ describe('OverlaidEdge — text-under-bar P: a role-less clickable dumped as the
   });
 });
 
+describe('OverlaidEdge — found first, else overlaid: the cover a judgement found wins over the cut (cover.ts#coverClause\'s precedence)', () => {
+  /** A row 100,1000 400x100 in no scroll view, and a later button 50..1030 wide reaching past it at both ends, overlapping its bottom by `overlap` px. */
+  const barOver = (overlap: number) => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" clickable="true" resource-id="node" bounds="[100,1000][500,1100]"><node class="android.widget.TextView" text="Row" bounds="[120,1020][480,1080]" /></node><node class="android.widget.Button" clickable="true" resource-id="bar" bounds="[50,${1100 - overlap}][1030,1300]"><node class="android.widget.TextView" text="Continue" bounds="[400,1150][680,1250]" /></node>
+</node></hierarchy>`);
+    return { t, row: byId(t, 'node'), bar: byId(t, 'bar') };
+  };
+  const orderOf = (s: Standing | PixelStanding) => (s.kind === 'covered' ? s.cover.order.kind : s.kind);
+  it('flush (no overlap): the overlaid cover, for `fully` and both pixel asserts', () => {
+    const { t, row } = barOver(0);
+    for (const purpose of [FULLY, COLOUR, OCR]) expect(orderOf(standing(t, row, purpose))).toBe('overlaid');
+  });
+  it('3 px over: `fully` and the ocr assert name the cover the draw order found, not the overlaid edge — and no overlaid cover is made', () => {
+    const { t, row, bar } = barOver(3);
+    for (const purpose of [FULLY, OCR]) {
+      const s = standing(t, row, purpose);
+      expect(s.kind === 'covered' && s.cover.node).toBe(bar);
+      expect(orderOf(s)).toBe('drawn');
+      expect(overlaidOf(s)).toBeUndefined();
+    }
+  });
+  it('1 px over: `fully` names the found cover; the ocr assert, where it paints no pixel it reads, the overlaid one — the same node then both among the found covers and overlaid', () => {
+    const { t, row, bar } = barOver(1);
+    expect(orderOf(standing(t, row, FULLY))).toBe('drawn');
+    const s = standing(t, row, OCR);
+    expect(orderOf(s)).toBe('overlaid');
+    expect(s.facts.covers.map((c) => [c.node === bar, c.order.kind])).toEqual([[true, 'drawn'], [true, 'overlaid']]);
+  });
+});
+
 describe('OverlaidEdge — never for a node in a scroll view: scroll-sticky-cut R, left open', () => {
   it('R dumped from 457, where the merged sticky header ends: not read as an overlay — at rest a first row lies whole and flush under its header, the same tree', async () => {
     const t = await lab('scroll-sticky-cut');

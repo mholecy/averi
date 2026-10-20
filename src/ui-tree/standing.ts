@@ -460,8 +460,10 @@ export interface StandingFacts {
    * screen presented over it), the one over the centre, and what shows. And, on a `fully` stop or a pixel standing
    * that found no cover, the node at its overlaid edge (`OverlaidEdge`), appended as its cover (cover.ts#overlaidCover,
    * the order `overlaid`): on the `fully` stop before the order is decided, so it is also there when an earlier rule
-   * wins (where the point lies, a cut: `stopOrdered`); on the pixel's only when it is the cover. No cover the draw
-   * order found, so a reader asking where the found ones press (interact/scroll-rounds.ts's far side) leaves it out.
+   * wins (where the point lies, a cut: `stopOrdered`); on the pixel's only when it is the cover, where no cover paints
+   * a pixel it reads (draw-order.ts#paintsOver) — so its node may also be among the exposure's covers, as one that paints none. No cover the draw
+   * order found (cover.ts#drawOrderFound), so a reader asking of the found ones (interact/scroll-rounds.ts's far side and
+   * its eyes trigger) leaves it out.
    */
   readonly covers: readonly Cover[];
   readonly centreCover?: Cover;
