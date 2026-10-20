@@ -38,11 +38,12 @@ const NOW: GoldenResult[] = [
     check('r/a.json', 'E', 'fully'),
   ]),
   result('r/b.json', [check('r/b.json', 'A', 'ocr', { reply: 'SKIPPED — no OCR on this host: sandbox', kind: 'other', skipped: 'sandbox' })]),
-  result('r/d.json', [check('r/d.json', 'A', 'tap')]),
+  // Not in the base: not compared, but its KNOWN row still red is held.
+  result('r/d.json', [check('r/d.json', 'A', 'tap'), check('r/d.json', 'B', 'tap', { mismatch: 'not in the tree: y', reply: 'y', kind: 'not found' })]),
 ];
 const RATCHET: Ratchet[] = [
   // `r/a.json Z tap`: a row its capture no longer asks — the ratchet fails it as fixed.
-  { family: 'forms', known: { 'r/a.json A tap': {}, 'r/a.json B tap': {}, 'r/a.json Z tap': {}, 'r/c.json A tap': {} }, counts: { 'r/a.json': 3, 'r/c.json': 1 } },
+  { family: 'forms', known: { 'r/a.json A tap': {}, 'r/a.json B tap': {}, 'r/a.json Z tap': {}, 'r/c.json A tap': {}, 'r/d.json B tap': {} }, counts: { 'r/a.json': 3, 'r/c.json': 1 } },
   { family: 'text', known: { 'r/b.json A ocr': {} }, counts: { 'r/b.json': 1 } },
 ];
 
@@ -80,7 +81,7 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
   it("each capture whose checks differ from the ratchet's COUNTS, a capture no file counts among them", () => {
     expect(d.counts).toEqual([
       { family: 'forms', recording: 'r/a.json', was: 3, now: 4 },
-      { family: undefined, recording: 'r/d.json', was: undefined, now: 1 },
+      { family: undefined, recording: 'r/d.json', was: undefined, now: 2 },
     ]);
   });
 });
@@ -123,7 +124,7 @@ describe('golden --against: the report (diffReport)', () => {
         'tests/differential/golden/forms.known.ts',
         '  r/a.json: 4 (was 3)',
         'no family file counts it',
-        '  r/d.json: 1 (was none)',
+        '  r/d.json: 2 (was none)',
         '',
       ].join('\n'),
     );
@@ -140,7 +141,7 @@ describe('golden --against: the base (baseOf)', () => {
   it("a --json run's results; anything else fails, naming the file", () => {
     expect(baseOf(JSON.stringify({ side: '/x', results: BASE }), 'b.json')).toEqual(BASE);
     expect(() => baseOf('{ not json', 'b.json')).toThrow('golden --against: b.json is no JSON');
-    for (const bad of [{ checks: [] }, { results: [1, 2] }, { results: [{ recording: 'r/a.json' }] }, null]) {
+    for (const bad of [{ checks: [] }, { results: [1, 2] }, { results: [{ recording: 'r/a.json' }] }, { results: [{ recording: 'r/a.json', checks: [] }] }, null]) {
       expect(() => baseOf(JSON.stringify(bad), 'b.json')).toThrow('golden --against: b.json is no golden --json output');
     }
   });
