@@ -16,7 +16,7 @@ import { keyOf, WORKING_TREE, type SideRun } from './calibrate.js';
  *   the side      a commit's full SHA (its src never changes); the working tree's every file under src/ as on disk
  *   the harness   every file under scripts/differential, scripts/truth and tests/differential/golden (but the table,
  *                 scripts/truth/calibration.json, which golden never reads: the verdicts are judged from the runs anew
- *                 every time); the corpus and the rest of tests/fixtures (the fake device's dumpsys captures); the src
+ *                 every time; and the Markdown, which no run reads); the corpus and the rest of tests/fixtures (the fake device's dumpsys captures); the src
  *                 THIS checkout's harness loads itself (harnessImports: recorded-source.ts's dialect marks, replies.ts's
  *                 hints — what a fix there changes for every side); package-lock.json; the node version; and whether
  *                 the host asks the `ocr` rows (golden.ts#ocrAvailability: a run in a sandbox skips them)
@@ -53,8 +53,11 @@ export async function thisHost(repo: string): Promise<Host> {
 
 /** The harness's directories, every file of which is in the key. */
 export const HARNESS_DIRS = ['scripts/differential', 'scripts/truth', 'tests/differential/golden', 'tests/fixtures'] as const;
-/** In the harness's directories but no input of a run: the table calibrate judges the runs by. */
-const NOT_HARNESS = new Set(['scripts/truth/calibration.json']);
+/**
+ * In the harness's directories but no input of a run: the table calibrate judges the runs by, and the Markdown (the
+ * READMEs: a run reads none).
+ */
+const isInput = (file: string) => file !== 'scripts/truth/calibration.json' && !file.endsWith('.md');
 /** The process every side runs: where harnessImports starts. */
 const GOLDEN = 'scripts/differential/golden.ts';
 
@@ -103,7 +106,7 @@ export function harnessDigest(repo: string, corpus: string, host: Host): string 
   const lock = existsSync(join(repo, 'package-lock.json')) ? ['package-lock.json'] : [];
   return digestOf(
     repo,
-    [...dirs.filter((f) => !NOT_HARNESS.has(f)), ...harnessImports(repo), ...lock],
+    [...dirs.filter(isInput), ...harnessImports(repo), ...lock],
     [`node ${host.node}`, `ocr ${host.ocrSkip === undefined ? 'asked' : `skipped: ${host.ocrSkip}`}`],
   );
 }

@@ -15,6 +15,7 @@ const FILES: Record<string, string> = {
   'scripts/differential/side.ts': 'export const side = 1;',
   'scripts/truth/replies.ts': 'export const r = 1;',
   'scripts/truth/calibration.json': '{"notes":[]}',
+  'scripts/differential/README.md': '# the harness',
   'tests/differential/golden/known.ts': 'export const k = 1;',
   'tests/fixtures/truth/cell.json': '{}',
   'tests/fixtures/dumpsys.txt': 'mInputMethodWindow',
@@ -75,7 +76,7 @@ describe('side-cache.ts — the harness the runs depend on (harnessImports, harn
     expect(digest()).not.toBe(before);
   });
 
-  it.each(['scripts/truth/calibration.json', 'src/b.ts', 'src/c.ts'])('a change to %s, which no run reads: the same digest', (path) => {
+  it.each(['scripts/truth/calibration.json', 'scripts/differential/README.md', 'src/b.ts', 'src/c.ts'])('a change to %s, which no run reads: the same digest', (path) => {
     const before = digest();
     write(path, `${FILES[path]}\n// changed`);
     expect(digest()).toBe(before);
