@@ -21,12 +21,15 @@ import { keyOf, WORKING_TREE, type SideRun } from './side-run.js';
  *                 every time; and the Markdown, which no run reads); the corpus and the rest of tests/fixtures (the
  *                 fake device's dumpsys captures); the src THIS checkout's harness loads itself (harnessImports:
  *                 recorded-source.ts's dialect marks, replies.ts's hints — what a fix there changes for every side);
- *                 package-lock.json; the node version; and the host's `ocr` rows (thisHost): skipped, and why (a run
- *                 in a sandbox skips them), or asked — and then the recognizer that reads them, the swiftc toolchain
- *                 compiling it and the macOS build whose Vision runs it (the cached `ocr` replies are its readings)
+ *                 the checkout's own package-lock.json, package.json and tsconfig.json (CHECKOUT_FILES); the node
+ *                 version; and the host's `ocr` rows (thisHost): skipped, and why (a run in a sandbox skips them), or
+ *                 asked — and then the recognizer that reads them, the swiftc toolchain compiling it and the macOS build
+ *                 whose Vision runs it (the cached `ocr` replies are its readings)
  *
  * Only a side that loaded is kept: one that did not may have failed itself (killed, a checkout git refused), and is run
- * again next time. An entry is the side's checks as the run kept them, in its order — what results() reads.
+ * again next time. Nor one whose `ocr` rows its golden process decided otherwise than the key's host (decidedAsHost):
+ * each process probes for itself, after calibrate's own probe made the key. An entry is the side's checks as the run
+ * kept them, in its order — what results() reads.
  */
 
 /** A side's run that loaded: the only kind the cache keeps. */
@@ -69,6 +72,24 @@ const processExec: HostExec = async (cmd, args) => {
   const { stdout, stderr } = await promisify(execFile)(cmd, args, { encoding: 'buffer' });
   return { stdout, stderr: stderr.toString('utf8') };
 };
+
+/**
+ * Whether `run`'s `ocr` rows were decided as `host` says (thisHost, the key's): every one asked where the host asks
+ * them, every one skipped for the host's reason where it skips them. golden decides per process (golden.ts
+ * #ocrAvailability, the same probe), so a process can disagree with the probe that made the key — a transient failure,
+ * another sandbox — and its run is then no run of that key.
+ */
+export const decidedAsHost = (run: LoadedRun, host: Host): boolean => {
+  const skip = 'skipped' in host.ocr ? host.ocr.skipped : undefined;
+  return [...run.checks.values()].every((c) => c.verb !== 'ocr' || c.skipped === skip);
+};
+
+/**
+ * The checkout's own files every run is loaded by, besides the harness's: the lock (the dependencies), package.json
+ * (its `type`, how node loads every module) and tsconfig.json (how tsx compiles the harness and the working tree's
+ * src). A commit side's own are in its SHA; these are this checkout's, which runs every side.
+ */
+const CHECKOUT_FILES = ['package-lock.json', 'package.json', 'tsconfig.json'] as const;
 
 /** The harness's directories, every file of which is in the key. */
 export const HARNESS_DIRS = ['scripts/differential', 'scripts/truth', 'tests/differential/golden', 'tests/fixtures'] as const;
@@ -143,10 +164,10 @@ function digestOf(repo: string, files: Iterable<string>, extra: readonly string[
 /** The harness's part of the key (the module doc): what every side's run depends on besides the side's own src. */
 export function harnessDigest(repo: string, corpus: string, host: Host): string {
   const dirs = [...HARNESS_DIRS, corpus].flatMap((d) => filesUnder(join(repo, d)).map((f) => relative(repo, f)));
-  const lock = existsSync(join(repo, 'package-lock.json')) ? ['package-lock.json'] : [];
+  const own = CHECKOUT_FILES.filter((f) => existsSync(join(repo, f)));
   return digestOf(
     repo,
-    [...dirs.filter(isInput), ...harnessImports(repo), ...lock],
+    [...dirs.filter(isInput), ...harnessImports(repo), ...own],
     [`node ${host.node}`, 'asked' in host.ocr ? `ocr asked: ${host.ocr.asked}` : `ocr skipped: ${host.ocr.skipped}`],
   );
 }
@@ -163,9 +184,13 @@ export function sideKeys(repo: string, harness: string, commitOf: (side: string)
   };
 }
 
-/** The cache in `dir`, one JSON file per key; written whole or not at all (several sides finish at once). */
+/**
+ * The cache in `dir`, one JSON file per key; written whole or not at all (several sides finish at once, two sides of
+ * one key among them: each write stages a file of its own).
+ */
 export function sideCache(dir: string): SideCache {
   const path = (key: string) => join(dir, `${key}.json`);
+  let staged = 0;
   return {
     async get(key) {
       try {
@@ -177,7 +202,7 @@ export function sideCache(dir: string): SideCache {
     },
     async put(key, run) {
       await mkdir(dir, { recursive: true });
-      const staging = `${path(key)}.${process.pid}`;
+      const staging = `${path(key)}.${process.pid}.${staged++}`;
       await writeFile(staging, JSON.stringify({ checks: [...run.checks.values()] }));
       await rename(staging, path(key));
     },

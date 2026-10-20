@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GoldenCheck } from '../../scripts/differential/golden.js';
 import { WORKING_TREE } from '../../scripts/truth/side-run.js';
-import { harnessDigest, harnessImports, sideCache, sideKeys, thisHost, type Host, type LoadedRun } from '../../scripts/truth/side-cache.js';
+import { decidedAsHost, harnessDigest, harnessImports, sideCache, sideKeys, thisHost, type Host, type LoadedRun } from '../../scripts/truth/side-cache.js';
 
 const HOST: Host = { node: 'v26.0.0', ocr: { asked: 'swift-driver version: 1.120.5 Apple Swift version 6.2; macOS 26A100' } };
 
@@ -25,6 +25,8 @@ const FILES: Record<string, string> = {
   'src/b.ts': 'export type B = number;',
   'src/c.ts': 'export const c = 1;',
   'package-lock.json': '{"lockfileVersion":3}',
+  'package.json': '{"type":"module"}',
+  'tsconfig.json': '{"compilerOptions":{}}',
 };
 
 let repo: string;
@@ -89,6 +91,8 @@ describe('side-cache.ts — the harness the runs depend on (harnessImports, harn
     'src/a.ts',
     'src/a2.ts',
     'package-lock.json',
+    'package.json',
+    'tsconfig.json',
   ])('a change to %s: another digest', (path) => {
     const before = digest();
     write(path, `${FILES[path]}\n// changed`);
@@ -200,11 +204,41 @@ describe('side-cache.ts — the cache on disk (sideCache)', () => {
     expect(back !== undefined && 'checks' in back && [...back.checks.keys()]).toEqual(['b t tap', 'a t tap']);
   });
 
+  it('two sides of one key finishing at once: both writes land, the entry whole — each stages a file of its own', async () => {
+    const cache = sideCache(join(repo, 'cache'));
+    const runs: LoadedRun[] = ['a', 'b', 'c', 'd'].map((r) => ({ checks: new Map([[`${r} t tap`, check(r)]]) }));
+    await Promise.all(runs.map((run) => cache.put('k', run)));
+    expect(runs).toContainEqual(await cache.get('k'));
+  });
+
   it('an entry not whole (cut short, or JSON of another shape): none kept — the side is run again', async () => {
     write('cache/cut.json', '{"checks":[{"recording":');
     write('cache/other.json', '{"runs":[]}');
     const cache = sideCache(join(repo, 'cache'));
     expect(await cache.get('cut')).toBeUndefined();
     expect(await cache.get('other')).toBeUndefined();
+  });
+});
+
+describe("side-cache.ts — a run decided as the key's host (decidedAsHost)", () => {
+  const ocr = (skipped?: string): GoldenCheck => ({ recording: 'r', target: 't', verb: 'ocr', reply: 'r', ...(skipped !== undefined && { skipped }) }) as GoldenCheck;
+  const tap = { recording: 'r', target: 't', verb: 'tap', reply: 'r' } as GoldenCheck;
+  const run = (...checks: GoldenCheck[]): LoadedRun => ({ checks: new Map(checks.map((c, i) => [`${i}`, c])) });
+  const SKIPPED: Host = { ...HOST, ocr: { skipped: 'Vision answers nilError' } };
+
+  it('the host asks the rows: a run that asked them all fits; one that skipped any does not', () => {
+    expect(decidedAsHost(run(tap, ocr(), ocr()), HOST)).toBe(true);
+    expect(decidedAsHost(run(tap, ocr(), ocr('Vision answers nilError')), HOST)).toBe(false);
+  });
+
+  it("the host skips them: a run that skipped them all for the host's reason fits; one that asked any, or skipped for another reason, does not", () => {
+    expect(decidedAsHost(run(tap, ocr('Vision answers nilError')), SKIPPED)).toBe(true);
+    expect(decidedAsHost(run(tap, ocr('Vision answers nilError'), ocr()), SKIPPED)).toBe(false);
+    expect(decidedAsHost(run(ocr('no swiftc on this host (ENOENT)')), SKIPPED)).toBe(false);
+  });
+
+  it('a run of no ocr row fits either host', () => {
+    expect(decidedAsHost(run(tap), HOST)).toBe(true);
+    expect(decidedAsHost(run(tap), SKIPPED)).toBe(true);
   });
 });

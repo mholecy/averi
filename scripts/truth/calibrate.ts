@@ -8,7 +8,7 @@ import type { GoldenCheck } from '../differential/golden.js';
 import { runSide, runSides, type SideDeps } from './calibrate-run.js';
 import { calibrationReport, verdictCell } from './calibration-report.js';
 import { FAMILIES } from './schema.js';
-import { harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
+import { decidedAsHost, harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
 import { WORKING_TREE, type SideRun } from './side-run.js';
 
 /**
@@ -459,6 +459,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     run: (side) => runSide(side, repo, deps),
     cache: sideCache(cacheDir),
     keys: () => sideKeys(repo, harnessDigest(repo, table.corpus, host), commitOf),
+    fits: (run) => decidedAsHost(run, host),
     mode: values['no-cache'] === true ? 'refresh' : 'reuse',
     jobs,
     log: (line) => console.error(line),
