@@ -58,7 +58,7 @@ open note on the working tree. See the script for the verdicts.
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | calibrate | 3b6d2b0 → 11daf08 | CALIBRATED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | calibrate | 003edf3 → 40b4856 | CALIBRATED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
-| VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
+| VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | calibrate | cbc584b → 7957a62 | CALIBRATED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
@@ -1145,15 +1145,16 @@ Red before the fix (003edf31, its first parent: the reading-order peers moved in
 
 Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to the target's own scroll view. Also sheet-long-list-short's F (round 3): the stroke touched down at (201,699), on the footer beside the sheet's table. Fixed by round 5's 0a, 958bd27 on arch/r21-strokes (a WDA target's strokes go over its own scroll views: WDA marks no node as clipping, so the clipping chain was empty), merged into arch/round-21 as fecb0b3 (the branch's tip 1bd8148 adds only the notes): the pair is that merge and its first parent 0e179aa (arch/r21-kbline's merge, no src change from debc9b2), as the table pairs the other fixes merged to a mainline (#29, #35). After: O and F stroked inside `lower` (201 524 → 416), sheet-long-list-short's F inside the table (201 369 → 139).
 
-## VA1: OPEN-RED
+## VA1: CALIBRATED
 
-2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md — defect: `^passed on|fully visible`
+2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md — defect: `fully visible`
 
-- working tree:
-  - RED android-averi_lab-api33/scroll-sticky-cut.xml R colour — passed on #00897B: PASS  element id:"lab.scroll-sticky-cut.R" fill within dE00 8 of #00897B — sampled #00897B (dominant, 100% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 1.000
+- before cbc584b:
   - RED android-averi_lab-api33/scroll-sticky-cut.xml R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky-cut.R" fully visible after 0 swipes
+- after 7957a62:
+  - ok android-averi_lab-api33/scroll-sticky-cut.xml R fully — Element id:"lab.scroll-sticky-cut.R" fully visible after 1 swipe; its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and dr
 
-No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744). Round 9's B4-L1 fix first read the sticky header as an overlay of the row (7755978): golden green, but on the device scroll_until R fully stroked the list away and timed out (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) — at rest a first row lies whole and flush under its sticky header, the same tree as the row it cuts; e6ed7d4 dropped the clause, and 151b2ca made an overlaid edge never for a node in a scroll view at all (ADR 0013, refined 2026-10-20). Left for a flush probe toward the header.
+Red before the fix (cbc584b6, its first parent, and at #9's 10fb02b and d2b7744 alike: fully visible after 0 swipes). Round 9's B4-L1 fix first read the sticky header as an overlay of the row (7755978): golden green, but on the device scroll_until R fully stroked the list away and timed out (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) — at rest a first row lies whole and flush under its sticky header, the same tree. Fixed by round 14's 7957a62: an edge laid flush under a node pinned at its scroll view's top (or left) inside that scroll view is `pinnedInScrollView` (ui-tree/later-edges.ts#PinnedEdge), and the fully stop's flush probe goes toward it (scroll-rounds.ts#flushWith; ADR 0013 refined 2026-10-20, round 14) — R fully visible after 1 swipe in the replay, the probe from inside the list below the header. The colour row stays KNOWN as ADR 0013 residual 3 (the pixel assert has no probe). Live: android-vis-r14-va1*.json (2 swipes, list 66→0, 0→0, Tapped; the at-rest twin scroll-sticky-rest after 1).
 
 ## B4-L1: CALIBRATED
 

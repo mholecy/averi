@@ -32,7 +32,6 @@ import type { ReplyKind } from './replies.js';
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
-const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
@@ -66,7 +65,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // (#10's turn:scroll-collapsing.A, filed here until 2026-10-18: ok since the owner decided no turn on uiautomator —
   // ADR 0021 — and its judge became live-visibility.ts#judgeAndroidTurn: a loud failure naming `up` after the
   // two-stroke stop, which the record reads.)
-  ...each('android uiautomator', ['scroll:scroll-sticky-cut.R.fully'], VA1, 'stop-claim', 'visible'),
+  // VA1 (scroll-sticky-cut's R.fully; docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md):
+  // fixed by the flush probe toward a sticky header pinned in the row's list, ok live twice (android-vis-r14-va1*.json:
+  // 2 swipes, list 66→0, 0→0, Tapped), struck off.
   ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1, 'unchanged-claim', 'not found'),
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', { intermittent: true }),
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),

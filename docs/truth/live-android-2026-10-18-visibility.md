@@ -282,6 +282,27 @@ entries now ok (struck off live-known.ts):
   `377,380 948x234` (91 % in the viewport, its centre in the carousel), then the tap fires C at (729,497) — the
   R-stroke round 6 could not ask of averi on Android.
 
+# Round 14, VA1: the flush probe toward a sticky header pinned in the row's list (2026-10-20)
+
+bugs/r14-va1 at `28210b37` (the fix `2641fbc`, ui-tree/later-edges.ts#PinnedEdge read by scroll-rounds.ts#flushWith —
+its src behaviour and replies unchanged in the code-reviewed fix `7957a62`;
+then the lab cell `scroll-sticky-rest`), and the at-rest case of live-visibility.ts#AT_REST, run from that checkout
+(its src as reviewed) on averi_lab (emulator-5554, booted `-no-window -no-snapshot-save`, shut down after), the lab app
+built from it and installed, `--groups visibility --cells scroll-sticky-cut,scroll-sticky-rest`. Records
+docs/truth/live-records/android-vis-r14-va1.json and -2.json, identical case by case: 5 cases, 5 ok, 0 loud, 0
+mismatches, exit 0 (VA1's entry already struck off live-known.ts):
+
+- `scroll_until R fully: true` on scroll-sticky-cut (R `128,391 825x176`, 66 px under the merged header, dumped
+  `128,457 825x110`): two probes toward the header from inside the list below it, (540,551) both — the app's list
+  offset 66 → 0 (R whole at `128,457 825x176`, flush under the header again), then 0 → 0 — "fully visible after 2
+  swipes; its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its
+  scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing", and the tap fires R at (541,545) (before: "fully visible after 0 swipes", R 66 px under the header). No
+  stroke carried R off, as round 9's overlay rule did (66→877→439→1→205, android-vis-r9-b4l1-sticky.json).
+- `scroll_until R fully: true` on scroll-sticky-rest (R whole at rest under the same header, the same tree): one probe,
+  list 0 → 0, "fully visible after 1 swipe", the tap fires R — the case that refused round 9 stops.
+- The taps on both R and the plain stop on scroll-sticky-cut's R as before: `Tapped` at its clear centre, "fully visible
+  after 0 swipes" (the plain stop judges the centre).
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

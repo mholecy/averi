@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeAtRest, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -140,6 +140,31 @@ describe('judgeScroll', () => {
   it('the stop held but the tap after it fired something else: MISMATCH', () => {
     const other = state({ ...reached, events: [{ kind: 'tab', tag: 'home', at }] });
     expect(judgeScroll(c, ['Element id:"x" visible after 1 swipe', 'Tapped id:"x"'], other, launched).outcome).toBe('MISMATCH');
+  });
+});
+
+describe('judgeAtRest — a first row at rest flush under its sticky header (VA1\'s scroll-sticky-rest): fully stops on it after a probe that moves nothing', () => {
+  // Android px: R whole at 457..633 under the merged header 303..457, the list 0,303 1080x1238 at offset 0.
+  const rest = (over: Partial<LabState> = {}): LabState =>
+    state({ screen: { x: 0, y: 0, width: 1080, height: 2220 }, scale: 1, safeArea: { top: 66, left: 0, bottom: 66, right: 0 }, frames: { R: { x: 128, y: 457, width: 825, height: 176 } }, scrollViews: { list: { x: 0, y: 303, width: 1080, height: 1238 } }, offsets: { list: 0 }, chrome: { stickyHeader: { x: 0, y: 303, width: 1080, height: 154 } }, ...over });
+  const launched = rest();
+  const fired = rest({ strokes: [stroke(0, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
+  const VISIBLE = 'Element id:"lab.scroll-sticky-rest.R" fully visible after 1 swipe; its top edge lies on the edge of …, pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing';
+  it('one probe that moved nothing, then the tap fires R: ok', () => {
+    expect(judgeAtRest('R', 'list', [VISIBLE, 'Tapped id:"lab.scroll-sticky-rest.R"'], fired, launched).outcome).toBe('ok');
+  });
+  it('a stroke that moved the list, or more than one swipe, or no stop: MISMATCH', () => {
+    // Stroked away and back (round 9's overlay rule stroked the list 66→877→439→1→205): whole again at the stop, still a break.
+    const moved = rest({ strokes: [stroke(0, 66, 'list'), stroke(66, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
+    expect(judgeAtRest('R', 'list', [VISIBLE, 'Tapped'], moved, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^R-direction \(at rest\): a stroke moved list 0→66; a stroke moved list 66→0/) });
+    expect(judgeAtRest('R', 'list', [VISIBLE.replace('after 1 swipe', 'after 2 swipes'), 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/2 swipes/) });
+    expect(judgeAtRest('R', 'list', ['ERROR scroll_until failed after 4 swipes', 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH' });
+  });
+  it('visibilityCases asks it of scroll-sticky-rest\'s R on Android, down, fully: true', () => {
+    const t: TargetTruth = { tag: 'R', id: 'lab.scroll-sticky-rest.R', color: '#00897B', declared: 'open', frame: { x: 128, y: 457, width: 825, height: 176 }, reached: true, probe: [], drawn: 1, seen: '#00897B', geometry: 'whole', scrollView: 'list' };
+    const cs = visibilityCases({ cell: 'scroll-sticky-rest', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t], scrollViews: { list: { x: 0, y: 303, width: 1080, height: 1238 } } }, 'android');
+    expect(cs.map((c) => c.id)).toEqual(['tap:scroll-sticky-rest.R', 'rest:scroll-sticky-rest.R.fully']);
+    expect(cs[1].calls).toEqual([{ tool: 'scroll_until', args: { selector: 'id:"lab.scroll-sticky-rest.R"', direction: 'down', fully: true } }, { tool: 'tap', args: { selector: 'id:"lab.scroll-sticky-rest.R"' } }]);
   });
 });
 

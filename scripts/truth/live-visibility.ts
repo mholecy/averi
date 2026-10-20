@@ -539,7 +539,47 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     });
   }
   if (platform === 'ios' && truth.cell === CARRY.cell) cases.push(carryCase());
+  for (const r of AT_REST.filter((x) => x.cell === truth.cell && platform === 'android')) {
+    const t = truth.targets.find((x) => x.tag === r.tag);
+    if (t?.scrollView !== undefined) cases.push(atRestCase(truth.cell, t, t.scrollView));
+  }
   return cases;
+}
+
+/**
+ * The at-rest cases (VA1, docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md): a first
+ * row WHOLE and flush under a sticky header pinned in its list, dumped exactly as the row the header cuts — the tree
+ * on which reading the header as an overlay of the row strokes the row away (the note's history). Judged whole, it gets no scroll case of its own; this one asks `fully: true`
+ * of it, which must stop on it (the flush probe toward the header moving nothing) and tap it — never stroke it away.
+ */
+export const AT_REST: readonly { cell: string; tag: string }[] = [{ cell: 'scroll-sticky-rest', tag: 'R' }];
+
+function atRestCase(cell: string, t: TargetTruth, view: string): VisibilityCase {
+  return {
+    id: `rest:${cell}.${t.tag}.fully`,
+    cell,
+    says: `scroll_until ${t.tag} (whole, flush under the sticky header pinned in ${view}) down, fully: stops on it after at most one probe that moves nothing, then the tap fires it (VA1's at-rest twin)`,
+    calls: [
+      { tool: 'scroll_until', args: { selector: selectorOf(t), direction: 'down', fully: true } },
+      { tool: 'tap', args: { selector: selectorOf(t) } },
+    ],
+    judge: (s, replies, launched, _source, after) => judgeAtRest(t.tag, view, replies, s, launched, after[0] ?? s),
+  };
+}
+
+/**
+ * An at-rest case's judge (AT_REST): judgeScroll's `fully` stop and tap — and on top, the target whole where it was
+ * launched: no more than one swipe said, and no stroke of `view` the app logged moved it (the probe toward the header
+ * moves nothing at offset 0). A stroke that moved it is the failure of reading the header as an overlay (the note).
+ */
+export function judgeAtRest(tag: string, view: string, replies: readonly string[], final: LabState, launched: LabState, atStop: LabState = final): LiveVerdict {
+  const verdict = judgeScroll({ tag, view, fully: true, platform: 'android' }, replies, final, launched, atStop);
+  if (verdict.outcome !== 'ok') return verdict.outcome === 'LOUD' ? { ...verdict, outcome: 'MISMATCH', cls: 'failed-holds', why: `whole at rest, yet ${verdict.why}` } : verdict;
+  const [scroll] = replies;
+  const swipes = swipesOf(scroll) ?? 0;
+  const moved = strokesSince(atStop, launched).filter((s) => s.view === view && Math.abs(s.to - s.from) > MOVE_SLACK);
+  const breaks = [...(swipes > 1 ? [`${swipes} swipes where one probe settles it`] : []), ...moved.map((s) => `a stroke moved ${view} ${round(s.from)}→${round(s.to)}`)];
+  return breaks.length === 0 ? verdict : { outcome: 'MISMATCH', cls: 'R-direction', kind: verdict.kind, why: `R-direction (at rest): ${breaks.join('; ')} — averi: ${short(scroll)}`, app: verdict.app };
 }
 
 /**

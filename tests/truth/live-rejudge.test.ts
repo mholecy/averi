@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -164,19 +164,14 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // WDA; C's tap and scroll_until refused as under W, seen so, nothing fired or stroked. Its first run, -1.json, is
     // pinned below: idb's first case timed out there, vacuous, as round 8's -3.json.
     ['ios-vis-r9-l4w-2.json', 'visibility', { cases: 40, ok: 15, loud: 0, mismatches: 25 }],
-    // round 9's B4-L1 fix (fix/r9-b4l1 e6ed7d43; docs/truth/live-android-2026-10-18-visibility.md, its round-9 B4-L1
-    // section): pinned-bar, text-under-bar, scroll-sticky-cut, bands and tabbar-floating — every tap as before (pinned-bar
-    // P Tapped at its clear centre), scroll-sticky-cut R fully the known VA1 stop-claim, tabbar-floating F LV1's.
-    ['android-vis-r9-b4l1.json', 'visibility', { cases: 18, ok: 16, loud: 0, mismatches: 2 }],
     // round 9's final device check at its final src (fix/round-9 14a7d90d, after the code review tightened the eyes'
     // guards; docs/truth/live-ios-2026-10-18-visibility.md and live-android-2026-10-18-visibility.md, their round-9
     // final sections): the blur menus read as at 1ef11b9c — W Tapped, W alone fired, under idb and WDA; C's tap and
     // scroll_until refused as under W, seen so, nothing fired or stroked (-2.json; -1.json below: the first-case idb
-    // timeout again). A sanity set of other iOS visibility cells as live-known.ts knows them; B4-L1's cells on
-    // Android as at e6ed7d43 (VA1 and LV1 the two known mismatches).
+    // timeout again). A sanity set of other iOS visibility cells as live-known.ts knows them. (Its Android record,
+    // android-vis-r9-final.json, is pinned below VA1's fix.)
     ['ios-vis-r9-final-2.json', 'visibility', { cases: 40, ok: 15, loud: 0, mismatches: 25 }],
     ['ios-vis-r9-final-sanity.json', 'visibility', { cases: 78, ok: 66, loud: 2, mismatches: 10 }],
-    ['android-vis-r9-final.json', 'visibility', { cases: 18, ok: 16, loud: 0, mismatches: 2 }],
     // Round 14's fix of LE1 (bugs/r14-le1, the drawn frame on Android): its six cases ok — S's and C's taps refused
     // outside their scroll view, P and S stroked inside upper/lower, C stroked sideways inside the carousel (824,497).
     ['android-vis-r14-le1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
@@ -187,6 +182,11 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // (list 24→0), R whole at 51,166, fully visible after 1 swipe, Tapped; its tap and plain stop as before.
     ['ios-vis-r14-le3-1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-vis-r14-le3-2.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    // Round 14's fix of VA1 (bugs/r14-va1 7957a62, the flush probe toward a sticky header pinned in the row's list):
+    // scroll-sticky-cut's R fully stops after 2 swipes (list 66→0, then 0→0), Tapped; scroll-sticky-rest's R, whole at
+    // rest under the same header, fully after 1 swipe (list 0→0), Tapped — twice; the taps and the plain stop as before.
+    ['android-vis-r14-va1.json', 'visibility', { cases: 5, ok: 5, loud: 0, mismatches: 0 }],
+    ['android-vis-r14-va1-2.json', 'visibility', { cases: 5, ok: 5, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -421,6 +421,9 @@ describe('live.ts --rejudge over the committed iOS records of the src before idb
   });
 });
 
+/** VA1's live case (docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md), struck off live-known.ts by round 14's fix. */
+const VA1_CASE = 'scroll:scroll-sticky-cut.R.fully';
+
 /** LE1's six live cases (docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md), struck off live-known.ts by round 14's fix. */
 const LE1_CASES = ['scroll:scroll-bounded.P.fully', 'tap:scroll-bounded.S', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully', 'tap:carousel-in-list.C', 'scroll:carousel-in-list.C'];
 
@@ -439,10 +442,26 @@ describe('live.ts --rejudge over the committed Android visibility records of the
     // no turn on uiautomator, a loud failure naming `up` after the two-stroke stop — live-visibility.ts#judgeAndroidTurn)
     ['android-vis.json', { cases: 111, ok: 98, loud: 3, mismatches: 10 }],
     ['android-vis-r7final.json', { cases: 137, ok: 120, loud: 3, mismatches: 14 }],
-  ] as const)('%s: LE1\'s six cases not known', { timeout: 60_000 }, async (record, want) => {
+  ] as const)('%s: LE1\'s six cases not known, and VA1\'s', { timeout: 60_000 }, async (record, want) => {
     const { code, out } = await rejudge(record, 'visibility');
-    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(6 not known\\), 0 skipped$`, 'm'));
-    expect(notKnown(out)).toEqual(LE1_CASES);
+    // (6 not known until VA1's fix, round 14: its case since.)
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(7 not known\\), 0 skipped$`, 'm'));
+    expect(notKnown(out).sort()).toEqual([...LE1_CASES, VA1_CASE].sort());
+    expect(code).toBe(1);
+  });
+});
+
+// Before VA1's fix (round 14).
+describe('live.ts --rejudge over the committed Android records of round 9\'s src, before VA1\'s fix', () => {
+  // round 9's B4-L1 fix (fix/r9-b4l1 e6ed7d43; docs/truth/live-android-2026-10-18-visibility.md, its round-9 B4-L1
+  // section) and round 9's final device check (fix/round-9 14a7d90d): pinned-bar, text-under-bar, scroll-sticky-cut,
+  // bands and tabbar-floating — every tap as before (pinned-bar P Tapped at its clear centre), tabbar-floating F LV1's
+  // known mismatch, scroll-sticky-cut R fully "fully visible after 0 swipes" under the header: VA1's stop-claim, known
+  // until round 14 struck it off — not known now, a calibration of that src: exit 1, as recorded.
+  it.each([['android-vis-r9-b4l1.json'], ['android-vis-r9-final.json']] as const)('%s: VA1\'s case not known', { timeout: 60_000 }, async (record) => {
+    const { code, out } = await rejudge(record, 'visibility');
+    expect(out).toMatch(/^# Live golden: 18 cases, 16 ok, 0 loud, 2 mismatches \(1 not known\), 0 skipped$/m);
+    expect(notKnown(out)).toEqual([VA1_CASE]);
     expect(code).toBe(1);
   });
 });
@@ -457,14 +476,14 @@ describe('live.ts --rejudge over the committed Android records of the src before
     // round 6's device check (src e98b87e) with the forms cases: k3 (a fill into note's 14-px strip under the bar) ok
     // since the owner's decision of 2026-10-18 — refused by design, the field untouched (live.ts k3); b1d and b7
     // (F2A2) LOUD. (Its visibility group alone is pinned above.)
-    // Since round 14, LE1's six cases not known too (its src before that fix).
-    ['android-vis.json', 'forms,visibility', { cases: 133, ok: 117, loud: 5, mismatches: 11, unknown: ['k7', ...LE1_CASES] }],
+    // Since round 14, LE1's six cases not known too (its src before that fix), and VA1's.
+    ['android-vis.json', 'forms,visibility', { cases: 133, ok: 117, loud: 5, mismatches: 11, unknown: ['k7', ...LE1_CASES, VA1_CASE] }],
     // A6's own run of k7 at its base, arch/round-23 bd43fc66, before the eyes
     ['android-k7-eyes-before-bd43fc66.json', 'forms', { cases: 1, ok: 0, loud: 0, mismatches: 1, unknown: ['k7'] }],
   ] as const)('%s (--groups %s): k7 not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.unknown.length} not known\\), 0 skipped$`, 'm'));
-    expect(notKnown(out)).toEqual(want.unknown);
+    expect(notKnown(out).sort()).toEqual([...want.unknown].sort());
     expect(out).toMatch(/^- MISMATCH k7 .*fully visible after 1 swipe — 18 px of phone under the bar, unsaid/m);
     expect(code).toBe(1);
   });
@@ -495,9 +514,9 @@ describe('live.ts --rejudge over the committed record of a --side run of b71cbbb
   it('android-vis-b71cbbb.json: the scroll cases beneath the dialog and the half sheet, and k7, not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('android-vis-b71cbbb.json', 'forms,visibility');
     // (108 ok, 20 mismatches until 2026-10-18: the turn of scroll-collapsing's A ok by the Android turn judge since.)
-    // (9 not known until round 14: LE1's six cases since.)
-    expect(out).toMatch(/^# Live golden: 133 cases, 109 ok, 5 loud, 19 mismatches \(15 not known\), 0 skipped$/m);
-    expect(notKnown(out).sort()).toEqual(['k7', ...LE1_CASES, ...['alert-dim', 'sheet-medium'].flatMap((c) => ['A', 'B', 'C', 'D'].map((t) => `scroll:${c}.${t}`))].sort());
+    // (9 not known until round 14: LE1's six cases since, and VA1's.)
+    expect(out).toMatch(/^# Live golden: 133 cases, 109 ok, 5 loud, 19 mismatches \(16 not known\), 0 skipped$/m);
+    expect(notKnown(out).sort()).toEqual(['k7', ...LE1_CASES, VA1_CASE, ...['alert-dim', 'sheet-medium'].flatMap((c) => ['A', 'B', 'C', 'D'].map((t) => `scroll:${c}.${t}`))].sort());
     expect(code).toBe(1);
   });
 });

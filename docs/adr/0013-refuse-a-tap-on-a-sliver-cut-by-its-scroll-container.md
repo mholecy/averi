@@ -352,8 +352,15 @@ probe spends one of `maxSwipes`, so at worst the stop says `budget`, unchecked, 
 
 Measured: golden over the whole corpus with OCR changes one reply — `scroll-sticky-cut.xml R fully`, red to green,
 "fully visible after 1 swipe" with the probe `540 551 → 540 728` from inside the list below the header (the replayed
-probe moves nothing) — 1410 checks, 224 → 223 mismatches. Over every Android dump in the fixtures exactly two nodes
-have a pinned edge: that `R` and its content `Target R`. iOS is untouched (no tree that cuts at later nodes).
+probe moves nothing) — 1410 checks, 224 → 223 mismatches. Over every uiautomator dump in the fixtures exactly two nodes
+have a pinned edge: that `R` and its content `Target R` (and, since the lab cell below, `scroll-sticky-rest`'s); over
+Compose's own snapshots of the banking app (tests/fixtures/android-ui-snapshot-compose.json) one: Account Detail's
+`date_header_22`, flush under `date_header_21` pinned at the transactions list's top — a sticky date header, so a
+`fully: true` stop on it pays the probe too. iOS is untouched (no tree that cuts at later nodes). Live on averi_lab,
+twice (docs/truth/live-records/android-vis-r14-va1.json, -2.json): `scroll_until R fully: true` probes toward the header
+from inside the list, the list 66 → 0 then 0 → 0, "fully visible after 2 swipes", the tap fires R; on the lab's new
+`scroll-sticky-rest` (R whole at rest under the same header — the case that refused round 9's rule) one probe that moves
+nothing, "fully visible after 1 swipe", Tapped.
 
 Bug note: docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
 
