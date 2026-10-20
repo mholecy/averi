@@ -8,12 +8,11 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
 // list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
 // (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
-// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE3; LE4 is calibrated since
-// round 5's 0a, LE1 and LE2's fixed half since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
+// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE4 is calibrated since
+// round 5's 0a, LE1, LE2's fixed half and LE3 since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
 
 /** LE2's rest, accepted (ADR 0010's residual 5): with no scroll view listed and no screenshot per tap or stop, the tap, the plain stop and the strokes are judged on the screen alone; treeSource: wda lists the scroll views. */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
-const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (201,699)';
 
@@ -46,11 +45,10 @@ export const edges: KnownFile = {
     // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
     // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
     // struck off here, calibrated in scripts/truth/calibration.json.
-    // LAB FINDING LE3 — SwiftUI lists the pinned section header before the rows it lies over: no cover of R's top 24 pt.
-    ...[`${IOS}/scroll-sticky.wda.json`, `${IOS}/scroll-sticky.idb.json`].flatMap((file) => [
-      ...keys(file, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the pinned header, listed first, is no cover of what the colour samples', as: LE3 }),
-      ...keys(file, ['R'], ['fully'], { cls: 'fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the pinned header is no cover for fully: true', as: LE3 }),
-    ]),
+    // LAB FINDING LE3 — fixed on bugs/r14-le3 (round 14): SwiftUI lists the pinned section header before the rows it
+    // lies over; the parsers keep its Header trait (UiNode.heading), and a heading listed before a target it overlaps,
+    // in a reading-order listing, is drawn over it (ui-tree/reading-order.ts#headingsOver): R's colour and fully rows
+    // green on idb and WDA, struck off here, calibrated in scripts/truth/calibration.json.
     // LAB FINDING VA1 — Compose cuts a row (and its content) at a sticky header that is one accessibility element: the
     // tree's row 128,457 825x110 begins at the header's bottom, its content cut alike, so nothing in it reaches under the
     // header — averi samples the cut rect (a PASS on R's own colour) and calls it fully visible.

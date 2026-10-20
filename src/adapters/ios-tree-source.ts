@@ -104,6 +104,8 @@ interface IdbElement {
   AXUniqueId?: string | null;
   AXValue?: string | null;
   frame?: Rect;
+  /** idb's accessibility traits (`["StaticText", "Header", "Scrollable"]`): read for `Header` alone (UiNode.heading). */
+  traits?: string[] | null;
 }
 
 /**
@@ -138,13 +140,15 @@ export function markIdbDialect<T extends UiNode>(tree: T): T {
 }
 
 function idbTree(elements: IdbElement[]): UiNode {
-  const children: UiNode[] = elements.map((el) =>
-    normalizeIosElement(
+  const children: UiNode[] = elements.map((el) => {
+    const node = normalizeIosElement(
       { type: el.type, label: el.AXLabel, identifier: el.AXUniqueId, value: el.AXValue, rect: el.frame },
       IOS_ROLE_MAP,
       [],
-    ),
-  );
+    );
+    if (el.traits?.includes('Header') === true) node.heading = true;
+    return node;
+  });
   attachFieldErrors(children);
   return markIdbDialect({
     role: 'container',

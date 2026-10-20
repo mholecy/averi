@@ -99,7 +99,7 @@ one frame cannot tell apart at all is listed under Residuals (7.):
 5. the overlap's dominant (at least half of it) within ΔE00 2.0 of exactly one side and farther than 8 from the other —
    that side is drawn on top; else untold (a frame mid-fade reads a blend; the lab: 0.00 and 17.69).
 
-WHAT the answer does (`draw-order.ts#readingOrderPeers`): a peer seen UNDER the target is no peer — not a cover listed
+WHAT the answer does (`reading-order.ts#readingOrderOf`): a peer seen UNDER the target is no peer — not a cover listed
 before it, not one whose order is untold, not a part a moved tap keeps clear of, and, listed after it, no cover by
 the draw order either (the screenshot overrides the listing for exactly that pair). A peer seen OVER it stays the cover
 the listing made it, named `Exposure.seenOver` instead of `unordered`. An untold pair is as with no screenshot.

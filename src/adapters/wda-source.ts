@@ -102,6 +102,8 @@ interface WdaElement {
   rect?: Rect;
   isVisible?: string | number | null;
   isAccessible?: string | number | null;
+  /** WDA's accessibility traits, one comma-separated string (`"Header, StaticText"`): read for `Header` alone (UiNode.heading). */
+  traits?: string | null;
   children?: WdaElement[] | null;
 }
 
@@ -206,6 +208,7 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
     (el.children ?? []).map((child) => toUiNode(child, marks, { hidden, cell, scroller })),
   );
   if (hidden) node.hidden = true;
+  if (/\bHeader\b/.test(el.traits ?? '')) node.heading = true;
   // A table scrolls vertically only (UITableView); a `ScrollView` or `CollectionView` may scroll either way, and its
   // type says nothing — its content's extent may (types.ts#UiNode.scrollAxis, ui-tree/scroll-containers.ts#scrollAxis).
   if (el.type === 'Table') node.scrollAxis = 'vertical';

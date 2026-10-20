@@ -539,7 +539,7 @@ export interface UiNode {
    * markWdaDialect). On WDA it is a SORT CHECK, not a fact WDA states: most top-to-bottom layouts pass it, UIKit's (which
    * lists in draw order) included; a run listed out of top order is surely no reading order and keeps its order as draw
    * order (Contacts' new-contact form, tests/fixtures/wda-capture-contacts-new-contact.json: its run lists an image at
-   * y 62 after a button at y 319). Read by ui-tree/draw-order.ts#listsInReadingOrder alone, for one question: which
+   * y 62 after a button at y 319). Read by ui-tree/reading-order.ts#listsInReadingOrder alone, for one question: which
    * of two overlapping CONTROLS of such a run is drawn on top is not told (cover.ts#CoverOrder's `untold`) — so those listed
    * before a control target cover it when one of them holds its centre. A mark of the source, like `flatList`: ui-tree
    * knows no platform. Absent on Android's trees (uiautomator's order is not measured to be reading order,
@@ -547,6 +547,17 @@ export interface UiNode {
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    */
   readingOrder?: true;
+  /**
+   * Set on a node its source marks an accessibility HEADING — the Header trait (idb's `traits` containing `Header`,
+   * adapters/ios-tree-source.ts#idbTree; WDA's `traits` naming `Header`, adapters/wda-source.ts#toUiNode). SwiftUI
+   * gives it to a `Section`'s header, and a pinned section header (`LazyVStack(pinnedViews: [.sectionHeaders])`) is
+   * listed BEFORE the rows it is drawn over: in a listing given in reading order (`readingOrder`) a heading listed
+   * before a target it overlaps is drawn over it (ui-tree/reading-order.ts#readingOrderOf, its `headingsOver`). The
+   * trait, not idb's `type` `Heading`: the trimmed mp-native fixtures give that type to nodes whose traits were not
+   * recorded. A mark of the source, like `readingOrder`: ui-tree knows no platform. Absent on Android's trees.
+   * docs/bugs/2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md
+   */
+  heading?: true;
   /**
    * Set on every node of a HIDDEN SUBTREE of a WDA tree (adapters/wda-source.ts#hiddenRoots): a node of no structural
    * role (`STRUCTURAL_ROLES`: not WDA's `Other`, `Cell`, `Window`, … — a control, an image, a text, a scroll view, a

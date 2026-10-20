@@ -6,6 +6,8 @@ covers listed before the target" below. The reading BREAK below still meets idb'
 meets WDA's nested tree too (its residual "WDA's nested tree and Android's never meet this rule" holds for the break
 alone). Amended again 2026-10-19 (round 9) by docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md:
 a screenshot tells the order the listing does not — the amendment's first residual closed, its second narrowed (below).
+Amended 2026-10-20 (round 14, LE3): a heading listed before a target it overlaps is drawn over it — see "Amendment: a
+heading listed before" below.
 
 ## Context
 
@@ -59,7 +61,7 @@ container lists flat there too.
 - In such a run, the interactive siblings of a control target that overlap it past the slack — neither holding the
   other whole nor of its frame — in idb's flat list from its content on (ADR 0004's top bar stays chrome) and none of
   its bottom chrome (a tab bar's items are covers by their own rule), on a nested tree none pinned at the screen's
-  bottom (`bottomPinned`'s shape), are its covers whose ORDER is not told (`draw-order.ts#readingOrderPeers`):
+  bottom (`bottomPinned`'s shape), are its covers whose ORDER is not told (`reading-order.ts#readingOrderOf`):
   - those listed BEFORE it are covers of it when one of them holds its centre (the draw order alone gives them not):
     C, under W. Only then: siblings that only overlap the target's edges by a few points (a card's shadow, an avatar
     stack, a badge) would else fail its colour assert and every `fully` stop on a cover that may lie beneath it;
@@ -106,3 +108,72 @@ docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-cove
   backdrop that has no node (ADR 0018 residual 9): the amendment closes C's direction only where a menu row holds the
   centre. Nor is a sibling listed before a target and overlapping only its edge a cover of it: a colour assert there
   may sample it.
+
+## Amendment: a heading listed before (2026-10-20, round 14, LE3)
+
+### Context
+
+SwiftUI lists a section's header FIRST and pins it (`LazyVStack(pinnedViews: [.sectionHeaders])`) over the rows
+scrolled under it, drawn on top. The lab's `scroll-sticky` (`tests/fixtures/truth/ios-iphone17-ios27/scroll-sticky.*`):
+the header `0,110 402x56` is listed before the row R `51,142 300x64`, scrolled 24 pt under it — 62.5 % of R drawn, its
+centre `(201,174)` clear. Read as draw order the header was beneath R, and neither rule above gave it as a cover: it is
+no control, it does not hold R's centre, and on idb it lies before the content (ADR 0004's bar). So the colour assert
+passed on a sample a third of which is the header's grey, and `fully: true` called R "fully visible" where it is — on
+idb and WDA alike. Both sources mark the header with the Header trait (idb `traits` `["StaticText", "Header",
+"Scrollable"]`, type `Heading`; WDA `traits` `"Header, StaticText"`); SwiftUI gives it to a `Section`'s header itself.
+
+### Decision
+
+- The parsers keep the trait as `UiNode.heading` (`ios-tree-source.ts#idbTree`, `wda-source.ts#toUiNode`). The TRAIT,
+  not idb's type `Heading`: the trimmed mp-native fixtures (`idb-modal-listed-before-content.json`,
+  `idb-swift-form-*.json`) give that type to nodes whose traits were not recorded, and reading it would make covers of
+  their date headers and value-date picker.
+- In a listing given in reading order (`UiNode.readingOrder`), a sibling that is a heading, listed BEFORE a target and
+  overlapping it past the slack — neither holding the other whole nor of its frame — is drawn over it: a cover whose
+  order is TOLD (`drawn`; `reading-order.ts#headingsOver`, joined to `before` by `readingOrderOf`). A row is never drawn
+  over its section's header, so nothing is left untold and no screenshot is asked; the remedy is the draw order's,
+  a scroll (`scroll_until … fully: true`) — on idb's flat list, which lists no scroll view, with its added clause for a
+  cover no scroll moves the target out from under.
+- No gate on where it overlaps (not only over the centre: a pinned header hides a row's top, what the colour assert
+  samples and `fully` claims), on the target's kind (any target, not only a control), nor on ADR 0004's bar (on idb the
+  header at the list's top reads as bar chrome). A target pinned at the screen's bottom keeps its place on top, as for
+  the controls above. A heading listed AFTER the target is a cover by the draw order already. A heading listed before
+  is judged by this rule, not as a control peer, even when interactive.
+- `ui_snapshot` prints the mark: an iOS node carrying the trait carries `"heading": true` (an added key; its tool
+  description names it).
+- `reading-order.ts` is the one owner of "listed before, but drawn over" in a reading-order listing (moved out of
+  `draw-order.ts`, 003edf31); `exposure` asks it once per target.
+
+Measured: golden over the truth corpus against `a922fec4`, 6 checks change, all scroll-sticky's R: colour and `fully`
+green on idb and WDA (`FAIL … "Sticky header" (0,110 402x56) is drawn over the element`; `fully: true` refused under the
+header, 63 % of it shows, the replay's three strokes then the exhausted reply), and the plain `scroll_until` still ok,
+now worded "visible after 0 swipes — PARTLY UNDER … 63% of it shows, its centre clear"; R's tap unchanged (`Tapped`
+at its clear centre); 0 new mismatch. Over every iOS tree of `tests/fixtures`, R is the one target that gains a cover
+(`tests/ui-tree/heading-listed-before.test.ts`); the 64 native iOS trees of the truth corpus
+(`tests/fixtures/truth/ios-iphone17-ios27`, idb and WDA) hold 20 headings, and only scroll-sticky's overlaps a sibling
+listed after it. The golden's replay of `fully: true` on R ends in the exhausted reply ("… at the end of the content — a
+layout defect"): the replay is one static tree, which no stroke moves; on the lab simulator R scrolls out from under the
+header (live 6 of 6 ok). The rejected alternatives: every overlapping earlier node a cover (golden turned two green rows red —
+form-keyboard's submit tap on idb, and a `scroll_until` read under the phone field), a header pinned at its scroll view's top by
+geometry (idb lists no scroll view), and the eyes per tap (a capture each; a header as wide as the screen leaves no
+side to compare).
+docs/bugs/2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md
+
+### Residuals of the amendment
+
+- An overlay pinned over rows listed after it that carries no Header trait (a custom sticky bar, a banner) is still
+  beneath them by the listing: a false "clear".
+- UIKit's floating section headers are not measured. They do carry the trait (Contacts' collection view, in
+  `tests/fixtures/wda-capture-contacts-*.json`: section header cells "a", "b", "h", … traited `Header`), but WDA's sort
+  check marks such a run as reading order only when its tops never decrease, and those runs fail it (their order is
+  kept as draw order), so a UIKit header floating over a row listed after it is judged by no capture.
+- idb names the header `other "Sticky header"` (its `Heading` type maps to no role), WDA `text "Sticky header"`: the
+  cover clause words the same node two ways per source. Cosmetic; accepted, not changed (mapping the type would change
+  snapshot replies).
+- A target held whole by a heading listed before it (a row shorter than the pinned header, scrolled wholly under it)
+  gains no cover: the rule keeps the own-content exclusion (a heading holding the target whole may be its section
+  title band around its own button), so such a row reads clear where it is hidden — a false "clear", unmeasured (R,
+  64 pt, is taller than the 56 pt header).
+- A menu, toast or popover listed after a heading it lies over is now still covered by the heading where they overlap
+  apart: a false refusal, the safe direction.
+

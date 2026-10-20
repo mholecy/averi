@@ -23,6 +23,10 @@ above, which the interim rule had let through. Between content nodes nothing cha
 the pinned CONTINUE still covers `priority_select`. The row is `draw-order.ts`'s `flatListChrome`, and only the
 `target` question asks it.
 
+A heading among the bar's items (`UiNode.heading`, the Header trait: SwiftUI's section header pinned at a list's top,
+which idb lists before the rows and reads as bar chrome) covers the content it overlaps
+(2026-10-20, round 14: ADR 0015's amendment "a heading listed before", `reading-order.ts#headingsOver`).
+
 ## Residuals accepted
 
 - Content listed after the bar that is drawn over it and ends inside the band is not seen. Examples are a small

@@ -32,7 +32,6 @@ import type { ReplyKind } from './replies.js';
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
-const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
 const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
@@ -152,7 +151,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
-    ...each(`ios ${src}`, ['scroll:scroll-sticky.R.fully'], LE3, 'stop-claim', 'visible'),
+    // scroll-sticky's R with `fully: true` struck off by round 14's LE3 fix (40b4856: a heading listed before is drawn
+    // over it): no stop under the pinned header — one stroke (list 24→0), R whole at 51,166, fully visible after 1 swipe
+    // and Tapped, under idb and WDA, in two runs of two (ios-vis-r14-le3-1.json, -2.json).
     // blur-menu's C struck off by round 8's L4 fix (37bf5a15): refused, nothing fired (it fired W before: ios-vis-r8-l4-before.json);
     // so at its final src too (94fc318b: ios-vis-r8-l4-3.json, -4.json).
     // (idb's tap of blur-menu's A came back ok once, in ios-vis-r8-l4-3.json: the run's first case on a freshly booted
