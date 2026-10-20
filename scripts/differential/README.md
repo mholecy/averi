@@ -205,7 +205,8 @@ reply says why, never a mismatch, the report counts them); golden.test.ts holds 
 is and shows `the ocr rows are asked` as a skipped test; calibrate reads a skipped named row as NOT-ASKED. Run golden
 and calibrate outside the sandbox to judge them; `GOLDEN_OCR=require` makes a skip an error (golden, golden.test.ts).
 `golden-spec/text.ts` holds the rows, asked of any text target (CatalogTarget.text) by its string: the tree's `text`
-and `ocr` pass on an open one (`ocr` exactly, or equal under the recognizer's fold, src/verify/ocr-fold.ts); under the
+and `ocr` pass on an open one (`ocr` exactly, or only as the recognizer may read the app's copy — its fold, and one way a measured
+letter misreading or a grouped number's separator read as nothing: src/verify/ocr-fold.ts#readingDifference, ADR 0025); under the
 status band, the chrome or Android's three-button bar `ocr` fails closed — a PASS or a reading measured what lies over
 it (its "not found" right only where the capture's tree of that source lists no node carrying the string:
 TargetTruth.textListed); across the gesture navigation band (the app's) a PASS or failing closed, never a FAIL on a

@@ -62,8 +62,8 @@ open note on the working tree. See the script for the verdicts.
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
-| OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
-| OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | open | working tree | OPEN-RED |
+| OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | calibrate | 3d668f1 → 9837ef6 | CALIBRATED |
+| OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | calibrate | 9837ef6 → cb0b7ac | CALIBRATED |
 | NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | open | working tree | OPEN-RED |
 | LW1 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 054a59f → f924893 | CALIBRATED |
 | LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
@@ -919,7 +919,7 @@ form-shared-id: a pristine form whose five fields and their floating titles (eac
   - ok ios-iphone17-ios27/text-sample.idb.json A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" = (differs only in á vs a, ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacriti
   - ok android-averi_lab-api33/text-sample.xml A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" = (differs only in ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacritics)
 
-A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.ts, by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability). own-parts' N draws Payee’s name (U+2019); asked `ocr` for that string the recognizer reads Payee's name: at 92f2a46 the assert fails on the reading (≠), at 35321b4 it passes, naming the fold (’ vs '). text-sample's E draws the same string (16 pt, both platforms), and its A the note's Slovak `Prihlásiť sa`, which the same fix folds (a combining mark off): read `Prihlásit sa`, red at 92f2a46 and green at 35321b4 alike. Its neighbours that the fold does not reach are lab notes OC1 (Ľ read L', ĺ read í) and OC2 (iOS: an NBSP thousands separator read as nothing), KNOWN in text.known.ts.
+A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.ts, by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability). own-parts' N draws Payee’s name (U+2019); asked `ocr` for that string the recognizer reads Payee's name: at 92f2a46 the assert fails on the reading (≠), at 35321b4 it passes, naming the fold (’ vs '). text-sample's E draws the same string (16 pt, both platforms), and its A the note's Slovak `Prihlásiť sa`, which the same fix folds (a combining mark off): read `Prihlásit sa`, red at 92f2a46 and green at 35321b4 alike. Its neighbours that the fold does not reach are lab notes OC1 (Ľ read L', ĺ read í) and OC2 (iOS: an NBSP thousands separator read as nothing), fixed in round 14 by one-way readings beside the fold (ADR 0025) and calibrated below.
 
 ## L1: CALIBRATED (partial: AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) is ADR 0018's residual 18, accepted by the owner 2026-10-18 with the active-window hint — its six rows filed as that residual)
 
@@ -1193,31 +1193,43 @@ Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater:
 
 No fix yet: red at HEAD and at cb77485, green at 7d9a783 (#1's regression elsewhere, recorded there). forms.known.ts owns the ratchet; this entry only links the note to its row.
 
-## OC1: OPEN-RED
+## OC1: CALIBRATED
 
 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md — defect: `≠`
 
-- working tree:
+- before 3d668f1:
   - RED ios-iphone17-ios27/text-sample.wda.json B ocr — read "L'ubomír Stastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
   - RED ios-iphone17-ios27/text-sample.wda.json C ocr — read "Makčeň, dižeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
   - RED ios-iphone17-ios27/text-sample.idb.json B ocr — read "L'ubomír Stastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
   - RED ios-iphone17-ios27/text-sample.idb.json C ocr — read "Makčeň, dižeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
   - RED android-averi_lab-api33/text-sample.xml B ocr — read "L'ubomír Sťastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" ≠
   - RED android-averi_lab-api33/text-sample.xml C ocr — read "Mäkčeň, dížeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+- after 9837ef6:
+  - ok ios-iphone17-ios27/text-sample.wda.json B ocr — PASS  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S, ť vs t — the recognizer does not tell a letter from the loo
+  - ok ios-iphone17-ios27/text-sample.wda.json C ocr — PASS  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ä vs a, ĺ vs i — the recognizer does not tell a lette
+  - ok ios-iphone17-ios27/text-sample.idb.json B ocr — PASS  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S, ť vs t — the recognizer does not tell a letter from the loo
+  - ok ios-iphone17-ios27/text-sample.idb.json C ocr — PASS  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ä vs a, ĺ vs i — the recognizer does not tell a lette
+  - ok android-averi_lab-api33/text-sample.xml B ocr — PASS  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S — the recognizer does not tell a letter from the look-alike 
+  - ok android-averi_lab-api33/text-sample.xml C ocr — PASS  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ĺ vs í — the recognizer does not tell a letter from t
 
-No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
+A text note judged on the real pixels by the host's recognizer (NOT-ASKED where it has none, golden.ts#ocrAvailability). Red before the fix (3d668f1, its first parent: the prep that moved the ocr assert onto ocr-fold.ts#readingDifference with no misreading yet): text-sample's B (Ľubomír Šťastný) read L'ubomír Stastný on iOS and L'ubomír Sťastný on Android, C (dĺžeň) read dižeň on iOS and dížeň on Android — ≠. Fixed by round 14's 9837ef6: a letter of the copy may be read as its measured misreadings, one way (ocr-fold.ts MISREADINGS: Ľ ľ ď ť with an apostrophe beside the letter, Ĺ ĺ as Í í; ADR 0025) — all six pass, naming Ľ vs L' and ĺ vs í with the reason the recognizer does not tell a letter from the look-alike it is read as.
 
-## OC2: OPEN-RED
+## OC2: CALIBRATED
 
 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md — defect: `≠`
 
-- working tree:
+- before 9837ef6:
   - RED ios-iphone17-ios27/text-sample.wda.json H ocr — read "1234,56 €", not the string: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
   - RED ios-iphone17-ios27/text-sample.wda.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
   - RED ios-iphone17-ios27/text-sample.idb.json H ocr — read "1234,56 €", not the string: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
   - RED ios-iphone17-ios27/text-sample.idb.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
+- after cb0b7ac:
+  - ok ios-iphone17-ios27/text-sample.wda.json H ocr — PASS  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" = (differs only in 1 234 vs 1234 — the recognizer does not tell a thousands separator between digit groups from no sp
+  - ok ios-iphone17-ios27/text-sample.wda.json I ocr — PASS  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" = (differs only in − vs -, 12 345 vs 12345 — the recognizer does not tell typographic punctuation fro
+  - ok ios-iphone17-ios27/text-sample.idb.json H ocr — PASS  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" = (differs only in 1 234 vs 1234 — the recognizer does not tell a thousands separator between digit groups from no sp
+  - ok ios-iphone17-ios27/text-sample.idb.json I ocr — PASS  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" = (differs only in − vs -, 12 345 vs 12345 — the recognizer does not tell typographic punctuation fro
 
-No fix yet: red at HEAD with the host's recognizer (NOT-ASKED where it has none). text.known.ts owns the ratchet; this entry only links the note to its rows.
+A text note judged on the real pixels by the host's recognizer (NOT-ASKED where it has none, golden.ts#ocrAvailability). Red before the fix (9837ef6, its first parent: OC1's fix, no separator rule yet): on iOS text-sample's H (1 234,56 €, NBSP) read 1234,56 € and I (−12 345,00 EUR, narrow NBSP) read -12345,00 EUR — ≠. Fixed by round 14's cb0b7ac: a space between the groups of a grouped number (ocr-fold.ts GROUPED_NUMBER, \d{1,3}( \d{3})+ wholly, on the copy as compared) may be read as nothing, one way (ADR 0025) — both pass, naming 1 234 vs 1234 and 12 345 vs 12345. Android reads the spaces (H, I green on both sides), and iOS's J (an IBAN in groups of four) is read with them.
 
 ## NI1: OPEN-RED
 

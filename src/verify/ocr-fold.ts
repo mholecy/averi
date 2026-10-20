@@ -1,23 +1,32 @@
 /**
- * What a text recognizer cannot tell apart — one notion of "a recognizer
- * difference", shared by the ocr assert, the text parity table's drift check
- * and the element assert's not-found hint.
+ * What a text recognizer may read the app's copy as — one notion of "a
+ * recognizer difference", shared by the ocr assert, the text parity table's
+ * drift check and the element assert's not-found hint (`readingDifference`).
+ * docs/adr/0025-what-the-recognizer-may-read-the-apps-copy-as.md
  *
  * Measured on device: macOS Vision reads Slovak `Prihlásiť sa` as
- * `Prihlásit sa` (combining marks dropped) and a typographic `Payee’s name` as
- * `Payee's name` (curly punctuation read as its ASCII look-alike). Neither is
- * on the screen — the screenshot shows the right glyphs — so an exact compare
- * of a READING against the app's copy fails on text that is correct.
+ * `Prihlásit sa` (combining marks dropped), a typographic `Payee’s name` as
+ * `Payee's name` (curly punctuation read as its ASCII look-alike), `Ľubomír`
+ * as `L'ubomír`, `dĺžeň` as `dížeň`, and on iOS `1 234,56 €` as `1234,56 €`.
+ * None is on the screen — the screenshot shows the right glyphs — so an exact
+ * compare of a READING against the app's copy fails on text that is correct.
  *
- * The fold is deliberately narrow: punctuation look-alikes and combining
- * marks, nothing else. Case is NOT folded (a case difference renders, and the
- * recognizer reads it); a letter keeps its base letter (only a Latin combining
- * mark comes off), digits never change. It runs either way round: a typographic
- * expectation read as ASCII and an ASCII one read typographic are alike, and a
- * `match` pattern either has its own characters folded (`ocrFoldPattern`) or,
- * naming none (`foldFree`), meets the folded reading. And it applies to
- * recognizer readings ONLY — the tree carries the app's characters exactly, so
- * a `’` → `'` change there is a copy change the tree can see.
+ * Two parts, deliberately narrow:
+ * - the FOLD — punctuation look-alikes and combining marks, nothing else. Case
+ *   is NOT folded (a case difference renders, and the recognizer reads it); a
+ *   letter keeps its base letter, digits never change. The fold runs either
+ *   way round: a typographic expectation read as ASCII and an ASCII one read
+ *   typographic are alike, and a `match` pattern either has its own characters
+ *   folded (`ocrFoldPattern`) or, naming none (`foldFree`), meets the folded
+ *   reading.
+ * - the copy's MISREADINGS and dropped SEPARATORS run copy → reading only: a
+ *   letter of the copy read as other characters (`MISREADINGS`), a space
+ *   between a grouped number's groups read as nothing (`GROUPED_NUMBER`) —
+ *   never the reverse, since an apostrophe, an `í` or a space the expectation
+ *   has is the copy's own. Not for `match` patterns.
+ * And it applies to recognizer readings ONLY — the tree carries the app's
+ * characters exactly, so a `’` → `'` change there is a copy change the tree
+ * can see.
  */
 
 /** Typographic punctuation → the ASCII the recognizer reads it as. */
