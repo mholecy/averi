@@ -1,5 +1,17 @@
 # BUG: the `ocr` assert fails on correctly drawn Slovak `Ľ`/`ľ` and `ĺ` — the recognizer reads `Ľ` as `L'` and `ĺ` as `í`, which the OCR fold does not forgive
 
+> **Status (2026-10-20, round 14): fixed** at `9837ef6` (bugs/r14-oc; prep `3d668f1`), measured by the golden mode
+> (against `73549ce7`, with OCR, `GOLDEN_OCR=require`: the six rows `B ocr` and `C ocr` on idb, WDA and Android red to
+> green — e.g. `read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S, ť vs t — the
+> recognizer does not tell a letter from the look-alike it is read as, nor a letter with diacritics from one without)`,
+> `read "Mäkčeň, dížeň a vokáň"; … = (differs only in ĺ vs í — …)`; no other reply changed) and by calibrate
+> (CALIBRATED, 3d668f1 → 9837ef6). The concept: what the recognizer may read the app's copy as, ONE WAY
+> (src/verify/ocr-fold.ts#readingDifference, MISREADINGS; docs/adr/0025-what-the-recognizer-may-read-the-apps-copy-as.md):
+> beside the symmetric fold, a letter of the copy may be read as its measured misreading — `Ľ ľ ď ť` (the caron drawn as
+> an apostrophe beside the letter) as the letter and `'`, `Ĺ ĺ` as `Í í` — composed with the fold (iOS's `dižeň`). Never
+> the reverse: expected `L'Oréal` fails on `ĽOréal`, `dížeň` on `dĺžeň` or `dlžeň` (a wrong letter still fails). Not
+> applied to `match` patterns nor to the parity table's UNREAD guard (ADR 0025 residuals R1, R2).
+
 Lab note OC1. **Found 2026-10-16** by the golden mode's `ocr` rows on the real pixels (phase 4: scripts/differential/
 golden.ts, golden-spec/text.ts; the host's macOS Vision recognizer, averi's own, reading the captured screenshot) over
 the lab app's `text-sample` cell (fixtures/apps/cells/text.json; AveriLab/Text.swift, Text.kt), captured on the

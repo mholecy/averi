@@ -1,5 +1,18 @@
 # BUG: on iOS the `ocr` assert fails on an amount with an NBSP (or narrow NBSP) thousands separator — the recognizer reads `1 234,56 €` as `1234,56 €`
 
+> **Status (2026-10-20, round 14): fixed** at `cb0b7ac` (bugs/r14-oc, on OC1's `9837ef6`), measured by the golden mode
+> (against `73549ce7`, with OCR, `GOLDEN_OCR=require`: `H ocr` and `I ocr` on idb and WDA red to green — `read "1234,56
+> €"; vs expected "1 234,56 €" = (differs only in 1 234 vs 1234 — the recognizer does not tell a thousands separator
+> between digit groups from no space)`, `read "-12345,00 EUR"; … = (differs only in − vs -, 12 345 vs 12345 — …)`;
+> Android's H/I and both platforms' J unchanged; no other reply changed) and by calibrate (CALIBRATED, 9837ef6 →
+> cb0b7ac). The concept (src/verify/ocr-fold.ts GROUPED_NUMBER;
+> docs/adr/0025-what-the-recognizer-may-read-the-apps-copy-as.md): a space may be read as nothing only inside a run of
+> the copy that is wholly a grouped number, `\d{1,3}( \d{3})+` with no digit (nor a space and a digit) either side and
+> no decimal mark after a digit before it — narrower than "between two digits" as asked above, since `12 34` read
+> `1234` would join two numbers: such a space, a fraction's digits then another number (`1,234 567`), an IBAN's groups
+> of four and a space between letters stay strict, and a space the reading has and the copy lacks
+> never passes. Named as the whole number (`12 345 vs 12345`), not as an invisible space.
+
 Lab note OC2. **Found 2026-10-16** by the golden mode's `ocr` rows on the real pixels (phase 4: scripts/differential/
 golden.ts, golden-spec/text.ts; the host's macOS Vision recognizer, averi's own, reading the captured screenshot) over
 the lab app's `text-sample` cell (fixtures/apps/cells/text.json; AveriLab/Text.swift), captured on the averi-lab

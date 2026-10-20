@@ -63,8 +63,8 @@ The order is by harm to the agent that uses averi as its eyes and hands in a ban
 
 | # | Id | Platform | What goes wrong | Note |
 |---|---|---|---|---|
-| 10 | OC1 | iOS + Android | The `ocr` assert fails on correctly drawn Slovak `Ľ`, `ľ` and `ĺ`: the recognizer reads `L'` and `í`, and the OCR fold does not forgive them. Probably a cheap fix in the fold. | `docs/bugs/2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md` |
-| 11 | OC2 | iOS | The `ocr` assert fails on an amount with an NBSP or narrow-NBSP thousands separator (`1 234,56 €` is read as `1234,56 €`). These amounts are on every banking screen. | `docs/bugs/2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md` |
+| ~~10~~ | ~~OC1~~ | ~~iOS + Android~~ | ~~The `ocr` assert fails on correctly drawn Slovak `Ľ`, `ľ` and `ĺ`: the recognizer reads `L'` and `í`, and the OCR fold does not forgive them.~~ **Fixed** at `9837ef6` (bugs/r14-oc, prep `3d668f1`, new ADR 0025): what the recognizer may read the app's copy as (`ocr-fold.ts#readingDifference`) — beside the symmetric fold, one way, a letter's measured misreading (`Ľ ľ ď ť` with an apostrophe, `Ĺ ĺ` as `Í í`); golden 6 rows green, CALIBRATED. Residuals: `match` patterns and the parity table's UNREAD guard (ADR 0025 R1, R2). | `docs/bugs/2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md` |
+| ~~11~~ | ~~OC2~~ | ~~iOS~~ | ~~The `ocr` assert fails on an amount with an NBSP or narrow-NBSP thousands separator (`1 234,56 €` is read as `1234,56 €`). These amounts are on every banking screen.~~ **Fixed** at `cb0b7ac` (bugs/r14-oc, ADR 0025): one way, a space between the groups of a grouped number (`\d{1,3}( \d{3})+`, wholly) may be read as nothing, named as the number (`12 345 vs 12345`); `12 34`, an IBAN's groups and words stay strict; golden 4 rows green, CALIBRATED. | `docs/bugs/2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md` |
 | 12 | LV1 | Android | `scroll_until` reads a list that is moving through blank content as exhausted, so the target is never reached. | `docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md` |
 | 13 | LV3 | iOS | The turn-back stroke of `scroll_until` touches down above the list and moves nothing. | `docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md` |
 | 14 | NI1 | iOS idb | idb lists a UIKit table row's label without its accessibility identifier. `tap` and `scroll_until` by that id time out, and the reply never says why. | `docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md` |
@@ -89,7 +89,7 @@ The order is by harm to the agent that uses averi as its eyes and hands in a ban
 
 1. **Covers the tree does not show:** ~~L2~~ (fixed), ~~B4-L1~~ (fixed, round 9), ~~LE3~~ (fixed, round 14), ~~VA1~~ (`fully` fixed, round 14; the colour half ADR 0013's residual 3), BLUR. These are pinned bars, sticky headers, and nodes the source cuts. They have the highest impact.
 2. **Clipped by the scroll container:** ~~LE1~~ (fixed, round 14), ~~LE2~~ (partly fixed, round 14; the rest ADR 0010's residual 5). The element is judged by the screen, not by its scroll view.
-3. **Quick win:** OC1, OC2, in the OCR fold.
+3. **Quick win:** ~~OC1, OC2~~ (both fixed, round 14: ADR 0025, what the recognizer may read the app's copy as).
 4. **SwiftUI reading order:** ~~L4~~ (both halves fixed: the unsafe one in round 8, the menu row's false refusal in round 9 by the eyes, ADR 0024).
 5. **Scrolling and diagnostics:** LV1, LV3, LV2, NI1.
 6. **The rest:** FU1, residuals 6 and 19, the phone-after-back case.
