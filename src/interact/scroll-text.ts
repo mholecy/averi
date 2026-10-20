@@ -1,5 +1,5 @@
-import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import type { DeviceScreen, Point, Rect, UiNode } from '../adapters/types.js';
+import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { EyesFinding, SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -655,22 +655,6 @@ function shortClause(judged: Judged): string {
     case 'covered':
       return underText(short);
   }
-}
-
-/**
- * The side of `viewport` a rect lies wholly past — below before above, as a scroll down finds it — or undefined when it
- * lies past none wholly. A rect with no area lies past none: it has no extent to lie past a side with, and where a tree
- * gives one it is most often a placeholder origin, not a place (the SWIFT form's `TextFieldWithComponentStyle` texts,
- * read at 0,0 0x0 under their fields) — its bottom edge on the viewport's top would read "above the viewport", so it
- * reads "outside the viewport" instead.
- */
-function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
-  if (rectArea(rect) === 0) return undefined;
-  if (rect.y >= viewport.y + viewport.height) return 'bottom';
-  if (rect.y + rect.height <= viewport.y) return 'top';
-  if (rect.x >= viewport.x + viewport.width) return 'right';
-  if (rect.x + rect.width <= viewport.x) return 'left';
-  return undefined;
 }
 
 /** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */

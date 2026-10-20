@@ -639,6 +639,22 @@ export function clippedEdges(
 }
 
 /**
+ * The side of `viewport` a rect lies wholly past — below before above, as a scroll down finds it — or undefined when it
+ * lies past none wholly. A rect with no area lies past none: it has no extent to lie past a side with, and where a tree
+ * gives one it is most often a placeholder origin, not a place (the SWIFT form's `TextFieldWithComponentStyle` texts,
+ * read at 0,0 0x0 under their fields) — its bottom edge on the viewport's top would read "above the viewport", so it
+ * reads "outside the viewport" instead (interact/scroll-text.ts#notInViewportText).
+ */
+export function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
+  if (rectArea(rect) === 0) return undefined;
+  if (rect.y >= viewport.y + viewport.height) return 'bottom';
+  if (rect.y + rect.height <= viewport.y) return 'top';
+  if (rect.x >= viewport.x + viewport.width) return 'right';
+  if (rect.x + rect.width <= viewport.x) return 'left';
+  return undefined;
+}
+
+/**
  * What a tree's CLIPPING says of its nodes (`clipsOf`), from one walk: each
  * node's clipping chain (`scrollersOf`) and its sliver cut (`cutSliver`).
  * Asked of nodes of THIS tree (a node of another read has no clipping
