@@ -381,7 +381,11 @@ export interface UiNode {
    * it in the parser — `cutBounds` — and one whose descendants are cut too
    * stays this residual). A RecyclerView with padding and
    * clipToPadding draws a row cut at its padding edge while the row's rect
-   * runs on to the view's edge: not flush, not caught either.
+   * runs on to the view's edge: not flush, not caught either. And a Compose
+   * `verticalScroll` in an edge-to-edge window does not cut its rows to it
+   * (at a line the status bar's height past it, if at all): the drawn frame
+   * cuts them (ui-tree/geometry.ts#Clips.drawnIn),
+   * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md.
    */
   clipsDescendants?: true;
   /**
@@ -515,9 +519,13 @@ export interface UiNode {
    * where the scroll view draws none of it (UIKit's `UIScrollView` clips to its bounds; so do a table, a collection
    * view and SwiftUI's `ScrollView`) — measured: the at-rest SWIFT form lists `payee_name_input` at `24,801 354x52`,
    * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read by
-   * ui-tree/draw-order.ts#listsUnclippedFrames, so geometry.ts#Clips.drawnIn cuts a node's frame by what scrolls
-   * above it. A mark of the source, like `flatList`: ui-tree knows no platform. Absent on Android's trees
-   * (uiautomator cuts every node's bounds to its ancestors' visible rects: nothing is left to cut) and on idb's flat
+   * ui-tree/draw-order.ts#listsUnclippedFrames: a scroll view's axis is read off its content past its frame
+   * (ui-tree/scroll-containers.ts#scrollAxis), its end off none (geometry.ts#Clips.endsAt), and `scroll_until`'s carry
+   * model measures a row's motion as the content's (interact/scroll-rounds.ts#stillNeeds). Not what cuts a node by
+   * what scrolls above it: geometry.ts#Clips.drawnIn does that on every tree that lists ancestry. A mark of the
+   * source, like `flatList`: ui-tree knows no platform. Absent on Android's trees (uiautomator cuts most nodes' bounds
+   * to their scroll container; not all: lab note LE1,
+   * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md) and on idb's flat
    * list (no scroll view listed).
    */
   unclippedFrames?: true;

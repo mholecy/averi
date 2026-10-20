@@ -93,7 +93,7 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
  * (`sampleRegion`, capture.ts#pngRegion: clipped to the png, then inset), from the same function
  * (capture.ts#clipThenInset), so the judge of what lies over what the colour assert reads
  * (verify/pixel-poll.ts#overElement) and the sampler read one region. `rect` is, for both, the element's part its
- * scroll views draw (ui-tree/geometry.ts#Clips.drawnIn, a WDA tree's drawn frame: the standing asks this of it, and
+ * scroll views draw (ui-tree/geometry.ts#Clips.drawnIn, the drawn frame: the standing asks this of it, and
  * the pixel poll measures it), so the scroll view's clip is shared as the screen's is. The png mapping's rounding is
  * left out (a fraction of a unit). When nothing of the rect lies on `screen`, the rect inset whole — off the screen as the rect
  * is, so the standing finds nothing of what it reads on the screen (ui-tree/standing.ts, its `offScreen` kind).

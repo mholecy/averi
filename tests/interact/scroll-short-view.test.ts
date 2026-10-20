@@ -185,4 +185,15 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
     expect(reaches[0]).toBe(1);
     expect(reaches[1]).toBeCloseTo(UNMEASURED_MIN_DRAG / 120, 5);
   });
+
+  it('never on Android\'s tree, though its scroll views now cut what they draw of a row there too (lab note LE1): a row dumped past its list\'s bottom, outside it, is stroked for at the full reach — its rect is no measure of the content\'s motion', () => {
+    // The same list as uiautomator lists it (clipping, no unclipped-frames mark), its row dumped 44 px past its bottom
+    // (500) as Compose's verticalScroll rows are: on a WDA tree it would still need 112 of a stroke; here nothing.
+    const list: Rect = { x: 0, y: 300, width: 402, height: 200 };
+    const m = node({ role: 'button', identifier: 't', rect: { x: 0, y: 480, width: 402, height: 64 } });
+    const tree = node({ role: 'container', rect: BOX, children: [node({ role: 'scrollable', clipsDescendants: true, rect: list, children: [m] })] });
+    const played = play({ ...RULES, maxSwipes: 2, screen: { width: 402, height: 874 } }, [{ tree, found: [m] }, { tree, found: [m] }, { tree, found: [m] }]);
+    expect(sceneOf(tree).clips.drawnIn(m)).toMatchObject({ frame: list, listedWhereItLies: false });
+    expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [st.reach] : []))).toEqual([1, 1]);
+  });
 });

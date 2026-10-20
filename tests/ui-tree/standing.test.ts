@@ -5,6 +5,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import type { Cover } from '../../src/ui-tree/cover.js';
+import { drawnPart } from '../../src/ui-tree/geometry.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -1291,6 +1292,8 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     for (const purpose of ALL) {
       expect(said(sceneOf(tree).standing(name, IPHONE, purpose as TouchPurpose))).toEqual({ kind: 'offScreen', at: { x: 201, y: 827 }, visible: 0, scroller: 'form' });
     }
+    // WDA lists it where it lies: its drawn frame is the window the content moves through (the carry model's).
+    expect(sceneOf(tree).standing(name, IPHONE, ALL[0] as TouchPurpose).facts).toMatchObject({ drawn: { x: 0, y: 0, width: 402, height: 780 }, listedWhereItLies: true });
   });
 
   it('payee_street_input, 5 pt on the screen and none in its scroll view: the colour and the ocr reader judge it outside the form, not measured', () => {
@@ -1373,7 +1376,7 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(sceneOf(tree).standing(byId(tree, 'Uganda'), IPHONE, TAP).kind).toBe('reachable');
   });
 
-  it('the dialect is the source\'s: WDA\'s parser marks its root, uiautomator\'s does not — an Android web view and a list with scrollable="false" (no clipsDescendants anywhere) judge their rows on the screen alone, as before', async () => {
+  it('the frame is cut whatever the dialect (lab note LE1): WDA\'s parser marks its root unclipped, uiautomator\'s does not, and an Android web view and a list with scrollable="false" (no clipsDescendants anywhere) still draw nothing of a row past their frame', async () => {
     expect(parseWdaSource(await fixture('wda-capture-swift-form-pushed.json')).unclippedFrames).toBe(true);
     const android = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
       <node class="android.webkit.WebView" scrollable="false" resource-id="web" bounds="[0,200][1080,1600]">
@@ -1385,12 +1388,14 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
       </node></node></hierarchy>`);
     expect(android.unclippedFrames).toBeUndefined();
     const scene = sceneOf(android);
-    for (const id of ['pastpage', 'fitsrow']) {
+    for (const [id, scroller, visible] of [['pastpage', 'web', 0], ['fitsrow', 'fits', 50 / 150]] as const) {
       const n = byId(android, id);
-      expect(scene.clips.drawnIn(n)).toBeUndefined();
-      expect(said(scene.standing(n, PIXEL, TAP))).toEqual({ kind: 'reachable', at: tapPoint(n) });
-      expect(scene.standing(n, PIXEL, COLOUR(n)).kind).toBe('reachable');
+      expect(scene.clips.drawnIn(n)?.frame).toEqual(byId(android, scroller).rect);
+      expect(said(scene.standing(n, PIXEL, TAP))).toEqual({ kind: 'offScreen', at: tapPoint(n), visible, scroller });
+      // The colour: nothing of the page's row drawn — fails closed; a third of the list's row drawn — measured there.
+      expect(said(scene.standing(n, PIXEL, COLOUR(n)))).toMatchObject(visible === 0 ? { kind: 'offScreen', scroller } : { kind: 'reachable' });
     }
+    expect(scene.pixelRegion(byId(android, 'fitsrow'), PIXEL)).toEqual({ x: 0, y: 1950, width: 1080, height: 50 });
   });
 
   it('a centre outside its scroll view and under a WITNESSED keyboard line is no stop: the plain and the fully stop judge it short of a stop — outside the scroll view, clipped at its edge (a stroke brings it up), never "visible, its centre clear"', () => {
@@ -1408,22 +1413,110 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     expect(said(sceneOf(tree).standing(field, IPHONE, { of: 'tap', keyboardTop: wda(566) }))).toMatchObject({ kind: 'reachable', moved: { aboveKeyboard: true } });
   });
 
-  it('unchanged where frames are already cut or nothing scrolls: the same rows on a tree with nothing that scrolls, on Android (a clipsDescendants scroller) and on idb\'s flat list', () => {
+  it('unchanged where nothing scrolls or no scroll view is listed: the same rows on a tree with nothing that scrolls and on idb\'s flat list; Android\'s dialect (a clipsDescendants scroller) is cut as WDA\'s is (lab note LE1)', () => {
     const { tree, name, street } = atRest();
     const [form, bar] = tree.children;
     const plain = wdaRoot([node({ role: 'other', rect: form.rect, children: form.children }), bar]);
-    // Android's dialect: no unclipped-frames mark, whatever it flags (its bounds are cut already).
+    // Android's dialect: no unclipped-frames mark — but a rect uiautomator did not cut is cut by the drawn frame all the same.
     const android = node({ role: 'container', rect: box(402, 874), children: [{ ...form, clipsDescendants: true as const }, bar] });
     const flat = { ...node({ role: 'container', rect: box(402, 874), children: [form, ...form.children, name, street, bar] }), flatList: true as const };
     // Judged on the screen alone, as before: the name field's centre (201,827) on it — tapped where nothing covers it
     // (idb's CONTINUE, pinned at a flat list's bottom, reaches down over it) — and 5 pt of the street field measured.
     expect(said(sceneOf(plain).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
-    expect(said(sceneOf(android).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
     expect(said(sceneOf(flat).standing(name, IPHONE, TAP))).toEqual({ kind: 'covered', cover: 'continue' });
-    for (const t of [plain, android, flat]) {
+    for (const t of [plain, flat]) {
       for (const purpose of [PLAIN, FULLY]) expect(sceneOf(t).standing(name, IPHONE, purpose).kind).not.toBe('offScreen');
       expect(sceneOf(t).standing(street, IPHONE, COLOUR(street)).kind).toBe(t === flat ? 'covered' : 'reachable');
     }
+    // Android's: outside the form, as on WDA's tree.
+    for (const purpose of ALL) expect(said(sceneOf(android).standing(name, IPHONE, purpose as TouchPurpose))).toEqual({ kind: 'offScreen', at: { x: 201, y: 827 }, visible: 0, scroller: 'form' });
+    expect(said(sceneOf(android).standing(street, IPHONE, COLOUR(street)))).toEqual({ kind: 'offScreen', box: box(402, 874), scroller: 'form' });
+  });
+});
+
+/**
+ * Lab note LE1 (docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md):
+ * uiautomator does not always cut a rect to its scroll container — Compose's `verticalScroll` in an edge-to-edge window
+ * cuts at a line the status bar's height past it, if at all — so the drawn frame judges Android's trees too. Real
+ * captures of the lab app (averi_lab, API 33, 1080x2220): `scroll-bounded`'s `upper` `0,303 1080x605` and `lower`
+ * `0,1046 1080x495`, P dumped whole at `128,798 825x176` (62.5 % drawn), S cut at 1607, 66 px below `lower` (`128,1519
+ * 825x88`, 22 px drawn); `carousel-in-list`'s carousel `66,380 948x234`, its card C dumped as the strip right of it
+ * `1014,380 66x234`, nothing of it drawn.
+ */
+describe('Scene.standing — the drawn frame on Android: bounds uiautomator did not cut to their scroll container (lab note LE1)', () => {
+  const lab = async (cell: string): Promise<UiNode> => parseDump(await fixture(`truth/android-averi_lab-api33/${cell}.xml`));
+  const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+  const CAROUSEL: Rect = { x: 66, y: 380, width: 948, height: 234 };
+
+  it('scroll-bounded S, its centre (541,1563) below `lower`: drawn in `lower` alone — the tap and the plain stop refuse it outside `lower`, 22 of its 88 px drawn; fully: true clipped at `lower`\'s bottom', async () => {
+    const tree = await lab('scroll-bounded');
+    const s = byId(tree, 'lab.scroll-bounded.S');
+    const scene = sceneOf(tree);
+    expect(scene.clips.drawnIn(s)).toMatchObject({ frame: LOWER, scrollers: [{ rect: LOWER }], listedWhereItLies: false });
+    for (const purpose of [TAP, PLAIN] as const) {
+      const standing = scene.standing(s, PIXEL, purpose);
+      expect(standing).toMatchObject({ kind: 'offScreen', at: { x: 541, y: 1563 }, scroller: { rect: LOWER } });
+      expect(standing.facts.visible).toBeCloseTo(22 / 88);
+      // Cut by the drawn frame, but not listed where it lies: no window for the carry model (interact/scroll-rounds.ts#stillNeeds).
+      expect(standing.facts.drawn).toEqual(LOWER);
+      expect(standing.facts.listedWhereItLies).toBeUndefined();
+    }
+    expect(scene.standing(s, PIXEL, FULLY)).toMatchObject({ kind: 'clipped', edges: ['bottom'], byScrollView: { edges: ['bottom'], scroller: { rect: LOWER } } });
+  });
+
+  it('scroll-bounded P, dumped whole past `upper`\'s 908: the plain stop and the tap at its drawn centre; fully: true clipped at `upper`\'s bottom', async () => {
+    const tree = await lab('scroll-bounded');
+    const p = byId(tree, 'lab.scroll-bounded.P');
+    const scene = sceneOf(tree);
+    expect(said(scene.standing(p, PIXEL, TAP))).toEqual({ kind: 'reachable', at: tapPoint(p) });
+    expect(said(scene.standing(p, PIXEL, PLAIN))).toEqual({ kind: 'reachable', at: tapPoint(p) });
+    expect(scene.standing(p, PIXEL, FULLY)).toMatchObject({ kind: 'clipped', edges: ['bottom'], byScrollView: { edges: ['bottom'], scroller: { rect: { x: 0, y: 303, width: 1080, height: 605 } } } });
+  });
+
+  it('carousel-in-list C, nothing of it drawn in its carousel: the tap and both stops refuse it outside the carousel; the colour fails closed, never measuring the page\'s background', async () => {
+    const tree = await lab('carousel-in-list');
+    const c = byId(tree, 'lab.carousel-in-list.C');
+    const scene = sceneOf(tree);
+    expect(scene.clips.drawnIn(c)?.frame).toEqual(CAROUSEL);
+    for (const purpose of [TAP, PLAIN, FULLY] as const) expect(scene.standing(c, PIXEL, purpose)).toMatchObject({ kind: 'offScreen', scroller: { rect: CAROUSEL } });
+    expect(scene.standing(c, PIXEL, COLOUR(c))).toMatchObject({ kind: 'offScreen', scroller: { rect: CAROUSEL } });
+  });
+
+  it('a no-op where uiautomator did cut: over every Android capture, what of each node its scroll views draw is its whole rect, but for the rects measured past their scroll view', async () => {
+    const root = new URL('../fixtures/', import.meta.url);
+    const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith('.xml')).sort();
+    const trees: [string, UiNode][] = [];
+    for (const f of files) trees.push([f, parseDump(await readFile(new URL(f, root), 'utf8'))]);
+    // The ui_snapshot capture of Google Contacts and the Compose demo (paddedTouchTargets: uiautomator's dialect).
+    for (const name of Object.keys(JSON.parse(await fixture('android-ui-snapshot-compose.json')).screens).sort()) trees.push([`android-ui-snapshot-compose.json ${name}`, await compose(name)]);
+    const cut: string[] = [];
+    for (const [f, tree] of trees) {
+      const clips = sceneOf(tree).clips;
+      for (const n of everyNode(tree)) {
+        if (n.rect.width <= 0 || n.rect.height <= 0) continue;
+        const part = drawnPart(n.rect, clips.drawnIn(n));
+        const off = part === undefined ? Infinity : Math.max(part.x - n.rect.x, part.y - n.rect.y, n.rect.x + n.rect.width - part.x - part.width, n.rect.y + n.rect.height - part.y - part.height);
+        if (off > 1) cut.push(`${f} ${n.identifier ?? n.label ?? `${n.role} ${n.rect.x},${n.rect.y} ${n.rect.width}x${n.rect.height}`}`);
+      }
+    }
+    expect(cut).toEqual([
+      'android-lab-form-keyboard-k7-stop.xml lab.form-keyboard.reference',
+      'truth/android-averi_lab-api33/carousel-in-list.xml lab.carousel-in-list.C',
+      'truth/android-averi_lab-api33/form-picker.xml lab.form-picker.country.FO',
+      'truth/android-averi_lab-api33/scroll-bounded-flush.xml Target P',
+      'truth/android-averi_lab-api33/scroll-bounded-flush.xml Target S',
+      'truth/android-averi_lab-api33/scroll-bounded.xml lab.scroll-bounded.P',
+      'truth/android-averi_lab-api33/scroll-bounded.xml lab.scroll-bounded.S',
+      'uiautomator-lab-form-picker.xml lab.form-picker.country.FO',
+      // Google Contacts' create form (scroller 0,242 1080x1912): "First name" and its boxes dumped above its top, the
+      // "Add fields" containers past its bottom (2154) — pixel-chrome.test.ts pins what the pixel readers make of them.
+      'android-ui-snapshot-compose.json contactsCreate container 105,2047 261x132',
+      'android-ui-snapshot-compose.json contactsCreateStaged container 132,100 816x175',
+      'android-ui-snapshot-compose.json contactsCreateStaged container 132,100 816x175',
+      'android-ui-snapshot-compose.json contactsCreateStaged container 132,115 816x160',
+      'android-ui-snapshot-compose.json contactsCreateStaged First name',
+      'android-ui-snapshot-compose.json contactsCreateStaged container 132,2067 312x132',
+    ]);
   });
 });
 

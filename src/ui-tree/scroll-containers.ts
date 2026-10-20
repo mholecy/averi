@@ -12,7 +12,7 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  *   Only Android supplies it; iOS
  *   frames are unclipped, so no iOS node clips and no iOS clip chain is
  *   invented. Not what marks a tree's frames unclipped: the source says
- *   that on the root (UiNode.unclippedFrames, geometry.ts#Clips.drawnIn) —
+ *   that on the root (UiNode.unclippedFrames, geometry.ts#Clips.axesOf) —
  *   an Android tree with no scroller flagged is cut all the same.
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
@@ -26,11 +26,11 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  *   scrolls under its frame. A classic Android list whose content fits
  *   (`scrollable="false"`) is still a scroll view, and a remedy that says
  *   "scroll_until it first" over it is answered honestly by scroll_until's
- *   exhaustion. And, on a tree of unclipped frames (WDA's), where a node
- *   is DRAWN: its frame cut by every ancestor that scrolls
+ *   exhaustion. And, on every tree that lists ancestry, where a node is
+ *   DRAWN: its frame cut by every ancestor that scrolls
  *   (geometry.ts#Clips.drawnIn — a scroll view draws none of its content
- *   outside its frame, while the tree lists that content at its laid-out
- *   rect) — and so the scroll views a WDA target's strokes go over
+ *   outside its frame, while WDA lists that content at its laid-out rect,
+ *   and uiautomator sometimes past it) — and so the scroll views a WDA target's strokes go over
  *   (interact/stroke-plan.ts#targetScrollers). And the container a
  *   drawn-over question names (draw-order.ts#DrawOrder.drawnOver): a
  *   clipping scroller on Android, a scroll view on WDA.
@@ -90,8 +90,10 @@ export function isScrollViewOf(n: UiNode, container: Rect): boolean {
  *   page's content (a pager's page the tree does not list as a scroll view, a drawer exactly as wide as the content) —
  *   each reads a vertical page horizontal, so its `down` stroke goes over an outer scroll view, or keeps off it as a
  *   nested one;
- * - nothing on Android's other scrollers (uiautomator cuts every rect to its scroll view: no content shows past it —
- *   a lazy list, a RecyclerView) nor on idb (its flat list lists no scroll view).
+ * - nothing on Android's other scrollers (uiautomator cuts most rects to their scroll view: little content shows past
+ *   it — a lazy list, a RecyclerView; a Compose `verticalScroll` row it leaves uncut is too rare to read an axis by,
+ *   docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md) nor on idb (its
+ *   flat list lists no scroll view).
  * Undefined for a node that does not scroll (`scrolls`).
  */
 export function scrollAxis(n: UiNode, unclipped: boolean): ScrollAxis | undefined {

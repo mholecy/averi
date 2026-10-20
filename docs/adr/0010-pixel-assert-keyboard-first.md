@@ -1,6 +1,6 @@
 # 10. The pixel assert judges the soft keyboard first, with K1's reading outside standing
 
-Status: accepted, 2026-10-12 (owner).
+Status: accepted, 2026-10-12 (owner). Amended 2026-10-20 (round 14, lab note LE1): the drawn frame on Android (below).
 
 ## Context
 
@@ -52,7 +52,8 @@ was reported done at (201,827), 3 pt below CONTINUE.
   the WDA parser marks its root (`UiNode.unclippedFrames`), as idb's marks `flatList` and uiautomator's
   `paddedTouchTargets`, and `draw-order.ts#listsUnclippedFrames` reads it. Android's rects are already cut to their
   ancestors and carry no mark — whatever they flag: a web view or a `scrollable="false"` list with no scroller flagged
-  is unchanged — and idb lists no scroll view: both are unchanged by construction. A normalized WDA tree saved before
+  is unchanged — and idb lists no scroll view: both are unchanged by construction. **Superseded for Android
+  2026-10-20** (below, "the drawn frame on Android"): uiautomator does not always cut. A normalized WDA tree saved before
   the mark (the differential corpus's `ui_snapshot` trees) is given it when the harness serves it.
 - **Outside its scroll view** comes after off the screen: an element nothing of which lies on the screen is off the
   screen, whatever its scroll view. An element on the screen nothing of which is drawn there is `offScreen` with its
@@ -83,6 +84,55 @@ was reported done at (201,827), 3 pt below CONTINUE.
   the drawn part of such a node is a strip at an edge where a tap is least likely to reach it, and `scroll_until`'s
   plain stop stops only with the centre drawn, so `scroll_until X` then `tap X` agree. Measured shape: a carousel's
   card at a form's foot (`low_card 24,750 200x80` in a carousel at 740, the form ending at 780: 38 % drawn).
+
+## Amendment: the drawn frame on Android (2026-10-20, round 14)
+
+Measured by the lab app (`averi_lab`, API 33, edge-to-edge): uiautomator does NOT always cut a rect to its scroll
+container. Compose's `verticalScroll` is cut, if at all, at a line the status bar's height (66 px) past it:
+`scroll-bounded` lists `P` whole at `[128,798][953,974]` under `upper` ending at 908, and `S` at `[128,1519][953,1607]`
+under `lower` ending at 1541 — 22 px of it drawn. Its `horizontalScroll` carousel's card `C` is cut to the SCREEN's
+edge, `[1014,380][1080,614]`, right of the carousel ending at 1014 — nothing of it drawn. `S` and `C` were tapped on
+the background and reported done, `C`'s colour passed on the page's background, and both stops called all three visible
+after 0 swipes. Google Contacts' staged form (`android-ui-snapshot-compose.json`) lists the "First name" field 142 px
+above its scroll view's top too.
+
+- **The drawn frame is asked on every tree that lists ancestry** (`Clips.drawnIn`'s gate is `ancestry` alone), not on
+  WDA's alone. A scroll view draws nothing outside its frame on either platform — a fact of drawing, not of a source's
+  dialect. Where uiautomator did cut, the frame is a no-op: over the 43 Android XML captures (771 nodes) only the eight
+  rects measured past their scroll view change, and over the ui_snapshot capture (`android-ui-snapshot-compose.json`)
+  only Google Contacts' "First name" field and boxes above its form and its "Add fields" containers past it
+  (`tests/ui-tree/standing.test.ts`, "a no-op where uiautomator did cut").
+  The verbs answer as on WDA's tree of the same screen: `S`'s tap is refused outside `lower` ("only 25% of it … is
+  drawn"), both stops stroke inside `lower` and `upper` and fail clipped at their edge; `C`'s tap is refused outside
+  the carousel, its colour fails closed, and `scroll_until C right` strokes sideways inside the carousel.
+- **A unit past the edge is flush, not past** (`geometry.ts#overhangAsFlush`), on every tree — the tolerance is one
+  unit of the source, a px on Android and a pt on WDA, as `flushEdges`' is; measured on Android only: mp-native's SWIFT
+  toggle `66,1924 948x55` ends at 1979 under its form `[0,242][1080,1978]`, the line CONTINUE starts on. Cut there by a
+  pixel, the `fully` stop read it `clipped` where its flush probe is the rule (ADR 0013). `flushEdges` and `endsAt`
+  read "past" as more than a pixel already.
+- **The carry model stays WDA's** (`ui-tree/geometry.ts#Drawn.listedWhereItLies`, true only where
+  `draw-order.ts#listsUnclippedFrames`; the standing hands it on as `StandingFacts.listedWhereItLies`, which
+  `interact/scroll-rounds.ts#stillNeeds` asks): the drawn frame no longer tells the dialect, and on Android a row's
+  rect as it comes in is mostly cut to its scroll view, so its motion is no measure of the content's. The dialect is
+  read in ui-tree, by the drawn frame's owner, not again by `scroll_until`.
+- **The sliver rule stays for a rect cut flush** (ADR 0013): a rect cut flush with its container is judged by the
+  sliver rule and the flush probe, a rect past it by the drawn frame.
+
+- **The navigation-bar cut reads the drawn part** (`standing.ts#cutAtNavigationBar`, ADR 0009's N-b): a node dumped
+  past a scroll view ending at the navigation bar (Contacts' "Add fields" container `132,2067 312x132` under its form
+  ending at 2154, the lab's `form-picker` `FO` at `[0,2080][1080,2220]`, its glyphs cut at the form's 2154 in the
+  screenshot) is drawn to that bar's top exactly as a node uiautomator cut flush there is, so an ocr assert on it fails
+  closed the same way; a colour assert measures its drawn part (D5).
+
+Residuals: the share a reply quotes is of the DUMPED rect, which may itself be partly cut (`S`: "25%" where 12.5 % of
+its 176-px frame is drawn — WDA says 13 %). A `scrollable="true"` node that does not clip what it lists (a Compose
+`Modifier.scrollable` without a clip, a peek carousel drawn past its frame) is read as clipping: what it draws past
+its frame is read as not drawn — a tap refused, a colour or ocr assert failing closed, never a pass on what is not
+there; unmeasured, no capture shows one. The unnamed children of `scroll-bounded-flush`'s targets and `form-picker`'s
+`FO` are judged by the frame too (each runs 66 px past), and so is `android-lab-form-keyboard-k7-stop`'s `reference` (17 px above its
+ScrollView) — none with a golden check changed.
+
+Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md
 
 ## Residuals accepted
 
