@@ -261,7 +261,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   }
   // The base is read first: a missing file, or one no `--json` run wrote, fails before any replay.
   const against = values.against;
-  const base = against === undefined ? undefined : (await import('./golden-diff.js')).baseOf(await readFile(resolve(against), 'utf8'), against);
+  const base = against === undefined ? undefined : { against, results: (await import('./golden-diff.js')).baseOf(await readFile(resolve(against), 'utf8'), against) };
   // The checkout first: git runs before the fake device refuses every process.
   const { codeRoot } = await import('./checkout.js');
   const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -278,11 +278,11 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     const corpus = selectRecordings((await loadCorpus(resolve(values.corpus))).filter((r) => r.truth !== undefined), parseOnly(values.only));
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
-    if (against !== undefined && base !== undefined) {
+    if (base !== undefined) {
       // The ratchet's files are this checkout's: the rows to strike and the counts to write are in them.
       const { KNOWN_FILES } = await import('../../tests/differential/golden/files.js');
       const { diffReport, goldenDiff } = await import('./golden-diff.js');
-      console.log(diffReport(against, goldenDiff(base, results, KNOWN_FILES)));
+      console.log(diffReport(base.against, goldenDiff(base.results, results, KNOWN_FILES)));
     } else console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results));
     process.exitCode = exitCode(results);
   } finally {

@@ -474,7 +474,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       // Clipped at the end of the content, worded by what cuts it (scroll-read.ts#ClipCause).
       const { clipped, visible } = judged.standing.facts;
-      switch (short.cause.at) {
+      switch (short.cause.of) {
         // The keyboard's edge: the keyboard, not the layout, is what hides the rest — a container that does not resize
         // for it keeps its last rows under it. Said as such, with how to hide it; the layout-defect wording only when
         // the keyboard is not the edge in question.

@@ -7,7 +7,7 @@ import {
   type Exposure,
 } from './draw-order.js';
 import { coverAtPoint, lastPresented, overlaidCover, type Cover } from './cover.js';
-import { EDGES, laterEdgesIn, type FlushNeighbour, type LaterEdges } from './later-edges.js';
+import { laterEdgesIn, type FlushNeighbour, type LaterEdges } from './later-edges.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
 import type { SeenOrder } from './seen-order.js';
 import {
@@ -19,6 +19,7 @@ import {
   clipsOf,
   containsPoint,
   drawnPart,
+  EDGES,
   overlapsPastSlack,
   PIXEL_OVERLAP_SLACK,
   rectWithin,
@@ -525,10 +526,12 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
  *    fold or wholly inside the status band has no covers, so no presented surface — it would be told to scroll while
  *    `scroll_until` stops on the presented screen: so every non-reachable kind takes it.
  *    docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
- *    `cover`: the node a sentence names — the one over its centre when it is `covered` (the modal's card over the
- *    dim), else the last presented surface among its covers, else the last drawn over it. `layer`: the presented
- *    layer the tree source marks when that surface is its element (presentation.ts#Presentation.press), which
- *    `presentedRemedy` names.
+ *    `cover`: the cover `scroll_until`'s `presented` stop records, when the presented surface lies over the node IN the
+ *    frame (a presented one among its covers) — the one over its centre when it is `covered` (the modal's card over
+ *    the dim), else that last presented surface; absent when the surface was judged of the node alone (`presentedOver`:
+ *    nothing of it over what shows of the node), which the stroke asks at its touch-down instead. `layer`: the
+ *    presented layer the tree source marks when that surface is its element (presentation.ts#Presentation.press),
+ *    which `presentedRemedy` names.
  * 2. `unordered` — `covered` by a cover whose order against the node the tree does not tell (cover.ts#CoverOrder's
  *    `untold`: the two listed in reading order): which is drawn on top is not told, and no
  *    scroll tells it — a screenshot does (`orderRemedyText`). Not `scroll`: a stroke for the lab's menu row's
@@ -570,7 +573,7 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
  * words those and the compiler refuses one it cannot (a keyboard remedy under a bar, say).
  */
 export type Remedy =
-  | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: MarkedLayer }
+  | { readonly of: 'presented'; readonly cover?: Cover; readonly layer?: MarkedLayer }
   | { readonly of: 'unordered'; readonly why?: string }
   | { readonly of: 'seenOver' }
   | { readonly of: 'keyboard' }
@@ -769,10 +772,12 @@ function remedied(
   // 1. Beneath a screen presented over its own, whatever its kind and wherever it lies: a presented surface among its
   // covers in the frame, else one judged of the node itself (draw-order.ts#DrawOrder.presentedOver) — a node with
   // nothing in the frame (below the fold, inside the status band) has no covers there.
-  const surface = lastPresented(judgement.facts.covers)?.node ?? scene.order.presentedOver(node);
+  const framed = lastPresented(judgement.facts.covers);
+  const surface = framed?.node ?? scene.order.presentedOver(node);
   if (surface !== undefined) {
     const { layer } = scene.order.presentation.press(surface);
-    return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover.node : surface, ...(layer !== undefined && { layer }) } };
+    const cover = framed === undefined ? undefined : judgement.kind === 'covered' ? judgement.cover : framed;
+    return { ...judgement, remedy: { of: 'presented', ...(cover !== undefined && { cover }), ...(layer !== undefined && { layer }) } };
   }
   if ('touch' in judging) {
     const touch = judging.touch;
@@ -1060,8 +1065,8 @@ function systemBands(box: Rect, bands: Bands): { clear: Rect; top?: SystemBand<S
  * line to the screen's bottom — idb's band's own shape (soft-keyboard.ts
  * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
  * sentence quotes for it (the pixel assert's keyboard miss, through
- * `underKeyboard`; `scroll_until`'s cover, interact/scroll-read.ts
- * #bandCoverOf, on the box its round judges in).
+ * `underKeyboard`; `scroll_until`'s applied keyboard, interact/scroll-read.ts
+ * #bandKeyboardOf, on the box its round judges in).
  */
 export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });
 

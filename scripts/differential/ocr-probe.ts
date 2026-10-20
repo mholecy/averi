@@ -96,7 +96,8 @@ const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-ipho
 
 /**
  * The harness's probe (probeRecognizer on its own image): what golden.ts#ocrAvailability decides the `ocr` rows by, and
- * what calibrate's side cache keys the host by (side-cache.ts#thisHost) — one probe, so the two cannot disagree.
+ * what calibrate's side cache keys the host by (side-cache.ts#thisHost) — one probe, run by each process: a run whose
+ * process decided otherwise than the key's is not kept (side-cache.ts#decidedAsHost).
  */
 export const probeHarness = (exec: HostExec): Promise<ProbeOutcome> => probeRecognizer(exec, OCR_PROBE_PNG);
 

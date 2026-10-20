@@ -1,3 +1,4 @@
+import { captureOf, keyOf } from '../truth/side-run.js';
 import type { GoldenCheck, GoldenResult } from './golden.js';
 
 /**
@@ -17,7 +18,8 @@ import type { GoldenCheck, GoldenResult } from './golden.js';
  *   the captures replayed here, and only those that differ: the lines to edit, not the whole table. A COUNTS entry
  *   whose capture left the corpus, and the family file of a capture no file counts yet, golden.test.ts names.
  *
- * Checks are matched by `<recording> <target> <verb>` (the ratchet's key), a key asked twice by its occurrence.
+ * Checks are matched by `<recording> <target> <verb>` (the ratchet's key, scripts/truth/side-run.ts#keyOf), a key asked
+ * twice by its occurrence.
  */
 
 /** One family's ratchet as this module reads it (tests/differential/golden/known.ts#KnownFile). */
@@ -54,24 +56,22 @@ export interface GoldenDiff {
   counts: { family: string | undefined; recording: string; was: number | undefined; now: number }[];
 }
 
-export const checkKey = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
-
 /** A check's verdict as the report words it. */
-export const verdictOf = (c: GoldenCheck) => (c.skipped !== undefined ? `skipped (${c.skipped})` : c.mismatch === undefined ? 'ok' : `MISMATCH ${c.mismatch}`);
+const checkVerdictText = (c: GoldenCheck) => (c.skipped !== undefined ? `skipped (${c.skipped})` : c.mismatch === undefined ? 'ok' : `MISMATCH ${c.mismatch}`);
 
 /** The checks of `results` by key, a key asked again suffixed with its occurrence (` #2`). */
 function byKey(results: readonly GoldenResult[]): Map<string, GoldenCheck> {
   const map = new Map<string, GoldenCheck>();
   for (const c of results.flatMap((r) => r.checks)) {
-    let key = checkKey(c);
-    for (let n = 2; map.has(key); n++) key = `${checkKey(c)} #${n}`;
+    let key = keyOf(c);
+    for (let n = 2; map.has(key); n++) key = `${keyOf(c)} #${n}`;
     map.set(key, c);
   }
   return map;
 }
 
 const same = (a: GoldenCheck, b: GoldenCheck) =>
-  verdictOf(a) === verdictOf(b) && a.reply === b.reply && JSON.stringify(a.calls) === JSON.stringify(b.calls) && JSON.stringify(a.faults ?? []) === JSON.stringify(b.faults ?? []);
+  checkVerdictText(a) === checkVerdictText(b) && a.reply === b.reply && JSON.stringify(a.calls) === JSON.stringify(b.calls) && JSON.stringify(a.faults ?? []) === JSON.stringify(b.faults ?? []);
 
 const tallyOf = (results: readonly GoldenResult[]): Tally => {
   const checks = results.flatMap((r) => r.checks);
@@ -98,9 +98,9 @@ export function goldenDiff(base: readonly GoldenResult[], now: readonly GoldenRe
 
   // golden.test.ts's "no known mismatch is fixed without being struck off KNOWN", over the captures run here: a KNOWN
   // row that is no mismatch and not skipped is fixed — asked green, or no longer asked.
-  const red = new Set(now.flatMap((r) => r.checks).filter((c) => c.mismatch !== undefined || c.skipped !== undefined).map(checkKey));
+  const red = new Set(now.flatMap((r) => r.checks).filter((c) => c.mismatch !== undefined || c.skipped !== undefined).map(keyOf));
   const strike = ratchet
-    .map((f) => ({ family: f.family, keys: Object.keys(f.known).filter((k) => ran.has(k.split(' ')[0]) && !red.has(k)) }))
+    .map((f) => ({ family: f.family, keys: Object.keys(f.known).filter((k) => ran.has(captureOf(k)) && !red.has(k)) }))
     .filter((f) => f.keys.length > 0);
 
   const counts: GoldenDiff['counts'] = now.flatMap((r) => {
@@ -124,10 +124,10 @@ function replyLines(was: string, now: string): string[] {
 }
 
 function changeLines({ key, was, now }: CheckChange): string[] {
-  if (was === undefined) return [`- NEW ${key}: ${verdictOf(now!)}`];
-  if (now === undefined) return [`- GONE ${key}: was ${verdictOf(was)}`];
+  if (was === undefined) return [`- NEW ${key}: ${checkVerdictText(now!)}`];
+  if (now === undefined) return [`- GONE ${key}: was ${checkVerdictText(was)}`];
   const lines = [`- ${key}`];
-  if (verdictOf(was) !== verdictOf(now)) lines.push(`  verdict: was ${verdictOf(was)}`, `           now ${verdictOf(now)}`);
+  if (checkVerdictText(was) !== checkVerdictText(now)) lines.push(`  verdict: was ${checkVerdictText(was)}`, `           now ${checkVerdictText(now)}`);
   // A skipped row's reply is the harness's stub: its verdict says all.
   if (was.reply !== now.reply && was.skipped === undefined && now.skipped === undefined) lines.push('  reply:', ...replyLines(was.reply, now.reply));
   if (JSON.stringify(was.calls) !== JSON.stringify(now.calls)) lines.push(`  calls: was ${JSON.stringify(was.calls)}`, `         now ${JSON.stringify(now.calls)}`);

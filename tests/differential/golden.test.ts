@@ -3,9 +3,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { installVirtualClock } from '../../scripts/differential/clock.js';
 import { loadCorpus, type Recording } from '../../scripts/differential/corpus.js';
 import { installFakeDevice } from '../../scripts/differential/fake-device.js';
-import { cellOf, goldenRecording, ocrAvailability, type GoldenCheck, type GoldenResult } from '../../scripts/differential/golden.js';
+import { cellOf, goldenRecording, ocrAvailability, type GoldenResult } from '../../scripts/differential/golden.js';
 import { loadSide, type Side } from '../../scripts/differential/side.js';
 import { familyOf, loadCatalog } from '../../scripts/truth/catalog.js';
+import { captureOf, keyOf as key } from '../../scripts/truth/side-run.js';
 import { FAMILIES } from '../../scripts/truth/schema.js';
 import { COUNTS, KNOWN, KNOWN_FILES as FILES } from './golden/files.js';
 import type { KnownFile } from './golden/known.js';
@@ -24,8 +25,6 @@ import type { KnownFile } from './golden/known.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TRUTH = fileURLToPath(new URL('../fixtures/truth/', import.meta.url));
-
-const key = (c: GoldenCheck) => `${c.recording} ${c.target} ${c.verb}`;
 
 // Whether the `ocr` rows are asked on this host (golden.ts#ocrAvailability: the harness's own probe): undefined, or why
 // not — not macOS, no swiftc, Vision refusing with nilError (a sandbox). A skip shows as a skipped test below; with
@@ -50,7 +49,7 @@ describe('the ratchet\'s files', () => {
     expect(FILES.map((f) => f.family)).toEqual([...FAMILIES]);
     const misfiled = FILES.flatMap((f) =>
       [...Object.keys(f.known), ...Object.keys(f.counts)].flatMap((k) => {
-        const file = k.split(' ')[0].split('/').pop()!;
+        const file = captureOf(k).split('/').pop()!;
         const family = familyOf(catalog, cellOf({ file }));
         return family === f.family ? [] : [`${f.family}: ${k} (cell of ${family ?? 'no family'})`];
       }),

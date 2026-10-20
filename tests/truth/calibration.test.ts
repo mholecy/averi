@@ -635,6 +635,7 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
         },
       },
       keys: () => (sideName) => (sideName === WORKING_TREE ? undefined : `key-${sideName}`),
+      fits: () => true,
       mode: 'reuse',
       jobs: 2,
       log: (line) => log.push(line),
@@ -710,6 +711,14 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
     expect(t.puts).toEqual([]);
     expect(runs.get('aaaaaaa')).toEqual(loaded(1));
     expect(t.log[0]).toMatch(/\(not kept: the harness or the side's src was edited while it ran\)$/);
+  });
+
+  it("a run whose ocr rows its process decided otherwise than the key's host (fits false): not kept, its line says so, the others kept", async () => {
+    const t = sides({ fits: (run) => run.checks.get(K1)?.mismatch !== 'red 2', jobs: 1 });
+    const { runs } = await runSides(['aaaaaaa', 'other'], t.s);
+    expect(t.puts).toEqual(['key-aaaaaaa']);
+    expect(runs.get('other')).toEqual(loaded(2));
+    expect(t.log[1]).toMatch(/^calibrate: other ran in [\d.]+ s \(not kept: its ocr rows were decided otherwise than this host's probe, which its key names\)$/);
   });
 
   it('the runs keyed by side whatever order they finish in, at most `jobs` at once', async () => {

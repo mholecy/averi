@@ -20,7 +20,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
  * witness must be asked first:
  * - the tree's facts (`TreeFacts`), derived once;
  * - the keyboard cover that applies — a reading's (`offeredKeyboard`), the
- *   witness standing by it, or idb's band (`bandCoverOf`), which no
+ *   witness standing by it, or idb's band (`bandKeyboardOf`), which no
  *   witness stands by — and the reading's offered cover, applied or not;
  * - the best match judged (`judge`), box by box over the boxes that count
  *   (`judgeOver`), and judged again above the cover when one applies;
@@ -107,7 +107,7 @@ export interface RoundRead {
  *   undefined when this tree has no container with that rect (one remembered from an earlier read: the list has moved
  *   since), never any on iOS, which has no clipping container;
  * - its `keyboard` position: idb's keyboard band (`line`), the line the strokes stay above (`strokeLine`) and the round
- *   judges under (`bandCoverOf`), and which nodes are the keyboard's own (`owns`: the reading's `ofKeyboard`, idb's
+ *   judges under (`bandKeyboardOf`), and which nodes are the keyboard's own (`owns`: the reading's `ofKeyboard`, idb's
  *   band's nodes), judged against the whole screen. The reading's line is the round's protocol's (`offeredKeyboard`), never
  *   the position's: the look holds no `cover` to ask.
  */
@@ -176,7 +176,7 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
 }
 
 /**
- * A shown soft keyboard as the round may apply it — a reading's cover (`offeredKeyboard`), or idb's band (`bandCoverOf`): its frame,
+ * A shown soft keyboard as the round may apply it — a reading's (`offeredKeyboard`), or idb's band (`bandKeyboardOf`): its frame,
  * the part of the screen it leaves — everything above its TOP edge, full
  * width — and what the adapter can do about it. Above the top edge, not
  * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
@@ -203,7 +203,7 @@ export interface AppliedKeyboard {
   topCover: Rect;
   above: DeviceScreen | undefined;
   remedy: KeyboardRemedy;
-  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): witnessed for a reading's cover, which the witness stood by; unwitnessed for idb's band (`bandCoverOf`), which no reading stands by — a centre under it stops nothing. */
+  /** Its top edge as a keyboard line (`line.y` is `topCover.y`): witnessed for a reading's cover, which the witness stood by; unwitnessed for idb's band (`bandKeyboardOf`), which no reading stands by — a centre under it stops nothing. */
   line: KeyboardLine;
 }
 
@@ -277,8 +277,8 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   // draw order, and which nodes are the keyboard's own — the read's `ofKeyboard`; the reading's line is the round's
   // protocol's (`offeredKeyboard`).
   const position = facts.keyboard;
-  // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
-  const band = offered !== undefined ? undefined : bandCoverOf(position.line(), viewport, read.remedy);
+  // idb's band (`bandKeyboardOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
+  const band = offered !== undefined ? undefined : bandKeyboardOf(position.line(), viewport, read.remedy);
   const applied = offered ?? band;
   let cover: AppliedKeyboard | undefined;
   let best = whole;
@@ -290,7 +290,7 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
     // reported. Otherwise the witness is asked THIS read (the module doc).
     const moot = endsClean(whole) && sameJudgement(whole, covered);
     if (!moot) {
-      // idb's band asks no witness: no reading stands by it, nor could deny it (`bandCoverOf`).
+      // idb's band asks no witness: no reading stands by it, nor could deny it (`bandKeyboardOf`).
       if (offered === undefined) {
         cover = applied;
         best = covered;
@@ -328,7 +328,7 @@ function offeredKeyboard(shown: KeyboardCover | undefined, viewport: DeviceScree
 }
 
 /**
- * idb's band as a cover the round applies: its line
+ * idb's band as a keyboard the round applies (`AppliedKeyboard`): its line
  * (ui-tree/keyboard-position.ts#KeyboardPosition.line, no reading) as the band's rect —
  * the viewport's width from the line to its bottom, the shape idb's band
  * has (soft-keyboard.ts#flatListKeyboardBand) — with the reading's
@@ -337,7 +337,7 @@ function offeredKeyboard(shown: KeyboardCover | undefined, viewport: DeviceScree
  * below the viewport's bottom.
  * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
-function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): AppliedKeyboard | undefined {
+function bandKeyboardOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): AppliedKeyboard | undefined {
   if (line === undefined || line.y >= viewport.y + viewport.height) return undefined;
   const topCover = bandRect(line, viewport);
   return { topCover, above: aboveTop(line.y, viewport), remedy, line };
@@ -430,7 +430,7 @@ export function stops(j: Judged): boolean {
  * view's edge inside the screen (`scrollView`, the standing's ui-tree/standing.ts#ScrollViewCut); else the viewport's
  * edge. The stuck sentence words each (scroll-text.ts#failureText); the bound sentence does not tell them apart yet.
  */
-export type ClipCause = { at: 'keyboard'; keyboard: AppliedKeyboard } | { at: 'scrollView'; cut: ScrollViewCut } | { at: 'viewport' };
+export type ClipCause = { of: 'keyboard'; keyboard: AppliedKeyboard } | { of: 'scrollView'; cut: ScrollViewCut } | { of: 'viewport' };
 
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`, with its `cause`), or something of the app drawn over it (`covered`). */
 export type InFrameShort =
@@ -481,9 +481,9 @@ export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' }> {
 
 /** A `clipped` shortfall's cause (`ClipCause`): the keyboard first — its edge is the frame's bottom — then the scroll view's. */
 function clipCause({ under, standing }: Judged): ClipCause {
-  if (under !== undefined && standing.facts.clipped.includes('bottom')) return { at: 'keyboard', keyboard: under };
-  if (standing.kind === 'clipped' && standing.byScrollView !== undefined) return { at: 'scrollView', cut: standing.byScrollView };
-  return { at: 'viewport' };
+  if (under !== undefined && standing.facts.clipped.includes('bottom')) return { of: 'keyboard', keyboard: under };
+  if (standing.kind === 'clipped' && standing.byScrollView !== undefined) return { of: 'scrollView', cut: standing.byScrollView };
+  return { of: 'viewport' };
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */

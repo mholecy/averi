@@ -1184,21 +1184,42 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
   });
 });
 
-describe('the presented remedy\'s cover — the node a sentence names for a target beneath a screen presented over its own (ADR 0018)', () => {
+describe('the presented remedy\'s cover — the one scroll_until\'s `presented` stop records for a target beneath a screen presented over its own in the frame (ADR 0018)', () => {
   const screens = stackedLayers;
   const at = (tree: UiNode, r: Rect): UiNode => [...everyNode(tree)].find((n) => JSON.stringify(n.rect) === JSON.stringify(r))!;
   const remedyOf = (s: Standing | PixelStanding) => (s.kind === 'reachable' ? undefined : s.remedy);
+  /** The remedy with its cover as the node it names. */
+  const named = (s: Standing | PixelStanding) => {
+    const r = remedyOf(s);
+    return r?.of === 'presented' ? { ...r, cover: r.cover?.node } : r;
+  };
   it('covered: the cover over its centre, whichever surface is presented (the modal\'s card over the dim)', async () => {
     const tree = (await screens()).finportalForgot;
     const title = [...everyNode(tree)].find((n) => n.identifier === 'login_title')!;
-    expect(remedyOf(sceneOf(tree).standing(title, IPHONE, TAP))).toEqual({ of: 'presented', cover: [...everyNode(tree)].find((n) => n.identifier === 'forgot_modal') });
+    const standing = sceneOf(tree).standing(title, IPHONE, TAP);
+    expect(named(standing)).toEqual({ of: 'presented', cover: [...everyNode(tree)].find((n) => n.identifier === 'forgot_modal') });
+    expect(remedyOf(standing)).toMatchObject({ cover: standing.kind === 'covered' ? standing.cover : 'not covered' });
   });
   it('any other kind: the last presented surface among its covers — the header under the status bar names the modal\'s dim', async () => {
     const tree = (await screens()).finportalForgot;
     const header = at(tree, { x: 0, y: 0, width: 402, height: 102 });
     const standing = sceneOf(tree).standing(header, IPHONE, TAP);
     expect(standing.kind).toBe('systemBar');
-    expect(remedyOf(standing)).toEqual({ of: 'presented', cover: [...everyNode(tree)].find((n) => n.identifier === 'forgot_overlay') });
+    expect(named(standing)).toEqual({ of: 'presented', cover: [...everyNode(tree)].find((n) => n.identifier === 'forgot_overlay') });
+  });
+  it('judged of the node alone — nothing of the presented screen over what shows of it: the presented remedy, no cover (scroll_until\'s stroke asks it at its touch-down)', () => {
+    // An undimmed partial sheet over the screen's lower part, a target wholly above the screen (ADR 0018 residual 11).
+    const full = (children: UiNode[]) => node({ role: 'container', rect: box(402, 874), children });
+    const target = node({ role: 'button', identifier: 't', rect: { x: 24, y: -300, width: 354, height: 52 } });
+    const sheet = node({ role: 'scrollable', rect: { x: 0, y: 500, width: 402, height: 374 }, children: [node({ role: 'button', identifier: 'opt', label: 'Option', rect: { x: 20, y: 520, width: 362, height: 50 } })] });
+    const tree = full([full([full([node({ role: 'scrollable', rect: box(402, 874), children: [target] })]), full([sheet])])]);
+    expect(remedyOf(sceneOf(tree).standing(target, IPHONE, TAP))).toEqual({ of: 'presented' });
+    // …and covered in the frame by a node of its own screen, not the presented one: still no cover.
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 200, width: 354, height: 52 } });
+    const over = node({ role: 'button', identifier: 'over', rect: { x: 0, y: 190, width: 402, height: 80 } });
+    const covered = full([full([full([node({ role: 'scrollable', rect: box(402, 874), children: [row] }), over]), full([sheet])])]);
+    const standing = sceneOf(covered).standing(row, IPHONE, TAP);
+    expect({ kind: standing.kind, remedy: remedyOf(standing) }).toEqual({ kind: 'covered', remedy: { of: 'presented' } });
   });
   it('under no presented screen: another remedy, whatever the kind — the same header on the login screen with no modal', async () => {
     const tree = (await screens()).finportalLogin;

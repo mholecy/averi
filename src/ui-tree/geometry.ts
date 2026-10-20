@@ -618,6 +618,9 @@ export const overlapsPastSlack = (a: Rect, b: Rect): boolean => {
  */
 export type { Edge };
 
+/** A rect's four sides, in the order every reader asks them: top, bottom, left, right. */
+export const EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
+
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with
@@ -953,7 +956,7 @@ export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'hor
     left: axis !== 'vertical' && on(rect.x, container.x),
     right: axis !== 'vertical' && on(rect.x + rect.width, container.x + container.width),
   };
-  return (['top', 'bottom', 'left', 'right'] as const).filter((e) => flush[e]);
+  return EDGES.filter((e) => flush[e]);
 }
 
 /**
