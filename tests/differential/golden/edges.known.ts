@@ -4,6 +4,8 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // round 4's scroll-top-edge-end, its content ending at the screen's bottom: #17's turn-back, live), and round 3's
 // Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
 // scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it), and
+// round 14's scroll-sticky-rest (Android only, VA1: scroll-sticky-cut at rest, R whole under the merged header — all
+// green; `fully` is not asked of a whole target, live asks it: docs/truth/live-android-2026-10-18-visibility.md), and
 // round 6's carousel-in-list (both platforms; iOS captured by round 6's iOS device check, 2026-10-18, once the host's
 // Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
 // list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
@@ -66,6 +68,7 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-sticky.xml`]: 4,
     [`${ANDROID}/scroll-bounded-flush.xml`]: 8,
     [`${ANDROID}/scroll-sticky-cut.xml`]: 4,
+    [`${ANDROID}/scroll-sticky-rest.xml`]: 3,
     [`${ANDROID}/scroll-sticky-view.xml`]: 4,
     [`${ANDROID}/scroll-top-edge.xml`]: 7,
     [`${ANDROID}/scroll-top-edge-end.xml`]: 7,

@@ -2314,7 +2314,7 @@ describe('round — a sheet whose detent the swipes changed', () => {
  * as at a clipping container's edge, and a first row at rest whole under it dumps the same tree: the `fully: true` stop
  * answers it with the flush probe toward the header, and the probe's motion tells the two. Over the lab's real capture
  * (tests/fixtures/truth/android-averi_lab-api33/scroll-sticky-cut.xml: R `[128,457][953,567]`, 66 px under the header)
- * and the same dump with R whole, as the app lays it out at offset 0 (`[128,457][953,633]`).
+ * and the same dump with R whole, as the app lays it out at offset 0 (`[128,457][953,633]`: scroll-sticky-rest.xml).
  */
 describe('round — a fully: true stop flush under a node pinned in its own scroll view (VA1)', async () => {
   const { readFile } = await import('node:fs/promises');
@@ -2349,8 +2349,10 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
     );
   });
 
-  it('the first row at rest, whole under the header: one probe that moves nothing — "fully visible after 1 swipe" (the stated cost)', () => {
-    const played = play(FULLY_ANDROID, [read('rest'), read('rest')]);
+  it('the first row at rest, whole under the header (the lab\'s scroll-sticky-rest as captured): one probe that moves nothing — "fully visible after 1 swipe" (the stated cost)', async () => {
+    const tree = parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/scroll-sticky-rest.xml', import.meta.url), 'utf8'));
+    const rest: Row = { tree, found: [[...everyNode(tree)].find((x) => x.identifier === 'lab.scroll-sticky-rest.R')!] };
+    const played = play(FULLY_ANDROID, [rest, rest]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
     expect(resultOf(played)).toMatchObject({ swipes: 1, flush: { edge: 'top', checked: true } });
   });

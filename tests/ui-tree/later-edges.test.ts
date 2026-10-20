@@ -221,7 +221,6 @@ describe('LaterEdges — the two complements its readers ask', () => {
 
 describe('LaterEdges.pinned — a node flush under a node pinned in its own scroll view (VA1: docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md)', () => {
   const pinnedOf = (tree: UiNode, node: UiNode) => laterEdgesIn(tree, sceneOf(tree))(node).pinned().map((e) => ({ edge: e.edge, by: named(e.by), depth: e.depth }));
-  const labText = (cell: string) => readFile(new URL(`../fixtures/truth/android-averi_lab-api33/${cell}.xml`, import.meta.url), 'utf8');
 
   it('scroll-sticky-cut: R and its content `Target R`, cut at the merged header pinned at the list\'s top, each its top edge pinned by the header', async () => {
     const t = await lab('scroll-sticky-cut');
@@ -230,9 +229,9 @@ describe('LaterEdges.pinned — a node flush under a node pinned in its own scro
     expect(pinnedOf(t, find(t, (n) => n.label === 'Target R', 'Target R'))).toEqual([header]);
   });
 
-  it('the same dump at rest (offset 0: R whole, 128,457 825x176, flush under the header) reads the same — only motion tells the two', async () => {
-    const t = parseDump((await labText('scroll-sticky-cut')).replaceAll('bounds="[128,457][953,567]"', 'bounds="[128,457][953,633]"'));
-    expect(pinnedOf(t, byId(t, 'lab.scroll-sticky-cut.R'))).toEqual([{ edge: 'top', by: 'lab.scroll-sticky-cut.header', depth: 176 }]);
+  it('scroll-sticky-rest, the same list at rest (offset 0: R whole, 128,457 825x176, flush under the header) reads the same — only motion tells the two', async () => {
+    const t = await lab('scroll-sticky-rest');
+    expect(pinnedOf(t, byId(t, 'lab.scroll-sticky-rest.R'))).toEqual([{ edge: 'top', by: 'lab.scroll-sticky-rest.header', depth: 176 }]);
   });
 
   it('none where R overlaps the header (scroll-sticky, scroll-sticky-view: R listed from 391, a cover) nor for a list\'s next row', async () => {
@@ -244,7 +243,7 @@ describe('LaterEdges.pinned — a node flush under a node pinned in its own scro
     expect(pinnedOf(picker, byId(picker, 'lab.form-picker.country.AL'))).toEqual([]);
   });
 
-  it('over every Android dump in the fixtures, exactly scroll-sticky-cut\'s R and `Target R` have a pinned edge', async () => {
+  it('over every Android dump in the fixtures, exactly scroll-sticky-cut\'s and scroll-sticky-rest\'s R and `Target R` have a pinned edge', async () => {
     const root = new URL('../fixtures/', import.meta.url);
     const { readdir } = await import('node:fs/promises');
     const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith('.xml'));
@@ -255,6 +254,11 @@ describe('LaterEdges.pinned — a node flush under a node pinned in its own scro
       const later = laterEdgesIn(tree, sceneOf(tree));
       for (const n of everyNode(tree)) for (const e of later(n).pinned()) found.push(`${f.split('/').pop()} ${named(n)} ${e.edge}`);
     }
-    expect(found.sort()).toEqual(['scroll-sticky-cut.xml Target R top', 'scroll-sticky-cut.xml lab.scroll-sticky-cut.R top']);
+    expect(found.sort()).toEqual([
+      'scroll-sticky-cut.xml Target R top',
+      'scroll-sticky-cut.xml lab.scroll-sticky-cut.R top',
+      'scroll-sticky-rest.xml Target R top',
+      'scroll-sticky-rest.xml lab.scroll-sticky-rest.R top',
+    ]);
   });
 });

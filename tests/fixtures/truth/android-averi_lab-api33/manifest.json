@@ -181,6 +181,17 @@
       "truth": "scroll-sticky-cut.truth.json"
     },
     {
+      "file": "scroll-sticky-rest.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "scroll-sticky-rest.png",
+      "truth": "scroll-sticky-rest.truth.json"
+    },
+    {
       "file": "scroll-sticky-view.xml",
       "source": "uiautomator",
       "form": "raw",
