@@ -1119,7 +1119,7 @@
       "pairs": [
         {
           "before": "e52d179",
-          "after": "0f28b4c",
+          "after": "1ef11b9",
           "checks": [
             "ios-iphone17-ios27/blur-menu.idb.json W tap",
             "ios-iphone17-ios27/blur-menu.idb.json W colour",

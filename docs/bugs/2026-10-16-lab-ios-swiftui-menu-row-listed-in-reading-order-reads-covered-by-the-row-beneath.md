@@ -28,8 +28,8 @@
 > within one png pixel of a text-only control's edges. The review-fix commits: `85e36215`, `8c738ecc` (docs),
 > `a374227a`, `0f28b4cf`. The live records stay those taken at `1ef11b9c`; no device re-run was done: the review fixes
 > only add untold / covered paths, every lab strip and slice measures 0.000 share (W stays told), and the golden
-> replies are identical (1410 checks, 217 mismatches, every reply, kind and call list unchanged). Calibrate re-run
-> with the second pair's `after` at `0f28b4c`.
+> replies are identical (1410 checks, 217 mismatches, every reply, kind and call list unchanged). Calibrate judges
+> the fix alone as the second pair (`e52d179` → `1ef11b9`, its first parent), the review fixes changing no golden reply.
 
 > **Status (2026-10-19, round 8):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
 > (its review's fixes; from `fix/round-8` `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual, now

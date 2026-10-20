@@ -53,7 +53,7 @@ open note on the working tree. See the script for the verdicts.
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | calibrate | 6f3a633 → 837ec3e | CALIBRATED; live ios: CALIBRATED |
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4.1 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e0c2587 → bea9769 | CALIBRATED-ON-DEFECT; live ios: CALIBRATED |
-| L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 0f28b4c | CALIBRATED; live ios: CALIBRATED |
+| L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 1ef11b9 | CALIBRATED; live ios: CALIBRATED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
@@ -1061,7 +1061,7 @@ Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4
   - RED ios-iphone17-ios27/blur-menu.wda.json W tap — not tapped: ERROR id:"lab.blur-menu.W" is overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading order: which is drawn on top is not told; only a 300x22 part of it show
   - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) overlaps the element (element 51,448 300x64), the two listed in reading order: which is drawn on to
   - RED ios-iphone17-ios27/blur-menu.wda.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu.W" stopped before any swipe — element is in the viewport but overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading ord
-- after 0f28b4c:
+- after 1ef11b9:
   - ok ios-iphone17-ios27/blur-menu.idb.json W tap — Tapped id:"lab.blur-menu.W"
   - ok ios-iphone17-ios27/blur-menu.idb.json W colour — PASS  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — sampled #00897B (dominant, 100% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 3.000
   - ok ios-iphone17-ios27/blur-menu.idb.json W scroll_until — Element id:"lab.blur-menu.W" fully visible after 0 swipes
