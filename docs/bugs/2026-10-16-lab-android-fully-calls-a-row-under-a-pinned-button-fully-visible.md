@@ -80,7 +80,7 @@ stop does: an assert that should have failed closed passes on what shows.
 ## Notes
 
 - Kept in the bars family's KNOWN list (tests/differential/golden/bars.known.ts), the `fully` row and the colour row
-  `as: bug:` this note; scripts/truth/calibration.json `B4-L1` (open) links the note to both rows.
+  `as: bug:` this note; scripts/truth/calibration.json `B4-L1` (`calibrate`, four rows) links the note to its rows.
 - The plain stop has the same form where the button covers the target's CENTRE: text-under-bar's P on Android
   (under-chrome:pinned, its string listed by no node, its node by the strip above the button), asked by its identifier,
   `scroll_until` stops on it with no swipe ("fully visible after 0 swipes"). Asked by its string, as an agent would, it
