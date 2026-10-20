@@ -1,6 +1,6 @@
 import { rectArea, sameRect, type Rect, type UiNode } from '../adapters/types.js';
 import { listsAncestry, listsUnclippedFrames, type DrawOrder } from './draw-order.js';
-import { across, EDGES, rectWithin, type Clips, type Edge } from './geometry.js';
+import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './geometry.js';
 
 /**
  * THE EDGE EVIDENCE OF COMPOSE'S CUT AT A LATER NODE: on a tree whose source cuts a node's bounds at a node drawn after
@@ -16,28 +16,45 @@ import { across, EDGES, rectWithin, type Clips, type Edge } from './geometry.js'
  *   or riding on the IME): a flush neighbour (`FlushNeighbour`) whose SURFACE past its node only the eyes can judge.
  * - `aligned` — the node in no scroll view, the later node a layout neighbour sharing an alignment line with it at one
  *   end at least (a list's next row, a field under its title, a touch target exactly as wide), or across any side edge.
- * - `sameScrollView` — the node in a clipping scroll view, the later node in that same scroll view (the list's next
- *   row, a field under its title, or a sticky header in it): the list's own content, which its scroll moves.
+ * - `pinnedInScrollView` — the node in a clipping scroll view, the later node in that same scroll view PINNED at its
+ *   edge on that side (its outer edge within a pixel of the scroll view's) and laid flush against the node, not over
+ *   it (its inner edge within a pixel of the node's), at the content's START — the top or left edge, where a sticky
+ *   header pins: a sticky header holding its list's top (`PinnedEdge`). The node runs on under it or it does not — a
+ *   row Compose cut at its merged sticky header (the lab's `scroll-sticky-cut`, VA1) and a first row at rest whole
+ *   under it are the same tree; only motion tells them, so its one reader is the `fully` stop's flush probe, pointed at
+ *   the pinned node's inner edge as at a clipping container's edge. Not at the far edges (bottom, right): there the
+ *   node flush with the row and with the scroll view's edge is the list's NEXT row cut at the fold, listed after the
+ *   row as a pinned footer would be — every `fully` stop on the row above it would be probed, the probe carrying it
+ *   on while the row after it lies cut at the fold. At the start the row before it is listed BEFORE it, so no later
+ *   node is. Residual, stated: a reversed list (`reverseLayout`) pins its sticky header at the bottom, read as the
+ *   next row (a row cut there still reads whole), and lists the rows above a row after it (a row cut at the top
+ *   reads pinned: one needless probe); a right-to-left horizontal list lists the card to a card's left after it (the
+ *   card next to the leftmost one shown reads pinned: one needless probe on a sideways `fully` stop).
+ * - `sameScrollView` — the node in a clipping scroll view, the later node in that same scroll view and not pinned so
+ *   (the list's next row, a field under its title): the list's own content, which its scroll moves.
  * - `none` — no later node lies flush there (and every edge, on a tree of another dialect or a node of no area).
  *
  * `overlaid` and `outsideScrollView` are COMPLEMENTS — the same evidence, read for a node in no scroll view and one in
- * a scroll view — so one classifier makes both (as `aligned` and `sameScrollView` are each one's other side): a node
- * in a scroll view is never an overlay's, because at rest a list's first row lies whole and flush under a bar pinned at
+ * a scroll view — so one classifier makes both (as `aligned` and `sameScrollView` are each one's other side): a node in
+ * a scroll view is never an overlay's, because at rest a list's first row lies whole and flush under a bar pinned at
  * its edge, dumped exactly as a row the bar cuts (the lab's `scroll-sticky-cut`), and an edge-to-edge top bar over a
- * padded list reaches past its rows at both ends as an overlay does; only motion can tell (scroll_until's flush probe,
- * the eyes). And a node in no scroll view has no flush neighbour: no scroll moves it, so no stop waits on its surface.
+ * padded list reaches past its rows at both ends as an overlay does; only motion can tell (scroll_until's flush probe —
+ * `pinnedInScrollView` in the list, a clipping container's edge or a flush neighbour outside it — and the eyes). And a
+ * node in no scroll view has no flush neighbour: no scroll moves it, so no stop waits on its surface.
  *
  * Readers (ui-tree/standing.ts): the sliver cut by a later node (`cutByLater`: a control thinner than the tap minimum
  * across an edge of any class but `none`; a role-less strip only on an `overlaid` edge), the `fully` stop's and the pixel
- * assert's overlaid cover (`LaterEdges.overlaid`, cover.ts#overlaidCover), and `Scene.flushNeighbours` (the eyes'
+ * assert's overlaid cover (`LaterEdges.overlaid`, cover.ts#overlaidCover), `Scene.flushNeighbours` (the eyes'
  * trigger, ui-tree/eyes.ts, which leaves out a neighbour spanning the screen — a question about the screen, not the
- * edge). Edges are asked top, bottom, left, right; the overlay top and bottom only (every measured Compose cut is
- * vertical; sideways a row's padded overflow icon reaches past its neighbour's ends).
+ * edge), and `Scene.pinnedEdges` (the `fully` stop's flush probe, interact/scroll-rounds.ts#PROBE_REACH). Edges are
+ * asked top, bottom, left, right; the overlay top and bottom only (every measured Compose cut is vertical; sideways a
+ * row's padded overflow icon reaches past its neighbour's ends).
  *
- * The next class is VA1's (docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md): a row
- * Compose cut at a sticky header IN its own list is today `sameScrollView` — the header flush across its top edge, in
- * the same scroll view — read whole; telling it from the next row needs a flush probe toward the header, so that class
- * splits from `sameScrollView` here and its reader is the probe.
+ * Not for the pixel assert: `pinnedInScrollView` refuses nothing there — it has no motion to ask, and failing closed
+ * would fail every first row at rest under a sticky header (stated residual: the colour of a row cut at a merged
+ * sticky header is sampled on what the tree lists of it, which is all drawn; its rest lies under the opaque header,
+ * where no screenshot sees; `scroll_until fully: true` first brings it whole).
+ * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
  *
  * Not a reader: adapters/android.ts#widenUnderCovers. It is different evidence — the strip a node GAINS when the
  * parser widens it to its descendants' extent (a node whose own content still carries the cut extent), asked through
@@ -51,17 +68,34 @@ export type LaterEdge =
   | { readonly kind: 'none'; readonly edge: Edge; readonly depth: number }
   | OverlaidEdge
   | { readonly kind: 'outsideScrollView'; readonly edge: Edge; readonly by: UiNode; readonly depth: number }
+  | PinnedEdge
   | { readonly kind: 'sameScrollView' | 'aligned'; readonly edge: Edge; readonly by: UiNode; readonly depth: number };
 
 /**
+ * A PINNED EDGE: an edge of a node in a clipping scroll view (its nearest) laid flush against `by`, a node drawn
+ * after it IN that scroll view and pinned at the scroll view's edge on that side (`LaterEdge`'s
+ * `pinnedInScrollView`) — so the scroll view shows nothing of its content past `by`'s inner edge, and that edge is
+ * where the node may be cut, as at a clipping container's own edge. The lab's merged sticky header `0,303 1080x154`
+ * held at its list's top `0,303 1080x1238`, R dumped `128,457 825x110` under it (66 px cut, VA1) — and at rest `128,457
+ * 825x176` whole: the tree is the same, so this says only where to probe, never that the node is cut.
+ */
+export interface PinnedEdge {
+  readonly kind: 'pinnedInScrollView';
+  /** At the content's start only (the module doc). */
+  readonly edge: 'top' | 'left';
+  readonly by: UiNode;
+  readonly depth: number;
+}
+
+/**
  * AN OVERLAID EDGE: a top or bottom edge of a node's bounds that the tree's source cut at a node DRAWN OVER IT — so an
- * unknown run of the node lies under `by` (`LaterEdge`'s `overlaid`). `by` is the node laid flush against that edge along
- * the node's whole width, drawn after it outside its subtree, that also REACHES PAST THE NODE AT BOTH ENDS of the edge:
- * an overlay laid over content with margins of its own (the lab's pinned `Continue` 66..1014 over its row 127..952),
- * where a sibling laid beside it in a column shares an alignment line with it at one end at least (a list's next row, a
- * field under its title, a touch target exactly as wide). Never for a node in a scroll view (the module doc): a row cut
- * at a bar at its list's edge stays read whole (open: VA1). Decided from the tree alone — no screenshot sees under an
- * opaque node.
+ * unknown run of the node lies under `by` (`LaterEdge`'s `overlaid`). `by` is the node laid flush against that edge
+ * along the node's whole width, drawn after it outside its subtree, that also REACHES PAST THE NODE AT BOTH ENDS of the
+ * edge: an overlay laid over content with margins of its own (the lab's pinned `Continue` 66..1014 over its row
+ * 127..952), where a sibling laid beside it in a column shares an alignment line with it at one end at least (a list's
+ * next row, a field under its title, a touch target exactly as wide). Never for a node in a scroll view (the module
+ * doc): a row cut at a sticky header pinned in its list is `pinnedInScrollView`'s, the flush probe's (VA1). Decided
+ * from the tree alone — no screenshot sees under an opaque node.
  *
  * Unlike `FlushNeighbour` (its complement), here the neighbour's own node is the cover. Asked where nothing else
  * covers: the `fully` stop and the pixel assert name it as their cover (cover.ts#overlaidCover, appended to
@@ -99,6 +133,11 @@ export interface LaterEdges {
   overlaid(): OverlaidEdge | undefined;
   /** Its flush neighbours (`outsideScrollView`), top, bottom, left, right — empty for a node in no scroll view. */
   flushNeighbours(): readonly FlushNeighbour[];
+  /**
+   * Its edges laid flush under a node pinned in its own scroll view (`pinnedInScrollView`), top before left (the only
+   * edges it pins at) — empty for a node in no scroll view.
+   */
+  pinned(): readonly PinnedEdge[];
 }
 
 /** What the classification asks of the scene: the draw order's covers and the clip facts' scroll views. */
@@ -119,7 +158,7 @@ export function laterEdgesIn(tree: UiNode, scene: LaterScene): (node: UiNode) =>
 
 /** Every edge `none`. */
 function uncut(node: UiNode): LaterEdges {
-  return { at: (edge) => ({ kind: 'none', edge, depth: across(node.rect, edge) }), overlaid: () => undefined, flushNeighbours: () => [] };
+  return { at: (edge) => ({ kind: 'none', edge, depth: across(node.rect, edge) }), overlaid: () => undefined, flushNeighbours: () => [], pinned: () => [] };
 }
 
 /** `node`'s edges classified over `scene`, on a tree that cuts at later nodes. */
@@ -133,7 +172,12 @@ function classified(scene: LaterScene, node: UiNode): LaterEdges {
     const by = laterAcross(scene.order, node, edge);
     if (by === undefined) return { kind: 'none', edge, depth };
     const own = ownScrollers()[0];
-    if (own !== undefined) return { kind: scene.clips.scrollersOf(by).some((s) => sameRect(s, own)) ? 'sameScrollView' : 'outsideScrollView', edge, by, depth };
+    if (own !== undefined) {
+      if (!scene.clips.scrollersOf(by).some((s) => sameRect(s, own))) return { kind: 'outsideScrollView', edge, by, depth };
+      // Pinned only at the content's start (the module doc): at the far edges the next row cut at the fold looks alike.
+      if ((edge === 'top' || edge === 'left') && pinnedAt(own, r, by.rect, edge)) return { kind: 'pinnedInScrollView', edge, by, depth };
+      return { kind: 'sameScrollView', edge, by, depth };
+    }
     const c = by.rect;
     // An overlay's own margins: past the node at both ends, not on an alignment line it shares with it.
     if ((edge === 'top' || edge === 'bottom') && c.x < r.x && c.x + c.width > r.x + r.width) return { kind: 'overlaid', edge, by, depth };
@@ -160,7 +204,19 @@ function classified(scene: LaterScene, node: UiNode): LaterEdges {
     at,
     overlaid,
     flushNeighbours: () => (ownScrollers().length === 0 ? [] : EDGES.map(at).flatMap((e) => (e.kind === 'outsideScrollView' ? [{ edge: e.edge, by: e.by }] : []))),
+    pinned: () => (ownScrollers().length === 0 ? [] : EDGES.map(at).filter((e): e is PinnedEdge => e.kind === 'pinnedInScrollView')),
   };
+}
+
+/**
+ * `by` (laid across `node`'s `edge` at the content's start, in its scroll view `scrollView`) is pinned there: its outer
+ * edge on that side lies on the scroll view's (geometry.ts#flushEdges, within a pixel), and its inner edge (its bottom,
+ * at the top; its right, at the left) on the node's, within a pixel — flush, not drawn over it (a header overlapping
+ * the row is a cover, the draw order's).
+ */
+function pinnedAt(scrollView: Rect, node: Rect, by: Rect, edge: 'top' | 'left'): boolean {
+  const [inner, own] = edge === 'top' ? [by.y + by.height, node.y] : [by.x + by.width, node.x];
+  return flushEdges(by, scrollView).includes(edge) && Math.abs(inner - own) <= 1;
 }
 
 /**

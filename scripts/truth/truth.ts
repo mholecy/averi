@@ -388,6 +388,9 @@ export function intersect(a: Rect, b: Rect): Rect | null {
   const r = { x, y, width: Math.min(a.x + a.width, b.x + b.width) - x, height: Math.min(a.y + a.height, b.y + b.height) - y };
   return r.width > 0 && r.height > 0 ? r : null;
 }
+/** `inner` lies wholly inside `outer`. */
+export const rectInside = (inner: Rect, outer: Rect): boolean =>
+  inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
 /** What of `r` lies outside `cut`: up to four rects (above, below, left, right of it). */
 export function subtract(r: Rect, cut: Rect): Rect[] {
   const o = intersect(r, cut);

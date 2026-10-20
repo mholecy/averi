@@ -4,16 +4,19 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // round 4's scroll-top-edge-end, its content ending at the screen's bottom: #17's turn-back, live), and round 3's
 // Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
 // scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it), and
+// round 14's scroll-sticky-rest (Android only, VA1: scroll-sticky-cut at rest, R whole under the merged header — all
+// green; `fully` is not asked of a whole target, live asks it: docs/truth/live-android-2026-10-18-visibility.md), and
 // round 6's carousel-in-list (both platforms; iOS captured by round 6's iOS device check, 2026-10-18, once the host's
 // Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
 // list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
 // (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
 // scripts/truth/calibration.json owns only the link from each lab note to its rows (LE4 is calibrated since
-// round 5's 0a, LE1, LE2's fixed half and LE3 since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
+// round 5's 0a, LE1, LE2's fixed half, LE3 and VA1's fully half since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
 
 /** LE2's rest, accepted (ADR 0010's residual 5): with no scroll view listed and no screenshot per tap or stop, the tap, the plain stop and the strokes are judged on the screen alone; treeSource: wda lists the scroll views. */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
-const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
+/** VA1's colour half, accepted (ADR 0013 residual 3): the pixel assert has no probe to tell a row cut at a merged sticky header from a first row at rest whole under it, and samples what the tree lists of it. */
+const PINNED_NO_PROBE = 'residual:ADR 0013 residual 3 — the pixel assert has no probe: a row cut at a merged sticky header is sampled on what the tree lists of it';
 const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (201,699)';
 
 export const edges: KnownFile = {
@@ -49,11 +52,13 @@ export const edges: KnownFile = {
     // lies over; the parsers keep its Header trait (UiNode.heading), and a heading listed before a target it overlaps,
     // in a reading-order listing, is drawn over it (ui-tree/reading-order.ts#headingsOver): R's colour and fully rows
     // green on idb and WDA, struck off here, calibrated in scripts/truth/calibration.json.
-    // LAB FINDING VA1 — Compose cuts a row (and its content) at a sticky header that is one accessibility element: the
-    // tree's row 128,457 825x110 begins at the header's bottom, its content cut alike, so nothing in it reaches under the
-    // header — averi samples the cut rect (a PASS on R's own colour) and calls it fully visible.
-    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'lab finding: the row cut at the header, its content too — the sample is the cut rect', as: VA1 }),
-    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['fully'], { cls: 'fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the row cut at the header reads whole', as: VA1 }),
+    // LAB FINDING VA1 — fixed on bugs/r14-va1 (round 14): Compose cuts a row (and its content) at a sticky header that
+    // is one accessibility element, pinned at its list's top — the tree's row 128,457 825x110 begins at the header's
+    // bottom, as a first row at rest whole under it does. `fully: true` probes toward the header
+    // (ui-tree/later-edges.ts#PinnedEdge, the flush probe): R fully green, struck off here, calibrated in
+    // scripts/truth/calibration.json. The colour assert has no probe: it samples the cut rect (a PASS on R's own
+    // colour) — the residual, accepted.
+    ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'the row cut at the header, its content too — the sample is the cut rect', as: PINNED_NO_PROBE }),
   ]),
   // scroll-top-edge(-end)'s T, in the status band and its scroll view, is asked R-fully too (7 rows, 6 before round 5):
   // the target contract asks `fully` of a band target in a scroll view (scripts/truth/target-contract.ts#fullyAsked),
@@ -63,6 +68,7 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-sticky.xml`]: 4,
     [`${ANDROID}/scroll-bounded-flush.xml`]: 8,
     [`${ANDROID}/scroll-sticky-cut.xml`]: 4,
+    [`${ANDROID}/scroll-sticky-rest.xml`]: 3,
     [`${ANDROID}/scroll-sticky-view.xml`]: 4,
     [`${ANDROID}/scroll-top-edge.xml`]: 7,
     [`${ANDROID}/scroll-top-edge-end.xml`]: 7,

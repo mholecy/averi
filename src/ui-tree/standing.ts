@@ -7,7 +7,7 @@ import {
   type Exposure,
 } from './draw-order.js';
 import { coverAtPoint, lastPresented, overlaidCover, type Cover } from './cover.js';
-import { laterEdgesIn, type FlushNeighbour, type LaterEdges } from './later-edges.js';
+import { laterEdgesIn, type FlushNeighbour, type LaterEdges, type PinnedEdge } from './later-edges.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
 import type { SeenOrder } from './seen-order.js';
 import {
@@ -336,6 +336,13 @@ export interface Scene {
    * `scroll_until`'s stop, through ui-tree/eyes.ts#eyesQuestion.
    */
   flushNeighbours(node: UiNode): readonly FlushNeighbour[];
+  /**
+   * THE PINNED EDGES of the node (later-edges.ts#PinnedEdge, the classification's `pinnedInScrollView`), top before
+   * left, empty when none: an edge laid flush under a node pinned in the node's own scroll view (a merged sticky
+   * header), where Compose may have cut it — the twin of `flushNeighbours` inside the scroll view. One reader:
+   * `scroll_until`'s `fully: true` flush probe (interact/scroll-rounds.ts#PROBE_REACH).
+   */
+  pinnedEdges(node: UiNode): readonly PinnedEdge[];
 }
 
 /**
@@ -725,6 +732,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
     flushNeighbours: (node) => laterOf(node).flushNeighbours(),
+    pinnedEdges: (node) => laterOf(node).pinned(),
     presentedAt(point, target) {
       const surface = target === undefined ? scene.order.markedAt(point) : scene.order.presentedAt(target, point);
       return surface === undefined ? undefined : scene.order.presentation.press(surface);

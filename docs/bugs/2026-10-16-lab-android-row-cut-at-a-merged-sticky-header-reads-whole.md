@@ -1,6 +1,21 @@
 # BUG: on Android a row Compose cuts at a sticky header — its content cut with it — reads whole: `fully: true` calls it "fully visible" and the colour assert passes on the cut rect
 
-> **Status (2026-10-20, round 9): still open.** Round 9's B4-L1 fix first read the merged sticky header, pinned at its
+> **Status (2026-10-20, round 14): fixed (`fully`)** at `7957a62` (bugs/r14-va1), measured by the golden mode (against
+> `cbc584b6`, with OCR: `R fully` red to green — "fully visible after 1 swipe; its top edge lies on the edge of
+> container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top
+> and drawn after it, and a probe swipe toward it moved nothing", the probe `540 551 → 540 728` from inside the list
+> below the header; no other reply changed; the new cell `scroll-sticky-rest`, not in the base: 3 rows, all green), by
+> calibrate (CALIBRATED, cbc584b → 7957a62) and live on averi_lab twice
+> (docs/truth/live-records/android-vis-r14-va1.json, -2.json): `scroll_until R fully: true` probes toward the header
+> twice — list 66→0 (R grows to `128,457 825x176`, flush again), then 0→0 — "fully visible after 2 swipes", and the tap
+> fires R; on the new at-rest cell `scroll-sticky-rest` (R whole under the same header, offset 0: the case that refused
+> round 9) one probe that moves nothing, "fully visible after 1 swipe", Tapped. The concept: an edge laid flush under a
+> node pinned at its scroll view's top or left inside that scroll view (ui-tree/later-edges.ts#PinnedEdge) is the flush
+> probe's to check (ADR 0013, refined 2026-10-20, round 14). **The colour half is an accepted residual** (ADR 0013
+> residual 3): the pixel assert has no probe and still passes on the cut rect; remedy `scroll_until … fully: true`
+> first. `R colour` stays KNOWN as that residual.
+>
+> **Round 9 (2026-10-20): left open.** Round 9's B4-L1 fix first read the merged sticky header, pinned at its
 > list's top, as an OVERLAY of R (`fix/r9-b4l1` `7755978c`: `fully` covered by it, the colour assert failing closed —
 > both golden rows green). On the device `scroll_until R fully: true` then stroked the list 66→877→439→1→205 and timed
 > out with R under the header (docs/truth/live-records/android-vis-r9-b4l1-sticky.json). The tree cannot tell the two:

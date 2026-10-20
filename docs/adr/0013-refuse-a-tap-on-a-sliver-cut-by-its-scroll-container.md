@@ -238,7 +238,7 @@ sliver (`P`'s probe at its dumped centre fired `P`). The words for the cut are o
 (`geometry.ts`'s then, `cover.ts#mayRunOnUnderText`, `#cutAtLaterText` since round 10), said by the sliver's sentence, `scroll_until`'s `fully` failure
 and the pixel assert's covered miss.
 
-**Never for a node in a scroll view — VA1 left open.** The same shape cuts `scroll-sticky-cut`'s `R` at a
+**Never for a node in a scroll view — VA1 left to motion** (closed 2026-10-20 by the flush probe, below). The same shape cuts `scroll-sticky-cut`'s `R` at a
 merged sticky header (`0,303 1080x154`, pinned at its list's top): `R` and its content are dumped from 457. A first
 version read a neighbour in the node's own scroll view as an overlay when pinned at that scroll view's far edge, and
 turned VA1's two golden rows green. The device refused it (`docs/truth/live-records/android-vis-r9-b4l1-sticky.json`,
@@ -253,7 +253,7 @@ edge-to-edge top bar over a list padded to clear it lies flush on the first inse
 last one at the end of the content (and a list ending flush on a bar laid below it ends there too, where `scroll_until`'s
 flush probe answered correctly before) — a whole row, `fully` failing for good with "a layout defect", the pixel assert
 failing closed. So a node in a scroll view is never read as overlaid at all (the eyes and the flush probe keep it,
-`Scene.flushNeighbours` being this concept's complement), and VA1 stays open for that probe.
+`Scene.flushNeighbours` being this concept's complement), and VA1 stays open for that probe (round 14 sends it, below).
 
 **What it narrows:**
 - 2026-10-17's second residual: a role-less clickable cut to a strip is refused when the node that cut it is an
@@ -271,7 +271,8 @@ the floating tab bar lie in their list, so they read as before.
 **Residuals, stated:**
 - an overlay exactly as wide as the node (equal margins, or full-bleed over full-bleed) is not read as one: the node
   reads whole, as before (in a scroll view with the neighbour outside it, the eyes still look at the node-less padding);
-- a row cut at a sticky header in its own list reads whole (VA1, above);
+- a row cut at a sticky header in its own list reads whole (VA1, above; since round 14 `fully: true` probes it, below —
+  the pixel assert still samples the cut rect);
 - a node in no scroll view laid flush, with no gap, against a later node that reaches past it at both ends reads as
   running on under it, whether or not it does: `fully` fails and the colour and ocr asserts fail closed naming that
   node. The tree cannot tell an overlay from a section laid below in the same column — a button centred above a
@@ -292,17 +293,93 @@ the floating tab bar lie in their list, so they read as before.
 
 Bug note: docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
 
+## Refined 2026-10-20 (round 14, VA1): a row flush under a node pinned in its own scroll view is the flush probe's
+
+Round 9 left VA1 to motion (above): on the lab's `scroll-sticky-cut` (Android), `R` and its content are dumped
+`128,457 825x110`, cut 66 px at the merged sticky header `0,303 1080x154` pinned at its list's top `0,303 1080x1238`
+and listed after it; at rest (offset 0) a first row lies whole and flush under the same header, `128,457 825x176`, the
+same tree. Before this, `scroll_until R fully: true` said "fully visible after 0 swipes": the flush probe asked only
+about the scroll container's own edge (457 is not 303).
+
+**The concept** (`ui-tree/later-edges.ts#PinnedEdge`, the class `pinnedInScrollView`, split out of `sameScrollView`;
+`Scene.pinnedEdges`, the twin of `Scene.flushNeighbours` inside the scroll view): on a tree that cuts at later nodes
+(Android's), an edge of a node in a clipping scroll view with a node drawn after it laid flush against it (the same
+evidence as every class of `later-edges.ts`) that lies IN the node's nearest scroll view, is pinned there — its outer
+edge within a pixel of the scroll view's on that side — and does not overlap the node (its inner edge within a pixel of
+the node's). The scroll view shows nothing of its content past that inner edge, so it is where the node may be cut, as
+at the scroll view's own edge. At the content's START only, the top or left edge, where a sticky header pins: at the
+far edges the same shape is the list's next row cut at the fold (listed after the row, as a footer would be), which
+would turn every `fully` stop on the row above it into probes carrying it on (measured on the test's Settings list: 3
+swipes where 1 did); at the start the row before is listed before it.
+
+**Its one reader is the `fully` stop's flush probe** (`interact/scroll-rounds.ts#flushWith`): the nearest scroll view's
+flush edges along the scroll are its own and the match's pinned ones; one edge is probed toward (the probe planned,
+held, budgeted and refused for room or axis exactly as before), two are `fills` (the row spanning from under the pinned
+node to the scroll view's far edge: no probe, the reply naming both edges for what they lie on). The stop's `Flush`
+carries the pinned node (`pinned`), and the reply names the edge for what it lies on: `its top edge lies on the edge of
+container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and
+drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut there` (unchecked: `where Android cuts
+a node's bounds at a node drawn over it`). Decided in review against the design's "keep the prefix `its top edge lies on
+its scroll container's`": that prefix is false here (R's top is 457, the container's 303), and a truthful reply
+outranks a harness regex, so the golden harness reply parser (`flushProbedSide`, scripts/truth/replies.ts) reads both
+forms.
+The tap, the plain stop and the sliver rules are unchanged (`cutByLater` reads any class but `none`, as before).
+
+**Costs, stated:** one probe (a stroke of at most PROBE_MAX_TRAVEL_FRACTION, a settle and a read — ~2.5–3 s on the
+lab AVD) on every `fully: true` stop flush under a sticky header pinned in its list: a first row at rest pays one
+probe that moves nothing; VA1's cut row pays two (the first moves the list 66 → 0 and R grows, flush again; the second
+moves nothing). The tap, the plain stop and the pixel assert pay nothing. As between a scroll view's own two edges, a
+row whose probe toward the header leaves it flush at the far edge (or the reverse) is probed again from there; every
+probe spends one of `maxSwipes`, so at worst the stop says `budget`, unchecked, never a false "nothing of it is cut".
+
+**Residuals, stated:**
+- **the pixel assert has no probe** (residual 3, below): on VA1's tree it samples what the tree lists of R (all
+  drawn, its own colour) and passes, whatever lies under the opaque header. Refusing there would fail every first row at rest under a sticky
+  header for good (round 9's refusal), and no screenshot sees under an opaque node. Remedy: `scroll_until … fully:
+  true` first, which brings the row whole; the golden row `scroll-sticky-cut.xml R colour` stays KNOWN as this
+  residual;
+- a reversed list (`reverseLayout`) pins its sticky header at the bottom, read as a next row: a row cut there still
+  reads whole; and lists the rows above a row after it, so a row under one cut at the list's top costs one needless
+  probe; a right-to-left horizontal list likewise lists the card to a card's left after it, so a sideways `fully` stop
+  on the card next to the leftmost one shown costs one needless probe;
+- the nearest scroll view only: a card in a carousel nested in a list, flush under a sticky header pinned in that
+  LIST, has the carousel as its scroll view, so its edge is `outsideScrollView`, never pinned. Compose cuts the
+  carousel at the header too, so a card cut there lies on its carousel's cut edge and the container-edge rule asks
+  (a probe, or `fills` for a card as tall as its carousel: tested). Only a tree listing the carousel uncut over a card
+  it cuts would go unasked; no such tree has been measured;
+- remembering a probe's answer for a later pixel assert, a doubt clause on a colour PASS, and failing the colour assert
+  closed were rejected: the first is state across calls, the others a false failure or noise on every first row.
+
+Measured: golden over the whole corpus with OCR changes one reply — `scroll-sticky-cut.xml R fully`, red to green,
+"fully visible after 1 swipe" with the probe `540 551 → 540 728` from inside the list below the header (the replayed
+probe moves nothing) — 1410 checks, 224 → 223 mismatches. Over every uiautomator dump in the fixtures exactly two nodes
+have a pinned edge: that `R` and its content `Target R` (and, since the lab cell below, `scroll-sticky-rest`'s); over
+Compose's own snapshots of the banking app (tests/fixtures/android-ui-snapshot-compose.json) one: Account Detail's
+`date_header_22`, flush under `date_header_21` pinned at the transactions list's top — a sticky date header, so a
+`fully: true` stop on it pays the probe too. iOS is untouched (no tree that cuts at later nodes). Live on averi_lab,
+twice (docs/truth/live-records/android-vis-r14-va1.json, -2.json): `scroll_until R fully: true` probes toward the header
+from inside the list, the list 66 → 0 then 0 → 0, "fully visible after 2 swipes", the tap fires R; on the lab's new
+`scroll-sticky-rest` (R whole at rest under the same header — the case that refused round 9's rule) one probe that moves
+nothing, "fully visible after 1 swipe", Tapped.
+
+Bug note: docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
+
 ## Residuals accepted
 
-- A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;
-  the refusal names a child or a coordinate tap as the way past it.
-- **"fully visible" while a surface with no node lies over part of the target** (live case k7, round 6's Android
-  device check; accepted 2026-10-18; CLOSED 2026-10-19 by the eyes, above — the account below is kept as measured). After one stroke the lab's phone field (`1129–1228`) lay with its centre clear of
-  the bar riding on the IME, and averi stopped "fully visible after 1 swipe" — but the bar's top padding, a surface
-  Compose dumps no node for, still covered 18 px of its bottom (of 99). The tree cannot see what has no node (ADR
-  0018's residual 9 is the same class); the plain stop is right (its centre is clear, a tap there focuses phone), the
-  word "fully" overstates by those 18 px. A future "eyes" item (docs/plans/2026-10-15-ground-truth-lab-app.md): verify
-  a "fully" claim with pixels where a node-less sibling's padding may lie over the target.
+1. A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;
+   the refusal names a child or a coordinate tap as the way past it.
+2. **"fully visible" while a surface with no node lies over part of the target** (live case k7, round 6's Android
+   device check; accepted 2026-10-18; CLOSED 2026-10-19 by the eyes, above — the account below is kept as measured). After one stroke the lab's phone field (`1129–1228`) lay with its centre clear of
+   the bar riding on the IME, and averi stopped "fully visible after 1 swipe" — but the bar's top padding, a surface
+   Compose dumps no node for, still covered 18 px of its bottom (of 99). The tree cannot see what has no node (ADR
+   0018's residual 9 is the same class); the plain stop is right (its centre is clear, a tap there focuses phone), the
+   word "fully" overstates by those 18 px. A future "eyes" item (docs/plans/2026-10-15-ground-truth-lab-app.md): verify
+   a "fully" claim with pixels where a node-less sibling's padding may lie over the target.
+3. **The pixel assert on a row cut at a sticky header pinned in its own list** (VA1, accepted 2026-10-20 in round 14,
+   above): it has no probe, so it samples what the tree lists of the row — all drawn, the row's own colour — and passes
+   whatever lies under the opaque header; failing it closed would fail every first row at rest under a sticky header.
+   Remedy: `scroll_until … fully: true` first (the flush probe brings the row whole). Golden:
+   `scroll-sticky-cut.xml R colour`, KNOWN as this residual.
 
 ## Bug note
 

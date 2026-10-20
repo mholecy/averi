@@ -1156,14 +1156,14 @@
     {
       "n": "VA1",
       "note": "2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["7957a62"],
       "verified": "golden",
-      "defect": "^passed on|fully visible",
+      "defect": "fully visible",
       "checks": [
-        "android-averi_lab-api33/scroll-sticky-cut.xml R colour",
         "android-averi_lab-api33/scroll-sticky-cut.xml R fully"
       ],
-      "remark": "No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744). Round 9's B4-L1 fix first read the sticky header as an overlay of the row (7755978): golden green, but on the device scroll_until R fully stroked the list away and timed out (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) — at rest a first row lies whole and flush under its sticky header, the same tree as the row it cuts; e6ed7d4 dropped the clause, and 151b2ca made an overlaid edge never for a node in a scroll view at all (ADR 0013, refined 2026-10-20). Left for a flush probe toward the header."
+      "remark": "Red before the fix (cbc584b6, its first parent, and at #9's 10fb02b and d2b7744 alike: fully visible after 0 swipes). Round 9's B4-L1 fix first read the sticky header as an overlay of the row (7755978): golden green, but on the device scroll_until R fully stroked the list away and timed out (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) — at rest a first row lies whole and flush under its sticky header, the same tree. Fixed by round 14's 7957a62: an edge laid flush under a node pinned at its scroll view's top (or left) inside that scroll view is `pinnedInScrollView` (ui-tree/later-edges.ts#PinnedEdge), and the fully stop's flush probe goes toward it (scroll-rounds.ts#flushWith; ADR 0013 refined 2026-10-20, round 14) — R fully visible after 1 swipe in the replay, the probe from inside the list below the header. The colour row stays KNOWN as ADR 0013 residual 3 (the pixel assert has no probe). Live: android-vis-r14-va1*.json (2 swipes, list 66→0, 0→0, Tapped; the at-rest twin scroll-sticky-rest after 1)."
     },
     {
       "n": "B4-L1",

@@ -2307,3 +2307,149 @@ describe('round — a sheet whose detent the swipes changed', () => {
     expect(describeScrollResult(resultOf(play(IPHONE, [sheet(undefined, 900), sheet('Expanded', 300), sheet('Expanded', 300)])))).toBe('fully visible after 1 swipe');
   });
 });
+
+/**
+ * VA1 (docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md): a row flush under a node
+ * pinned in its own scroll view (ui-tree/later-edges.ts#PinnedEdge — the lab's merged sticky header) may be cut there,
+ * as at a clipping container's edge, and a first row at rest whole under it dumps the same tree: the `fully: true` stop
+ * answers it with the flush probe toward the header, and the probe's motion tells the two. Over the lab's real capture
+ * (tests/fixtures/truth/android-averi_lab-api33/scroll-sticky-cut.xml: R `[128,457][953,567]`, 66 px under the header)
+ * and the same dump with R whole, as the app lays it out at offset 0 (`[128,457][953,633]`: scroll-sticky-rest.xml).
+ */
+describe('round — a fully: true stop flush under a node pinned in its own scroll view (VA1)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { everyNode } = await import('../../src/adapters/types.js');
+  const { parseDump } = await import('../helpers/android-dumps.js');
+  const xml = await readFile(new URL('../fixtures/truth/android-averi_lab-api33/scroll-sticky-cut.xml', import.meta.url), 'utf8');
+  const LIST: Rect = { x: 0, y: 303, width: 1080, height: 1238 };
+  const HEADER = { role: 'container', identifier: 'lab.scroll-sticky-cut.header', rect: { x: 0, y: 303, width: 1080, height: 154 } };
+  const FULLY_ANDROID: Rules = { ...ANDROID, fully: true };
+  /** The read: the dump, R as dumped (`cut`) or whole at rest. */
+  const read = (r: 'cut' | 'rest'): Row => {
+    const tree = parseDump(r === 'cut' ? xml : xml.replaceAll('bounds="[128,457][953,567]"', 'bounds="[128,457][953,633]"'));
+    return { tree, found: [[...everyNode(tree)].find((x) => x.identifier === 'lab.scroll-sticky-cut.R')!] };
+  };
+  const probes = (played: Played) => played.steps.filter((s) => s.do === 'stroke' && s.probe === true);
+
+  it('VA1\'s capture: probed toward the header (content up, the finger down) from inside the list; R grows, flush again, probed again; the probe that moves nothing settles it — "fully visible after 2 swipes", naming the header', () => {
+    const played = play(FULLY_ANDROID, [read('cut'), read('rest'), read('rest'), read('rest')]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
+    for (const p of probes(played)) {
+      expect(p).toMatchObject({ toward: 'up', probe: true });
+      const box = (p as { box: Rect }).box;
+      expect(box.y).toBeGreaterThanOrEqual(LIST.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(LIST.y + LIST.height);
+    }
+    expect(probes(played)).toHaveLength(2);
+    const result = resultOf(played);
+    expect(result.flush).toEqual({ edge: 'top', container: LIST, pinned: { ...HEADER, label: null }, checked: true });
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
+        'and a probe swipe toward it moved nothing — nothing of it is cut there',
+    );
+  });
+
+  it('the first row at rest, whole under the header (the lab\'s scroll-sticky-rest as captured): one probe that moves nothing — "fully visible after 1 swipe" (the stated cost)', async () => {
+    const tree = parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/scroll-sticky-rest.xml', import.meta.url), 'utf8'));
+    const rest: Row = { tree, found: [[...everyNode(tree)].find((x) => x.identifier === 'lab.scroll-sticky-rest.R')!] };
+    const played = play(FULLY_ANDROID, [rest, rest]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
+    expect(resultOf(played)).toMatchObject({ swipes: 1, flush: { edge: 'top', checked: true } });
+  });
+
+  it('no swipe left: unchecked for the budget, and the reply says Compose may have cut it at the pinned node', () => {
+    const result = resultOf(play({ ...FULLY_ANDROID, maxSwipes: 0 }, [read('cut')]));
+    expect(result.flush).toMatchObject({ edge: 'top', container: LIST, checked: false, why: 'budget' });
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 0 swipes; but its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
+        "where Android cuts a node's bounds at a node drawn over it, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it",
+    );
+  });
+
+  it('a row spanning from under the pinned header to the list\'s bottom edge — in the list itself or in one nested in an outer list — `fills` it: no probe, the reply naming both edges for what they lie on', () => {
+    const header = '<node class="android.view.View" resource-id="header" bounds="[0,303][1080,457]"><node class="android.widget.TextView" text="Section" bounds="[400,347][681,413]" /></node>';
+    const list = `<node class="android.view.View" scrollable="true" resource-id="list" bounds="[0,303][1080,1541]"><node class="android.view.View" clickable="true" resource-id="row" bounds="[128,457][953,1541]" />${header}</node>`;
+    const tall = (inner: string): Row => {
+      const tree = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">${inner}</node></hierarchy>`);
+      return { tree, found: [[...everyNode(tree)].find((x) => x.identifier === 'row')!] };
+    };
+    const nested = `<node class="android.view.View" scrollable="true" resource-id="outer" bounds="[0,0][1080,2220]">${list}</node>`;
+    for (const shape of [list, nested]) {
+      const played = play(FULLY_ANDROID, [tall(shape)]);
+      expect(probes(played)).toEqual([]);
+      const result = resultOf(played);
+      expect(result.flush).toEqual({ edges: ['top', 'bottom'], container: LIST, pinned: { role: 'container', identifier: 'header', label: null, rect: { x: 0, y: 303, width: 1080, height: 154 } }, checked: false, why: 'fills' });
+      expect(describeScrollResult(result)).toBe(
+        'fully visible after 0 swipes; but it spans its scroll container (0,303 1080x1238) from the edge of container id:header (0,303 1080x154), pinned at the container\'s top and drawn after it, ' +
+          "to the container's bottom edge — its top edge lies on that node's, its bottom edge on the container's, where Android cuts a node's bounds at a node drawn over it or to the container, " +
+          'and no probe swipe can tell which side, if either, is cut — it may be cut there, a rect assert or screenshot may measure part of it; check with a screenshot',
+      );
+    }
+  });
+
+  /** A dump of `inner` on the lab AVD's screen, the node `id` found. */
+  const shaped = (inner: string, id: string): Row => {
+    const tree = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">${inner}</node></hierarchy>`);
+    return { tree, found: [[...everyNode(tree)].find((x) => x.identifier === id)!] };
+  };
+
+  it('nested: a row flush under the header pinned in its own list, that list nested in an outer one, is probed toward the header in its own list — the nearest', () => {
+    const row = shaped(
+      `<node class="android.view.View" scrollable="true" resource-id="outer" bounds="[0,0][1080,2220]"><node class="android.view.View" scrollable="true" resource-id="list" bounds="[0,303][1080,1541]"><node class="android.view.View" clickable="true" resource-id="row" bounds="[128,457][953,633]" /><node class="android.view.View" resource-id="header" bounds="[0,303][1080,457]"><node class="android.widget.TextView" text="Section" bounds="[400,347][681,413]" /></node></node></node>`,
+      'row',
+    );
+    const played = play(FULLY_ANDROID, [row, row]);
+    expect(probes(played)).toHaveLength(1);
+    expect(probes(played)[0]).toMatchObject({ toward: 'up', probe: true });
+    expect(resultOf(played).flush).toEqual({ edge: 'top', container: LIST, pinned: { role: 'container', identifier: 'header', label: null, rect: { x: 0, y: 303, width: 1080, height: 154 } }, checked: true });
+  });
+
+  it('nested the other way: a card of a carousel in the list, the header pinned in the LIST — not pinned (its scroll view is the carousel), but Compose cuts the carousel at the header alike, so the card fills its carousel: `fills`, no probe', () => {
+    const card = shaped(
+      `<node class="android.view.View" scrollable="true" resource-id="list" bounds="[0,303][1080,1541]"><node class="android.view.View" scrollable="true" resource-id="carousel" bounds="[0,457][1080,757]"><node class="android.view.View" clickable="true" resource-id="card" bounds="[100,457][500,757]" /></node><node class="android.view.View" resource-id="header" bounds="[0,303][1080,457]"><node class="android.widget.TextView" text="Section" bounds="[400,347][681,413]" /></node></node>`,
+      'card',
+    );
+    const played = play(FULLY_ANDROID, [card]);
+    expect(probes(played)).toEqual([]);
+    expect(resultOf(played).flush).toEqual({ edges: ['top', 'bottom'], container: { x: 0, y: 457, width: 1080, height: 300 }, checked: false, why: 'fills' });
+  });
+
+  describe('sideways: a card flush right of a node pinned at its strip\'s left edge', () => {
+    const STRIP: Rect = { x: 0, y: 300, width: 1080, height: 300 };
+    const HEAD = { role: 'container', identifier: 'header', label: null, rect: { x: 0, y: 300, width: 240, height: 300 } };
+    const card = (bounds: string): Row =>
+      shaped(
+        `<node class="android.view.View" scrollable="true" resource-id="strip" bounds="[0,300][1080,600]"><node class="android.view.View" clickable="true" resource-id="card" bounds="${bounds}" /><node class="android.view.View" resource-id="header" bounds="[0,300][240,600]"><node class="android.widget.TextView" text="A" bounds="[40,400][160,460]" /></node></node>`,
+        'card',
+      );
+
+    it('is probed toward the node (content right, the finger right) from inside the strip; the probe that moves nothing settles it, naming the node', () => {
+      const played = play({ ...FULLY_ANDROID, direction: 'right' }, [card('[240,300][540,600]'), card('[240,300][540,600]')]);
+      expect(probes(played)).toHaveLength(1);
+      const p = probes(played)[0] as { toward: string; box: Rect };
+      expect(p.toward).toBe('left');
+      expect(p.box.y).toBeGreaterThanOrEqual(STRIP.y);
+      expect(p.box.y + p.box.height).toBeLessThanOrEqual(STRIP.y + STRIP.height);
+      const result = resultOf(played);
+      expect(result.flush).toEqual({ edge: 'left', container: STRIP, pinned: HEAD, checked: true });
+      expect(describeScrollResult(result)).toContain(
+        "its left edge lies on the edge of container id:header (0,300 240x300), pinned at its scroll container's (0,300 1080x300) left and drawn after it, and a probe swipe toward it moved nothing",
+      );
+    });
+
+    it('spanning to the strip\'s right edge, it `fills` it: no probe, the reply naming the left edge on the node and the right on the strip', () => {
+      const played = play({ ...FULLY_ANDROID, direction: 'right' }, [card('[240,300][1080,600]')]);
+      expect(probes(played)).toEqual([]);
+      const result = resultOf(played);
+      expect(result.flush).toEqual({ edges: ['left', 'right'], container: STRIP, pinned: HEAD, checked: false, why: 'fills' });
+      expect(describeScrollResult(result)).toContain(
+        "but it spans its scroll container (0,300 1080x300) from the edge of container id:header (0,300 240x300), pinned at the container's left and drawn after it, " +
+          "to the container's right edge — its left edge lies on that node's, its right edge on the container's",
+      );
+    });
+  });
+
+  it('only along the scroll: a sideways scroll asks no probe of a top edge pinned so', () => {
+    expect(resultOf(play({ ...FULLY_ANDROID, direction: 'right' }, [read('cut')])).flush).toBeUndefined();
+  });
+});

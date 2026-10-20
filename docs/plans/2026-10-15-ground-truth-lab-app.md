@@ -323,7 +323,9 @@ was recaptured with it, so it is replayed against its three-button bar, not the 
 unchanged); since the round-3 review it is the one source of that IME-down dump, an IME-up capture's ImeCapture
 holding only what is extra. Round 4 (truth/r4-followups) adds `scroll-sticky-view` (Android): scroll-sticky-cut with
 R's content an Android View (AndroidView) — the container cut at the header, the View listed whole, #9's own shape:
-#9 CALIBRATED on it (10fb02b → d2b7744); VA1 stays the all-Compose row's. And `form-keyboard-floating` (Android, `ime:
+#9 CALIBRATED on it (10fb02b → d2b7744); VA1 stays the all-Compose row's (round 14 adds `scroll-sticky-rest`, Android:
+scroll-sticky-cut at offset 0, R whole and flush under the merged header — the same tree as VA1's cut row, the case that
+refused round 9's overlay rule; `fully: true` stops on it after one flush probe). And `form-keyboard-floating` (Android, `ime:
 floating`): form-keyboard with Gboard switched to Floating by hand on averi_lab (the grid → the Floating tile; no adb
 command or setting switches Gboard's mode — tried nothing else; docked again after): the strip `[0,2088][1080,2220]` the
 inset, the panel `(71,1092,1008,1884)` the touchable region's second rect, four fields' centres under it

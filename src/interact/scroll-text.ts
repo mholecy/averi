@@ -291,17 +291,34 @@ const detentText = (detent: DetentMove | undefined): string => (detent === undef
 export function flushText(flush: ScrollUntilResult['flush']): string {
   if (flush === undefined) return '';
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
+  const box = rectText(flush.container);
   if ('edges' in flush) {
+    // A node pinned at the content's start (scroll-rounds.ts#Flush: always `edges[0]`): the match spans from that
+    // node's inner edge to the container's far edge — cut at either, by Compose at the node or by the container.
+    if (flush.pinned !== undefined) {
+      const [start, end] = flush.edges;
+      return (
+        `; but it spans its scroll container (${box}) from the edge of ${nodeText(flush.pinned)}, pinned at the container's ${start} and drawn after it, ` +
+        `to the container's ${end} edge — its ${start} edge lies on that node's, its ${end} edge on the container's, where Android cuts a node's bounds ` +
+        `at a node drawn over it or to the container, and no probe swipe can tell which side, if either, is cut — ${cut}; check with a screenshot`
+      );
+    }
     // The usual benign case named, so the reader weighs the warning: a card
     // as tall as its horizontal carousel inside a vertical list fills the
     // carousel.
     return (
-      `; but it fills its scroll container (${rectText(flush.container)}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
+      `; but it fills its scroll container (${box}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
       `the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — ${cut}; ` +
       'usual for a card as tall as its carousel — check with a screenshot'
     );
   }
-  const where = `its ${flush.edge} edge lies on its scroll container's (${rectText(flush.container)})`;
+  // A pinned node's edge (scroll-rounds.ts#Flush's `pinned`): where the container's content ends as it shows, and the
+  // cut it may make is Compose's at a node drawn after the match, not the container's.
+  const where =
+    flush.pinned === undefined
+      ? `its ${flush.edge} edge lies on its scroll container's (${box})`
+      : `its ${flush.edge} edge lies on the edge of ${nodeText(flush.pinned)}, pinned at its scroll container's (${box}) ${flush.edge} and drawn after it`;
+  const cuts = flush.pinned === undefined ? "where Android cuts a node's bounds to the container" : "where Android cuts a node's bounds at a node drawn over it";
   if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
   const unchecked = {
     budget: 'no swipe or time was left to check it',
@@ -309,7 +326,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
     axis: `every scroll container around it from that one outward scrolls only ${axisOfEdge(flush.edge) === 'vertical' ? 'sideways' : 'up and down'}, so no probe swipe can move its ${flush.edge} edge into view to check it`,
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
-  return `; but ${where}, where Android cuts a node's bounds to the container, and ${unchecked} — ${cut}`;
+  return `; but ${where}, ${cuts}, and ${unchecked} — ${cut}`;
 }
 
 /** The `settled: false` note — what the reader should know before measuring the element. */

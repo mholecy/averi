@@ -90,6 +90,12 @@ private val STICKY_HEIGHT = 450.dp
 private val STICKY_HEADER = 56.dp
 private val STICKY_OFFSET = 24.dp
 
+/** The sticky list's offset on appear: scroll-sticky-rest's list at rest (VA1: R whole and flush under the merged header), every other cell's scrolled STICKY_OFFSET. */
+private fun stickyOffset(cell: Cell): Dp = if (cell.id == "scroll-sticky-rest") 0.dp else STICKY_OFFSET
+
+/** The sticky cells whose header is one accessibility element (`semantics(mergeDescendants = true)`), so Compose cuts what it covers out of the rows' bounds. */
+private val MERGED_HEADER_CELLS = setOf("scroll-sticky-cut", "scroll-sticky-rest", "scroll-sticky-view")
+
 private val ROW_WIDTH = 300.dp
 private val ROW_HEIGHT = 64.dp
 
@@ -101,7 +107,7 @@ private val ROW_HEIGHT = 64.dp
  * flush: docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md,
  * …-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md.
  */
-private val SPLIT_CELLS = setOf("scroll-bounded-flush", "scroll-sticky-cut")
+private val SPLIT_CELLS = setOf("scroll-bounded-flush", "scroll-sticky-cut", "scroll-sticky-rest")
 
 /** One target, as Base.kt's TargetBox draws it, reporting its unclipped frame. */
 @Composable
@@ -187,7 +193,7 @@ private fun RowBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modifie
 internal fun EdgesScreen(cell: Cell, lab: Lab) {
     systemBarsInsets(lab)
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }) {
-        if (cell.id == "scroll-sticky" || cell.id == "scroll-sticky-cut" || cell.id == "scroll-sticky-view") {
+        if (cell.id == "scroll-sticky" || cell.id in MERGED_HEADER_CELLS) {
             StickyList(cell, lab)
         } else if (cell.id == "carousel-in-list") {
             CarouselInList(cell, lab, maxWidth, maxHeight)
@@ -242,7 +248,7 @@ private fun EdgeScrollColumn(cell: Cell, s: EdgeScroller, lab: Lab, height: Dp) 
 private fun StickyList(cell: Cell, lab: Lab) {
     val view = LocalView.current
     val density = LocalDensity.current
-    val initial = with(density) { STICKY_OFFSET.roundToPx() }
+    val initial = with(density) { stickyOffset(cell).roundToPx() }
     val state = rememberLazyListState(0, initial)
     // The list's offset in pixels down its content: the header item (index 0) then rows of ROW_HEIGHT.
     val header = with(density) { STICKY_HEADER.roundToPx() }
@@ -268,10 +274,10 @@ private fun StickyList(cell: Cell, lab: Lab) {
                     .height(STICKY_HEADER)
                     .background(Color(0xFF455A64))
                     .testTag("lab.${cell.id}.header")
-                    // scroll-sticky-cut: the header one accessibility element (as a header with a title and an action
-                    // is), so Compose takes what it covers out of the rows' bounds beneath it — mp-native's Account
-                    // Detail, a row's container cut at its sticky date header (calibration.json #9).
-                    .then(if (cell.id == "scroll-sticky-cut" || cell.id == "scroll-sticky-view") Modifier.semantics(mergeDescendants = true) {} else Modifier)
+                    // MERGED_HEADER_CELLS: the header one accessibility element (as a header with a title and an
+                    // action is), so Compose takes what it covers out of the rows' bounds beneath it — mp-native's
+                    // Account Detail, a row's container cut at its sticky date header (calibration.json #9).
+                    .then(if (cell.id in MERGED_HEADER_CELLS) Modifier.semantics(mergeDescendants = true) {} else Modifier)
                     .onGloballyPositioned { lab.chrome("stickyHeader", screenFrame(view, it)) },
                 contentAlignment = Alignment.Center,
             ) { Text("Sticky header", color = Color.White) }

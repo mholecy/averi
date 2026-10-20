@@ -504,6 +504,7 @@ describe('the look\'s scene — judgeTap reads it and derives none', () => {
       pixelRegion: (...args) => (asked.push('pixelRegion'), real.pixelRegion(...args)),
       presentedAt: (...args) => (asked.push('presentedAt'), real.presentedAt(...args)),
       flushNeighbours: (...args) => (asked.push('flushNeighbours'), real.flushNeighbours(...args)),
+      pinnedEdges: (...args) => (asked.push('pinnedEdges'), real.pinnedEdges(...args)),
     };
     Object.defineProperty(look, 'scene', { get: () => scene });
     return { look, asked };
