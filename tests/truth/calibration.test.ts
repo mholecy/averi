@@ -698,6 +698,20 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
     expect(t.log[1]).toMatch(/^calibrate: edited ran in [\d.]+ s \(not kept: the harness or the side's src was edited while it ran\)$/);
   });
 
+  it('keys that no longer derive after a run (a computed import added mid-run): that run not kept, the others go on', async () => {
+    let calls = 0;
+    const t = sides({
+      keys: () => {
+        if (calls++ > 0) throw new Error('side-cache: golden.ts loads a module it computes');
+        return (sideName) => `key-${sideName}`;
+      },
+    });
+    const { runs } = await runSides(['aaaaaaa'], t.s);
+    expect(t.puts).toEqual([]);
+    expect(runs.get('aaaaaaa')).toEqual(loaded(1));
+    expect(t.log[0]).toMatch(/\(not kept: the harness or the side's src was edited while it ran\)$/);
+  });
+
   it('the runs keyed by side whatever order they finish in, at most `jobs` at once', async () => {
     const g = gated();
     const t = sides({ jobs: 2, run: async (sideName) => ({ run: loaded(await g.task(Number(sideName))) }) });

@@ -143,6 +143,15 @@ export interface Sides {
   log: (line: string) => void;
 }
 
+/** A side's key taken again after its run; undefined when the keys no longer derive (a computed import added mid-run). */
+const keyNow = (s: Sides, side: string): string | undefined => {
+  try {
+    return s.keys()(side);
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Every side's run, by side: from the cache where a run is kept under its key (`reuse`), else run — `jobs` at once
  * (pool) — and kept if it loaded (one that did not may have failed itself, and is run again next time) and its key held
@@ -157,7 +166,7 @@ export async function runSides(sides: readonly string[], s: Sides): Promise<{ ru
     const kept = key === undefined || s.mode === 'refresh' ? undefined : await s.cache.get(key);
     let outcome: SideOutcome = kept !== undefined ? { run: kept, cached: true } : await s.run(side);
     if (key !== undefined && outcome.cached === undefined && !('error' in outcome.run)) {
-      if (s.keys()(side) === key) await s.cache.put(key, outcome.run);
+      if (keyNow(s, side) === key) await s.cache.put(key, outcome.run);
       else outcome = { ...outcome, unkept: true };
     }
     s.log(sideLine(side, outcome, (Date.now() - started) / 1000));

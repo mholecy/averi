@@ -1,9 +1,9 @@
 import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
 
 /**
- * One side of the calibration as calibrate reads it (calibrate.ts judges the notes by it, calibrate-run.ts makes it from
- * a golden process, side-cache.ts keeps it): the sides' names, a row's key, and a side's run — its checks by key, or
- * why it does not count as loaded (the canary, sideRunOf). Below the three, so none of them imports another for it.
+ * One side of the calibration as calibrate reads it (calibrate.ts judges the notes by it, calibrate-run.ts makes it
+ * from a golden process, side-cache.ts keeps it): the sides' names, a row's key, and a side's run — its checks by key,
+ * or why it does not count as loaded (the canary, sideRunOf). Below the three, so none of them imports another for it.
  */
 
 /** The side an open note is judged on: this checkout as it is on disk, not its committed HEAD. */
@@ -33,6 +33,7 @@ export function sideRunOf(json: GoldenJson): SideRun {
   const open = checks.filter((c) => isOpenCell(c.recording));
   if (open.length === 0) faults.push('the open cell was not replayed');
   faults.push(...open.filter((c) => c.mismatch !== undefined).map((c) => `${keyOf(c)} (open cell) red: ${c.mismatch}`));
-  if (faults.length > 0) return { error: `canary: ${faults.length} fault${faults.length === 1 ? '' : 's'}; first ${faults[0].slice(0, 300)}` };
+  const count = `${faults.length} fault${faults.length === 1 ? '' : 's'}`;
+  if (faults.length > 0) return { error: `canary: ${count}; first ${faults[0].slice(0, 300)}` };
   return { checks: new Map(checks.map((c) => [keyOf(c), c])) };
 }

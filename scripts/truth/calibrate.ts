@@ -47,7 +47,8 @@ import { WORKING_TREE, type SideRun } from './side-run.js';
  * as it is on disk, uncommitted changes included. The sides run several at once (half the cores), and each side that
  * loaded is kept in the cache (side-cache.ts; `<worktrees>/side-cache` unless --cache names another directory) under a
  * key of the side and everything of the harness its run depends on, so the next run replays only the sides whose key
- * changed; --no-cache runs every side and keeps the runs afresh. The console names the sides taken from the cache.
+ * changed; --no-cache runs every side and keeps the runs afresh. Entries are never pruned (none can be served stale);
+ * delete the cache's directory to reclaim the space. The console names the sides taken from the cache.
  * Exit code 1 when a note's verdict is not the one it expects (`expect`; CALIBRATED, or OPEN-RED for an open note), or
  * a note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more
  * (calibrate-run.ts#runSide; said on the console only, so the report stays the same); a side that still does not load
