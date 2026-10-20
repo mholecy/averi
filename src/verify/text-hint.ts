@@ -1,5 +1,5 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
-import { differsOnlyByOcrFold, foldDifference } from './ocr-fold.js';
+import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
 
 /**
  * Why an exact-text expectation missed when the string is nonetheless ON the
@@ -112,16 +112,23 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
  * see; the hint only names the node, so the reader need not dump the tree.
  */
 function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
-  const hits: { node: UiNode; field: 'label' | 'value'; text: string }[] = [];
+  const hits: { node: UiNode; field: 'label' | 'value'; text: string; difference: RecognizerDifference }[] = [];
   for (const node of candidates) {
-    const field = (['label', 'value'] as const).find((f) => {
-      const v = node[f];
-      return v !== null && differsOnlyByOcrFold(expected, v);
-    });
-    if (field !== undefined) hits.push({ node, field, text: node[field] as string });
+    for (const field of ['label', 'value'] as const) {
+      const text = node[field];
+      if (text === null) continue;
+      // The node is the app's copy; the expectation is what a reading of it may say.
+      const difference = readingDifference(text, expected);
+      if (difference === undefined) continue;
+      hits.push({ node, field, text, difference });
+      break;
+    }
   }
   if (hits.length === 0) return undefined;
-  const pairs = [...new Set(hits.flatMap(({ text }) => foldDifference(expected, text).characters.split(', ')))];
+  // Named expectation first, as the assert names its own side.
+  const pairs = [
+    ...new Set(hits.flatMap(({ difference }) => namePairs(difference.pairs.map(([node, want]) => [want, node] as const)).split(', '))),
+  ];
   const shown = hits
     .slice(0, 3)
     .map(({ node, field, text }) => `    id=${node.identifier ?? '(none)'} ${field}=${JSON.stringify(text)}`)

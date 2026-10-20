@@ -246,52 +246,30 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
   return { text: negated ? `(?:(?!${extra})${text})` : `(?:${text}|${extra})`, end, added };
 }
 
-/**
- * Equal under the fold but not exactly: the two differ ONLY in what the
- * recognizer cannot tell apart.
- */
-export const differsOnlyByOcrFold = (a: string, b: string): boolean => a !== b && ocrFold(a) === ocrFold(b);
+/** A kind of difference the recognizer makes between the app's copy and its reading. */
+type Kind = 'punctuation' | 'diacritics';
 
-/**
- * The folded characters that make `want` and `read` differ, as `’ vs '` pairs
- * (the assert's side first), found by position: both strings are walked
- * character by character along their folds, and wherever the two spans that
- * fold to the same text are spelled differently, that pair is named. So
- * `it’s Bob’s` read as `it's Bob’s` names `’ vs '` once — the second `’` was
- * read as written. Meant for a fold-equal pair (`differsOnlyByOcrFold`).
- */
-function foldedPairs(want: string, read: string): [string, string][] {
-  const a = charsOf(want);
-  const b = charsOf(read);
-  const pairs: [string, string][] = [];
-  let i = 0;
-  let j = 0;
-  while (i < a.length || j < b.length) {
-    // One aligned span: grow the side whose fold is shorter until both folds
-    // have the same length (equal, since the whole folds are).
-    let spanA = '';
-    let spanB = '';
-    let foldA = '';
-    let foldB = '';
-    do {
-      if (i < a.length && (foldA.length <= foldB.length || j >= b.length)) {
-        spanA += a[i];
-        foldA += foldChar(a[i++]);
-      } else if (j < b.length) {
-        spanB += b[j];
-        foldB += foldChar(b[j++]);
-      }
-    } while ((foldA.length !== foldB.length || spanA === '' || spanB === '') && (i < a.length || j < b.length));
-    if (spanA !== spanB) pairs.push([spanA, spanB]);
-  }
-  return pairs;
-}
-
-/** What the recognizer cannot tell apart, per kind of folded character — said of neither side, since either may be the typographic or accented one. */
-const CANNOT_TELL: Readonly<Record<'punctuation' | 'diacritics', string>> = {
+/** What the recognizer cannot tell apart, per kind, in the order a note names them — said of neither side. */
+const CANNOT_TELL: Readonly<Record<Kind, string>> = {
   punctuation: 'typographic punctuation from its ASCII look-alike',
   diacritics: 'a letter with diacritics from one without',
 };
+
+/** The fold's kinds the characters of `s` show: a punctuation look-alike, a letter with marks. */
+function foldKinds(s: string): Kind[] {
+  return charsOf(s).flatMap((c): Kind[] =>
+    PUNCTUATION[c] !== undefined ? ['punctuation']
+    : foldMarks(c) !== c ? ['diacritics']
+    : [],
+  );
+}
+
+/** `the recognizer does not tell …, nor …` for the kinds present, in CANNOT_TELL's order. */
+const reasonFor = (kinds: ReadonlySet<Kind>): string =>
+  `the recognizer does not tell ${(Object.keys(CANNOT_TELL) as Kind[])
+    .filter((kind) => kinds.has(kind))
+    .map((kind) => CANNOT_TELL[kind])
+    .join(', nor ')}`;
 
 /**
  * Why folded pairs are forgiven, naming only the kinds present: a punctuation
@@ -299,31 +277,145 @@ const CANNOT_TELL: Readonly<Record<'punctuation' | 'diacritics', string>> = {
  * both — `the recognizer does not tell typographic punctuation from its ASCII
  * look-alike, nor a letter with diacritics from one without`.
  */
-export function foldReason(pairs: readonly (readonly [string, string])[]): string {
-  const chars = pairs.flatMap(([a, b]) => [...charsOf(a), ...charsOf(b)]);
-  const kinds = (['punctuation', 'diacritics'] as const).filter((kind) =>
-    chars.some((c) => (kind === 'punctuation' ? PUNCTUATION[c] !== undefined : PUNCTUATION[c] === undefined && foldMarks(c) !== c)),
-  );
-  return `the recognizer does not tell ${kinds.map((kind) => CANNOT_TELL[kind]).join(', nor ')}`;
+export const foldReason = (pairs: readonly (readonly [string, string])[]): string =>
+  reasonFor(new Set(pairs.flatMap(([a, b]) => foldKinds(a + b))));
+
+/** One way a unit of the copy may come out of the recognizer: as `raw`, which the fold makes `folded`. */
+interface Reading {
+  raw: string;
+  folded: string;
+}
+
+/** One character of the app's copy, with every way the recognizer may read it — its own fold first. */
+interface Unit {
+  text: string;
+  readings: readonly Reading[];
+}
+
+/** The copy as units, one per composed code point. */
+function unitsOf(copy: string): Unit[] {
+  return charsOf(copy).map((c) => ({ text: c, readings: [{ raw: c, folded: foldChar(c) }] }));
+}
+
+/** How the alignment first reached a position of the folded reading: from which position, by which reading of the unit. */
+interface Step {
+  from: number;
+  pick: number;
 }
 
 /**
- * What a fold-equal pair differs in and why that is forgiven, for a note:
- * `characters` is `’ vs '`, `reason` the recognizer's for the kinds of
- * character named (`foldReason`). Two strings that differ only in how a letter
- * is encoded (`é` as one code point or as `e` + a combining acute) have no
- * such character and are not the recognizer's doing; that is said instead.
+ * Which reading of each unit spells `folded` (the folded reading) left to
+ * right, or undefined when none does. A set of reachable positions per unit,
+ * each remembering how it was first reached: linear in the units times the
+ * positions reachable (a handful), no backtracking, no pattern built from the
+ * text.
  */
-export function foldDifference(want: string, read: string): { characters: string; reason: string } {
-  const pairs = foldedPairs(want, read);
-  return pairs.length > 0 ?
-      { characters: namePairs(pairs), reason: foldReason(pairs) }
-    : { characters: 'composed vs decomposed characters', reason: 'the same letters, encoded differently' };
+function align(units: readonly Unit[], folded: string): number[] | undefined {
+  const reached: Map<number, Step>[] = [new Map([[0, { from: 0, pick: -1 }]])];
+  for (const unit of units) {
+    const next = new Map<number, Step>();
+    for (const at of reached[reached.length - 1].keys()) {
+      unit.readings.forEach((r, pick) => {
+        const to = at + r.folded.length;
+        if (!next.has(to) && folded.startsWith(r.folded, at)) next.set(to, { from: at, pick });
+      });
+    }
+    if (next.size === 0) return undefined;
+    reached.push(next);
+  }
+  if (!reached[units.length].has(folded.length)) return undefined;
+  const picks: number[] = [];
+  let at = folded.length;
+  for (let u = units.length; u > 0; u--) {
+    const step = reached[u].get(at) as Step;
+    picks[u - 1] = step.pick;
+    at = step.from;
+  }
+  return picks;
+}
+
+/** How a reading differs from the app's copy only in what the recognizer may read it as. */
+export interface RecognizerDifference {
+  /**
+   * The spans that differ, as `[copy, read]` — the copy's side first, each the
+   * smallest stretch of both whose folds line up. None: the two differ only in
+   * how their letters are encoded (`namePairs` says so).
+   */
+  pairs: readonly (readonly [string, string])[];
+  /** Why that is forgiven — the recognizer's reason for the kinds of difference named. */
+  reason: string;
+}
+
+/**
+ * How `read` differs from the app's `copy` ONLY in what the recognizer may
+ * read it as — undefined when the two are equal, or differ in more.
+ *
+ * The copy is split into units, one per character, each offering what the
+ * recognizer may read it as; the units are matched left to right against the
+ * folded reading (`align`). Then copy and reading are walked side by side
+ * along those folds, and wherever two stretches that fold alike are spelled
+ * differently, that pair is named. So `it’s Bob’s` read as `it's Bob’s` names
+ * `’ vs '` once — the second `’` was read as written.
+ */
+export function readingDifference(copy: string, read: string): RecognizerDifference | undefined {
+  if (copy === read) return undefined;
+  const units = unitsOf(copy);
+  const picks = align(units, ocrFold(read));
+  if (picks === undefined) return undefined;
+  const { pairs, kinds } = differingSpans(
+    units.map((unit, u) => ({ text: unit.text, ...unit.readings[picks[u]] })),
+    charsOf(read),
+  );
+  return { pairs, reason: pairs.length > 0 ? reasonFor(kinds) : 'the same letters, encoded differently' };
+}
+
+/** A unit of the copy with the reading the alignment chose for it. */
+type ReadUnit = Reading & { text: string };
+
+/**
+ * The copy as the alignment read it (`a`) and the reading's characters (`b`),
+ * walked side by side along their folds into the smallest aligned spans: each
+ * span spelled differently on the two sides is a pair, `[copy, read]`, and the
+ * kinds of difference it shows are gathered for the reason.
+ */
+function differingSpans(a: readonly ReadUnit[], b: readonly string[]): { pairs: [string, string][]; kinds: Set<Kind> } {
+  const pairs: [string, string][] = [];
+  const kinds = new Set<Kind>();
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    // One aligned span: grow the side whose fold is shorter until both folds
+    // have the same length (equal, since the alignment spelled the reading).
+    let spanA = '';
+    let rawA = '';
+    let spanB = '';
+    let lengthA = 0;
+    let lengthB = 0;
+    do {
+      if (i < a.length && (lengthA <= lengthB || j >= b.length)) {
+        spanA += a[i].text;
+        rawA += a[i].raw;
+        lengthA += a[i++].folded.length;
+      } else if (j < b.length) {
+        spanB += b[j];
+        lengthB += foldChar(b[j++]).length;
+      }
+    } while ((lengthA !== lengthB || spanA === '' || spanB === '') && (i < a.length || j < b.length));
+    if (spanA === spanB) continue;
+    pairs.push([spanA, spanB]);
+    if (rawA !== spanB) for (const kind of foldKinds(rawA + spanB)) kinds.add(kind);
+  }
+  return { pairs, kinds };
 }
 
 /** A combining mark shown on a dotted circle, so a note can print it on its own. */
 const shown = (c: string): string => (c === '' ? 'nothing' : /^\p{M}/u.test(c) ? `◌${c}` : c);
 
-/** `’ vs ', … vs ...` — folded characters as a note names them, each pair once. */
+/**
+ * `’ vs ', … vs ...` — folded characters as a note names them, each pair once;
+ * no pair at all is two strings that differ only in how letters are encoded.
+ */
 export const namePairs = (pairs: readonly (readonly [string, string])[]): string =>
-  [...new Set(pairs.map(([a, b]) => `${shown(a)} vs ${shown(b)}`))].join(', ');
+  pairs.length === 0 ?
+    'composed vs decomposed characters'
+  : [...new Set(pairs.map(([a, b]) => `${shown(a)} vs ${shown(b)}`))].join(', ');

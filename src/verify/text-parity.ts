@@ -16,14 +16,14 @@ import {
 } from './ocr.js';
 import { failClosed } from './fail-closed.js';
 import {
-  differsOnlyByOcrFold,
-  foldDifference,
   foldFree,
   foldReason,
   namePairs,
   ocrFold,
   ocrFoldPattern,
+  readingDifference,
   readingFolds,
+  type RecognizerDifference,
 } from './ocr-fold.js';
 import type { PixelMeasureInput, PollVerdict } from './poll-verdict.js';
 import { headerWithRule, row as tableRow, type Column } from './table.js';
@@ -765,12 +765,19 @@ export function compareTextParity(
       // screen. OCR-only, fold-only differences are a note, never a finding —
       // the same fold the ocr assert passes on; the tree carries the app's
       // characters faithfully, so `tree` stays exact.
-      const recognizerDifference = (x: string, y: string): boolean =>
-        source === 'ocr' && differsOnlyByOcrFold(x, y);
+      const recognizerDifference = (copy: string, read: string): RecognizerDifference | undefined =>
+        source === 'ocr' ? readingDifference(copy, read) : undefined;
       if (a !== undefined && i !== undefined && a !== i) {
-        if (recognizerDifference(a, i)) {
-          const { characters, reason } = foldDifference(a, i);
-          notes.push(`${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in ${characters} (${reason}) — not drift.`);
+        // Neither reading is the copy: either may stand for it; pairs stay android first.
+        const iosAsCopy = (): RecognizerDifference | undefined => {
+          const d = recognizerDifference(i, a);
+          return d && { ...d, pairs: d.pairs.map(([ios, android]) => [android, ios] as const) };
+        };
+        const between = recognizerDifference(a, i) ?? iosAsCopy();
+        if (between !== undefined) {
+          notes.push(
+            `${id}: android ${JSON.stringify(a)} vs ios ${JSON.stringify(i)} differ only in ${namePairs(between.pairs)} (${between.reason}) — not drift.`,
+          );
         } else {
           findings.push({
             anchor: id,
@@ -784,9 +791,11 @@ export function compareTextParity(
         for (const p of present) {
           const got = seen(p) as string;
           if (got === expected) continue;
-          if (recognizerDifference(got, expected)) {
-            const { characters, reason } = foldDifference(expected, got);
-            notes.push(`${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — differs only in ${characters} (${reason}); not drift.`);
+          const difference = recognizerDifference(expected, got);
+          if (difference !== undefined) {
+            notes.push(
+              `${id}: ${p} read ${JSON.stringify(got)} for contract ${JSON.stringify(expected)} — differs only in ${namePairs(difference.pairs)} (${difference.reason}); not drift.`,
+            );
             continue;
           }
           findings.push({
@@ -1120,12 +1129,12 @@ export function evaluateOcrAssert(
     const want = normalizeText(expectation.text);
     // Exact first; equal only under the recognizer's fold is a pass that says
     // which characters it took on trust (ocr-fold.ts) — both strings verbatim.
-    const folded = differsOnlyByOcrFold(want, seen) ? foldDifference(want, seen) : undefined;
-    const ok = seen === want || folded !== undefined;
+    const difference = readingDifference(want, seen);
+    const ok = seen === want || difference !== undefined;
     if (!ok) pass = false;
     parts.push(
       `vs expected ${JSON.stringify(want)} ${ok ? '=' : '≠'}` +
-        (folded !== undefined ? ` (differs only in ${folded.characters} — ${folded.reason})` : ''),
+        (difference !== undefined ? ` (differs only in ${namePairs(difference.pairs)} — ${difference.reason})` : ''),
     );
   }
   if (expectation.match !== undefined) {
