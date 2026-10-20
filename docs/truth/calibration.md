@@ -59,7 +59,7 @@ open note on the working tree. See the script for the verdicts.
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
-| B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → e6ed7d4 | CALIBRATED |
+| B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
@@ -1152,7 +1152,7 @@ No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and 
   - RED android-averi_lab-api33/pinned-bar.xml P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 100% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/text-under-bar.xml P colour — passed on #FCE4EC: PASS  element id:"lab.text-under-bar.P" fill within dE00 8 of #FCE4EC — sampled #FCE4EC (dominant, 100% of region) vs expected #FCE4EC → dE00 0.00 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/text-under-bar.xml P.id scroll_until — reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing: Element id:"lab.text-under-bar.P" fully visible after 0 swipes
-- after e6ed7d4:
+- after 151b2ca:
   - ok android-averi_lab-api33/pinned-bar.xml P fully — ERROR scroll_until id:"lab.pinned-bar.P" failed after 3 swipes — element is in the viewport but cut at its bottom edge by container id:lab.pinned-bar.continue (66,1956 948x154), drawn after it — the dump (Compose's, on A
   - ok android-averi_lab-api33/pinned-bar.xml P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — container id:lab.pinned-bar.continue (66,1956 948x154) meets the element's bottom edge (element 127,1846 825x110), drawn after it — the dump (Compose's,
   - ok android-averi_lab-api33/text-under-bar.xml P colour — FAIL  element id:"lab.text-under-bar.P" fill within dE00 8 of #FCE4EC — container id:lab.text-under-bar.continue (66,1956 948x154) meets the element's bottom edge (element 127,1934 825x22), drawn after it — the dump (Com

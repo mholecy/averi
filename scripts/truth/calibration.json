@@ -1245,9 +1245,9 @@
       "n": "B4-L1",
       "note": "2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md",
       "status": "calibrate",
-      "fix": ["7755978", "e6ed7d4"],
+      "fix": ["7755978", "e6ed7d4", "151b2ca"],
       "before": "706dfae",
-      "after": "e6ed7d4",
+      "after": "151b2ca",
       "verified": "golden",
       "defect": "fully visible where it is|^passed on|^reached where it is under-chrome",
       "checks": [
