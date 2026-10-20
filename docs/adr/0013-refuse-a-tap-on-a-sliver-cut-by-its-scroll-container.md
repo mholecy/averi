@@ -6,9 +6,12 @@ way past kept after the remedy, a fill into the strip refused by design, k7's "f
 
 ## Context
 
-uiautomator cuts every rect to its scroll container. On mp-native's SWIFT form (Android) the "Payment details" toggle,
-132 px tall, read `66,1924 948x55` at the form's bottom edge (1978). The tap went to (540,1952) and "Tapped" was
-reported, but the section did not expand. Hand taps on the strip did nothing either. A target that size beside a COVER
+uiautomator cuts most rects to their scroll container (not all: a Compose `verticalScroll` in an edge-to-edge window is
+cut, if at all, a status bar's height past it — a rect past its container's edge is judged by the drawn frame, ADR 0010's
+amendment of 2026-10-20, not by this rule, which reads only a rect flush with the edge;
+docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md). On mp-native's SWIFT
+form (Android) the "Payment details" toggle, 132 px tall, read `66,1924 948x55` at the form's bottom edge (1978). The tap
+went to (540,1952) and "Tapped" was reported, but the section did not expand. Hand taps on the strip did nothing either. A target that size beside a COVER
 was already refused; one cut to that size by a CLIP was tapped and reported done.
 
 ## Decision

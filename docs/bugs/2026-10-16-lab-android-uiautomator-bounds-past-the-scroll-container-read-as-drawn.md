@@ -1,6 +1,15 @@
 # BUG: on Android a row whose uiautomator bounds run on past its scroll container's edge is judged on the screen alone — `fully: true` calls a cut row "fully visible", and a 22-px sliver is `Tapped` at a centre below its container, where nothing of it is drawn
 
-> **Status (2026-10-18):** open. Measured live by round 6's Android device check (`averi_lab`, the lab app of
+> **Status (2026-10-20):** fixed at `16ff607f` (bugs/r14-le1, round 14): the drawn frame
+> (`src/ui-tree/geometry.ts#Clips.drawnIn`) is asked on every tree that lists ancestry, not on WDA's alone — a scroll
+> view draws nothing outside its frame on either platform; a no-op where uiautomator did cut (ADR 0010, "the drawn frame
+> on Android"). Measured by golden against caa0f41b: the seven rows below green, no other check changed; CALIBRATED
+> (docs/truth/calibration.md); live on `averi_lab` (docs/truth/live-records/android-vis-r14-le1.json): all six cases ok —
+> S's and C's taps refused, P and S stroked inside their scroll view, C stroked sideways inside the carousel
+> (docs/truth/live-android-2026-10-18-visibility.md, "Round 14, LE1"). Residual: a reply's share is of the dumped rect
+> (S: "25%", 12.5 % of its frame drawn).
+>
+> Earlier, **status (2026-10-18):** open. Measured live by round 6's Android device check (`averi_lab`, the lab app of
 > truth/round-6, src b71cbbb and e98b87e alike — docs/truth/live-android-2026-10-18-visibility.md): `scroll-bounded`'s
 > P.fully, S, S.fully and tap S as before (KNOWN); and across, `carousel-in-list`'s C: `tap C` → `Tapped` at
 > `1047,497`, the app logging the touch and no tap (the page's background); `scroll_until C right` → "fully visible

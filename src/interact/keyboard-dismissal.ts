@@ -395,9 +395,8 @@ async function blankPoint({ look, screen, target }: DismissalGround): Promise<Bl
 /**
  * The nodes from `root` down to `node`, both included, by identity; undefined when `node` is not in the tree. The blank
  * point reads the target's nearest scroll view off it, and the scroll view's ancestors (`holds`). Not
- * geometry.ts#Clips.drawnIn's `scrollers`: that is kept only on a tree that lists ancestry and unclipped frames, and
- * passes over a scroll view of no area, so it would answer otherwise wherever either fails — and the path is needed
- * for `holds` anyway.
+ * geometry.ts#Clips.drawnIn's `scrollers`: that is kept only on a tree that lists ancestry, and passes over a scroll
+ * view of no area, so it would answer otherwise wherever either fails — and the path is needed for `holds` anyway.
  */
 function pathTo(root: UiNode, node: UiNode): UiNode[] | undefined {
   if (root === node) return [root];

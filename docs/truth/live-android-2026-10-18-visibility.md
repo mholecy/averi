@@ -260,6 +260,28 @@ tab bar and reached after 1 swipe, text-under-bar S refused under the status bar
 the two known mismatches scroll-sticky-cut R fully (VA1) and tabbar-floating F's unmoved claim (LV1). The device check
 the review's fix went without now stands.
 
+# Round 14, LE1: the drawn frame on Android (2026-10-20)
+
+bugs/r14-le1 at `8d8d58ca` (the drawn frame, ui-tree/geometry.ts#Clips.drawnIn, asked on every tree that lists
+ancestry; after review rebased as `16ff607f` — `8d8d58ca` is on no branch since — whose src adds only the pixel
+assert's navigation-bar cut by the drawn part, on none of these six cases' path, and the code review's refactors with
+no change of reply: golden against the base identical, 7 checks changed, 232 mismatches), run from that checkout on averi_lab (emulator-5554, booted `-no-snapshot-save`, shut down after), the lab
+app as installed, `--groups visibility --cells scroll-bounded,carousel-in-list` with LE1's six cases. Record
+docs/truth/live-records/android-vis-r14-le1.json: 6 cases, 6 ok, 0 loud, 0 mismatches, exit 1 only for the six known
+entries now ok (struck off live-known.ts):
+
+- `tap S` refused "outside its scroll view scrollable (0,1046 1080x495) at (541,1563): only 25% of it … is drawn",
+  nothing fired (before: `Tapped` on the background).
+- `scroll_until S` and `S fully: true`: one stroke inside `lower` from (540,1443), the app's `lower` offset 0 → 368 and
+  0 → 366, S whole at `128,1151 825x176` and `128,1153`, then the tap fires S (before: "fully visible after 0 swipes",
+  no stroke).
+- `scroll_until P fully: true`: one stroke inside `upper` from (540,788), offset 0 → 421, P whole, the tap fires it.
+- `tap C` refused "outside its scroll view scrollable (66,380 948x234) at (1047,497): nothing of it is drawn", nothing
+  fired.
+- `scroll_until C right`: one stroke SIDEWAYS inside the carousel from (824,497), the carousel's offset 0 → 637, C at
+  `377,380 948x234` (91 % in the viewport, its centre in the carousel), then the tap fires C at (729,497) — the
+  R-stroke round 6 could not ask of averi on Android.
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

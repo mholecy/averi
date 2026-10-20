@@ -67,10 +67,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   a root of no area (its `failsOpen`) a touch — the tap, either stop —
  *   leaves every point on the screen and judges in the node's own rect,
  *   and the pixel assert judges on the largest node (`treeScreen`'s box).
- * - THE DRAWN FRAME, every purpose: on a tree of unclipped frames (WDA's)
- *   a scroll view draws none of its content outside its own frame, while
- *   the content keeps its laid-out rect (geometry.ts#Clips.drawnIn, the
- *   frames of every scrolling ancestor intersected). Every frame a purpose
+ * - THE DRAWN FRAME, every purpose: a scroll view draws none of its
+ *   content outside its own frame, while WDA lists the content at its
+ *   laid-out rect and uiautomator sometimes past the frame too
+ *   (geometry.ts#Clips.drawnIn, the frames of every scrolling ancestor
+ *   intersected, on every tree that lists ancestry). Every frame a purpose
  *   judges in is cut to it (`drawnFrame`), so `visible`, `shows`, the
  *   covers and the tap's moved piece count only what is drawn; a centre on
  *   the screen outside it is `offScreen` with that scroll view (`scroller`,
@@ -78,13 +79,17 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   then outside the scroll view, then a system band; the pixel assert's
  *   region likewise (below). The tap judges it after its keyboard guard
  *   (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay the
- *   scroll view out taller; a stop judges it under any line. Android's
- *   trees (rects already cut), idb's flat list (no scroll view listed: a
- *   residual) and a node under nothing that scrolls have none: unchanged.
- *   Measured: the at-rest SWIFT form lists `payee_name_input` at `24,801
- *   354x52`, below its `ScrollView 0,0 402x780`; a tap at its centre was
- *   reported done on the bare background.
+ *   scroll view out taller; a stop judges it under any line. Where
+ *   uiautomator did cut a rect to its scroll view the frame cuts nothing;
+ *   idb's flat list (no scroll view listed: a residual) and a node under
+ *   nothing that scrolls have none: unchanged. Measured: the at-rest SWIFT
+ *   form lists `payee_name_input` at `24,801 354x52`, below its `ScrollView
+ *   0,0 402x780`; a tap at its centre was reported done on the bare
+ *   background. On Android the lab app's `scroll-bounded` lists `S` at
+ *   `[128,1519][953,1607]` under `lower` ending at 1541; a tap at its centre
+ *   (541,1563) was reported done on the background.
  *   docs/adr/0010-pixel-assert-keyboard-first.md
+ *   docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md
  * - THE ORDER, once for every verb — after what only the stops judge first
  *   (nothing of it in its frame: `underKeyboard` when a keyboard line
  *   applies and the node is in the box, else `offScreen`; the `fully`
@@ -227,10 +232,11 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   clear of the bar). A scroll view's content is lifted, whatever its
  *   shape.
  *   docs/adr/0009-android-navigation-band.md
- * - A sliver: uiautomator cuts every rect to its scroller, so a cut node's
- *   centre is always on the screen; the stop handed back the very strip the
- *   tap refuses, and a tap on it was reported done and did nothing.
- *   Scrolling on reveals it. A control cut by a node drawn after it
+ * - A sliver: uiautomator cuts most rects to their scroller, so a cut node's
+ *   centre is on the screen (one it does not cut is judged by THE DRAWN
+ *   FRAME, above); the stop handed back the very strip the tap refuses,
+ *   and a tap on it was reported done and did nothing. Scrolling on
+ *   reveals it. A control cut by a node drawn after it
  *   (`cutByLater`) is no stop either — the `fully` stop's too, since no flush
  *   probe sees that cut: `phone` under the bar riding on the IME read
  *   "visible after 0 swipes" while the user saw only the bar.
@@ -430,6 +436,12 @@ export interface StandingFacts {
   readonly sliver?: Cut;
   /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
+  /**
+   * With `drawn` only, on a tree whose source lists the node where it lies (geometry.ts#Drawn.listedWhereItLies, WDA's):
+   * `drawn` is then the window a row moves through as the content does — the one tree on which `scroll_until`'s carry
+   * model measures a stroke's carry (interact/scroll-rounds.ts#stillNeeds).
+   */
+  readonly listedWhereItLies?: true;
 }
 
 /** A presented layer the source TYPES, as the words name it (`presentedRemedy`): its article and its noun. */
@@ -943,8 +955,8 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
  * `place` judged against the node's DRAWN frame (`Scene`'s contract; geometry.ts#Clips.drawnIn): a centre on the
  * screen, or in a system band, that lies outside what the node's scroll views draw is `outside` the scroll view
  * `scrollerOf` names — off the screen as a touch judges it, its edge the scroll view's: nothing a tap there presses is
- * the node. Off the screen stays off the screen, judged first. A tree whose frames are already cut (Android's), idb's
- * flat list and a node under nothing that scrolls have no drawn frame: `place` as it is. Under a witnessed keyboard
+ * the node. Off the screen stays off the screen, judged first. idb's flat list and a node under nothing that scrolls
+ * have no drawn frame, and a rect uiautomator cut to its scroll view lies in it: `place` as it is. Under a witnessed keyboard
  * line too: a stop never stops on a centre its scroll view does not draw — a stroke brings it up into the scroll view
  * laid out above the keyboard. Only the TAP defers it past its keyboard guard
  * (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay that scroll view out taller (React Native's
@@ -1194,7 +1206,8 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
   const { scene, node, centre } = judged;
   const seen = scene.order.exposure(node, exposed);
   const sliver = judgeSliver ? (scene.clips.cutSliver(node, seen.minPiece) ?? cutByLater(judged, seen.minPiece)) : undefined;
-  const drawn = scene.clips.drawnIn(node)?.frame;
+  const within = scene.clips.drawnIn(node);
+  const drawn = within?.frame;
   const facts: StandingFacts = {
     centre,
     screen: frame,
@@ -1207,6 +1220,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),
     ...(drawn !== undefined && { drawn: { ...drawn } }),
+    ...(drawn !== undefined && within?.listedWhereItLies === true && { listedWhereItLies: true as const }),
   };
   return { facts, seen };
 }
@@ -1466,7 +1480,9 @@ const singleBox = (usable: UsableScreen): JudgedBoxes => ({
 
 /**
  * The node's cut at the navigation bar, as the tree can tell it (N-b,
- * ADR 0009): its bottom flush, within a unit, with the band's top
+ * ADR 0009): the bottom of what of it is drawn (geometry.ts#drawnPart — its
+ * rect, or the part its scroll views draw where uiautomator dumped it past
+ * one, ADR 0010's drawn frame) flush, within a unit, with the band's top
  * (geometry.ts#flushEdges' unit), inside a clipping scroller
  * (`Clips.scrollersOf`) whose bottom is flush with it too — uiautomator cut
  * it at the window's visible frame and left no evidence (no `cutBounds`,
@@ -1480,7 +1496,8 @@ function cutAtNavigationBar(node: UiNode, box: Rect, bands: Bands, scene: Pick<S
   const { bottom } = systemBands(box, bands);
   if (bottom === undefined) return undefined;
   const on = (y: number) => Math.abs(y - bottom.band.y) <= 1;
-  if (!on(node.rect.y + node.rect.height)) return undefined;
+  const shown = drawnPart(node.rect, scene.clips.drawnIn(node)) ?? node.rect;
+  if (!on(shown.y + shown.height)) return undefined;
   const container = scene.clips.scrollersOf(node).find((c) => on(c.y + c.height));
   return container === undefined ? undefined : { bar: bottom.bar, container: { ...container } };
 }

@@ -1548,8 +1548,12 @@ export function listsAncestry(tree: UiNode): boolean {
 
 /**
  * Whether the tree's source reports every frame unclipped (`UiNode.unclippedFrames`: WDA's) — a scroll view's
- * content at its laid-out rect past the scroll view's frame — so what a scroll view draws of a node is asked of its
- * frames (geometry.ts#Clips.drawnIn). The second half of the tree's dialect (`listsAncestry`'s doc).
+ * content at its laid-out rect past the scroll view's frame, always — so the content past a frame says which way it
+ * scrolls and where it ends (geometry.ts#Clips.axesOf, #Clips.endsAt), and a row's motion as it comes in is the
+ * content's (interact/scroll-rounds.ts#farFacts, the carry model's `window`); its negation, on a nested tree, is a
+ * source that cuts a node's bounds at what is drawn after it (later-edges.ts#laterEdgesIn: Compose's). Not what the
+ * drawn frame asks (geometry.ts#Clips.drawnIn, on every tree that lists ancestry: uiautomator too lists some content
+ * past its frame). The second half of the tree's dialect (`listsAncestry`'s doc).
  */
 export function listsUnclippedFrames(tree: UiNode): boolean {
   return tree.unclippedFrames === true;

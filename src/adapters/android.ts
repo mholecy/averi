@@ -1439,8 +1439,8 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
     value: isTextInput ? text : null,
     rect,
     children,
-    // The one fact the role cannot carry: uiautomator has already cut every
-    // descendant's bounds to this node (types.ts#UiNode.clipsDescendants —
+    // The one fact the role cannot carry: uiautomator cuts its descendants'
+    // bounds to this node, most of them (types.ts#UiNode.clipsDescendants —
     // why a flag and not a `scrollable` role for a Compose scroller).
     ...(clips && { clipsDescendants: true as const }),
     // Dumped inverted: wholly outside its container, on this side (types.ts#UiNode.clippedOut).

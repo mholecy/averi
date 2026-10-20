@@ -64,10 +64,10 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the stretch
  * below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched down on it
  * on an earlier replay (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
- * recorded); C, the card past the carousel's right clip, is never stroked there, uiautomator dumping it as a strip at
- * the screen's edge that averi stops on at once (lab finding LE1,
- * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md). Captured on iOS
- * (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes
+ * recorded); C, the card past the carousel's right clip, which uiautomator dumps as a strip at the screen's edge, is
+ * judged by the carousel's drawn frame — nothing of it drawn — and stroked for inside the carousel, along its axis
+ * (lab note LE1, docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md).
+ * Captured on iOS (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes
  * INSIDE the carousel (24,138 354x85), along its axis — the full stroke `307 181 → 95 181`, the first one cut by the
  * carry model to `307 181 → 181 181` (UNMEASURED_CARRY). ADR 0010
  * (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke rules: the candidates — the target's own scroll
@@ -453,11 +453,11 @@ const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined
 
 /**
  * The target's scroll views, nearest first, as rects — what its strokes may go over (`seeRead`). Each tree names
- * them in its own dialect, and only one of the two readers answers on a tree: its clipping ancestors
- * (ui-tree/geometry.ts#Clips.scrollersOf — Android's, whose rects uiautomator has cut to them), else the ancestors
- * that scroll on a tree of unclipped frames (`Clips.drawnIn`'s `scrollers` — WDA's, which marks no node as clipping,
- * so its `scrollersOf` is empty for every node). Both empty — idb's flat list, which lists no scroll view, or a target
- * under none — is the screen box. Measured (the lab app's `scroll-bounded`, WDA): with the chain alone the stroke for
+ * them in its own dialect: its clipping ancestors (ui-tree/geometry.ts#Clips.scrollersOf — Android's, to which
+ * uiautomator cuts most rects), else the ancestors that scroll (`Clips.drawnIn`'s `scrollers` — WDA's, which marks no
+ * node as clipping, so its `scrollersOf` is empty for every node; on Android the two name the same scroll views where
+ * every one clips, and the chain, asked first, also names one of no area). Both empty — idb's flat list, which lists
+ * no scroll view, or a target under none — is the screen box. Measured (the lab app's `scroll-bounded`, WDA): with the chain alone the stroke for
  * a row of the bounded `lower` (0,380 402x180) was drawn over the screen, touching down at (201,699) below it on the
  * bare background — nothing moved, and the reply called the content exhausted while naming `lower`; the turned stroke
  * for `tabbar-floating`'s R touched down at y 175, in the header above its list.

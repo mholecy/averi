@@ -33,7 +33,8 @@ import { SIDES } from './swipe.js';
  * container` when Android dumped it so (UiNode.clippedOut), `above the
  * viewport` when its rect lies there — or `above its scroll view <node>` when
  * it lies past the edge of what that scroll view draws, on the screen
- * (`scrollView`, a WDA tree's drawn frame) — the one wording of it, for the
+ * (`scrollView`, the drawn frame's: a WDA row where it lies, or an Android rect uiautomator dumped past its scroll
+ * view) — the one wording of it, for the
  * wait's hint (resolve.ts) and `scroll_until`'s failure (scroll-text.ts).
  */
 export function pastSideText(side: Edge, clippedOut: boolean, scrollView?: UiNode): string {

@@ -667,9 +667,10 @@ export interface Clips {
   /**
    * The node's ancestors that CLIP it — every node marked
    * `clipsDescendants` above it (adapters/types.ts#UiNode.clipsDescendants:
-   * Android's `scrollable="true"`, whose descendants' bounds uiautomator has
-   * already cut to it), NEAREST FIRST, as their rects; empty for a node with
-   * none, which is every node of an iOS tree. `scroll_until`'s
+   * Android's `scrollable="true"`, to which uiautomator cuts its
+   * descendants' bounds — most of them: `drawnIn` cuts the rest),
+   * NEAREST FIRST, as their rects; empty for a node with none, which is
+   * every node of an iOS tree. `scroll_until`'s
    * round asks it of each match (interact/scroll-read.ts#TreeFacts), to
    * tell a `fully: true` stop whose edge sits exactly on a clipping
    * ancestor's — possibly cut there — from one inside them all
@@ -729,18 +730,28 @@ export interface Clips {
   inScroller(node: UiNode): boolean | undefined;
   /**
    * Where the node can be DRAWN as far as what scrolls above it says (`Drawn`): the frames of every ancestor that
-   * scroll-containers.ts#scrolls, intersected — on a tree of UNCLIPPED frames only, as its source says
-   * (adapters/types.ts#UiNode.unclippedFrames, WDA's; `clipsOf`'s `unclipped`). An ancestor of no area cuts nothing
-   * (it fails open, as a root of no area does). There a scroll view's content keeps its laid-out rect wherever it lies, and the
-   * scroll view draws none of it outside its own frame (UIKit's `UIScrollView` clips to its bounds, so do a table, a
-   * collection view and SwiftUI's `ScrollView`). Measured: the at-rest SWIFT form lists `payee_name_input` at
-   * `24,801 354x52`, below its `ScrollView 0,0 402x780`; the capture shows the bare background from CONTINUE's bottom
-   * (824) down, and a tap at its centre was reported done on it. Undefined for a node under nothing that scrolls, a
-   * node of another tree, on Android's trees (uiautomator has cut every rect to its ancestors already: nothing is
-   * left to cut) and on idb's flat list, which lists no scroll view (a residual: its rows below a short scroll view
-   * are judged on the screen alone). Rects stay unclipped (`scroll_until`'s far edge, interact/scroll-rounds.ts
-   * #beyondFarEdge, reads a row's rect past the frame); the standing cuts what it judges by this frame
-   * (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first ask; the answer is shared along a branch.
+   * scroll-containers.ts#scrolls, intersected — on every tree that lists ancestry (`clipsOf`'s `ancestry`), whatever
+   * its source says of its frames. An ancestor of no area cuts nothing (it fails open, as a root of no area does). A
+   * scroll view draws none of its content outside its own frame, on either platform (UIKit's `UIScrollView` clips to
+   * its bounds, so do a table, a collection view and SwiftUI's `ScrollView`; so do Android's scroll containers), while
+   * a source may list that content past it:
+   * - WDA always (adapters/types.ts#UiNode.unclippedFrames): the at-rest SWIFT form lists `payee_name_input` at
+   *   `24,801 354x52`, below its `ScrollView 0,0 402x780`; the capture shows the bare background from CONTINUE's
+   *   bottom (824) down, and a tap at its centre was reported done on it.
+   * - uiautomator sometimes: it cuts most rects to their scroll container (a no-op here), but Compose's
+   *   `verticalScroll` in an edge-to-edge window is cut, if at all, at a line the status bar's height past it — the
+   *   lab app's `scroll-bounded` lists `S` at `[128,1519][953,1607]` under its `lower` ending at 1541, 22 px of it drawn;
+   *   its `carousel-in-list` lists the card `C` as `[1014,380][1080,614]`, cut to the screen's edge, not to its carousel
+   *   ending at 1014: nothing of it drawn. Both were tapped on the background.
+   *   docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md
+   * An edge the node runs past by a unit at most (a px on Android, a pt on WDA) is no cut: there the node is flush with
+   * it (`overhangAsFlush`).
+   * Undefined for a node under nothing that scrolls, a node of another tree, and on idb's flat list, which lists no
+   * scroll view (a residual: its rows below a short scroll view are judged on the screen alone). Rects stay as listed
+   * (`scroll_until`'s far edge, interact/scroll-rounds.ts#beyondFarEdge, reads a row's rect past the frame); the
+   * standing cuts what it judges by this frame (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first
+   * ask, its ancestors' frames shared along a branch; each ask then meets them with the node's own rect
+   * (`overhangAsFlush`), a constant.
    */
   drawnIn(node: UiNode): Drawn | undefined;
   /**
@@ -758,12 +769,13 @@ export interface Clips {
    * that exact rect — the one the stroke plan remembered and drew over, whose cut and axes the same read finds by it
    * exactly; one moved by a pixel is found by none of them, and no proof is the safe answer), when the tree shows its
    * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
-   * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`drawnIn`'s
-   * dialect, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
+   * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`unclipped`,
+   * WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
    * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container
    * at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
-   * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts every rect to its scroll
-   * container, so content past an edge reads flush with it (or is not listed at all), and idb's flat list lists no
+   * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts most rects to their scroll
+   * container, so content past an edge reads flush with it (or is not listed at all) — that it does not cut some
+   * (`drawnIn`'s lab note) proves no end where it does — and idb's flat list lists no
    * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
    * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG that
    * edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
@@ -807,16 +819,24 @@ export interface Drawn {
   readonly frame: Rect | undefined;
   /** The ancestors that scroll, nearest first: the scroll view a sentence names is one of them. */
   readonly scrollers: readonly UiNode[];
+  /**
+   * Whether the tree's source lists the node WHERE IT LIES (`clipsOf`'s `unclipped`, draw-order.ts#listsUnclippedFrames:
+   * WDA's): then `frame` is the window the content moves through, and a row's motion as it comes in is the content's —
+   * what `scroll_until`'s carry model measures (interact/scroll-rounds.ts#stillNeeds), through
+   * ui-tree/standing.ts#StandingFacts.listedWhereItLies. Not on uiautomator's trees, which cut most rows to their
+   * scroll container (a row coming in reads short).
+   */
+  readonly listedWhereItLies: boolean;
 }
 
 /**
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
  * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
- * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry);
- * `unclipped`: whether its source reports frames unclipped, which `drawnIn`
- * asks (draw-order.ts#listsUnclippedFrames) — the two readers of the tree's
- * dialect, both in draw order.
+ * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry), which
+ * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
+ * frames unclipped (draw-order.ts#listsUnclippedFrames), which `axesOf` and
+ * `endsAt` ask — the two readers of the tree's dialect, both in draw order.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
@@ -872,12 +892,12 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     }
     return scrolled.get(node);
   };
-  let drawn: Map<UiNode, Drawn> | undefined;
+  let drawn: Map<UiNode, Omit<Drawn, 'listedWhereItLies'>> | undefined;
   const drawnIn = (node: UiNode): Drawn | undefined => {
     if (drawn === undefined) {
-      const found = new Map<UiNode, Drawn>();
-      if (ancestry && unclipped) {
-        const mark = (n: UiNode, within: Drawn | undefined): void => {
+      const found = new Map<UiNode, Omit<Drawn, 'listedWhereItLies'>>();
+      if (ancestry) {
+        const mark = (n: UiNode, within: Omit<Drawn, 'listedWhereItLies'> | undefined): void => {
           if (within !== undefined) found.set(n, within);
           // An ancestor of no area cuts nothing: it fails open, as a root of no area does.
           const below = !scrolls(n) || rectArea(n.rect) === 0
@@ -891,7 +911,10 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
       }
       drawn = found;
     }
-    return drawn.get(node);
+    const within = drawn.get(node);
+    if (within === undefined) return undefined;
+    const frame = within.frame === undefined ? undefined : overhangAsFlush(node.rect, within.frame);
+    return { frame, scrollers: within.scrollers, listedWhereItLies: unclipped };
   };
   const axes = new Map<UiNode, ScrollAxes>();
   const axesOf = (container: Rect): ScrollAxes | undefined => {
@@ -923,6 +946,24 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     return under.some((d) => past[edge](d.rect)) ? undefined : view;
   };
   return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, endsAt };
+}
+
+/**
+ * `frame` with every edge `rect` is flush with (`flushEdges`: within a unit, a px on Android, a pt on WDA) and runs past
+ * moved out onto `rect`'s: there the rect is FLUSH with its scroll view's edge, not past it (`endsAt` reads past as more
+ * than a unit too) — a rounding of the source's bounds, which the drawn frame must not read as a cut. Measured:
+ * mp-native's SWIFT form on Android lists `details_toggle` at `66,1924 948x55`, ending at 1979, under its form
+ * `[0,242][1080,1978]` — the CONTINUE bar starts at 1979, so the form's 1978 and the toggle's 1979 are the same line;
+ * cut there by a pixel, the toggle read `clipped` where the `fully` stop's flush probe is the rule
+ * (interact/scroll-rounds.ts#PROBE_REACH).
+ */
+function overhangAsFlush(rect: Rect, frame: Rect): Rect {
+  const flush = new Set(flushEdges(rect, frame));
+  const left = flush.has('left') ? Math.min(rect.x, frame.x) : frame.x;
+  const top = flush.has('top') ? Math.min(rect.y, frame.y) : frame.y;
+  const right = Math.max(frame.x + frame.width, flush.has('right') ? rect.x + rect.width : -Infinity);
+  const bottom = Math.max(frame.y + frame.height, flush.has('bottom') ? rect.y + rect.height : -Infinity);
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 /** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */

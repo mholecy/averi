@@ -8,10 +8,9 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 // Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
 // list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
 // (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
-// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE1–LE3; LE4 is calibrated since
-// round 5's 0a); this KNOWN owns the ratchet, as presented.known.ts does for L1.
+// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE2–LE3; LE4 is calibrated since
+// round 5's 0a, LE1 since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
 
-const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
 const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
@@ -20,22 +19,10 @@ const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (2
 export const edges: KnownFile = {
   family: 'edges',
   known: Object.fromEntries([
-    // LAB FINDING LE1 — uiautomator's bounds of a Compose verticalScroll's rows are not cut to their container (P: not
-    // at all; S: 66 px past its bottom), and averi judges an Android rect on the screen alone unless it is flush with
-    // its container's edge: P (cut, 62 % drawn) "fully visible"; S (a 22-px sliver) Tapped at (541,1563), below its
-    // container — where nothing of it is drawn — and called reached by both stops.
-    ...keys(`${ANDROID}/scroll-bounded.xml`, ['P'], ['fully'], { cls: 'fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: a rect past its container read as whole', as: LE1 }),
-    ...keys(`${ANDROID}/scroll-bounded.xml`, ['S'], ['fully'], { cls: 'fully visible where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: a sliver past its container read as whole', as: LE1 }),
-    ...keys(`${ANDROID}/scroll-bounded.xml`, ['S'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['adb shell input tap 541 1563'], note: 'lab finding: Tapped below its container, where nothing of it is drawn', as: LE1 }),
-    ...keys(`${ANDROID}/scroll-bounded.xml`, ['S'], ['scroll_until'], { cls: 'reached where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the plain stop on a sliver past its container', as: LE1 }),
-    // LE1 across: carousel-in-list's C, the card right of the carousel (a Compose horizontalScroll Row), is dumped as
-    // the strip of it right of the carousel's clip, [1014,380][1080,614], where nothing of it is drawn (the page's
-    // background): Tapped there, its colour PASSES on the background, and the stop calls it visible — so its R-stroke
-    // (a sideways scroll inside the carousel, what the axis-aware stroke choice is judged on) is never reached on
-    // Android.
-    ...keys(`${ANDROID}/carousel-in-list.xml`, ['C'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['adb shell input tap 1047 497'], note: 'lab finding: a card past its carousel\'s clip read as drawn — Tapped on the background', as: LE1 }),
-    ...keys(`${ANDROID}/carousel-in-list.xml`, ['C'], ['colour'], { cls: 'passed on #EEEEEE', kind: 'PASS', calls: [], note: 'lab finding: a card past its carousel\'s clip — the colour measured the background (#29\'s shape)', as: LE1 }),
-    ...keys(`${ANDROID}/carousel-in-list.xml`, ['C'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'lab finding: a card past its carousel\'s clip — visible after 0 swipes, no sideways stroke', as: LE1 }),
+    // LAB FINDING LE1 — fixed on bugs/r14-le1 (round 14): uiautomator's bounds of a Compose verticalScroll's rows past
+    // their container (scroll-bounded's P and S) and of a horizontalScroll's card past its carousel (carousel-in-list's
+    // C) are judged by what their scroll views draw (ui-tree/geometry.ts#Clips.drawnIn, now on every tree that lists
+    // ancestry): all seven rows green, struck off here, calibrated in scripts/truth/calibration.json.
     // LAB FINDING LE2 — idb lists no scroll view: P, S and O are judged on the screen alone. O (outside its scroll view)
     // Tapped on the background, its colour PASSES on the background, and the stop calls it visible; S Tapped and
     // reached; P and S "fully visible". WDA answers every one of these rows as the truth does.

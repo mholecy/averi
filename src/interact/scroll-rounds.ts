@@ -925,12 +925,23 @@ function beyondFarEdgeIn(found: FarFacts, direction: Direction, frames: readonly
   return found.clippedOut === far || found.slicedAt === far || frames.every((f) => beyondFarEdge(found.rect, direction, cut(f)));
 }
 
-/** What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, the edge its scroll container cuts it to a sliver at, and the frame its scroll views draw it in (ui-tree/standing.ts#StandingFacts.drawn). */
+/**
+ * What `beyondFarEdgeIn` reads of a match: its rect, the side it was dumped clipped out past, the edge its scroll
+ * container cuts it to a sliver at, and the frame its scroll views draw it in (ui-tree/standing.ts#StandingFacts.drawn,
+ * on every tree that lists ancestry). And what `stillNeeds` reads: whether that frame is the WINDOW a row moves through
+ * as the content does (`listedWhereItLies`, ui-tree/standing.ts#StandingFacts.listedWhereItLies: on a tree that lists
+ * the match where it lies, WDA's) — the one dialect on which a stroke's carry can be measured. Not on Android's: its
+ * rects are cut to the scroll container where uiautomator cuts them (most rows; lab note LE1's are the exception, not
+ * the rule), so a row's motion as it comes in reads short, and its strokes drag at `dragSpeed`, no fling, with
+ * nothing to carry.
+ * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md
+ */
 interface FarFacts {
   readonly rect: Rect;
   readonly clippedOut?: ClippedSide;
   readonly slicedAt?: Edge;
   readonly drawn?: Rect;
+  readonly listedWhereItLies?: true;
 }
 
 /** A judged match's `FarFacts`, its rect copied. */
@@ -940,6 +951,7 @@ const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   // A container's cut only: the rest of a node cut by a node drawn after it lies under that node, not past the far edge (geometry.ts#Cut.by).
   ...(facts.sliver !== undefined && facts.sliver.by === undefined && { slicedAt: facts.sliver.edge }),
   ...(facts.drawn !== undefined && { drawn: { ...facts.drawn } }),
+  ...(facts.listedWhereItLies === true && { listedWhereItLies: true as const }),
 });
 
 /**
@@ -1116,15 +1128,16 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   }
   s.lastFound = best === undefined ? undefined : { ...farFacts(best), frames };
   if (best !== undefined) {
+    const farRead = farFacts(best);
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
     // What the stroke just sent carried the target (interact/stroke-plan.ts#carried, the carry model): only on a tree
-    // that lists it where it lies (its drawn frame known — WDA's unclipped frames), only after a stroke of the course
-    // (not the probe), and only of the SAME node at the same size — a judged match that switched to another node, or
-    // one that changed size, moved by no stroke.
+    // that lists it where it lies (`listedWhereItLies` — WDA's unclipped frames, as `stillNeeds` asks), only after a
+    // stroke of the course (not the probe), and only of the SAME node at the same size — a judged match that switched
+    // to another node, or one that changed size, moved by no stroke.
     const key = identityOf(best.node);
     const same = s.prevBest !== undefined && s.prevKey === key && sameSize(s.prevBest, best.node.rect);
-    if (current === 'stroke' && s.probe === undefined && same && s.prevBest !== undefined && s.lastSent !== undefined && s.lastDrawn !== undefined && best.standing.facts.drawn !== undefined) {
+    if (current === 'stroke' && s.probe === undefined && same && s.prevBest !== undefined && s.lastSent !== undefined && s.lastDrawn !== undefined && farRead.listedWhereItLies === true) {
       s.strokes = carried(s.strokes, { moved: motionToward(s.prevBest, best.node.rect, s.lastSent), drawn: s.lastDrawn });
     }
     s.prevKey = key;
@@ -1132,7 +1145,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
     // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
-    const beyond = beyondFarEdgeIn(farFacts(best), courseOf(s), frames);
+    const beyond = beyondFarEdgeIn(farRead, courseOf(s), frames);
     // Kept whatever the target showed: only a read with none of it in the
     // frame reaches the failure's `past` (`left` needs it never in the
     // frame, `offFrame` this read's match at visible 0).
@@ -1158,7 +1171,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // one (`overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
     const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => drawOrderFound(c) && overFar(c.reach)));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
-    if (!beyondFarEdgeIn(farFacts(best), courseOf(s), uncutFrames)) s.seenShort = true;
+    if (!beyondFarEdgeIn(farRead, courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
@@ -1274,13 +1287,13 @@ function nextStroke(s: State): { toward: Direction; reach: number; turn: boolean
  * interact/stroke-plan.ts#carried's): once it lies in the tree short of its window — past the window's near edge, the
  * side content comes in through — `needs`, the distance that brings it to the window's middle, and `slack`, how far
  * the window lets it travel while whole in it (the window's side less its own). The window is what the target's
- * scroll views draw met with every frame judged (`FarFacts.drawn`): known on WDA's trees only, where an off-screen row
- * is listed where it lies — not on Android's (its strokes drag at `dragSpeed`, no fling, and its rects are cut to the
+ * scroll views draw met with every frame judged (`FarFacts.drawn`, when `listedWhereItLies`): known on WDA's trees
+ * only, where an off-screen row is listed where it lies — not on Android's (its strokes drag at `dragSpeed`, no fling, and its rects are cut to the
  * scroll container, so a row's motion as it comes in reads short) nor on idb's flat list. Undefined otherwise.
  * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md
  */
 function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direction): StillNeeds | undefined {
-  if (found.drawn === undefined) return undefined;
+  if (found.drawn === undefined || found.listedWhereItLies !== true) return undefined;
   const window = found.frames.reduce<Rect | undefined>((w, f) => (w === undefined ? undefined : rectIntersection(w, f)), found.drawn);
   if (window === undefined) return undefined;
   const { rect } = found;
