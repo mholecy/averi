@@ -103,7 +103,7 @@ THE REMEDY (`standing.ts#Remedy`, second in the precedence beside `unordered`): 
 or a popover, close it first; no scroll moves it out from under it" (the pixel assert: "… else assert something in the
 element that lies clear of it", after "the capture would show it, not the element"); the cover named "drawn over it as
 a screenshot shows (the two are listed in reading order)" (`geometry.ts#seenOverText`, `#drawnOverSeenText`). An
-`unordered` remedy a screenshot looked at carries why it could not tell (`untold`), and its words drop "see a
+`unordered` remedy a screenshot looked at carries why it could not tell (`why`), and its words drop "see a
 screenshot": "no scroll tells which is on top: a screenshot could not tell either (the two look alike (ΔE 3.10)) — …".
 
 ## Measured
@@ -116,6 +116,8 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
     and no stroke sent, now worded `under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as a
     screenshot shows (the two are listed in reading order)` with the `seenOver` remedy — still red as ADR 0018's
     residual 9 (#31: the backdrop has no node, so no "close it first" of a presented layer).
+- The review fixes after it (`85e36215`, `a374227a`, `0f28b4cf`) change no golden reply: 217 mismatches at `0f28b4cf`,
+  as at `1ef11b9c`.
 - Unit and table tests: tests/verify/eyes-order.test.ts (the judge over both lab pngs and synthetic pngs for every
   untold rule — the inset card ahead of and sideways past the peer, run-ons of 2–3 pt read by the slices, a band of no
   one colour, sides only just apart, residuals 2 and 7 pinned; a horizontal overlap's bands and strips; the question's bands

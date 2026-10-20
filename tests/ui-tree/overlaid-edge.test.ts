@@ -55,7 +55,7 @@ const said = (s: Standing | PixelStanding): unknown => {
 };
 const standing = (tree: UiNode, node: UiNode, purpose: Purpose) => sceneOf(tree).standing(node, AVD, purpose);
 
-describe('OverlaidEdge — pinned-bar P (B4-L1): dumped 127,1846 825x110, ending where Continue 66,1956 948x154 begins; its frame runs 66 px on under it', () => {
+describe('OverlaidEdge — pinned-bar P: dumped 127,1846 825x110, ending where Continue 66,1956 948x154 begins; its frame runs 66 px on under it', () => {
   it('`fully`: covered by Continue, the overlaid edge its fact — no "fully visible" on a row under a pinned button', async () => {
     const t = await lab('pinned-bar');
     const p = byId(t, 'lab.pinned-bar.P');
@@ -86,7 +86,7 @@ describe('OverlaidEdge — pinned-bar P (B4-L1): dumped 127,1846 825x110, ending
   });
 });
 
-describe('OverlaidEdge — text-under-bar P (B4-L1): a role-less clickable dumped as the 22-px strip 127,1934 825x22 above Continue', () => {
+describe('OverlaidEdge — text-under-bar P: a role-less clickable dumped as the 22-px strip 127,1934 825x22 above Continue', () => {
   it('the plain stop and the tap: cut to a sliver by Continue — the role-less node under an OVERLAY is read as the sliver it is', async () => {
     const t = await lab('text-under-bar');
     const p = byId(t, 'lab.text-under-bar.P');
@@ -100,7 +100,7 @@ describe('OverlaidEdge — text-under-bar P (B4-L1): a role-less clickable dumpe
   });
 });
 
-describe('OverlaidEdge — never for a node in a scroll view: scroll-sticky-cut R (VA1, left open)', () => {
+describe('OverlaidEdge — never for a node in a scroll view: scroll-sticky-cut R, left open', () => {
   it('R dumped from 457, where the merged sticky header ends: not read as an overlay — at rest a first row lies whole and flush under its header, the same tree', async () => {
     const t = await lab('scroll-sticky-cut');
     const r = byId(t, 'lab.scroll-sticky-cut.R');

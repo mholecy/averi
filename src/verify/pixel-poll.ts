@@ -1,6 +1,6 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { coverText, drawnOverSeenText, mayRunOnUnderText, nodeText, overlapsUntoldText, rectText, sameRect } from '../ui-tree/geometry.js';
+import { coverText, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { judgedWithOrder, type OrderEyes, type OrderQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
@@ -8,7 +8,7 @@ import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { orderUntold, outsideItsScrollView, overlaidBy, presentedRemedy, seenOver, seenOverRemedy, unorderedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { coverOverClause, orderRemedyText, outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
@@ -304,19 +304,6 @@ class PixelPollMemory {
   }
 
   /**
-   * Something is over the element, worded with its remedy (`overElement`'s
-   * sentence, which the round hands in whole): the soft keyboard, or a
-   * system band or something of the app (`scroll_until` with `fully: true`, which stops only once
-   * nothing is drawn over any of it, and something in it clear of that
-   * when no scroll may cure it). A miss naming it, never a measurement —
-   * what would be sampled is the cover — and a finding like any other, so
-   * when every round was covered it is the timeout's wording
-   * (`timeoutDetail`: the last finding outranks the silent rounds and
-   * not-found), and a later round cut by the deadline before its query
-   * does not erase it; a later round that finds the element clear
-   * withdraws it (`uncovered`).
-   */
-  /**
    * The eyes' order answer this poll keeps (ADR 0024) — on this round's tree, `tree`: a covered element's order question
    * captures the round's frame, and an answer that keeps it covered (no pair seen `over`) would cost that capture again
    * every round for nothing. So such an answer, judged on a frame settled over the whole screen, is kept and handed back
@@ -343,6 +330,19 @@ class PixelPollMemory {
 
   private order: { key: string; seen: readonly OrderSeen[] } | undefined;
 
+  /**
+   * Something is over the element, worded with its remedy (`overElement`'s
+   * sentence, which the round hands in whole): the soft keyboard, or a
+   * system band or something of the app (`scroll_until` with `fully: true`, which stops only once
+   * nothing is drawn over any of it, and something in it clear of that
+   * when no scroll may cure it). A miss naming it, never a measurement —
+   * what would be sampled is the cover — and a finding like any other, so
+   * when every round was covered it is the timeout's wording
+   * (`timeoutDetail`: the last finding outranks the silent rounds and
+   * not-found), and a later round cut by the deadline before its query
+   * does not erase it; a later round that finds the element clear
+   * withdraws it (`uncovered`).
+   */
   coveredMiss(reason: string): PollVerdict {
     const detail = failClosed(reason, this.unchecked);
     this.lastCovered = detail;
@@ -576,19 +576,9 @@ async function judgeOver(
       return `${cut} — ${advice(standing.remedy, () => 'scroll it up: scroll_until the element with `fully: true` first and re-run')}`;
     }
     case 'covered': {
-      const named = coverText(standing.cover, standing.reach);
-      // A cover whose order against the element the tree does not tell (listed in reading order) is said as such.
-      // …and one a screenshot saw drawn over it, as such; one the tree shows only by the cut (its overlaid edge), as that cut.
-      const overlaid = overlaidBy(standing.facts, standing.cover);
-      const over =
-        overlaid !== undefined
-          ? `meets the element's ${overlaid.edge} edge ${at}), drawn after it — ${mayRunOnUnderText(standing.cover, 'the element')}`
-          : orderUntold(standing.facts, standing.cover)
-            ? overlapsUntoldText(`the element ${at})`)
-            : seenOver(standing.facts, standing.cover)
-              ? drawnOverSeenText(`the element ${at})`)
-              : `is drawn over the element ${at})`;
-      return `${named} ${over} — ${coverRemedy(standing.remedy)}`;
+      // The cover as the tree orders it against the element: drawn over it, its order untold or seen by a screenshot, or
+      // the node at its overlaid edge (ui-tree/standing.ts#coverOverClause, the one choice of its words).
+      return `${coverText(standing.cover, standing.reach)} ${coverOverClause(standing.facts, standing.cover, `${at})`)} — ${coverRemedy(standing.remedy)}`;
     }
     default: {
       // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).
@@ -668,9 +658,9 @@ const coverRemedy = (remedy: CoverRemedy): string => {
     case 'scroll':
       return scroll;
     case 'unordered':
-      return `the capture may show it, not the element; ${unorderedRemedy('pixel', remedy)}`;
+      return `the capture may show it, not the element; ${orderRemedyText(remedy, 'pixel')}`;
     case 'seenOver':
-      return `the capture would show it, not the element; ${seenOverRemedy('pixel')}`;
+      return `the capture would show it, not the element; ${orderRemedyText(remedy, 'pixel')}`;
   }
 };
 

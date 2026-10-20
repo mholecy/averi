@@ -1653,12 +1653,13 @@ function readingOrderPeers(
   if (peers.length === 0 || pinnedTargets().has(target)) return none;
   const centre = tapPoint(t);
   const holdsCentre = (p: Placed): boolean => containsPoint(p.node.rect, centre);
-  const told = (p: Placed): 'over' | 'under' | undefined => {
-    const pair = seen?.between(t, p.node);
+  // What a screenshot saw of the PEER against the target: drawn over it (`over`), or under it — no peer then.
+  const peerSeen = (p: Placed): 'over' | 'under' | undefined => {
+    const pair = seen?.between(p.node, t);
     return pair === undefined || pair.seen === 'untold' ? undefined : pair.seen;
   };
-  const overIt = (p: Placed): boolean => told(p) === 'under';
-  const kept = peers.filter((p) => told(p) !== 'over');
+  const overIt = (p: Placed): boolean => peerSeen(p) === 'over';
+  const kept = peers.filter((p) => peerSeen(p) !== 'under');
   const listedBefore = kept.filter((p) => p.at < target.at);
   const before = listedBefore.some(holdsCentre) ? listedBefore : [];
   const overlapping = [...before, ...kept.filter((p) => p.at > target.at && holdsCentre(p))];
@@ -1666,7 +1667,7 @@ function readingOrderPeers(
     before,
     unordered: new Set(overlapping.filter((p) => !overIt(p))),
     seenOver: new Set(overlapping.filter(overIt)),
-    seenUnder: new Set(peers.filter((p) => told(p) === 'over')),
+    seenUnder: new Set(peers.filter((p) => peerSeen(p) === 'under')),
     listedBefore,
   };
 }

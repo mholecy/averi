@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { lookAt, lookOn } from '../../src/ui-tree/look.js';
-import { presentedRemedy, sceneOf, seenOverRemedy, unorderedRemedy } from '../../src/ui-tree/standing.js';
+import { orderRemedyText, presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
 import type { OrderQuestion } from '../../src/ui-tree/eyes.js';
 import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
 import { judgeOrder } from '../../src/verify/eyes.js';
@@ -706,7 +706,7 @@ describe('one remedy for a target under a cover whose order is not told — the 
       const w = [...everyNode(tree)].find((n) => n.identifier === 'lab.blur-menu.W')!;
       expect(await tapSaid(tree, w)).toBe(
         'id:t is overlapped by button "Target C" (51,470 300x64) at its centre (201,480), the two listed in reading order: which is drawn on top is not told; ' +
-          `only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('touch')}; nothing was tapped`,
+          `only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${orderRemedyText({ of: 'unordered' }, 'touch')}; nothing was tapped`,
       );
       const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [{ tree, found: [w], screen: USABLE }]), 'id:t').message;
       expect(failure).toMatch(/^scroll_until id:t stopped before any swipe — element is in the viewport but overlapped by button "Target C" .*; no swipe was sent — /);
@@ -715,15 +715,15 @@ describe('one remedy for a target under a cover whose order is not told — the 
 
   it('word for word: overlapped, the order not told, no scroll advised — scroll_until stops before any swipe', async () => {
     for (const [, tree] of await trees()) {
-      expect(await tapSaid(tree, c(tree))).toBe(`id:t is ${OVERLAPPED}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${unorderedRemedy('touch')}; nothing was tapped`);
+      expect(await tapSaid(tree, c(tree))).toBe(`id:t is ${OVERLAPPED}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${orderRemedyText({ of: 'unordered' }, 'touch')}; nothing was tapped`);
       expect(await colourSaid(tree, c(tree))).toBe(
         'button "Target W" (51,448 300x64) overlaps the element (element 51,470 300x64), the two listed in reading order: which is drawn on top is not told — ' +
-          `the capture may show it, not the element; ${unorderedRemedy('pixel')}`,
+          `the capture may show it, not the element; ${orderRemedyText({ of: 'unordered' }, 'pixel')}`,
       );
       const row: Row = { tree, found: [c(tree)], screen: USABLE };
       const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE }, [row]), 'id:t').message;
       expect(failure).toBe(
-        `scroll_until id:t stopped before any swipe — element is in the viewport but ${OVERLAPPED} — 34% of it shows; no swipe was sent — ${unorderedRemedy('touch')}. ` +
+        `scroll_until id:t stopped before any swipe — element is in the viewport but ${OVERLAPPED} — 34% of it shows; no swipe was sent — ${orderRemedyText({ of: 'unordered' }, 'touch')}. ` +
           'Last rect {"x":51,"y":470,"width":300,"height":64} in a 402x874 viewport',
       );
     }
@@ -793,15 +793,15 @@ describe('one remedy for a target under a cover a screenshot saw drawn over it �
     for (const [, tree] of await trees()) {
       const c = byId(tree, 'lab.blur-menu.C');
       expect(await tapSaid(tree, c, ON_IPHONE, (await eyesOver()).order)).toBe(
-        `id:t is ${SEEN}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${seenOverRemedy('touch')}; nothing was tapped`,
+        `id:t is ${SEEN}; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — ${orderRemedyText({ of: 'seenOver' }, 'touch')}; nothing was tapped`,
       );
       expect(await colourSaid(tree, c, ON_IPHONE, (await eyesOver()).order)).toBe(
         'button "Target W" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — ' +
-          `the capture would show it, not the element; ${seenOverRemedy('pixel')}`,
+          `the capture would show it, not the element; ${orderRemedyText({ of: 'seenOver' }, 'pixel')}`,
       );
       const failure = failureOf(play(RULES, [{ tree, found: [c], screen: USABLE, order: (await eyesOver()).sync }]), 'id:t').message;
       expect(failure).toBe(
-        `scroll_until id:t stopped before any swipe — element is in the viewport but ${SEEN} — 34% of it shows; no swipe was sent — ${seenOverRemedy('touch')}. ` +
+        `scroll_until id:t stopped before any swipe — element is in the viewport but ${SEEN} — 34% of it shows; no swipe was sent — ${orderRemedyText({ of: 'seenOver' }, 'touch')}. ` +
           'Last rect {"x":51,"y":470,"width":300,"height":64} in a 402x874 viewport',
       );
     }
@@ -811,7 +811,7 @@ describe('one remedy for a target under a cover a screenshot saw drawn over it �
     const [[, tree]] = await trees();
     const w = byId(tree, 'lab.blur-menu.W');
     const untold: Order = async (q) => q.pairs.map(({ peer }) => ({ peer, seen: 'untold', why: 'the two look alike (ΔE 3.10)' }));
-    const remedy = unorderedRemedy('touch', { of: 'unordered', untold: 'the two look alike (ΔE 3.10)' });
+    const remedy = orderRemedyText({ of: 'unordered', why: 'the two look alike (ΔE 3.10)' }, 'touch');
     expect(remedy).toContain('a screenshot could not tell either (the two look alike (ΔE 3.10))');
     expect(remedy).not.toContain('see a screenshot');
     expect(await tapSaid(tree, w, ON_IPHONE, untold)).toBe(
