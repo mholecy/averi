@@ -426,7 +426,7 @@ export function stops(j: Judged): boolean {
 
 /**
  * What cuts a `clipped` match (`shortOf`), decided once in this order: the soft keyboard's edge — judged under an
- * applied cover and clipped at the bottom, the frame's bottom then the cover's top (`keyboard`, the cover); its scroll
+ * applied cover and clipped at the bottom, the frame's bottom being the cover's top (`keyboard`, the cover); its scroll
  * view's edge inside the screen (`scrollView`, the standing's ui-tree/standing.ts#ScrollViewCut); else the viewport's
  * edge. The stuck sentence words each (scroll-text.ts#failureText); the bound sentence does not tell them apart yet.
  */

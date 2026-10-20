@@ -505,6 +505,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
                 `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
           };
         }
+        // The viewport's edge. A cover clipping only the top still words the frame (`judged.under`): that is the
+        // frame the element is clipped in, not what cuts it — the cut is the viewport's.
         case 'viewport':
           return {
             message:
@@ -514,6 +516,10 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
                 `The element cannot be fully revealed — that is a layout defect ` +
                 `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
           };
+        default: {
+          const unworded: never = short.cause;
+          return unworded;
+        }
       }
     }
     case 'covered': {
