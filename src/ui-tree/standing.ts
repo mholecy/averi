@@ -682,12 +682,15 @@ type TouchKind =
  * at where the frame judged in ends at the drawn frame's edge and the box does not (the rest of `edges` are the
  * screen's, or a keyboard line's); `scroller`, the scroll view a sentence names (`scrollerOf`); `longer`, `taller` or
  * `wider` when the node is longer, on an axis of those edges, than what of the drawn frame is judged in (the screen's
- * part of it, above any keyboard line) — no scroll shows it whole.
+ * part of it, above any keyboard line) — no scroll shows it whole; `stopsShort`, where the scroll view's content stops
+ * short of the node, by the sides of those edges: `after` it (every edge a far side, bottom or right), `before` it
+ * (every edge a near side, top or left), or `both` (one of each).
  */
 export interface ScrollViewCut {
   readonly edges: readonly Edge[];
   readonly scroller: UiNode;
   readonly longer?: 'taller' | 'wider';
+  readonly stopsShort: 'after' | 'before' | 'both';
 }
 
 /** Where the node stands for a touch (the tap, the stop), and why: `facts`, one kind with what its sentence quotes, and — not reachable — its `remedy`. */
@@ -1413,7 +1416,8 @@ function clippedByScrollView({ scene, node }: Judged, box: Rect, facts: Standing
   const shown = facts.screen;
   const longer =
     edges.some(across) && node.rect.height > shown.height ? 'taller' : edges.some((e) => !across(e)) && node.rect.width > shown.width ? 'wider' : undefined;
-  return { edges, scroller: scrollerOf(drawn, (f) => !rectWithin(node.rect, f)), ...(longer !== undefined && { longer }) };
+  const stopsShort = edges.every((e) => e === 'bottom' || e === 'right') ? 'after' : edges.every((e) => e === 'top' || e === 'left') ? 'before' : 'both';
+  return { edges, scroller: scrollerOf(drawn, (f) => !rectWithin(node.rect, f)), ...(longer !== undefined && { longer }), stopsShort };
 }
 
 /**

@@ -8,7 +8,7 @@ import { lookAt, lookTold, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { bandRect, farEdgeFrames, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
+import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 
 /**
@@ -424,9 +424,17 @@ export function stops(j: Judged): boolean {
   return j.standing.kind === 'reachable';
 }
 
-/** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
+/**
+ * What cuts a `clipped` match (`shortOf`), decided once in this order: the soft keyboard's edge — judged under an
+ * applied cover and clipped at the bottom, the frame's bottom then the cover's top (`keyboard`, the cover); its scroll
+ * view's edge inside the screen (`scrollView`, the standing's ui-tree/standing.ts#ScrollViewCut); else the viewport's
+ * edge. The stuck sentence words each (scroll-text.ts#failureText); the bound sentence does not tell them apart yet.
+ */
+export type ClipCause = { at: 'keyboard'; keyboard: AppliedKeyboard } | { at: 'scrollView'; cut: ScrollViewCut } | { at: 'viewport' };
+
+/** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`, with its `cause`), or something of the app drawn over it (`covered`). */
 export type InFrameShort =
-  | { of: 'clipped'; judged: Judged }
+  | { of: 'clipped'; judged: Judged; cause: ClipCause }
   | { of: 'covered'; judged: Judged; cover: Cover }
   /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
   | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
@@ -445,7 +453,8 @@ export type InFrameShort =
  * rule the stuck and the bound sentences read, the standing's kind as
  * their sentences group it: a cut edge (`fully: true`), a centre off the
  * screen or one under idb's band (`underKeyboard` with something in the
- * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`;
+ * frame: clipped at the keyboard's edge, the frame's bottom) is `clipped`,
+ * with what cuts it (`ClipCause`);
  * a centre in a system band (the status bar's, the navigation bar's), or for `fully` any of it there past the slack, `systemBar`, never a clip or a layout defect; a sliver its scroll container cuts it to
  * `sliver`; anything of the app drawn over it `covered`, naming the cover
  * the standing names. Asked only of a match with something in the frame
@@ -458,7 +467,7 @@ export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' }> {
     case 'clipped':
     case 'offScreen':
     case 'underKeyboard':
-      return { of: 'clipped', judged: j };
+      return { of: 'clipped', judged: j, cause: clipCause(j) };
     case 'systemBar':
       return { of: 'systemBar', judged: j, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
     case 'cut':
@@ -468,6 +477,13 @@ export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' }> {
     case 'reachable':
       throw new Error('scroll round: no shortfall for a match standing reachable (a stop is reported first)');
   }
+}
+
+/** A `clipped` shortfall's cause (`ClipCause`): the keyboard first — its edge is the frame's bottom — then the scroll view's. */
+function clipCause({ under, standing }: Judged): ClipCause {
+  if (under !== undefined && standing.facts.clipped.includes('bottom')) return { at: 'keyboard', keyboard: under };
+  if (standing.kind === 'clipped' && standing.byScrollView !== undefined) return { at: 'scrollView', cut: standing.byScrollView };
+  return { at: 'viewport' };
 }
 
 /** Would this judgement end the round cleanly — a stop, no stroke, no failure? */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
-import { judgeRead, strokeLine, type ReadJudgement, type RoundRead } from '../../src/interact/scroll-read.js';
+import { judgeRead, shortOf, strokeLine, type ReadJudgement, type RoundRead } from '../../src/interact/scroll-read.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { node } from '../helpers/fake.js';
@@ -196,5 +196,81 @@ describe('strokeLine — the line a read\'s strokes stay above', () => {
   it('no cover, idb\'s band: the band\'s line', () => {
     const over = [node({ role: 'button', label: 'Q', rect: { x: 2, y: 780, width: 38, height: 46 } }), node({ role: 'other', rect: { x: 0, y: 590, width: 402, height: 284 } })];
     expect(strokeLine(undefined, facts({ flatList: true, found: [], over }, box(402, 874)))).toEqual({ y: 590, witnessed: false });
+  });
+});
+
+describe('shortOf — a clipped match carries what cuts it (`ClipCause`), decided once', () => {
+  /** The cause of the best match's shortfall, as one plain value: where, the keyboard's top, the scroll view's cut. */
+  const causeOf = (j: ReadJudgement) => {
+    if (j.best === undefined) throw new Error('no match');
+    const short = shortOf(j.best);
+    if (short.of !== 'clipped') throw new Error(`short of ${short.of}`);
+    const { cause } = short;
+    switch (cause.at) {
+      case 'keyboard':
+        return { at: cause.at, top: cause.keyboard.topCover.y };
+      case 'scrollView':
+        return { at: cause.at, edges: cause.cut.edges, scroller: cause.cut.scroller.identifier, longer: cause.cut.longer, stopsShort: cause.cut.stopsShort };
+      case 'viewport':
+        return { at: cause.at };
+    }
+  };
+  const fullyOn = (row: Row, screen: Rect, corroborated?: boolean) => causeOf(judged(judgeRead(readOf(row, screen), screenOf([screen]), true, corroborated)));
+
+  it('clipped at the bottom under a corroborated cover: the keyboard, its cover carried', () => {
+    expect(fullyOn({ found: [match({ x: 0, y: 1420, width: 100, height: 100 })], cover: coverOver(IME) }, PHONE, true)).toEqual({ at: 'keyboard', top: 1500 });
+  });
+
+  it('judged under a corroborated cover but clipped only at the top: the viewport — the keyboard cuts only the bottom', () => {
+    expect(fullyOn({ found: [match({ x: 0, y: -20, width: 100, height: 100 })], cover: coverOver(IME) }, PHONE, true)).toEqual({ at: 'viewport' });
+  });
+
+  it('clipped at the screen\'s bottom, no keyboard: the viewport', () => {
+    expect(fullyOn({ found: [match({ x: 0, y: 1950, width: 100, height: 100 })] }, PHONE)).toEqual({ at: 'viewport' });
+  });
+
+  describe('its scroll view\'s edge inside the screen (the country sheet\'s list, 31,456 340xH on 402x874)', () => {
+    const IPHONE = box(402, 874);
+    const listRow = (listHeight: number, row: Rect): Row => {
+      const target = match(row, 'row_7');
+      const tree = node({
+        role: 'container',
+        unclippedFrames: true,
+        rect: { ...IPHONE },
+        children: [node({ role: 'scrollable', identifier: 'country_list', rect: { x: 31, y: 456, width: 340, height: listHeight }, children: [match({ x: 31, y: 466, width: 340, height: 43 }, 'row_1'), target] })],
+      });
+      return { tree, found: [target] };
+    };
+    const at = (listHeight: number, row: Rect) => fullyOn(listRow(listHeight, row), IPHONE);
+    const cut = (edges: string[], stopsShort: string, longer?: string) => ({ at: 'scrollView', edges, scroller: 'country_list', longer, stopsShort });
+
+    it('at its bottom: the content stops short after the element', () => {
+      expect(at(355, { x: 31, y: 779, width: 340, height: 43 })).toEqual(cut(['bottom'], 'after'));
+    });
+    it('at its top: before it', () => {
+      expect(at(355, { x: 31, y: 440, width: 340, height: 43 })).toEqual(cut(['top'], 'before'));
+    });
+    it('at its bottom and right, both far sides: after it', () => {
+      expect(at(355, { x: 200, y: 779, width: 200, height: 43 })).toEqual(cut(['bottom', 'right'], 'after'));
+    });
+    it('at its left, its bottom the screen\'s: before it, only the scroll view\'s edge in the cut', () => {
+      expect(at(600, { x: 20, y: 850, width: 340, height: 43 })).toEqual(cut(['left'], 'before'));
+    });
+    it('at its top and right, one of each kind: both', () => {
+      expect(at(355, { x: 200, y: 440, width: 200, height: 43 })).toEqual(cut(['top', 'right'], 'both'));
+    });
+    it('taller than the scroll view, cut at both its edges: longer', () => {
+      expect(at(355, { x: 31, y: 440, width: 340, height: 400 })).toEqual(cut(['top', 'bottom'], 'both', 'taller'));
+    });
+    it('taller than what of its scroll view the screen shows, though not than the scroll view: longer', () => {
+      expect(at(600, { x: 31, y: 440, width: 340, height: 450 })).toEqual(cut(['top'], 'before', 'taller'));
+    });
+    it('at its top by the scroll view and at its bottom by a corroborated keyboard: the keyboard, decided first', () => {
+      const row = { ...listRow(600, { x: 31, y: 440, width: 340, height: 400 }), cover: coverOver({ x: 0, y: 800, width: 402, height: 74 }) };
+      expect(fullyOn(row, IPHONE, true)).toEqual({ at: 'keyboard', top: 800 });
+    });
+    it('at the screen\'s edge, its scroll view reaching it too: the viewport, not the scroll view', () => {
+      expect(at(418, { x: 31, y: 850, width: 340, height: 43 })).toEqual({ at: 'viewport' });
+    });
   });
 });
