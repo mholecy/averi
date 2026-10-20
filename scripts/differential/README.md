@@ -352,14 +352,15 @@ and each side that loaded is kept in a cache (`scripts/truth/side-cache.ts`; `<w
 names another directory) under a key of the side (a commit's SHA; the working tree's `src/` as on disk) and everything
 of the harness its run depends on: every file under `scripts/differential`, `scripts/truth` (but `calibration.json`,
 which golden never reads, and the Markdown), `tests/differential/golden` and `tests/fixtures`, the corpus, the `src`
-this checkout's harness loads itself (the run-time import closure of `golden.ts`), its `package-lock.json`, `package.json` and `tsconfig.json`, the node version
-and the host's `ocr` rows: skipped (a sandbox skips them, so its runs never stand in outside it), or asked and read by
-the host's recognizer (its `swiftc` toolchain and macOS build). So a run after a table edit or a fix outside that
-closure replays only the sides whose key changed; the console names the sides taken from the cache. A side whose key
-changed while it ran (the harness or `src/` edited mid-run) is not kept, nor one whose golden process decided its `ocr`
-rows otherwise than calibrate's own probe, which the key names (each process probes for itself). `--no-cache` runs every side and keeps the runs
-afresh (a refresh: the cache is written, not bypassed). Entries are never pruned — none can be served stale, the key
-being the content; delete `<worktrees>/side-cache` to reclaim the space, and the next run is cold.
+this checkout's harness loads itself (the run-time import closure of `golden.ts`), its `package-lock.json`,
+`package.json` and `tsconfig.json`, the node version and the host's `ocr` rows: skipped (a sandbox skips them, so its
+runs never stand in outside it), or asked and read by the host's recognizer (its `swiftc` toolchain and macOS build). So
+a run after a table edit or a fix outside that closure replays only the sides whose key changed; the console names the
+sides taken from the cache. A side whose key changed while it ran (the harness or `src/` edited mid-run) is not kept,
+nor one whose golden process decided its `ocr` rows otherwise than calibrate's own probe, which the key names (each
+process probes for itself). `--no-cache` runs every side and keeps the runs afresh (a refresh: the cache is written, not
+bypassed). Entries are never pruned — none can be served stale, the key being the content; delete
+`<worktrees>/side-cache` to reclaim the space, and the next run is cold.
 `tests/truth/calibration.test.ts` pins the table against docs/bugs and the git history, and the verdicts, the canary,
 the wiring, a side that fails and the pool as pure functions; `tests/truth/side-cache.test.ts` the key and the cache.
 
