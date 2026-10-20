@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -12,8 +12,9 @@ import { FAMILIES } from './schema.js';
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
  * note's fix and pass after it. Golden runs (`--json`, the whole truth corpus) with THIS checkout's harness and truth
- * over the src of every before and after commit the notes of scripts/truth/calibration.json name (side.ts loads an
- * older src as it is), and each note that names golden rows gets a verdict from its rows — a note with several fixes
+ * over the src of every before and after commit of the notes of scripts/truth/calibration.json (withSides: the commit
+ * a note's first fix was made on and its last fix, unless the table says otherwise; side.ts loads an older src as it
+ * is), and each note that names golden rows gets a verdict from its rows — a note with several fixes
  * one verdict per before/after pair (`pairs`, pairsOf: `<n>.1` its own, `<n>.2` … the further ones):
  *
  *   CALIBRATED            every named row red before WITH the note's defect (`defect`: the note's own symptom, a
@@ -92,8 +93,15 @@ export interface CalibrationEntry {
   note: string;
   status: string;
   fix?: string[];
+  /**
+   * The commit judged red: the first fix's first parent, which withSides derives — given only to override it (none
+   * does).
+   */
   before?: string;
-  /** The commit judged green: a fix commit (usually the first) — or, with `afterNotFix`, the commit that cured the cell. */
+  /**
+   * The commit judged green: the last fix, which withSides derives — given only to override it: another fix commit (#1:
+   * the first, its own rows; the further fix a pair of its own), or, with `afterNotFix`, the commit that cured the cell.
+   */
   after?: string;
   /**
    * Why `after` is none of the note's `fix` commits: the note's fix cured the device's tree but not the lab cell's
@@ -145,7 +153,11 @@ export interface CalibrationEntry {
 
 /** One more before/after pair of a note (CalibrationEntry.pairs): the fields of the note's own pair, for one fix. */
 export interface CalibrationPair {
-  before: string;
+  /**
+   * The commit judged red: its after's first parent (the fix it judges alone), which withSides derives — given only with
+   * `afterNotFix`, whose after has no first parent that means anything, or to override it.
+   */
+  before?: string;
   /** The fix commit judged green — one of the note's `fix`, unless `afterNotFix` says why not. */
   after: string;
   afterNotFix?: string;
@@ -266,6 +278,56 @@ export function pairsOf(e: CalibrationEntry): CalibrationEntry[] {
   ];
 }
 
+/** A commit's first parent, written as the table writes a commit (SHORT_SHA). */
+export type ParentOf = (commit: string) => string;
+
+/** How long the table's commits are, and so the report's: a short SHA of 7 characters. */
+export const SHORT_SHA = 7;
+
+/**
+ * A note with the sides the table leaves out filled in from the history, so the table records only what the history
+ * does not say: `before` the first fix's first parent (the commit the fix was made on), `after` the last fix, and a
+ * further pair's `before` its after's first parent (the fix that pair judges alone). A side the table gives overrides
+ * the derivation: an `after` that is an earlier fix (#7: the first fix, the last one judged by a further pair) or, with
+ * `afterNotFix`, no fix at all (#27); a pair with `afterNotFix` must give its `before`, which nothing derives. A note with
+ * no fix (open, needs-…, residual) gets no sides. Run before pairsOf (entriesOf), which hands each pair its sides.
+ */
+export function withSides(e: CalibrationEntry, parentOf: ParentOf): CalibrationEntry {
+  const pairs = e.pairs?.map((p): CalibrationPair => {
+    if (p.before !== undefined) return p;
+    if (p.afterNotFix !== undefined) throw new Error(`calibration.json #${e.n}: the pair ${p.after} is no fix (afterNotFix) and gives no before`);
+    return { ...p, before: parentOf(p.after) };
+  });
+  const fix = e.fix ?? [];
+  return {
+    ...e,
+    ...(fix.length > 0 && { before: e.before ?? parentOf(fix[0]), after: e.after ?? fix[fix.length - 1] }),
+    ...(pairs !== undefined && { pairs }),
+  };
+}
+
+/**
+ * The first parent from git in `repo`, as a short SHA (SHORT_SHA). A commit that is not there (a shallow clone, a SHA
+ * mistyped) is an error naming it: calibrate needs the history it replays.
+ */
+export const gitParentOf =
+  (repo: string): ParentOf =>
+  (commit) => {
+    try {
+      return execFileSync('git', ['-C', repo, 'rev-parse', '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+        .trim()
+        .slice(0, SHORT_SHA);
+    } catch {
+      throw new Error(`calibrate: ${commit} has no first parent in ${repo} — calibrate needs the commits' history`);
+    }
+  };
+
+/** The pairs a run judges: the notes `--note` names (notesOf), their sides derived (withSides), split per pair (pairsOf). */
+export const entriesOf = (table: Pick<Calibration, 'notes'>, only: readonly string[] | undefined, parentOf: ParentOf): CalibrationEntry[] =>
+  notesOf(table, only)
+    .map((e) => withSides(e, parentOf))
+    .flatMap(pairsOf);
+
 export const expected = (e: CalibrationEntry): Verdict => e.expect ?? (e.status === 'open' ? 'OPEN-RED' : 'CALIBRATED');
 
 /**
@@ -379,7 +441,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const repo = fileURLToPath(new URL('../..', import.meta.url));
   const table = JSON.parse(await readFile(join(repo, 'scripts/truth/calibration.json'), 'utf8')) as Calibration;
   const only = values.note?.split(',').map((s) => s.trim());
-  const entries = notesOf(table, only).flatMap(pairsOf);
+  const entries = entriesOf(table, only, gitParentOf(repo));
   const { codeRoot } = await import('../differential/checkout.js');
   const worktrees = resolve(values.worktrees ?? join(tmpdir(), 'averi-calibration'));
   const run = promisify(execFile);

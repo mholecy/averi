@@ -6,7 +6,6 @@
       "note": "2026-10-05-android-floating-gboard-keyboard.md",
       "status": "calibrate",
       "fix": ["cb77485", "9131730"],
-      "before": "7d9a783",
       "after": "cb77485",
       "verified": "golden",
       "defect": "^Tapped|reached with no swipe, under the keyboard|^passed on",
@@ -34,7 +33,6 @@
       "remark": "forms/form-keyboard-floating (round 4): form-keyboard on averi_lab with Gboard switched to Floating by hand (its grid → the Floating tile; no adb command or setting switches it; docked again after, the touchable region back to `(0,1398,1080,2220)`): `ITYPE_IME` only the 132-px strip `[0,2088][1080,2220]`, the panel the second rect of `touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))` — the note's three readings, served by the fake device (CellTruth.ime) — and postcode, phone, vs, ks with their centres under the panel, clear of the strip (truth.ts#imePanels, situationOf: under-keyboard; each probe at its centre pressed a key, each after one back focused it). At 7d9a783 each is `Tapped` with no back (the key pressed), its colour PASSES on the panel, and scroll_until calls it `fully visible after 0 swipes`; at cb77485 one back then a tap inside it, the colour fails closed, and scroll_until swipes touching down above the panel (y 874), clear of it and the strip. The docked leg (form-keyboard under a docked Gboard): green at 7d9a783 and at cb77485 alike, golden identical on the cell — docked, the region is the band, nothing beyond it (by design); 1.2 judges the docked half the fix was built on.",
       "pairs": [
         {
-          "before": "98e49b7",
           "after": "9131730",
           "defect": "reached with no swipe, under the keyboard|touched down under the keyboard",
           "checks": [
@@ -53,7 +51,6 @@
       "note": "2026-10-05-ios-tap-lands-on-soft-keyboard.md",
       "status": "calibrate",
       "fix": ["6f41787", "0036762"],
-      "before": "73eea5f",
       "after": "6f41787",
       "verified": "golden",
       "partial": "stage A only",
@@ -71,8 +68,6 @@
       "note": "2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md",
       "status": "calibrate",
       "fix": ["95f75f4"],
-      "before": "926b826",
-      "after": "95f75f4",
       "verified": "golden",
       "defect": "^passed on|^measured the layer over the target as the target",
       "checks": [
@@ -89,8 +84,6 @@
       "note": "2026-10-08-ios-tap-off-screen-reported-done.md",
       "status": "calibrate",
       "fix": ["1221b0f"],
-      "before": "2ae8b10",
-      "after": "1221b0f",
       "verified": "golden",
       "defect": "^Tapped",
       "checks": [
@@ -106,7 +99,6 @@
       "note": "2026-10-08-scroll-until-ignores-android-soft-keyboard.md",
       "status": "calibrate",
       "fix": ["9131730", "1bc603a", "565b747"],
-      "before": "98e49b7",
       "after": "9131730",
       "verified": "golden",
       "defect": "reached with no swipe, under the keyboard|touched down under the keyboard",
@@ -128,7 +120,6 @@
       "note": "2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md",
       "status": "calibrate",
       "fix": ["13d68a2", "8a55d2b"],
-      "before": "16ae6bb",
       "after": "13d68a2",
       "verified": "golden",
       "defect": "^Tapped|reached with no swipe where a tap fires",
@@ -257,7 +248,6 @@
       "note": "2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md",
       "status": "calibrate",
       "fix": ["7542021", "c3ebc62"],
-      "before": "5cff2ad",
       "after": "7542021",
       "verified": "golden",
       "defect": "^no tap on the dismissal .*\\(refused for a toolbar\\)",
@@ -270,7 +260,6 @@
       "remark": "A pair per fix. 7.1, the first fix alone (5cff2ad → 7542021), on toolbar-dismiss: the principal title (a ToolbarItem) makes SwiftUI lay a 402x874 `Toolbar` with one empty child after the content in WDA's tree — the note's first shape: refused at 5cff2ad, `covered by toolbar \"Toolbar\"`, nothing tapped; the title tapped from 7542021 on. The defect reads the guard's own `covered by <role>` clause (replies.ts#dismissalCover): every refusal's advice names the input-accessory toolbar, so a bare /toolbar/ matched any refusal. The idb captures ask the form's own under-keyboard rows (keyboardDismiss is inert under idb).",
       "pairs": [
         {
-          "before": "d928789",
           "after": "c3ebc62",
           "defect": "^no tap on the dismissal .*\\(refused for a scrollable\\)",
           "checks": [
@@ -316,7 +305,6 @@
       "note": "2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md",
       "status": "calibrate",
       "fix": ["cccf6b8", "c8c06a8"],
-      "before": "dd50327",
       "after": "cccf6b8",
       "verified": "golden",
       "defect": "^(not tapped|stopped): .*\\bunder button \\(",
@@ -327,7 +315,6 @@
       "remark": "own-parts' L: a Material button's text LOGIN, which uiautomator lists as the clickable wrapper (lab.own-parts.L.box), the TextView, then an unlabelled android.widget.Button of the wrapper's rect — the note's shape. Red at dd50327 (`under button (127,303 825x176)`, the stop after 2 swipes \"a layout defect\"), green at cccf6b8. The regression is confirmed: green at 13d68a2's first parent and at 86eb42d, red from 13d68a2. iOS lists the SwiftUI button alone (its label LOGIN): green throughout.",
       "pairs": [
         {
-          "before": "2f98900",
           "after": "c8c06a8",
           "defect": "^(not tapped|stopped): .*\\bunder button \\(",
           "checks": [
@@ -343,8 +330,6 @@
       "note": "2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md",
       "status": "calibrate",
       "fix": ["d2b7744"],
-      "before": "10fb02b",
-      "after": "d2b7744",
       "verified": "golden",
       "defect": "fully visible",
       "checks": ["android-averi_lab-api33/scroll-sticky-view.xml R fully"],
@@ -355,8 +340,6 @@
       "note": "2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md",
       "status": "calibrate",
       "fix": ["d2b7744"],
-      "before": "10fb02b",
-      "after": "d2b7744",
       "verified": "golden",
       "partial": "the static rows only, toward the row (`up`); the note's own symptom — the default `down` neither seeing the row past its far edge nor turning — is no defect since the owner's decision of 2026-10-18 (ADR 0021: no turn on uiautomator, the two-stroke stop kept; the tool reports the direction, the agent turns): the live turn-back case `turn:scroll-collapsing.A` (live-visibility.ts#judgeAndroidTurn) is ok when averi fails loudly naming `up` after at most two unmoved strokes, as the record at e98b87e reads (and at b71cbbb)",
       "defect": "0×0 nodes|\"height\":-\\d",
@@ -374,7 +357,6 @@
       "note": "2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md",
       "status": "calibrate",
       "fix": ["bd06470", "16ae6bb"],
-      "before": "188740b",
       "verified": "golden",
       "remark": "tabbar-floating's F lies far below the fold in a scroll view running to the screen's bottom under a floating tab bar (its host 66,1860 948x239, listed after the list). At 188740b the stroke is drawn over the list's container and touches down at 0.8 of it, (540,1886), on the bar; at bd06470 the box is cut above the bar and every touch-down lies clear of it. F is in no dump (uiautomator lists no off-screen Compose row): the row judges the strokes alone.",
       "after": "bd06470",
@@ -386,8 +368,6 @@
       "note": "2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md",
       "status": "calibrate",
       "fix": ["9c7885e"],
-      "before": "d043e65",
-      "after": "9c7885e",
       "verified": "golden",
       "partial": "the replay checks only that the probe is sent toward the flush edge (from inside its scroll view, the edge flush in the truth: rows.ts#flushProbe); whether it reveals the row and the stop goes on is judged by the note's live calibration (recorded: `needs` says what it found)",
       "needs": "Done live, phase 5 (`live`): the probe reveals the cut rows in most runs, but moves the list 21–82 px a stroke, and a deep cut (S, 154 px) was left cut in one run of five at 9c7885e and one of three at debc9b2 when the budget ended the stop, \"fully visible … it may be cut there\" — LV2 (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md).",
@@ -424,8 +404,6 @@
       "note": "2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md",
       "status": "calibrate",
       "fix": ["29a5c30"],
-      "before": "f4ff4be",
-      "after": "29a5c30",
       "verified": "golden",
       "defect": "^Tapped",
       "checks": [
@@ -438,10 +416,8 @@
       "note": "2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md",
       "status": "calibrate",
       "fix": ["81a7d62"],
-      "before": "d2b7744",
       "verified": "golden",
       "remark": "81a7d62 does flip sheet-medium.wda S — that is #18's half of the merge, not this note's.",
-      "after": "81a7d62",
       "defect": "^Tapped",
       "checks": [
         "ios-iphone17-ios27/tabbar-floating.idb.json R tap",
@@ -453,8 +429,6 @@
       "note": "2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md",
       "status": "calibrate",
       "fix": ["8a55d2b"],
-      "before": "20053ae",
-      "after": "8a55d2b",
       "verified": "golden",
       "defect": "under button",
       "checks": [
@@ -479,8 +453,6 @@
       "note": "2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md",
       "status": "calibrate",
       "fix": ["f4ff4be"],
-      "before": "81a7d62",
-      "after": "f4ff4be",
       "verified": "golden",
       "defect": "touched down under the keyboard",
       "checks": [
@@ -497,7 +469,6 @@
       "note": "2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md",
       "status": "calibrate",
       "fix": ["21f1deb", "b940052"],
-      "before": "8a55d2b",
       "after": "21f1deb",
       "verified": "golden",
       "partial": "the static half only (a row resting in the status band); the turn-back is calibrated live (`live`)",
@@ -526,8 +497,6 @@
       "note": "2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md",
       "status": "calibrate",
       "fix": ["81a7d62"],
-      "before": "d2b7744",
-      "after": "81a7d62",
       "verified": "golden",
       "partial": "the cell-background half and the text field over its own label; the field's scroll-indicator node is captured since round 7 (rn-field) but asks no row of its own: what covers there is LR1's and LR2's",
       "defect": "^(not tapped|stopped): .*\\bunder (container|textfield)\\b",
@@ -558,7 +527,6 @@
       "note": "2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md",
       "status": "calibrate",
       "fix": ["470dafe", "cd4d177"],
-      "before": "bd06470",
       "after": "470dafe",
       "verified": "golden",
       "defect": "^no tap on the dismissal .*\\(refused for a toolbar\\)",
@@ -571,7 +539,6 @@
       "remark": "toolbar-dismiss-bar: an itemless UIToolbar, listed 0,65 402x48 with one empty child, over the title (138,73 126x22) after SwiftUI's full-screen host — the note's corrected shape (its bar-sized toolbar). Red at bd06470 and at c3ebc62 (#7's second fix) and its first parent d928789: the host is excused, the bar refuses the dismissal; green at 470dafe. The first fix, cd4d177 (children.length === 0), is judged alone as 19.2.",
       "pairs": [
         {
-          "before": "c11d179",
           "after": "cd4d177",
           "defect": "^no tap on the dismissal .*\\(refused for a toolbar\\)",
           "checks": [
@@ -607,8 +574,6 @@
       "note": "2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible.md",
       "status": "calibrate",
       "fix": ["83e282a"],
-      "before": "7566443",
-      "after": "83e282a",
       "verified": "golden",
       "partial": "R-off only",
       "needs": "The note's own call, `fully: true` on a parked row, is uncalibrated: R-fully is not asked of an off-screen target, and no static capture holds this note's shape on the screen — the R-outside-sv variant (presented/sheet-long-list-short, round 3: the table 62–446 in the large sheet, a footer under it; F, row 8, 574–638 on the screen below the table's clip, WDA parks its label at 0,62 402x64) is not this note's: its tap and plain stop red at 7566443 AND at 83e282a (Tapped at the parked point; `fully visible after 0 swipes`), its colour asked for the footer's #CFD8DC red from 83e282a (see regressions), all cured at b7eac90 — #29's fix (tap refused, colour failed closed; ec2893a red): its colour row is calibrated under #29, its stroke row is LE4's.",
@@ -632,10 +597,8 @@
       "note": "2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md",
       "status": "calibrate",
       "fix": ["5e47ff4"],
-      "before": "0cb8b62",
       "verified": "golden",
       "remark": "bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.",
-      "after": "5e47ff4",
       "defect": "^Tapped|reached where it is",
       "checks": ["android-averi_lab-api33/bands.xml S tap", "android-averi_lab-api33/bands.xml S scroll_until"]
     },
@@ -644,8 +607,6 @@
       "note": "2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md",
       "status": "calibrate",
       "fix": ["596a379"],
-      "before": "ad7ed11",
-      "after": "596a379",
       "verified": "golden",
       "partial": "the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts",
       "defect": "measured the layer over the target as the target|^passed on",
@@ -708,10 +669,8 @@
       "note": "2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar.md",
       "status": "calibrate",
       "fix": ["e85bcdf"],
-      "before": "94bae14",
       "verified": "golden",
       "remark": "Replayed against the capture's own `dumpsys window displays` (CellTruth.displays, served by the fake device as DeviceProfile.windowDisplays: the three-button bar [0,2088][1080,2220], recaptured 2026-10-16 at the round-3 merge), so averi's navigation band there is the bar's; the verdict is the one review round 1 measured under a dump patched to it. bands-three-button: bands' screen on the averi_lab AVD under three-button navigation (`navigation_mode` 0, the bar `[0,2088][1080,2220]`; restored to gesture, mode 2, after the capture), in the same run as bands' gesture capture (CatalogCell.navigation, catalog.ts#captureRefusal). Its N row is green on both sides — DOES-NOT-FAIL: the pre-fix assert does not pass on the bar (N's tree node runs [127,2088][952,2220], so the assert samples the bar's white and its tint mixed: it fails at 94bae14, 57 % white, dE00 8.87, as at e85bcdf). Under gesture navigation (bands.xml) N is reached, 90 % drawn and seen in its own colour beneath the handle, its row accepting a PASS on its own colour or a fail-closed FAIL (rows.ts#bandColour, ADR 0020): green on both sides too. Phase 4 (round 4) calibrates on text-nav-cut (gesture navigation): T, a 74-px string box drawn across the band's top (2105–2179, the band from 2154), its own 49-px node ending flush at the band. Its colour row (R-overlap, rows.ts#overlapColour: what it samples is overlapped by the band) PASSes at 94bae14, sampling across the band (66 % of the region its colour), and fails closed at e85bcdf naming the navigation bar: CALIBRATED on the note's band, a check of its own since N's DOES-NOT-FAIL would hold the whole entry. This red is a CONTRACT, not a device-measured misread: the band under gesture navigation is transparent, and what the 94bae14 assert sampled is T's own colour (66 % of the region) — ADR 0009 N-b (a pixel assert whose sampled region a band overlaps past the slack fails closed: rows.ts#overlapColour) makes that PASS the mismatch. It is the note's fix (e85bcdf: the navigation band read, a pixel assert past the slack fails closed) that the row calibrates, not the note's misreading. T's `ocr` row on the same geometry takes the other rule on purpose (golden-spec/text.ts, as rows.ts#bandColour for the app's band): the string is drawn whole beneath the handle, so a PASS reading it right is true of the screen, and only a FAIL on a reading — the note's symptom — is red. Its `ocr` row (golden-spec/text.ts, the host's recognizer) is green on both sides: PASS reading the whole string at 94bae14, failing closed at e85bcdf — see needs.",
-      "after": "e85bcdf",
       "defect": "^passed on|^read what the band leaves of it as its text",
       "checks": [
         "android-averi_lab-api33/text-nav-cut.xml T colour"
@@ -738,7 +697,6 @@
       "note": "2026-10-13-ios-wda-hidden-host-tab-bar-covers-a-pushed-screens-rows.md",
       "status": "calibrate",
       "fix": ["83e282a"],
-      "before": "7566443",
       "verified": "golden",
       "regressions": [
         {
@@ -749,7 +707,6 @@
         }
       ],
       "remark": "The merge message names it ('the phantom tab bar no longer refuses the SWIFT form's rows'). Before, C's tap was moved to (201,830), 'under button \"Cards\" … tapped the uncovered part 300x24' — 20 pt off C's probe (201,810): red on the open row's tap (golden-spec/base.ts#atProbe: at its probe point from phase 3 round 3, at its node's centre in the tree from round 4).",
-      "after": "83e282a",
       "defect": "drawn over|under button",
       "checks": [
         "ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour",
@@ -763,7 +720,6 @@
       "note": "2026-10-13-ios-wda-rn-transparent-modal-dim-overlay-is-no-cover-tap-reported-done.md",
       "status": "calibrate",
       "fix": ["15896c5"],
-      "before": "53da035",
       "after": "41c394a",
       "afterNotFix": "15896c5 fixed the note's Finportal tree, not this SwiftUI cover: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it",
       "verified": "golden",
@@ -789,7 +745,6 @@
       "note": "2026-10-13-ios-wda-sheet-background-is-no-cover-tap-goes-through-to-the-screen-beneath.md",
       "status": "calibrate",
       "fix": ["15896c5"],
-      "before": "53da035",
       "after": "41c394a",
       "afterNotFix": "15896c5 fixed the note's Contacts tree, not this SwiftUI sheet: still red at 15896c5 and at every first-parent commit to 20b800a; 41c394a (fix/r20-marks) cured it",
       "verified": "golden",
@@ -809,8 +764,6 @@
       "note": "2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md",
       "status": "calibrate",
       "fix": ["b7eac90"],
-      "before": "ec2893a",
-      "after": "b7eac90",
       "verified": "golden",
       "defect": "^passed on|^Tapped",
       "checks": [
@@ -825,8 +778,6 @@
       "note": "2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md",
       "status": "calibrate",
       "fix": ["753b560"],
-      "before": "4655113",
-      "after": "753b560",
       "verified": "golden",
       "defect": "measured the layer over the target as the target",
       "checks": ["ios-iphone17-ios27/sheet-medium-edges.wda.json E colour"],
@@ -844,8 +795,6 @@
       "note": "2026-10-14-ios-wda-scroll-until-swipes-under-a-presented-screen-when-the-target-is-below-the-fold.md",
       "status": "calibrate",
       "fix": ["0c439ad"],
-      "before": "83e282a",
-      "after": "0c439ad",
       "verified": "golden",
       "defect": "swiped \\d+× beneath",
       "checks": [
@@ -859,8 +808,6 @@
       "note": "2026-10-14-ios-wda-sheet-dim-labelled-dismiss-region-is-no-presented-screen-scroll-until-swipes-the-sheet.md",
       "status": "calibrate",
       "fix": ["ce33431"],
-      "before": "23fb824",
-      "after": "ce33431",
       "verified": "golden",
       "defect": "scroll_until [^;]*first|swiped \\d+× beneath",
       "checks": [
@@ -880,8 +827,6 @@
       "note": "2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-give-scroll-or-status-bar-advice-when-nothing-of-the-target-shows-below-the-bar.md",
       "status": "calibrate",
       "fix": ["753b560"],
-      "before": "4655113",
-      "after": "753b560",
       "verified": "golden",
       "defect": "without \"close it first\"",
       "checks": [
@@ -897,8 +842,6 @@
       "note": "2026-10-15-ios-wda-swiftui-alert-dim-is-no-cover-tap-beneath-reported-done.md",
       "status": "calibrate",
       "fix": ["92f2a46"],
-      "before": "173023f",
-      "after": "92f2a46",
       "verified": "golden",
       "defect": "^Tapped|measured the layer over the target as the target|fully visible",
       "checks": [
@@ -926,8 +869,6 @@
       "note": "2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field.md",
       "status": "calibrate",
       "fix": ["7566443"],
-      "before": "e1384aa",
-      "after": "7566443",
       "verified": "golden",
       "defect": "^failed: .*error was: null",
       "checks": [
@@ -943,8 +884,6 @@
       "note": "2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title.md",
       "status": "calibrate",
       "fix": ["dfe63da"],
-      "before": "d407256",
-      "after": "dfe63da",
       "verified": "golden",
       "defect": "^passed: |^reads .* as its error, where none is paired",
       "checks": [
@@ -972,8 +911,6 @@
       "note": "2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md",
       "status": "calibrate",
       "fix": ["35321b4"],
-      "before": "92f2a46",
-      "after": "35321b4",
       "verified": "golden",
       "defect": "≠",
       "checks": [
@@ -994,8 +931,6 @@
       "note": "2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md",
       "status": "calibrate",
       "fix": ["d43df5d"],
-      "before": "b71cbbb",
-      "after": "d43df5d",
       "verified": "golden",
       "partial": "AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker) is ADR 0018's residual 18, accepted by the owner 2026-10-18 with the active-window hint — its six rows filed as that residual",
       "defect": "without \"close it first\"|swiped \\d+× beneath a presented layer",
@@ -1024,8 +959,6 @@
       "note": "2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md",
       "status": "calibrate",
       "fix": ["837ec3e"],
-      "before": "6f3a633",
-      "after": "837ec3e",
       "verified": "golden",
       "defect": "^Tapped|reached with no swipe where a tap fires",
       "checks": [
@@ -1071,8 +1004,6 @@
       "note": "2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md",
       "status": "calibrate",
       "fix": ["468dc1b"],
-      "before": "fecb0b3",
-      "after": "468dc1b",
       "verified": "golden",
       "defect": "without \"close it first\"|swiped \\d+× beneath a presented layer",
       "checks": [
@@ -1099,7 +1030,6 @@
       "note": "2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md",
       "status": "calibrate",
       "fix": ["37bf5a1", "f5a28b3", "bea9769", "1ef11b9", "85e3621", "a374227", "0f28b4c"],
-      "before": "e0c2587",
       "after": "bea9769",
       "verified": "golden",
       "defect": "^Tapped|passed on #00897B|fully visible",
@@ -1118,7 +1048,6 @@
       "remark": "Fixed by round 8, 37bf5a1, f5a28b3 and bea9769 (its review's fixes) on fix/r8-l4 (draw-order.ts#readingOrderPeers: in a listing the parsers mark as reading order — idb's flat list, a WDA run sorted by top, UiNode.readingOrder — the controls listed before a control target that overlap it cover it when one holds its centre, every control overlapping it over its centre, before or after, is a cover whose order is not told, and a moved tap is never aimed at one listed before it; never a target pinned at the bottom; ADR 0015 amended): the pair is bea9769 and e0c2587 (fix/round-8's src). Before: C's tap Tapped (`idb ui tap 201 502`, which fires W), its colour a PASS on #00897B, scroll_until fully visible after 0 swipes. After: each refused as overlapped by W, the order not told (scroll_until stopped before any swipe) — still red, as blur-menu-grouped.wda's C was already: no \"close it first\" (ADR 0018 residual 9, calibration.json #31: the backdrop has no node), so CALIBRATED-ON-DEFECT; refiled in presented.known.ts as that residual. W's six rows, red after this pair (overlapped by C, the order not told, scroll_until stopped before any swipe), are the second pair's (round 9, `pairs`). Live: C's tap fired W under idb and WDA before, refused after.",
       "pairs": [
         {
-          "before": "e52d179",
           "after": "1ef11b9",
           "checks": [
             "ios-iphone17-ios27/blur-menu.idb.json W tap",
@@ -1218,8 +1147,6 @@
       "note": "2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md",
       "status": "calibrate",
       "fix": ["fecb0b3"],
-      "before": "0e179aa",
-      "after": "fecb0b3",
       "verified": "golden",
       "defect": "touched down outside its scroll view",
       "checks": [
@@ -1246,8 +1173,6 @@
       "note": "2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md",
       "status": "calibrate",
       "fix": ["7755978", "e6ed7d4", "151b2ca"],
-      "before": "706dfae",
-      "after": "151b2ca",
       "verified": "golden",
       "defect": "fully visible where it is|^passed on|^reached where it is under-chrome",
       "checks": [
@@ -1263,8 +1188,6 @@
       "note": "2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md",
       "status": "calibrate",
       "fix": ["6d8f8de"],
-      "before": "b71cbbb",
-      "after": "6d8f8de",
       "verified": "golden",
       "defect": "reached with no swipe where a tap fires",
       "checks": ["android-averi_lab-api33/form-keyboard.xml phone scroll_until"],
@@ -1332,8 +1255,6 @@
       "fix": [
         "f924893"
       ],
-      "before": "054a59f",
-      "after": "f924893",
       "verified": "golden",
       "defect": "to appear$|active-window hint|never appeared in the tree",
       "checks": [
@@ -1353,8 +1274,6 @@
       "note": "2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md",
       "status": "calibrate",
       "fix": ["ce19c23", "f3a7043"],
-      "before": "565bcb9",
-      "after": "f3a7043",
       "verified": "golden",
       "defect": "^(not tapped|stopped|failed): .*\\bunder textfield\\b|textfield .* is drawn over the element",
       "checks": [
@@ -1372,8 +1291,6 @@
       "note": "2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md",
       "status": "calibrate",
       "fix": ["ce19c23", "f3a7043"],
-      "before": "565bcb9",
-      "after": "f3a7043",
       "verified": "golden",
       "defect": "^(not tapped|stopped|failed): .*\\bunder textfield\\b|textfield .* is drawn over the element",
       "checks": [

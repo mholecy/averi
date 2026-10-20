@@ -9,7 +9,9 @@ import { calibrationReport, verdictCell } from '../../scripts/truth/calibration-
 import {
   captureOf,
   disposition,
+  entriesOf,
   failing,
+  gitParentOf,
   isOpenCell,
   notesOf,
   pairsOf,
@@ -20,10 +22,12 @@ import {
   STATUSES,
   VERDICTS,
   verdictOf,
+  withSides,
   WORKING_TREE,
   type Calibration,
   type CalibrationEntry,
   type LiveCalibration,
+  type ParentOf,
   type SideRun,
 } from '../../scripts/truth/calibrate.js';
 
@@ -35,6 +39,8 @@ import {
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, 'utf8')) as Calibration;
 const SHA = /^[0-9a-f]{7}$/;
+/** A stand-in for the history where none is asked: a commit's first parent named after it. */
+const parentNamed: ParentOf = (c) => `${c}^1`;
 const VERBS = new Set<string>(GOLDEN_VERBS);
 const captures = new Set(
   readdirSync(`${ROOT}${table.corpus}`).flatMap((run) => {
@@ -66,9 +72,12 @@ describe('calibration.json', () => {
         .map((s) => `${e.n}: ${s} is no short SHA`),
       ...(e.after !== undefined && !(e.fix ?? []).includes(e.after) && e.afterNotFix === undefined ? [`${e.n}: after ${e.after} is none of its fix commits, and afterNotFix says not why`] : []),
       ...(e.afterNotFix !== undefined && (e.after === undefined || (e.fix ?? []).includes(e.after)) ? [`${e.n}: afterNotFix, but after ${e.after} is a fix commit`] : []),
+      // a side withSides derives is not written down: only an override
+      ...(e.after !== undefined && e.after === e.fix?.at(-1) ? [`${e.n}: after ${e.after} is its last fix, which withSides derives — drop it`] : []),
       ...(e.pairs ?? []).flatMap((p) => [
+        ...(p.afterNotFix !== undefined && p.before === undefined ? [`${e.n}: pair after ${p.after} is no fix (afterNotFix) and gives no before`] : []),
         ...(e.status === 'calibrate' ? [] : [`${e.n}: ${e.status} has pairs`]),
-        ...(e.before === undefined ? [`${e.n}: pairs, but no pair of its own`] : []),
+        ...((e.fix ?? []).length === 0 ? [`${e.n}: pairs, but no fix of its own (no pair of its own)`] : []),
         ...(p.expect === undefined || VERDICTS.includes(p.expect) ? [] : [`${e.n}: pair ${p.after} expect ${p.expect}`]),
         ...(!(e.fix ?? []).includes(p.after) && p.afterNotFix === undefined ? [`${e.n}: pair after ${p.after} is none of its fix commits, and afterNotFix says not why`] : []),
       ]),
@@ -86,12 +95,12 @@ describe('calibration.json', () => {
   });
 
   it("a note calibrated or open names golden rows of the committed truth and the note's defect, each pair its own; any other names none", () => {
-    const bad = table.notes.flatMap(pairsOf).flatMap((e) => {
+    const bad = entriesOf(table, undefined, parentNamed).flatMap((e) => {
       const runs = e.status === 'calibrate' || e.status === 'open';
       if (!runs) return [...(e.checks === undefined ? [] : [`${e.n}: ${e.status} names rows`]), ...(e.partial === undefined ? [] : [`${e.n}: ${e.status} is partial`])];
       if (e.checks === undefined || e.checks.length === 0) return [`${e.n}: no rows`];
       if (e.defect === undefined) return [`${e.n}: no defect`];
-      if (e.status === 'calibrate' && (e.before === undefined || e.after === undefined)) return [`${e.n}: no before/after`];
+      if (e.status === 'calibrate' && (e.before === undefined || e.after === undefined)) return [`${e.n}: no before/after (no fix)`];
       return e.checks.flatMap((k) => rowProblem(k) ?? []).map((p) => `${e.n}: ${p}`);
     });
     expect(bad).toEqual([]);
@@ -106,8 +115,9 @@ describe('calibration.json', () => {
     for (const e of table.notes.flatMap(pairsOf)) if (e.defect !== undefined) expect(() => new RegExp(e.defect!)).not.toThrow();
   });
 
-  // The commits against the history: each exists, each fix is in this branch, and `before` is the commit the first fix
-  // was made on (its first parent) — a typo'd or swapped SHA is caught here, not by a run that reads green.
+  // The commits against the history: each exists and each fix is in this branch — a typo'd SHA is caught here, not by a
+  // run that reads green. The sides withSides derives from it are the first parents, in the table's short form; a
+  // `before` the table gives is an override, never the parent it would derive anyway.
   const git = (...args: string[]): string | undefined => {
     try {
       return execFileSync('git', ['-C', ROOT, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -116,22 +126,35 @@ describe('calibration.json', () => {
     }
   };
   const history = git('rev-parse', '--verify', 'HEAD') !== undefined && git('cat-file', '-e', 'b7c44de^{commit}') !== undefined;
-  it.skipIf(!history)("each commit exists; every fix is an ancestor of HEAD; before is the first parent of the first fix, a further pair's its after's", () => {
+  it.skipIf(!history)('each commit exists; every fix is an ancestor of HEAD; a before given overrides, never repeats, its derivation', () => {
+    const parentOf = gitParentOf(ROOT);
     const bad = table.notes.flatMap((e) => [
-      ...[...(e.fix ?? []), e.before, ...(e.regressions ?? []).flatMap((r) => [r.broke, r.fixed])]
+      ...[...(e.fix ?? []), e.before, e.after, ...(e.regressions ?? []).flatMap((r) => [r.broke, r.fixed]), ...(e.pairs ?? []).flatMap((p) => [p.before, p.after])]
         .filter((s): s is string => s !== undefined && git('cat-file', '-e', `${s}^{commit}`) === undefined)
         .map((s) => `${e.n}: ${s} is no commit`),
       ...(e.fix ?? []).filter((f) => git('merge-base', '--is-ancestor', f, 'HEAD') === undefined).map((f) => `${e.n}: fix ${f} is not in HEAD`),
-      ...(e.fix !== undefined && e.before !== undefined && git('rev-parse', `${e.fix[0]}^1`) !== git('rev-parse', `${e.before}^{commit}`)
-        ? [`${e.n}: before ${e.before} is not ${e.fix[0]}'s first parent`]
-        : []),
-      // a further pair: its before is its after's first parent (the fix it judges alone)
+      ...(e.fix !== undefined && e.before !== undefined && e.before === parentOf(e.fix[0]) ? [`${e.n}: before ${e.before} is ${e.fix[0]}'s first parent, which withSides derives — drop it`] : []),
       ...(e.pairs ?? [])
-        .filter((p) => p.afterNotFix === undefined && git('rev-parse', `${p.after}^1`) !== git('rev-parse', `${p.before}^{commit}`))
-        .map((p) => `${e.n}: pair before ${p.before} is not ${p.after}'s first parent`),
-      ...(e.pairs ?? []).flatMap((p) => [p.before, p.after]).filter((c) => git('cat-file', '-e', `${c}^{commit}`) === undefined).map((c) => `${e.n}: ${c} is no commit`),
+        .filter((p) => p.afterNotFix === undefined && p.before !== undefined && p.before === parentOf(p.after))
+        .map((p) => `${e.n}: pair before ${p.before} is ${p.after}'s first parent, which withSides derives — drop it`),
     ]);
     expect(bad).toEqual([]);
+  });
+
+  it.skipIf(!history)("withSides from git: before the first fix's first parent, a further pair's its after's — each a short SHA of that commit", () => {
+    const parentOf = gitParentOf(ROOT);
+    const bad = entriesOf(table, undefined, parentOf).flatMap((e) => {
+      if (e.fix === undefined) return [];
+      const first = /\.(\d+)$/.exec(e.n)?.[1];
+      const fixOf = first === undefined || first === '1' ? e.fix[0] : e.after!;
+      return [
+        ...(SHA.test(e.before!) ? [] : [`${e.n}: before ${e.before} is no short SHA`]),
+        ...(git('rev-parse', `${e.before}^{commit}`) === git('rev-parse', `${fixOf}^1`) ? [] : [`${e.n}: before ${e.before} is not ${fixOf}'s first parent`]),
+      ];
+    });
+    expect(bad).toEqual([]);
+    expect(entriesOf(table, ['3'], parentOf)[0]).toMatchObject({ before: '926b826', after: '95f75f4' });
+    expect(() => parentOf('0000000')).toThrow(`calibrate: 0000000 has no first parent in ${ROOT}`);
   });
 });
 
@@ -327,6 +350,42 @@ describe('calibrate.ts — several fixes, one pair each (pairsOf)', () => {
     const report = calibrationReport(rs);
     expect(report).toContain('| 7.1 | x | calibrate | aaaaaaa → bbbbbbb | CALIBRATED (partial: first) |');
     expect(report).toContain('| 7.2 | x | calibrate | ccccccc → ddddddd | CALIBRATED, regressed elsewhere: 1 row (recorded) |');
+  });
+});
+
+describe('calibrate.ts — the sides from the history (withSides)', () => {
+  const bare = (more: Partial<CalibrationEntry> = {}) => entry({ before: undefined, after: undefined, ...more });
+
+  it("before is the first fix's first parent, after the last fix", () => {
+    expect(withSides(bare({ fix: ['bbbbbbb'] }), parentNamed)).toEqual(entry({ before: 'bbbbbbb^1', after: 'bbbbbbb' }));
+    expect(withSides(bare({ fix: ['bbbbbbb', 'ccccccc', 'ddddddd'] }), parentNamed)).toMatchObject({ before: 'bbbbbbb^1', after: 'ddddddd' });
+  });
+
+  it('a side the table gives overrides the derivation', () => {
+    expect(withSides(bare({ fix: ['bbbbbbb', 'ccccccc'], after: 'bbbbbbb' }), parentNamed)).toMatchObject({ before: 'bbbbbbb^1', after: 'bbbbbbb' });
+    expect(withSides(bare({ fix: ['bbbbbbb'], before: 'aaaaaaa' }), parentNamed)).toMatchObject({ before: 'aaaaaaa', after: 'bbbbbbb' });
+    expect(withSides(bare({ fix: ['bbbbbbb'], after: 'eeeeeee', afterNotFix: 'w' }), parentNamed)).toMatchObject({ before: 'bbbbbbb^1', after: 'eeeeeee' });
+  });
+
+  it('a note with no fix gets no sides', () => {
+    const open = bare({ status: 'open', fix: undefined });
+    expect(withSides(open, parentNamed)).toEqual(open);
+    expect(withSides(bare({ fix: [] }), parentNamed)).toEqual(bare({ fix: [] }));
+  });
+
+  it("a further pair's before is its after's first parent; given, it stays; with afterNotFix it must be given", () => {
+    const p = { after: 'ddddddd', checks: [K2], defect: 'd' };
+    const note = bare({ fix: ['bbbbbbb', 'ddddddd'], after: 'bbbbbbb', pairs: [p, { ...p, before: 'ccccccc' }] });
+    expect(withSides(note, parentNamed).pairs).toEqual([{ ...p, before: 'ddddddd^1' }, { ...p, before: 'ccccccc' }]);
+    expect(withSides(bare({ fix: ['bbbbbbb'], pairs: [{ ...p, after: 'eeeeeee', afterNotFix: 'w', before: 'ccccccc' }] }), parentNamed).pairs?.[0].before).toBe('ccccccc');
+    expect(() => withSides(bare({ fix: ['bbbbbbb'], pairs: [{ ...p, after: 'eeeeeee', afterNotFix: 'w' }] }), parentNamed)).toThrow('calibration.json #x: the pair eeeeeee is no fix (afterNotFix) and gives no before');
+  });
+
+  it('entriesOf: the notes --note names, their sides derived, each pair with its own', () => {
+    const t = { notes: [bare({ n: '1', fix: ['bbbbbbb'] }), bare({ n: '7', fix: ['bbbbbbb', 'ddddddd'], after: 'bbbbbbb', pairs: [{ after: 'ddddddd', checks: [K2], defect: 'd' }] })] };
+    expect(entriesOf(t, ['7'], parentNamed).map((e) => [e.n, e.before, e.after])).toEqual([['7.1', 'bbbbbbb^1', 'bbbbbbb'], ['7.2', 'ddddddd^1', 'ddddddd']]);
+    expect(plan(entriesOf(t, undefined, parentNamed))).toEqual(['bbbbbbb^1', 'bbbbbbb', 'ddddddd^1', 'ddddddd']);
+    expect(() => entriesOf(t, ['9'], parentNamed)).toThrow('calibrate --note: 9 is no note of the table');
   });
 });
 
