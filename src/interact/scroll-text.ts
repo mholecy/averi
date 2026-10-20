@@ -5,7 +5,8 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { coverClause, outsideItsScrollView, overlaidBy, orderRemedyText, presentedRemedy, presentedStop } from '../ui-tree/standing.js';
+import { coverClause, type Cover } from '../ui-tree/cover.js';
+import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
@@ -162,14 +163,14 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  * <cover> at its centre (x,y), drawn over it — N% of it shows` — the cover
  * the standing names (ui-tree/standing.ts#Scene.standing), at the centre
  * when it is the one over it (the point the next tap presses). A cover the
- * tree shows only by the cut (its overlaid edge, ui-tree/standing.ts
- * #overlaidBy) is said as that cut, with no share: how far the node runs on
- * under it is not told.
+ * tree shows only by the cut (its overlaid edge, ui-tree/cover.ts
+ * #CoverOrder's `overlaid`) is said as that cut, with no share: how far the
+ * node runs on under it is not told.
  */
-function underText({ judged, cover }: { readonly judged: Judged; readonly cover: UiNode }): string {
+function underText({ judged, cover }: { readonly judged: Judged; readonly cover: Cover }): string {
   const { facts } = judged.standing;
-  const clause = coverClause(facts, cover, cover === facts.centreCover ? tapPoint(judged.node) : undefined);
-  return overlaidBy(facts, cover) === undefined ? `${clause} — ${percent(facts.shows)}% of it shows` : clause;
+  const clause = coverClause(cover, { of: 'touch', ...(cover === facts.centreCover && { centre: tapPoint(judged.node) }) });
+  return cover.order.kind === 'overlaid' ? clause : `${clause} — ${percent(facts.shows)}% of it shows`;
 }
 
 /** When a stop that sends no swipe came: `before any swipe`, or `after N swipes, without swiping further`. */

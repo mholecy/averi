@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
+import { coverAtPoint } from '../../src/ui-tree/cover.js';
 import { drawOrder, labelOverhang, minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
@@ -491,7 +492,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen.shows).toBeCloseTo(9 / 52);
       expect(seen.tapAt).toBeUndefined();
       expect(seen.minPiece).toBe(24); // 0.06 × 402, rounded
-      expect(seen.coverAt({ x: 201, y: 797 })?.identifier).toBe('swift_payment.form.continue_button');
+      expect(coverAtPoint(seen.covers, { x: 201, y: 797 })?.node.identifier).toBe('swift_payment.form.continue_button');
     });
 
     it('at y 763 a 17-pt strip shows — still under 24, refused; at y 754 a 26-pt strip, the centre (201,780) on the bar — the tap moves to the strip', () => {
@@ -576,13 +577,13 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     });
   });
 
-  it('coverAt names the cover drawn on top at a point — the last in pre-order that contains it — and nothing off the covers', () => {
+  it('coverAtPoint names the cover drawn on top at a point — the last in pre-order that contains it — and nothing off the covers', () => {
     const target = uiNode({ role: 'button', label: 'Row', rect: rect(0, 500, 400, 100) });
     const host = uiNode({ role: 'container', rect: rect(0, 540, 400, 100), children: [uiNode({ role: 'button', label: 'Home', rect: rect(0, 560, 100, 80) })] });
     const seen = drawOrder(uiNode({ role: 'container', rect: rect(0, 0, 400, 800), children: [target, host] })).exposure(target, rect(0, 0, 400, 800));
-    expect(seen.coverAt({ x: 50, y: 580 })?.label).toBe('Home');
-    expect(seen.coverAt({ x: 200, y: 580 })).toBe(host);
-    expect(seen.coverAt({ x: 200, y: 520 })).toBeUndefined();
+    expect(coverAtPoint(seen.covers, { x: 50, y: 580 })?.node.label).toBe('Home');
+    expect(coverAtPoint(seen.covers, { x: 200, y: 580 })?.node).toBe(host);
+    expect(coverAtPoint(seen.covers, { x: 200, y: 520 })?.node).toBeUndefined();
   });
 
   it('Compose Account Detail (2026-10-09): a row under the floating tab bar\'s host — host and tabs cover it; the tab itself has nothing over it', () => {
@@ -612,7 +613,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     const seen = order.exposure(firstName, PIXEL);
     expect(seen.largest).toEqual(rect(132, 240, 816, 38));
     expect(seen.tapAt).toBeUndefined();
-    expect(seen.coverAt({ x: 540, y: 198 })).toBe(bar);
+    expect(coverAtPoint(seen.covers, { x: 540, y: 198 })?.node).toBe(bar);
   });
 
   describe('a floating tab bar covers what lies outside it, whatever the listing order (docs/bugs/2026-10-09-ios-floating-tab-bar-surface-above-its-buttons-takes-a-rows-tap.md)', () => {
@@ -630,7 +631,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const seen = drawOrder(tree).exposure(row, IPHONE);
       expect(seen.covers.map(({ node: n }) => n.identifier)).toEqual(['nav.tab_home', 'nav.tab_transactions', 'nav.tab_cards', 'nav.tab_more']);
       expect(seen.covers.map((c) => c.reach)).toEqual([rect(37, 742, 82, 77), rect(119, 742, 82, 77), rect(201, 742, 82, 77), rect(283, 742, 82, 77)]);
-      expect(seen.centreCover?.identifier).toBe('nav.tab_cards');
+      expect(seen.centreCover?.node.identifier).toBe('nav.tab_cards');
       expect(seen.largest).toEqual(rect(24, 721, 354, 21));
       expect(seen.tapAt).toBeUndefined();
     });
@@ -643,14 +644,14 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         children: [uiNode({ role: 'container', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 0, 402, 874), children: [row] }), uiNode({ role: 'container', rect: rect(0, 0, 402, 874), children: tabs() })] })],
       });
       const seen = drawOrder(tree).exposure(row, IPHONE);
-      expect(seen.centreCover?.identifier).toBe('nav.tab_cards');
+      expect(seen.centreCover?.node.identifier).toBe('nav.tab_cards');
       expect(seen.tapAt).toBeUndefined();
     });
 
     it('whatever the order: the tab items listed last cover row_3 the same; a row clear of the reach (bottom at 742) has nothing over it, in either order', () => {
       const row = row3();
       const last = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', label: 'mp-native', rect: IPHONE }), title(), row, ...tabs()] });
-      expect(drawOrder(last).exposure(row, IPHONE)).toMatchObject({ covers: [37, 119, 201, 283].map((x) => ({ reach: rect(x, 742, 82, 77) })), centreCover: { identifier: 'nav.tab_cards' } });
+      expect(drawOrder(last).exposure(row, IPHONE)).toMatchObject({ covers: [37, 119, 201, 283].map((x) => ({ reach: rect(x, 742, 82, 77) })), centreCover: { node: { identifier: 'nav.tab_cards' } } });
       const clear = uiNode({ role: 'button', identifier: 'transactions.list.row_2', rect: rect(24, 690, 354, 52) });
       expect(drawOrder(idb(title(), clear)).exposure(clear, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { moved: false } });
       const clearLast = uiNode({ role: 'container', rect: rect(0, 0, 0, 0), flatList: true, children: [uiNode({ role: 'other', rect: IPHONE }), title(), clear, ...tabs()] });
@@ -715,7 +716,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const nested = uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'container', rect: rect(20, 743, 362, 76), children: tabs() }), uiNode({ role: 'scrollable', rect: IPHONE, children: [row] })] });
       expect(coverNodes(drawOrder(nested).exposure(row, IPHONE).covers)).toEqual([]);
       const flat = row3();
-      expect(drawOrder(idb(flat)).exposure(flat, IPHONE).centreCover?.identifier).toBe('nav.tab_cards');
+      expect(drawOrder(idb(flat)).exposure(flat, IPHONE).centreCover?.node.identifier).toBe('nav.tab_cards');
     });
 
     it('in idb\'s list the items are bottom chrome: a row listed BEFORE them, a reading-order break between (a date header above it), still has them over it', () => {
@@ -919,7 +920,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(exposure.covers.filter(({ node: n }) => n.role === 'text')).toEqual([]); // only the RN debugger's warning banner, 10,787 382x49, at the bottom
       expect(exposure.centreCover).toBeUndefined();
       expect(exposure.tapAt).toEqual({ point: { x: 201, y: 495 }, moved: false });
-      expect(exposure.coverAt({ x: 201, y: 495 })).toBeUndefined();
+      expect(coverAtPoint(exposure.covers, { x: 201, y: 495 })?.node).toBeUndefined();
     });
 
     it('idb\'s flat list, chrome before content (owner decision on device check C3-3): a row scrolled up under the top bar, listed after it, is no cover of BackButton or the title; CONTINUE over priority_select still is', async () => {
@@ -1059,7 +1060,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const tree = positions.find(([p]) => p === 'pos6')![1];
         const row = tree.children.find((n) => n.identifier === 'swift_payment.form.payee_country_select')!;
         const seen = drawOrder(tree).exposure(row, IPHONE);
-        expect(seen.centreCover?.identifier).toBe('swift_payment.form.continue_button');
+        expect(seen.centreCover?.node.identifier).toBe('swift_payment.form.continue_button');
         expect(seen.tapAt).toBeUndefined(); // 4 pt show above the bar
       });
     });
@@ -1132,7 +1133,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
           const row = tree.children.find((n) => n.identifier === 'swift_payment.form.value_date_select')!;
           const seen = drawOrder(tree).exposure(row, IPHONE);
           expect(labels(coverNodes(seen.covers))).toEqual(['swift_payment.form.continue_button', '1', '2', '3']);
-          expect(seen.centreCover?.identifier).toBe('swift_payment.form.continue_button');
+          expect(seen.centreCover?.node.identifier).toBe('swift_payment.form.continue_button');
           expect(seen.tapAt).toBeUndefined();
         });
 
@@ -1209,8 +1210,8 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const label = tree.children.find((n) => n.label === 'Payee\u2019s bank street & no.*')!;
         label.rect = rect(42, 817, 186, 20);
         const seen = drawOrder(tree).exposure(label, IPHONE);
-        expect(seen.centreCover?.identifier).toBe(CONTINUE);
-        expect(seen.coverAt({ x: 135, y: 827 })?.identifier).toBe(CONTINUE);
+        expect(seen.centreCover?.node.identifier).toBe(CONTINUE);
+        expect(coverAtPoint(seen.covers, { x: 135, y: 827 })?.node.identifier).toBe(CONTINUE);
         expect([seen.shows, seen.tapAt]).toEqual([0, undefined]);
         // Where it lay under the frame itself (42,807, centre 817): refused as before.
         label.rect = rect(42, 807, 186, 20);
@@ -1452,7 +1453,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
     const tree = screen('finportalForgot');
     const seen = drawOrder(tree).exposure(byId(tree, 'lang_sk'), IPHONE);
     expect(seen.shows).toBe(0);
-    expect(seen.centreCover?.identifier).toBe('forgot_overlay');
+    expect(seen.centreCover?.node.identifier).toBe('forgot_overlay');
     expect(coverNodes(seen.covers).filter(bareFrame)).toEqual([]);
     expect(seen.tapAt).toBeUndefined();
   });
@@ -1465,7 +1466,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(coverNodes(seen.covers).filter(bareFrame)).toEqual([]);
     }
     const tree = screen('contactsSheet');
-    expect(drawOrder(tree).exposure(byId(tree, 'Contact photo for Kate Bell'), IPHONE).centreCover).toMatchObject({ role: 'scrollable', rect: rect(0, 62, 402, 812) });
+    expect(drawOrder(tree).exposure(byId(tree, 'Contact photo for Kate Bell'), IPHONE).centreCover?.node).toMatchObject({ role: 'scrollable', rect: rect(0, 62, 402, 812) });
   });
 
   it('no regression, measured: the layer\'s own nodes, and every node of the login screen with no modal (#218), read uncovered', () => {
@@ -1821,7 +1822,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
     const seen = order.exposure(text, PIXEL);
     expect(seen).toMatchObject({ covers: [], shows: 1, tapAt: { point: centre, moved: false } });
     expect(seen.centreCover).toBeUndefined();
-    expect(seen.coverAt(centre)).toBeUndefined();
+    expect(coverAtPoint(seen.covers, centre)?.node).toBeUndefined();
   });
 
   it('Account Detail through the parser: the avatar\'s text `LR`, in the avatar\'s wrapper and wholly inside the row\'s label node, is the row\'s own content — the label node shows whole; the floating tab bar\'s host still covers the row beneath it', () => {
@@ -2029,7 +2030,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
 describe('exposure.centreExcused — the later nodes the target column excused that hold the centre (the dismissal picker\'s one read, docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md)', () => {
   const IPHONE = rect(0, 0, 402, 874);
 
-  it('counted at the node\'s reach, as `coverAt` asks: a keyboard-owned key pinned at the bottom of idb\'s flat list holds a text below its frame — excused, no cover, yet there', () => {
+  it('counted at the node\'s reach, as cover.ts#coverAtPoint asks: a keyboard-owned key pinned at the bottom of idb\'s flat list holds a text below its frame — excused, no cover, yet there', () => {
     const app = uiNode({ role: 'other', label: 'app', rect: IPHONE });
     const under = uiNode({ role: 'text', label: 'Under', rect: rect(42, 840, 150, 20) }); // centre (117,850), below the key's frame (780–824)
     const key = uiNode({ role: 'button', label: 'Done', ofKeyboard: true, rect: rect(24, 780, 354, 44) });
@@ -2043,7 +2044,7 @@ describe('exposure.centreExcused — the later nodes the target column excused t
     const aside = uiNode({ role: 'button', label: 'Key', ofKeyboard: true, rect: rect(100, 700, 50, 30) }); // excused, off the centre
     const bar = uiNode({ role: 'button', label: 'Bar', rect: rect(0, 745, 402, 10) }); // a cover across the centre
     const order = drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [title, twin, aside, bar] }));
-    expect(order.exposure(title, IPHONE)).toMatchObject({ covers: [{ node: bar }], centreCover: bar, centreExcused: [twin] });
+    expect(order.exposure(title, IPHONE)).toMatchObject({ covers: [{ node: bar }], centreCover: { node: bar }, centreExcused: [twin] });
     // The box ends at 740, above the centre: the twin still meets what shows, but no tap lands at the centre.
     expect(order.exposure(title, rect(0, 0, 402, 740))).toMatchObject({ covers: [], centreExcused: [] });
   });

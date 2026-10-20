@@ -328,7 +328,7 @@ export interface Exposure {
    * holds its centre, `readingOrderPeers`), each as one record (cover.ts#Cover); empty when none. Each with:
    * - its REACH: its rect, or — for a node pinned at a flat list's bottom (`bottomPinned`) — its reach (`pinnedReach`),
    *   raised by its bar's lift for a floating tab bar's item (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`), or the whole
-   *   screen for a presented layer's cover. The rects `shows`, `largest` and `coverAt` are judged against, so a caller
+   *   screen for a presented layer's cover. The rects `shows`, `largest` and cover.ts#coverAtPoint are judged against, so a caller
    *   asking where a cover lies over the target (scroll-rounds.ts#overFarSide) asks of the same rect;
    * - its ORDER (cover.ts#CoverOrder): `untold` for a control of a run given in reading order that overlaps it, listed
    *   before it or after (`readingOrderPeers`, `UiNode.readingOrder`) — the one drawn on top may be either: named as
@@ -355,11 +355,11 @@ export interface Exposure {
    * (it holds no part of its centre) still counts in `shows`, so a sentence quoting `largest` names these.
    */
   readonly aimedClearOf: readonly UiNode[];
-  /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — `coverAt` of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
-  readonly centreCover?: UiNode;
+  /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — cover.ts#coverAtPoint of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
+  readonly centreCover?: Cover;
   /**
    * The nodes listed after it that hold its centre (inside `within`, at
-   * their reach, as `coverAt` asks) and that the `target` column EXCUSED —
+   * their reach, as cover.ts#coverAtPoint asks) and that the `target` column EXCUSED —
    * drawn there, by the table, as no cover of it — in pre-order; empty when
    * none, or when the centre lies outside `within` — a node of a hidden
    * subtree (`UiNode.hidden`, the `hidden` row) included: WDA's
@@ -384,8 +384,6 @@ export interface Exposure {
   readonly tapAt?: { readonly point: Point; readonly moved: false } | { readonly point: Point; readonly moved: true; readonly piece: Rect };
   /** MIN_TAP_PIECE_FRACTION of this tree's screen's shorter side, rounded — the piece size `tapAt` needs. */
   readonly minPiece: number;
-  /** The cover drawn on top at `point` — the last of `covers` whose reach contains it (cover.ts#coverAtPoint) — or undefined. */
-  coverAt(point: Point): UiNode | undefined;
 }
 
 /** What a row is judged against beside the node: the screen's area (`screenOf`). */
@@ -1859,10 +1857,9 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       const aimedClearOf = (peers?.listedBefore ?? []).filter((p) => pieces.some((piece) => rectIntersection(piece, p.node.rect) !== undefined));
       const aimable = aimedClearOf.reduce<Rect[]>((left, p) => left.flatMap((piece) => subtract(piece, p.node.rect)), pieces);
       const largest = largestRect(aimable);
-      const coverAt = (point: Point): UiNode | undefined => coverAtPoint(covers, point)?.node;
       const centre = tapPoint(node);
       const onCentre = shown !== undefined && containsPoint(shown, centre);
-      const centreCover = onCentre ? coverAt(centre) : undefined;
+      const centreCover = onCentre ? coverAtPoint(covers, centre) : undefined;
       const centreExcused = onCentre ? met.filter((c) => !c.draws && containsPoint(c.reach, centre)).map((c) => c.node) : [];
       const tappable = largestRect(aimable.filter((r) => r.width >= minPiece && r.height >= minPiece));
       const tapAt: Exposure['tapAt'] =
@@ -1880,7 +1877,6 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
         centreExcused,
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
-        coverAt,
       };
     },
   };

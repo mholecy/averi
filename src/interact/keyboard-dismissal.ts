@@ -230,7 +230,7 @@ function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
   if (standing.kind !== 'reachable' && standing.remedy.of === 'presented' && standing.remedy.layer !== undefined) return presentedRemedy('it', standing.remedy.layer);
   switch (standing.kind) {
     case 'reachable': {
-      if (standing.moved !== undefined) return `covered by ${coverName(standing.moved.cover)}`;
+      if (standing.moved !== undefined) return `covered by ${coverName(standing.moved.cover.node)}`;
       const presses = standing.facts.centreExcused.filter(isInteractive).at(-1);
       return presses === undefined ? undefined : `covered by ${coverName(presses)}`;
     }
@@ -240,7 +240,7 @@ function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
     case 'systemBar':
       return `off screen at (${standing.at.x},${standing.at.y})`;
     case 'covered':
-      return `covered by ${coverName(standing.cover)}`;
+      return `covered by ${coverName(standing.cover.node)}`;
     case 'cut':
       return cutSliverText(standing.cut, node.rect, standing.minPiece);
     case 'underKeyboard':

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
+import type { Cover } from '../../src/ui-tree/cover.js';
 import { sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing } from '../../src/ui-tree/standing.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
@@ -10,7 +11,7 @@ import { parseDump } from '../helpers/android-dumps.js';
  * AN OVERLAID EDGE (ui-tree/standing.ts#OverlaidEdge): Compose leaves out of a node's bounds what a node drawn after it
  * covers, so a node partly under a pinned button is dumped ending exactly at that node. Read only where that node is an
  * OVERLAY — reaching past a node in no scroll view at both ends of a top or bottom edge — the
- * `fully` stop and the pixel assert treat it as the cover, and a role-less node cut to a strip by it is a sliver. Over
+ * `fully` stop and the pixel assert treat it as the cover (ui-tree/cover.ts#CoverOrder's `overlaid`), and a role-less node cut to a strip by it is a sliver. Over
  * the lab's real captures (tests/fixtures/truth/android-averi_lab-api33).
  * docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
@@ -46,7 +47,7 @@ const said = (s: Standing | PixelStanding): unknown => {
     case 'reachable':
       return { kind: s.kind, at: s.at };
     case 'covered':
-      return { kind: s.kind, cover: named(s.cover), ...('reach' in s && { reach: s.reach }), ...remedy };
+      return { kind: s.kind, cover: named(s.cover.node), ...remedy };
     case 'cut':
       return 'cut' in s ? { kind: s.kind, edge: s.cut.edge, depth: s.cut.depth, by: s.cut.by === undefined ? undefined : named(s.cut.by), ...remedy } : { kind: s.kind, ...remedy };
     default:
@@ -54,6 +55,8 @@ const said = (s: Standing | PixelStanding): unknown => {
   }
 };
 const standing = (tree: UiNode, node: UiNode, purpose: Purpose) => sceneOf(tree).standing(node, AVD, purpose);
+/** The overlaid cover among a standing's covers (ui-tree/cover.ts#CoverOrder's `overlaid`), or undefined. */
+const overlaidOf = (s: Standing | PixelStanding): Cover | undefined => s.facts.covers.find((c) => c.order.kind === 'overlaid');
 
 describe('OverlaidEdge — pinned-bar P: dumped 127,1846 825x110, ending where Continue 66,1956 948x154 begins; its frame runs 66 px on under it', () => {
   it('`fully`: covered by Continue, the overlaid edge its fact — no "fully visible" on a row under a pinned button', async () => {
@@ -61,24 +64,29 @@ describe('OverlaidEdge — pinned-bar P: dumped 127,1846 825x110, ending where C
     const p = byId(t, 'lab.pinned-bar.P');
     const s = standing(t, p, FULLY);
     expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', remedy: 'scroll' });
-    expect(s.facts.overlaid).toEqual({ edge: 'bottom', by: byId(t, 'lab.pinned-bar.continue') });
-    // The exposure found no cover: the tree shows the button only by the cut.
-    expect(s.facts.covers).toEqual([]);
+    // The exposure found no cover: the tree shows the button only by the cut — its one cover, the overlaid edge's, which
+    // the standing names.
+    const button = byId(t, 'lab.pinned-bar.continue');
+    expect(s.facts.covers).toEqual([{ node: button, reach: button.rect, order: { kind: 'overlaid', edge: 'bottom' }, presented: false }]);
+    expect(s.kind === 'covered' && s.cover).toBe(s.facts.covers[0]);
   });
   it('the colour assert and the ocr assert: covered by Continue, its rect the reach — in no scroll view, `pinned`', async () => {
     const t = await lab('pinned-bar');
     const p = byId(t, 'lab.pinned-bar.P');
-    const reach = { x: 66, y: 1956, width: 948, height: 154 };
-    expect(said(standing(t, p, COLOUR))).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', reach, remedy: 'pinned' });
-    expect(said(standing(t, p, OCR))).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', reach, remedy: 'pinned' });
-    expect(standing(t, p, COLOUR).facts.overlaid?.edge).toBe('bottom');
+    const cover = { reach: { x: 66, y: 1956, width: 948, height: 154 }, order: { kind: 'overlaid', edge: 'bottom' } };
+    for (const purpose of [COLOUR, OCR]) {
+      const s = standing(t, p, purpose);
+      expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', remedy: 'pinned' });
+      expect(s).toMatchObject({ cover });
+      expect(overlaidOf(s)).toBe(s.kind === 'covered' && s.cover);
+    }
   });
   it('the tap and the plain stop are unchanged: its dumped centre (540,1901) is clear, and the probe there fired P', async () => {
     const t = await lab('pinned-bar');
     const p = byId(t, 'lab.pinned-bar.P');
     expect(said(standing(t, p, TAP))).toEqual({ kind: 'reachable', at: { x: 540, y: 1901 } });
     expect(said(standing(t, p, PLAIN))).toEqual({ kind: 'reachable', at: { x: 540, y: 1901 } });
-    expect(standing(t, p, PLAIN).facts.overlaid).toBeUndefined();
+    expect(overlaidOf(standing(t, p, PLAIN))).toBeUndefined();
   });
   it('W, far above the button, has no overlaid edge: reachable for `fully`', async () => {
     const t = await lab('pinned-bar');
@@ -96,7 +104,9 @@ describe('OverlaidEdge — text-under-bar P: a role-less clickable dumped as the
   });
   it('the colour assert: covered by Continue', async () => {
     const t = await lab('text-under-bar');
-    expect(said(standing(t, byId(t, 'lab.text-under-bar.P'), COLOUR))).toEqual({ kind: 'covered', cover: 'lab.text-under-bar.continue', reach: { x: 66, y: 1956, width: 948, height: 154 }, remedy: 'pinned' });
+    const s = standing(t, byId(t, 'lab.text-under-bar.P'), COLOUR);
+    expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.text-under-bar.continue', remedy: 'pinned' });
+    expect(s).toMatchObject({ cover: { reach: { x: 66, y: 1956, width: 948, height: 154 }, order: { kind: 'overlaid', edge: 'bottom' } } });
   });
 });
 
@@ -105,7 +115,7 @@ describe('OverlaidEdge — never for a node in a scroll view: scroll-sticky-cut 
     const t = await lab('scroll-sticky-cut');
     const r = byId(t, 'lab.scroll-sticky-cut.R');
     expect(said(standing(t, r, FULLY))).toEqual({ kind: 'reachable', at: { x: 541, y: 512 } });
-    expect(standing(t, r, FULLY).facts.overlaid).toBeUndefined();
+    expect(overlaidOf(standing(t, r, FULLY))).toBeUndefined();
     expect(standing(t, r, COLOUR).kind).toBe('reachable');
   });
 });
@@ -116,7 +126,7 @@ describe('OverlaidEdge — layout neighbours laid flush are no overlay (the meas
       const t = await lab(cell);
       const q = byId(t, `lab.${cell}.Q`);
       expect(standing(t, q, COLOUR).kind, cell).toBe('reachable');
-      expect(standing(t, q, FULLY).facts.overlaid, cell).toBeUndefined();
+      expect(overlaidOf(standing(t, q, FULLY)), cell).toBeUndefined();
     }
   });
   it('a picker row above the next row, as wide: reachable for `fully` and the colour assert', async () => {
@@ -129,14 +139,14 @@ describe('OverlaidEdge — layout neighbours laid flush are no overlay (the meas
     const t = await compose('contactsCreate');
     const save = at(t, { x: 719, y: 99, width: 218, height: 110 });
     expect(standing(t, save, COLOUR).kind).toBe('reachable');
-    expect(standing(t, save, COLOUR).facts.overlaid).toBeUndefined();
+    expect(overlaidOf(standing(t, save, COLOUR))).toBeUndefined();
   });
   it('a node in no scroll view with a later node flush at its RIGHT edge, reaching past it at its top and bottom: a side edge, never read', () => {
     const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
   <node class="android.view.View" clickable="true" resource-id="node" bounds="[100,1000][500,1100]" /><node class="android.view.View" clickable="true" resource-id="beside" bounds="[500,950][900,1150]"><node class="android.widget.TextView" text="Beside" bounds="[600,1020][800,1080]" /></node>
 </node></hierarchy>`);
     const n = byId(t, 'node');
-    expect(standing(t, n, FULLY).facts.overlaid).toBeUndefined();
+    expect(overlaidOf(standing(t, n, FULLY))).toBeUndefined();
     expect(standing(t, n, COLOUR).kind).toBe('reachable');
   });
   it('accountDetail "+493" 736,1831 92x9, cut at the floating tab bar\'s top, in its list: no overlay in a scroll view — tap, plain stop and colour as before', async () => {
@@ -145,7 +155,7 @@ describe('OverlaidEdge — layout neighbours laid flush are no overlay (the meas
     expect(standing(t, amount, TAP).kind).toBe('reachable');
     expect(standing(t, amount, PLAIN).kind).toBe('reachable');
     expect(standing(t, amount, COLOUR).kind).toBe('reachable');
-    expect(standing(t, amount, COLOUR).facts.overlaid).toBeUndefined();
+    expect(overlaidOf(standing(t, amount, COLOUR))).toBeUndefined();
   });
 });
 

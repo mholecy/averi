@@ -35,7 +35,7 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     const w = byId(t, `${prefix}.W`);
     const seen = drawOrder(t).exposure(byId(t, `${prefix}.C`), IPHONE);
     expect(tagged(seen.covers).filter((c) => c.order !== 'drawn')).toEqual([{ node: w, order: 'untold', presented: false }]);
-    expect(seen.centreCover).toBe(w);
+    expect(seen.centreCover?.node).toBe(w);
     expect(seen.tapAt).toBeUndefined();
     // W is a cover, so what shows is already clear of it: nothing more to say of the part a tap may be aimed at.
     expect(seen.aimedClearOf).toEqual([]);
@@ -74,7 +74,7 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
         : node({ role: 'other', rect: { ...IPHONE }, children: [node({ role: 'other', rect: { ...IPHONE }, readingOrder: true, children: [w, c, toast] })] });
     const seen = drawOrder(t).exposure(c, IPHONE);
     expect(tagged(seen.covers)).toEqual([{ node: toast, order: 'untold', presented: false }]);
-    expect(seen.centreCover).toBe(toast);
+    expect(seen.centreCover?.node).toBe(toast);
     // The only piece of C clear of the toast, 400–440, lies on W down to 430: 10 pt left, under the 24 a tap needs.
     expect(seen.tapAt).toBeUndefined();
     // …and says so: the part a sentence quotes (`largest`) is cut clear of W, which `shows` still counts.
@@ -166,7 +166,7 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const c = byId(t, 'lab.blur-menu.C');
     const seen = drawOrder(t, seenOrderOf(w, [{ peer: c, seen: 'over', ...HEX }])).exposure(c, IPHONE);
     expect(tagged(seen.covers)).toEqual([{ node: w, order: 'seenOver', presented: false }]);
-    expect(seen.centreCover).toBe(w);
+    expect(seen.centreCover?.node).toBe(w);
     expect(seen.tapAt).toBeUndefined();
   });
 
@@ -184,8 +184,8 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const w = byId(t, 'lab.blur-menu.W');
     const c = byId(t, 'lab.blur-menu.C');
     const untold: OrderSeen[] = [{ peer: c, seen: 'untold', why: 'the two look alike (ΔE 3.10)' }];
-    const { coverAt: _a, ...told } = drawOrder(t, seenOrderOf(w, untold)).exposure(w, IPHONE);
-    const { coverAt: _b, ...listed } = drawOrder(t).exposure(w, IPHONE);
+    const told = drawOrder(t, seenOrderOf(w, untold)).exposure(w, IPHONE);
+    const listed = drawOrder(t).exposure(w, IPHONE);
     expect(told).toEqual(listed);
     expect(tagged(listed.covers)).toEqual([{ node: c, order: 'untold', presented: false }]);
   });

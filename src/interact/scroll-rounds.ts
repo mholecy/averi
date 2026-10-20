@@ -2,6 +2,7 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
+import { lastPresented, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -232,7 +233,7 @@ export type ScrollOutcome = (
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
   | { kind: 'covered'; swipes: number; cover: AppliedKeyboard; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; layer?: MarkedLayer; next?: undefined }
+  | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; layer?: MarkedLayer; next?: undefined }
   | { kind: 'presented'; swipes: number; judged: Judged | undefined; viewport: Rect; next: PresentedTouchDown }
   /**
    * Under a cover the tree lists in reading order with it (ui-tree/standing.ts#Remedy's `unordered`, the order not
@@ -242,7 +243,7 @@ export type ScrollOutcome = (
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
-  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
+  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
   | {
       kind: 'bound';
       swipes: number;
@@ -1153,7 +1154,9 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, courseOf(s), cover, f));
-    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => overFar(c.reach)));
+    // Only the covers the draw order found, as before the overlaid edge was a cover: the overlaid one (cover.ts#CoverOrder's
+    // `overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
+    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => c.order.kind !== 'overlaid' && overFar(c.reach)));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyondFarEdgeIn(farFacts(best), courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
@@ -1467,8 +1470,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // presented surface lies over it IN this read's frame (a `presented` one of `facts.covers`, ui-tree/cover.ts#Cover). One the standing judged of the node
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
     // ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
+    // The cover its sentence names is the remedy's (`remedied`), as its record: the one the standing judged it under, else
+    // that surface.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented' && best.standing.facts.covers.some((c) => c.presented)) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    const surface = lastPresented(best.standing.facts.covers);
+    if (remedy?.of === 'presented' && surface !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: best.standing.kind === 'covered' ? best.standing.cover : surface, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — no swipe tells which is
     // on top or moves it out from under the other: stop.
     if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver')) {

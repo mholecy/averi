@@ -1,5 +1,6 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
-import { cutAtLaterText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { cutAtLaterText } from '../ui-tree/cover.js';
+import { outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 

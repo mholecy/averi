@@ -4,6 +4,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
+import type { Cover } from '../../src/ui-tree/cover.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -77,7 +78,7 @@ const FULLY = { of: 'fully' } as const;
 const said = (s: Standing | PixelStanding): unknown => {
   switch (s.kind) {
     case 'reachable':
-      return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.identifier ?? s.moved.cover.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
+      return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.node.identifier ?? s.moved.cover.node.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
     case 'offScreen': {
       // Outside the scroll view it lies in (its drawn frame, geometry.ts#Clips.drawnIn): the scroll view named.
       const outside = s.scroller === undefined ? {} : { scroller: s.scroller.identifier };
@@ -95,15 +96,17 @@ const said = (s: Standing | PixelStanding): unknown => {
     case 'covered':
       return {
         kind: s.kind,
-        cover: s.cover.identifier ?? s.cover.label,
+        cover: s.cover.node.identifier ?? s.cover.node.label,
         ...('largest' in s && s.largest !== undefined && { largest: s.largest }),
-        ...('reach' in s && { reach: s.reach }),
         ...('overRoot' in s && s.overRoot === true && { overRoot: true }),
       };
     case 'underKeyboard':
       return { kind: s.kind, top: s.line.y, witnessed: s.line.witnessed, ...('band' in s && { band: s.band }) };
   }
 };
+
+/** `said` of a pixel standing: its cover with where it presses (`Cover.reach`), as the pixel assert's sentence quotes it. */
+const pixelSaid = (s: PixelStanding): unknown => (s.kind === 'covered' ? { ...(said(s) as object), reach: s.cover.reach } : said(s));
 
 describe('Scene.standing for scroll_until\'s stop — measured cases, fixture × purpose → kind', () => {
   it.each([
@@ -355,7 +358,7 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     // `label@y`: the node with that label at that y, where the label repeats.
     const [label, y] = id.split('@');
     const n = y === undefined ? byId(t, id) : [...everyNode(t)].find((m) => m.label === label && m.rect.y === Number(y))!;
-    expect(said(sceneOf(t).standing(n, screen, purpose(n)))).toEqual(expected);
+    expect(pixelSaid(sceneOf(t).standing(n, screen, purpose(n)))).toEqual(expected);
   });
 
   it('the 2-unit edge (geometry.ts#PIXEL_OVERLAP_SLACK) for the navigation band too: 2 px into it measured, 3 px under the bar', () => {
@@ -847,7 +850,7 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
     const t = await tree();
     const n = byId(t, id);
     const s = sceneOf(t).standing(n, IPHONE_BARE, tapOf(t, n));
-    expect([s.kind, s.facts.centre, s.facts.centreCover?.identifier]).toEqual(['covered', centre, 'swift_payment.form.continue_button']);
+    expect([s.kind, s.facts.centre, s.facts.centreCover?.node.identifier]).toEqual(['covered', centre, 'swift_payment.form.continue_button']);
   });
 
   it('the number pad\'s covered row is judged above the keyboard (its 589–596 strip lies under the band): `aboveKeyboard`, nothing of it shows', async () => {
@@ -1010,7 +1013,7 @@ describe('Scene.standing — the purpose names the answer\'s union', () => {
     expectTypeOf<TapStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();
     expectTypeOf<Extract<TapStanding, { kind: 'reachable' }>>().toEqualTypeOf<Extract<Standing, { kind: 'reachable' }>>();
     expectTypeOf<Extract<PixelStanding, { kind: 'cut' }>['bar']>().toEqualTypeOf<{ readonly edge: 'bottom'; readonly top: number }>();
-    expectTypeOf<Extract<PixelStanding, { kind: 'covered' }>['reach']>().toEqualTypeOf<Rect>();
+    expectTypeOf<Extract<PixelStanding, { kind: 'covered' }>['cover']>().toEqualTypeOf<Cover>();
     expectTypeOf<Extract<PixelStanding, { kind: 'systemBar' }>['band']>().toEqualTypeOf<Rect>();
     expectTypeOf<Extract<PixelStanding, { kind: 'underKeyboard' }>['band']>().toEqualTypeOf<Rect>();
     expectTypeOf<PixelStanding['kind']>().toEqualTypeOf<'reachable' | 'offScreen' | 'systemBar' | 'cut' | 'covered' | 'underKeyboard'>();

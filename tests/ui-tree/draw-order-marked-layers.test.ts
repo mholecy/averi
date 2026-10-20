@@ -16,7 +16,7 @@ import { IPHONE, judged, list, popover, rect, sheet } from '../helpers/presented
 const desc = (n: UiNode | undefined): string | undefined => n && `${n.role} ${n.identifier ?? n.label ?? ''} ${n.rect.x},${n.rect.y} ${n.rect.width}x${n.rect.height}`.replace('  ', ' ');
 const exposed = (tree: UiNode, target: UiNode) => {
   const seen = drawOrder(tree).exposure(target, IPHONE);
-  return { covers: seen.covers.map((c) => ({ node: desc(c.node), order: c.order.kind, presented: c.presented })), centreCover: desc(seen.centreCover), shows: seen.shows, tapAt: seen.tapAt };
+  return { covers: seen.covers.map((c) => ({ node: desc(c.node), order: c.order.kind, presented: c.presented })), centreCover: desc(seen.centreCover?.node), shows: seen.shows, tapAt: seen.tapAt };
 };
 /** A cover drawn over the target that is the surface of the screen presented over it (`Cover.presented`) — or, `presented: false`, any other. */
 const surface = (node: string, presented = true) => ({ node, order: 'drawn', presented });
