@@ -341,6 +341,37 @@ run from that checkout; the lab app as installed (no app change). The averi-lab 
   Tapped (the menu dismissed), so the entry stays, and -1.json is pinned exiting 1 on that line alone.
 - Not measured separately: the latency of the one screenshot the W and C taps now take (the record keeps no timings).
 
+# Round 9 final device check: the blur menus and a sanity set on iOS, 2026-10-20
+
+fix/round-9 at `14a7d90d` (the round's final src: L4's W fix after its review fixes — strips, thin slices, the settled
+screen, the per-tree memo — and the round's code review), run from that checkout; the lab app as installed (no app
+change). The averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), booted fresh, WDA on 8120 in the lab's own
+derived data, idb through a companion of this run's own on gRPC 10899 (`IDB_COMPANION=localhost:10899`); the simulator
+shut down after. Reproduce (outside the sandbox): `node --import tsx scripts/truth/live.ts --udid <lab simulator>
+--sources idb,wda --groups visibility --cells <cells> --record <file>`.
+
+| record (docs/truth/live-records/) | cells | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r9-final-1.json | blur-menu, blur-menu-grouped | 40 | 16 | 0 | 24 (all known; idb's tap of A ok vacuously: FIXED printed) |
+| ios-vis-r9-final-2.json | blur-menu, blur-menu-grouped | 40 | 15 | 0 | 25 (all known) |
+| ios-vis-r9-final-sanity.json | pinned-bar, sheet-background, alert-dim, dim-cover, own-parts, fab, bands | 78 | 66 | 2 | 10 (all known) |
+
+- **The eyes still tell W over C on real screenshots** through the tightened guards: `tap W` on blur-menu `Tapped
+  id:"lab.blur-menu.W"`, W alone fired, under idb and WDA, both runs; `tap C` and `scroll_until C` on blur-menu (idb,
+  WDA) and blur-menu-grouped (idb) refused as "under button "Target W" … drawn over it as a screenshot shows", nothing
+  fired or stroked. Run 2's case lines are identical to `1ef11b9c`'s run 2 (ios-vis-r9-l4w-2.json); run 1 differs from
+  run 2 only in idb's first case.
+- The first-case anomaly recurred: in -1.json idb's `tap A`, the first case after a fresh boot, timed out waiting for A
+  with no tree, nothing tapped — ok vacuously, FIXED printed for its residual-9 entry; -2.json reads it Tapped (the menu
+  dismissed), so the entry stays and -1.json is pinned exiting 1 on that line alone, as ios-vis-r9-l4w-1.json is.
+- The golden of the two cells at this src: W's tap, colour (PASS on `#00897B`) and `scroll_until` green on all four
+  captures; C's rows red as ADR 0018's residual 9 (no "close it first").
+- Sanity set: no case not known, exit 0; all 78 outcomes (ok / LOUD / MISMATCH, case by case) as round 7's final
+  device check reads them (ios-idb-vis-r7final.json, ios-wda-vis-r7final.json, rejudged at this src) — the presented
+  layers (alert-dim, sheet-background, dim-cover) refused under WDA, idb's taps timing out with no tree and its scrolls
+  stroking the layer (the known `presented-stroke`; sheet-background A, B LOUD `presented-changed`), bands S refused
+  under the status bar, every other tap `Tapped`.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

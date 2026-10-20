@@ -249,6 +249,17 @@ text-under-bar P is asked by its string). No live-known.ts entry changes.
   text-under-bar and bands nodes lie in none and are judged as e6ed7d43 judged them. The committed records still
   re-judge as stated (tests/truth/live-rejudge.test.ts).
 
+# Round 9 final device check: B4-L1's cells (2026-10-20)
+
+fix/round-9 at `14a7d90d` (the round's final src, B4-L1 with its review's narrowing to nodes in no scroll view, `151b2ca5`),
+run from that checkout on averi_lab (emulator-5554, booted `-no-window -no-snapshot-save`, shut down after), the lab app
+as installed, the same command and cells as above. Record docs/truth/live-records/android-vis-r9-final.json: 18 cases,
+16 ok, 0 loud, 2 mismatches, 0 not known, exit 0 — every case line as e6ed7d43's run (android-vis-r9-b4l1.json):
+pinned-bar P and W `Tapped`, bands S and N refused in their bands, Q, O, W `Tapped`, tabbar-floating R refused under the
+tab bar and reached after 1 swipe, text-under-bar S refused under the status bar, W `Tapped`, P not found by its string;
+the two known mismatches scroll-sticky-cut R fully (VA1) and tabbar-floating F's unmoved claim (LV1). The device check
+the review's fix went without now stands.
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

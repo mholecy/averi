@@ -17,6 +17,9 @@
 > view to motion — a bar outside the list lies flush on a whole first or last row at rest too (ADR 0013); VA1 stays
 > open. Residual: the plain stop on P
 > still says "fully visible after 0 swipes" (its centre is clear; `fully: true` asks for the whole node).
+> Live again at round 9's final src (`fix/round-9` `14a7d90d`, with the review's narrowing; 2026-10-20,
+> `docs/truth/live-records/android-vis-r9-final.json`): every case as at `e6ed7d43` — 18 cases, 16 ok, the two known
+> (VA1's scroll-sticky-cut R fully, LV1's tabbar-floating F).
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33/pinned-bar.*`, captured by scripts/truth/capture-android.ts on the

@@ -30,6 +30,10 @@
 > only add untold / covered paths, every lab strip and slice measures 0.000 share (W stays told), and the golden
 > replies are identical (1410 checks, 217 mismatches, every reply, kind and call list unchanged). Calibrate judges
 > the fix alone as the second pair (`e52d179` → `1ef11b9`, its first parent), the review fixes changing no golden reply.
+> Live again at round 9's final src (`fix/round-9` `14a7d90d`, after the round's code review; 2026-10-20,
+> `docs/truth/live-records/ios-vis-r9-final-1.json`, `-2.json`): the real screenshots still tell the order through the
+> tightened guards — W's tap `Tapped`, W alone fired, under idb and WDA, both runs; C's tap and `scroll_until` refused
+> as under W, seen so, nothing fired or stroked; every case line identical to `1ef11b9c`'s run 2.
 
 > **Status (2026-10-19, round 8):** C's half (the unsafe direction) fixed on `fix/r8-l4` at `37bf5a15`, `f5a28b38` and `bea9769c`
 > (its review's fixes; from `fix/round-8` `e0c2587e`); W's half (the false refusal) stays open as ADR 0015's residual, now

@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -175,6 +175,15 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // section): pinned-bar, text-under-bar, scroll-sticky-cut, bands and tabbar-floating — every tap as before (pinned-bar
     // P Tapped at its clear centre), scroll-sticky-cut R fully the known VA1 stop-claim, tabbar-floating F LV1's.
     ['android-vis-r9-b4l1.json', 'visibility', { cases: 18, ok: 16, loud: 0, mismatches: 2 }],
+    // round 9's final device check at its final src (fix/round-9 14a7d90d, after the code review tightened the eyes'
+    // guards; docs/truth/live-ios-2026-10-18-visibility.md and live-android-2026-10-18-visibility.md, their round-9
+    // final sections): the blur menus read as at 1ef11b9c — W Tapped, W alone fired, under idb and WDA; C's tap and
+    // scroll_until refused as under W, seen so, nothing fired or stroked (-2.json; -1.json below: the first-case idb
+    // timeout again). A sanity set of other iOS visibility cells as live-known.ts knows them; B4-L1's cells on
+    // Android as at e6ed7d43 (VA1 and LV1 the two known mismatches).
+    ['ios-vis-r9-final-2.json', 'visibility', { cases: 40, ok: 15, loud: 0, mismatches: 25 }],
+    ['ios-vis-r9-final-sanity.json', 'visibility', { cases: 78, ok: 66, loud: 2, mismatches: 10 }],
+    ['android-vis-r9-final.json', 'visibility', { cases: 18, ok: 16, loud: 0, mismatches: 2 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -236,6 +245,21 @@ describe('live.ts --rejudge over the first committed iOS record of L4\'s remaini
   // its entry reads FIXED here; it read Tapped (the menu dismissed) in -2.json, so the entry stays: exit 1, as recorded.
   it('ios-vis-r9-l4w-1.json: idb\'s tap of A ok by a timeout, so FIXED; W tapped under both sources', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('ios-vis-r9-l4w-1.json', 'visibility');
+    expect(out).toMatch(/^# Live golden: 40 cases, 16 ok, 0 loud, 24 mismatches \(0 not known\), 0 skipped$/m);
+    expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
+    expect(out.match(/^- ok tap:blur-menu\.W blur-menu: tap W \(open\): fires it alone — Tapped id:"lab\.blur-menu\.W"$/gm)).toHaveLength(2);
+    expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb tap:blur-menu.A\n');
+    expect(code).toBe(1);
+  });
+});
+
+// Round 9's final device check (fix/round-9 14a7d90d): its first run.
+describe('live.ts --rejudge over the first committed iOS record of round 9\'s final device check', () => {
+  // As ios-vis-r9-l4w-1.json: every case as ios-vis-r9-final-2.json reads it but idb's tap of blur-menu's A, the run's
+  // first case on a freshly booted simulator — the wait for A timed out with no tree, nothing tapped: ok, vacuously, so
+  // its entry reads FIXED here; it read Tapped (the menu dismissed) in -2.json, so the entry stays: exit 1, as recorded.
+  it('ios-vis-r9-final-1.json: idb\'s tap of A ok by a timeout, so FIXED; W tapped under both sources', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudge('ios-vis-r9-final-1.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 40 cases, 16 ok, 0 loud, 24 mismatches \(0 not known\), 0 skipped$/m);
     expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
     expect(out.match(/^- ok tap:blur-menu\.W blur-menu: tap W \(open\): fires it alone — Tapped id:"lab\.blur-menu\.W"$/gm)).toHaveLength(2);
