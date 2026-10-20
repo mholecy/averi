@@ -32,7 +32,6 @@ import type { ReplyKind } from './replies.js';
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
-const LV1 = 'bug:2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
@@ -68,7 +67,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // VA1 (scroll-sticky-cut's R.fully; docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md):
   // fixed by the flush probe toward a sticky header pinned in the row's list, ok live twice (android-vis-r14-va1*.json:
   // 2 swipes, list 66→0, 0→0, Tapped), struck off.
-  ...each('android uiautomator', ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'], LV1, 'unchanged-claim', 'not found'),
+  // LV1 (scroll-bounded's O and F, tabbar-floating's F; docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md):
+  // fixed by round 14's bugs/r14-lv1 (a read listing none of the stroked scroll view's content is no evidence), struck
+  // off — live three times (android-vis-r14-lv1.json, -2.json at its first form bd1c1107; -3.json at 770344ae):
+  // tabbar-floating F visible after 5 swipes and Tapped, also with timeoutMs 30000 (blank:tabbar-floating.F);
+  // scroll-bounded O and F an honest LOUD at the deadline with no unchanged claim, the blank clause naming `upper`.
   ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', { intermittent: true }),
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the

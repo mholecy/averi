@@ -184,6 +184,11 @@ the read a fling comes to rest in (decision 5).
       stretch has no bound length — 2400 dp here — so any N is arbitrary); wording alone (keeps the false "not found"
       under budget, the bug); a `blank` flag on the fingerprint in `TreeFacts` (wider, and it splits one question
       about the stroked view across two modules).
+    - **Live (2026-10-21, averi_lab, twice at the fix's first form `bd1c1107`: docs/truth/live-records/android-vis-r14-lv1.json, -2.json; once at `770344ae`, `00ed9ec8`'s src but for names and comments: -3.json):**
+      tabbar-floating F visible after 5 swipes at (540,1598), one every 3.2 s, the list 0→861→…→4273, Tapped F — also
+      at timeoutMs 30000 (`blank:tabbar-floating.F`); scroll-bounded O and F LOUD at the 15 s deadline after 5 strokes
+      into `upper` (one every 2.8 s), saying the last 4 went over it while the tree listed none of its content (the
+      clause's first wording, at `bd1c1107`; at `770344ae` its final one, above, the same 4 of 5), no unchanged claim; `turn:scroll-bounded.F` unchanged (2 unmoved, `upper` listing W and P).
 - **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged.
 
 ## Consequences and residuals

@@ -303,6 +303,42 @@ mismatches, exit 0 (VA1's entry already struck off live-known.ts):
 - The taps on both R and the plain stop on scroll-sticky-cut's R as before: `Tapped` at its clear centre, "fully visible
   after 0 swipes" (the plain stop judges the centre).
 
+# Round 14, LV1: a blank read is no evidence the stroke moved nothing (2026-10-21)
+
+bugs/r14-lv1 at `bd1c1107` (geometry.ts#Clips.contentToward's `blank`, read by scroll-rounds.ts#observe; the live case
+`blank:tabbar-floating.F` of live-visibility.ts#BLANK_STRETCH added with the records), run from that checkout on
+averi_lab (emulator-5554, booted `-no-window -no-snapshot-save`, shut down after), the lab app as installed (built at
+VA1, no app change since). Records docs/truth/live-records/android-vis-r14-lv1.json (`--groups visibility`, the whole
+group: 140 cases, 131 ok, 5 loud, 4 mismatches — dialog-fullscreen's four, residual 19, known) and -2.json (`--cells
+tabbar-floating,scroll-bounded`: 18 cases, 15 ok, 3 loud, 0 mismatches); both exit 1 only for `scroll:tabbar-floating.F`
+known and now ok (LV1's three entries struck off live-known.ts). The same in both runs:
+
+- `scroll_until F` on tabbar-floating (the 15 s default): 5 strokes at (540,1598), inside the list clear of the tab
+  bar, one every 3.2 s; the app's list 0→861→1712→2568→3422→4273 (run 2: 0→850→…→4277) — "visible after 5 swipes —
+  PARTLY UNDER other "more" …, its centre clear", and the tap fires F (before: "failed after 4 swipes (the last 2 …
+  did not change the screen …)" at offset 3437, every stroke having moved the list ~860 px).
+- `blank:tabbar-floating.F` (timeoutMs 30000): the same 5 strokes, list to 4272 (4278), visible after 5 swipes,
+  Tapped F — the fix's promise with the time to keep it.
+- `scroll_until O` and `F` on scroll-bounded: LOUD, honestly — 5 strokes at (540,788) into `upper`, one every 2.8 s,
+  0→430→856→1291→1320→1320, `lower` never stroked (O and F unlisted: which scroll view holds them averi cannot know);
+  "failed after 16078ms (timeout 15000ms; 5 swipes sent; …) — element never appeared in the tree …; the last 4 swipes
+  went over the scroll container 0,303 1080x605 while the tree listed none of its content (blank space, or content
+  with no node), so whether they moved it is unknown — the element may lie further down: raise maxSwipes or
+  timeoutMs" — no unchanged claim (before: "failed after 4 swipes (the last 2 … did not change the screen …)" while the
+  third stroke moved `upper` 435 px). The cost the ADR names: a fifth stroke and the deadline, ≈ 5 s more.
+- `turn:scroll-bounded.F` unchanged: 2 swipes up at (540,424), nothing moved, "the last 2, swiping up, did not change
+  the screen" — `upper` at its top lists W and P, content that shows motion.
+- Nothing else changed: every other case as at VA1 and LE1.
+- After review (`770344ae`: rows lying apart across a sideways stroke read as content shown — `stackedAcross`; the
+  cross-axis guard narrowed to a scroll view holding none that may scroll on the stroke's axis; the clause reworded
+  "how far", not "whether", and counted over one scroll view, one way), tabbar-floating and scroll-bounded again
+  (`--cells tabbar-floating,scroll-bounded`, docs/truth/live-records/android-vis-r14-lv1-3.json: 18 cases, 15 ok, 3
+  loud, 0 mismatches, exit 0): F visible after 5 swipes and Tapped, list to 4274 (`blank:` 4267); O and F LOUD at the
+  deadline after 5 strokes into `upper` (0→433→866→1303→1320), "… after the last 4 swipes over the scroll container
+  0,303 1080x605 the tree listed none of its content where a swipe's motion would show (blank space, content with no
+  node, or a node cut at both of the container's edges), so how far they moved it is unknown — the element may lie
+  further down: raise maxSwipes or timeoutMs"; `turn:scroll-bounded.F` unchanged.
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

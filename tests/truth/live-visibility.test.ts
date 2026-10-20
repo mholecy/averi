@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeAtRest, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -165,6 +165,30 @@ describe('judgeAtRest — a first row at rest flush under its sticky header (VA1
     const cs = visibilityCases({ cell: 'scroll-sticky-rest', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t], scrollViews: { list: { x: 0, y: 303, width: 1080, height: 1238 } } }, 'android');
     expect(cs.map((c) => c.id)).toEqual(['tap:scroll-sticky-rest.R', 'rest:scroll-sticky-rest.R.fully']);
     expect(cs[1].calls).toEqual([{ tool: 'scroll_until', args: { selector: 'id:"lab.scroll-sticky-rest.R"', direction: 'down', fully: true } }, { tool: 'tap', args: { selector: 'id:"lab.scroll-sticky-rest.R"' } }]);
+  });
+});
+
+describe('judgeBlankStretch — tabbar-floating\'s F past the blank stretch of its list, with the time to reach it (LV1)', () => {
+  // Android px: the list 0,550 1080x1670; F at content y 5500 (5500 + 550 − offset on the screen), 143 tall.
+  const scrolledTo = (offset: number, over: Partial<LabState> = {}): LabState =>
+    state({ screen: { x: 0, y: 0, width: 1080, height: 2220 }, scale: 1, safeArea: { top: 66, left: 0, bottom: 66, right: 0 }, frames: { F: { x: 66, y: 6050 - offset, width: 948, height: 143 } }, scrollViews: { list: { x: 0, y: 550, width: 1080, height: 1670 } }, offsets: { list: offset }, ...over });
+  const launched = scrolledTo(0);
+  const strokes = [stroke(0, 858, 'list'), stroke(858, 1714, 'list'), stroke(1714, 2578, 'list'), stroke(2578, 3437, 'list'), stroke(3437, 4290, 'list')];
+  const reached = scrolledTo(4290, { strokes, events: [{ kind: 'tap', tag: 'F', at }] });
+  it('stops on F, every stroke bringing it closer, then the tap fires it: ok', () => {
+    expect(judgeBlankStretch('F', 'list', ['Element id:"lab.tabbar-floating.F" visible after 5 swipes', 'Tapped id:"lab.tabbar-floating.F"'], reached, launched).outcome).toBe('ok');
+  });
+  it('a loud failure — judgeScroll\'s honest LOUD — is this case\'s MISMATCH: it had the time', () => {
+    const short = scrolledTo(3437, { strokes: strokes.slice(0, 4) });
+    expect(judgeBlankStretch('F', 'list', ['ERROR scroll_until id:"lab.tabbar-floating.F" failed after 4 swipes (the last 2, swiping down, did not change the screen: …) — element never appeared in the tree'], short, launched)).toMatchObject({ outcome: 'MISMATCH' });
+  });
+  it('visibilityCases asks it of tabbar-floating\'s F on Android only, down, timeoutMs 30000, then the tap', () => {
+    const t: TargetTruth = { tag: 'F', id: 'lab.tabbar-floating.F', color: '#00897B', declared: 'open', frame: { x: 66, y: 6050, width: 948, height: 143 }, reached: true, probe: [], drawn: 1, seen: '#00897B', geometry: 'off-screen', scrollView: 'list' };
+    const truth: Parameters<typeof visibilityCases>[0] = { cell: 'tabbar-floating', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t], scrollViews: { list: { x: 0, y: 550, width: 1080, height: 1670 } } };
+    const blank = visibilityCases(truth, 'android').filter((c) => c.id.startsWith('blank:'));
+    expect(blank.map((c) => c.id)).toEqual(['blank:tabbar-floating.F']);
+    expect(blank[0].calls).toEqual([{ tool: 'scroll_until', args: { selector: 'id:"lab.tabbar-floating.F"', direction: 'down', timeoutMs: 30_000 } }, { tool: 'tap', args: { selector: 'id:"lab.tabbar-floating.F"' } }]);
+    expect(visibilityCases(truth, 'ios').filter((c) => c.id.startsWith('blank:'))).toEqual([]);
   });
 });
 
@@ -358,10 +382,12 @@ describe('the tap after a stop is judged on the state after the tap', () => {
 
 describe('the live KNOWN pins the rule a case fails by and the kind of reply it rests on', () => {
   it('a known case failing by its entry\'s rule on its entry\'s kind is known; by another rule, or another kind, it is not', () => {
-    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'not found')).toMatch(/LV1|blank-content/);
-    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'stop-claim', 'not found')).toBeUndefined();
-    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'refused')).toBeUndefined();
-    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', undefined)).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'not found')).toMatch(/residual 19/);
+    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'unchanged-claim', 'not found')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'refused')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', undefined)).toBeUndefined();
+    // Struck off by LV1's fix (round 14): its unchanged claim is no longer known.
+    expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'not found')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired', 'refused')).toBeUndefined();
     expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim', 'visible')).toBeUndefined();
   });
