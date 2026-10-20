@@ -30,7 +30,6 @@ import type { ReplyKind } from './replies.js';
  * left with LV4's entry at round 7's A1, and the mechanism with it at round 7's integration 3.)
  */
 
-const LE1 = 'bug:2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md';
 const LE2 = 'bug:2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md';
 const LE3 = 'bug:2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md';
 const VA1 = 'bug:2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md';
@@ -62,13 +61,8 @@ const each = (prefix: string, ids: readonly string[], note: string, cls: Verdict
 
 export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntries([
   // Android
-  ...each('android uiautomator', ['scroll:scroll-bounded.P.fully', 'scroll:scroll-bounded.S', 'scroll:scroll-bounded.S.fully'], LE1, 'stop-claim', 'visible'),
-  ...each('android uiautomator', ['tap:scroll-bounded.S'], LE1, 'tap-claim', 'Tapped'),
-  // Round 6's device check (android-vis.json at e98b87e, and at b71cbbb: android-vis-b71cbbb.json): carousel-in-list's
-  // C, cut to the screen's right edge and not to its carousel, is LE1 across — tapped on the page's background, a stop
-  // with no stroke.
-  ...each('android uiautomator', ['tap:carousel-in-list.C'], LE1, 'tap-claim', 'Tapped'),
-  ...each('android uiautomator', ['scroll:carousel-in-list.C'], LE1, 'stop-claim', 'visible'),
+  // LE1 (scroll-bounded's P.fully, S, S.fully and tap S; carousel-in-list's tap C and scroll C): fixed on round 14's
+  // bugs/r14-le1 (the drawn frame on Android), all six ok live (android-vis-r14-le1.json), struck off.
   // (#10's turn:scroll-collapsing.A, filed here until 2026-10-18: ok since the owner decided no turn on uiautomator —
   // ADR 0021 — and its judge became live-visibility.ts#judgeAndroidTurn: a loud failure naming `up` after the
   // two-stroke stop, which the record reads.)

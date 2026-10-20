@@ -54,7 +54,7 @@ open note on the working tree. See the script for the verdicts.
 | L3 | 2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy | calibrate | fecb0b3 → 468dc1b | CALIBRATED |
 | L4.1 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e0c2587 → bea9769 | CALIBRATED-ON-DEFECT; live ios: CALIBRATED |
 | L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 1ef11b9 | CALIBRATED; live ios: CALIBRATED |
-| LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | open | working tree | OPEN-RED |
+| LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | calibrate | caa0f41 → 16ff607 | CALIBRATED |
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | open | working tree | OPEN-RED |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
@@ -1073,11 +1073,11 @@ Live (phase 5, ios idb, wda): **CALIBRATED**, 94fc318 → 1ef11b9, tap:blur-menu
 
 W's half, round 9 (fix/r9-l4w 1ef11b9, its review fixes 85e3621, a374227 and 0f28b4c; ADR 0024): the eyes tell the order of two controls listed in reading order from one screenshot (verify/eyes.ts#judgeOrder over the committed blur-menu.png: the overlap #00897B, W's band #00897B, C's #347937, ΔE00 0.00 and 17.69) and the draw order takes the answer as an input (ui-tree/seen-order.ts). Before (fix/round-9 e52d179): W refused / FAIL / stopped before any swipe, overlapped by C, the order not told. After: Tapped at (201,480), colour PASS on #00897B, fully visible after 0 swipes. C's nine rows reworded as under W, seen drawn over it on the screenshot — still red as #31's residual (the first pair's ON-DEFECT).
 
-## LE1: OPEN-RED
+## LE1: CALIBRATED
 
 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md — defect: `fully visible|^Tapped|reached where it is|^passed on`
 
-- working tree:
+- before caa0f41:
   - RED android-averi_lab-api33/scroll-bounded.xml P fully — fully visible where it is partly-centre-in, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.P" fully visible after 0 swipes
   - RED android-averi_lab-api33/scroll-bounded.xml S tap — Tapped: Tapped id:"lab.scroll-bounded.S"
   - RED android-averi_lab-api33/scroll-bounded.xml S scroll_until — reached where it is sliver, after 0 swipe(s) that move nothing: Element id:"lab.scroll-bounded.S" fully visible after 0 swipes
@@ -1085,8 +1085,16 @@ W's half, round 9 (fix/r9-l4w 1ef11b9, its review fixes 85e3621, a374227 and 0f2
   - RED android-averi_lab-api33/carousel-in-list.xml C tap — Tapped: Tapped id:"lab.carousel-in-list.C"
   - RED android-averi_lab-api33/carousel-in-list.xml C colour — passed on #EEEEEE: PASS  element id:"lab.carousel-in-list.C" fill within dE00 8 of #EEEEEE — sampled #EEEEEE (dominant, 100% of region) vs expected #EEEEEE → dE00 0.00 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/carousel-in-list.xml C scroll_until — no swipe: Element id:"lab.carousel-in-list.C" fully visible after 0 swipes
+- after 16ff607:
+  - ok android-averi_lab-api33/scroll-bounded.xml P fully — ERROR scroll_until id:"lab.scroll-bounded.P" failed after 3 swipes — element is in the viewport but CLIPPED at bottom by its scroll view scrollable (0,303 1080x605): 63% of it is drawn, and the content is exhausted: swip
+  - ok android-averi_lab-api33/scroll-bounded.xml S tap — ERROR id:"lab.scroll-bounded.S" is outside its scroll view scrollable (0,1046 1080x495) at (541,1563): only 25% of it (rect 128,1519 825x88) is drawn, and a tap goes to its centre — scroll_until it with fully: true first
+  - ok android-averi_lab-api33/scroll-bounded.xml S scroll_until — ERROR scroll_until id:"lab.scroll-bounded.S" failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 25% of it is in the viewport, and the content is exhausted: swiping down no longer moves it, nor does
+  - ok android-averi_lab-api33/scroll-bounded.xml S fully — ERROR scroll_until id:"lab.scroll-bounded.S" failed after 3 swipes — element is in the viewport but CLIPPED at bottom by its scroll view scrollable (0,1046 1080x495): 25% of it is drawn, and the content is exhausted: swi
+  - ok android-averi_lab-api33/carousel-in-list.xml C tap — ERROR id:"lab.carousel-in-list.C" is outside its scroll view scrollable (66,380 948x234) at (1047,497): nothing of it is drawn (rect 1014,380 66x234) — scroll_until it first; nothing was tapped
+  - ok android-averi_lab-api33/carousel-in-list.xml C colour — FAIL  element id:"lab.carousel-in-list.C" fill within dE00 8 of #EEEEEE — nothing of the element is drawn: it lies outside its scroll view scrollable (66,380 948x234) (element 1014,380 66x234, screen 0,0 1080x2220) — scr
+  - ok android-averi_lab-api33/carousel-in-list.xml C scroll_until — ERROR scroll_until id:"lab.carousel-in-list.C" failed after 2 swipes (the last 2, swiping right, did not move it: content exhausted, or the swipes were not taken) — element in tree but never drawn: it lies outside its sc
 
-No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes.
+Red before the fix (caa0f41b, its first parent), and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes. Fixed by round 14's 16ff607 (the drawn frame, geometry.ts#Clips.drawnIn, on every tree that lists ancestry): S's tap refused outside lower, P and S stroked inside upper/lower and failing clipped at their edge; C's tap refused outside the carousel, its colour failing closed, scroll_until C right stroked 824 497 → 256 497 inside the carousel.
 
 ## LE2: OPEN-RED
 

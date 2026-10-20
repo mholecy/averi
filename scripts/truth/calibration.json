@@ -1094,7 +1094,8 @@
     {
       "n": "LE1",
       "note": "2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["16ff607"],
       "verified": "golden",
       "defect": "fully visible|^Tapped|reached where it is|^passed on",
       "checks": [
@@ -1106,7 +1107,7 @@
         "android-averi_lab-api33/carousel-in-list.xml C colour",
         "android-averi_lab-api33/carousel-in-list.xml C scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD, and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes."
+      "remark": "Red before the fix (caa0f41b, its first parent), and with the same symptom at the fixes of #12 (9c7885e) and #13 (29a5c30). Round 6: carousel-in-list's C, a card wholly right of its Compose carousel's clip, dumped as the strip of it on the screen right of that clip — Tapped on the background, its colour passing on the background (`^passed on`, LE2's form), the stop visible after 0 swipes. Fixed by round 14's 16ff607 (the drawn frame, geometry.ts#Clips.drawnIn, on every tree that lists ancestry): S's tap refused outside lower, P and S stroked inside upper/lower and failing clipped at their edge; C's tap refused outside the carousel, its colour failing closed, scroll_until C right stroked 824 497 → 256 497 inside the carousel."
     },
     {
       "n": "LE2",
