@@ -1169,7 +1169,7 @@ function cutByLater({ node, later }: Judged, minPiece: number): Cut | undefined 
     // its siblings does not have — never a text, which is tapped as before.
     if (node.role === 'text' || r.height >= minPiece) return undefined;
     const overlaid = later.overlaid();
-    return overlaid === undefined ? undefined : { edge: overlaid.edge, container: { ...overlaid.by.rect }, depth: across(r, overlaid.edge), by: overlaid.by };
+    return overlaid === undefined ? undefined : { edge: overlaid.edge, container: { ...overlaid.by.rect }, depth: overlaid.depth, by: overlaid.by };
   }
   for (const edge of EDGES) {
     const depth = across(r, edge);

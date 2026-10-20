@@ -1,6 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { containsPoint, coverText, nodeText, type Edge, type QuotedNode } from './geometry.js';
-import type { OverlaidEdge } from './later-edges.js';
 
 /**
  * A COVER: one node drawn over a target — as the draw order found it (draw-order.ts#DrawOrder.exposure), or, where it
@@ -52,7 +51,7 @@ export type CoverOrder =
   | { readonly kind: 'overlaid'; readonly edge: 'top' | 'bottom' };
 
 /** The cover the tree shows only by the cut at the target's overlaid edge (`CoverOrder`'s `overlaid`, later-edges.ts#OverlaidEdge): `by`, pressing where it lies, the surface of no presented screen. */
-export const overlaidCover = ({ by, edge }: OverlaidEdge): Cover => ({ node: by, reach: { ...by.rect }, order: { kind: 'overlaid', edge }, presented: false });
+export const overlaidCover = ({ by, edge }: { readonly by: UiNode; readonly edge: 'top' | 'bottom' }): Cover => ({ node: by, reach: { ...by.rect }, order: { kind: 'overlaid', edge }, presented: false });
 
 /** Whether `cover` is one the draw order found (draw-order.ts#Exposure.covers) — every order but `overlaid`, which the cut alone shows. */
 export const drawOrderFound = (cover: Cover): boolean => cover.order.kind !== 'overlaid';

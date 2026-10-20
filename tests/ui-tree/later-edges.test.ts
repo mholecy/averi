@@ -7,7 +7,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * THE EDGE EVIDENCE OF COMPOSE'S CUT AT A LATER NODE (ui-tree/later-edges.ts): each edge of a node, the later node laid
- * flush against it classified once — `overlay`, `outsideScrollView`, `beside`, `none` — over the lab's real captures
+ * flush against it classified once — `overlay`, `outsideScrollView`, `sameScrollView`, `aligned`, `none` — over the lab's real captures
  * (tests/fixtures/truth/android-averi_lab-api33), Compose's own snapshots and the shapes the overlay must not make.
  * What each class means to a judgement is tested end to end in overlaid-edge.test.ts, eyes.test.ts and the golden rows.
  */
@@ -53,17 +53,18 @@ describe('LaterEdge — each edge of a node classified, over the lab\'s captures
     // The bar riding on the IME, outside the form's scroll view: `phone` cut to 42 px under it, its title to 14 above it.
     ['form-keyboard', 'lab.form-keyboard.phone', only('top', 'outsideScrollView lab.form-keyboard.submit 42')],
     ['form-keyboard', 'lab.form-keyboard.phone.title', only('bottom', 'outsideScrollView lab.form-keyboard.submit 14')],
-    // A field's title flush above its field, in the same scroll view: laid beside it.
-    ['form-keyboard', 'lab.form-keyboard.street.title', only('bottom', 'beside lab.form-keyboard.street 56')],
-    // After `back` the bar sits lower: `note` cut to 14 px, `phone` whole and laid beside its title.
+    // A field's title flush above its field, in the same scroll view: its list's own content.
+    ['form-keyboard', 'lab.form-keyboard.street.title', only('bottom', 'sameScrollView lab.form-keyboard.street 56')],
+    // After `back` the bar sits lower: `note` cut to 14 px, `phone` whole under its title.
     ['form-keyboard.after-back', 'lab.form-keyboard.note', only('top', 'outsideScrollView lab.form-keyboard.submit 14')],
     ['form-keyboard.after-back', 'lab.form-keyboard.phone', only('top', 'none')],
-    // VA1's shape: R cut at the merged sticky header IN its own list — beside it, as a first row at rest lies whole under it.
-    ['scroll-sticky-cut', 'lab.scroll-sticky-cut.R', only('top', 'beside lab.scroll-sticky-cut.header 110')],
-    // Layout neighbours laid flush, sharing an alignment line: Q above N's 48-dp touch target, a picker row above the next.
-    ['bands', 'lab.bands.Q', only('bottom', 'beside lab.bands.N 132')],
-    ['bands-three-button', 'lab.bands-three-button.Q', only('bottom', 'beside lab.bands-three-button.N 165')],
-    ['form-picker', 'lab.form-picker.country.AL', only('bottom', 'beside lab.form-picker.country.AX 143')],
+    // VA1's shape: R cut at the merged sticky header IN its own list — `sameScrollView`, as a first row at rest lies whole under it.
+    ['scroll-sticky-cut', 'lab.scroll-sticky-cut.R', only('top', 'sameScrollView lab.scroll-sticky-cut.header 110')],
+    // Layout neighbours laid flush, sharing an alignment line in no scroll view: Q above N's 48-dp touch target.
+    ['bands', 'lab.bands.Q', only('bottom', 'aligned lab.bands.N 132')],
+    ['bands-three-button', 'lab.bands-three-button.Q', only('bottom', 'aligned lab.bands-three-button.N 165')],
+    // A picker row above the next, in their list.
+    ['form-picker', 'lab.form-picker.country.AL', only('bottom', 'sameScrollView lab.form-picker.country.AX 143')],
   ])('%s %s', async (cell, id, edges) => {
     const t = await lab(cell);
     expect(edgesOf(t, byId(t, id))).toEqual(edges);
@@ -71,26 +72,26 @@ describe('LaterEdge — each edge of a node classified, over the lab\'s captures
 
   it('Compose\'s snapshots: Contacts\' "Save" beside the 132-px overflow target reaching past it at both ends — a SIDE edge, never an overlay; accountDetail "+493" cut at the floating tab bar, outside its list', async () => {
     const contacts = await compose('contactsCreate');
-    expect(edgesOf(contacts, at(contacts, { x: 719, y: 99, width: 218, height: 110 }))).toEqual(only('right', 'beside container 218'));
+    expect(edgesOf(contacts, at(contacts, { x: 719, y: 99, width: 218, height: 110 }))).toEqual(only('right', 'aligned container 218'));
     const account = await compose('accountDetail');
     expect(edgesOf(account, at(account, { x: 736, y: 1831, width: 92, height: 9 }))).toEqual(only('bottom', 'outsideScrollView container 9'));
   });
 
-  it('a full-bleed header flush over an inset row: an overlay with no list; outside the row\'s list a flush neighbour; in it (a sticky header) beside it', () => {
+  it('a full-bleed header flush over an inset row: an overlay with no list; outside the row\'s list a flush neighbour; in it (a sticky header) the list\'s own', () => {
     const row = (t: UiNode) => edgesOf(t, byId(t, 'row'));
     expect(row(headerOver('no list'))).toEqual(only('top', 'overlay header 176'));
     expect(row(headerOver('outside it'))).toEqual(only('top', 'outsideScrollView header 176'));
-    expect(row(headerOver('in the list'))).toEqual(only('top', 'beside header 176'));
+    expect(row(headerOver('in the list'))).toEqual(only('top', 'sameScrollView header 176'));
   });
 
-  it('in no scroll view, a later node sharing an end with the row is laid beside it, at either end; one between two overlays has both', () => {
+  it('in no scroll view, a later node sharing an end with the row is aligned with it, at either end; one between two overlays has both', () => {
     const tree = (nodes: string): UiNode => parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">${nodes}</node></hierarchy>`);
     const row = '<node class="android.view.View" clickable="true" resource-id="row" bounds="[128,454][953,630]" />';
     const later = (id: string, bounds: string) => `<node class="android.view.View" resource-id="${id}" bounds="${bounds}"><node class="android.widget.TextView" text="${id}" bounds="[400,344][681,410]" /></node>`;
     const sharesLeft = tree(`${row}${later('bar', '[128,630][1080,800]')}`);
-    expect(edgesOf(sharesLeft, byId(sharesLeft, 'row'))).toEqual(only('bottom', 'beside bar 176'));
+    expect(edgesOf(sharesLeft, byId(sharesLeft, 'row'))).toEqual(only('bottom', 'aligned bar 176'));
     const sharesRight = tree(`${row}${later('bar', '[0,630][953,800]')}`);
-    expect(edgesOf(sharesRight, byId(sharesRight, 'row'))).toEqual(only('bottom', 'beside bar 176'));
+    expect(edgesOf(sharesRight, byId(sharesRight, 'row'))).toEqual(only('bottom', 'aligned bar 176'));
     const between = tree(`${row}${later('header', '[0,300][1080,454]')}${later('bar', '[0,630][1080,800]')}`);
     expect(edgesOf(between, byId(between, 'row'))).toEqual({ ...only('top', 'overlay header 176'), bottom: 'overlay bar 176' });
     expect(laterEdgesIn(between, sceneOf(between))(byId(between, 'row')).overlaid()).toMatchObject({ edge: 'top', by: byId(between, 'header') });
@@ -149,5 +150,11 @@ describe('LaterEdges — the two complements its readers ask', () => {
     asked.length = 0;
     laterEdgesIn(k, { order: { coversOf: (node, strip) => (asked.push(strip), kScene.order.coversOf(node, strip)) }, clips: kScene.clips })(byId(k, 'lab.form-keyboard.phone')).overlaid();
     expect(asked).toHaveLength(0);
+    // An overlay at the top: the bottom edge is not asked.
+    const top = headerOver('no list');
+    const topScene = sceneOf(top);
+    asked.length = 0;
+    expect(laterEdgesIn(top, { order: { coversOf: (node, strip) => (asked.push(strip), topScene.order.coversOf(node, strip)) }, clips: topScene.clips })(byId(top, 'row')).overlaid()).toMatchObject({ edge: 'top' });
+    expect(asked).toHaveLength(1);
   });
 });

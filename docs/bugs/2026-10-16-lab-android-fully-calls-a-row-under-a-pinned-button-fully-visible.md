@@ -2,7 +2,7 @@
 
 > **Status (2026-10-20, round 9):** fixed on `fix/r9-b4l1` at `7755978c` + `e6ed7d43` + `151b2ca5` (from `fix/round-9`
 > `706dfaea`): for a node in no scroll view, a node laid flush across its top or bottom edge, drawn after it outside its
-> subtree, that reaches past it at both ends is an OVERLAY the dump cut the node at (`ui-tree/standing.ts#OverlaidEdge`, ADR 0013
+> subtree, that reaches past it at both ends is an OVERLAY the dump cut the node at (`ui-tree/later-edges.ts#OverlaidEdge`, ADR 0013
 > refined 2026-10-20). `fully: true` names it as P's cover and never stops on P ("… cut at its bottom edge by container
 > id:lab.pinned-bar.continue (66,1956 948x154), drawn after it — the dump (Compose's, on Android) leaves out of a
 > node's bounds what a later node covers, so the rest of it may lie under that container"); the colour assert fails
