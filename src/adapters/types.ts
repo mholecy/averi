@@ -532,7 +532,7 @@ export interface UiNode {
    * lists in draw order) included; a run listed out of top order is surely no reading order and keeps its order as draw
    * order (Contacts' new-contact form, tests/fixtures/wda-capture-contacts-new-contact.json: its run lists an image at
    * y 62 after a button at y 319). Read by ui-tree/draw-order.ts#listsInReadingOrder alone, for one question: which
-   * of two overlapping CONTROLS of such a run is drawn on top is not told (`Exposure.unordered`) — so those listed
+   * of two overlapping CONTROLS of such a run is drawn on top is not told (cover.ts#CoverOrder's `untold`) — so those listed
    * before a control target cover it when one of them holds its centre. A mark of the source, like `flatList`: ui-tree
    * knows no platform. Absent on Android's trees (uiautomator's order is not measured to be reading order,
    * draw-order.ts's doc). Printed by `ui_snapshot` with the node.
@@ -598,7 +598,7 @@ export interface UiNode {
    *   module's marks adapter, `byMarks`): a typed layer's element, when its rect has area on the screen (never judged
    *   by `hidden`), is that layer's ONE cover through the whole screen; a `screen` layer reaches the whole screen and
    *   its own nodes stay covers, each a presented surface (presentation.ts#PresentedOver, which draw order reads for
-   *   `Exposure.presented`, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer`
+   *   each cover's `presented` flag, cover.ts#Cover, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer`
    *   (its kind and label, presentation.ts#Presentation.press) — to the standing's remedy
    *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.

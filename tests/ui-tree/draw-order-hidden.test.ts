@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, rectArea, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { coverNodes, tagged } from '../helpers/covers.js';
 import { node } from '../helpers/fake.js';
 
 // Draw order's `hidden` row (ui-tree/draw-order.ts#NOT_DRAWN): a node of a HIDDEN SUBTREE (`UiNode.hidden`, set by the
@@ -19,7 +20,7 @@ describe('a hidden subtree is no cover of a target', () => {
     const tree = await capture('swift-form-pushed');
     const standard = [...everyNode(tree)].find((n) => n.label === 'Standard')!;
     const seen = drawOrder(tree).exposure(standard, IPHONE);
-    expect({ covers: seen.covers.map(desc), centreCover: seen.centreCover, shows: seen.shows, tapAt: seen.tapAt }).toEqual({
+    expect({ covers: coverNodes(seen.covers).map(desc), centreCover: seen.centreCover, shows: seen.shows, tapAt: seen.tapAt }).toEqual({
       covers: [],
       centreCover: undefined,
       shows: 1,
@@ -32,7 +33,7 @@ describe('a hidden subtree is no cover of a target', () => {
     const order = drawOrder(tree);
     const underTabs = [...everyNode(tree)]
       .filter((n) => !n.hidden && rectArea(n.rect) > 0)
-      .flatMap((n) => order.exposure(n, IPHONE).covers.filter((c) => /^nav\.tab_|^Dashboard\//.test(c.identifier ?? c.label ?? '')).map((c) => `${desc(n)} under ${desc(c)}`));
+      .flatMap((n) => order.exposure(n, IPHONE).covers.filter(({ node: c }) => /^nav\.tab_|^Dashboard\//.test(c.identifier ?? c.label ?? '')).map(({ node: c }) => `${desc(n)} under ${desc(c)}`));
     expect(underTabs).toEqual([]);
   });
 
@@ -44,7 +45,7 @@ describe('a hidden subtree is no cover of a target', () => {
     const [oa, ob] = [drawOrder(tree), drawOrder(stripped)];
     const said = (order: ReturnType<typeof drawOrder>, n: UiNode) => {
       const seen = order.exposure(n, IPHONE);
-      return JSON.stringify({ covers: seen.covers.map(desc), presented: seen.presented.map(desc), tapAt: seen.tapAt, shows: seen.shows });
+      return JSON.stringify({ covers: seen.covers.map((c) => ({ ...c, node: desc(c.node) })), tapAt: seen.tapAt, shows: seen.shows });
     };
     const differ = a.flatMap((n, i) => (said(oa, n) === said(ob, b[i]) ? [] : [desc(n)]));
     expect(differ).toEqual([]);
@@ -58,7 +59,7 @@ describe('a hidden subtree is no cover of a target', () => {
     const tree = node({ role: 'container', rect: IPHONE, children: [list, tab] });
     const order = drawOrder(tree);
     expect(order.drawnOver(list.rect)).toEqual([tab]);
-    expect(order.exposure(list.children[0], IPHONE).covers).toEqual([]);
+    expect(coverNodes(order.exposure(list.children[0], IPHONE).covers)).toEqual([]);
   });
 
   it('…but a hidden control holding a target\'s centre is still something a tap there may press (`centreExcused`, the dismissal picker\'s refusal): WDA\'s isVisible "0" is no proof a node takes no touch', () => {
@@ -83,9 +84,11 @@ describe('…except the surface of a screen presented over the target\'s, which 
     expect(table.hidden).toBe(true);
     const row = [...everyNode(tree)].find((n) => n.label === 'a' && n.role === 'container')!; // the list's section header `a`, 0,116 402x38
     const seen = drawOrder(tree).exposure(row, IPHONE);
-    expect(seen.covers).not.toContain(table);
-    expect(seen.covers.map(desc)).toEqual(['container 0,0 402x874', 'container New Contact 0,78 402x54', 'button close 20,82 36x36', 'button Done 346,82 36x36', 'other Are you sure you want to discard this new contact? 10,78 240x169']);
-    expect(seen.presented).toEqual(seen.covers);
+    expect(coverNodes(seen.covers)).not.toContain(table);
+    // Every one of them a surface of the presented sheet's layer.
+    expect(tagged(seen.covers).map((c) => ({ ...c, node: desc(c.node) }))).toEqual(
+      ['container 0,0 402x874', 'container New Contact 0,78 402x54', 'button close 20,82 36x36', 'button Done 346,82 36x36', 'other Are you sure you want to discard this new contact? 10,78 240x169'].map((node) => ({ node, order: 'drawn', presented: true })),
+    );
     expect(seen.shows).toBe(0);
   });
 
@@ -97,6 +100,6 @@ describe('…except the surface of a screen presented over the target\'s, which 
     const window = node({ role: 'container', rect: IPHONE, children: [screen, sheet] });
     const tree = node({ role: 'container', rect: IPHONE, children: [window] });
     const seen = drawOrder(tree).exposure(row, IPHONE);
-    expect({ centreCover: seen.centreCover, presented: seen.presented, tapAt: seen.tapAt }).toEqual({ centreCover: form, presented: [form], tapAt: undefined });
+    expect({ centreCover: seen.centreCover, covers: tagged(seen.covers), tapAt: seen.tapAt }).toEqual({ centreCover: form, covers: [{ node: form, order: 'drawn', presented: true }], tapAt: undefined });
   });
 });

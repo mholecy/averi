@@ -88,7 +88,7 @@ export interface MarkedLayer {
 
 /**
  * A presented surface as a sentence quotes it (`Presentation.press`): the `surface` draw order named
- * (draw-order.ts#DrawOrder.presentedAt, #presentedOver, #markedAt, or `Exposure.presented`), where it presses
+ * (draw-order.ts#DrawOrder.presentedAt, #presentedOver, #markedAt, or cover.ts#Cover.presented), where it presses
  * (`reach`: the whole screen for a marked presented layer's cover — a typed layer's element, a `screen` layer itself —
  * else its rect), and that marked `layer` when it is one's cover.
  */

@@ -151,7 +151,7 @@ describe('UiNode.presentation "screen" — a later screen-sized layer shown over
     const order = drawOrder(tree);
     const byId = (id: string) => [...everyNode(tree)].find((n) => n.identifier === `lab.${id}`)!;
     for (const id of ['H', 'G', 'M', 'E', 'F']) expect(order.presentedOver(byId(id)), id).toBeDefined();
-    expect(order.exposure(byId('M'), SCREEN).presented.length).toBeGreaterThan(0);
+    expect(order.exposure(byId('M'), SCREEN).covers.some((c) => c.presented)).toBe(true);
   });
 
   it('…but only as the last word: a content-carrying layer after it is still the one marked, and one that is neither hidden nor shown still marks nothing', () => {

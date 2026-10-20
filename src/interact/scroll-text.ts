@@ -139,7 +139,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
       : o.unlocated
         ? { state: 'unlocated' }
         : undefined;
-  const by = facts.covers.at(-1);
+  const by = facts.covers.at(-1)?.node;
   return {
     swipes: o.swipes,
     visible: facts.visible,

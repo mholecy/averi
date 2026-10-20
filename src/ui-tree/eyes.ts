@@ -138,7 +138,7 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  * THE EYES TELL THE ORDER OF TWO CONTROLS LISTED IN READING ORDER (ADR 0024): the second question.
  *
  * Why: SwiftUI lists a container's elements in reading order, by their tops, not in draw order, so of two controls of
- * such a run that overlap the tree cannot say which is drawn on top (draw-order.ts#Exposure.unordered, ADR 0015
+ * such a run that overlap the tree cannot say which is drawn on top (cover.ts#CoverOrder's `untold`, ADR 0015
  * amended): the lab's menu row W (`51,448 300x64`, drawn on top) and the row C (`51,470`) beneath were BOTH refused, the
  * order not told. The screenshot tells it: W's teal fills the overlap and W's own band above it; C's band below it is
  * the blurred green (ΔE00 17.69 from the overlap, 0.00 between the overlap and W's band).
@@ -190,7 +190,7 @@ export async function judgedWithOrder<R extends LookReading, S extends Standing 
 
 /** One pair the eyes are asked to order: the target against `peer`, in tree units. */
 export interface OrderPair {
-  /** The `unordered` cover of the target (draw-order.ts#Exposure.unordered). */
+  /** The `untold` cover of the target (cover.ts#CoverOrder): its order against the target the listing does not give. */
   readonly peer: UiNode;
   /** Where the two overlap, in the frame the standing was judged in. */
   readonly overlap: Rect;
@@ -221,22 +221,22 @@ export interface OrderQuestion {
 /**
  * The question `standing` of `node` asks the eyes — when it is `covered` with remedy `unordered` (a cover the listing
  * does not order, ui-tree/standing.ts#Remedy) and not yet looked at (no `why`) — or undefined: every other standing
- * asks nothing. Its pairs are the standing's `unordered` covers, judged in its frame (`facts.screen`).
+ * asks nothing. Its pairs are the standing's `untold` covers, judged in its frame (`facts.screen`).
  */
 export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | PixelStanding): OrderQuestion | undefined {
   if (standing.kind !== 'covered' || standing.remedy.of !== 'unordered' || standing.remedy.why !== undefined) return undefined;
   const { facts } = standing;
   const frame = facts.screen;
-  const pairs = (facts.unordered ?? []).flatMap((peer): OrderPair[] => {
+  const pairs = facts.covers.filter((c) => c.order.kind === 'untold').flatMap(({ node: peer }): OrderPair[] => {
     const both = rectIntersection(node.rect, peer.rect);
     const overlap = both === undefined ? undefined : rectIntersection(both, frame);
     if (overlap === undefined) return [];
     // A band another cover of the target meets shows that cover, not the control it is a band of.
-    const others = facts.covers.filter((c) => c !== peer);
+    const others = facts.covers.filter((c) => c.node !== peer);
     const clear = (bands: readonly BandBeside[]): BandBeside[] =>
       bands.flatMap(({ band, around }) => {
         const on = rectIntersection(band, frame);
-        return on === undefined || others.some((c) => rectIntersection(c.rect, on) !== undefined) ? [] : [{ band: on, around }];
+        return on === undefined || others.some((c) => rectIntersection(c.node.rect, on) !== undefined) ? [] : [{ band: on, around }];
       });
     const aroundOf = (bands: readonly BandBeside[]): AroundStrip[] =>
       bands.flatMap(({ around }) => around.flatMap(({ rect, against }) => {

@@ -204,7 +204,7 @@ describe('one remedy for a target beneath a presented screen — the tap, the pi
             scene.standing(target, screen, { of: 'pixel', reads: (r) => r, glyphs: true }),
           ];
           for (const s of standings) {
-            if (s.kind === 'reachable' || s.facts.presented === undefined) continue;
+            if (s.kind === 'reachable' || !s.facts.covers.some((c) => c.presented)) continue;
             expect({ name, rect: target.rect, kind: s.kind, remedy: s.remedy.of }).toEqual({ name, rect: target.rect, kind: s.kind, remedy: 'presented' });
           }
         }
@@ -674,7 +674,7 @@ describe('a target not in the tree beneath a marked presented screen — scroll_
   });
 });
 
-// A cover whose order against the target the tree does not tell (draw-order.ts#Exposure.unordered: the lab's in-screen
+// A cover whose order against the target the tree does not tell (ui-tree/cover.ts#CoverOrder's `untold`: the lab's in-screen
 // menu row W, listed before the row C it is drawn over, in reading order) is said as overlapping it, and no verb
 // advises a scroll for it — one stroke beside the menu lands on its backdrop, which closes it (Remedy's `unordered`).
 // docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
