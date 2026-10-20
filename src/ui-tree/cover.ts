@@ -32,7 +32,7 @@ export interface Cover {
  * for an order the listing does not give (standing.ts#Remedy's `unordered` and `seenOver`):
  * - `drawn`: drawn over it by the draw order — listed after it, a floating tab bar's item, a presented layer's cover;
  * - `untold`: one of the two controls of a run listed in READING order (`UiNode.readingOrder`) that overlap it, which
- *   of the two is on top not told (draw-order.ts#readingOrderPeers' `unordered`);
+ *   of the two is on top not told (reading-order.ts#ReadingOrder's `unordered`);
  *   docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  * - `seenOver`: such a peer whose order a screenshot told, seen drawn over it (ui-tree/seen-order.ts);
  *   docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md

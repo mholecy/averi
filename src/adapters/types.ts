@@ -539,7 +539,7 @@ export interface UiNode {
    * markWdaDialect). On WDA it is a SORT CHECK, not a fact WDA states: most top-to-bottom layouts pass it, UIKit's (which
    * lists in draw order) included; a run listed out of top order is surely no reading order and keeps its order as draw
    * order (Contacts' new-contact form, tests/fixtures/wda-capture-contacts-new-contact.json: its run lists an image at
-   * y 62 after a button at y 319). Read by ui-tree/draw-order.ts#listsInReadingOrder alone, for one question: which
+   * y 62 after a button at y 319). Read by ui-tree/reading-order.ts#listsInReadingOrder alone, for one question: which
    * of two overlapping CONTROLS of such a run is drawn on top is not told (cover.ts#CoverOrder's `untold`) — so those listed
    * before a control target cover it when one of them holds its centre. A mark of the source, like `flatList`: ui-tree
    * knows no platform. Absent on Android's trees (uiautomator's order is not measured to be reading order,

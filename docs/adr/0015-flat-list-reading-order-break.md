@@ -59,7 +59,7 @@ container lists flat there too.
 - In such a run, the interactive siblings of a control target that overlap it past the slack — neither holding the
   other whole nor of its frame — in idb's flat list from its content on (ADR 0004's top bar stays chrome) and none of
   its bottom chrome (a tab bar's items are covers by their own rule), on a nested tree none pinned at the screen's
-  bottom (`bottomPinned`'s shape), are its covers whose ORDER is not told (`draw-order.ts#readingOrderPeers`):
+  bottom (`bottomPinned`'s shape), are its covers whose ORDER is not told (`reading-order.ts#readingOrderOf`):
   - those listed BEFORE it are covers of it when one of them holds its centre (the draw order alone gives them not):
     C, under W. Only then: siblings that only overlap the target's edges by a few points (a card's shadow, an avatar
     stack, a badge) would else fail its colour assert and every `fully` stop on a cover that may lie beneath it;
