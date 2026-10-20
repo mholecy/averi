@@ -8,7 +8,8 @@ import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { coverOverClause, orderRemedyText, outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { coverClause } from '../ui-tree/cover.js';
+import { orderRemedyText, outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
@@ -577,8 +578,8 @@ async function judgeOver(
     }
     case 'covered': {
       // The cover as the tree orders it against the element: drawn over it, its order untold or seen by a screenshot, or
-      // the node at its overlaid edge (ui-tree/standing.ts#coverOverClause, the one choice of its words).
-      return `${coverText(standing.cover, standing.reach)} ${coverOverClause(standing.facts, standing.cover, `${at})`)} — ${coverRemedy(standing.remedy)}`;
+      // the node at its overlaid edge (ui-tree/cover.ts#coverClause, the one choice of its words, in the pixel grammar).
+      return `${coverText(standing.cover.node, standing.cover.reach)} ${coverClause(standing.cover, { of: 'pixel', at: `${at})` })} — ${coverRemedy(standing.remedy)}`;
     }
     default: {
       // Exhaustive by type: a kind left unworded must not read as "nothing over it" (that would measure the cover).

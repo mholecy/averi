@@ -39,8 +39,9 @@ const overIt = (s: PixelStanding): string => {
   if (s.kind === 'systemBar') return s.bar.edge === 'top' ? 'the status bar' : 'the navigation bar';
   if (s.kind === 'cut') return `cut at the navigation bar, in ${s.container.x},${s.container.y} ${s.container.width}x${s.container.height}`;
   if (s.kind !== 'covered') return s.kind;
-  const reach = JSON.stringify(s.reach) === JSON.stringify(s.cover.rect) ? '' : `, reaching ${s.reach.x},${s.reach.y} ${s.reach.width}x${s.reach.height}`;
-  return `${nodeText(s.cover).slice(0, -1)}${reach})`;
+  const { node, reach: r } = s.cover;
+  const reach = JSON.stringify(r) === JSON.stringify(node.rect) ? '' : `, reaching ${r.x},${r.y} ${r.width}x${r.height}`;
+  return `${nodeText(node).slice(0, -1)}${reach})`;
 };
 
 /**

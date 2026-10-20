@@ -102,7 +102,8 @@ the listing made it, named `Exposure.seenOver` instead of `unordered`. An untold
 THE REMEDY (`standing.ts#Remedy`, second in the precedence beside `unordered`): `seenOver` — no scroll; "if it is a menu
 or a popover, close it first; no scroll moves it out from under it" (the pixel assert: "… else assert something in the
 element that lies clear of it", after "the capture would show it, not the element"); the cover named "drawn over it as
-a screenshot shows (the two are listed in reading order)" (`geometry.ts#seenOverText`, `#drawnOverSeenText`). An
+a screenshot shows (the two are listed in reading order)" (`geometry.ts`'s `seenOverText` and `drawnOverSeenText` then; since round 10 the `seenOver` case of
+`cover.ts#coverClause`). An
 `unordered` remedy a screenshot looked at carries why it could not tell (`why`), and its words drop "see a
 screenshot": "no scroll tells which is on top: a screenshot could not tell either (the two look alike (ΔE 3.10)) — …".
 

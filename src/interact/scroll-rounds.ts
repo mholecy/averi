@@ -2,6 +2,7 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
+import { drawOrderFound, lastPresented, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -9,7 +10,7 @@ import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
-import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
+import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedEnd, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
@@ -231,8 +232,8 @@ export type ScrollOutcome = (
        */
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
-  | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
-  | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; layer?: MarkedLayer; next?: undefined }
+  | { kind: 'covered'; swipes: number; cover: AppliedKeyboard; viewport: Rect; evidence: WaitEvidence }
+  | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; layer?: MarkedLayer; next?: undefined }
   | { kind: 'presented'; swipes: number; judged: Judged | undefined; viewport: Rect; next: PresentedTouchDown }
   /**
    * Under a cover the tree lists in reading order with it (ui-tree/standing.ts#Remedy's `unordered`, the order not
@@ -242,7 +243,7 @@ export type ScrollOutcome = (
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
-  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
+  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
   | {
       kind: 'bound';
       swipes: number;
@@ -251,7 +252,7 @@ export type ScrollOutcome = (
       /** Direction changes the scroll made (a fling carried the target past the frame). */
       turns: number;
       /** The last cover any round applied, in how many of the rounds that read. */
-      keyboard?: { cover: Cover; rounds: number; read: number };
+      keyboard?: { cover: AppliedKeyboard; rounds: number; read: number };
       unlocated: boolean;
       evidence: WaitEvidence;
       /** The swipe the bound held back would have touched down on a screen presented over the target's (interact/stroke-plan.ts#PresentedTouchDown). */
@@ -430,7 +431,7 @@ export type Shortfall =
   | { of: 'absent'; unsearched?: Edge; miss?: Miss }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
-  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
+  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: AppliedKeyboard; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
 
 /** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
 export interface PastSide {
@@ -686,7 +687,7 @@ interface State {
   /** Every round's tree read, failed ones included — for the timeout's sentence, where a failed read's time counts. */
   readonly reads: ReadTime;
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
-  readonly lastCover: Cover | undefined;
+  readonly lastCover: AppliedKeyboard | undefined;
   readonly coveredRounds: number;
   /** What the strokes remember across reads — the target's scroll views, the last keyboard line, the scroll view the last stroke went over (interact/stroke-plan.ts#StrokeMemory): the plan's, which `round` holds and reads none of. */
   readonly strokes: StrokeMemory;
@@ -1153,7 +1154,9 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, courseOf(s), cover, f));
-    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => overFar(c.reach)));
+    // Only the covers the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover: the overlaid
+    // one (`overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
+    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => drawOrderFound(c) && overFar(c.reach)));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyondFarEdgeIn(farFacts(best), courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
@@ -1407,7 +1410,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
     // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
     const { facts } = best.standing;
-    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.length > 0 }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
+    // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover —
+    // neutral either way today: an overlaid cover lies over a node in no scroll view, which has no flush neighbour to ask of.
+    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.some(drawOrderFound) }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
     // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
     // last refused them — no confirm, no screenshot; this stroke's read, short as before.
     const refused = s.eyesRefused;
@@ -1467,8 +1472,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // presented surface lies over it IN this read's frame (a `presented` one of `facts.covers`, ui-tree/cover.ts#Cover). One the standing judged of the node
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
     // ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
+    // The cover its sentence names is the remedy's (`remedied`), as its record: the one the standing judged it under, else
+    // that surface.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented' && best.standing.facts.covers.some((c) => c.presented)) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    const surface = lastPresented(best.standing.facts.covers);
+    if (remedy?.of === 'presented' && surface !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: best.standing.kind === 'covered' ? best.standing.cover : surface, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — no swipe tells which is
     // on top or moves it out from under the other: stop.
     if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver')) {
@@ -1641,8 +1649,8 @@ interface FlushRound {
   /** The round's gesture box (`RoundSeen.screen`'s `oriented`). */
   readonly gesture: Rect | undefined;
   /** The keyboard cover the read applied, and the one it offered the witness (scroll-read.ts#ReadJudgement). */
-  readonly cover: Cover | undefined;
-  readonly offered: Cover | undefined;
+  readonly cover: AppliedKeyboard | undefined;
+  readonly offered: AppliedKeyboard | undefined;
   readonly seen: RoundSeen;
   /** `round`'s ask: the state as it came in, the question asked. */
   readonly ask: (what: 'witness') => Next;
@@ -1798,7 +1806,7 @@ interface BoundRound {
   /** The frame it was judged in — the screen box (`State.frame`) — which an `offFrame` failure quotes. */
   readonly viewport: Rect;
   /** The keyboard cover applied to that frame, if any — quoted with it. */
-  readonly cover: Cover | undefined;
+  readonly cover: AppliedKeyboard | undefined;
   /** What this round's read saw of a target no round matched (ui-tree/miss.ts#missOf) — an `absent` failure carries it. */
   readonly miss: Miss | undefined;
   /** What the eyes saw over the best match this round, when that alone kept a `fully: true` stop from being claimed. */

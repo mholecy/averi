@@ -1,5 +1,6 @@
 import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, type Cut } from '../ui-tree/geometry.js';
+import type { Cover } from '../ui-tree/cover.js';
 import type { SurfaceFinding } from '../ui-tree/eyes.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, type KeyboardLine } from '../ui-tree/keyboard-position.js';
@@ -18,7 +19,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
  * and the stop's `fully`. Its answer is the read's judgement, or that the
  * witness must be asked first:
  * - the tree's facts (`TreeFacts`), derived once;
- * - the keyboard cover that applies — a reading's (`coverOf`), the
+ * - the keyboard cover that applies — a reading's (`offeredKeyboard`), the
  *   witness standing by it, or idb's band (`bandCoverOf`), which no
  *   witness stands by — and the reading's offered cover, applied or not;
  * - the best match judged (`judge`), box by box over the boxes that count
@@ -107,7 +108,7 @@ export interface RoundRead {
  *   since), never any on iOS, which has no clipping container;
  * - its `keyboard` position: idb's keyboard band (`line`), the line the strokes stay above (`strokeLine`) and the round
  *   judges under (`bandCoverOf`), and which nodes are the keyboard's own (`owns`: the reading's `ofKeyboard`, idb's
- *   band's nodes), judged against the whole screen. The reading's line is the round's protocol's (`coverOf`), never
+ *   band's nodes), judged against the whole screen. The reading's line is the round's protocol's (`offeredKeyboard`), never
  *   the position's: the look holds no `cover` to ask.
  */
 export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
@@ -175,7 +176,7 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
 }
 
 /**
- * A shown soft keyboard as the round may apply it — a reading's cover (`coverOf`), or idb's band (`bandCoverOf`): its frame,
+ * A shown soft keyboard as the round may apply it — a reading's cover (`offeredKeyboard`), or idb's band (`bandCoverOf`): its frame,
  * the part of the screen it leaves — everything above its TOP edge, full
  * width — and what the adapter can do about it. Above the top edge, not
  * around the band: a docked keyboard (Android IME [0,1398][1080,2220], WDA
@@ -198,7 +199,7 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
  * itself — would tap it; and a panel dragged near the top leaves a short
  * stroke box (a residual).
  */
-export interface Cover {
+export interface AppliedKeyboard {
   topCover: Rect;
   above: DeviceScreen | undefined;
   remedy: KeyboardRemedy;
@@ -217,7 +218,7 @@ export interface Cover {
  */
 export interface Judged {
   node: UiNode;
-  under?: Cover;
+  under?: AppliedKeyboard;
   standing: Standing;
 }
 
@@ -234,9 +235,9 @@ export interface ReadJudgement {
   /** The match judged best (`judge`), under the applied cover when one applies; undefined when the read found none. */
   readonly best: Judged | undefined;
   /** The cover the read applied — the reading's once the witness stood by it, or idb's band — or none (moot, denied, or no keyboard). */
-  readonly cover: Cover | undefined;
+  readonly cover: AppliedKeyboard | undefined;
   /** The reading's cover, applied or not — for the probe's late witness (scroll-rounds.ts#round). Never idb's band. */
-  readonly offered: Cover | undefined;
+  readonly offered: AppliedKeyboard | undefined;
   /**
    * The frames the far edge is judged in (ui-tree/standing.ts#farEdgeFrames):
    * the screen above an applied cover, else every box that counts — each
@@ -263,9 +264,9 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   // The stop's purpose, mapped from the tool's flag once (ui-tree/standing.ts#TouchPurpose).
   const stop: StopOf = fully ? 'fully' : 'stop';
   // The round judged twice when a keyboard is up: over the whole screen,
-  // and over the screen ABOVE the cover (`coverOf`) — the covered judgement
+  // and over the screen ABOVE the cover (`offeredKeyboard`) — the covered judgement
   // stands only when the band changes the round and the witness stood by it.
-  const offered = coverOf(read.cover, viewport);
+  const offered = offeredKeyboard(read.cover, viewport);
   // The tree's facts, once a read (`factsOf`): what is drawn over what
   // (ui-tree/draw-order.ts) — the judgement's covers, and the stroke's —
   // each match's clipping ancestors, for the plain stop's sliver rule
@@ -274,12 +275,12 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   const whole = judgeOver(found, screen, facts, stop);
   // Where the keyboard lies on this read (the look's position, ui-tree/keyboard-position.ts): idb's band from the scene's
   // draw order, and which nodes are the keyboard's own — the read's `ofKeyboard`; the reading's line is the round's
-  // protocol's (`coverOf`).
+  // protocol's (`offeredKeyboard`).
   const position = facts.keyboard;
   // idb's band (`bandCoverOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
   const band = offered !== undefined ? undefined : bandCoverOf(position.line(), viewport, read.remedy);
   const applied = offered ?? band;
-  let cover: Cover | undefined;
+  let cover: AppliedKeyboard | undefined;
   let best = whole;
   if (applied !== undefined) {
     // The keyboard's own UI is judged against the whole screen: the reading's (WDA's marks), and idb's band's own nodes.
@@ -314,7 +315,7 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
 }
 
 /** The cover a reading offers, its line the cover's (ui-tree/keyboard-position.ts#coverLine), or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
-function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cover | undefined {
+function offeredKeyboard(shown: KeyboardCover | undefined, viewport: DeviceScreen): AppliedKeyboard | undefined {
   if (shown === undefined) return undefined;
   // The highest covered rect, not always the inset band: a floating
   // Gboard's panel mid-screen above its 132-px strip — so a target
@@ -336,13 +337,13 @@ function coverOf(shown: KeyboardCover | undefined, viewport: DeviceScreen): Cove
  * below the viewport's bottom.
  * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
-function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): Cover | undefined {
+function bandCoverOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): AppliedKeyboard | undefined {
   if (line === undefined || line.y >= viewport.y + viewport.height) return undefined;
   const topCover = bandRect(line, viewport);
   return { topCover, above: aboveTop(line.y, viewport), remedy, line };
 }
 
-/** A cover's `above` (`Cover`): the viewport's width down to the cover's top `y`, or none when the top lies at or above y 0. */
+/** A cover's `above` (`AppliedKeyboard`): the viewport's width down to the cover's top `y`, or none when the top lies at or above y 0. */
 const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined => (y <= 0 ? undefined : { width: viewport.width, height: y });
 
 /**
@@ -358,7 +359,7 @@ const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined =
  * tests/interact/scroll.test.ts), and one at or above its top cannot occur:
  * the band starts below the top bar's line, a fifth of the screen down.
  */
-export function strokeLine(cover: Cover | undefined, facts: Pick<TreeFacts, 'keyboard'>): KeyboardLine | undefined {
+export function strokeLine(cover: AppliedKeyboard | undefined, facts: Pick<TreeFacts, 'keyboard'>): KeyboardLine | undefined {
   return facts.keyboard.line(undefined, cover?.line);
 }
 
@@ -383,7 +384,7 @@ function judge(
   frame: UsableScreen,
   facts: Pick<TreeFacts, 'scene'>,
   stop: StopOf,
-  cover?: { cover: Cover; owns: (node: UiNode) => boolean },
+  cover?: { cover: AppliedKeyboard; owns: (node: UiNode) => boolean },
 ): Judged | undefined {
   const scored = found.map((node): Judged => {
     const under = cover === undefined || cover.owns(node) ? undefined : cover.cover;
@@ -426,7 +427,7 @@ export function stops(j: Judged): boolean {
 /** What a match in the frame is short of a stop (`shortOf`): cut (`clipped`), or something of the app drawn over it (`covered`). */
 export type InFrameShort =
   | { of: 'clipped'; judged: Judged }
-  | { of: 'covered'; judged: Judged; cover: UiNode }
+  | { of: 'covered'; judged: Judged; cover: Cover }
   /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
   | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
   | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number }

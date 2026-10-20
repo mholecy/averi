@@ -175,7 +175,8 @@ Compose cut is vertical, and sideways a row's padded overflow icon reaches past 
 
 **Its three uses**, all inside the standing, the interface unchanged:
 1. The `fully` stop names the overlay as its cover when the exposure found none (`covered`, remedy `scroll`; the fact
-   `StandingFacts.overlaid`). `scroll_until … fully: true` never claims `P`: it fails saying "cut at its bottom edge by
+   `StandingFacts.overlaid` — since 2026-10-20, architecture round 10, a cover of its own, its order `overlaid`:
+   `cover.ts#CoverOrder`). `scroll_until … fully: true` never claims `P`: it fails saying "cut at its bottom edge by
    … drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the
    rest of it may lie under that container", with no share said to show (how far it runs on is not told).
 2. The pixel assert, with no pixel cover, names it, its rect the reach, and fails closed ("… meets the element's bottom
@@ -187,7 +188,7 @@ Compose cut is vertical, and sideways a row's padded overflow icon reaches past 
 
 The tap and the plain stop are otherwise unchanged: they judge the centre, which the cut leaves clear unless it is a
 sliver (`P`'s probe at its dumped centre fired `P`). The words for the cut are one clause in the UI-tree layer
-(`geometry.ts#mayRunOnUnderText`, `#cutAtLaterText`), said by the sliver's sentence, `scroll_until`'s `fully` failure
+(`geometry.ts`'s then, `cover.ts#mayRunOnUnderText`, `#cutAtLaterText` since round 10), said by the sliver's sentence, `scroll_until`'s `fully` failure
 and the pixel assert's covered miss.
 
 **Never for a node in a scroll view — VA1 left open.** The same shape cuts `scroll-sticky-cut`'s `R` at a

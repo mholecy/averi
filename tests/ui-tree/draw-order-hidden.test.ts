@@ -100,6 +100,6 @@ describe('…except the surface of a screen presented over the target\'s, which 
     const window = node({ role: 'container', rect: IPHONE, children: [screen, sheet] });
     const tree = node({ role: 'container', rect: IPHONE, children: [window] });
     const seen = drawOrder(tree).exposure(row, IPHONE);
-    expect({ centreCover: seen.centreCover, covers: tagged(seen.covers), tapAt: seen.tapAt }).toEqual({ centreCover: form, covers: [{ node: form, order: 'drawn', presented: true }], tapAt: undefined });
+    expect({ centreCover: seen.centreCover?.node, covers: tagged(seen.covers), tapAt: seen.tapAt }).toEqual({ centreCover: form, covers: [{ node: form, order: 'drawn', presented: true }], tapAt: undefined });
   });
 });
