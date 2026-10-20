@@ -351,9 +351,9 @@ writes `<out>.partial`, the full report left as it is. The sides run half the co
 is kept in a cache (`scripts/truth/side-cache.ts`; `<worktrees>/side-cache` unless `--cache` names another directory)
 under a key of the side (a commit's SHA; the working tree's `src/` as on disk) and everything of the harness its run
 depends on: every file under `scripts/differential`, `scripts/truth` (but `calibration.json`, which golden never
-reads, and the Markdown), `tests/differential/golden` and `tests/fixtures`, the corpus, the `src` this checkout's harness loads itself
-(the run-time import closure of `golden.ts`), `package-lock.json`, the node version and whether the host asks the `ocr`
-rows. So a run after a table edit or a fix outside that closure replays only the sides whose key changed; the console
+reads, and the Markdown), `tests/differential/golden` and `tests/fixtures`, the corpus, the `src` this checkout's
+harness loads itself (the run-time import closure of `golden.ts`), `package-lock.json`, the node version and whether
+the host asks the `ocr` rows. So a run after a table edit or a fix outside that closure replays only the sides whose key changed; the console
 names the sides taken from the cache. `--no-cache` runs every side and keeps the runs afresh.
 `tests/truth/calibration.test.ts` pins the table against docs/bugs and the git history, and the verdicts, the canary,
 the wiring, a side that fails and the pool as pure functions; `tests/truth/side-cache.test.ts` the key and the cache.
