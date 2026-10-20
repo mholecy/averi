@@ -605,13 +605,13 @@ export const overlaidBy = (facts: Pick<StandingFacts, 'overlaid'>, cover: UiNode
  * (draw-order.ts#Exposure.unordered: the two listed in reading order) — the one question every reader of
  * `facts.unordered` asks: `Remedy`'s `unordered`, `coverClause`, the pixel assert's covered sentence.
  */
-export const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
+const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
 
 /**
  * Whether `cover`, one of `facts.covers`, is one whose order the tree did not tell and a screenshot did, seen drawn over
  * the node (draw-order.ts#Exposure.seenOver) — `orderUntold`'s sibling, asked by the same readers.
  */
-export const seenOver = (facts: Pick<StandingFacts, 'seenOver'>, cover: UiNode): boolean => facts.seenOver?.includes(cover) === true;
+const seenOver = (facts: Pick<StandingFacts, 'seenOver'>, cover: UiNode): boolean => facts.seenOver?.includes(cover) === true;
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
