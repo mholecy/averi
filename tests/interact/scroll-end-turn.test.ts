@@ -4,7 +4,7 @@ import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import type { RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
-import { planStroke, seeRead, startStrokes, strokedEnd, strokeSent } from '../../src/interact/stroke-plan.js';
+import { planStroke, seeRead, startStrokes, strokedContent, strokeSent } from '../../src/interact/stroke-plan.js';
 import { largestScroller } from '../../src/ui-tree/geometry.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
@@ -13,7 +13,7 @@ import { decided, failureOf, play, resultOf, strokesToward, type Row } from '../
 /**
  * The END TURN (interact/scroll-rounds.ts#EndTurn; lab note LV4,
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md)
- * and the end proof it rests on (#Observed.ends, interact/stroke-plan.ts#strokedEnd, ui-tree/geometry.ts#Clips.endsAt),
+ * and the end proof it rests on (#Observed.ends, interact/stroke-plan.ts#strokedContent, ui-tree/geometry.ts#Clips.contentToward),
  * over the real WDA capture of the lab app's `scroll-bounded` at rest: `lower` (0,380 402x180) at its top, its content
  * listed at 0,380 402x1300, F at 51,1380 300x64 — 820 pt below what `lower` shows. A moved read is that capture with
  * `lower`'s content shifted up by the offset, as WDA lists a scrolled UIScrollView's content.
@@ -42,18 +42,18 @@ const at = (offset: number, id = F): Row => {
 describe('the end proof — the tree lists where a scroll view\'s content ends (WDA only)', () => {
   it('the capture: `lower` at rest lists nothing above its top, and 1120 pt below its bottom; scrolled 300 pt it lists content above', () => {
     const { clips } = sceneOf(CAPTURE);
-    expect(clips.endsAt(LOWER, 'top')?.rect).toEqual(LOWER);
-    expect(clips.endsAt(LOWER, 'bottom')).toBeUndefined();
-    expect(sceneOf(scrolled(300)).clips.endsAt(LOWER, 'top')).toBeUndefined();
+    expect(clips.contentToward(LOWER, 'top')).toMatchObject({ kind: 'ends', view: { rect: LOWER } });
+    expect(clips.contentToward(LOWER, 'bottom')).toEqual({ kind: 'listed' });
+    expect(sceneOf(scrolled(300)).clips.contentToward(LOWER, 'top')).toEqual({ kind: 'listed' });
     // No scroll view of that rect in the tree: nothing to say.
-    expect(clips.endsAt({ x: 0, y: 0, width: 10, height: 10 }, 'top')).toBeUndefined();
+    expect(clips.contentToward({ x: 0, y: 0, width: 10, height: 10 }, 'top')).toBeUndefined();
   });
 
   it('finds the scroll view by its exact rect, as its axes are found: one remembered half a pixel off proves nothing', () => {
     const { clips } = sceneOf(CAPTURE);
     const off: Rect = { ...LOWER, y: LOWER.y + 0.5 };
     expect(clips.axesOf(off)).toBeUndefined();
-    expect(clips.endsAt(off, 'top')).toBeUndefined();
+    expect(clips.contentToward(off, 'top')).toBeUndefined();
   });
 
   it('only along the axis the scroll view scrolls on: a horizontal carousel lists nothing below its bottom, and that proves no end for a vertical stroke', () => {
@@ -65,29 +65,29 @@ describe('the end proof — the tree lists where a scroll view\'s content ends (
       children: [node({ role: 'scrollable', rect: carousel, children: [node({ role: 'other', rect: { x: 24, y: 138, width: 1416, height: 85 } })] })],
     });
     const { clips } = sceneOf(tree);
-    expect(clips.endsAt(carousel, 'bottom')).toBeUndefined();
-    expect(clips.endsAt(carousel, 'top')).toBeUndefined();
+    expect(clips.contentToward(carousel, 'bottom')).toEqual({ kind: 'listed' });
+    expect(clips.contentToward(carousel, 'top')).toEqual({ kind: 'listed' });
     // Along its axis it does: nothing of it left of its left edge.
-    expect(clips.endsAt(carousel, 'left')?.rect).toEqual(carousel);
+    expect(clips.contentToward(carousel, 'left')).toMatchObject({ kind: 'ends', view: { rect: carousel } });
   });
 
   it('uiautomator\'s dialect (rects cut to their clipping scroll container) never proves an end: content past the edge would read flush with it', () => {
     const list: Rect = { x: 0, y: 303, width: 1080, height: 605 };
     const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'scrollable', rect: list, clipsDescendants: true, children: [node({ role: 'button', rect: { x: 128, y: 303, width: 825, height: 176 } })] })] });
-    expect(sceneOf(tree).clips.endsAt(list, 'top')).toBeUndefined();
+    expect(sceneOf(tree).clips.contentToward(list, 'top')).toEqual({ kind: 'listed' });
   });
 
-  it('strokedEnd asks it of the scroll view the last stroke SENT went over, the edge the stroke\'s direction brings content in through', () => {
+  it('strokedContent asks it of the scroll view the last stroke SENT went over, the edge the stroke\'s direction brings content in through', () => {
     const facts = { scene: sceneOf(CAPTURE), mainScroller: largestScroller(CAPTURE) };
     const f = [...everyNode(CAPTURE)].find((n) => n.identifier === F);
     const seen = seeRead(startStrokes(), { facts, line: undefined, target: f });
     const plan = planStroke(seen, { toward: 'up', reach: 1, gesture: { x: 0, y: 0, width: 402, height: 874 }, read: { facts, target: f } });
     expect(plan.stroke.box).toEqual(LOWER);
     // Planned, not sent: no stroke went over anything yet.
-    expect(strokedEnd(plan.memory, facts, 'up')).toBeUndefined();
+    expect(strokedContent(plan.memory, facts, 'up')).toBeUndefined();
     const sent = strokeSent(plan.memory);
-    expect(strokedEnd(sent, facts, 'up')?.rect).toEqual(LOWER);
-    expect(strokedEnd(sent, facts, 'down')).toBeUndefined();
+    expect(strokedContent(sent, facts, 'up')).toMatchObject({ kind: 'ends', view: { rect: LOWER } });
+    expect(strokedContent(sent, facts, 'down')).toEqual({ kind: 'listed' });
   });
 });
 

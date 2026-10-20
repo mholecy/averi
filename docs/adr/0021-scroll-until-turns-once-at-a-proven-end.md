@@ -44,8 +44,8 @@ the read a fling comes to rest in (decision 5).
       failure (decision 3; scroll-text.ts#endText, one wording for both since round 6's code review).
    The caller's direction is always stroked first. The turn keeps the full reach — no fling carried the target past;
    it was never near — and is not counted among the fling's turns (`scroll-rounds.ts#EndTurn`).
-2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedEnd`,
-   `ui-tree/geometry.ts#Clips.endsAt`): on the read right after a stroke toward the target (never the flush probe):
+2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedContent`,
+   `ui-tree/geometry.ts#Clips.contentToward`, its `ends`): on the read right after a stroke toward the target (never the flush probe):
    every match where it was (with no target, the whole tree unchanged), no progress node shown, the stroke touching
    down on nothing drawn over its scroll view, and the tree LISTING that scroll view's content ending at the edge the
    stroke brings content in through — no node of it past that edge — for a scroll view that scrolls along that axis
@@ -148,7 +148,7 @@ the read a fling comes to rest in (decision 5).
   kept. Both are the device check's to confirm (`ios wda turn:scroll-bounded.F`, `ios wda scroll:scroll-bounded.F`).
 - Two tolerances meet across reads, on purpose: whether a stroke moved the match ("unmoved") forgives under a pixel
   (`sameRectWithinPixel`), while the proof's and the carry's scroll view is found again by its EXACT rect
-  (`Clips.endsAt`, `stroke-plan.ts#carryOver`, as `axesOf` and `drawnOver` find it — round 6's code review, S1/P5).
+  (`Clips.contentToward`, `stroke-plan.ts#carryOver`, as `axesOf` and `drawnOver` find it — round 6's code review, S1/P5).
   WDA's rects reach the tree rounded (ios-node.ts), so a scroll view at rest keeps its rect; one that moves by a pixel
   between reads loses the proof (no turn after one stroke: the two-stroke rule decides) or the carry (no shortened
   final stroke), both the safe side. The live cases are where such a 1-px flip would show:

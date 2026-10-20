@@ -108,7 +108,7 @@ above its scroll view's top too.
 - **A unit past the edge is flush, not past** (`geometry.ts#overhangAsFlush`), on every tree — the tolerance is one
   unit of the source, a px on Android and a pt on WDA, as `flushEdges`' is; measured on Android only: mp-native's SWIFT
   toggle `66,1924 948x55` ends at 1979 under its form `[0,242][1080,1978]`, the line CONTINUE starts on. Cut there by a
-  pixel, the `fully` stop read it `clipped` where its flush probe is the rule (ADR 0013). `flushEdges` and `endsAt`
+  pixel, the `fully` stop read it `clipped` where its flush probe is the rule (ADR 0013). `flushEdges` and `contentToward`
   read "past" as more than a pixel already.
 - **The carry model stays WDA's** (`ui-tree/geometry.ts#DrawnFrame.listedWhereItLies`, true only where
   `draw-order.ts#listsUnclippedFrames`; the standing hands it on as `StandingFacts.listedWhereItLies`, which

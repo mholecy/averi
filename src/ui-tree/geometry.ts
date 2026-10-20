@@ -773,20 +773,23 @@ export interface Clips {
    */
   axesOf(container: Rect): ScrollAxes | undefined;
   /**
-   * The scroll view of rect `scroller` (found as `axesOf` finds its scroll view: scroll-containers.ts#isScrollViewOf,
-   * that exact rect — the one the stroke plan remembered and drew over, whose cut and axes the same read finds by it
-   * exactly; one moved by a pixel is found by none of them, and no proof is the safe answer), when the tree shows its
-   * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
-   * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`unclipped`,
-   * WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
-   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container
-   * at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
-   * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts most rects to their scroll
-   * container, so content past an edge reads flush with it (or is not listed at all) — that it does not cut some
-   * (`drawnIn`'s lab note) proves no end where it does — and idb's flat list lists no
-   * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
-   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG that
-   * edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
+   * What this tree lists of the content of the scroll view of rect `scroller` toward its `edge` (`ListedContent`) —
+   * the scroll view found as `axesOf` finds its scroll view (scroll-containers.ts#isScrollViewOf, that exact rect — the
+   * one the stroke plan remembered and drew over, whose cut and axes the same read finds by it exactly; one moved by a
+   * pixel is found by none of them, and undefined, no answer, is the safe one; so too on a tree that lists no
+   * ancestry, whose nesting is no scroll view's content).
+   *
+   * `ends`: the tree shows its CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more
+   * than a pixel — so nothing of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED
+   * frames only (`unclipped`, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content
+   * above a list's top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its
+   * content container at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). `listed`, not `ends`, when
+   * it does not end there, and on every other tree: uiautomator cuts most rects to their scroll container, so content
+   * past an edge reads flush with it (or is not listed at all) — that it does not cut some (`drawnIn`'s lab note)
+   * proves no end where it does — and idb's flat list lists no scroll view. What a node past the edge may be — a row,
+   * a parked cell's content (ADR 0019), a pinned header — is not asked: any of them says "not provably the end", the
+   * safe answer. And only for a scroll view that scrolls ALONG that edge's axis (scroll-containers.ts#scrollAxis: its
+   * content listed running on past its frame on that axis —
    * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
    * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
    * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
@@ -800,8 +803,14 @@ export interface Clips {
    * anywhere along a row), and the stroke must also go untaken, with nothing drawn over its touch-down (that withholds
    * the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most once a round, after a stroke).
    */
-  endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
+  contentToward(scroller: Rect, edge: Edge): ListedContent | undefined;
 }
+
+/**
+ * What a read lists of a scroll view's content toward one of its edges (`Clips.contentToward`): its content ENDING
+ * there (`ends`, the scroll view quoted), or any other listing (`listed`).
+ */
+export type ListedContent = { readonly kind: 'ends'; readonly view: UiNode } | { readonly kind: 'listed' };
 
 /** A scroll view's axis and those of the scroll views nested in it (`Clips.axesOf`). */
 export interface ScrollAxes {
@@ -866,6 +875,9 @@ export interface DrawnFrame {
   readonly listedWhereItLies: boolean;
 }
 
+/** `Clips.contentToward`'s answer for content listed, not ending at the edge asked. */
+const LISTED: ListedContent = { kind: 'listed' };
+
 /**
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
@@ -873,7 +885,7 @@ export interface DrawnFrame {
  * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry), which
  * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
  * frames unclipped (draw-order.ts#listsUnclippedFrames), which `axesOf` and
- * `endsAt` ask — the two readers of the tree's dialect, both in draw order.
+ * `contentToward` ask — the two readers of the tree's dialect, both in draw order.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
@@ -967,12 +979,12 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     axes.set(found, facts);
     return facts;
   };
-  const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
-    if (!ancestry || !unclipped) return undefined;
+  const contentToward = (scroller: Rect, edge: Edge): ListedContent | undefined => {
+    if (!ancestry) return undefined;
     const view = [...everyNode(tree)].find((n) => isScrollViewOf(n, scroller));
     if (view === undefined) return undefined;
     // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
-    if (scrollAxis(view, unclipped) !== axisOfEdge(edge)) return undefined;
+    if (!unclipped || scrollAxis(view, unclipped) !== axisOfEdge(edge)) return LISTED;
     const r = view.rect;
     const past: Record<Edge, (d: Rect) => boolean> = {
       top: (d) => d.y < r.y - 1,
@@ -981,14 +993,14 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
       right: (d) => d.x + d.width > r.x + r.width + 1,
     };
     const under = [...everyNode(view)].filter((d) => d !== view && rectArea(d.rect) > 0);
-    return under.some((d) => past[edge](d.rect)) ? undefined : view;
+    return under.some((d) => past[edge](d.rect)) ? LISTED : { kind: 'ends', view };
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, endsAt };
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, contentToward };
 }
 
 /**
  * `frame` with every edge `rect` is flush with (`flushEdges`: within a unit, a px on Android, a pt on WDA) and runs past
- * moved out onto `rect`'s: there the rect is FLUSH with its scroll view's edge, not past it (`endsAt` reads past as more
+ * moved out onto `rect`'s: there the rect is FLUSH with its scroll view's edge, not past it (`contentToward` reads past as more
  * than a unit too) — a rounding of the source's bounds, which the drawn frame must not read as a cut. Measured:
  * mp-native's SWIFT form on Android lists `details_toggle` at `66,1924 948x55`, ending at 1979, under its form
  * `[0,242][1080,1978]` — the CONTINUE bar starts at 1979, so the form's 1978 and the toggle's 1979 are the same line;
@@ -1011,7 +1023,7 @@ export function across(rect: Rect, edge: Edge): number {
 
 /**
  * The axis along which content comes in through `edge`: `vertical` for the top or bottom, `horizontal` for a side —
- * the one edge → axis mapping, read by `Clips.endsAt` and scroll_until's sentences (interact/scroll-text.ts), and by
+ * the one edge → axis mapping, read by `Clips.contentToward` and scroll_until's sentences (interact/scroll-text.ts), and by
  * interact/swipe.ts#axisOf for a direction (through its EDGE_TOWARD), so ui-tree imports nothing of interact.
  */
 export function axisOfEdge(edge: Edge): ScrollAxis {

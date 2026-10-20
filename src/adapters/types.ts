@@ -520,7 +520,7 @@ export interface UiNode {
    * view and SwiftUI's `ScrollView`) — measured: the at-rest SWIFT form lists `payee_name_input` at `24,801 354x52`,
    * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read by
    * ui-tree/draw-order.ts#listsUnclippedFrames: a scroll view's axis is read off its content past its frame
-   * (ui-tree/scroll-containers.ts#scrollAxis), its end off none (geometry.ts#Clips.endsAt), and `scroll_until`'s carry
+   * (ui-tree/scroll-containers.ts#scrollAxis), its end off none (geometry.ts#Clips.contentToward), and `scroll_until`'s carry
    * model measures a row's motion as the content's (interact/scroll-rounds.ts#stillNeeds). Not what cuts a node by
    * what scrolls above it: geometry.ts#Clips.drawnIn does that on every tree that lists ancestry. A mark of the
    * source, like `flatList`: ui-tree knows no platform. Absent on Android's trees (uiautomator cuts most nodes' bounds

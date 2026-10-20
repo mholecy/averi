@@ -39,7 +39,7 @@ export const SIDES: Readonly<Record<Edge, SideWords>> = {
 /**
  * The edge past which lies the content a scroll toward `direction` (where the content lies) brings in — its top for
  * `up`: `SIDES[…].reveals` read the other way (pinned against it in tests/interact/swipe.test.ts). Read by the end
- * proof (stroke-plan.ts#strokedEnd) and its sentences (scroll-text.ts).
+ * proof (stroke-plan.ts#strokedContent) and its sentences (scroll-text.ts).
  */
 export const EDGE_TOWARD: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
 

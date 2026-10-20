@@ -12,7 +12,7 @@ import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/st
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedEnd, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
+import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
@@ -266,7 +266,7 @@ export type ScrollOutcome = (
  * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below;
  * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): the strokes went the caller's way first and the read after
  * one of them proved the content exhausted that way — the stroke moved no match, and the tree shows the content of the
- * scroll view it went over ENDING at the edge that way (`Observed.ends`, interact/stroke-plan.ts#strokedEnd) — while
+ * scroll view it went over ENDING at the edge that way (`Observed.ends`, interact/stroke-plan.ts#strokedContent) — while
  * the tree places the target wholly past the OPPOSITE (far) edge of that same scroll view, inside it. Then the strokes
  * turn ONCE toward the target, at full reach (no fling carried it past: it was never near), and every reply and failure
  * says so (the proof — the caller's way, the scroll view named, the strokes that moved nothing — `to`, and the swipes
@@ -281,7 +281,7 @@ export type ScrollOutcome = (
  * guess either. Why turn rather than fail with the advice: the reply already knew the way, and a caller who asked the
  * wrong way gets the row at the cost of the one stroke that proved it.
  *
- * Decidable on WDA's trees only (unclipped frames: ui-tree/geometry.ts#Clips.endsAt). Not on uiautomator's: its rects
+ * Decidable on WDA's trees only (unclipped frames: ui-tree/geometry.ts#Clips.contentToward). Not on uiautomator's: its rects
  * are cut to the scroll container, so where the content ends is not listed — content past the edge reads flush with
  * it, or (Compose) is not listed at all — and the reads can prove the end only by strokes that changed nothing, which
  * a stroke not taken also does; so Android keeps the caller's direction and fails with the advice, as before. Nor on
@@ -1094,11 +1094,11 @@ interface Observed {
   /**
    * The exhaustion PROVEN by the tree, after one unmoved stroke (UNMOVED_STROKES_EXHAUST says why one alone is no proof
    * otherwise): the scroll view the stroke went over, whose content this read lists ending the way that stroke went
-   * (interact/stroke-plan.ts#strokedEnd) — set only with `exhausted`, on the read right after a stroke toward the
+   * (interact/stroke-plan.ts#strokedContent, its `ends`) — set only with `exhausted`, on the read right after a stroke toward the
    * target (not the flush check's probe) that moved nothing: every match where it was, or, with no target in the tree,
    * the whole tree unchanged; never while a progress node shows, nor of a stroke that touched down on a node drawn over
    * its scroll view (`touchedOn`: that node may have taken it, and the fast fail names it first); and only of a scroll
-   * view that scrolls along the stroke's axis (geometry.ts#Clips.endsAt). What counts as proof, stated: the tree's
+   * view that scrolls along the stroke's axis (geometry.ts#Clips.contentToward). What counts as proof, stated: the tree's
    * listing of the content, not the strokes — a stroke not taken moves nothing too, but cannot make a list's content
    * end where the tree shows it ending; and the read unmoved besides, so a list still settling (a bounce at its end,
    * momentum from an earlier stroke) reads moved and proves nothing until a read finds it still.
@@ -1215,16 +1215,17 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved, and never while a
   // progress node shows (content may yet load there). The flush probe (PROBE_REACH) never meets it, by the trees'
   // dialects: a probe is planned only over CLIPPING ancestors (`scrollersOf`), which only Android's tree marks, and the
-  // proof needs `Clips.endsAt`, which only a tree of unclipped frames (WDA's) answers — no real source gives both. The
+  // proof needs `Clips.contentToward`'s `ends`, which only a tree of unclipped frames (WDA's) answers — no real source gives both. The
   // probe's own answer is the stop it checks (pinned, on a synthetic tree carrying both marks, in
   // tests/interact/scroll-end-turn.test.ts).
   const unmovedNow = (offFrame && allUnmoved && !loading) || (found.length === 0 && treeUnmoved);
   // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
   // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
-  const ends =
+  const proof =
     current === 'stroke' && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, s.lastDrawn) === undefined
-      ? strokedEnd(s.strokes, facts, s.lastSent)
+      ? strokedContent(s.strokes, facts, s.lastSent)
       : undefined;
+  const ends = proof?.kind === 'ends' ? proof.view : undefined;
   const exhausted =
     offFrame && (s.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
       ? 'matches'
