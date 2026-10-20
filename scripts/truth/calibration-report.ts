@@ -46,7 +46,7 @@ export function calibrationReport(rs: readonly NoteResult[]): string {
     const sides =
       e.status === 'open' ? WORKING_TREE
       : e.before === undefined ? '—'
-      : `${e.before} → ${e.after ?? e.fix?.join(', ') ?? '?'}${e.afterNotFix === undefined ? '' : ` (the note's fix ${e.fix?.join(', ') ?? '—'} does not cure this cell)`}`;
+      : `${e.before} → ${e.after}${e.afterNotFix === undefined ? '' : ` (the note's fix ${e.fix?.join(', ') ?? '—'} does not cure this cell)`}`;
     lines.push(`| ${e.n} | ${e.note.replace(/\.md$/, '')} | ${e.status} | ${sides} | ${verdictCell(r)} |`);
   }
   lines.push('');
