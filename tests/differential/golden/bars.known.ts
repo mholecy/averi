@@ -19,7 +19,7 @@ export const bars: KnownFile = {
     ...keys(`${ANDROID}/fab.xml`, ['L', 'K'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: '#24: refused as under the FAB host, beside the FAB', as: FAB_HOST }),
     ...keys(`${ANDROID}/fab.xml`, ['L', 'K'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: '#24: fails closed naming the FAB host', as: FAB_HOST }),
     ...keys(`${ANDROID}/fab.xml`, ['L', 'K'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: FAB_STROKES, note: '#24: strokes to clear the FAB host, then fails', as: FAB_HOST }),
-    // LAB FINDING B4-L1 — fixed on fix/r9-b4l1 (ui-tree/standing.ts#OverlaidEdge): Compose's bounds leave out what the
+    // LAB FINDING B4-L1 — fixed on fix/r9-b4l1 (ui-tree/later-edges.ts#OverlaidEdge): Compose's bounds leave out what the
     // pinned Continue covers, so P's dumped rect ends at the button, which reaches past it at both ends — an overlay.
     // `fully` and the colour assert name it as P's cover; both rows green, struck off here, calibrated in
     // scripts/truth/calibration.json.

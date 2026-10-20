@@ -50,12 +50,12 @@ describe('lastPresented — the last cover that is a presented screen\'s surface
 describe('overlaidCover — the cover the tree shows only by the cut at the target\'s edge', () => {
   it('the node that cut it, pressing where it lies, its order `overlaid` at that edge, no presented surface', () => {
     const button = node({ role: 'button', label: 'Continue', rect: rect(66, 1956, 948, 154) });
-    expect(overlaidCover(button, 'bottom')).toEqual({ node: button, reach: rect(66, 1956, 948, 154), order: { kind: 'overlaid', edge: 'bottom' }, presented: false });
-    expect(overlaidCover(button, 'top').reach).not.toBe(button.rect);
+    expect(overlaidCover({ by: button, edge: 'bottom' })).toEqual({ node: button, reach: rect(66, 1956, 948, 154), order: { kind: 'overlaid', edge: 'bottom' }, presented: false });
+    expect(overlaidCover({ by: button, edge: 'top' }).reach).not.toBe(button.rect);
   });
   it('is no cover the draw order found (`drawOrderFound`); every other order is', () => {
     const button = node({ role: 'button', label: 'Continue', rect: rect(66, 1956, 948, 154) });
-    expect(drawOrderFound(overlaidCover(button, 'bottom'))).toBe(false);
+    expect(drawOrderFound(overlaidCover({ by: button, edge: 'bottom' }))).toBe(false);
     for (const kind of ['drawn', 'untold', 'seenOver'] as const) expect(drawOrderFound(cover('Bar', button.rect, { order: { kind } })), kind).toBe(true);
   });
 });
@@ -73,8 +73,8 @@ describe('coverClause — one clause per order, in each grammar', () => {
     ['untold', { ...w, order: { kind: 'untold' } }, pixel, 'overlaps the element (element 51,470 300x64), the two listed in reading order: which is drawn on top is not told'],
     ['seenOver', { ...w, order: { kind: 'seenOver' } }, touch, 'under button "W" (51,448 300x64) at its centre (201,480), drawn over it as a screenshot shows (the two are listed in reading order)'],
     ['seenOver', { ...w, order: { kind: 'seenOver' } }, pixel, 'is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order)'],
-    ['overlaid', overlaidCover(continueBar.node, 'bottom'), touch, `cut at its bottom edge by button "Continue" (24,780 354x44), drawn after it — ${MAY_RUN_ON} it may lie under that button`],
-    ['overlaid', overlaidCover(continueBar.node, 'bottom'), pixel, `meets the element's bottom edge (element 51,470 300x64), drawn after it — ${MAY_RUN_ON} the element may lie under that button`],
+    ['overlaid', overlaidCover({ by: continueBar.node, edge: 'bottom' }), touch, `cut at its bottom edge by button "Continue" (24,780 354x44), drawn after it — ${MAY_RUN_ON} it may lie under that button`],
+    ['overlaid', overlaidCover({ by: continueBar.node, edge: 'bottom' }), pixel, `meets the element's bottom edge (element 51,470 300x64), drawn after it — ${MAY_RUN_ON} the element may lie under that button`],
   ])('%s, %#', (_kind, c, grammar, said) => {
     expect(coverClause(c, grammar)).toBe(said);
   });

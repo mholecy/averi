@@ -1,5 +1,6 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { containsPoint, coverText, nodeText, type Edge, type QuotedNode } from './geometry.js';
+import type { OverlaidEdge } from './later-edges.js';
 
 /**
  * A COVER: one node drawn over a target — as the draw order found it (draw-order.ts#DrawOrder.exposure), or, where it
@@ -37,7 +38,7 @@ export interface Cover {
  * - `seenOver`: such a peer whose order a screenshot told, seen drawn over it (ui-tree/seen-order.ts);
  *   docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  * - `overlaid`: drawn after it, laid flush across its top or bottom `edge`, where the tree's source cut its bounds
- *   (standing.ts#OverlaidEdge, Compose's dialect) — known by that cut alone, so a sentence says how far the target may
+ *   (later-edges.ts#OverlaidEdge, Compose's dialect) — known by that cut alone, so a sentence says how far the target may
  *   run on under it is not told, never how much of it shows. Made only where the judgement found no cover of its
  *   own (`overlaidCover`): the `fully` stop where the exposure found none; the pixel assert where no cover paints a
  *   pixel it reads (draw-order.ts#paintsOver) — so there its node may also be among the exposure's covers, as one that
@@ -50,8 +51,8 @@ export type CoverOrder =
   | { readonly kind: 'seenOver' }
   | { readonly kind: 'overlaid'; readonly edge: 'top' | 'bottom' };
 
-/** The cover the tree shows only by the cut at the target's `edge` (`CoverOrder`'s `overlaid`): `by`, pressing where it lies, the surface of no presented screen. */
-export const overlaidCover = (by: UiNode, edge: 'top' | 'bottom'): Cover => ({ node: by, reach: { ...by.rect }, order: { kind: 'overlaid', edge }, presented: false });
+/** The cover the tree shows only by the cut at the target's overlaid edge (`CoverOrder`'s `overlaid`, later-edges.ts#OverlaidEdge): `by`, pressing where it lies, the surface of no presented screen. */
+export const overlaidCover = ({ by, edge }: OverlaidEdge): Cover => ({ node: by, reach: { ...by.rect }, order: { kind: 'overlaid', edge }, presented: false });
 
 /** Whether `cover` is one the draw order found (draw-order.ts#Exposure.covers) — every order but `overlaid`, which the cut alone shows. */
 export const drawOrderFound = (cover: Cover): boolean => cover.order.kind !== 'overlaid';

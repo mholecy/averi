@@ -1,7 +1,7 @@
 import { PNG } from 'pngjs';
 import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
-import type { FlushNeighbour } from '../ui-tree/standing.js';
+import type { FlushNeighbour } from '../ui-tree/later-edges.js';
 import type { AroundStrip, Eyes, EyesAnswer, EyesQuestion, OrderPair, OrderQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import { errorMessage } from '../util/error-message.js';

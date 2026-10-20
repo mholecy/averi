@@ -5,7 +5,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
 /**
- * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/standing.ts#OverlaidEdge), over the lab's real captures
+ * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge), over the lab's real captures
  * served unchanged by every read: `fully: true` never claims a row whose rest may lie under the pinned button, and a
  * role-less strip cut by the button is no stop; the plain stop on a row whose centre is clear still stops. docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
