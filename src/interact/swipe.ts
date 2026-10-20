@@ -141,7 +141,7 @@ export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeani
  * box's own, as short as the box: a short drag on the content rather than
  * a stroke on the panel. `keyboardTop` must lie inside the box (the caller
  * fails before stroking when a keyboard leaves nothing above it;
- * scroll-read.ts#coverOf). Pure.
+ * scroll-read.ts#offeredKeyboard). Pure.
  */
 export function swipeVectorAbove(box: Rect, keyboardTop: number, direction: Direction, meaning: SwipeMeaning): Stroke {
   const uncovered = { ...box, height: Math.min(box.height, keyboardTop - box.y) };

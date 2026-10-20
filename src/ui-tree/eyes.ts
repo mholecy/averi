@@ -2,7 +2,8 @@ import { rectIntersection, type Point, type Rect, type UiNode } from '../adapter
 import { axisOfEdge, sameRectWithinPixel, type Edge } from './geometry.js';
 import { lookTold, type Look, type LookReading } from './look.js';
 import { seenOrderOf, type OrderSeen, type SeenOrder } from './seen-order.js';
-import type { FlushNeighbour, PixelStanding, Scene, Standing } from './standing.js';
+import type { FlushNeighbour } from './later-edges.js';
+import type { PixelStanding, Scene, Standing } from './standing.js';
 import { treeScreen, type UsableScreen } from './usable-screen.js';
 
 /**

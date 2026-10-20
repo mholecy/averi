@@ -5,7 +5,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 
 /**
- * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/standing.ts#OverlaidEdge), over the lab's real captures
+ * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge), over the lab's real captures
  * served unchanged by every read: `fully: true` never claims a row whose rest may lie under the pinned button, and a
  * role-less strip cut by the button is no stop; the plain stop on a row whose centre is clear still stops. docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
@@ -28,6 +28,12 @@ describe('scroll_until on a node cut at an overlay', () => {
     const message = await failure('pinned-bar', 'id:"lab.pinned-bar.P"', true);
     expect(message).toContain(`element is in the viewport but cut at its bottom edge by container id:lab.pinned-bar.continue (66,1956 948x154), ${RUNS_ON} — and the content is exhausted`);
     expect(message).not.toMatch(/% of it shows/);
+  });
+  // The overlaid cover is no cover the draw order found: it does not turn the strokes as one over the far side does
+  // (interact/scroll-rounds.ts's far edge), so `direction: "up"` strokes up first, as before it was a Cover.
+  it('pinned-bar P, fully: true, direction up — the overlaid cover turns no stroke: up first, then down', async () => {
+    const e = (await scrollUntilVisible(fakeOf('pinned-bar'), 'id:"lab.pinned-bar.P"', { ...FAST, fully: true, direction: 'up' }).catch((err: unknown) => err)) as Error;
+    expect(e.message).toContain('the content is exhausted: swiping up no longer moves it, nor does swiping down');
   });
   // The plain stop is the next tap's point (its centre clear, the probe there fired P): it stops, its words as before —
   // a stated residual (ADR 0013, refined 2026-10-20): its reply does not say the row may run on under the button.

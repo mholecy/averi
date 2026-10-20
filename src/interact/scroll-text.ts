@@ -1,15 +1,16 @@
-import { rectArea, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import type { DeviceScreen, Point, Rect, UiNode } from '../adapters/types.js';
+import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { EyesFinding, SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { coverClause, outsideItsScrollView, overlaidBy, orderRemedyText, presentedRemedy, presentedStop } from '../ui-tree/standing.js';
+import { coverClause, type Cover } from '../ui-tree/cover.js';
+import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, type ScrollViewCut } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { fullyClaimed, shortOf, type Cover, type Judged } from './scroll-read.js';
+import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
@@ -43,7 +44,7 @@ export interface ScrollUntilResult {
    * — absent when none was read, so a run without a keyboard
    * reports what it always did:
    * - `shown`: the stop was judged against the screen ABOVE `frame` (the
-   *   highest covered rect, `Cover.topCover`: the band, or a floating
+   *   highest covered rect, `AppliedKeyboard.topCover`: the band, or a floating
    *   panel above it), not the whole screen, and that changed it — the
    *   part under it is not visible, whatever the tree says.
    *   docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
@@ -162,14 +163,14 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
  * <cover> at its centre (x,y), drawn over it — N% of it shows` — the cover
  * the standing names (ui-tree/standing.ts#Scene.standing), at the centre
  * when it is the one over it (the point the next tap presses). A cover the
- * tree shows only by the cut (its overlaid edge, ui-tree/standing.ts
- * #overlaidBy) is said as that cut, with no share: how far the node runs on
- * under it is not told.
+ * tree shows only by the cut (its overlaid edge, ui-tree/cover.ts
+ * #CoverOrder's `overlaid`) is said as that cut, with no share: how far the
+ * node runs on under it is not told.
  */
-function underText({ judged, cover }: { readonly judged: Judged; readonly cover: UiNode }): string {
+function underText({ judged, cover }: { readonly judged: Judged; readonly cover: Cover }): string {
   const { facts } = judged.standing;
-  const clause = coverClause(facts, cover, cover === facts.centreCover ? tapPoint(judged.node) : undefined);
-  return overlaidBy(facts, cover) === undefined ? `${clause} — ${percent(facts.shows)}% of it shows` : clause;
+  const clause = coverClause(cover, { of: 'touch', ...(cover === facts.centreCover && { centre: tapPoint(judged.node) }) });
+  return cover.order.kind === 'overlaid' ? clause : `${clause} — ${percent(facts.shows)}% of it shows`;
 }
 
 /** When a stop that sends no swipe came: `before any swipe`, or `after N swipes, without swiping further`. */
@@ -319,7 +320,7 @@ function hideToJudgeWholeScreen(remedy: KeyboardRemedy): string {
 }
 
 /** What the stop judged against, for "never intersected …". */
-const frameWords = (viewport: DeviceScreen, cover: Cover | undefined): string =>
+const frameWords = (viewport: DeviceScreen, cover: AppliedKeyboard | undefined): string =>
   cover?.above === undefined
     ? `${viewport.width}x${viewport.height} viewport`
     : `${cover.above.width}x${cover.above.height} screen above the soft keyboard over ${frameText(cover.topCover)}`;
@@ -387,6 +388,13 @@ export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, de
   const full = `${message}${endTurnText(o.endTurn)}${detentText(o.detent)}`;
   return absence === undefined ? new Error(full) : absenceError(full, absence);
 }
+
+/** Where a scroll view's content stops short of the element it cuts (ui-tree/standing.ts#ScrollViewCut's `stopsShort`), as the stuck sentence says it. */
+const CONTENT_STOPS_SHORT: Record<ScrollViewCut['stopsShort'], string> = {
+  after: 'its content ends before the element does (no room after it — a layout defect)',
+  before: 'its content begins after the element does (no room before it — a layout defect)',
+  both: 'its content stops short of the element at those edges (no room past them — a layout defect)',
+};
 
 /** `scrollFailure`'s sentence, one case per kind, and the evidence of absence for the kinds judged by it (`covered`, `bound`). */
 function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): { message: string; absence?: WaitEvidence } {
@@ -464,55 +472,55 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
               `(no clearance for a pinned bar?), not a scroll that needs more swipes. ${last}`,
         };
       }
-      // Clipped at the keyboard's edge at the end of the content: the
-      // keyboard, not the layout, is what hides the rest — a container that
-      // does not resize for it keeps its last rows under it. Said as such,
-      // with how to hide it; the layout-defect wording only when the
-      // keyboard is not the edge in question.
+      // Clipped at the end of the content, worded by what cuts it (scroll-read.ts#ClipCause).
       const { clipped, visible } = judged.standing.facts;
-      if (judged.under !== undefined && clipped.includes('bottom')) {
-        return {
-          message:
-            `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-              `${describeClip(clipped, visible, judged.under.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
-              `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(judged.under.remedy)}; only if it ` +
-              `stays clipped with the keyboard down is it a layout defect. ${last}`,
-        };
+      switch (short.cause.at) {
+        // The keyboard's edge: the keyboard, not the layout, is what hides the rest — a container that does not resize
+        // for it keeps its last rows under it. Said as such, with how to hide it; the layout-defect wording only when
+        // the keyboard is not the edge in question.
+        case 'keyboard': {
+          const { keyboard } = short.cause;
+          return {
+            message:
+              `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
+                `${describeClip(clipped, visible, keyboard.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
+                `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(keyboard.remedy)}; only if it ` +
+                `stays clipped with the keyboard down is it a layout defect. ${last}`,
+          };
+        }
+        // Its scroll view's edge inside the screen, at an edge or more: each edge named with what cuts it, the part
+        // drawn quoted, and why the rest may stay past that scroll view — no overlay diagnosed for its edge.
+        case 'scrollView': {
+          const { edges, scroller, longer, stopsShort } = short.cause.cut;
+          const byScreen = clipped.filter((edge) => !edges.includes(edge));
+          const at = `${edges.join('/')} ${outsideScrollViewText(scroller, 'by')}${byScreen.length === 0 ? '' : ` and at ${byScreen.join('/')} by the viewport`}`;
+          const past = byScreen.length > 0 ? 'those edges' : edges.length > 1 ? "that scroll view's edges" : "that scroll view's edge";
+          const rest =
+            longer !== undefined
+              ? `It is ${longer} than what of its scroll view the screen shows: no scroll shows it whole.`
+              : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${CONTENT_STOPS_SHORT[stopsShort]}.`;
+          return {
+            message:
+              `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
+                `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
+          };
+        }
+        // The viewport's edge. A cover clipping only the top still words the frame (`judged.under`): that is the
+        // frame the element is clipped in, not what cuts it — the cut is the viewport's.
+        case 'viewport':
+          return {
+            message:
+              `scroll_until ${describe} failed after ${n} — ` +
+                `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
+                `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
+                `The element cannot be fully revealed — that is a layout defect ` +
+                `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
+          };
+        default: {
+          const unworded: never = short.cause;
+          return unworded;
+        }
       }
-      // Clipped, at an edge or more, by its scroll view's edge inside the screen: each edge named with what cuts it, the
-      // part drawn quoted, and why the rest may stay past that scroll view — no overlay diagnosed for its edge.
-      const { standing } = judged;
-      if (standing.kind === 'clipped' && standing.byScrollView !== undefined) {
-        const { edges, scroller, longer } = standing.byScrollView;
-        const byScreen = clipped.filter((edge) => !edges.includes(edge));
-        const at = `${edges.join('/')} ${outsideScrollViewText(scroller, 'by')}${byScreen.length === 0 ? '' : ` and at ${byScreen.join('/')} by the viewport`}`;
-        // Where its content stops short of the element: past its end (bottom, right), before its start (top, left), or both.
-        const after = edges.every((e) => e === 'bottom' || e === 'right');
-        const before = edges.every((e) => e === 'top' || e === 'left');
-        const short = after
-          ? 'its content ends before the element does (no room after it — a layout defect)'
-          : before
-            ? 'its content begins after the element does (no room before it — a layout defect)'
-            : 'its content stops short of the element at those edges (no room past them — a layout defect)';
-        const past = byScreen.length > 0 ? 'those edges' : edges.length > 1 ? "that scroll view's edges" : "that scroll view's edge";
-        const rest =
-          longer !== undefined
-            ? `It is ${longer} than what of its scroll view the screen shows: no scroll shows it whole.`
-            : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${short}.`;
-        return {
-          message:
-            `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
-        };
-      }
-      return {
-        message:
-          `scroll_until ${describe} failed after ${n} — ` +
-            `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
-            `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
-            `The element cannot be fully revealed — that is a layout defect ` +
-            `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
-      };
     }
     case 'covered': {
       // The absence rule holds here too: a target no
@@ -653,22 +661,6 @@ function shortClause(judged: Judged): string {
     case 'covered':
       return underText(short);
   }
-}
-
-/**
- * The side of `viewport` a rect lies wholly past — below before above, as a scroll down finds it — or undefined when it
- * lies past none wholly. A rect with no area lies past none: it has no extent to lie past a side with, and where a tree
- * gives one it is most often a placeholder origin, not a place (the SWIFT form's `TextFieldWithComponentStyle` texts,
- * read at 0,0 0x0 under their fields) — its bottom edge on the viewport's top would read "above the viewport", so it
- * reads "outside the viewport" instead.
- */
-function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
-  if (rectArea(rect) === 0) return undefined;
-  if (rect.y >= viewport.y + viewport.height) return 'bottom';
-  if (rect.y + rect.height <= viewport.y) return 'top';
-  if (rect.x >= viewport.x + viewport.width) return 'right';
-  if (rect.x + rect.width <= viewport.x) return 'left';
-  return undefined;
 }
 
 /** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */

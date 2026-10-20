@@ -93,7 +93,7 @@ export interface KeyboardPosition {
    * and never again for this position; none, asking nothing, for a position
    * built without a reading that can be asked (the scroll read's, whose
    * round asks the same two through its own protocol — interact/scroll-read.ts
-   * #Cover). The pixel poll never asks it.
+   * #AppliedKeyboard). The pixel poll never asks it.
    */
   readingLine(): Promise<KeyboardLine | undefined>;
   /**
@@ -113,7 +113,7 @@ export interface KeyboardPosition {
  * read. Synchronous and asks nothing: whether the witness stands
  * by the cover is the caller's question, put before this one —
  * `KeyboardPosition.readingLine` asks it of the reading, `scroll_until`'s
- * round through its protocol (interact/scroll-read.ts#coverOf).
+ * round through its protocol (interact/scroll-read.ts#offeredKeyboard).
  */
 export function coverLine(cover: KeyboardCover): KeyboardLine {
   return { y: cover.top.y, witnessed: true };

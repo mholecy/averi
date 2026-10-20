@@ -23,7 +23,7 @@ const byLabel = (tree: UiNode, label: string): UiNode => find(tree, (n) => n.lab
 const exposed = (tree: UiNode, target: UiNode) => {
   const seen = drawOrder(tree).exposure(target, IPHONE);
   const covers = seen.covers.map((c) => ({ node: desc(c.node), reach: c.reach, order: c.order.kind, presented: c.presented }));
-  return { covers, centreCover: seen.centreCover && desc(seen.centreCover), shows: seen.shows, tapAt: seen.tapAt };
+  return { covers, centreCover: seen.centreCover && desc(seen.centreCover.node), shows: seen.shows, tapAt: seen.tapAt };
 };
 const ALERT = 'container Leave the form 41,365 320x172';
 /** A marked alert as the one cover of what lies beneath it: reaching the whole screen, a presented screen's surface. */

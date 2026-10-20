@@ -5,7 +5,8 @@ import { judgedWithOrder, type OrderEyes } from '../ui-tree/eyes.js';
 import type { Look, LookReading } from '../ui-tree/look.js';
 import type { KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive } from '../ui-tree/selectors.js';
-import { coverClause, outsideItsScrollView, orderRemedyText, presentedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
+import { coverClause } from '../ui-tree/cover.js';
+import { outsideItsScrollView, orderRemedyText, presentedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -349,7 +350,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       const above = moved.aboveKeyboard ? ' above the soft keyboard' : '';
       return {
         point,
-        moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${coverClause(standing.facts, moved.cover)}; tapped the uncovered part ${moved.piece.width}x${moved.piece.height}${above}`,
+        moved: `at (${point.x},${point.y}) — its centre (${centre.x},${centre.y}) is ${coverClause(moved.cover, { of: 'touch' })}; tapped the uncovered part ${moved.piece.width}x${moved.piece.height}${above}`,
       };
     }
     case 'covered': {
@@ -364,9 +365,9 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint — or, under
       // a cover whose order the tree does not tell, or one a screenshot saw drawn over it, no scroll.
       const remedy = advice(standing.remedy, (r) =>
-        r.of === 'unordered' || r.of === 'seenOver' ? orderRemedyText(r, 'touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first'),
+        r.of === 'unordered' || r.of === 'seenOver' ? orderRemedyText(r, 'touch') : (positionerRemedy(standing.cover.node) ?? 'scroll_until it first'),
       );
-      throw new CoveredRefusal(told.refusal(`${coverClause(standing.facts, standing.cover, centre)}; ${shows} — ${remedy}`));
+      throw new CoveredRefusal(told.refusal(`${coverClause(standing.cover, { of: 'touch', centre })}; ${shows} — ${remedy}`));
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band — the only line no guard acts on — is found only in a flat
@@ -488,7 +489,7 @@ const INHERITED_CUT_WAY_PAST =
  * nothing) — whose own way past names what it lies in:
  * something in THAT clear of the edge. A container's cut needs a clipping
  * ancestor (UiNode.clipsDescendants, Android's); a cut by a later node needs
- * none, only a nested tree of clipped frames (standing.ts#cutByLater's
+ * none, only a nested tree of clipped frames (ui-tree/later-edges.ts#laterEdgesIn's
  * `cutsAtLater`) — an iOS tree is neither (WDA's frames are unclipped, idb's
  * list flat), so no cut is refused there.
  */

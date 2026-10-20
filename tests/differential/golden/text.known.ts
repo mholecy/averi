@@ -26,7 +26,7 @@ export const text: KnownFile = {
     ]),
     [`${ANDROID}/text-sample.xml B ocr`, READ("L'ubomír Sťastný", "lab finding OC1: Ľ read as L'", OC1)],
     [`${ANDROID}/text-sample.xml C ocr`, READ('Mäkčeň, dížeň a vokáň', 'lab finding OC1: ĺ read as í', OC1)],
-    // LAB FINDING B4-L1 — fixed on fix/r9-b4l1 (ui-tree/standing.ts#OverlaidEdge): the pinned-button shape of bars'
+    // LAB FINDING B4-L1 — fixed on fix/r9-b4l1 (ui-tree/later-edges.ts#OverlaidEdge): the pinned-button shape of bars'
     // pinned-bar P. Compose lists P by its uncovered strip above the button; the button reaches past it at both ends — an
     // overlay — so the colour assert fails closed naming it, and the plain stop asked by P's identifier reads the
     // role-less strip as the sliver it is (cut by the button). Both rows green, struck off here, calibrated in
