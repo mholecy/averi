@@ -1,5 +1,5 @@
 import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
@@ -1425,7 +1425,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const { facts } = best.standing;
     // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover —
     // neutral either way today: an overlaid cover lies over a node in no scroll view, which has no flush neighbour to ask of.
-    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.some(drawOrderFound) }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
+    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.some(drawOrderFound) }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame, fully ? 'fully' : 'stop') : undefined;
     // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
     // last refused them — no confirm, no screenshot; this stroke's read, short as before.
     const refused = s.eyesRefused;
@@ -1775,7 +1775,7 @@ function endProof(s: State, way: Direction, view: UiNode, unchanged: 'matches' |
  */
 function turnsAtEnd(s: State, best: Judged, view: UiNode, facts: TreeFacts): boolean {
   if (s.endTurn !== undefined) return false;
-  const inside = facts.scene.clips.drawnIn(best.node)?.scrollers.includes(view) === true;
+  const inside = toldFrame(facts.scene.clips.drawnIn(best.node))?.scrollers.includes(view) === true;
   return inside && beyondFarEdge(best.node.rect, courseOf(s), view.rect);
 }
 

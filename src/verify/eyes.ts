@@ -2,7 +2,7 @@ import { PNG } from 'pngjs';
 import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/later-edges.js';
-import type { AroundStrip, Eyes, EyesAnswer, EyesQuestion, OrderPair, OrderQuestion } from '../ui-tree/eyes.js';
+import { CLIP_LINE, unseen, type AroundStrip, type Eyes, type EyesAnswer, type EyesQuestion, type OrderPair, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import { errorMessage } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
@@ -35,11 +35,10 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>):
   };
   return {
     async fully(question) {
-      // A failure before any edge is judged is the first edge's to say.
-      const first = question.flush[0];
-      if (first === undefined) return { sees: 'own' };
+      if (question.edges.length === 0) return { sees: 'own' };
       const seen = await look(question.tree);
-      return 'why' in seen ? { sees: 'unjudged', edge: first.edge, neighbour: first.by, why: seen.why } : judgeEyes(seen.png, seen.scale, question);
+      // A failure before any edge is judged is said as ui-tree/eyes.ts#unseen says it.
+      return 'why' in seen ? unseen(question, seen.why) : judgeEyes(seen.png, seen.scale, question);
     },
     async order(question) {
       const seen = await look(question.tree);
@@ -55,6 +54,89 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>):
  */
 export const orderOfFrame = (frame: MeasuredFrame, question: OrderQuestion): readonly OrderSeen[] =>
   frame.scale.error !== undefined ? untoldAll(question, `the screenshot could not be scaled to the tree: ${frame.scale.error}`) : judgeOrder(frame.png, frame.scale.scale, question);
+
+/**
+ * THE EYES' THIRD QUESTION — does the colour assert's region read as THE SCREEN BESIDE IT? Asked of an element whose
+ * tree cannot tell where it is drawn (ui-tree/geometry.ts#DrawnUntold: idb's flat list, which lists no scroll view),
+ * on the frame the assert captures anyway (verify/pixel-poll.ts#pollPixels), as the order question is
+ * (`orderOfFrame`): no capture added.
+ *
+ * Why: under idb a row past its scroll view's clip is listed at its laid-out frame, and what the capture shows there
+ * is whatever lies beneath — the lab's `scroll-bounded` O (`51,620 300x64`, wholly below `lower`, which ends at 560)
+ * passed a colour assert on the white background (#FFFFFF, 100 % of its region), and `carousel-in-list`'s C, right of
+ * its carousel, on the page's #EEEEEE. The tree cannot see the clip; the screenshot can see that the region holds
+ * nothing but the colour around it.
+ * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+ *
+ * The answer (`ApartSeen`):
+ * - `blends`: the region holds nothing of its own (OWN_PIXELS_MAX: at most one point's worth of its pixels further than
+ *   EYES_SAME_DE from its dominant) and a plain strip of the screen beside it (`BESIDE_DEPTH` deep, above, below, left
+ *   or right, each one colour: `oneColour`) is that colour too — nothing in the frame tells the element from what lies around it, so the assert fails closed
+ *   rather than certify the background;
+ * - `apart`: it is not — the region shows something of its own (a label, a border), or no strip beside it is its colour;
+ * - `untold`: the frame cannot say (`why`: its scale refused, the region off it, no plain strip beside it) — the
+ *   assert measures as before.
+ * What it costs: an element genuinely drawn in the colour of the screen around it with nothing at all of its own (an
+ * empty, unbordered white card on a white page) fails closed under idb too — it is told apart from the background by
+ * nothing in the frame either; under WDA, which lists the scroll views, it is measured. Measured over every node idb
+ * lists in the 32 iOS lab captures: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see —
+ * measured as before, so a PASS on what lies beneath the clip: anything of that beneath in the region (a separator, a
+ * shadow, text: more than a point of it reads `apart`), and no plain strip beside it (`untold`). Asked on a frame
+ * settled over the region only too (verify/pixel-poll.ts#blendsUntold): a strip beside still moving is no plain strip.
+ */
+export type ApartSeen = { readonly seen: 'apart' } | { readonly seen: 'blends'; readonly colour: string } | { readonly seen: 'untold'; readonly why: string };
+
+/**
+ * A region holds NOTHING OF ITS OWN when at most this many points' worth of its pixels (scale² px each) lie further than
+ * EYES_SAME_DE from its dominant (`apartOfFrame`) — a count, not a share, so a large element with a small mark of its
+ * own (a short label on a wide row, a chevron on a card) is not read as blank by its area. An element drawn where it is
+ * listed shows something: a label, a placeholder, a border, an outline's antialiasing — glyphs and strokes are hundreds
+ * of pixels at 3x. A screenshot is pixel-exact (EYES_APART_DE), so what lies beneath a clip shows exactly zero; the one
+ * point's allowance is for a stray pixel, not for noise. Measured over every node idb lists in the 32 iOS lab captures
+ * (all 393, not only the lab's ids), the strip beside it its colour: O and C 0 px off their dominant (#FFFFFF,
+ * #EEEEEE); every other node at least 777 px (own-parts' I; the white `sheet-long-list` rows labelled "Row N", 25728
+ * pt², 1674 px and more).
+ */
+const OWN_PIXELS_MAX = 1;
+
+/**
+ * How deep each strip of the screen beside the region is read, in tree units (`apartOfFrame`): a fixed depth on all four
+ * sides, not `flanksBeside`'s strips across one axis to the screen's edge — the region is asked whether it reads as the
+ * screen right around it, not whether a band of it runs on beside it as the fully question's edges are.
+ */
+const BESIDE_DEPTH = 8;
+
+/** The colour assert's region against the screen beside it, on a frame already captured (`ApartSeen`). */
+export function apartOfFrame(frame: MeasuredFrame, region: Rect): ApartSeen {
+  if (frame.scale.error !== undefined) return { seen: 'untold', why: `the screenshot could not be scaled to the tree: ${frame.scale.error}` };
+  const { png } = frame;
+  const { scale } = frame.scale;
+  /** `r` on the png, when FLANK_MIN_PX wide and tall at least there — else too little of it to tell a colour by. */
+  const readable = (r: Rect): EdgeBounds | undefined => {
+    const on = pngRegion(r, scale, png);
+    return on === undefined || on.x1 - on.x0 < FLANK_MIN_PX || on.y1 - on.y0 < FLANK_MIN_PX ? undefined : on;
+  };
+  const at = readable(region);
+  if (at === undefined) return { seen: 'untold', why: 'the region lies off the screenshot, or too thin on it to read' };
+  const own = sampleDominant(png, [at])?.rgb;
+  if (own === undefined) return { seen: 'apart' };
+  const { near, total } = nearCount(png, at, own, EYES_SAME_DE);
+  if (total - near > OWN_PIXELS_MAX * scale * scale) return { seen: 'apart' };
+  const d = BESIDE_DEPTH;
+  const { x, y, width, height } = region;
+  const strips = [
+    { x, y: y - d, width, height: d },
+    { x, y: y + height, width, height: d },
+    { x: x - d, y, width: d, height },
+    { x: x + width, y, width: d, height },
+  ].flatMap((r) => readable(r) ?? []);
+  const plain = strips.flatMap((strip) => {
+    const colour = sampleDominant(png, [strip])?.rgb;
+    return colour === undefined || !oneColour(png, strip, colour) ? [] : [colour];
+  });
+  if (plain.length === 0) return { seen: 'untold', why: 'no plain screen beside it' };
+  return plain.some((c) => distance(c, own) <= EYES_SAME_DE) ? { seen: 'blends', colour: rgbToHex(own) } : { seen: 'apart' };
+}
 
 /** Every pair of `question` untold, for `why`. */
 export const untoldAll = (question: OrderQuestion, why: string): readonly OrderSeen[] => question.pairs.map(({ peer }) => ({ peer, seen: 'untold', why }));
@@ -83,12 +165,12 @@ const LINE_SHARE = 0.9;
 const FLANK_MIN_PX = 4;
 
 /**
- * The judge, pure over a decoded png at `scale` px per tree unit — each flush edge of the question on its own
- * (`judgeEdge`), one png: the deepest band of a surface any edge shows, else the first edge it could not tell, else
- * `own`.
+ * The judge, pure over a decoded png at `scale` px per tree unit — each edge of the question on its own (a flush
+ * neighbour's, `judgeEdge`; a clip line's, `judgeClipLine`), one png: the deepest band of a surface any edge shows,
+ * else the first edge it could not tell, else `own`.
  */
 export function judgeEyes(png: RgbaImage, scale: number, q: EyesQuestion): EyesAnswer {
-  const answers = q.flush.map((f) => judgeEdge(png, scale, q.region, f));
+  const answers = q.edges.map(({ edge, by }) => (by === CLIP_LINE ? judgeClipLine(png, scale, q.region, edge) : judgeEdge(png, scale, q.region, { edge, by })));
   const surfaces = answers.filter((a): a is Extract<EyesAnswer, { sees: 'surface' }> => a.sees === 'surface');
   if (surfaces.length > 0) return surfaces.reduce((a, b) => (b.depth > a.depth ? b : a));
   return answers.find((a) => a.sees === 'unjudged') ?? { sees: 'own' };
@@ -113,7 +195,7 @@ export function judgeEyes(png: RgbaImage, scale: number, q: EyesQuestion): EyesA
  *    colour with the surface's, is `unjudged` — the band cannot be told from that margin.
  */
 function judgeEdge(png: RgbaImage, scale: number, regionRect: Rect, { edge, by: neighbour }: FlushNeighbour): EyesAnswer {
-  const unjudged = (why: string): EyesAnswer => ({ sees: 'unjudged', edge, neighbour, why });
+  const unjudged = (why: string): EyesAnswer => ({ sees: 'unjudged', edge, by: neighbour, why });
   const region = pngRegion(regionRect, scale, png);
   const by = pngRegion(neighbour.rect, scale, png);
   if (region === undefined || by === undefined) return unjudged('the element or the node beside it lies off the screenshot');
@@ -136,7 +218,57 @@ function judgeEdge(png: RgbaImage, scale: number, regionRect: Rect, { edge, by: 
   const beside = flanksBeside(past, axis, png);
   if (beside.length === 0) return unjudged('nothing of the screen beside it to tell its own margin from that surface');
   if (beside.some((f) => oneColour(png, f, surface))) return unjudged(`the screen beside it shows that surface's colour ${rgbToHex(surface)} too: the band may be its own margin over that background`);
-  return { sees: 'surface', edge, neighbour, depth, surface: rgbToHex(surface), own: rgbToHex(own) };
+  return { sees: 'surface', edge, by: neighbour, depth, surface: rgbToHex(surface), own: rgbToHex(own) };
+}
+
+/**
+ * A clip line at `edge` (ui-tree/eyes.ts#ClipLine): a scroll view the tree does not list, cutting the target there —
+ * what lies beneath its clip showing on the target's rows past it, the same as on the screen beside them. Never
+ * `unjudged`: a clip line is looked for, not suspected, so wherever the evidence below is missing the answer is `own`.
+ * 1. THE BAND: the lines of the target's region from the edge inward, each across the region's whole extent, while the
+ *    line is one colour with the outermost line's (`oneColour`), and the screen BESIDE it on the line's own rows
+ *    (columns) — each strip FLANK_MIN_PX wide at least, at least one — is that colour too. No deeper than the pixel
+ *    slack: `own`.
+ * 2. THE TARGET's own colour: the dominant past the band, further than EYES_APART_DE from the band's — else `own`.
+ * 3. THE LINE: the screen beside the target on the rows past the band (each FLANK_MIN_PX wide, at least one), every
+ *    strip of it a plain colour of its own (`oneColour` with its dominant) further than EYES_APART_DE from the band's —
+ *    the screen changes at the line as the target does, to what a scroll view's background is. Else `own`: a target
+ *    whose own margin is the colour of a page that runs on beside all of it (a label's padding) is no cut, nor one in
+ *    a row of drawn neighbours whose rows beside it mix their fills with that margin's colour (a keyboard's keys, each
+ *    rect holding the gap below its cap; a row of padded chips) — measured over every node idb lists in the 32 lab
+ *    captures, only P and S read cut (tests/verify/eyes-clip-line.test.ts).
+ * Measured, the lab's `scroll-bounded` under idb: P's bottom 24 pt (330–354) and S's 56 (560–616) #FFFFFF across their
+ * columns and beside them; beside their drawn rows `upper`'s and `lower`'s #EEEEEE.
+ * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+ */
+function judgeClipLine(png: RgbaImage, scale: number, regionRect: Rect, edge: Edge): EyesAnswer {
+  const own: EyesAnswer = { sees: 'own' };
+  const region = pngRegion(regionRect, scale, png);
+  if (region === undefined) return own;
+  const axis = axisOfEdge(edge);
+  const surface = sampleDominant(png, [lineOf(region, edge, 0)])?.rgb;
+  if (surface === undefined) return own;
+  const asScreen = (line: EdgeBounds): boolean => {
+    const beside = flanksBeside(line, axis, png);
+    return oneColour(png, line, surface) && beside.length > 0 && beside.every((f) => oneColour(png, f, surface));
+  };
+  const lines = axis === 'vertical' ? region.y1 - region.y0 : region.x1 - region.x0;
+  let band = 0;
+  while (band < lines && asScreen(lineOf(region, edge, band))) band++;
+  const depth = Math.round(band / scale);
+  if (depth <= PIXEL_OVERLAP_SLACK) return own;
+  const past = pastBand(region, edge, band);
+  const drawn = past === undefined ? undefined : sampleDominant(png, [past])?.rgb;
+  if (past === undefined || drawn === undefined || distance(drawn, surface) <= EYES_APART_DE) return own;
+  const beside = flanksBeside(past, axis, png);
+  if (beside.length === 0 || !beside.every((f) => plainOtherThan(png, f, surface))) return own;
+  return { sees: 'surface', edge, by: CLIP_LINE, depth, surface: rgbToHex(surface), own: rgbToHex(drawn) };
+}
+
+/** `strip` is one plain colour of its own (its dominant, `oneColour`), told apart from `from` (further than EYES_APART_DE). */
+function plainOtherThan(png: RgbaImage, strip: EdgeBounds, from: Rgb): boolean {
+  const colour = sampleDominant(png, [strip])?.rgb;
+  return colour !== undefined && distance(colour, from) > EYES_APART_DE && oneColour(png, strip, colour);
 }
 
 /** ΔE00 of two colours (the line test memoises it per pixel colour, `oneColour`). */
@@ -151,26 +283,32 @@ function oneColour(png: RgbaImage, bounds: EdgeBounds, ref: Rgb): boolean {
   return nearShare(png, bounds, ref, EYES_SAME_DE) >= LINE_SHARE;
 }
 
-/** The share of `bounds`' pixels within `within` (ΔE00) of `ref`, each pixel judged as it is (`oneColour`'s count); 0 for an empty one. */
+/** The share of `bounds`' pixels within `within` (ΔE00) of `ref` (`nearCount`'s); 0 for an empty one. */
 function nearShare(png: RgbaImage, bounds: EdgeBounds, ref: Rgb, within: number): number {
+  const { near, total } = nearCount(png, bounds, ref, within);
+  return total === 0 ? 0 : near / total;
+}
+
+/** How many of `bounds`' pixels lie within `within` (ΔE00) of `ref`, of how many, each pixel judged as it is (`oneColour`'s count). */
+function nearCount(png: RgbaImage, bounds: EdgeBounds, ref: Rgb, within: number): { readonly near: number; readonly total: number } {
   const { data, width } = png;
-  const near = new Map<number, boolean>();
+  const memo = new Map<number, boolean>();
   let total = 0;
-  let same = 0;
+  let near = 0;
   for (let y = bounds.y0; y < bounds.y1; y++) {
     for (let x = bounds.x0; x < bounds.x1; x++) {
       const o = (y * width + x) * 4;
       const key = (data[o]! << 16) | (data[o + 1]! << 8) | data[o + 2]!;
-      let hit = near.get(key);
+      let hit = memo.get(key);
       if (hit === undefined) {
         hit = distance([data[o]!, data[o + 1]!, data[o + 2]!], ref) <= within;
-        near.set(key, hit);
+        memo.set(key, hit);
       }
       total++;
-      if (hit) same++;
+      if (hit) near++;
     }
   }
-  return total === 0 ? 0 : same / total;
+  return { near, total };
 }
 
 /**

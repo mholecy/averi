@@ -13,10 +13,10 @@ import { node } from '../helpers/fake.js';
 const k7 = (): EyesQuestion => {
   const tree = parseDump(readFileSync(new URL('../fixtures/android-lab-form-keyboard-k7-stop.xml', import.meta.url), 'utf8'));
   const phone = [...everyNode(tree)].find((n) => n.identifier === 'lab.form-keyboard.phone')!;
-  return eyesQuestion(sceneOf(tree), tree, phone, undefined)!;
+  return eyesQuestion(sceneOf(tree), tree, phone, undefined, 'stop')!;
 };
 const moved = (r: Rect, dy: number): Rect => ({ ...r, y: r.y + dy });
-const withFlush = (q: EyesQuestion, rects: readonly Rect[]): EyesQuestion => ({ ...q, flush: rects.map((rect, i) => ({ edge: 'bottom', by: node({ identifier: `n${i}`, rect }) })) });
+const withFlush = (q: EyesQuestion, rects: readonly Rect[]): EyesQuestion => ({ ...q, edges: rects.map((rect, i) => ({ edge: 'bottom', by: node({ identifier: `n${i}`, rect }) })) });
 
 describe('sameQuestion — the region and every neighbour where the refusal left them, as many', () => {
   it('k7 asked again unmoved: the same question; a pixel off still the same; two pixels off another', () => {
@@ -25,19 +25,19 @@ describe('sameQuestion — the region and every neighbour where the refusal left
     expect(sameQuestion(asked, q)).toBe(true);
     expect(sameQuestion(asked, { ...q, region: moved(q.region, 1) })).toBe(true);
     expect(sameQuestion(asked, { ...q, region: moved(q.region, 2) })).toBe(false);
-    expect(sameQuestion(asked, withFlush(q, [moved(q.flush[0]!.by.rect, 2)]))).toBe(false);
+    expect(sameQuestion(asked, withFlush(q, [moved((q.edges[0]!.by as UiNode).rect, 2)]))).toBe(false);
   });
 
   it('k7 asked with two neighbours, then with only the first of them: another question', () => {
     const q = k7();
-    const bar = q.flush[0]!.by.rect;
+    const bar = (q.edges[0]!.by as UiNode).rect;
     const asked = askedOf(withFlush(q, [bar, { x: 0, y: 1370, width: 1080, height: 40 }]));
     expect(sameQuestion(asked, withFlush(q, [bar]))).toBe(false);
   });
 });
 
 describe('reachesPoint — the band from the region\'s edge inward by its depth, against the point on that axis', () => {
-  const finding = (edge: Edge, depth: number): SurfaceFinding => ({ sees: 'surface', edge, depth, neighbour: node({}), surface: '#F2F2F7', own: '#FFFFFF' });
+  const finding = (edge: Edge, depth: number): SurfaceFinding => ({ sees: 'surface', edge, depth, by: node({}), surface: '#F2F2F7', own: '#FFFFFF' });
 
   it("k7: the bar's padding 28 px deep from phone's bottom (1210–1237) does not reach its centre at 1175; 63 deep reaches it", () => {
     const { region } = k7();

@@ -4,6 +4,7 @@ import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import {
   absentFromViewport,
   clipsOf,
+  toldFrame,
   containsPoint,
   flushEdges,
   inferScreenSize,
@@ -732,8 +733,8 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
   it("a row listed below its scroll view: drawn only in the scroll view's frame, the scroll view named", () => {
     const { tree, scroll, row, field } = form();
     const clips = clipsOf(tree, UNCLIPPED);
-    expect(clips.drawnIn(row)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: true });
-    expect(clips.drawnIn(field)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: true });
+    expect(clips.drawnIn(row)).toEqual({ told: true, frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: true });
+    expect(clips.drawnIn(field)).toEqual({ told: true, frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: true });
   });
 
   it('nested scrollers: the frames intersected, the nearest named first; scrollers that share nothing leave no frame', () => {
@@ -741,11 +742,11 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
     const carousel = fakeNode({ role: 'scrollable', rect: r(0, 100, 402, 200), children: [card] });
     const page = fakeNode({ role: 'scrollable', rect: r(0, 116, 402, 664), children: [carousel] });
     const clips = clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [page] }), UNCLIPPED);
-    expect(clips.drawnIn(card)).toEqual({ frame: r(0, 116, 402, 184), scrollers: [carousel, page], listedWhereItLies: true });
+    expect(clips.drawnIn(card)).toEqual({ told: true, frame: r(0, 116, 402, 184), scrollers: [carousel, page], listedWhereItLies: true });
     const below = fakeNode({ role: 'button', rect: r(0, 900, 402, 50) });
     const lower = fakeNode({ role: 'scrollable', rect: r(0, 880, 402, 200), children: [below] });
     const list = fakeNode({ role: 'scrollable', rect: r(0, 0, 402, 780), children: [lower] });
-    expect(clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [list] }), UNCLIPPED).drawnIn(below)).toEqual({ frame: undefined, scrollers: [lower, list], listedWhereItLies: true });
+    expect(clipsOf(fakeNode({ role: 'container', rect: SCREEN_RECT, children: [list] }), UNCLIPPED).drawnIn(below)).toEqual({ told: true, frame: undefined, scrollers: [lower, list], listedWhereItLies: true });
   });
 
   it('undefined for a node under nothing that scrolls, the scroller itself, a node of another tree', () => {
@@ -756,10 +757,22 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
     expect(clips.drawnIn(fakeNode({}))).toBeUndefined();
   });
 
-  it('on every tree that lists ancestry, whatever its source says of its frames: a nested tree not marked unclipped (Android\'s — uiautomator does not always cut a rect to its scroll view) is cut the same; undefined on a flat list (idb\'s), which lists no scroll view', () => {
+  it('on every tree that lists ancestry, whatever its source says of its frames: a nested tree not marked unclipped (Android\'s — uiautomator does not always cut a rect to its scroll view) is cut the same; UNTOLD on a flat list (idb\'s), which lists no scroll view — every node, not "nothing cuts it"', () => {
     const { tree, scroll, row } = form();
-    expect(clipsOf(tree, NESTED).drawnIn(row)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: false });
-    expect(clipsOf(tree, { ancestry: false, unclipped: true }).drawnIn(row)).toBeUndefined();
+    expect(clipsOf(tree, NESTED).drawnIn(row)).toEqual({ told: true, frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: false });
+    expect(clipsOf(tree, { ancestry: false, unclipped: true }).drawnIn(row)).toEqual({ told: false });
+    expect(clipsOf(tree, { ancestry: false }).drawnIn(tree.children[1])).toEqual({ told: false });
+  });
+
+  it("the lab's scroll-bounded (iOS 27): idb lists O flat at its laid-out frame below `lower` and no scroll view — untold; WDA's twin lists `lower` above it — drawn in `lower`'s frame, which O lies wholly past", async () => {
+    const lab = async (name: string): Promise<string> => readFile(new URL(`../fixtures/truth/ios-iphone17-ios27/${name}`, import.meta.url), 'utf8');
+    const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id)!;
+    const idb = parseIdbDescribeAll(await lab('scroll-bounded.idb.json'));
+    const wda = parseWdaSourceValue(JSON.parse(await lab('scroll-bounded.wda.json')));
+    expect(clipsOf(idb, { ancestry: false }).drawnIn(byId(idb, 'lab.scroll-bounded.O'))).toEqual({ told: false });
+    const o = byId(wda, 'lab.scroll-bounded.O');
+    expect(o.rect).toEqual(r(51, 620, 300, 64));
+    expect(clipsOf(wda, UNCLIPPED).drawnIn(o)).toMatchObject({ told: true, frame: r(0, 380, 402, 180), listedWhereItLies: true });
   });
 
   it('a rect past its scroll view\'s edge by a pixel at most is flush with it, not cut: mp-native\'s SWIFT toggle `66,1924 948x55` ends at 1979 under its form `[0,242][1080,1978]` — its frame reaches 1979; 2 px past is cut', () => {
@@ -769,17 +782,17 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
     const rightward = fakeNode({ role: 'button', rect: r(981, 241, 100, 50) });
     const form = fakeNode({ role: 'scrollable', rect: r(0, 242, 1080, 1736), children: [toggle, deeper, leftward, rightward] });
     const clips = clipsOf(fakeNode({ role: 'container', rect: r(0, 0, 1080, 2220), children: [form] }), NESTED);
-    expect(clips.drawnIn(toggle)?.frame).toEqual(r(0, 242, 1080, 1737));
-    expect(clips.drawnIn(deeper)?.frame).toEqual(r(0, 242, 1080, 1736));
-    expect(clips.drawnIn(leftward)?.frame).toEqual(r(-1, 242, 1081, 1736));
-    expect(clips.drawnIn(rightward)?.frame).toEqual(r(0, 241, 1081, 1737));
+    expect(toldFrame(clips.drawnIn(toggle))?.frame).toEqual(r(0, 242, 1080, 1737));
+    expect(toldFrame(clips.drawnIn(deeper))?.frame).toEqual(r(0, 242, 1080, 1736));
+    expect(toldFrame(clips.drawnIn(leftward))?.frame).toEqual(r(-1, 242, 1081, 1736));
+    expect(toldFrame(clips.drawnIn(rightward))?.frame).toEqual(r(0, 241, 1081, 1737));
   });
 
   it('an ancestor of no area cuts nothing — it fails open, as a root of no area does: a ScrollView WDA reports 0,0 0x0', () => {
     const { tree, scroll, row } = form();
     const zero = fakeNode({ role: 'scrollable', rect: r(0, 0, 0, 0), children: [row] });
     scroll.children = [zero];
-    expect(clipsOf(tree, UNCLIPPED).drawnIn(row)).toEqual({ frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: true });
+    expect(clipsOf(tree, UNCLIPPED).drawnIn(row)).toEqual({ told: true, frame: r(0, 0, 402, 780), scrollers: [scroll], listedWhereItLies: true });
     const alone = fakeNode({ role: 'container', rect: SCREEN_RECT, children: [fakeNode({ role: 'scrollable', rect: r(0, 0, 0, 0), children: [row] })] });
     expect(clipsOf(alone, UNCLIPPED).drawnIn(row)).toBeUndefined();
   });

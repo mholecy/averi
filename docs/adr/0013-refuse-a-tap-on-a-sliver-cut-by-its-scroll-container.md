@@ -2,7 +2,8 @@
 
 Status: accepted, 2026-10-10 (owner). Refined 2026-10-17 (owner, lab note F2A1). Decided 2026-10-18 (owner): F2A1's
 way past kept after the remedy, a fill into the strip refused by design, k7's "fully" a residual (below). Refined
-2026-10-19 (orchestrator, round 7 A6, the owner's delegation): k7's residual closed by the eyes (below).
+2026-10-19 (orchestrator, round 7 A6, the owner's delegation): k7's residual closed by the eyes (below). Refined
+2026-10-20 (round 14, LE2): the eyes look for a clip line under idb (below).
 
 ## Context
 
@@ -158,6 +159,49 @@ Residuals, stated:
 - the band is measured on the dumped node (k7: 28 px of its touch target, of which 18 px are the drawn field's);
 - a surface with no flush node at all (a node-less bar over a target no later node touches) is not looked for — no
   trigger, no screenshot.
+
+## Refined 2026-10-20 (round 14, LE2): the eyes look for a CLIP LINE where the tree tells no drawn frame
+
+idb lists no scroll view, so its tree cannot say where a row is drawn (`ui-tree/geometry.ts#DrawnUntold`): the lab's
+`scroll-bounded` P (`51,290 300x64`, cut at `upper`'s bottom, 330) and S (`51,552`, cut at `lower`'s, 560 — 8 pt of it
+drawn) were "fully visible after 0 swipes" under `fully: true`
+(docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md).
+
+WHEN, widened by one case: a `fully: true` claim (`ui-tree/eyes.ts#eyesQuestion`'s `claim`, the round's `fully`) on a
+node whose drawn frame is untold is looked at too, ONE screenshot, every one of its four edges asked for a clip line
+(`EyesEdge` with `by: 'clip line'`, beside the flush neighbours' `by: <node>`). The plain stop asks nothing: its claim
+stays the tree's (ADR 0010's residual 5 — a screenshot per stop is the cost the default tree source cannot carry).
+
+WHAT is a clip line (`verify/eyes.ts#judgeClipLine`), over the target's pixel region, per edge:
+1. the BAND: the target's lines from the edge inward while each is one colour with the outermost line's AND the screen
+   beside it on that line's own rows (columns) — every strip at least 4 px wide, at least one — is that colour too:
+   what lies beneath the clip shows across the target's columns and beside them alike;
+2. the target's OWN colour past the band, at least ΔE00 2.0 from the band's;
+3. THE LINE: the screen beside the target on the rows past the band is, every strip of it, a plain colour of its own
+   told apart from the band's (ΔE00 over 2.0) — the screen changes at the line as the target does, to what a scroll
+   view's background is (beside P's drawn rows `upper`'s grey `#EEEEEE`, beside its band the screen's white). Not
+   merely "not the band's colour": a keyboard's keys (each rect holding the gap below its cap) and a row of padded
+   chips have a band of the gap's colour with the screen beside it that colour, and past it keys and gaps mixed —
+   about 100 of the lab's idb keys read cut that way until round 14's review; over every node idb lists in the 32 lab
+   captures only P and S now do (tests/verify/eyes-clip-line.test.ts).
+Any of them missing is `own` — never `unjudged`: a clip line is looked for, not suspected, so a screenshot that fails
+or cannot tell leaves the tree's claim as it was, unremarked (`ui-tree/eyes.ts#unseen`). A band deeper than the pixel
+slack is a `surface` finding `by: 'clip line'` and is said as the eyes' finding is, in points: `fully: true` does not
+stop; the strokes go on (over the screen's middle — idb names no scroll view), and the failure says `its bottom 24 pt
+read as the screen beside them (#FFFFFF), not its own #1E88E5: cut at the edge of a scroll view the tree does not list
+(a screenshot)`, then that the strokes may have missed the scroll view that holds it and that `treeSource: wda` lists
+it. Measured on `scroll-bounded.png` (iOS 27, 1206x2622): P's band 24 pt (330–354), S's 56 pt (560–616), W (whole in
+`upper`) its own colour to every edge; golden: P's and S's `fully` rows green, every other idb `fully` reply unchanged.
+
+Residuals: a target whose own band is transparent over a page whose colour changes exactly at a line across it, the
+screen beside changing there too, reads cut (a label straddling a section's edge) — a refused `fully: true` stop, the
+safe side. Not seen, the claim standing as the tree's (the stop says "fully visible" as before): a clip at an edge
+where the screen beside the target is not plain (another control there), or not one plain colour — a scroll view
+inset from the screen's edge, the page's margin beside it in the colour of what lies beneath its clip (a card-style box
+with margins: every strip beside must be one colour of its own, or a keyboard's keys would read cut); a target that
+spans the screen's width — no screen beside it at all, most list rows — at its top or bottom edge; and a scroll view
+drawn in the colour of what lies beneath its clip (a transparent SwiftUI `ScrollView` on the page's background): no
+line changes there, on the target's rows past it nor beside them. Each is ADR 0010's residual 5; `treeSource: wda` lists the scroll view and judges them.
 
 ## Refined 2026-10-20 (round 9, B4-L1): a node cut at an OVERLAY may run on under it
 

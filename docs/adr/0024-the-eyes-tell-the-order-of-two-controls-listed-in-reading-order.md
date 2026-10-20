@@ -50,6 +50,11 @@ dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
 - the colour and ocr asserts (`verify/pixel-poll.ts`): the round's one capture is taken on first need — for the order
   question before the standing is decided, else after — and the order is judged on that same decoded frame
   (`verify/eyes.ts#orderOfFrame`): ZERO extra captures (tests/verify/eyes-order.test.ts counts two, the settled pair).
+  A third question shares that frame (2026-10-20, round 14, LE2): on a tree that tells no drawn frame (idb's), whether
+  the colour assert's region reads as the screen beside it (`verify/eyes.ts#apartOfFrame`; ADR 0010's residual 5).
+  NOT under the rule below: it is asked on a region-only frame too, since skipping it there would measure — a PASS on
+  the background beneath a clip — where `untold` here keeps the element covered; a strip beside still moving is no
+  plain strip, and its miss is no final one.
   Only a frame settled over the WHOLE screen is judged: the bands and the strips around the two lie outside the
   element's region, which a region-settled frame does not vouch for — an unsettled or region-only frame reads `untold`.
   The order question never throws, as `eyesOn` never does: a capture that fails is `untold`, said why, the round a

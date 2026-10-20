@@ -110,7 +110,7 @@ above its scroll view's top too.
   toggle `66,1924 948x55` ends at 1979 under its form `[0,242][1080,1978]`, the line CONTINUE starts on. Cut there by a
   pixel, the `fully` stop read it `clipped` where its flush probe is the rule (ADR 0013). `flushEdges` and `endsAt`
   read "past" as more than a pixel already.
-- **The carry model stays WDA's** (`ui-tree/geometry.ts#Drawn.listedWhereItLies`, true only where
+- **The carry model stays WDA's** (`ui-tree/geometry.ts#DrawnFrame.listedWhereItLies`, true only where
   `draw-order.ts#listsUnclippedFrames`; the standing hands it on as `StandingFacts.listedWhereItLies`, which
   `interact/scroll-rounds.ts#stillNeeds` asks): the drawn frame no longer tells the dialect, and on Android a row's
   rect as it comes in is mostly cut to its scroll view, so its motion is no measure of the content's. The dialect is
@@ -136,57 +136,87 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
 
 ## Residuals accepted
 
-- When the reading cannot see the keyboard, the old behaviour returns silently. Examples: a floating or split IME that
-  supplies no insets frame, and the transient read right after the focus tap.
-- The API 34+ `type=ime` line comes from AOSP and has not been captured on a device.
-- A multi-display device reads unknown.
-- A stale `shown` costs covered rounds until the window state catches up. Under a short timeout it fails closed with the
-  covered wording, never a false pass.
-- **idb lists no scroll view** (a flat list): an element below a short scroll view (the SWIFT form's text field at
-  `42,817` under idb) is judged on the screen alone, so the drawn frame cannot refuse it there: it is refused only
-  where something the flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`),
-  and otherwise tapped, stopped on and measured on what shows.
-- **Strokes over the screen's middle, not the target's scroll view** (iOS) — **closed 2026-10-16**: the scrollers now
-  feed the stroke's containers on a WDA tree (`interact/stroke-plan.ts#targetScrollers`: the clipping chain, else
-  `Clips.drawnIn`'s `scrollers`), and what WDA draws over such a scroll view cuts the stroke as on Android
-  (`draw-order.ts#DrawOrder.drawnOver` finds its container among the nodes that scroll). Lab notes LE4 and LV3
-  (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). Still so under idb, which
-  lists no scroll view.
-- **A stroke across a scroll view's axis** (LE4's residual) — **refined 2026-10-18** (round 22, `arch/r22-axis`): the
-  stroke's scroll view is taken among the target's scroll views that scroll ALONG the stroke or whose axis the tree
-  cannot tell, nearest first, and inside it the stroke's path keeps off every nested scroll view that scrolls only
-  ACROSS it — the longest stretch of the scroll view clear of it on the stroke's line, when that stretch has room
-  (`interact/stroke-plan.ts#strokeRoom`, `#clearLane`). A card of a horizontal carousel nested in a vertical page,
-  scrolled for `down`, is stroked over the page, not vertically in the carousel; a page's content-down touch-down on
-  such a carousel is moved off it. The cost: the lane shortens the stroke to its stretch's 60 % — on the note's
-  geometry (a carousel `24,700 354x85` in the page `0,180 402x694`) 312 pt of finger travel (596 → 284) for the page's
-  416 (735 → 319), so more rounds against the swipe and time budget for one scroll. The axis per source
-  (`ui-tree/scroll-containers.ts#scrollAxis`): Android by class (`ScrollView`, `ListView`, … vertical;
-  `HorizontalScrollView`, `ViewPager` horizontal — a Compose `verticalScroll` dumps as `ScrollView`,
-  `horizontalScroll` as `HorizontalScrollView`); WDA's `Table` vertical, else a scroll view's content that runs on
-  past its frame on one axis alone — a node straddling the frame's edge by a quarter of its side, or one wholly past
-  it continuing a same-sized sibling inside it, never any node past it (a drawer at x −300, swipe-action buttons, a
-  page beside a fitting page read nothing). False readings left: a node of a fitting page straddling its side by a
-  quarter without scrolling (an overflowing row it clips), and a same-sized sibling beside a fitting page's content (a
-  pager's page the tree lists as no scroll view) — each reads that page horizontal; unknown — today's behaviour — for
-  a Compose lazy list or grid, a RecyclerView, a WDA scroll view whose content fits or runs on past it by less than a
-  quarter of its side with no same-sized sibling past it, and idb — false negatives among them (a chip carousel of
-  mixed widths, a card carousel spaced more than a quarter card apart with none straddling its edge, full-width cells
-  paged exactly with the next cell unlisted) all fall back to today's stroke. Fallbacks: no candidate along the stroke
-  with room — the pick as before (the nearest with room, whatever its axis: mp-native's Account Detail as captured,
-  whose carousel no list holds); no clear stretch with room, or none left with room by the cut for what is drawn over
-  the scroll view — the stroke as before, over the nested scroll view; the `fully: true` probe never goes over a
-  scroll view that scrolls only across it (unchecked, not a probe that moves nothing; a flush chain of such scroll
-  views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty). Still
-  UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
-  the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown
-  axis on Android.
-- **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
-  21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
-  at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.
-- **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
-  `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
-  the safe direction.
+1. When the reading cannot see the keyboard, the old behaviour returns silently. Examples: a floating or split IME that
+   supplies no insets frame, and the transient read right after the focus tap.
+2. The API 34+ `type=ime` line comes from AOSP and has not been captured on a device.
+3. A multi-display device reads unknown.
+4. A stale `shown` costs covered rounds until the window state catches up. Under a short timeout it fails closed with the
+   covered wording, never a false pass.
+5. **idb lists no scroll view** (a flat list) — **refined 2026-10-20** (round 14, LE2): the drawn frame is UNTOLD there
+   (`ui-tree/geometry.ts#DrawnUntold`, a named answer of `Clips.drawnIn`, not "nothing cuts it"), and the eyes look
+   where a claim rests on it, from the frame the claim is checked on:
+   - the colour assert asks whether its region reads as the screen beside it (`verify/eyes.ts#apartOfFrame`, on the
+     frame it measures — no capture added): a region of nothing but one colour, a plain strip beside it that colour
+     too, fails closed ("its region reads as the screen beside it … measure it under treeSource: wda"). The lab's
+     `scroll-bounded` O (wholly below `lower`) and `carousel-in-list`'s C (right of its carousel) no longer pass on the
+     background; every node drawn where idb lists it shows something of its own — "nothing of its own" is a COUNT,
+     at most one point's worth of pixels off the region's dominant (`OWN_PIXELS_MAX`), not a share, so a short label
+     on a wide row is its own: over the 393 nodes idb lists in the 32 lab captures, O and C have 0 px off, every other
+     node at least 777 (a placeholder, a label). Asked on a frame settled over the region only too: the background
+     under a clip holds still while a spinner or a caret elsewhere moves, and a strip beside still moving is no plain
+     strip — so it fails closed as on a still screen, the miss no final one (unlike ADR 0024's order question, whose
+     `untold` keeps the element covered; skipping it here would measure, a PASS on the background). What it does not
+     see, measured as before (a PASS on the background, as before this refinement): anything of what lies beneath the
+     clip inside the region (a separator, a shadow, text — more than a point of pixels reads apart), and no plain strip
+     of the screen beside the region (`untold`). The ocr assert is not asked: a region of one colour holds no glyphs
+     to pass on. Its cost: an element drawn in nothing but the colour around it (an empty, unbordered card on a page
+     of its colour) fails closed under idb too — nothing in the frame tells it from the screen either;
+   - a `fully: true` claim looks for a clip line at each edge, one screenshot (ADR 0013, "the eyes", refined
+     2026-10-20): P (cut at `upper`'s 330) and S (at `lower`'s 560) are no longer "fully visible". It cannot see a
+     clip with no plain screen beside the target (a full-width row) or a scroll view the colour of what lies beneath
+     it (ADR 0013's residuals): there the claim stays the tree's.
+   What stays, accepted: the tap, the plain stop and the strokes are judged on the screen alone — an element below a
+   short scroll view (the SWIFT form's text field at `42,817`, the lab's O and S) is refused only where something the
+   flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`), and otherwise
+   tapped and stopped on; `scroll_until` strokes over the screen's middle, which may miss the scroll view that holds
+   it (the lab's F, C). Why not more: a screenshot per tap or plain stop would double the cost of the commonest verbs
+   under the default tree source (idb), and nothing cheaper sees the clip — idb's `Scrollable` trait marks 372 of the
+   409 nodes idb lists in the 33 iOS lab captures (the 32 above and the React Native app's), contents and all, and an
+   element "listed past the screen" is no clip (13 of those 33 captures, 11 with nothing cut); refusing every untold node would refuse 88 green taps. The remedy is the tree source that lists
+   the scroll views: `treeSource: wda`, which the tool descriptions name, and under which every one of these rows is
+   answered as the truth does.
+   docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+6. **Strokes over the screen's middle, not the target's scroll view** (iOS) — **closed 2026-10-16**: the scrollers now
+   feed the stroke's containers on a WDA tree (`interact/stroke-plan.ts#targetScrollers`: the clipping chain, else
+   `Clips.drawnIn`'s `scrollers`), and what WDA draws over such a scroll view cuts the stroke as on Android
+   (`draw-order.ts#DrawOrder.drawnOver` finds its container among the nodes that scroll). Lab notes LE4 and LV3
+   (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). Still so under idb, which
+   lists no scroll view.
+7. **A stroke across a scroll view's axis** (LE4's residual) — **refined 2026-10-18** (round 22, `arch/r22-axis`): the
+   stroke's scroll view is taken among the target's scroll views that scroll ALONG the stroke or whose axis the tree
+   cannot tell, nearest first, and inside it the stroke's path keeps off every nested scroll view that scrolls only
+   ACROSS it — the longest stretch of the scroll view clear of it on the stroke's line, when that stretch has room
+   (`interact/stroke-plan.ts#strokeRoom`, `#clearLane`). A card of a horizontal carousel nested in a vertical page,
+   scrolled for `down`, is stroked over the page, not vertically in the carousel; a page's content-down touch-down on
+   such a carousel is moved off it. The cost: the lane shortens the stroke to its stretch's 60 % — on the note's
+   geometry (a carousel `24,700 354x85` in the page `0,180 402x694`) 312 pt of finger travel (596 → 284) for the page's
+   416 (735 → 319), so more rounds against the swipe and time budget for one scroll. The axis per source
+   (`ui-tree/scroll-containers.ts#scrollAxis`): Android by class (`ScrollView`, `ListView`, … vertical;
+   `HorizontalScrollView`, `ViewPager` horizontal — a Compose `verticalScroll` dumps as `ScrollView`,
+   `horizontalScroll` as `HorizontalScrollView`); WDA's `Table` vertical, else a scroll view's content that runs on
+   past its frame on one axis alone — a node straddling the frame's edge by a quarter of its side, or one wholly past
+   it continuing a same-sized sibling inside it, never any node past it (a drawer at x −300, swipe-action buttons, a
+   page beside a fitting page read nothing). False readings left: a node of a fitting page straddling its side by a
+   quarter without scrolling (an overflowing row it clips), and a same-sized sibling beside a fitting page's content (a
+   pager's page the tree lists as no scroll view) — each reads that page horizontal; unknown — today's behaviour — for
+   a Compose lazy list or grid, a RecyclerView, a WDA scroll view whose content fits or runs on past it by less than a
+   quarter of its side with no same-sized sibling past it, and idb — false negatives among them (a chip carousel of
+   mixed widths, a card carousel spaced more than a quarter card apart with none straddling its edge, full-width cells
+   paged exactly with the next cell unlisted) all fall back to today's stroke. Fallbacks: no candidate along the stroke
+   with room — the pick as before (the nearest with room, whatever its axis: mp-native's Account Detail as captured,
+   whose carousel no list holds); no clear stretch with room, or none left with room by the cut for what is drawn over
+   the scroll view — the stroke as before, over the nested scroll view; the `fully: true` probe never goes over a
+   scroll view that scrolls only across it (unchecked, not a probe that moves nothing; a flush chain of such scroll
+   views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty). Still
+   UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
+   the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown
+   axis on Android.
+8. **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
+   21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
+   at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.
+9. **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
+   `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
+   the safe direction.
 
 ## Bug note
 
