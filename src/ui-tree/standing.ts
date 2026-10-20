@@ -7,7 +7,7 @@ import {
   type Exposure,
 } from './draw-order.js';
 import { coverAtPoint, lastPresented, overlaidCover, type Cover } from './cover.js';
-import { EDGES, laterEdgesIn, type FlushNeighbour, type LaterEdges } from './later-edges.js';
+import { laterEdgesIn, type FlushNeighbour, type LaterEdges } from './later-edges.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
 import type { SeenOrder } from './seen-order.js';
 import {
@@ -19,6 +19,7 @@ import {
   clipsOf,
   containsPoint,
   drawnPart,
+  EDGES,
   overlapsPastSlack,
   PIXEL_OVERLAP_SLACK,
   rectWithin,
@@ -1060,8 +1061,8 @@ function systemBands(box: Rect, bands: Bands): { clear: Rect; top?: SystemBand<S
  * line to the screen's bottom — idb's band's own shape (soft-keyboard.ts
  * #flatListKeyboardBand: screen-wide, ending at its bottom), the rect a
  * sentence quotes for it (the pixel assert's keyboard miss, through
- * `underKeyboard`; `scroll_until`'s cover, interact/scroll-read.ts
- * #bandCoverOf, on the box its round judges in).
+ * `underKeyboard`; `scroll_until`'s applied keyboard, interact/scroll-read.ts
+ * #bandKeyboardOf, on the box its round judges in).
  */
 export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen.x, y: line.y, width: screen.width, height: screen.y + screen.height - line.y });
 

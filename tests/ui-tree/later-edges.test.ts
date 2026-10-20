@@ -1,13 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { EDGES, laterEdgesIn, type LaterEdge, type LaterScene } from '../../src/ui-tree/later-edges.js';
+import { EDGES } from '../../src/ui-tree/geometry.js';
+import { laterEdgesIn, type LaterEdge, type LaterScene } from '../../src/ui-tree/later-edges.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * THE EDGE EVIDENCE OF COMPOSE'S CUT AT A LATER NODE (ui-tree/later-edges.ts): each edge of a node, the later node laid
- * flush against it classified once — `overlay`, `outsideScrollView`, `sameScrollView`, `aligned`, `none` — over the lab's real captures
+ * flush against it classified once — `overlaid`, `outsideScrollView`, `sameScrollView`, `aligned`, `none` — over the lab's real captures
  * (tests/fixtures/truth/android-averi_lab-api33), Compose's own snapshots and the shapes the overlay must not make.
  * What each class means to a judgement is tested end to end in overlaid-edge.test.ts, eyes.test.ts and the golden rows.
  */
@@ -47,9 +48,9 @@ const headerOver = (header: 'in the list' | 'outside it' | 'no list'): UiNode =>
 describe('LaterEdge — each edge of a node classified, over the lab\'s captures', () => {
   it.each([
     // An overlay: the pinned `Continue` 66..1014 reaching past the row 127..952 at both ends, in no scroll view.
-    ['pinned-bar', 'lab.pinned-bar.P', only('bottom', 'overlay lab.pinned-bar.continue 110')],
+    ['pinned-bar', 'lab.pinned-bar.P', only('bottom', 'overlaid lab.pinned-bar.continue 110')],
     ['pinned-bar', 'lab.pinned-bar.W', only('top', 'none')],
-    ['text-under-bar', 'lab.text-under-bar.P', only('bottom', 'overlay lab.text-under-bar.continue 22')],
+    ['text-under-bar', 'lab.text-under-bar.P', only('bottom', 'overlaid lab.text-under-bar.continue 22')],
     // The bar riding on the IME, outside the form's scroll view: `phone` cut to 42 px under it, its title to 14 above it.
     ['form-keyboard', 'lab.form-keyboard.phone', only('top', 'outsideScrollView lab.form-keyboard.submit 42')],
     ['form-keyboard', 'lab.form-keyboard.phone.title', only('bottom', 'outsideScrollView lab.form-keyboard.submit 14')],
@@ -79,7 +80,7 @@ describe('LaterEdge — each edge of a node classified, over the lab\'s captures
 
   it('a full-bleed header flush over an inset row: an overlay with no list; outside the row\'s list a flush neighbour; in it (a sticky header) the list\'s own', () => {
     const row = (t: UiNode) => edgesOf(t, byId(t, 'row'));
-    expect(row(headerOver('no list'))).toEqual(only('top', 'overlay header 176'));
+    expect(row(headerOver('no list'))).toEqual(only('top', 'overlaid header 176'));
     expect(row(headerOver('outside it'))).toEqual(only('top', 'outsideScrollView header 176'));
     expect(row(headerOver('in the list'))).toEqual(only('top', 'sameScrollView header 176'));
   });
@@ -93,7 +94,7 @@ describe('LaterEdge — each edge of a node classified, over the lab\'s captures
     const sharesRight = tree(`${row}${later('bar', '[0,630][953,800]')}`);
     expect(edgesOf(sharesRight, byId(sharesRight, 'row'))).toEqual(only('bottom', 'aligned bar 176'));
     const between = tree(`${row}${later('header', '[0,300][1080,454]')}${later('bar', '[0,630][1080,800]')}`);
-    expect(edgesOf(between, byId(between, 'row'))).toEqual({ ...only('top', 'overlay header 176'), bottom: 'overlay bar 176' });
+    expect(edgesOf(between, byId(between, 'row'))).toEqual({ ...only('top', 'overlaid header 176'), bottom: 'overlaid bar 176' });
     expect(laterEdgesIn(between, sceneOf(between))(byId(between, 'row')).overlaid()).toMatchObject({ edge: 'top', by: byId(between, 'header') });
   });
 

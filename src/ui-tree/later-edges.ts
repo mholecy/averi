@@ -1,6 +1,6 @@
 import { rectArea, sameRect, type Rect, type UiNode } from '../adapters/types.js';
 import { listsAncestry, listsUnclippedFrames, type DrawOrder } from './draw-order.js';
-import { across, rectWithin, type Clips, type Edge } from './geometry.js';
+import { across, EDGES, rectWithin, type Clips, type Edge } from './geometry.js';
 
 /**
  * THE EDGE EVIDENCE OF COMPOSE'S CUT AT A LATER NODE: on a tree whose source cuts a node's bounds at a node drawn after
@@ -10,7 +10,7 @@ import { across, rectWithin, type Clips, type Edge } from './geometry.js';
  * cannot say by itself whether the target runs on under it; what it means depends on where the two lie. This module
  * finds it once per edge and CLASSIFIES it (`LaterEdge`), and every reader asks the class instead of re-deriving it:
  *
- * - `overlay` — the node in NO scroll view, the later node across its top or bottom edge reaching past it at BOTH ends:
+ * - `overlaid` — the node in NO scroll view, the later node across its top or bottom edge reaching past it at BOTH ends:
  *   an overlay laid over content with margins of its own (`OverlaidEdge`); its own node is the cover.
  * - `outsideScrollView` — the node in a clipping scroll view, the later node outside it (a bar pinned over the content
  *   or riding on the IME): a flush neighbour (`FlushNeighbour`) whose SURFACE past its node only the eyes can judge.
@@ -20,7 +20,7 @@ import { across, rectWithin, type Clips, type Edge } from './geometry.js';
  *   row, a field under its title, or a sticky header in it): the list's own content, which its scroll moves.
  * - `none` — no later node lies flush there (and every edge, on a tree of another dialect or a node of no area).
  *
- * `overlay` and `outsideScrollView` are COMPLEMENTS — the same evidence, read for a node in no scroll view and one in
+ * `overlaid` and `outsideScrollView` are COMPLEMENTS — the same evidence, read for a node in no scroll view and one in
  * a scroll view — so one classifier makes both (as `aligned` and `sameScrollView` are each one's other side): a node
  * in a scroll view is never an overlay's, because at rest a list's first row lies whole and flush under a bar pinned at
  * its edge, dumped exactly as a row the bar cuts (the lab's `scroll-sticky-cut`), and an edge-to-edge top bar over a
@@ -28,7 +28,7 @@ import { across, rectWithin, type Clips, type Edge } from './geometry.js';
  * the eyes). And a node in no scroll view has no flush neighbour: no scroll moves it, so no stop waits on its surface.
  *
  * Readers (ui-tree/standing.ts): the sliver cut by a later node (`cutByLater`: a control thinner than the tap minimum
- * across an edge of any class but `none`; a role-less strip only on an `overlay`), the `fully` stop's and the pixel
+ * across an edge of any class but `none`; a role-less strip only on an `overlaid` edge), the `fully` stop's and the pixel
  * assert's overlaid cover (`LaterEdges.overlaid`, cover.ts#overlaidCover), and `Scene.flushNeighbours` (the eyes'
  * trigger, ui-tree/eyes.ts, which leaves out a neighbour spanning the screen — a question about the screen, not the
  * edge). Edges are asked top, bottom, left, right; the overlay top and bottom only (every measured Compose cut is
@@ -50,11 +50,12 @@ import { across, rectWithin, type Clips, type Edge } from './geometry.js';
 export type LaterEdge =
   | { readonly kind: 'none'; readonly edge: Edge; readonly depth: number }
   | OverlaidEdge
-  | { readonly kind: 'outsideScrollView' | 'sameScrollView' | 'aligned'; readonly edge: Edge; readonly by: UiNode; readonly depth: number };
+  | { readonly kind: 'outsideScrollView'; readonly edge: Edge; readonly by: UiNode; readonly depth: number }
+  | { readonly kind: 'sameScrollView' | 'aligned'; readonly edge: Edge; readonly by: UiNode; readonly depth: number };
 
 /**
  * AN OVERLAID EDGE: a top or bottom edge of a node's bounds that the tree's source cut at a node DRAWN OVER IT — so an
- * unknown run of the node lies under `by` (`LaterEdge`'s `overlay`). `by` is the node laid flush against that edge along
+ * unknown run of the node lies under `by` (`LaterEdge`'s `overlaid`). `by` is the node laid flush against that edge along
  * the node's whole width, drawn after it outside its subtree, that also REACHES PAST THE NODE AT BOTH ENDS of the edge:
  * an overlay laid over content with margins of its own (the lab's pinned `Continue` 66..1014 over its row 127..952),
  * where a sibling laid beside it in a column shares an alignment line with it at one end at least (a list's next row, a
@@ -70,7 +71,7 @@ export type LaterEdge =
  * docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
 export interface OverlaidEdge {
-  readonly kind: 'overlay';
+  readonly kind: 'overlaid';
   readonly edge: 'top' | 'bottom';
   readonly by: UiNode;
   readonly depth: number;
@@ -85,17 +86,16 @@ export interface OverlaidEdge {
  * its field (live case k7; docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md, the eyes). The
  * neighbour is the first such node in draw order (the outermost: the submit bar's node, not its button), whatever the
  * node's depth across that edge, and one per edge (a row between a pinned header and a bar riding on the IME has two).
+ * So it keeps the edge and its node of the `outsideScrollView` class, not its `depth`: the eyes judge the neighbour's
+ * surface past its node, which the node's own extent across that edge says nothing of.
  */
-export interface FlushNeighbour {
-  readonly edge: Edge;
-  readonly by: UiNode;
-}
+export type FlushNeighbour = Pick<Extract<LaterEdge, { kind: 'outsideScrollView' }>, 'edge' | 'by'>;
 
 /** A node's four edges, classified (`LaterEdge`) — each asked on first use and kept. */
 export interface LaterEdges {
   /** The edge's flush later node, classified. */
   at(edge: Edge): LaterEdge;
-  /** The node's overlaid edge (`overlay`), top before bottom, or undefined — never asked of a node in a scroll view. */
+  /** The node's overlaid edge (`overlaid`), top before bottom, or undefined — never asked of a node in a scroll view. */
   overlaid(): OverlaidEdge | undefined;
   /** Its flush neighbours (`outsideScrollView`), top, bottom, left, right — empty for a node in no scroll view. */
   flushNeighbours(): readonly FlushNeighbour[];
@@ -106,9 +106,6 @@ export interface LaterScene {
   readonly order: Pick<DrawOrder, 'coversOf'>;
   readonly clips: Pick<Clips, 'scrollersOf'>;
 }
-
-/** The edges in the order every reader asks them. */
-export const EDGES = ['top', 'bottom', 'left', 'right'] as const;
 
 /**
  * The classifier of `tree`'s nodes' edges over `scene` (the module doc): the dialect asked once (`cutsAtLater`); on a
@@ -139,7 +136,7 @@ function classified(scene: LaterScene, node: UiNode): LaterEdges {
     if (own !== undefined) return { kind: scene.clips.scrollersOf(by).some((s) => sameRect(s, own)) ? 'sameScrollView' : 'outsideScrollView', edge, by, depth };
     const c = by.rect;
     // An overlay's own margins: past the node at both ends, not on an alignment line it shares with it.
-    if ((edge === 'top' || edge === 'bottom') && c.x < r.x && c.x + c.width > r.x + r.width) return { kind: 'overlay', edge, by, depth };
+    if ((edge === 'top' || edge === 'bottom') && c.x < r.x && c.x + c.width > r.x + r.width) return { kind: 'overlaid', edge, by, depth };
     return { kind: 'aligned', edge, by, depth };
   };
   const at = (edge: Edge): LaterEdge => {
@@ -155,7 +152,7 @@ function classified(scene: LaterScene, node: UiNode): LaterEdges {
     if (ownScrollers().length > 0) return undefined;
     for (const edge of ['top', 'bottom'] as const) {
       const edged = at(edge);
-      if (edged.kind === 'overlay') return edged;
+      if (edged.kind === 'overlaid') return edged;
     }
     return undefined;
   };

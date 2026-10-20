@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import type { Edge } from '../../src/ui-tree/geometry.js';
+import { EDGES } from '../../src/ui-tree/geometry.js';
 import { coverName, cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from '../../src/interact/target-text.js';
 
 /**
@@ -9,8 +9,6 @@ import { coverName, cutRemedy, cutSliverText, pastSideText, revealText, underKey
  * lines. Each row is the literal those callers quote (their own tests pin
  * them in context: resolve.test, scroll.test, keyboard-in-tree.test).
  */
-const EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
-
 describe('cutRemedy — the scroll toward where the rest of a cut target lies', () => {
   it.each([
     ['top', 'scroll_until it with direction: up first'],

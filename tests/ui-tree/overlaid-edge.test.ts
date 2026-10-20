@@ -102,7 +102,7 @@ describe('OverlaidEdge — text-under-bar P: a role-less clickable dumped as the
   });
 });
 
-describe('OverlaidEdge — found first, else overlaid: the cover a judgement found wins over the cut (cover.ts#coverClause\'s precedence)', () => {
+describe('OverlaidEdge — found first, else overlaid: the cover a judgement found wins over the cut (standing.ts#fullyStanding, #pixelStanding)', () => {
   /** A row 100,1000 400x100 in no scroll view, and a later button 50..1030 wide reaching past it at both ends, overlapping its bottom by `overlap` px. */
   const barOver = (overlap: number) => {
     const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
