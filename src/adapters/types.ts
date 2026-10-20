@@ -548,6 +548,17 @@ export interface UiNode {
    */
   readingOrder?: true;
   /**
+   * Set on a node its source marks an accessibility HEADING — the Header trait (idb's `traits` containing `Header`,
+   * adapters/ios-tree-source.ts#idbTree; WDA's `traits` naming `Header`, adapters/wda-source.ts#toUiNode). SwiftUI
+   * gives it to a `Section`'s header, and a pinned section header (`LazyVStack(pinnedViews: [.sectionHeaders])`) is
+   * listed BEFORE the rows it is drawn over: in a listing given in reading order (`readingOrder`) a heading listed
+   * before a target it overlaps is drawn over it (ui-tree/reading-order.ts#readingOrderOf, its `headingsOver`). The
+   * trait, not idb's `type` `Heading`: the trimmed mp-native fixtures give that type to nodes whose traits were not
+   * recorded. A mark of the source, like `readingOrder`: ui-tree knows no platform. Absent on Android's trees.
+   * docs/bugs/2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md
+   */
+  heading?: true;
+  /**
    * Set on every node of a HIDDEN SUBTREE of a WDA tree (adapters/wda-source.ts#hiddenRoots): a node of no structural
    * role (`STRUCTURAL_ROLES`: not WDA's `Other`, `Cell`, `Window`, … — a control, an image, a text, a scroll view, a
    * toolbar) that WDA reports `isVisible="0"` AND `isAccessible="0"`, whose every descendant is `isVisible="0"`, roots

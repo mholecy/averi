@@ -36,7 +36,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * when one holds its centre, and every overlapping control of it, before or after, as a
  * cover whose order it does not tell (reading-order.ts#readingOrderOf, cover.ts#CoverOrder's `untold`) — unless a screenshot
  * told it: the order SEEN is an input (`drawOrder`'s `orderSeen`, ui-tree/seen-order.ts), a peer seen under the
- * target no cover of it, one seen over it a cover named so (`seenOver`).
+ * target no cover of it, one seen over it a cover named so (`seenOver`). A HEADING listed before a target it overlaps
+ * (`UiNode.heading`: SwiftUI's pinned section header, listed before the rows scrolled under it) is drawn over it, its
+ * order told (reading-order.ts#headingsOver).
  *
  * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
@@ -136,8 +138,9 @@ export interface DrawOrder {
    * object appears) — and, in idb's flat list, a
    * floating tab bar's items listed before it, when it lies outside the bar
    * (`tabBarsOf`: idb lists the bar first; a nested tree's order is its draw
-   * order), and, in a listing given in reading order, the controls listed
-   * before a control target when one holds its centre (reading-order.ts#readingOrderOf) — that draw for a
+   * order), and, in a listing given in reading order, a heading listed
+   * before it that overlaps it, and the controls listed before a control
+   * target when one holds its centre (reading-order.ts#readingOrderOf) — that draw for a
    * target (`NOT_DRAWN`'s `target` column) and share area with the part of
    * `node` inside `within` — a cover's rect, or, for a node pinned at the
    * bottom of idb's flat list, that rect run down to the screen's bottom
@@ -325,8 +328,8 @@ export interface Exposure {
   readonly shows: number;
   /**
    * The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before
-   * it among them, `tabBarsOf`; in a reading-order listing, the controls listed before it that overlap it when one
-   * holds its centre, reading-order.ts#readingOrderOf), each as one record (cover.ts#Cover); empty when none. Each with:
+   * it among them, `tabBarsOf`; in a reading-order listing, the headings listed before it that overlap it and the
+   * controls listed before it that overlap it when one holds its centre, reading-order.ts#readingOrderOf), each as one record (cover.ts#Cover); empty when none. Each with:
    * - its REACH: its rect, or — for a node pinned at a flat list's bottom (`bottomPinned`) — its reach (`pinnedReach`),
    *   raised by its bar's lift for a floating tab bar's item (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`), or the whole
    *   screen for a presented layer's cover. The rects `shows`, `largest` and cover.ts#coverAtPoint are judged against, so a caller
@@ -1737,8 +1740,8 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       // tree's order IS its draw order (an action sheet listed after the bar is drawn over it), so there only the items listed after the target count.
       // A flat list has no nesting, so no item listed before the target is its ancestor.
       const tabsBefore = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
-      // In a listing given in reading order, the controls that overlap it whose order is not told: those listed before it over its centre are
-      // covers too.
+      // In a listing given in reading order, what is listed before it but drawn over it: a heading that overlaps it, and the controls that
+      // overlap it whose order is not told when one of them holds its centre.
       const peers = about === undefined ? undefined : readingOrderOf(order, about, pinnedTargets, orderSeen);
       const before = [...tabsBefore, ...(peers?.before ?? [])].sort((a, b) => a.at - b.at);
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.

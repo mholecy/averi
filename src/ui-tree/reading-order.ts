@@ -10,10 +10,12 @@ import type { SeenOrder } from './seen-order.js';
  * (`UiNode.readingOrder`: idb's flat list, a WDA run sorted by top), so a node drawn on top may be listed BEFORE the
  * node it is drawn over, and the draw order's rule "listed later = drawn later" (draw-order.ts#DrawOrder's doc) does
  * not hold there. This module is the one owner of "listed before, but drawn over" in such a listing: which siblings
- * listed before a target cover it, which covers' order the listing does not tell, and which a moved tap must keep
- * clear of. draw-order.ts#DrawOrder.exposure asks it once per target and joins its answer to the draw order's own
+ * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header) or a
+ * control whose order against it the listing does not tell (`peersOf`) — which covers' order is not told, and which
+ * siblings a moved tap must keep clear of. draw-order.ts#DrawOrder.exposure asks it once per target and joins its answer to the draw order's own
  * covers; it knows nothing of rows, presented layers or reaches.
- * docs/adr/0015-flat-list-reading-order-break.md (its amendment, "covers listed before the target")
+ * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target" and "a heading
+ * listed before")
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
 
@@ -40,6 +42,70 @@ function listsInReadingOrder(parent: UiNode): boolean {
 }
 
 /**
+ * What a listing given in reading order says of a target's order against its siblings (`readingOrderOf`):
+ * - `before`: the siblings listed BEFORE it that are drawn over it — covers the draw order alone would not give: the
+ *   headings over it (`headingsOver`, their order `drawn`) and the controls whose order is not told (`peersOf`'s
+ *   `before`); in the walk's order;
+ * - `unordered`, `seenOver`, `seenUnder`, `listedBefore`: of the controls whose order is not told (`peersOf`, its doc
+ *   says each) — a heading is none of them.
+ */
+export interface ReadingOrder {
+  readonly before: readonly Placed[];
+  readonly unordered: ReadonlySet<Placed>;
+  readonly seenOver: ReadonlySet<Placed>;
+  /** The peers a screenshot saw drawn UNDER the target: no covers of it, wherever listed (`seen`). */
+  readonly seenUnder: ReadonlySet<Placed>;
+  readonly listedBefore: readonly Placed[];
+}
+
+const NONE: ReadingOrder = { before: [], unordered: new Set<Placed>(), seenOver: new Set<Placed>(), seenUnder: new Set<Placed>(), listedBefore: [] };
+
+/**
+ * What the listing of `about.target`'s parent says of the target's order against its siblings (`ReadingOrder`) —
+ * nothing unless that listing is given in reading order (`listsInReadingOrder`), and nothing for a target PINNED at the
+ * screen's bottom (`pinnedTargets`): a pinned bar is drawn over what scrolls under it, listed before it or not (the
+ * pinned-bar cell's Continue, idb and WDA). Two kinds of sibling listed before it are drawn over it: a heading
+ * (`headingsOver`), and a control whose order is not told (`peersOf`). The order SEEN (`seen`, ui-tree/seen-order.ts)
+ * tells the second kind only.
+ */
+export function readingOrderOf(
+  order: readonly Placed[],
+  about: ReadingOrderAbout,
+  pinnedTargets: () => ReadonlyMap<Placed, number>,
+  seen: SeenOrder | undefined,
+): ReadingOrder {
+  const { target } = about;
+  if (target.parent === undefined || !listsInReadingOrder(target.parent.node)) return NONE;
+  const headings = headingsOver(order, target);
+  const peers = peersOf(order, about, pinnedTargets, seen, new Set(headings));
+  if ((headings.length === 0 && peers === NONE) || pinnedTargets().has(target)) return NONE;
+  return { ...peers, before: [...headings, ...peers.before].sort((a, b) => a.at - b.at) };
+}
+
+/** Whether `p` overlaps `target` past geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a node's own wrapper, its own title, its own content). */
+function overlapsApart(p: Placed, target: Placed): boolean {
+  const [a, t] = [p.node.rect, target.node.rect];
+  return overlapsPastSlack(a, t) && !rectWithin(t, a) && !rectWithin(a, t) && !sameRectWithinPixel(a, t);
+}
+
+/**
+ * A HEADING LISTED BEFORE: the target's siblings the source marks a heading (`UiNode.heading`, the Header trait)
+ * listed BEFORE it that overlap it apart (`overlapsApart`) — drawn over it, their order told (cover.ts#CoverOrder's
+ * `drawn`). SwiftUI lists a section's header first and pins it (`LazyVStack(pinnedViews: [.sectionHeaders])`) over
+ * the rows scrolled under it, drawn on top: the lab's scroll-sticky, header `0,110 402x56` listed before R
+ * `51,142 300x64`, whose top 24 pt it hides (62.5 % of R drawn), in idb's flat list and in WDA's run alike. A row is
+ * never drawn over its section's header, so no order is left untold and no screenshot is asked. Unlike a control
+ * peer, no gate on what it overlaps: not only over the target's centre (a pinned header hides a row's top, the centre
+ * still clear — what the colour assert samples and `fully` claims), not only a control (a heading is text), and in
+ * idb's flat list before its content too (idb reads the header at the list's top as top-bar chrome, ADR 0004).
+ * A heading listed AFTER the target is drawn over it by the draw order already.
+ * docs/bugs/2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md
+ */
+function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
+  return order.slice(0, target.at).filter((p) => p.parent === target.parent && p.node.heading === true && overlapsApart(p, target));
+}
+
+/**
  * The controls whose ORDER against a control target a listing given in reading order does not tell
  * (`listsInReadingOrder` of the target's parent, `about.target`): its siblings that are interactive and overlap it past
  * geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a control's own wrapper, its own
@@ -59,54 +125,39 @@ function listsInReadingOrder(parent: UiNode): boolean {
  *   a scroll advised. Only over the centre: a floating control listed after a row that only pokes over its edge (a FAB
  *   in idb's flat list, not pinned by shape) keeps its draw order's remedy, a scroll.
  * - `listedBefore`: every one listed before it, cover or not — where a tap moved off a covered centre may not be aimed
- *   (`exposure`'s `tapAt`): the reviewer's shape, W `51,690 300x40` listed before C `51,700 300x120` under a pinned
+ *   (`exposure`'s `tapAt`): W `51,690 300x40` listed before C `51,700 300x120` under a pinned
  *   Continue `0,740`, had C's tap moved to (201,720), on W.
  * A peer held whole by the target, or holding it whole, is no peer: before or after, it is the control's own wrapper or
  * its own content (the draw order's own-content rule excuses the latter listed after it, `ownContentOf`).
- * None for a target PINNED at the screen's bottom (`pinnedTargets`): a pinned bar is drawn over what scrolls under it,
- * listed before it or not (the pinned-bar cell's Continue, idb and WDA).
+ * A heading listed before it is none (`headings`): it is drawn over it (`headingsOver`).
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
- */
-/** What `readingOrderOf` finds of a control target's siblings in a listing given in reading order (its doc says each). */
-export interface ReadingOrder {
-  readonly before: readonly Placed[];
-  readonly unordered: ReadonlySet<Placed>;
-  readonly seenOver: ReadonlySet<Placed>;
-  /** The peers a screenshot saw drawn UNDER the target: no covers of it, wherever listed (`seen`). */
-  readonly seenUnder: ReadonlySet<Placed>;
-  readonly listedBefore: readonly Placed[];
-}
-
-/**
+ *
  * …and THE ORDER SEEN (`seen`, ui-tree/seen-order.ts): a peer a screenshot saw drawn UNDER the target is no peer — not
  * in `before`, `unordered` or `listedBefore`, and, listed after it, no cover by the draw order either (`seenUnder`: the
  * screenshot overrides the listing for exactly that pair): the lab's W, seen over C. A peer seen OVER it stays the
  * cover the listing made it, named `seenOver` instead of `unordered`: C, under W. An untold pair is as with no
  * screenshot.
  */
-export function readingOrderOf(
+function peersOf(
   order: readonly Placed[],
   about: ReadingOrderAbout,
   pinnedTargets: () => ReadonlyMap<Placed, number>,
   seen: SeenOrder | undefined,
+  headings: ReadonlySet<Placed>,
 ): ReadingOrder {
   const { target, flatList, contentFrom, bottomChrome } = about;
-  const none: ReadingOrder = { before: [], unordered: new Set<Placed>(), seenOver: new Set<Placed>(), seenUnder: new Set<Placed>(), listedBefore: [] };
   const t = target.node;
-  const parent = target.parent;
-  if (parent === undefined || !listsInReadingOrder(parent.node) || !isInteractive(t) || (flatList && target.at < contentFrom)) return none;
+  if (!isInteractive(t) || (flatList && target.at < contentFrom)) return NONE;
   const peers = order.filter(
     (p) =>
       p !== target &&
-      p.parent === parent &&
+      p.parent === target.parent &&
+      !headings.has(p) &&
       (flatList ? p.at >= contentFrom && !bottomChrome.has(p) : !pinnedTargets().has(p)) &&
       isInteractive(p.node) &&
-      overlapsPastSlack(p.node.rect, t.rect) &&
-      !rectWithin(t.rect, p.node.rect) &&
-      !rectWithin(p.node.rect, t.rect) &&
-      !sameRectWithinPixel(p.node.rect, t.rect),
+      overlapsApart(p, target),
   );
-  if (peers.length === 0 || pinnedTargets().has(target)) return none;
+  if (peers.length === 0) return NONE;
   const centre = tapPoint(t);
   const holdsCentre = (p: Placed): boolean => containsPoint(p.node.rect, centre);
   // What a screenshot saw of the PEER against the target: drawn over it (`over`), or under it — no peer then.
