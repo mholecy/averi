@@ -10,7 +10,9 @@ import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
 export const WORKING_TREE = 'working tree';
 
 /**
- * A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it.
+ * A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it —
+ * its one owner: golden's ratchet (tests/differential/golden.test.ts) and `--against` (golden-diff.ts) key by it too.
+ * Here, not beside GoldenCheck in golden.ts, so the calibration's modules need not load the harness to name a row.
  */
 export const keyOf = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
 /** The capture a row key names (`<run>/<file>`). */

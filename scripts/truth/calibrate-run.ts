@@ -159,10 +159,10 @@ const keyNow = (s: Sides, side: string): string | undefined => {
  * --remove, and the sides taken from the cache are named.
  */
 export async function runSides(sides: readonly string[], s: Sides): Promise<{ runs: Map<string, SideRun>; cleanups: (() => void)[]; cached: string[] }> {
-  const keyOf = s.keys();
+  const cacheKeyOf = s.keys();
   const outcomes = await pool(sides, s.jobs, async (side): Promise<SideOutcome> => {
     const started = Date.now();
-    const key = keyOf(side);
+    const key = cacheKeyOf(side);
     const kept = key === undefined || s.mode === 'refresh' ? undefined : await s.cache.get(key);
     let outcome: SideOutcome = kept !== undefined ? { run: kept, cached: true } : await s.run(side);
     if (key !== undefined && outcome.cached === undefined && !('error' in outcome.run)) {
