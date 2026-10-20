@@ -1,8 +1,11 @@
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { cellOf, checkOf, exitCode, faultsOf, parseOnly, selectRecordings, type GoldenResult } from '../../scripts/differential/golden.js';
+import { cellOf, checkOf, exitCode, faultsOf, parseOnly, selectRecordings, type GoldenJson, type GoldenResult } from '../../scripts/differential/golden.js';
 import { loadSide, takesDeps } from '../../scripts/differential/side.js';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
@@ -153,4 +156,41 @@ describe('golden --json: a fault reaches the check and the exit code (checkOf, e
     expect(exitCode([result([{ ...green, mismatch: 'not tapped' }])])).toBe(1);
     expect(exitCode([result([green], ['C'])])).toBe(1);
   });
+});
+
+describe('golden --against <base.json>: the diff against an earlier --json run, in place of the report', () => {
+  const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+  const CAPTURE = `${IOS}/alert-dim.wda.json`;
+  const golden = (...args: string[]) =>
+    promisify(execFile)(process.execPath, ['--import', 'tsx', 'scripts/differential/golden.ts', '--corpus', 'tests/fixtures/truth', '--only', 'alert-dim.wda', ...args], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
+
+  it("names the check whose verdict and reply changed and the one the base did not ask; this checkout's ratchet holds", async () => {
+    const run = JSON.parse((await golden('--json')).stdout) as GoldenJson;
+    const [a, ...rest] = run.results[0].checks;
+    expect(`${a.target} ${a.verb} ${a.mismatch ?? 'ok'}`).toBe('A tap ok');
+    // The base: A's tap a known-looking mismatch the "fix" turned green, D's scroll_until not yet asked.
+    const base: GoldenJson = { side: run.side, results: [{ ...run.results[0], checks: [{ ...a, mismatch: 'refused without "close it first": ERROR old', reply: 'ERROR old' }, ...rest.filter((c) => `${c.target} ${c.verb}` !== 'D scroll_until')] }] };
+    const dir = await mkdtemp(join(tmpdir(), 'averi-golden-against-'));
+    try {
+      await writeFile(join(dir, 'base.json'), JSON.stringify(base));
+      const { stdout } = await golden('--against', join(dir, 'base.json'));
+      expect(stdout).toContain(`: 12 checks (was 11), 0 mismatches (was 1), 0 broken targets (was 0), 0 skipped (was 0)\n`);
+      expect(stdout).toContain(`## Changed: 2 checks\n- ${CAPTURE} A tap\n  verdict: was MISMATCH refused without "close it first": ERROR old\n           now ok\n  reply:\n    - ERROR old\n    + ${a.reply}\n`);
+      expect(stdout).toContain(`- NEW ${CAPTURE} D scroll_until: ok\n`);
+      expect(stdout).toContain('## Strike from KNOWN: 0 rows\n\n## COUNTS: 0 captures\n');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('refuses a base no --json run wrote, and --json beside it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-golden-against-'));
+    try {
+      await writeFile(join(dir, 'report.json'), JSON.stringify({ checks: [] }));
+      await expect(golden('--against', join(dir, 'report.json'))).rejects.toThrow('is no golden --json output');
+      await expect(golden('--json', '--against', join(dir, 'report.json'))).rejects.toThrow('[--json | --against <base.json>]');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
