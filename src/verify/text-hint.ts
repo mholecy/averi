@@ -1,5 +1,6 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
+import { normalizeText } from './text-parity.js';
 
 /**
  * Why an exact-text expectation missed when the string is nonetheless ON the
@@ -107,11 +108,14 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
  * recognizer may read the app's copy as (ocr-fold.ts#readingDifference) — the
  * node is the copy, the expectation the reading: typographic punctuation vs
  * its ASCII look-alike, a letter with or without its diacritics, and one way a
- * letter's measured misreading (`Ľ` as `L'`). An expectation copied from an
- * ocr reading, or typed on an ASCII keyboard. The tree carries the app's
- * characters exactly, so the assert stays exact and still fails — a `’` → `'`
- * change in the app is a copy change the tree can see; the hint only names the
- * node, so the reader need not dump the tree.
+ * letter's measured misreading (`Ľ` as `L'`) or a grouped number's separator
+ * read as nothing (`1 234` as `1234`). An expectation copied from an ocr
+ * reading, or typed on an ASCII keyboard. Both sides compared whitespace
+ * collapsed (`normalizeText`), as the ocr assert compares them, so an app's
+ * NBSP separator is a space here too. The tree carries the app's characters
+ * exactly, so the assert stays exact and still fails — a `’` → `'` change in
+ * the app is a copy change the tree can see; the hint only names the node, so
+ * the reader need not dump the tree.
  */
 function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
   const hits: { node: UiNode; field: 'label' | 'value'; text: string; difference: RecognizerDifference }[] = [];
@@ -120,7 +124,7 @@ function foldedTextHint(candidates: UiNode[], expected: string): string | undefi
       const text = node[field];
       if (text === null) continue;
       // The node is the app's copy; the expectation is what a reading of it may say.
-      const difference = readingDifference(text, expected);
+      const difference = readingDifference(normalizeText(text), normalizeText(expected));
       if (difference === undefined) continue;
       hits.push({ node, field, text, difference });
       break;
@@ -131,12 +135,17 @@ function foldedTextHint(candidates: UiNode[], expected: string): string | undefi
   const pairs = [
     ...new Set(hits.flatMap(({ difference }) => namePairs(difference.pairs.map(([node, want]) => [want, node] as const)).split(', '))),
   ];
+  // Compared whitespace collapsed, while the selector is exact: a run, NBSP or
+  // padding the two do not share — the node's text as written is no such
+  // reading of the expectation as written — is said too, or "only" would be false.
+  const spaced = hits.some(({ text }) => readingDifference(text, expected) === undefined);
+  const named = spaced ? `${pairs.join(', ')}, and in whitespace` : pairs.join(', ');
   const shown = hits
     .slice(0, 3)
     .map(({ node, field, text }) => `    id=${node.identifier ?? '(none)'} ${field}=${JSON.stringify(text)}`)
     .join('\n');
   return (
-    `no node has this exact text, but ${hits.length} node(s) differ from it only in ${pairs.join(', ')}:\n${shown}\n` +
+    `no node has this exact text, but ${hits.length} node(s) differ from it only in ${named}:\n${shown}\n` +
     "    (the tree carries the app's characters exactly, so the assert compares them exactly — " +
     'expect the text as the node has it)'
   );

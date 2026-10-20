@@ -374,6 +374,12 @@ describe('compareTextParity — the occlusion guard', () => {
     expect(r.notes).toEqual([]);
   });
 
+  it('residual R2: a single-part amount read without its thousands separator stops at the UNREAD guard', () => {
+    const r = misreadRow('1\u00a0234,56 €', '1234,56 €');
+    expect(r.rows[0].verdict).toBe('OCCLUDED');
+    expect(r.notes).toEqual([]);
+  });
+
   it('a drift-table pair that differs only in how a letter is encoded gives that reason, not the recognizer\'s', () => {
     const c = contract([{ id: 'cafe', text: 'Caf\u00e9' }]);
     const r = compareTextParity(c, {
@@ -1163,6 +1169,72 @@ describe('evaluateOcrAssert — a letter the recognizer reads as other character
       `read ${JSON.stringify(read)}; vs expected ${JSON.stringify(want)} = (differs only in ${pairs} — ` +
         'the recognizer does not tell a letter with diacritics from one without)',
     );
+  });
+});
+
+describe('evaluateOcrAssert — a thousands separator the recognizer reads as nothing', () => {
+  /**
+   * Measured on the lab app's text-sample under iOS (docs/bugs/2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-
+   * nbsp-thousands-separator-the-recognizer-reads-as-nothing.md): Vision reads `1 234,56 €` (NBSP) as `1234,56 €` and
+   * `−12 345,00 EUR` (narrow NBSP) as `-12345,00 EUR`. A space may go missing only inside a grouped number.
+   */
+  const SEPARATOR = 'the recognizer does not tell a thousands separator between digit groups from no space';
+
+  it.each([
+    ['1\u00a0234,56 €', '1234,56 €', '1 234 vs 1234'],
+    ['\u221212\u202f345,00 EUR', '-12345,00 EUR', '− vs -, 12 345 vs 12345'],
+    ['Zostatok 1\u00a0234\u00a0567,00 €', 'Zostatok 1234 567,00 €', '1 234 567 vs 1234 567'],
+    ['1 234 567', '1234567', '1 234 567 vs 1234567'],
+    ['12 345,00', '12345,00', '12 345 vs 12345'],
+    // An astral character (two UTF-16 units) before each number: the groups are found by code point.
+    ['\u{1F600}1 234 \u{1F600}5 678', '\u{1F600}1234 \u{1F600}5678', '1 234 vs 1234, 5 678 vs 5678'],
+    // Accepted (ADR 0025): a phone number in groups of three is a grouped number — the same digits in the same order.
+    ['+421 905 123 456', '+421905123456', '421 905 123 456 vs 421905123456'],
+  ])('passes %j read as %j, naming %s', (want, read, pairs) => {
+    const r = evaluateOcrAssert({ text: want }, [line(read, 30)], 1080);
+    expect(r.pass).toBe(true);
+    expect(r.detail).toContain(`vs expected ${JSON.stringify(normalizeText(want))} = (differs only in ${pairs} — `);
+  });
+
+  it('names the grouped number whose separator was read as nothing, with its own reason', () => {
+    expect(evaluateOcrAssert({ text: '1\u00a0234,56 €' }, [line('1234,56 €', 30)], 1080).detail).toBe(
+      `read "1234,56 €"; vs expected "1 234,56 €" = (differs only in 1 234 vs 1234 — ${SEPARATOR})`,
+    );
+    expect(evaluateOcrAssert({ text: '\u221212\u202f345,00 EUR' }, [line('-12345,00 EUR', 30)], 1080).detail).toBe(
+      'read "-12345,00 EUR"; vs expected "−12 345,00 EUR" = (differs only in − vs -, 12 345 vs 12345 — ' +
+        `the recognizer does not tell typographic punctuation from its ASCII look-alike, nor a thousands separator between digit groups from no space)`,
+    );
+  });
+
+  it.each([
+    // Never the reverse: a space the reading has and the copy lacks is not the copy's.
+    ['1234', '1 234'],
+    // Not a grouped number: groups of other lengths, two numbers side by side, an IBAN's groups of four, words.
+    ['12 34', '1234'],
+    ['1 2345', '12345'],
+    ['1234 567', '1234567'],
+    ['12 34 567', '12 34567'],
+    ['1 234 56', '1234 56'],
+    ['12 345 6', '123456'],
+    // A fraction's digits after a decimal mark, then another number: no grouped number.
+    ['1,234 567', '1,234567'],
+    ['0.123 456', '0.123456'],
+    ['SK31 1200 0000', 'SK3112000000'],
+    ['ab 123', 'ab123'],
+    ['a b', 'ab'],
+    // The digits still count, and in order.
+    ['1 234', '1243'],
+    ['1 234,56', '1 23456'],
+  ])('%j read as %j still fails', (want, read) => {
+    expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080)).toEqual({
+      pass: false,
+      detail: `read ${JSON.stringify(read)}; vs expected ${JSON.stringify(want)} ≠`,
+    });
+  });
+
+  it('a grouped number read with its separators passes exactly, and an IBAN read with its spaces too', () => {
+    expect(evaluateOcrAssert({ text: '1\u00a0234,56 €' }, [line('1 234,56 €', 30)], 1080).detail).toBe('read "1 234,56 €"; vs expected "1 234,56 €" =');
+    expect(evaluateOcrAssert({ text: 'SK31 1200 0000' }, [line('SK31 1200 0000', 30)], 1080).pass).toBe(true);
   });
 });
 

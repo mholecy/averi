@@ -267,8 +267,27 @@ const MISREADINGS: Readonly<Record<string, readonly string[]>> = {
   ĺ: ['í'],
 };
 
-/** A way the recognizer may read a unit of the copy beyond the unit's own fold — copy → reading only: a misreading. */
-type Way = 'letters';
+/**
+ * A grouped number of the copy — 1 to 3 digits, then one or more groups of
+ * exactly 3, each after one space, and no digit (nor a space and a digit)
+ * either side, nor a decimal mark after a digit before it (`1,234 567` is a
+ * fraction's digits and another number): `1 234`, `12 345,00`, `1 234 567`. A space between its groups
+ * the recognizer may read as nothing — Vision reads iOS's NBSP and narrow-NBSP
+ * separators so (`1 234,56 €` as `1234,56 €`) — and leaving one out changes no
+ * digit nor its place. Any other space stays: `12 34`, `1 2345`, `12 34 567`
+ * and an IBAN's groups of four are two numbers, or no grouped one. Matched on
+ * the copy as compared, whitespace collapsed (verify/text-parity.ts
+ * `normalizeText`), so a typed ASCII space counts like the app's NBSP: the
+ * shape is the guard, not the code point. A fixed pattern, never built from
+ * the text. docs/bugs/2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md
+ */
+const GROUPED_NUMBER = /(?<!\d)(?<!\d )(?<!\d[.,])\d{1,3}(?: \d{3})+(?!\d)(?! \d)/g;
+
+/**
+ * A way the recognizer may read a unit of the copy beyond the unit's own fold
+ * — copy → reading only: a misreading, or a separator read as nothing.
+ */
+type Way = 'letters' | 'separator';
 
 /** A kind of difference the recognizer makes between the app's copy and its reading: the fold's own, or a way beyond it. */
 type Kind = 'punctuation' | 'diacritics' | Way;
@@ -278,6 +297,7 @@ const CANNOT_TELL: Readonly<Record<Kind, string>> = {
   punctuation: 'typographic punctuation from its ASCII look-alike',
   letters: 'a letter from the look-alike it is read as',
   diacritics: 'a letter with diacritics from one without',
+  separator: 'a thousands separator between digit groups from no space',
 };
 
 /** The fold's kinds the characters of `s` show: a punctuation look-alike, a letter with marks. */
@@ -307,7 +327,8 @@ export const foldReason = (pairs: readonly (readonly [string, string])[]): strin
 
 /**
  * One way a unit of the copy may come out of the recognizer: as `raw`, which
- * the fold makes `folded`; `kind` names a way other than the unit's own fold.
+ * the fold makes `folded`; `kind` names a way beyond the unit's own fold — a
+ * misreading (`letters`) or a separator read as nothing (`separator`).
  */
 interface Reading {
   raw: string;
@@ -315,25 +336,76 @@ interface Reading {
   kind?: Way;
 }
 
-/** One character of the app's copy, with every way the recognizer may read it — its own fold first. */
+/**
+ * One character of the app's copy, with every way the recognizer may read it
+ * — its own fold first — and, inside a grouped number, which one (its start).
+ */
 interface Unit {
   text: string;
   readings: readonly Reading[];
+  group?: number;
+}
+
+/** Per code point of the copy, the start of the grouped number (`GROUPED_NUMBER`) it lies in, if any. */
+function groupsOf(chars: readonly string[]): (number | undefined)[] {
+  const group: (number | undefined)[] = [];
+  // A match's UTF-16 offset as the index of its code point.
+  const charAt: number[] = [];
+  chars.forEach((c, k) => {
+    for (let u = 0; u < c.length; u++) charAt.push(k);
+  });
+  for (const m of chars.join('').matchAll(GROUPED_NUMBER)) {
+    // The pattern is ASCII, so its match is as many code points as UTF-16 units.
+    const start = charAt[m.index];
+    for (let k = start; k < start + m[0].length; k++) group[k] = start;
+  }
+  return group;
 }
 
 /**
  * The copy as units, one per composed code point: each read as itself folded,
  * or as one of its misreadings folded (a misread `ĺ` as `í` may lose the
- * `í`'s mark as well).
+ * `í`'s mark as well), and a space between a grouped number's groups as
+ * nothing too.
  */
 function unitsOf(copy: string): Unit[] {
-  return charsOf(copy).map((c) => ({
+  const chars = charsOf(copy);
+  const group = groupsOf(chars);
+  return chars.map((c, k) => ({
     text: c,
     readings: [
       { raw: c, folded: foldChar(c) },
       ...(MISREADINGS[c] ?? []).map((raw): Reading => ({ raw, folded: ocrFold(raw), kind: 'letters' })),
+      ...(c === ' ' && group[k] !== undefined ? [{ raw: '', folded: '', kind: 'separator' } as const] : []),
     ],
+    group: group[k],
   }));
+}
+
+/** A unit of the copy with the reading the alignment chose for it. */
+type ReadUnit = Reading & { text: string };
+
+/**
+ * Each unit as the alignment read it — except a grouped number with a
+ * separator read as nothing, which is read as one whole (`12 345` read as
+ * `12345`), so a note names the number rather than an invisible space.
+ */
+function asRead(units: readonly Unit[], picks: readonly number[]): ReadUnit[] {
+  const dropped = new Set(units.flatMap((unit, u) => (unit.readings[picks[u]].kind === 'separator' ? [unit.group] : [])));
+  const out: (ReadUnit & { group?: number })[] = [];
+  units.forEach((unit, u) => {
+    const reading = unit.readings[picks[u]];
+    const last = out[out.length - 1];
+    if (unit.group !== undefined && dropped.has(unit.group) && last?.group === unit.group) {
+      last.text += unit.text;
+      last.raw += reading.raw;
+      last.folded += reading.folded;
+    } else {
+      const whole = unit.group !== undefined && dropped.has(unit.group);
+      out.push({ text: unit.text, ...reading, ...(whole ? { kind: 'separator' as const, group: unit.group } : {}) });
+    }
+  });
+  return out;
 }
 
 /** How the alignment first reached a position of the folded reading: from which position, by which reading of the unit. */
@@ -401,15 +473,9 @@ export function readingDifference(copy: string, read: string): RecognizerDiffere
   const units = unitsOf(copy);
   const picks = align(units, ocrFold(read));
   if (picks === undefined) return undefined;
-  const { pairs, kinds } = differingSpans(
-    units.map((unit, u) => ({ text: unit.text, ...unit.readings[picks[u]] })),
-    charsOf(read),
-  );
+  const { pairs, kinds } = differingSpans(asRead(units, picks), charsOf(read));
   return { pairs, reason: pairs.length > 0 ? reasonFor(kinds) : 'the same letters, encoded differently' };
 }
-
-/** A unit of the copy with the reading the alignment chose for it. */
-type ReadUnit = Reading & { text: string };
 
 /**
  * The copy as the alignment read it (`a`) and the reading's characters (`b`),
@@ -428,7 +494,7 @@ function differingSpans(a: readonly ReadUnit[], b: readonly string[]): { pairs: 
     let spanA = '';
     let rawA = '';
     let spanB = '';
-    const misread = new Set<Way>();
+    const ways = new Set<Way>();
     let lengthA = 0;
     let lengthB = 0;
     do {
@@ -437,7 +503,7 @@ function differingSpans(a: readonly ReadUnit[], b: readonly string[]): { pairs: 
         spanA += unit.text;
         rawA += unit.raw;
         lengthA += unit.folded.length;
-        if (unit.kind !== undefined) misread.add(unit.kind);
+        if (unit.kind !== undefined) ways.add(unit.kind);
       } else if (j < b.length) {
         spanB += b[j];
         lengthB += foldChar(b[j++]).length;
@@ -445,8 +511,9 @@ function differingSpans(a: readonly ReadUnit[], b: readonly string[]): { pairs: 
     } while ((lengthA !== lengthB || spanA === '' || spanB === '') && (i < a.length || j < b.length));
     if (spanA === spanB) continue;
     pairs.push([spanA, spanB]);
-    // The span's misreadings, and the fold's kinds where the reading is not the misreading as written.
-    for (const kind of misread) kinds.add(kind);
+    // The span's ways beyond the fold (a misreading, a dropped separator), and the fold's own kinds where the
+    // reading is not the copy as those ways would write it.
+    for (const kind of ways) kinds.add(kind);
     if (rawA !== spanB) for (const kind of foldKinds(rawA + spanB)) kinds.add(kind);
   }
   return { pairs, kinds };

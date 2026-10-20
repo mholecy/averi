@@ -326,6 +326,23 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     expect(result.detail).toContain("no node has this exact text, but 1 node(s) differ from it only in L' vs Ľ:");
   });
 
+  it('names a node whose amount has an NBSP thousands separator an expectation copied from a reading lacks', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'amount', label: '1\u00a0234,56 €' })) }, 'p');
+    const result = await new Verifier(fake, FAST).assert({ element: { text: '1234,56 €' } });
+    expect(result.pass).toBe(false);
+    // The NBSP is said too: the selector is exact, so typing an ASCII space would still miss.
+    expect(result.detail).toContain('no node has this exact text, but 1 node(s) differ from it only in 1234 vs 1 234, and in whitespace:');
+  });
+
+  it('says no whitespace difference when both sides share the same NBSP', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'payee', label: 'Payee’s\u00a0name' })) }, 'p');
+    const result = await new Verifier(fake, FAST).assert({ element: { text: "Payee's\u00a0name" } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain("no node has this exact text, but 1 node(s) differ from it only in ' vs ’:");
+  });
+
   it('names no node whose text is the look-alike of the letter expected — the node is the copy', async () => {
     resetLayout();
     const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'name', label: "L'ubomír" })) }, 'p');

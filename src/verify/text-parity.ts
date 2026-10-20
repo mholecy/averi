@@ -271,8 +271,10 @@ const looseForm = (s: string): string =>
   // `Payee's` — every such row was OCCLUDED while correct on the screenshot.
   // The reported strings stay verbatim; the drift comparison forgives the
   // same difference for OCR readings (see `recognizerDifference`). The fold
-  // only: a letter's misreading (`Ľ` read `L'`, `ĺ` read `í`) is not forgiven
-  // here, so a single-part row of one reads OCCLUDED before the drift check.
+  // only: a letter's misreading (`Ľ` read `L'`, `ĺ` read `í`) and a grouped
+  // number read without its separator (`1 234,56 €` read `1234,56 €`) are
+  // not forgiven here, so a single-part row of them reads OCCLUDED before the
+  // drift check — ADR 0025's residual R2.
   ocrFold(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The whole-string test: containment, or a prefix of an ellipsized render. */
@@ -764,12 +766,12 @@ export function compareTextParity(
       // Drift stays exact — except for what a recognizer may read the app's
       // copy as (ocr-fold.ts#readingDifference: the fold — combining marks
       // dropped, typographic punctuation read as ASCII — and, one way, a
-      // letter's misreading). Once the occlusion guard forgives such a reading
-      // (looseForm: the fold only) the row would land HERE as a copy-drift
-      // finding for text that is correct on screen. OCR-only such differences
-      // are a note, never a finding — the same relation the ocr assert passes
-      // on; the tree carries the app's characters faithfully, so `tree` stays
-      // exact.
+      // letter's misreading or a grouped number's separator read as nothing).
+      // Once the occlusion guard forgives such a reading (looseForm: the fold
+      // only) the row would land HERE as a copy-drift finding for text that is
+      // correct on screen. OCR-only such differences are a note, never a
+      // finding — the same relation the ocr assert passes on; the tree carries
+      // the app's characters faithfully, so `tree` stays exact.
       const recognizerDifference = (copy: string, read: string): RecognizerDifference | undefined =>
         source === 'ocr' ? readingDifference(copy, read) : undefined;
       if (a !== undefined && i !== undefined && a !== i) {
