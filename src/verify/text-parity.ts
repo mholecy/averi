@@ -262,14 +262,17 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  * case folded, joining punctuation dropped, whitespace collapsed. NEVER used
  * for the reported strings — a row's message must keep both sides verbatim so
  * the reader sees the real difference — and never for drift, which forgives
- * only the recognizer's fold.
+ * what the recognizer may read the copy as (ocr-fold.ts#readingDifference),
+ * not this form's case and punctuation.
  */
 const looseForm = (s: string): string =>
   // The recognizer's fold (ocr-fold.ts): it reads Slovak `Prihlásiť sa` as
   // `Prihlásit sa` and `Payee’s` as
   // `Payee's` — every such row was OCCLUDED while correct on the screenshot.
   // The reported strings stay verbatim; the drift comparison forgives the
-  // same difference for OCR readings (see `recognizerDifference`).
+  // same difference for OCR readings (see `recognizerDifference`). The fold
+  // only: a letter's misreading (`Ľ` read `L'`, `ĺ` read `í`) is not forgiven
+  // here, so a single-part row of one reads OCCLUDED before the drift check.
   ocrFold(s).toLowerCase().replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The whole-string test: containment, or a prefix of an ellipsized render. */
@@ -758,13 +761,15 @@ export function compareTextParity(
     if (!dynamic) {
       const a = seen('android');
       const i = seen('ios');
-      // Drift stays exact — except for what a recognizer cannot tell apart
-      // (ocr-fold.ts: combining marks dropped, typographic punctuation read as
-      // ASCII). Once the occlusion guard forgives that (looseForm) the row
-      // would land HERE as a copy-drift finding for text that is correct on
-      // screen. OCR-only, fold-only differences are a note, never a finding —
-      // the same fold the ocr assert passes on; the tree carries the app's
-      // characters faithfully, so `tree` stays exact.
+      // Drift stays exact — except for what a recognizer may read the app's
+      // copy as (ocr-fold.ts#readingDifference: the fold — combining marks
+      // dropped, typographic punctuation read as ASCII — and, one way, a
+      // letter's misreading). Once the occlusion guard forgives such a reading
+      // (looseForm: the fold only) the row would land HERE as a copy-drift
+      // finding for text that is correct on screen. OCR-only such differences
+      // are a note, never a finding — the same relation the ocr assert passes
+      // on; the tree carries the app's characters faithfully, so `tree` stays
+      // exact.
       const recognizerDifference = (copy: string, read: string): RecognizerDifference | undefined =>
         source === 'ocr' ? readingDifference(copy, read) : undefined;
       if (a !== undefined && i !== undefined && a !== i) {

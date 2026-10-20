@@ -246,12 +246,37 @@ function foldClass(cps: string[], start: number): { text: string; end: number; a
   return { text: negated ? `(?:(?!${extra})${text})` : `(?:${text}|${extra})`, end, added };
 }
 
-/** A kind of difference the recognizer makes between the app's copy and its reading. */
-type Kind = 'punctuation' | 'diacritics';
+/**
+ * A letter of the app's copy the recognizer reads as other characters, beyond
+ * dropping its marks — measured, and ONE WAY: the copy's letter may be read as
+ * these, never the reverse (an apostrophe or an `í` in the copy is the copy's
+ * own). Each is a misreading of a glyph, not of a language:
+ * - `Ľ ľ ď ť` — the caron drawn as an apostrophe beside the letter (Unicode's
+ *   "caron with vertical comma form"); Vision reads `Ľubomír` as `L'ubomír` on
+ *   both platforms. `Ď` and `Ť` take a normal caron above and are not listed.
+ * - `Ĺ ĺ` — the l with acute read as an i with acute (`dĺžeň` as `dížeň`; with
+ *   the í's mark dropped as well, `dižeň`).
+ * docs/bugs/2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md
+ */
+const MISREADINGS: Readonly<Record<string, readonly string[]>> = {
+  Ľ: ["L'"],
+  ľ: ["l'"],
+  ď: ["d'"],
+  ť: ["t'"],
+  Ĺ: ['Í'],
+  ĺ: ['í'],
+};
+
+/** A way the recognizer may read a unit of the copy beyond the unit's own fold — copy → reading only: a misreading. */
+type Way = 'letters';
+
+/** A kind of difference the recognizer makes between the app's copy and its reading: the fold's own, or a way beyond it. */
+type Kind = 'punctuation' | 'diacritics' | Way;
 
 /** What the recognizer cannot tell apart, per kind, in the order a note names them — said of neither side. */
 const CANNOT_TELL: Readonly<Record<Kind, string>> = {
   punctuation: 'typographic punctuation from its ASCII look-alike',
+  letters: 'a letter from the look-alike it is read as',
   diacritics: 'a letter with diacritics from one without',
 };
 
@@ -280,10 +305,14 @@ const reasonFor = (kinds: ReadonlySet<Kind>): string =>
 export const foldReason = (pairs: readonly (readonly [string, string])[]): string =>
   reasonFor(new Set(pairs.flatMap(([a, b]) => foldKinds(a + b))));
 
-/** One way a unit of the copy may come out of the recognizer: as `raw`, which the fold makes `folded`. */
+/**
+ * One way a unit of the copy may come out of the recognizer: as `raw`, which
+ * the fold makes `folded`; `kind` names a way other than the unit's own fold.
+ */
 interface Reading {
   raw: string;
   folded: string;
+  kind?: Way;
 }
 
 /** One character of the app's copy, with every way the recognizer may read it — its own fold first. */
@@ -292,9 +321,19 @@ interface Unit {
   readings: readonly Reading[];
 }
 
-/** The copy as units, one per composed code point. */
+/**
+ * The copy as units, one per composed code point: each read as itself folded,
+ * or as one of its misreadings folded (a misread `ĺ` as `í` may lose the
+ * `í`'s mark as well).
+ */
 function unitsOf(copy: string): Unit[] {
-  return charsOf(copy).map((c) => ({ text: c, readings: [{ raw: c, folded: foldChar(c) }] }));
+  return charsOf(copy).map((c) => ({
+    text: c,
+    readings: [
+      { raw: c, folded: foldChar(c) },
+      ...(MISREADINGS[c] ?? []).map((raw): Reading => ({ raw, folded: ocrFold(raw), kind: 'letters' })),
+    ],
+  }));
 }
 
 /** How the alignment first reached a position of the folded reading: from which position, by which reading of the unit. */
@@ -389,13 +428,16 @@ function differingSpans(a: readonly ReadUnit[], b: readonly string[]): { pairs: 
     let spanA = '';
     let rawA = '';
     let spanB = '';
+    const misread = new Set<Way>();
     let lengthA = 0;
     let lengthB = 0;
     do {
       if (i < a.length && (lengthA <= lengthB || j >= b.length)) {
-        spanA += a[i].text;
-        rawA += a[i].raw;
-        lengthA += a[i++].folded.length;
+        const unit = a[i++];
+        spanA += unit.text;
+        rawA += unit.raw;
+        lengthA += unit.folded.length;
+        if (unit.kind !== undefined) misread.add(unit.kind);
       } else if (j < b.length) {
         spanB += b[j];
         lengthB += foldChar(b[j++]).length;
@@ -403,6 +445,8 @@ function differingSpans(a: readonly ReadUnit[], b: readonly string[]): { pairs: 
     } while ((lengthA !== lengthB || spanA === '' || spanB === '') && (i < a.length || j < b.length));
     if (spanA === spanB) continue;
     pairs.push([spanA, spanB]);
+    // The span's misreadings, and the fold's kinds where the reading is not the misreading as written.
+    for (const kind of misread) kinds.add(kind);
     if (rawA !== spanB) for (const kind of foldKinds(rawA + spanB)) kinds.add(kind);
   }
   return { pairs, kinds };

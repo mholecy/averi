@@ -104,12 +104,14 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
 
 /**
  * A node whose text differs from the expected string only in what a text
- * recognizer cannot tell apart — typographic punctuation vs its ASCII
- * look-alike, a letter with or without its diacritics (ocr-fold.ts): an
- * expectation copied from an ocr reading, or typed on an ASCII keyboard. The
- * tree carries the app's characters exactly, so the assert stays exact and
- * still fails — a `’` → `'` change in the app is a copy change the tree can
- * see; the hint only names the node, so the reader need not dump the tree.
+ * recognizer may read the app's copy as (ocr-fold.ts#readingDifference) — the
+ * node is the copy, the expectation the reading: typographic punctuation vs
+ * its ASCII look-alike, a letter with or without its diacritics, and one way a
+ * letter's measured misreading (`Ľ` as `L'`). An expectation copied from an
+ * ocr reading, or typed on an ASCII keyboard. The tree carries the app's
+ * characters exactly, so the assert stays exact and still fails — a `’` → `'`
+ * change in the app is a copy change the tree can see; the hint only names the
+ * node, so the reader need not dump the tree.
  */
 function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
   const hits: { node: UiNode; field: 'label' | 'value'; text: string; difference: RecognizerDifference }[] = [];

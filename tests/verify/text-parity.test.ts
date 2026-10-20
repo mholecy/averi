@@ -333,6 +333,47 @@ describe('compareTextParity — the occlusion guard', () => {
     );
   });
 
+  // A combined row ('Ľubomír, účet'): its 'účet' part survives the UNREAD guard, so the drift check is reached. A
+  // single-part row is stopped before it — the guard's loose form has no misreadings (ADR 0025, residual R2).
+  const misreadRow = (contracted: string, read: string, ios?: string) =>
+    compareTextParity(contract([{ id: 'name', text: contracted }]), {
+      android: { tree: root(1080, [text('name', contracted)]), ocr: { byId: ocrMap({ name: [line(read, 30)] }), pngWidth: 1080 } },
+      ...(ios === undefined ? {} : {
+        ios: { tree: root(1080, [text('name', contracted)]), ocr: { byId: ocrMap({ name: [line(ios, 30)] }), pngWidth: 1080 } },
+      }),
+    });
+
+  it('a contract letter read as its look-alike is a note, not drift — and never the other way round', () => {
+    const misread = misreadRow('Ľubomír, účet', "L'ubomír, účet");
+    expect(misread.findings).toEqual([]);
+    expect(misread.notes).toEqual([
+      `name: android read "L'ubomír, účet" for contract "Ľubomír, účet" — differs only in Ľ vs L' ` +
+        '(the recognizer does not tell a letter from the look-alike it is read as); not drift.',
+    ]);
+    const reversed = misreadRow("L'ubomír, účet", 'Ľubomír, účet');
+    expect(reversed.findings.map((f) => f.detail)).toEqual([`android "Ľubomír, účet", contract "L'ubomír, účet" (from ocr)`]);
+  });
+
+  it('two readings, one a misreading of the other, are a note naming android first', () => {
+    const iosMisread = misreadRow('Ľubomír, účet', 'Ľubomír, účet', "L'ubomír, účet");
+    expect(iosMisread.findings).toEqual([]);
+    expect(iosMisread.notes).toContain(
+      `name: android "Ľubomír, účet" vs ios "L'ubomír, účet" differ only in Ľ vs L' ` +
+        '(the recognizer does not tell a letter from the look-alike it is read as) — not drift.',
+    );
+    const androidMisread = misreadRow('Ľubomír, účet', "L'ubomír, účet", 'Ľubomír, účet');
+    expect(androidMisread.notes).toContain(
+      `name: android "L'ubomír, účet" vs ios "Ľubomír, účet" differ only in L' vs Ľ ` +
+        '(the recognizer does not tell a letter from the look-alike it is read as) — not drift.',
+    );
+  });
+
+  it('residual R2: a single-part row whose letter is read as its look-alike stops at the UNREAD guard', () => {
+    const r = misreadRow('Ľubomír', "L'ubomír");
+    expect(r.rows[0].verdict).toBe('OCCLUDED');
+    expect(r.notes).toEqual([]);
+  });
+
   it('a drift-table pair that differs only in how a letter is encoded gives that reason, not the recognizer\'s', () => {
     const c = contract([{ id: 'cafe', text: 'Caf\u00e9' }]);
     const r = compareTextParity(c, {
@@ -1049,6 +1090,79 @@ describe('evaluateOcrAssert — what the recognizer cannot tell apart', () => {
   it('case is not folded', () => {
     expect(evaluateOcrAssert({ text: 'Payee’s Name' }, [line("Payee's name", 30)], 1080).pass).toBe(false);
     expect(evaluateOcrAssert({ text: 'CONTINUE' }, [line('Continue', 30)], 1080).pass).toBe(false);
+  });
+});
+
+describe('evaluateOcrAssert — a letter the recognizer reads as other characters, one way only', () => {
+  /**
+   * The readings measured on the lab app's text-sample (docs/bugs/2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-
+   * and-l-acute-the-recognizer-reads-as-other-letters.md): Vision reads Ľ/ľ, whose caron is drawn as an apostrophe
+   * beside the letter, as L' — and ĺ as í, on iOS with í's mark dropped too.
+   */
+  it.each([
+    ['Ľubomír Šťastný', "L'ubomír Stastný", "Ľ vs L', Š vs S, ť vs t"],
+    ['Ľubomír Šťastný', "L'ubomír Sťastný", "Ľ vs L', Š vs S"],
+    ['Mäkčeň, dĺžeň a vokáň', 'Makčeň, dižeň a vokáň', 'ä vs a, ĺ vs i'],
+    ['Mäkčeň, dĺžeň a vokáň', 'Mäkčeň, dížeň a vokáň', 'ĺ vs í'],
+    ['ľad', "l'ad", "ľ vs l'"],
+    ['ďakujem, ťava', "d'akujem, t'ava", "ď vs d', ť vs t'"],
+    ['ĹAN', 'ÍAN', 'Ĺ vs Í'],
+  ])('passes %j read as %j, naming %s', (want, read, pairs) => {
+    const r = evaluateOcrAssert({ text: want }, [line(read, 30)], 1080);
+    expect(r.pass).toBe(true);
+    expect(r.detail).toContain(`read ${JSON.stringify(read)}; vs expected ${JSON.stringify(want)} = (differs only in ${pairs} — `);
+  });
+
+  it('names the misreading with its own reason, beside the fold\'s', () => {
+    expect(evaluateOcrAssert({ text: 'Ľubomír Šťastný' }, [line("L'ubomír Stastný", 30)], 1080).detail).toBe(
+      `read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S, ť vs t — ` +
+        'the recognizer does not tell a letter from the look-alike it is read as, nor a letter with diacritics from one without)',
+    );
+    expect(evaluateOcrAssert({ text: 'Ľubomír' }, [line("L'ubomír", 30)], 1080).detail).toBe(
+      `read "L'ubomír"; vs expected "Ľubomír" = (differs only in Ľ vs L' — the recognizer does not tell a letter from the look-alike it is read as)`,
+    );
+  });
+
+  it('names a diacritics reason beside the misreading only when the reading dropped a mark of it', () => {
+    // Android read ĺ as í — the misreading as written, no mark lost: the letters reason alone.
+    expect(evaluateOcrAssert({ text: 'Mäkčeň, dĺžeň a vokáň' }, [line('Mäkčeň, dížeň a vokáň', 30)], 1080).detail).toBe(
+      'read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ĺ vs í — ' +
+        'the recognizer does not tell a letter from the look-alike it is read as)',
+    );
+    // iOS read it as i — the misreading with its mark dropped as well: both reasons.
+    expect(evaluateOcrAssert({ text: 'dĺžeň' }, [line('dižeň', 30)], 1080).detail).toBe(
+      'read "dižeň"; vs expected "dĺžeň" = (differs only in ĺ vs i — the recognizer does not tell a letter from the ' +
+        'look-alike it is read as, nor a letter with diacritics from one without)',
+    );
+  });
+
+  it.each([
+    // Never the reverse: an apostrophe or an í in the expectation is the copy's own.
+    ['L', "L'"],
+    ["L'Oréal", 'LOréal'],
+    ["L'Oréal", 'ĽOréal'],
+    ['dížeň', 'dĺžeň'],
+    ['dížeň', 'dlžeň'],
+    // Only the letters measured — no other base letter, no other look-alike.
+    ['Ďakujem', "D'akujem"],
+    ['Ľubomír', "I'ubomír"],
+    ['ĺ', 'l\''],
+  ])('%j read as %j still fails', (want, read) => {
+    expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080)).toEqual({
+      pass: false,
+      detail: `read ${JSON.stringify(read)}; vs expected ${JSON.stringify(want)} ≠`,
+    });
+  });
+
+  it.each([
+    ['dĺžeň', 'dlžeň', 'ĺ vs l'],
+    ['Ľubomír', 'Lubomír', 'Ľ vs L'],
+    ['ťava', 'tava', 'ť vs t'],
+  ])('%j read as %j still passes by the fold alone (%s)', (want, read, pairs) => {
+    expect(evaluateOcrAssert({ text: want }, [line(read, 30)], 1080).detail).toBe(
+      `read ${JSON.stringify(read)}; vs expected ${JSON.stringify(want)} = (differs only in ${pairs} — ` +
+        'the recognizer does not tell a letter with diacritics from one without)',
+    );
   });
 });
 

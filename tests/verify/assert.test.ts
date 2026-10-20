@@ -318,6 +318,22 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     expect(result.detail).toContain('differ from it only in t vs ť');
   });
 
+  it('names a node whose letter an expectation copied from a reading has as its look-alike, expectation first', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'name', label: 'Ľubomír' })) }, 'p');
+    const result = await new Verifier(fake, FAST).assert({ element: { text: "L'ubomír" } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toContain("no node has this exact text, but 1 node(s) differ from it only in L' vs Ľ:");
+  });
+
+  it('names no node whose text is the look-alike of the letter expected — the node is the copy', async () => {
+    resetLayout();
+    const fake = new FakeAdapter({ p: screen(el({ role: 'text', identifier: 'name', label: "L'ubomír" })) }, 'p');
+    const result = await new Verifier(fake, FAST).assert({ element: { text: 'Ľubomír' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).not.toContain('differ from it only in');
+  });
+
   it('names the character that differs even when the node also keeps it elsewhere', async () => {
     resetLayout();
     const fake = new FakeAdapter(
