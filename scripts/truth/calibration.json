@@ -1112,22 +1112,17 @@
     {
       "n": "LE2",
       "note": "2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["11daf08"],
       "verified": "golden",
-      "defect": "fully visible|^Tapped|reached where it is|^passed on|no swipe|touched down outside",
+      "defect": "fully visible|^passed on",
       "checks": [
         "ios-iphone17-ios27/scroll-bounded.idb.json P fully",
-        "ios-iphone17-ios27/scroll-bounded.idb.json S tap",
-        "ios-iphone17-ios27/scroll-bounded.idb.json S scroll_until",
         "ios-iphone17-ios27/scroll-bounded.idb.json S fully",
-        "ios-iphone17-ios27/scroll-bounded.idb.json O tap",
         "ios-iphone17-ios27/scroll-bounded.idb.json O colour",
-        "ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until",
-        "ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until",
-        "ios-iphone17-ios27/carousel-in-list.idb.json C colour",
-        "ios-iphone17-ios27/carousel-in-list.idb.json C scroll_until"
+        "ios-iphone17-ios27/carousel-in-list.idb.json C colour"
       ],
-      "remark": "No fix yet: red at HEAD. src calls it a residual (ui-tree/geometry.ts#Clips.drawnIn: 'idb's flat list, which lists no scroll view'); no ADR records it. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen — its colour passes on the page's background (#EEEEEE), and scroll_until strokes sideways across the screen's middle (`322 437 → 80 437` twice, then one back), outside the carousel; its tap is refused (off screen at its centre). WDA answers all three rows as the truth does."
+      "remark": "Red before the fix (3b6d2b0a, its first parent; and at every commit before it: src called it a residual, ui-tree/geometry.ts#Clips.drawnIn undefined on idb's flat list). Partly fixed by round 14's 11daf08: the drawn frame is untold on idb (geometry.ts#DrawnUntold) and the eyes look where a claim rests on it — O's and C's colour, their region reading as the screen beside it (#FFFFFF, #EEEEEE), fail closed (verify/eyes.ts#apartOfFrame, no capture added); P's and S's fully: true stops see the clip line (bottom 24 pt, 56 pt) on one screenshot and fail after two unmoved strokes. The rest — S and O Tapped, S and O reached by the plain stop, F's and C's strokes over the screen — is ADR 0010's residual 5, accepted (the owner's delegation, round 14): its six KNOWN rows filed as that residual. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen. WDA answers all of the note's rows as the truth does."
     },
     {
       "n": "LE3",
