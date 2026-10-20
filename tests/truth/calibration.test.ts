@@ -72,6 +72,8 @@ describe('calibration.json', () => {
         .map((s) => `${e.n}: ${s} is no short SHA`),
       ...(e.after !== undefined && !(e.fix ?? []).includes(e.after) && e.afterNotFix === undefined ? [`${e.n}: after ${e.after} is none of its fix commits, and afterNotFix says not why`] : []),
       ...(e.afterNotFix !== undefined && (e.after === undefined || (e.fix ?? []).includes(e.after)) ? [`${e.n}: afterNotFix, but after ${e.after} is a fix commit`] : []),
+      // a side is calibrate's: only a calibrate note gives one (withSides leaves any other as it is, the report would print it)
+      ...(e.status !== 'calibrate' && (e.before !== undefined || e.after !== undefined) ? [`${e.n}: ${e.status} gives a side`] : []),
       // a side withSides derives is not written down: only an override
       ...(e.after !== undefined && e.after === e.fix?.at(-1) ? [`${e.n}: after ${e.after} is its last fix, which withSides derives — drop it`] : []),
       ...(e.pairs ?? []).flatMap((p) => [
@@ -172,7 +174,7 @@ describe('calibration.json', () => {
     );
     const bad = entriesOf(table, undefined, gitParentOf(ROOT))
       .filter((e) => e.status === 'calibrate')
-      .flatMap((e) => (report.get(e.n)?.startsWith(`${e.before} → ${e.after}`) === true ? [] : [`${e.n}: ${e.before} → ${e.after}, the report: ${report.get(e.n) ?? 'no row'}`]));
+      .flatMap((e) => (report.get(e.n)?.startsWith(`${e.before} → ${e.after}`) === true ? [] : [`${e.n}: ${e.before} → ${e.after}, the report: ${report.get(e.n) ?? 'no row'} — run calibrate in full with --out docs/truth/calibration.md and commit the report (a --note run writes .partial)`]));
     expect(bad).toEqual([]);
   });
 });
