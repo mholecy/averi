@@ -77,7 +77,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const w = byId(t, 'lab.blur-menu.W');
     const seen = seenOrderOf(w, [{ peer: byId(t, 'lab.blur-menu.C'), seen: 'untold', why: 'the two look alike (ΔE 3.10)' }]);
     const standing = sceneOf(t, seen).standing(w, USABLE, { of: 'tap' });
-    expect(standing).toMatchObject({ kind: 'covered', remedy: { of: 'unordered', untold: 'the two look alike (ΔE 3.10)' } });
+    expect(standing).toMatchObject({ kind: 'covered', remedy: { of: 'unordered', why: 'the two look alike (ΔE 3.10)' } });
     expect(orderQuestion(t, w, standing)).toBeUndefined();
   });
 
@@ -239,11 +239,11 @@ describe('the judge — each rule answers untold where its evidence is missing',
     expect(seenOf(paint([[C, GREEN], [W, TEAL]]), ask({ peerAround: [] }))).toEqual({ untold: 'nothing around the other past its edge to tell a drawn surface from' });
   });
 
-  it('RESIDUAL (ADR 0024): a peer on top drawn in two tones split exactly at the target\'s edge, its part over the overlap the target\'s own colour, reads as the target on top — pixel for pixel the same frame', () => {
+  it('RESIDUAL: a peer on top drawn in two tones split exactly at the target\'s edge, its part over the overlap the target\'s own colour, reads as the target on top — pixel for pixel the same frame', () => {
     expect(seenOf(paint([[W, TEAL], [C, GREEN], [PAIR.overlap, TEAL]]))).toEqual({ seen: 'over' });
   });
 
-  it('RESIDUAL (ADR 0024, 2.): a text-only peer over a surface its own frame or a pixel more reads as the target on top — that pixel is the antialiasing every strip skips', () => {
+  it('RESIDUAL: a text-only peer over a surface its own frame or a pixel more reads as the target on top — that pixel is the antialiasing every strip skips', () => {
     expect(seenOf(paint([[C, [255, 255, 255]], [W, TEAL]]))).toEqual({ seen: 'over' });
     expect(seenOf(paint([[{ x: 50, y: 470, width: 302, height: 65 }, [255, 255, 255]], [W, TEAL]]))).toEqual({ seen: 'over' });
   });

@@ -17,8 +17,11 @@ import {
   clipsOf,
   containsPoint,
   cutAtLaterText,
+  drawnOverSeenText,
   drawnOverText,
   drawnPart,
+  mayRunOnUnderText,
+  overlapsUntoldText,
   orderUntoldText,
   seenOverText,
   overlapsPastSlack,
@@ -359,7 +362,7 @@ export interface FlushNeighbour {
  * top bar over a list padded to clear it — and its last row whole on a bottom bar, dumped exactly as a row the bar
  * cuts; the tree cannot tell the two (live, the lab's `scroll-sticky-cut`: `fully` strokes on `R` ended with it
  * scrolled away), only motion can (scroll_until's flush probe, `FlushNeighbour` for the eyes), so a row cut at a bar
- * at its list's edge stays read whole (VA1, open). Top and bottom only: every measured
+ * at its list's edge stays read whole (open: docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md). Top and bottom only: every measured
  * Compose cut is vertical, and sideways a row's padded overflow icon reaches past its neighbour's ends (Contacts' "Save"
  * beside its 132-px touch target). Decided from the tree alone — no screenshot sees under an opaque node.
  *
@@ -539,32 +542,29 @@ export const presentedStop = (layer?: MarkedLayer): string => {
 };
 
 /**
- * THE remedy's words for a node under a cover whose order against it the tree does not tell (`Remedy`'s `unordered`),
- * for a touch (the tap, `scroll_until`) or the pixel assert — as `presentedRemedy`'s: no scroll tells which of the two
- * is drawn on top, so none is advised (a stroke beside an in-screen menu may close it); a screenshot shows it — a menu
- * or popover drawn over the node is closed first; and, the node on top (the listing does not tell, so a cover may lie
- * beneath it), the way out: a tap by coordinates, or an assert on a part of it clear of the other.
- * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+ * THE remedy's words for a node under a cover the tree lists in reading order with it (`Remedy`'s `unordered` and
+ * `seenOver`), for a touch (the tap, `scroll_until`) or the pixel assert — the one wording every verb quotes:
+ * - `unordered`, the order not told — as `presentedRemedy`'s: no scroll tells which of the two is drawn on top, so none
+ *   is advised (a stroke beside an in-screen menu may close it); a screenshot shows it — a menu or popover drawn over
+ *   the node is closed first; and, the node on top (the listing does not tell, so a cover may lie beneath it), the way
+ *   out: a tap by coordinates, or an assert on a part of it clear of the other. A screenshot already looked at (`why`:
+ *   why it could not tell) is not advised again.
+ *   docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+ * - `seenOver`, a screenshot saw the cover drawn over it, in the node's own screen — a menu or popover over it is
+ *   closed first; no scroll moves it out from under it (a stroke beside an in-screen menu lands on its backdrop); the
+ *   pixel assert, something of the element clear of it.
+ *   docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
-export const unorderedRemedy = (purpose: 'touch' | 'pixel', { untold }: RemedyCase<'unordered'> = { of: 'unordered' }): string => {
-  // A screenshot already looked at (`untold`: why it could not tell) is not advised again.
-  const look = untold === undefined ? 'see a screenshot' : `a screenshot could not tell either (${untold})`;
+export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, purpose: 'touch' | 'pixel'): string => {
+  if (remedy.of === 'seenOver')
+    return purpose === 'touch'
+      ? 'if it is a menu or a popover, close it first; no scroll moves it out from under it'
+      : 'if it is a menu or a popover, close it first; else assert something in the element that lies clear of it';
+  const look = remedy.why === undefined ? 'see a screenshot' : `a screenshot could not tell either (${remedy.why})`;
   return purpose === 'touch'
     ? `no scroll tells which is on top: ${look} — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates`
     : `no scroll tells which is on top: ${look} — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other`;
 };
-
-/**
- * THE remedy's words for a node under a cover whose order the tree did not tell and a screenshot did (`Remedy`'s
- * `seenOver`): drawn over it, in the node's own screen — a menu or popover over it is closed first; no scroll moves it
- * out from under it (a stroke beside an in-screen menu lands on its backdrop); the pixel assert, something of the
- * element clear of it.
- * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
- */
-export const seenOverRemedy = (purpose: 'touch' | 'pixel'): string =>
-  purpose === 'touch'
-    ? 'if it is a menu or a popover, close it first; no scroll moves it out from under it'
-    : 'if it is a menu or a popover, close it first; else assert something in the element that lies clear of it';
 
 /**
  * How a sentence says `cover`, one of `facts.covers`, lies over the node — at its centre when `centre` is given: drawn
@@ -580,6 +580,20 @@ export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'u
 };
 
 /**
+ * `coverClause`'s choice as the pixel assert's covered miss says it, its subject the cover (`<cover> <clause>`):
+ * `element` the element as that sentence quotes it (`the element (element 51,470 300x64)`) and `at` its parenthetical
+ * alone. The overlaid edge's cut (`meets the element's bottom edge (…), drawn after it — …`), an order untold, one a
+ * screenshot saw, or plainly drawn over it — the same four cases, decided here once.
+ */
+export const coverOverClause = (facts: Pick<StandingFacts, 'unordered' | 'seenOver' | 'overlaid'>, cover: UiNode, at: string): string => {
+  const overlaid = overlaidBy(facts, cover);
+  if (overlaid !== undefined) return `meets the element's ${overlaid.edge} edge ${at}, drawn after it — ${mayRunOnUnderText(cover, 'the element')}`;
+  const element = `the element ${at}`;
+  if (orderUntold(facts, cover)) return overlapsUntoldText(element);
+  return seenOver(facts, cover) ? drawnOverSeenText(element) : `is drawn over ${element}`;
+};
+
+/**
  * The node's overlaid edge (`StandingFacts.overlaid`) when `cover` is the node over it — the cover the tree shows only
  * by the cut, of which a sentence says the node may run on under it, not how much of it shows; undefined for any other
  * cover. `orderUntold`'s sibling, asked by `coverClause`, `scroll_until`'s covered failure and the pixel assert's.
@@ -591,13 +605,13 @@ export const overlaidBy = (facts: Pick<StandingFacts, 'overlaid'>, cover: UiNode
  * (draw-order.ts#Exposure.unordered: the two listed in reading order) — the one question every reader of
  * `facts.unordered` asks: `Remedy`'s `unordered`, `coverClause`, the pixel assert's covered sentence.
  */
-export const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
+const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
 
 /**
  * Whether `cover`, one of `facts.covers`, is one whose order the tree did not tell and a screenshot did, seen drawn over
  * the node (draw-order.ts#Exposure.seenOver) — `orderUntold`'s sibling, asked by the same readers.
  */
-export const seenOver = (facts: Pick<StandingFacts, 'seenOver'>, cover: UiNode): boolean => facts.seenOver?.includes(cover) === true;
+const seenOver = (facts: Pick<StandingFacts, 'seenOver'>, cover: UiNode): boolean => facts.seenOver?.includes(cover) === true;
 
 /** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
 export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
@@ -626,13 +640,13 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  *    `presentedRemedy` names.
  * 2. `unordered` — `covered` by a cover whose order against the node the tree does not tell (`facts.unordered`,
  *    draw-order.ts#Exposure.unordered: the two listed in reading order): which is drawn on top is not told, and no
- *    scroll tells it — a screenshot does (`unorderedRemedy`). Not `scroll`: a stroke for the lab's menu row's
- *    neighbour would land on the menu's backdrop, which closes it. `untold`: a screenshot was looked at and could not
+ *    scroll tells it — a screenshot does (`orderRemedyText`). Not `scroll`: a stroke for the lab's menu row's
+ *    neighbour would land on the menu's backdrop, which closes it. `why`: a screenshot was looked at and could not
  *    tell either (the scene's `orderSeen`), why — its words drop "see a screenshot".
  *    docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  *    `seenOver` — the same place, `covered` by a cover the tree did not order and a screenshot saw drawn over the node
  *    (`facts.seenOver`, draw-order.ts#Exposure.seenOver): close it first if it is a menu or a popover; no scroll
- *    (`seenOverRemedy`). docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
+ *    (`orderRemedyText`). docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  * 3. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
  * 4. `fixed` — the pixel assert only, which judges a region: content no scroll moves out from under what is over it
@@ -666,7 +680,7 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  */
 export type Remedy =
   | { readonly of: 'presented'; readonly cover: UiNode; readonly layer?: MarkedLayer }
-  | { readonly of: 'unordered'; readonly untold?: string }
+  | { readonly of: 'unordered'; readonly why?: string }
   | { readonly of: 'seenOver' }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
@@ -934,7 +948,7 @@ function orderRemedy(scene: Scene, node: UiNode, { facts, cover }: { readonly fa
   if (seenOver(facts, cover)) return { of: 'seenOver' };
   if (!orderUntold(facts, cover)) return undefined;
   const pair = scene.orderSeen?.between(node, cover);
-  return pair?.seen === 'untold' ? { of: 'unordered', untold: pair.why } : { of: 'unordered' };
+  return pair?.seen === 'untold' ? { of: 'unordered', why: pair.why } : { of: 'unordered' };
 }
 
 /**

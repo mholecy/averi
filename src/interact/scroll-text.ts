@@ -5,7 +5,7 @@ import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { coverClause, outsideItsScrollView, overlaidBy, presentedRemedy, presentedStop, seenOverRemedy, unorderedRemedy } from '../ui-tree/standing.js';
+import { coverClause, outsideItsScrollView, overlaidBy, orderRemedyText, presentedRemedy, presentedStop } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
@@ -560,7 +560,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       return {
         message:
           `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${underText({ judged, cover: o.cover })}; ` +
-            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${remedy.of === 'unordered' ? unorderedRemedy('touch', remedy) : seenOverRemedy('touch')}. ` +
+            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${orderRemedyText(remedy, 'touch')}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

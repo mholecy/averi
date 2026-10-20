@@ -220,15 +220,16 @@ export interface OrderQuestion {
 
 /**
  * The question `standing` of `node` asks the eyes — when it is `covered` with remedy `unordered` (a cover the listing
- * does not order, ui-tree/standing.ts#Remedy) and not yet looked at (no `untold`) — or undefined: every other standing
+ * does not order, ui-tree/standing.ts#Remedy) and not yet looked at (no `why`) — or undefined: every other standing
  * asks nothing. Its pairs are the standing's `unordered` covers, judged in its frame (`facts.screen`).
  */
 export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | PixelStanding): OrderQuestion | undefined {
-  if (standing.kind !== 'covered' || standing.remedy.of !== 'unordered' || standing.remedy.untold !== undefined) return undefined;
+  if (standing.kind !== 'covered' || standing.remedy.of !== 'unordered' || standing.remedy.why !== undefined) return undefined;
   const { facts } = standing;
   const frame = facts.screen;
   const pairs = (facts.unordered ?? []).flatMap((peer): OrderPair[] => {
-    const overlap = rectIntersection(rectIntersection(node.rect, peer.rect) ?? EMPTY, frame);
+    const both = rectIntersection(node.rect, peer.rect);
+    const overlap = both === undefined ? undefined : rectIntersection(both, frame);
     if (overlap === undefined) return [];
     // A band another cover of the target meets shows that cover, not the control it is a band of.
     const others = facts.covers.filter((c) => c !== peer);
@@ -254,8 +255,6 @@ export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | P
   });
   return pairs.length === 0 ? undefined : { tree, node, pairs };
 }
-
-const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
  * A strip of the screen around a control (`OrderPair.nodeAround`, `peerAround`): its rect, and which of its edges lies

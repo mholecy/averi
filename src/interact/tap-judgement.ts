@@ -5,7 +5,7 @@ import { judgedWithOrder, type OrderEyes } from '../ui-tree/eyes.js';
 import type { Look, LookReading } from '../ui-tree/look.js';
 import type { KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { isInteractive } from '../ui-tree/selectors.js';
-import { coverClause, outsideItsScrollView, presentedRemedy, seenOverRemedy, unorderedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
+import { coverClause, outsideItsScrollView, orderRemedyText, presentedRemedy, type Remedy, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -364,7 +364,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint — or, under
       // a cover whose order the tree does not tell, or one a screenshot saw drawn over it, no scroll.
       const remedy = advice(standing.remedy, (r) =>
-        r.of === 'unordered' ? unorderedRemedy('touch', r) : r.of === 'seenOver' ? seenOverRemedy('touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first'),
+        r.of === 'unordered' || r.of === 'seenOver' ? orderRemedyText(r, 'touch') : (positionerRemedy(standing.cover) ?? 'scroll_until it first'),
       );
       throw new CoveredRefusal(told.refusal(`${coverClause(standing.facts, standing.cover, centre)}; ${shows} — ${remedy}`));
     }

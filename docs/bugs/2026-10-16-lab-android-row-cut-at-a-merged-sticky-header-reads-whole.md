@@ -6,7 +6,9 @@
 > out with R under the header (docs/truth/live-records/android-vis-r9-b4l1-sticky.json). The tree cannot tell the two:
 > at rest (offset 0) R lies WHOLE and flush under the header, dumped exactly as the row it cuts here, so the clause
 > would refuse `fully` and fail the pixel assert on every first row under a full-bleed sticky header. `e6ed7d43` dropped
-> it (ADR 0013, refined 2026-10-20: never a neighbour in the node's own scroll view). What could tell them is motion: a
+> it (no neighbour in the node's own scroll view), and the review's fix `151b2ca5` narrowed the rule further: an
+> overlaid edge is "never for a node in a scroll view" at all (ADR 0013, refined 2026-10-20) — every row in a list,
+> R included, is left to motion. What could tell them is motion: a
 > flush probe toward the header, as `scroll_until`'s probe at a clipping container's edge (interact/scroll-rounds.ts
 > #PROBE_REACH) — for `fully`; the pixel assert has no probe.
 
