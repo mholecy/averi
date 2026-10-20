@@ -6,7 +6,6 @@ import { ANDROID, IOS, type Classed, type KnownFile } from './known.js';
 
 const OC1: Classed = 'bug:2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md';
 const OC2: Classed = 'bug:2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md';
-const LAB_FULLY = 'bug:2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md';
 /**
  * A known `ocr` FAIL pinned to what the recognizer read (golden-spec/text.ts#ocrPasses: `read "…", not the string`):
  * the reading turning empty (a recognizer that died fails closed: class `failed`) or into another wrong reading fails
@@ -27,15 +26,11 @@ export const text: KnownFile = {
     ]),
     [`${ANDROID}/text-sample.xml B ocr`, READ("L'ubomír Sťastný", "lab finding OC1: Ľ read as L'", OC1)],
     [`${ANDROID}/text-sample.xml C ocr`, READ('Mäkčeň, dížeň a vokáň', 'lab finding OC1: ĺ read as í', OC1)],
-    // The pinned-button shape of bars' pinned-bar P (bars.known.ts, the same lab finding): Compose lists P by its
-    // uncovered strip above the button, so the colour assert — naming P by its identifier — samples only that and
-    // passes. Its tap and scroll_until ask P by its string, as an agent and the live golden do (rows.ts#tapCall), and the
-    // dump lists no node carrying it (TargetTruth.textListed): not found, an honest answer. Asked by its identifier
-    // (`P.id`, bars.ts: the plain stop's by-id variant), the stop reads P whole by its strip — the only row where a
-    // PLAIN stop on a target whose centre a later clickable pinned sibling covers reads it reached (pinned-bar P's centre
-    // is clear: only its `fully` row is red, another path).
-    [`${ANDROID}/text-under-bar.xml P colour`, { cls: 'passed on #FCE4EC', kind: 'PASS', calls: [], note: 'lab finding: the colour sampled on P\'s uncovered strip only (Compose\'s uncovered bounds)', as: LAB_FULLY }],
-    [`${ANDROID}/text-under-bar.xml P.id scroll_until`, { cls: 'reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'lab finding: the plain stop, asked by P\'s identifier, reads P whole by its uncovered strip (Compose\'s uncovered bounds)', as: LAB_FULLY }],
+    // LAB FINDING B4-L1 — fixed on fix/r9-b4l1 (ui-tree/standing.ts#OverlaidEdge): the pinned-button shape of bars'
+    // pinned-bar P. Compose lists P by its uncovered strip above the button; the button reaches past it at both ends — an
+    // overlay — so the colour assert fails closed naming it, and the plain stop asked by P's identifier reads the
+    // role-less strip as the sliver it is (cut by the button). Both rows green, struck off here, calibrated in
+    // scripts/truth/calibration.json. Its tap and scroll_until asked by P's string are not found, as before.
   ]),
   counts: {
     [`${ANDROID}/text-sample.xml`]: 40,

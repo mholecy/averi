@@ -1,5 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
-import { nodeText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { cutAtLaterText, outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { SIDES } from './swipe.js';
 
@@ -101,10 +101,7 @@ function cutByText(by: UiNode, cut: Cut, rect: Rect, minPiece: number, lineY: nu
     height === 0
       ? `nothing of it shows above the soft keyboard (its strip lies at ${rectText(rect)})`
       : `only a ${rect.width}x${height} part of it shows${above ? ' above the soft keyboard' : ''}, at ${rect.x},${rect.y}`;
-  return (
-    `cut at its ${cut.edge} edge by ${nodeText(by)}, drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, ` +
-    `so the rest of it may lie under that ${by.role}; ${shows}, ${cut.depth} deep across that edge, under the ${minPiece} a tap needs`
-  );
+  return `${cutAtLaterText(cut.edge, by)}; ${shows}, ${cut.depth} deep across that edge, under the ${minPiece} a tap needs`;
 }
 
 /** The soft keyboard a remedy names: up, its top edge (a keyboard line's `y`), and what the adapter can hide it with. */

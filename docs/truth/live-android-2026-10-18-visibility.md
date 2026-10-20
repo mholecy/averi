@@ -215,6 +215,40 @@ installed for round 7), harness truth/round-7 `b191055d`, `--side` the branch:
 - **Cost:** one screenshot only on a claim the trigger applies to; an unmoved read after a refused `fully` claim is
   refused again with no second screenshot. Ordinary stops take none (pinned: tests/interact/scroll-eyes.test.ts).
 
+# Round 9, B4-L1: a node Compose cut at an overlay (2026-10-20)
+
+docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md, ADR 0013 refined
+2026-10-20 (`ui-tree/standing.ts#OverlaidEdge`). averi_lab (emulator-5554, Android 13, API 33, 1080x2220, gesture
+navigation, booted `-no-window -no-snapshot-save`), the lab app as installed on the AVD (not rebuilt for this run), run
+from the fix/r9-b4l1 checkout:
+
+    node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups visibility \
+      --cells pinned-bar,text-under-bar,scroll-sticky-cut,bands,tabbar-floating --record <file>
+
+- **First src, 7755978c** (record docs/truth/live-records/android-vis-r9-b4l1-sticky.json): 18 cases, 16 ok, 2
+  mismatches, 1 not known. That src also read a sticky header in the row's own list as an overlay (VA1). On the device
+  `scroll_until R fully: true` on scroll-sticky-cut stroked the list 66→877→439→1→205 and timed out (15.7 s, 4 swipes)
+  with R under the header, where it used to say "fully visible after 0 swipes": no false claim, but no stop, and the
+  strokes did not bring R closer (R-direction). At rest a first row lies whole and flush under its sticky header, the
+  same tree as a row it cuts, so the clause was dropped (e6ed7d43) and VA1 stays open for a flush probe toward the
+  header.
+- **Final src, e6ed7d43** (record docs/truth/live-records/android-vis-r9-b4l1.json): 18 cases, 16 ok, 0 loud, 2
+  mismatches, 0 not known, exit 0. Every tap as before: pinned-bar P `Tapped` at its clear centre (the probe there
+  fires P), W `Tapped`, bands S and N refused in their bands, Q and O `Tapped`, tabbar-floating R refused under the tab
+  bar and reached after 1 swipe, text-under-bar P not found by its string (as before: no node carries it). The two
+  mismatches are known: scroll-sticky-cut R fully, "fully visible after 0 swipes" (VA1), and tabbar-floating F's
+  unmoved claim (LV1).
+
+B4-L1's own rows are replay findings (golden): `fully` and the colour assert on pinned-bar P, the colour assert and
+the plain stop by identifier on text-under-bar P — the harness asks none of them live (pinned-bar's cases are taps,
+text-under-bar P is asked by its string). No live-known.ts entry changes.
+
+- **After the review (`151b2ca5`), no device run.** The fix narrows the overlay to nodes in no scroll view (ADR 0013): a
+  node in a scroll view is judged exactly as on `706dfaea` again. Of the cases above only scroll-sticky-cut R and
+  tabbar-floating's rows lie in a scroll view, and e6ed7d43 already judged them as the base does; the pinned-bar,
+  text-under-bar and bands nodes lie in none and are judged as e6ed7d43 judged them. The committed records still
+  re-judge as stated (tests/truth/live-rejudge.test.ts).
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

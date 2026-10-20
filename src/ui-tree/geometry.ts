@@ -1160,6 +1160,27 @@ export const drawnOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): 
   `under ${coverText(cover, reach)}${centre === undefined ? '' : ` at its centre (${centre.x},${centre.y})`}, drawn over it`;
 
 /**
+ * THE one clause for a node the tree's source cut at a node drawn after it (Compose's dialect): `the dump (Compose's,
+ * on Android) leaves out of a node's bounds what a later node covers, so the rest of it may lie under that button` —
+ * `what` the node as its sentence names it (`it`, or `the element` in the pixel assert's, whose subject is the cover).
+ * "May": the dump cannot say how far, nor tell a cut from a node that ends there. Said wherever that cut is the
+ * evidence: a sliver cut by a later node (interact/target-text.ts#cutSliverText), and a node whose overlaid edge is its
+ * cover (ui-tree/standing.ts#OverlaidEdge) — `scroll_until`'s `fully` failure (`cutAtLaterText`, through
+ * standing.ts#coverClause) and the pixel assert's covered miss (verify/pixel-poll.ts).
+ */
+export const mayRunOnUnderText = (by: QuotedNode, what: 'it' | 'the element'): string =>
+  `the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of ${what} may lie under that ${by.role}`;
+
+/**
+ * How a sentence says a node was cut at `edge` by `by`, drawn after it (`mayRunOnUnderText`): `cut at its bottom edge by
+ * button id:lab.pinned-bar.continue (66,1956 948x154), drawn after it — the dump (Compose's, on Android) leaves out of a
+ * node's bounds what a later node covers, so the rest of it may lie under that button`. The head of the sliver's
+ * sentence (interact/target-text.ts#cutSliverText) and the `fully` stop's cover clause for an overlaid edge
+ * (ui-tree/standing.ts#coverClause).
+ */
+export const cutAtLaterText = (edge: Edge, by: QuotedNode): string => `cut at its ${edge} edge by ${nodeText(by)}, drawn after it — ${mayRunOnUnderText(by, 'it')}`;
+
+/**
  * How a sentence says a cover whose ORDER against the target the tree does not tell lies over it
  * (draw-order.ts#Exposure.unordered — the two listed in reading order): `overlapped by button "Target W" (51,448
  * 300x64) at its centre (201,502), the two listed in reading order: which is drawn on top is not told` — the place
