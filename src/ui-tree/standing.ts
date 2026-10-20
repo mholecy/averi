@@ -6,6 +6,7 @@ import {
   type DrawOrder,
   type Exposure,
 } from './draw-order.js';
+import { coverAtPoint, coverOf, lastPresented, type Cover } from './cover.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
 import type { SeenOrder } from './seen-order.js';
 import {
@@ -154,7 +155,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   the stop's box cut above its keyboard line; the tap's box less the
  *   system bands, cut above a line no guard acts on; the pixel's box less
  *   the status band. The
- *   covers (`facts.covers`, `reaches`, `shows`, `centreCover`) are judged in
+ *   covers (`facts.covers`, `shows`, `centreCover`) are judged in
  *   it below the status band — the pixel's only where that meets what it
  *   reads, as `exposure`'s touch covers (the kind names the pixel cover).
  *   docs/adr/0008-scroll-until-exposure-box-below-status-band.md
@@ -460,18 +461,15 @@ export interface StandingFacts {
   readonly visible: number;
   /** The frame's edges the node extends past (geometry.ts#clippedEdges). */
   readonly clipped: readonly Edge[];
-  /** draw-order.ts#Exposure's, inside the frame below the status band (the pixel's: where that meets what it reads): the covers, where each presses, the one over the centre, and what shows. */
-  readonly covers: readonly UiNode[];
-  readonly reaches: readonly Rect[];
+  /**
+   * draw-order.ts#Exposure's, inside the frame below the status band (the pixel's: where that meets what it reads): the
+   * covers (cover.ts#Cover: each with where it presses, its order against the node, and whether it is the surface of a
+   * screen presented over it), the one over the centre, and what shows.
+   */
+  readonly covers: readonly Cover[];
   readonly centreCover?: UiNode;
   /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
   readonly centreExcused: readonly UiNode[];
-  /** draw-order.ts#Exposure's: the covers that are the surface of a screen presented over the node (a modal's dim, a sheet's form); absent when none. */
-  readonly presented?: readonly UiNode[];
-  /** draw-order.ts#Exposure's: the covers whose order against the node the tree does not tell (listed in reading order); absent when none. */
-  readonly unordered?: readonly UiNode[];
-  /** draw-order.ts#Exposure's: the covers whose order the tree did not tell and a screenshot did, seen drawn over the node; absent when none. */
-  readonly seenOver?: readonly UiNode[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -568,15 +566,17 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
 
 /**
  * How a sentence says `cover`, one of `facts.covers`, lies over the node — at its centre when `centre` is given: drawn
- * over it (geometry.ts#drawnOverText), or, one of `facts.unordered`, overlapping it in an order the tree does not tell
- * (geometry.ts#orderUntoldText), or, the node's overlaid edge (`facts.overlaid`), cut at that edge by it and maybe
+ * over it (geometry.ts#drawnOverText), or, its order `untold` (cover.ts#CoverOrder), overlapping it in an order the tree
+ * does not tell (geometry.ts#orderUntoldText), or, `seenOver`, drawn over it as a screenshot shows
+ * (geometry.ts#seenOverText), or, the node's overlaid edge (`facts.overlaid`), cut at that edge by it and maybe
  * running on under it (geometry.ts#cutAtLaterText). The one choice for the tap's refusal and move, and `scroll_until`'s
  * covered sentences.
  */
-export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'unordered' | 'seenOver' | 'overlaid'>, cover: UiNode, centre?: Point): string => {
+export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'overlaid'>, cover: UiNode, centre?: Point): string => {
   const overlaid = overlaidBy(facts, cover);
   if (overlaid !== undefined) return cutAtLaterText(overlaid.edge, cover);
-  return (orderUntold(facts, cover) ? orderUntoldText : seenOver(facts, cover) ? seenOverText : drawnOverText)(cover, centre, reachOf(facts, cover));
+  const found = coverOf(facts.covers, cover);
+  return (found?.order.kind === 'untold' ? orderUntoldText : found?.order.kind === 'seenOver' ? seenOverText : drawnOverText)(cover, centre, found?.reach);
 };
 
 /**
@@ -585,36 +585,21 @@ export const coverClause = (facts: Pick<StandingFacts, 'covers' | 'reaches' | 'u
  * alone. The overlaid edge's cut (`meets the element's bottom edge (…), drawn after it — …`), an order untold, one a
  * screenshot saw, or plainly drawn over it — the same four cases, decided here once.
  */
-export const coverOverClause = (facts: Pick<StandingFacts, 'unordered' | 'seenOver' | 'overlaid'>, cover: UiNode, at: string): string => {
+export const coverOverClause = (facts: Pick<StandingFacts, 'covers' | 'overlaid'>, cover: UiNode, at: string): string => {
   const overlaid = overlaidBy(facts, cover);
   if (overlaid !== undefined) return `meets the element's ${overlaid.edge} edge ${at}, drawn after it — ${mayRunOnUnderText(cover, 'the element')}`;
   const element = `the element ${at}`;
-  if (orderUntold(facts, cover)) return overlapsUntoldText(element);
-  return seenOver(facts, cover) ? drawnOverSeenText(element) : `is drawn over ${element}`;
+  const order = coverOf(facts.covers, cover)?.order.kind;
+  if (order === 'untold') return overlapsUntoldText(element);
+  return order === 'seenOver' ? drawnOverSeenText(element) : `is drawn over ${element}`;
 };
 
 /**
  * The node's overlaid edge (`StandingFacts.overlaid`) when `cover` is the node over it — the cover the tree shows only
  * by the cut, of which a sentence says the node may run on under it, not how much of it shows; undefined for any other
- * cover. `orderUntold`'s sibling, asked by `coverClause`, `scroll_until`'s covered failure and the pixel assert's.
+ * cover. The cover's order's sibling (cover.ts#CoverOrder), asked by `coverClause`, `scroll_until`'s covered failure and the pixel assert's.
  */
 export const overlaidBy = (facts: Pick<StandingFacts, 'overlaid'>, cover: UiNode): OverlaidEdge | undefined => (facts.overlaid?.by === cover ? facts.overlaid : undefined);
-
-/**
- * Whether `cover`, one of `facts.covers`, is one whose ORDER against the node the tree does not tell
- * (draw-order.ts#Exposure.unordered: the two listed in reading order) — the one question every reader of
- * `facts.unordered` asks: `Remedy`'s `unordered`, `coverClause`, the pixel assert's covered sentence.
- */
-const orderUntold = (facts: Pick<StandingFacts, 'unordered'>, cover: UiNode): boolean => facts.unordered?.includes(cover) === true;
-
-/**
- * Whether `cover`, one of `facts.covers`, is one whose order the tree did not tell and a screenshot did, seen drawn over
- * the node (draw-order.ts#Exposure.seenOver) — `orderUntold`'s sibling, asked by the same readers.
- */
-const seenOver = (facts: Pick<StandingFacts, 'seenOver'>, cover: UiNode): boolean => facts.seenOver?.includes(cover) === true;
-
-/** Where `cover`, one of `facts.covers`, presses (draw-order.ts#Exposure.reaches, in the same order); undefined for a node not among them. */
-export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover: UiNode): Rect | undefined => facts.reaches[facts.covers.indexOf(cover)];
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
@@ -625,8 +610,7 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  *
  * The cases, in THE PRECEDENCE, one for every purpose — the first that holds is the remedy:
  * 1. `presented` — a screen is presented over the node's own (a modal's dimming leaf, a sheet's form), judged of the
- *    NODE, geometry-free: a presented surface among its covers in the frame (`facts.presented`,
- *    draw-order.ts#Exposure.presented), else one drawn over it wherever it lies
+ *    NODE, geometry-free: a presented surface among its covers in the frame (cover.ts#Cover.presented), else one drawn over it wherever it lies
  *    (draw-order.ts#DrawOrder.presentedOver — `scroll_until`'s touch-down rule less the point), whatever its kind:
  *    under the status bar (wholly inside the band too), off the screen (wholly too), cut, under the soft keyboard or
  *    under another cover beneath that screen alike. No scroll moves it out from under that screen, and hiding a
@@ -638,14 +622,14 @@ export const reachOf = (facts: Pick<StandingFacts, 'covers' | 'reaches'>, cover:
  *    dim), else the last presented surface among its covers, else the last drawn over it. `layer`: the presented
  *    layer the tree source marks when that surface is its element (presentation.ts#Presentation.press), which
  *    `presentedRemedy` names.
- * 2. `unordered` — `covered` by a cover whose order against the node the tree does not tell (`facts.unordered`,
- *    draw-order.ts#Exposure.unordered: the two listed in reading order): which is drawn on top is not told, and no
+ * 2. `unordered` — `covered` by a cover whose order against the node the tree does not tell (cover.ts#CoverOrder's
+ *    `untold`: the two listed in reading order): which is drawn on top is not told, and no
  *    scroll tells it — a screenshot does (`orderRemedyText`). Not `scroll`: a stroke for the lab's menu row's
  *    neighbour would land on the menu's backdrop, which closes it. `why`: a screenshot was looked at and could not
  *    tell either (the scene's `orderSeen`), why — its words drop "see a screenshot".
  *    docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  *    `seenOver` — the same place, `covered` by a cover the tree did not order and a screenshot saw drawn over the node
- *    (`facts.seenOver`, draw-order.ts#Exposure.seenOver): close it first if it is a menu or a popover; no scroll
+ *    (cover.ts#CoverOrder's `seenOver`): close it first if it is a menu or a popover; no scroll
  *    (`orderRemedyText`). docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  * 3. `keyboard` — its centre (the pixel assert: its rect) under a keyboard line no guard acts on (`underKeyboard`):
  *    hide the keyboard (the tap and the pixel assert each word how, ADR 0017).
@@ -875,7 +859,7 @@ function remedied(
   // 1. Beneath a screen presented over its own, whatever its kind and wherever it lies: a presented surface among its
   // covers in the frame, else one judged of the node itself (draw-order.ts#DrawOrder.presentedOver) — a node with
   // nothing in the frame (below the fold, inside the status band) has no covers there.
-  const surface = judgement.facts.presented?.at(-1) ?? scene.order.presentedOver(node);
+  const surface = lastPresented(judgement.facts.covers)?.node ?? scene.order.presentedOver(node);
   if (surface !== undefined) {
     const { layer } = scene.order.presentation.press(surface);
     return { ...judgement, remedy: { of: 'presented', cover: judgement.kind === 'covered' ? judgement.cover : surface, ...(layer !== undefined && { layer }) } };
@@ -945,8 +929,9 @@ function remedied(
  * (`seenOver`); undefined for any other cover.
  */
 function orderRemedy(scene: Scene, node: UiNode, { facts, cover }: { readonly facts: StandingFacts; readonly cover: UiNode }): RemedyCase<'unordered' | 'seenOver'> | undefined {
-  if (seenOver(facts, cover)) return { of: 'seenOver' };
-  if (!orderUntold(facts, cover)) return undefined;
+  const order = coverOf(facts.covers, cover)?.order.kind;
+  if (order === 'seenOver') return { of: 'seenOver' };
+  if (order !== 'untold') return undefined;
   const pair = scene.orderSeen?.between(node, cover);
   return pair?.seen === 'untold' ? { of: 'unordered', why: pair.why } : { of: 'unordered' };
 }
@@ -1363,12 +1348,8 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
     visible: visibleFractionInViewport(node.rect, frame),
     clipped: clippedEdges(node.rect, frame),
     covers: seen.covers,
-    reaches: seen.reaches,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
     centreExcused: seen.centreExcused,
-    ...(seen.presented.length > 0 && { presented: seen.presented }),
-    ...(seen.unordered.length > 0 && { unordered: seen.unordered }),
-    ...(seen.seenOver.length > 0 && { seenOver: seen.seenOver }),
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),
@@ -1391,7 +1372,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
 function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, line: KeyboardLine | undefined): { facts: StandingFacts; outside?: TouchJudgement } {
   const { scene, node, centre } = judged;
   if (line !== undefined && line.y <= box.y) {
-    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], reaches: [], centreExcused: [], shows: 0 };
+    const facts: StandingFacts = { centre, screen: { ...box, height: 0 }, visible: 0, clipped: [], covers: [], centreExcused: [], shows: 0 };
     return { facts, outside: { facts, kind: 'underKeyboard', line } };
   }
   const above = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
@@ -1453,7 +1434,7 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judg
   // A cut by a node drawn after it, which no flush probe sees: its rest lies under that node (`cutByLater`).
   const cutBy = facts.sliver?.by === undefined ? undefined : sliverCut(facts, facts.sliver);
   // Any cover the exposure found, else the overlay the source cut it at, which the tree shows only by the cut (`OverlaidEdge`).
-  const cover = facts.centreCover ?? facts.covers.at(-1);
+  const cover = facts.centreCover ?? facts.covers.at(-1)?.node;
   const overlaid = cover === undefined ? overlaidEdge(judged) : undefined;
   return stopOrdered(overlaid === undefined ? facts : { ...facts, overlaid }, placed, cutBy, cover ?? overlaid?.by, line);
 }
@@ -1492,7 +1473,7 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
   const inBand = cut.visible - visibleFractionInViewport(judged.node.rect, exposed);
   if (inBand <= 0) return cut;
   const whole = factsIn(judged, frame).facts;
-  const dropped = whole.covers.length !== cut.covers.length || whole.covers.some((c, i) => c !== cut.covers[i]);
+  const dropped = whole.covers.length !== cut.covers.length || whole.covers.some((c, i) => c.node !== cut.covers[i].node);
   return { ...cut, shows: dropped ? cut.shows + inBand : whole.shows };
 }
 
@@ -1542,7 +1523,7 @@ function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: Jud
   const cover = (): PixelJudgement | undefined => {
     const covers = scene.order.paintsOver(node, read);
     const centre = rectCentre(node.rect);
-    const over = covers.filter((c) => containsPoint(c.reach, centre)).at(-1) ?? covers.at(-1);
+    const over = coverAtPoint(covers, centre) ?? covers.at(-1);
     if (over === undefined) {
       // No pixel cover: the overlay the source cut it at, which the tree shows only by the cut (`OverlaidEdge`), its rect the reach.
       const overlaid = overlaidEdge(judged);

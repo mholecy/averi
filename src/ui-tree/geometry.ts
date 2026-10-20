@@ -1182,7 +1182,7 @@ export const cutAtLaterText = (edge: Edge, by: QuotedNode): string => `cut at it
 
 /**
  * How a sentence says a cover whose ORDER against the target the tree does not tell lies over it
- * (draw-order.ts#Exposure.unordered — the two listed in reading order): `overlapped by button "Target W" (51,448
+ * (cover.ts#CoverOrder's `untold` — the two listed in reading order): `overlapped by button "Target W" (51,448
  * 300x64) at its centre (201,502), the two listed in reading order: which is drawn on top is not told` — the place
  * `drawnOverText` takes in the same sentences (ui-tree/standing.ts#coverClause chooses).
  */
@@ -1198,7 +1198,7 @@ export const overlapsUntoldText = (element: string): string => `overlaps ${eleme
 
 /**
  * How a sentence says a cover the tree did not order and a screenshot saw drawn over the target lies over it
- * (draw-order.ts#Exposure.seenOver): `under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as
+ * (cover.ts#CoverOrder's `seenOver`): `under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as
  * a screenshot shows (the two are listed in reading order)` — `drawnOverText`'s place (ui-tree/standing.ts#coverClause).
  */
 export const seenOverText = (cover: QuotedNode, centre?: Point, reach?: Rect): string => `${drawnOverText(cover, centre, reach)} ${SEEN_OVER}`;
@@ -1213,7 +1213,7 @@ const SEEN_OVER = 'as a screenshot shows (the two are listed in reading order)';
 const ORDER_UNTOLD = 'the two listed in reading order: which is drawn on top is not told';
 
 /**
- * A cover as a sentence names it, with where it presses when that is not its rect (draw-order.ts#Exposure.reaches: a
+ * A cover as a sentence names it, with where it presses when that is not its rect (cover.ts#Cover.reach: a
  * pinned bar run down to the screen's bottom, a tab bar's item raised by its lift, an alert over the whole screen):
  * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the
  * cover's own rect still lies on what it names. One spelling for the tap, `scroll_until` and the pixel assert.

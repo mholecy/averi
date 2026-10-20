@@ -10,6 +10,7 @@ import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { coverNodes } from '../helpers/covers.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -139,7 +140,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
 
   it('…so the row reads under the header drawn after it: 66 of its 143 px show', () => {
     const seen = drawOrder(tree).exposure(byId('transactions.list.row_0'), PIXEL);
-    expect(seen.covers.map((c) => c.identifier)).toContain('transactions.list.date_header_0');
+    expect(seen.covers.map(({ node: c }) => c.identifier)).toContain('transactions.list.date_header_0');
     expect(seen.shows).toBeCloseTo(66 / 143, 9);
   });
 
@@ -329,7 +330,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
 </node></node></hierarchy>`);
     const a = [...everyNode(t)].find((n) => n.identifier === 'row_a')!;
     expect(a.rect).toEqual({ x: 0, y: 600, width: 1080, height: 105 });
-    expect(drawOrder(t).exposure(a, PIXEL).covers.map((c) => c.identifier)).not.toContain('row_b');
+    expect(drawOrder(t).exposure(a, PIXEL).covers.map(({ node: c }) => c.identifier)).not.toContain('row_b');
   });
 
   it('the round-5 ui_snapshots, re-dumped through the parser: only the two rows cut at the floating tab bar widen — every other rect, Contacts\' padded icons (wrapper 132, control 110, label 66) and the IME-cut "Add fields"/"Add phone" among them, stays as dumped', async () => {

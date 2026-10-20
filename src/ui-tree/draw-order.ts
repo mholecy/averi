@@ -1,4 +1,5 @@
 import { INPUT_ROLE, rectArea, rectIntersection, sameRect, sameRectWithinPixel, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { coverAtPoint, type Cover } from './cover.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
 import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
@@ -32,9 +33,9 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * `51,448`, `zIndex` over C `51,470`), so for a control target such a
  * listing gives the overlapping controls listed before it as covers too
  * when one holds its centre, and every overlapping control of it, before or after, as a
- * cover whose order it does not tell (`readingOrderPeers`, `Exposure.unordered`) — unless a screenshot
+ * cover whose order it does not tell (`readingOrderPeers`, cover.ts#CoverOrder's `untold`) — unless a screenshot
  * told it: the order SEEN is an input (`drawOrder`'s `orderSeen`, ui-tree/seen-order.ts), a peer seen under the
- * target no cover of it, one seen over it a cover named so (`Exposure.seenOver`).
+ * target no cover of it, one seen over it a cover named so (`seenOver`).
  *
  * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
  * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
@@ -59,7 +60,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  *   `exposure`'s covers hide PIXELS of the node, not only the touch —
  *   `exposure` less the node's own content listed beside it, a clickable
  *   layer with nothing drawn, and an overlap no thicker than an edge
- *   (`PixelCover`'s doc has the rules and the measured shapes).
+ *   (`paintsOver`'s doc has the rules and the measured shapes).
  * - `coversOf(node, region)` — the uiautomator parser's widening, through
  *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
  *   drawn over the strip a node cut short of its own content would gain?
@@ -246,7 +247,7 @@ export interface DrawOrder {
    * The covers of `exposure(node, within)` that hide PIXELS of `node` —
    * what a colour sample or an ocr crop of its rect would read instead of
    * it (ui-tree/standing.ts#Scene.standing's pixel purpose) — in
-   * `exposure`'s order, each with its reach. `exposure` answers where a
+   * `exposure`'s order, each the record `exposure` made of it (cover.ts#Cover: its reach, its order, presented or not). `exposure` answers where a
    * TOUCH goes, so it counts what takes the touch and draws nothing; three
    * of its covers are left out here (found by a sweep of every node of
    * every fixture):
@@ -296,13 +297,7 @@ export interface DrawOrder {
    * are the owner's decision:
    * docs/adr/0003-pixel-cover-exemptions.md
    */
-  paintsOver(node: UiNode, within: Rect): readonly PixelCover[];
-}
-
-/** A cover of a pixel assert's element (`DrawOrder.paintsOver`): the node, and where it presses — its rect, or a pinned bar's reach (`Exposure.reaches`). */
-export interface PixelCover {
-  readonly node: UiNode;
-  readonly reach: Rect;
+  paintsOver(node: UiNode, within: Rect): readonly Cover[];
 }
 
 /**
@@ -327,33 +322,31 @@ export const minTapPiece = (screen: { readonly width: number; readonly height: n
 export interface Exposure {
   /** The fraction of `node`'s area inside `within` and under no cover (0 for a node of no area) — `visibleFractionInViewport` less the covers. */
   readonly shows: number;
-  /** The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before it among them, `tabBarsOf`; in a reading-order listing, the controls listed before it that overlap it when one holds its centre, `readingOrderPeers`); empty when none. */
-  readonly covers: readonly UiNode[];
   /**
-   * The covers whose ORDER against the node the listing does not tell, in `covers`' order: the controls of a run given
-   * in reading order that overlap it, listed before it or after (`readingOrderPeers`, `UiNode.readingOrder`) — the one
-   * drawn on top may be either; empty when none. What the sentences read: such a cover is named as overlapping the node, which of the two
-   * is on top not told, and no scroll is advised (ui-tree/standing.ts#Remedy's `unordered`).
-   * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
+   * The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before
+   * it among them, `tabBarsOf`; in a reading-order listing, the controls listed before it that overlap it when one
+   * holds its centre, `readingOrderPeers`), each as one record (cover.ts#Cover); empty when none. Each with:
+   * - its REACH: its rect, or — for a node pinned at a flat list's bottom (`bottomPinned`) — its reach (`pinnedReach`),
+   *   raised by its bar's lift for a floating tab bar's item (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`), or the whole
+   *   screen for a presented layer's cover. The rects `shows`, `largest` and `coverAt` are judged against, so a caller
+   *   asking where a cover lies over the target (scroll-rounds.ts#overFarSide) asks of the same rect;
+   * - its ORDER (cover.ts#CoverOrder): `untold` for a control of a run given in reading order that overlaps it, listed
+   *   before it or after (`readingOrderPeers`, `UiNode.readingOrder`) — the one drawn on top may be either: named as
+   *   overlapping the node, which is on top not told, and no scroll advised (ui-tree/standing.ts#Remedy's
+   *   `unordered`; docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md);
+   *   `seenOver` for such a one whose order a screenshot told, seen drawn over the node in their overlap (`drawOrder`'s
+   *   `orderSeen`, ui-tree/seen-order.ts): named as drawn over it, a screenshot showing it on top, no scroll advised
+   *   (ui-tree/standing.ts#Remedy's `seenOver`; docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md)
+   *   — a peer seen UNDER the node is no cover, nor in `aimedClearOf`; `drawn` for every other;
+   * - PRESENTED: it is the SURFACE of a screen presented over the node (presentation.ts#PresentedOver: by shape on a
+   *   tree whose source did not judge presented layers, a dimming leaf, labelled or not, a sheet's scroll view, on a
+   *   later screen-sized layer stacked over its own; or a marked presented layer's cover, reaching the whole screen,
+   *   or a node of a marked `screen` layer) — never a control, a bar the layer carries or any other labelled node,
+   *   which cover anyway (Safari's capsule bar). A target under one lies under a presented screen no scroll moves it
+   *   out from under — close it first (ui-tree/standing.ts#presentedRemedy;
+   *   docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md).
    */
-  readonly unordered: readonly UiNode[];
-  /**
-   * The covers whose order the listing did not tell and a screenshot did — seen drawn over the node in their overlap
-   * (`drawOrder`'s `orderSeen`, ui-tree/seen-order.ts) — in `covers`' order; empty when none. What the sentences read: such a
-   * cover is named as drawn over the node, a screenshot showing it on top, and no scroll is advised
-   * (ui-tree/standing.ts#Remedy's `seenOver`). A peer seen UNDER the node is no cover, nor in `aimedClearOf`.
-   * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
-   */
-  readonly seenOver: readonly UiNode[];
-  /**
-   * Where each of `covers` presses, in the same order: its rect, or — for a
-   * node pinned at a flat list's bottom (`bottomPinned`) — its reach
-   * (`pinnedReach`), raised by its bar's lift for a floating tab bar's item
-   * (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`). The rects `shows`, `largest` and `coverAt` are judged
-   * against, so a caller asking where a cover lies over the target (scroll-
-   * rounds.ts#overFarSide) asks of the same rect.
-   */
-  readonly reaches: readonly Rect[];
+  readonly covers: readonly Cover[];
   /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals) that a tap may be aimed at — clear, too, of the controls listed before it in reading order that overlap it (`readingOrderPeers`' `listedBefore`); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
   /**
@@ -382,16 +375,6 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
-   * The covers that are the SURFACE of a screen presented over the node (presentation.ts#PresentedOver: by shape on a
-   * tree whose source did not judge presented layers, a dimming leaf, labelled or not, a sheet's scroll view, on a
-   * later screen-sized layer stacked over its own; or a marked presented layer's cover, reaching the whole screen, or a
-   * node of a marked `screen` layer), in `covers`' order; empty when none — never a control, a bar the layer
-   * carries or any other labelled node, which cover anyway (Safari's capsule bar). What the sentences read: a target
-   * under one lies under a presented screen no scroll moves it out from under — close it first
-   * (ui-tree/standing.ts#presentedRemedy; docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md).
-   */
-  readonly presented: readonly UiNode[];
-  /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
    * `within` under no cover (no `centreCover`) — `moved: false`; else the
    * centre (`rectCentre`) of the largest uncovered piece whose sides are
@@ -401,7 +384,7 @@ export interface Exposure {
   readonly tapAt?: { readonly point: Point; readonly moved: false } | { readonly point: Point; readonly moved: true; readonly piece: Rect };
   /** MIN_TAP_PIECE_FRACTION of this tree's screen's shorter side, rounded — the piece size `tapAt` needs. */
   readonly minPiece: number;
-  /** The cover drawn on top at `point` — the last of `covers` whose rect (a pinned node's reach, `exposure`) contains it — or undefined. */
+  /** The cover drawn on top at `point` — the last of `covers` whose reach contains it (cover.ts#coverAtPoint) — or undefined. */
   coverAt(point: Point): UiNode | undefined;
 }
 
@@ -1271,7 +1254,7 @@ const NOT_DRAWN = {
    *
    * Except, on a tree whose source did not judge presented layers, the SURFACE of a screen presented over the target's
    * by shape (presentation.ts#PresentedOver.surface `inferred`: the shape adapter's `presentedSurface`, the mirror of
-   * `givesWay`), which covers as before and stays in `Exposure.presented`: a sheet layer WDA reports `0/0` whole, over a list with no second dim,
+   * `givesWay`), which covers as before and stays `presented` (cover.ts#Cover.presented): a sheet layer WDA reports `0/0` whole, over a list with no second dim,
    * would otherwise let a tap through to the list. On a tree whose source judged, no shape is asked and the guard holds
    * of no node: a layer it marks covers through its cover, which no row excuses, and a hidden node of a marked `screen`
    * layer stays excused (Contacts' discard popover over the New Contact sheet, whose form `Table 0,62 402x812` and
@@ -1590,7 +1573,7 @@ function listsInReadingOrder(parent: UiNode): boolean {
  * title) — in idb's flat list from its content on (`contentFrom`: the top bar's are chrome before content, ADR 0004)
  * and none of its bottom chrome (`bottomChrome`: a tab bar's items are covers by their own rule), nor, on a nested
  * tree, a control pinned at the screen's bottom (`pinnedTargets`). Such a listing does not tell which of two
- * overlapping controls is drawn on top, so each is a cover of the other whose order is not told (`Exposure.unordered`):
+ * overlapping controls is drawn on top, so each is a cover of the other whose order is not told (cover.ts#CoverOrder's `untold`):
  * - `before`: the ones listed BEFORE the target, when one of them holds its centre (`tapPoint`) — covers the draw
  *   order alone would not give. Measured: the lab's in-screen menu, idb and WDA (`A 110, B 290, K 380, W 448, C 470, D 650`): W, drawn
  *   on top by `zIndex`, is listed before C, whose centre (201,502) lies on W — read clear, C was `Tapped` there and the
@@ -1801,13 +1784,11 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     paintsOver(node, box) {
       const target = placesOf(node)[0];
       if (target === undefined) return [];
-      const { covers, reaches } = api.exposure(node, box);
       const read = rectIntersection(node.rect, box);
-      return covers.flatMap((cover, i) => {
-        const placed = placesOf(cover)[0];
-        const reach = reaches[i];
-        const hides = read !== undefined && overlapsPastSlack(reach, read);
-        return !hides || ownContentOf(target, placed, reach) || clickableLayer(target, placed) ? [] : [{ node: cover, reach: { ...reach } }];
+      return api.exposure(node, box).covers.filter((cover) => {
+        const placed = placesOf(cover.node)[0];
+        const hides = read !== undefined && overlapsPastSlack(cover.reach, read);
+        return hides && !ownContentOf(target, placed, cover.reach) && !clickableLayer(target, placed);
       });
     },
     drawnOver,
@@ -1864,15 +1845,21 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
           : [...before, ...laterFor(places, about).filter((p) => peers?.seenUnder.has(p) !== true)]
               .filter((p) => rectIntersection(reachOf(p), shown) !== undefined)
               .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: wholeScreen(p) || drawsOverTarget(p, about), wholeScreen: wholeScreen(p) }));
-      const over = met.filter((c) => c.draws);
-      const covers = over.map((c) => c.node);
-      const pieces = over.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
+      const covers = met
+        .filter((c) => c.draws)
+        .map((c): Cover => ({
+          node: c.node,
+          reach: { ...c.reach },
+          order: { kind: peers?.unordered.has(c.placed) === true ? 'untold' : peers?.seenOver.has(c.placed) === true ? 'seenOver' : 'drawn' },
+          presented: c.wholeScreen || about?.over.surface(c.placed) !== undefined,
+        }));
+      const pieces = covers.reduce<Rect[]>((left, cover) => left.flatMap((piece) => subtract(piece, cover.reach)), shown === undefined ? [] : [shown]);
       const area = rectArea(node.rect);
       // A moved tap never lands on a control listed before it in reading order that overlaps it, cover or not: which is on top is not told.
       const aimedClearOf = (peers?.listedBefore ?? []).filter((p) => pieces.some((piece) => rectIntersection(piece, p.node.rect) !== undefined));
       const aimable = aimedClearOf.reduce<Rect[]>((left, p) => left.flatMap((piece) => subtract(piece, p.node.rect)), pieces);
       const largest = largestRect(aimable);
-      const coverAt = (point: Point): UiNode | undefined => over.filter((c) => containsPoint(c.reach, point)).at(-1)?.node;
+      const coverAt = (point: Point): UiNode | undefined => coverAtPoint(covers, point)?.node;
       const centre = tapPoint(node);
       const onCentre = shown !== undefined && containsPoint(shown, centre);
       const centreCover = onCentre ? coverAt(centre) : undefined;
@@ -1887,14 +1874,10 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       return {
         shows: area > 0 ? pieces.reduce((sum, r) => sum + rectArea(r), 0) / area : 0,
         covers,
-        reaches: over.map((c) => ({ ...c.reach })),
         ...(largest !== undefined && { largest: { ...largest } }),
         aimedClearOf: aimedClearOf.map((p) => p.node),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
-        unordered: over.filter((c) => peers?.unordered.has(c.placed) === true).map((c) => c.node),
-        seenOver: over.filter((c) => peers?.seenOver.has(c.placed) === true).map((c) => c.node),
-        presented: over.filter((c) => c.wholeScreen || about?.over.surface(c.placed) !== undefined).map((c) => c.node),
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
         coverAt,
