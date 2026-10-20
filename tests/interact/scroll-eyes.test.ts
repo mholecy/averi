@@ -159,7 +159,7 @@ describe('scroll_until — no screenshot on an ordinary stop (the trigger is nar
     expect(fake.screenshots).toHaveLength(0);
   });
 
-  it('the same bar over an INSET row, reaching past it at both ends: not asked either — in a scroll view a flush bar is no overlay (ui-tree/standing.ts#OverlaidEdge: at rest the last row lies whole on it, the same tree), the tree\'s claim as before', async () => {
+  it('the same bar over an INSET row, reaching past it at both ends: not asked either — in a scroll view a flush bar is no overlay (ui-tree/later-edges.ts#OverlaidEdge: at rest the last row lies whole on it, the same tree), the tree\'s claim as before', async () => {
     const fake = barOver({ x: 40, width: 1000 });
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }))).toBe('fully visible after 0 swipes');
     expect(fake.screenshots).toHaveLength(0);

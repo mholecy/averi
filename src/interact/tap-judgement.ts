@@ -489,7 +489,7 @@ const INHERITED_CUT_WAY_PAST =
  * nothing) — whose own way past names what it lies in:
  * something in THAT clear of the edge. A container's cut needs a clipping
  * ancestor (UiNode.clipsDescendants, Android's); a cut by a later node needs
- * none, only a nested tree of clipped frames (standing.ts#cutByLater's
+ * none, only a nested tree of clipped frames (ui-tree/later-edges.ts#laterEdgesIn's
  * `cutsAtLater`) — an iOS tree is neither (WDA's frames are unclipped, idb's
  * list flat), so no cut is refused there.
  */

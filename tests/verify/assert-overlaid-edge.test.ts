@@ -6,7 +6,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
 
-// THE PIXEL ASSERT ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/standing.ts#OverlaidEdge): the tree shows the pinned
+// THE PIXEL ASSERT ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge): the tree shows the pinned
 // button only by the cut, so the assert fails closed naming it, saying the element may run on
 // under it — never a PASS on the cut rect's own colour. The lab's real captures and screenshots.
 // docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md

@@ -163,9 +163,9 @@ row `P` is dumped `127,1846 825x110`, ending exactly where the pinned `Continue`
 frame runs 66 px on under the button. Nothing overlaps, so the draw order found no cover: `fully: true` said "fully
 visible after 0 swipes" and the colour assert passed on the cut rect.
 
-**The concept** (`ui-tree/standing.ts#OverlaidEdge`, decided from the tree alone): on a tree whose source cuts at a node
+**The concept** (`ui-tree/later-edges.ts#OverlaidEdge`, decided from the tree alone): on a tree whose source cuts at a node
 drawn after it (Android's), for a node in NO scroll view, a top or bottom edge with a node laid flush against it along
-its whole width, drawn after it outside its subtree (`laterAcross`, the cut's and the flush neighbour's evidence), that
+its whole width, drawn after it outside its subtree (`ui-tree/later-edges.ts`, the cut's and the flush neighbour's evidence), that
 ALSO reaches past the node at both ends of that edge. An overlay has margins of its own (Continue `66..1014` over `P`
 `127..952`); a sibling laid beside the
 node in a column shares an alignment line with it at one end at least (the next row of a list, a field under its
