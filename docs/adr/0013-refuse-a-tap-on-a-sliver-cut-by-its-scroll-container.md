@@ -164,10 +164,10 @@ frame runs 66 px on under the button. Nothing overlaps, so the draw order found 
 visible after 0 swipes" and the colour assert passed on the cut rect.
 
 **The concept** (`ui-tree/standing.ts#OverlaidEdge`, decided from the tree alone): on a tree whose source cuts at a node
-drawn after it (Android's), a node's top or bottom edge with a node laid flush against it along its whole width, drawn
-after it outside its subtree and outside the node's own scroll view (`laterAcross`, the cut's and the flush neighbour's
-evidence), that ALSO reaches past the node at both ends of that edge. An overlay has margins of its own (Continue
-`66..1014` over `P` `127..952`; mp-native's floating tab bar over a row's avatar and texts); a sibling laid beside the
+drawn after it (Android's), for a node in NO scroll view, a top or bottom edge with a node laid flush against it along
+its whole width, drawn after it outside its subtree (`laterAcross`, the cut's and the flush neighbour's evidence), that
+ALSO reaches past the node at both ends of that edge. An overlay has margins of its own (Continue `66..1014` over `P`
+`127..952`); a sibling laid beside the
 node in a column shares an alignment line with it at one end at least (the next row of a list, a field under its
 title, the 48-dp touch target of bands' `N`, exactly as wide as `Q` above it). Top and bottom only: every measured
 Compose cut is vertical, and sideways a row's padded overflow icon reaches past its neighbour's ends (Contacts' "Save"
@@ -190,7 +190,7 @@ sliver (`P`'s probe at its dumped centre fired `P`). The words for the cut are o
 (`geometry.ts#mayRunOnUnderText`, `#cutAtLaterText`), said by the sliver's sentence, `scroll_until`'s `fully` failure
 and the pixel assert's covered miss.
 
-**Not a neighbour in the node's own scroll view — VA1 left open.** The same shape cuts `scroll-sticky-cut`'s `R` at a
+**Never for a node in a scroll view — VA1 left open.** The same shape cuts `scroll-sticky-cut`'s `R` at a
 merged sticky header (`0,303 1080x154`, pinned at its list's top): `R` and its content are dumped from 457. A first
 version read a neighbour in the node's own scroll view as an overlay when pinned at that scroll view's far edge, and
 turned VA1's two golden rows green. The device refused it (`docs/truth/live-records/android-vis-r9-b4l1-sticky.json`,
@@ -199,31 +199,39 @@ header, where before it said "fully visible" — no false claim, but no stop eit
 (offset 0) the first row lies WHOLE and flush under its sticky header, dumped exactly as the row it cuts, so every first
 row under a full-bleed sticky header would be refused by `fully` and fail the pixel assert for good — a false failure
 an agent cannot get past, on the transaction lists of every banking app. Only motion tells the two (a flush probe
-toward the header, as `scroll_until`'s probe at a clipping container's edge), and the pixel assert has none. So a
-neighbour in the node's own scroll view is never an overlay, and VA1 stays open for that probe.
+toward the header, as `scroll_until`'s probe at a clipping container's edge), and the pixel assert has none. The review
+of the second version (2026-10-20) showed the same holds for a bar OUTSIDE the list, which that version still read: an
+edge-to-edge top bar over a list padded to clear it lies flush on the first inset card at rest, and a bottom bar on the
+last one at the end of the content (and a list ending flush on a bar laid below it ends there too, where `scroll_until`'s
+flush probe answered correctly before) — a whole row, `fully` failing for good with "a layout defect", the pixel assert
+failing closed. So a node in a scroll view is never read as overlaid at all (the eyes and the flush probe keep it,
+`Scene.flushNeighbours` being this concept's complement), and VA1 stays open for that probe.
 
 **What it narrows:**
 - 2026-10-17's second residual: a role-less clickable cut to a strip is refused when the node that cut it is an
   overlay — the evidence a layout wrapper laid beside its siblings does not have. Texts keep their tap (mp-native's
   Account Detail row titles cut 9 px at the floating tab bar stay `reachable`);
-- the eyes' residual "a neighbour as wide as the screen is not asked", for an INSET node: a full-bleed bar outside its
-  scroll view, flush with an inset row, now covers it, with no screenshot.
 
 Measured: golden, over the whole corpus (Android, iOS, React Native), changes four replies and no other —
 `pinned-bar.xml P fully` and `P colour`, `text-under-bar.xml P colour` and `P.id scroll_until`, each red to green
 (1410 checks, 217 → 213 mismatches; with OCR 243 → 239). iOS is untouched: neither WDA (frames unclipped) nor idb
-(flat) cuts at a later node. The pixel chrome sweep over every fixture node gains seven elements, all on mp-native's
-Account Detail and all true cuts at the floating tab bar: row_29's avatar box and its five texts ending at the bar's
-top, and the next row's avatar box beginning at its bottom.
+(flat) cuts at a later node. Over every Android tree in the fixtures (the banking app's screens, the lab's, React
+Native's; tap, plain stop, `fully`, colour and ocr, on the gesture and the three-button screen) the verdicts change on
+three nodes only: the two `P`s, and the sheet's drag handle below (a residual). mp-native's Account Detail rows cut at
+the floating tab bar lie in their list, so they read as before.
 
 **Residuals, stated:**
 - an overlay exactly as wide as the node (equal margins, or full-bleed over full-bleed) is not read as one: the node
   reads whole, as before (in a scroll view with the neighbour outside it, the eyes still look at the node-less padding);
 - a row cut at a sticky header in its own list reads whole (VA1, above);
-- a narrow node laid flush against a wider later node outside its scroll view, with no gap, reads as running on under
-  it: `fully` and the pixel assert fail closed naming that node. Measured only on a sheet's drag handle (the lab's
-  form-picker and sheet-medium), which no one asserts. The sentences say "may"; if a screenshot shows the node whole, a
-  rect assert or a tap by coordinates is the way past;
+- a node in no scroll view laid flush, with no gap, against a later node that reaches past it at both ends reads as
+  running on under it, whether or not it does: `fully` fails and the colour and ocr asserts fail closed naming that
+  node. The tree cannot tell an overlay from a section laid below in the same column — a button centred above a
+  full-bleed footer, a title centred above a full-width card. Measured once in the fixtures: sheet-medium's drag-handle
+  box (`496,1110 88x133`, above the sheet's content `0,1243 1080x977`), which no one asserts. Accepted: the error is the
+  fail-closed one ADR 0001 chose over a false pass, the sentences say "may" and name the node, and a rect assert, an
+  assert on a node clear of it, or a tap is the way past (the tap judges the centre). A narrower rule (the overlay not
+  filling the rest of its parent, say) would fit no measured case and is left until one is measured;
 - the overlay's rect may be only touch padding over the node: a 40-dp button padded to 48 dp still counts when it
   reaches past both ends (no density in the tree, so the depth cannot be told);
 - side edges are never read: no sideways cut has been measured;

@@ -1,8 +1,8 @@
 # BUG: on Android `scroll_until … fully: true` answers "fully visible after 0 swipes" for a row whose bottom third lies under a pinned button — Compose's uiautomator bounds leave out what a later clickable sibling covers, so the tree shows no cover and no cut
 
-> **Status (2026-10-20, round 9):** fixed on `fix/r9-b4l1` at `7755978c` + `e6ed7d43` (from `fix/round-9` `706dfaea`):
-> a node laid flush across a node's top or bottom edge, drawn after it outside its subtree and its scroll view, that
-> reaches past it at both ends is an OVERLAY the dump cut the node at (`ui-tree/standing.ts#OverlaidEdge`, ADR 0013
+> **Status (2026-10-20, round 9):** fixed on `fix/r9-b4l1` at `7755978c` + `e6ed7d43` + REVIEWFIX (from `fix/round-9`
+> `706dfaea`): for a node in no scroll view, a node laid flush across its top or bottom edge, drawn after it outside its
+> subtree, that reaches past it at both ends is an OVERLAY the dump cut the node at (`ui-tree/standing.ts#OverlaidEdge`, ADR 0013
 > refined 2026-10-20). `fully: true` names it as P's cover and never stops on P ("… cut at its bottom edge by container
 > id:lab.pinned-bar.continue (66,1956 948x154), drawn after it — the dump (Compose's, on Android) leaves out of a
 > node's bounds what a later node covers, so the rest of it may lie under that container"); the colour assert fails
@@ -13,7 +13,9 @@
 > green, struck from bars.known.ts and text.known.ts), calibrate (calibration.json `B4-L1`, CALIBRATED), and live on
 > averi_lab (docs/truth/live-records/android-vis-r9-b4l1.json: every tap as before). The first commit also read the
 > sticky header of docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md (VA1) as an
-> overlay; the device refused it, the second dropped it (ADR 0013), and VA1 stays open. Residual: the plain stop on P
+> overlay; the device refused it, the second dropped it, and the review's fix (REVIEWFIX) leaves every node in a scroll
+> view to motion — a bar outside the list lies flush on a whole first or last row at rest too (ADR 0013); VA1 stays
+> open. Residual: the plain stop on P
 > still says "fully visible after 0 swipes" (its centre is clear; `fully: true` asks for the whole node).
 
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth

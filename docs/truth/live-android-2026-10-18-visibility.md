@@ -243,6 +243,12 @@ B4-L1's own rows are replay findings (golden): `fully` and the colour assert on 
 the plain stop by identifier on text-under-bar P — the harness asks none of them live (pinned-bar's cases are taps,
 text-under-bar P is asked by its string). No live-known.ts entry changes.
 
+- **After the review (REVIEWFIX), no device run.** The fix narrows the overlay to nodes in no scroll view (ADR 0013): a
+  node in a scroll view is judged exactly as on `706dfaea` again. Of the cases above only scroll-sticky-cut R and
+  tabbar-floating's rows lie in a scroll view, and e6ed7d43 already judged them as the base does; the pinned-bar,
+  text-under-bar and bands nodes lie in none and are judged as e6ed7d43 judged them. The committed records still
+  re-judge as stated (tests/truth/live-rejudge.test.ts).
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

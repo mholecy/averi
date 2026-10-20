@@ -9,7 +9,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 /**
  * AN OVERLAID EDGE (ui-tree/standing.ts#OverlaidEdge): Compose leaves out of a node's bounds what a node drawn after it
  * covers, so a node partly under a pinned button is dumped ending exactly at that node. Read only where that node is an
- * OVERLAY — reaching past the node at both ends of a top or bottom edge, outside the node's own scroll view — the
+ * OVERLAY — reaching past a node in no scroll view at both ends of a top or bottom edge — the
  * `fully` stop and the pixel assert treat it as the cover, and a role-less node cut to a strip by it is a sliver. Over
  * the lab's real captures (tests/fixtures/truth/android-averi_lab-api33).
  * docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
@@ -100,7 +100,7 @@ describe('OverlaidEdge — text-under-bar P (B4-L1): a role-less clickable dumpe
   });
 });
 
-describe('OverlaidEdge — never a neighbour in the node\'s own scroll view: scroll-sticky-cut R (VA1, left open)', () => {
+describe('OverlaidEdge — never for a node in a scroll view: scroll-sticky-cut R (VA1, left open)', () => {
   it('R dumped from 457, where the merged sticky header ends: not read as an overlay — at rest a first row lies whole and flush under its header, the same tree', async () => {
     const t = await lab('scroll-sticky-cut');
     const r = byId(t, 'lab.scroll-sticky-cut.R');
@@ -131,16 +131,25 @@ describe('OverlaidEdge — layout neighbours laid flush are no overlay (the meas
     expect(standing(t, save, COLOUR).kind).toBe('reachable');
     expect(standing(t, save, COLOUR).facts.overlaid).toBeUndefined();
   });
-  it('accountDetail "+493" 736,1831 92x9, cut at the tab bar\'s top: a text keeps its tap and plain stop (ADR 0013); its colour is covered by the tab bar, a true cut', async () => {
+  it('a node in no scroll view with a later node flush at its RIGHT edge, reaching past it at its top and bottom: a side edge, never read', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" clickable="true" resource-id="node" bounds="[100,1000][500,1100]" /><node class="android.view.View" clickable="true" resource-id="beside" bounds="[500,950][900,1150]"><node class="android.widget.TextView" text="Beside" bounds="[600,1020][800,1080]" /></node>
+</node></hierarchy>`);
+    const n = byId(t, 'node');
+    expect(standing(t, n, FULLY).facts.overlaid).toBeUndefined();
+    expect(standing(t, n, COLOUR).kind).toBe('reachable');
+  });
+  it('accountDetail "+493" 736,1831 92x9, cut at the floating tab bar\'s top, in its list: no overlay in a scroll view — tap, plain stop and colour as before', async () => {
     const t = await compose('accountDetail');
     const amount = at(t, { x: 736, y: 1831, width: 92, height: 9 });
     expect(standing(t, amount, TAP).kind).toBe('reachable');
     expect(standing(t, amount, PLAIN).kind).toBe('reachable');
-    expect(said(standing(t, amount, COLOUR))).toMatchObject({ kind: 'covered', cover: `container ${JSON.stringify({ x: 66, y: 1840, width: 948, height: 248 })}` });
+    expect(standing(t, amount, COLOUR).kind).toBe('reachable');
+    expect(standing(t, amount, COLOUR).facts.overlaid).toBeUndefined();
   });
 });
 
-describe('OverlaidEdge — the same full-bleed node over an inset row: an overlay outside the row\'s scroll view, none inside it', () => {
+describe('OverlaidEdge — a full-bleed node flush over an inset row in a list: no overlay, in the list or outside it (at rest a first row lies whole and flush under a pinned top bar, the same tree)', () => {
   /** A list 0,300 1080x1200 holding an inset row 128,454 825x176, flush below a full-bleed header with its title — in the list (a sticky header) or laid outside it (a pinned top bar). */
   const list = (header: 'in the list' | 'outside it') => {
     const head = '<node class="android.view.View" resource-id="header" bounds="[0,300][1080,454]"><node class="android.widget.TextView" text="Section" bounds="[400,344][681,410]" /></node>';
@@ -149,8 +158,15 @@ describe('OverlaidEdge — the same full-bleed node over an inset row: an overla
   <node class="android.view.View" scrollable="true" resource-id="list" bounds="[0,300][1080,1500]">${row}${header === 'in the list' ? head : ''}</node>${header === 'outside it' ? head : ''}
 </node></hierarchy>`);
   };
-  it('outside it (a pinned bar over the list): an overlay — `fully` is covered by it', () => {
+  it('outside it (a pinned top bar over the list): no overlay — `fully` stops, the colour assert measures', () => {
     const t = list('outside it');
+    expect(said(standing(t, byId(t, 'row'), FULLY))).toEqual({ kind: 'reachable', at: { x: 541, y: 542 } });
+    expect(standing(t, byId(t, 'row'), COLOUR).kind).toBe('reachable');
+  });
+  it('the same row and bar with no list: an overlay — `fully` is covered by it', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" clickable="true" resource-id="row" bounds="[128,454][953,630]" /><node class="android.view.View" resource-id="header" bounds="[0,300][1080,454]"><node class="android.widget.TextView" text="Section" bounds="[400,344][681,410]" /></node>
+</node></hierarchy>`);
     expect(said(standing(t, byId(t, 'row'), FULLY))).toEqual({ kind: 'covered', cover: 'header', remedy: 'scroll' });
   });
   it('in the list (a sticky header): no overlay — `fully` stops', () => {

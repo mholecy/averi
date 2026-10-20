@@ -159,11 +159,9 @@ describe('scroll_until — no screenshot on an ordinary stop (the trigger is nar
     expect(fake.screenshots).toHaveLength(0);
   });
 
-  it('the same bar over an INSET row, reaching past it at both ends: an overlay the source cut the row at (ui-tree/standing.ts#OverlaidEdge) — no "fully visible", no screenshot', async () => {
+  it('the same bar over an INSET row, reaching past it at both ends: not asked either — in a scroll view a flush bar is no overlay (ui-tree/standing.ts#OverlaidEdge: at rest the last row lies whole on it, the same tree), the tree\'s claim as before', async () => {
     const fake = barOver({ x: 40, width: 1000 });
-    const failure = (await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }).catch((e: unknown) => e)) as Error;
-    expect(failure).toBeInstanceOf(Error);
-    expect(failure.message).toContain("element is in the viewport but cut at its bottom edge by button id:bar (0,1832 1080x168), drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of it may lie under that button");
+    expect(describeScrollResult(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }))).toBe('fully visible after 0 swipes');
     expect(fake.screenshots).toHaveLength(0);
   });
 });

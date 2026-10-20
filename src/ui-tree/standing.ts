@@ -349,21 +349,22 @@ export interface FlushNeighbour {
 /**
  * AN OVERLAID EDGE: a top or bottom edge of a node's bounds that the tree's source cut at a node DRAWN OVER IT — so an
  * unknown run of the node lies under `by`. On a tree whose source cuts a node's bounds at a node drawn after it
- * (`cutsAtLater`, Android's: Compose leaves out of a node's bounds what a later node covers), `by` is the node laid
- * flush against that edge along the node's whole width, drawn after it outside its subtree (`laterAcross`, the cut's
- * and the flush neighbour's evidence), that also REACHES PAST THE NODE AT BOTH ENDS of the edge: an overlay laid over
- * content with margins of its own (the lab's pinned `Continue` 66..1014 over its row 127..952; mp-native's floating
- * tab bar over a row's avatar and texts), where a sibling laid beside it in a column shares an alignment line with it at one end at
- * least (a list's next row, a field under its title, a touch target exactly as wide). Never a `by` in the node's own
- * scroll view: a sticky header pinned at the list's top lies flush on its first row at rest, whole, exactly as on a
- * row it cuts — the tree cannot tell the two, and no stroke settles it (live, the lab's `scroll-sticky-cut`: `fully`
- * strokes on `R` ended with it scrolled away), so a row cut at a sticky header stays read whole (VA1, open). Top and
- * bottom only: every measured
+ * (`cutsAtLater`, Android's: Compose leaves out of a node's bounds what a later node covers), for a node in NO scroll
+ * view, `by` is the node laid flush against that edge along the node's whole width, drawn after it outside its subtree
+ * (`laterAcross`, the cut's and the flush neighbour's evidence), that also REACHES PAST THE NODE AT BOTH ENDS of the
+ * edge: an overlay laid over content with margins of its own (the lab's pinned `Continue` 66..1014 over its row
+ * 127..952), where a sibling laid beside it in a column shares an alignment line with it at one end at least (a list's
+ * next row, a field under its title, a touch target exactly as wide). Never for a node in a scroll view: at rest a
+ * list's first row lies whole and flush under a bar pinned at its top — a sticky header in the list, or an edge-to-edge
+ * top bar over a list padded to clear it — and its last row whole on a bottom bar, dumped exactly as a row the bar
+ * cuts; the tree cannot tell the two (live, the lab's `scroll-sticky-cut`: `fully` strokes on `R` ended with it
+ * scrolled away), only motion can (scroll_until's flush probe, `FlushNeighbour` for the eyes), so a row cut at a bar
+ * at its list's edge stays read whole (VA1, open). Top and bottom only: every measured
  * Compose cut is vertical, and sideways a row's padded overflow icon reaches past its neighbour's ends (Contacts' "Save"
  * beside its 132-px touch target). Decided from the tree alone — no screenshot sees under an opaque node.
  *
- * Unlike `FlushNeighbour` (whose question is the neighbour's SURFACE past its node, for a node in a scroll view: the
- * eyes'), here the neighbour's own node is the cover. Asked where nothing else covers: the `fully` stop and the pixel
+ * Unlike `FlushNeighbour` (its complement: the same flush evidence for a node in a scroll view, whose question is the
+ * neighbour's SURFACE past its node — the eyes'), here the neighbour's own node is the cover. Asked where nothing else covers: the `fully` stop and the pixel
  * assert name it as their cover (`StandingFacts.overlaid`), and a node with no control role but not a text, cut by it
  * to a strip under the tap minimum, is a sliver (`cutByLater`). The tap and the plain stop judge the centre, which the
  * cut leaves clear unless it is a sliver.
@@ -474,10 +475,11 @@ export interface StandingFacts {
   /** The node's cut to a sliver under `minPiece` — by its scroll container (geometry.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
   /**
-   * The edge the tree's source cut it at a node drawn over it (`OverlaidEdge`), when a `fully` stop or the pixel assert
-   * found no other cover and took that node as its cover (`covered`, unless THE ORDER ended before the covers: the
-   * `fully` stop's is asked before it, the pixel's only for its cover). Absent otherwise. Its sentences say the node may
-   * run on under that node (`coverClause`, `overlaidBy`), not how much of it shows.
+   * The edge the tree's source cut it at a node drawn over it (`OverlaidEdge`): set on a `fully` stop or a pixel
+   * standing that found no other cover, which names that node as its cover. On the `fully` stop it is set before the
+   * order is decided, so it is also there when an earlier rule wins (where the point lies, a cut: `stopOrdered`); on the
+   * pixel's only when it is the cover. Absent otherwise. Its sentences say the node may run on under that node (`coverClause`,
+   * `overlaidBy`), not how much of it shows.
    */
   readonly overlaid?: OverlaidEdge;
   /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
@@ -1296,23 +1298,23 @@ function laterAcross(scene: Scene, node: UiNode, edge: Edge): UiNode | undefined
 
 /**
  * The node's overlaid edge (`OverlaidEdge`), top before bottom, or undefined: on a tree whose source cuts a node's bounds
- * at a node drawn after it (`cutsAtLater`), the node laid flush across that edge (`laterAcross`) reaching past the
- * node at both of its ends, outside the node's own scroll view. At most two
+ * at a node drawn after it (`cutsAtLater`), for a node in NO scroll view, the node laid flush across that edge
+ * (`laterAcross`) reaching past the node at both of its ends — `flushNeighboursOf`'s complement, which asks the same
+ * flush evidence of a node in a scroll view, where the eyes or the flush probe decide. At most two
  * `coversOf` questions; asked only where it decides (`cutByLater` for a role-less strip, the `fully` stop and the pixel
  * assert with no other cover).
  */
 function overlaidEdge({ scene, node, cutsAtLater }: Judged): OverlaidEdge | undefined {
-  if (!cutsAtLater || rectArea(node.rect) === 0) return undefined;
+  // Never a node in a scroll view: at rest its first row lies whole and flush under a bar pinned at the list's edge,
+  // exactly as one the bar cuts — only motion tells them (`flushNeighboursOf` and scroll_until's flush probe).
+  if (!cutsAtLater || rectArea(node.rect) === 0 || scene.clips.scrollersOf(node).length > 0) return undefined;
   const r = node.rect;
-  const own = scene.clips.scrollersOf(node)[0];
   for (const edge of ['top', 'bottom'] as const) {
     const by = laterAcross(scene, node, edge);
     if (by === undefined) continue;
     const c = by.rect;
     // An overlay's own margins: past the node at both ends, not on an alignment line it shares with it.
-    if (c.x >= r.x || c.x + c.width <= r.x + r.width) continue;
-    // Never one in its own scroll view: a row at rest lies whole and flush under its sticky header, as one it cuts.
-    if (own === undefined || !scene.clips.scrollersOf(by).some((s) => sameRect(s, own))) return { edge, by };
+    if (c.x < r.x && c.x + c.width > r.x + r.width) return { edge, by };
   }
   return undefined;
 }

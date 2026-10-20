@@ -96,10 +96,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'button (948,99 110x110)': 2, // Compose's top-bar button over the screen-sized root
       'container "!, Open debugger to view warnings." (10,787 382x49)': 4,
       'container (154,88 407x132)': 2,
-      // The floating tab bar, and — ui-tree/standing.ts#OverlaidEdge — over the 7 nodes Compose cut at its edges (a true
-      // cut, the bar an overlay reaching past each at both ends): row_29's avatar box, its "LR", "Loan repayment", "+493",
-      // ".00" and "EUR" dumped ending at the bar's top (1840), and the next row's avatar box dumped from its bottom (2088).
-      'container (66,1840 948x248)': 13,
+      'container (66,1840 948x248)': 6,
       'container id:nav.tab_cards (540,1876 219x176)': 1,
       'container id:nav.tab_more (759,1876 219x176)': 2,
       'other "More" (830,1926 77x77)': 9,
@@ -141,8 +138,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'textfield id:lab.rn-field.M.field (69,492 264x20)': 2,
       'textfield id:lab.rn-field.N.field (69,132 264x20)': 1,
       'container (154,88 407x132)': 2,
-      // The floating tab bar, and the same 7 nodes Compose cut at its edges (the ocr reader's, ui-tree/standing.ts#OverlaidEdge).
-      'container (66,1840 948x248)': 15,
+      'container (66,1840 948x248)': 8,
       'container id:nav.tab_cards (540,1876 219x176)': 1,
       'other "More" (830,1926 77x77)': 9,
       'text "Create contact" (154,115 407x77)': 2,
@@ -161,10 +157,9 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       expect(misses.filter((m) => /login_username_field|login_password_field|language_switcher|twofactor_code_field/.test(m))).toEqual([]);
       // idb: the account card and its own "Accounting Balance" text.
       expect(misses.filter((m) => m.startsWith('idb-modal chooser: button "My Account'))).toEqual([]);
-      // Compose: the card's and the rows' clickable layers over "1,121" and every "LR" avatar — row_29's "LR", cut at the
-      // floating tab bar's top, is named under that bar (an overlaid edge, ui-tree/standing.ts#OverlaidEdge), never its row.
+      // Compose: the card's and the rows' clickable layers over "1,121" and every "LR" avatar.
       expect(over('text "1,121" (385,290 145x69)')).toEqual([]);
-      expect(misses.filter((m) => m.includes(': text "LR" '))).toEqual(['android accountDetail: text "LR" (136,1832 48x8) — container (66,1840 948x248)']);
+      expect(misses.filter((m) => m.includes(': text "LR" '))).toEqual([]);
       // 2 pt: "Amount*" under "Value*", `Payee’s country` ending 2 pt into CONTINUE.
       expect(over('text "Amount*" (42,283 51x15)')).toEqual([]);
       expect(over('button "Payee’s country" (24,730 354x52)')).toEqual([]);
