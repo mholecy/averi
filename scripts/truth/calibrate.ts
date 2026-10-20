@@ -289,36 +289,37 @@ export const SHORT_SHA = 7;
  * does not say: `before` the first fix's first parent (the commit the fix was made on), `after` the last fix, and a
  * further pair's `before` its after's first parent (the fix that pair judges alone). A side the table gives overrides
  * the derivation: an `after` that is an earlier fix (#7: the first fix, the last one judged by a further pair) or, with
- * `afterNotFix`, no fix at all (#27); a pair with `afterNotFix` must give its `before`, which nothing derives. A note with
- * no fix (open, needs-…, residual) gets no sides. Run before pairsOf (entriesOf), which hands each pair its sides.
+ * `afterNotFix`, no fix at all (#27); a pair with `afterNotFix` must give its `before`, which nothing derives. Only a
+ * note calibrate judges on its fixes (`calibrate`) gets sides: one open, needs-… or residual, or with no fix, stays as
+ * the table gives it (the report's "—"). Run before pairsOf (entriesOf), which hands each pair its sides.
  */
 export function withSides(e: CalibrationEntry, parentOf: ParentOf): CalibrationEntry {
+  const fix = e.fix ?? [];
+  if (e.status !== 'calibrate' || fix.length === 0) return e;
   const pairs = e.pairs?.map((p): CalibrationPair => {
     if (p.before !== undefined) return p;
     if (p.afterNotFix !== undefined) throw new Error(`calibration.json #${e.n}: the pair ${p.after} is no fix (afterNotFix) and gives no before`);
     return { ...p, before: parentOf(p.after) };
   });
-  const fix = e.fix ?? [];
   return {
     ...e,
-    ...(fix.length > 0 && { before: e.before ?? parentOf(fix[0]), after: e.after ?? fix[fix.length - 1] }),
+    before: e.before ?? parentOf(fix[0]),
+    after: e.after ?? fix[fix.length - 1],
     ...(pairs !== undefined && { pairs }),
   };
 }
 
 /**
- * The first parent from git in `repo`, as a short SHA (SHORT_SHA). A commit that is not there (a shallow clone, a SHA
- * mistyped) is an error naming it: calibrate needs the history it replays.
+ * The first parent from git in `repo`, as a short SHA (SHORT_SHA; git lengthens one that would be ambiguous). A commit
+ * that is not there (a shallow clone, a SHA mistyped) is an error naming it: calibrate needs the history it replays.
  */
 export const gitParentOf =
   (repo: string): ParentOf =>
   (commit) => {
     try {
-      return execFileSync('git', ['-C', repo, 'rev-parse', '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-        .trim()
-        .slice(0, SHORT_SHA);
+      return execFileSync('git', ['-C', repo, 'rev-parse', `--short=${SHORT_SHA}`, '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     } catch {
-      throw new Error(`calibrate: ${commit} has no first parent in ${repo} — calibrate needs the commits' history`);
+      throw new Error(`calibrate: ${commit} is no commit with a first parent in ${repo} — calibrate needs the commits' history`);
     }
   };
 

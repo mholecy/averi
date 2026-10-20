@@ -75,6 +75,7 @@ describe('calibration.json', () => {
       // a side withSides derives is not written down: only an override
       ...(e.after !== undefined && e.after === e.fix?.at(-1) ? [`${e.n}: after ${e.after} is its last fix, which withSides derives — drop it`] : []),
       ...(e.pairs ?? []).flatMap((p) => [
+        // withSides throws on it too; said here with every other problem of the table at once
         ...(p.afterNotFix !== undefined && p.before === undefined ? [`${e.n}: pair after ${p.after} is no fix (afterNotFix) and gives no before`] : []),
         ...(e.status === 'calibrate' ? [] : [`${e.n}: ${e.status} has pairs`]),
         ...((e.fix ?? []).length === 0 ? [`${e.n}: pairs, but no fix of its own (no pair of its own)`] : []),
@@ -141,20 +142,38 @@ describe('calibration.json', () => {
     expect(bad).toEqual([]);
   });
 
-  it.skipIf(!history)("withSides from git: before the first fix's first parent, a further pair's its after's — each a short SHA of that commit", () => {
+  // Each side withSides derives from git — and only those: a side the table gives is an override it keeps (above).
+  it.skipIf(!history)("withSides from git: a side the table leaves out is the first parent of the first fix (a further pair's: of its after), as a short SHA", () => {
     const parentOf = gitParentOf(ROOT);
-    const bad = entriesOf(table, undefined, parentOf).flatMap((e) => {
-      if (e.fix === undefined) return [];
-      const first = /\.(\d+)$/.exec(e.n)?.[1];
-      const fixOf = first === undefined || first === '1' ? e.fix[0] : e.after!;
+    const parentProblem = (what: string, side: string | undefined, of: string): string[] =>
+      side !== undefined && SHA.test(side) && git('rev-parse', `${side}^{commit}`) === git('rev-parse', `${of}^1`) ? [] : [`${what}: before ${side} is not a short SHA of ${of}'s first parent`];
+    const bad = table.notes.flatMap((e) => {
+      const sides = withSides(e, parentOf);
+      if (sides === e) return [];
       return [
-        ...(SHA.test(e.before!) ? [] : [`${e.n}: before ${e.before} is no short SHA`]),
-        ...(git('rev-parse', `${e.before}^{commit}`) === git('rev-parse', `${fixOf}^1`) ? [] : [`${e.n}: before ${e.before} is not ${fixOf}'s first parent`]),
+        ...(e.before === undefined ? parentProblem(e.n, sides.before, e.fix![0]) : []),
+        ...(e.pairs ?? []).flatMap((p, i) => (p.before === undefined ? parentProblem(`${e.n} pair ${p.after}`, sides.pairs![i].before, p.after) : [])),
       ];
     });
     expect(bad).toEqual([]);
-    expect(entriesOf(table, ['3'], parentOf)[0]).toMatchObject({ before: '926b826', after: '95f75f4' });
-    expect(() => parentOf('0000000')).toThrow(`calibrate: 0000000 has no first parent in ${ROOT}`);
+    expect(() => parentOf('0000000')).toThrow(`calibrate: 0000000 is no commit with a first parent in ${ROOT}`);
+  });
+
+  // The anchor a derived side has outside the table: the committed report (docs/truth/calibration.md, which step 8's
+  // calibrate run writes) names the sides it judged. A `fix` reordered, or an `after` changed, after that run moves a
+  // side — the red side follows `fix[0]` — and is caught here until calibrate is run again and its report committed.
+  it.skipIf(!history)('the committed report judged the sides the table now gives: each pair\'s before → after as calibration.md prints it', () => {
+    const report = new Map(
+      readFileSync(`${ROOT}docs/truth/calibration.md`, 'utf8')
+        .split('\n')
+        .filter((l) => l.startsWith('| '))
+        .map((l) => l.split('|').map((c) => c.trim()))
+        .map((c) => [c[1], c[4]] as const),
+    );
+    const bad = entriesOf(table, undefined, gitParentOf(ROOT))
+      .filter((e) => e.status === 'calibrate')
+      .flatMap((e) => (report.get(e.n)?.startsWith(`${e.before} → ${e.after}`) === true ? [] : [`${e.n}: ${e.before} → ${e.after}, the report: ${report.get(e.n) ?? 'no row'}`]));
+    expect(bad).toEqual([]);
   });
 });
 
@@ -367,9 +386,11 @@ describe('calibrate.ts — the sides from the history (withSides)', () => {
     expect(withSides(bare({ fix: ['bbbbbbb'], after: 'eeeeeee', afterNotFix: 'w' }), parentNamed)).toMatchObject({ before: 'bbbbbbb^1', after: 'eeeeeee' });
   });
 
-  it('a note with no fix gets no sides', () => {
+  it('a note with no fix, or one calibrate does not judge on its fixes, gets no sides', () => {
     const open = bare({ status: 'open', fix: undefined });
     expect(withSides(open, parentNamed)).toEqual(open);
+    const residual = bare({ status: 'residual:the cell', fix: ['bbbbbbb'] });
+    expect(withSides(residual, parentNamed)).toEqual(residual);
     expect(withSides(bare({ fix: [] }), parentNamed)).toEqual(bare({ fix: [] }));
   });
 
