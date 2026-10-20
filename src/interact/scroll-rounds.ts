@@ -9,7 +9,7 @@ import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
-import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type Cover, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
+import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
 import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedEnd, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
@@ -231,7 +231,7 @@ export type ScrollOutcome = (
        */
       otherWay: 'unmoved' | 'stroked' | 'untried' | 'outward';
     }
-  | { kind: 'covered'; swipes: number; cover: Cover; viewport: Rect; evidence: WaitEvidence }
+  | { kind: 'covered'; swipes: number; cover: AppliedKeyboard; viewport: Rect; evidence: WaitEvidence }
   | { kind: 'presented'; swipes: number; judged: Judged; viewport: Rect; cover: UiNode; layer?: MarkedLayer; next?: undefined }
   | { kind: 'presented'; swipes: number; judged: Judged | undefined; viewport: Rect; next: PresentedTouchDown }
   /**
@@ -251,7 +251,7 @@ export type ScrollOutcome = (
       /** Direction changes the scroll made (a fling carried the target past the frame). */
       turns: number;
       /** The last cover any round applied, in how many of the rounds that read. */
-      keyboard?: { cover: Cover; rounds: number; read: number };
+      keyboard?: { cover: AppliedKeyboard; rounds: number; read: number };
       unlocated: boolean;
       evidence: WaitEvidence;
       /** The swipe the bound held back would have touched down on a screen presented over the target's (interact/stroke-plan.ts#PresentedTouchDown). */
@@ -430,7 +430,7 @@ export type Shortfall =
   | { of: 'absent'; unsearched?: Edge; miss?: Miss }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
-  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: Cover; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
+  | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: AppliedKeyboard; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
 
 /** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
 export interface PastSide {
@@ -686,7 +686,7 @@ interface State {
   /** Every round's tree read, failed ones included — for the timeout's sentence, where a failed read's time counts. */
   readonly reads: ReadTime;
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
-  readonly lastCover: Cover | undefined;
+  readonly lastCover: AppliedKeyboard | undefined;
   readonly coveredRounds: number;
   /** What the strokes remember across reads — the target's scroll views, the last keyboard line, the scroll view the last stroke went over (interact/stroke-plan.ts#StrokeMemory): the plan's, which `round` holds and reads none of. */
   readonly strokes: StrokeMemory;
@@ -1641,8 +1641,8 @@ interface FlushRound {
   /** The round's gesture box (`RoundSeen.screen`'s `oriented`). */
   readonly gesture: Rect | undefined;
   /** The keyboard cover the read applied, and the one it offered the witness (scroll-read.ts#ReadJudgement). */
-  readonly cover: Cover | undefined;
-  readonly offered: Cover | undefined;
+  readonly cover: AppliedKeyboard | undefined;
+  readonly offered: AppliedKeyboard | undefined;
   readonly seen: RoundSeen;
   /** `round`'s ask: the state as it came in, the question asked. */
   readonly ask: (what: 'witness') => Next;
@@ -1798,7 +1798,7 @@ interface BoundRound {
   /** The frame it was judged in — the screen box (`State.frame`) — which an `offFrame` failure quotes. */
   readonly viewport: Rect;
   /** The keyboard cover applied to that frame, if any — quoted with it. */
-  readonly cover: Cover | undefined;
+  readonly cover: AppliedKeyboard | undefined;
   /** What this round's read saw of a target no round matched (ui-tree/miss.ts#missOf) — an `absent` failure carries it. */
   readonly miss: Miss | undefined;
   /** What the eyes saw over the best match this round, when that alone kept a `fully: true` stop from being claimed. */

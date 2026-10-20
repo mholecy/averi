@@ -105,7 +105,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * the WDA band on iOS; what it asks the device is counted on
  * ui-tree/keyboard-cover.ts, WHAT A READING ASKS) — and
  * judges the round twice, over the whole screen and over the screen ABOVE a
- * shown keyboard (scroll-read.ts#coverOf): an element under it scores 0 or is clipped at
+ * shown keyboard (scroll-read.ts#offeredKeyboard): an element under it scores 0 or is clipped at
  * the keyboard's edge, and the stroke keeps clear of it
  * (`swipeVectorAbove`: the whole screen's stroke, its point on or near the
  * keyboard pulled up — the iOS device check, below), so it starts on
@@ -234,7 +234,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * method says shown, the window state gives it no area: one still coming
  * up? not measured. Not the floating keyboard any more: measured on API 33,
  * a floating Gboard keeps a band and its panel is read from the window's
- * touchable region, `coverOf`): on a failed stop, and on a
+ * touchable region, `offeredKeyboard`): on a failed stop, and on a
  * `fully: true` stop — where the answer changes what the reader does next —
  * a window reading `hidden` is checked once against the input method
  * (the reading's `unlocated`); when it says shown, the report says the keyboard

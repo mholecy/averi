@@ -28,7 +28,7 @@ import { sceneOf, type Scene } from './standing.js';
  * - `reading` is the reading this look was built with, never one of another tree's: its band and its `ofKeyboard` set
  *   are this tree's. `lookOn` takes the adapter's whole reading (the tap, the picker, the pixel poll ask it `over`,
  *   `frameOver`, `overlapping` and its `remedy`); `scroll_until`'s pure read holds only the synchronous facts its round
- *   hands in (`ofKeyboard`), its two async questions asked by the round's protocol (interact/scroll-read.ts#Cover).
+ *   hands in (`ofKeyboard`), its two async questions asked by the round's protocol (interact/scroll-read.ts#AppliedKeyboard).
  *
  * The screen is not a look's — BY DECISION, where the architecture review's candidate (A3) put it in the Look: a verb
  * asks ui-tree/usable-screen.ts#usableScreen of the look's tree (a Look is a TreeRead) and falls back to its

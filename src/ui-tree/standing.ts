@@ -267,7 +267,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   (not the top less the box's y — the boxes lie at the origin, so the two
  *   agree), and only when the cover leaves something above it: else every
  *   box, uncut by the keyboard. Those two are decided where the cover's
- *   `above` is built (interact/scroll-read.ts#Cover); this module takes the
+ *   `above` is built (interact/scroll-read.ts#AppliedKeyboard); this module takes the
  *   size it is handed. Its cuts are geometry's band cutters, not
  *   `systemBands`: a change to how `systemBands` composes the two (its fail
  *   open when the navigation band reaches above the status band, say) does
