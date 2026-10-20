@@ -2,7 +2,7 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
-import { drawOrderFound, lastPresented, type Cover } from '../ui-tree/cover.js';
+import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -1469,14 +1469,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
     // then, the read above stops as any other. Without a confirm left, stop on this read.
     // The standing's own remedy decides it (ui-tree/standing.ts#Remedy, presented first, whatever the kind) — when the
-    // presented surface lies over it IN this read's frame (a `presented` one of `facts.covers`, ui-tree/cover.ts#Cover). One the standing judged of the node
-    // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
-    // ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
-    // The cover its sentence names is the remedy's (`remedied`), as its record: the one the standing judged it under, else
-    // that surface.
+    // presented surface lies over it IN this read's frame: the remedy then carries the cover its sentence names, as its
+    // record (the one the standing judged it under, else that surface). One the standing judged of the node alone
+    // (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) carries none, and is the
+    // stroke's to ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    const surface = lastPresented(best.standing.facts.covers);
-    if (remedy?.of === 'presented' && surface !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: best.standing.kind === 'covered' ? best.standing.cover : surface, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    if (remedy?.of === 'presented' && remedy.cover !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — no swipe tells which is
     // on top or moves it out from under the other: stop.
     if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver')) {
