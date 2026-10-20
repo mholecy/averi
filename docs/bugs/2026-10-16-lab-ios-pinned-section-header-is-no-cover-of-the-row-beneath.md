@@ -1,5 +1,17 @@
 # BUG: on iOS a SwiftUI pinned section header is no cover of the row it lies over — the tree lists the header BEFORE the rows, so the colour assert passes on a sample the header covers and `fully: true` calls the row "fully visible"
 
+> **Status (2026-10-20, round 14): fixed** at `40b4856` (bugs/r14-le3, after the prep move `003edf31` that gave
+> "listed before, but drawn over" one owner, `ui-tree/reading-order.ts`), measured by the golden mode (against
+> `a922fec4`: the four rows below green, the two plain `scroll_until` rows still ok and worded "PARTLY UNDER … 63% of it
+> shows, its centre clear", nothing else changed), calibrate (CALIBRATED, `003edf3` → `40b4856`) and the lab simulator
+> (docs/truth/live-records/ios-vis-r14-le3-1.json, -2.json: six of six ok under idb and WDA, twice — R's `fully: true`
+> strokes once, list 24 → 0, and stops on R whole at `51,166`). The parsers keep the Header trait as `UiNode.heading`
+> (the trait, not idb's `Heading` type), and in a reading-order listing a heading listed before a target it overlaps is
+> drawn over it (`reading-order.ts#headingsOver`, order `drawn`; docs/adr/0015-flat-list-reading-order-break.md,
+> amendment "a heading listed before"; ADR 0004 one line). The colour assert now fails closed — `"Sticky header"
+> (0,110 402x56) is drawn over the element` — and `fully: true` does not stop on R under it. Since R is covered first,
+> idb's clip-line question (below) is no longer what judges R's `fully` stop.
+
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the iOS lab app's ground truth
 (`tests/fixtures/truth/ios-iphone17-ios27/scroll-sticky.*`, captured by scripts/truth/capture.ts on the dedicated
 `averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `truth/b2-edges` on `arch/round-20`'s

@@ -56,7 +56,7 @@ open note on the working tree. See the script for the verdicts.
 | L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 1ef11b9 | CALIBRATED; live ios: CALIBRATED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | calibrate | caa0f41 → 16ff607 | CALIBRATED |
 | LE2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | calibrate | 3b6d2b0 → 11daf08 | CALIBRATED |
-| LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
+| LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | calibrate | 003edf3 → 40b4856 | CALIBRATED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
@@ -1113,17 +1113,22 @@ Red before the fix (caa0f41b, its first parent), and with the same symptom at th
 
 Red before the fix (3b6d2b0a, its first parent; and at every commit before it: src called it a residual, ui-tree/geometry.ts#Clips.drawnIn undefined on idb's flat list). Partly fixed by round 14's 11daf08: the drawn frame is untold on idb (geometry.ts#DrawnUntold) and the eyes look where a claim rests on it — O's and C's colour, their region reading as the screen beside it (#FFFFFF, #EEEEEE), fail closed (verify/eyes.ts#apartOfFrame, no capture added); P's and S's fully: true stops see the clip line (bottom 24 pt, 56 pt) on one screenshot and fail after two unmoved strokes. The rest — S and O Tapped, S and O reached by the plain stop, F's and C's strokes over the screen — is ADR 0010's residual 5, accepted (the owner's delegation, round 14): its six KNOWN rows filed as that residual. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen. WDA answers all of the note's rows as the truth does.
 
-## LE3: OPEN-RED
+## LE3: CALIBRATED
 
 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md — defect: `^passed on|fully visible`
 
-- working tree:
+- before 003edf3:
   - RED ios-iphone17-ios27/scroll-sticky.wda.json R colour — passed on #00897B: PASS  element id:"lab.scroll-sticky.R" fill within dE00 8 of #00897B — sampled #00897B (dominant, 66% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/scroll-sticky.wda.json R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky.R" fully visible after 0 swipes
   - RED ios-iphone17-ios27/scroll-sticky.idb.json R colour — passed on #00897B: PASS  element id:"lab.scroll-sticky.R" fill within dE00 8 of #00897B — sampled #00897B (dominant, 66% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/scroll-sticky.idb.json R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky.R" fully visible after 0 swipes
+- after 40b4856:
+  - ok ios-iphone17-ios27/scroll-sticky.wda.json R colour — FAIL  element id:"lab.scroll-sticky.R" fill within dE00 8 of #00897B — text "Sticky header" (0,110 402x56) is drawn over the element (element 51,142 300x64) — the capture would show it, not the element; scroll_until the 
+  - ok ios-iphone17-ios27/scroll-sticky.wda.json R fully — ERROR scroll_until id:"lab.scroll-sticky.R" failed after 3 swipes — element is in the viewport but under text "Sticky header" (0,110 402x56), drawn over it — 63% of it shows — and the content is exhausted: swiping up no 
+  - ok ios-iphone17-ios27/scroll-sticky.idb.json R colour — FAIL  element id:"lab.scroll-sticky.R" fill within dE00 8 of #00897B — other "Sticky header" (0,110 402x56) is drawn over the element (element 51,142 300x64) — the capture would show it, not the element; scroll_until the
+  - ok ios-iphone17-ios27/scroll-sticky.idb.json R fully — ERROR scroll_until id:"lab.scroll-sticky.R" failed after 3 swipes — element is in the viewport but under other "Sticky header" (0,110 402x56), drawn over it — 63% of it shows — and the content is exhausted: swiping up no
 
-No fix yet: red at HEAD.
+Red before the fix (003edf31, its first parent: the reading-order peers moved into ui-tree/reading-order.ts, golden 0 changed; and at every commit before it). Fixed by round 14's 40b4856: the parsers keep the Header trait (UiNode.heading), and a heading listed before a target it overlaps, in a reading-order listing, is drawn over it (ui-tree/reading-order.ts#headingsOver, ADR 0015's amendment 'a heading listed before') — R's colour fails closed naming the header on idb and WDA, and fully: true does not stop on R under it.
 
 ## LE4: CALIBRATED
 

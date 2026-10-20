@@ -406,6 +406,35 @@ strip beside the drawn rows to be a plain colour of its own): every case line of
   screen), carousel-in-list's B and U reached and tapped.
 - Not run live: O's and C's colour asserts (live.ts has no assert cases); their replayed rows are green.
 
+# Round 14, LE3: a heading listed before is drawn over the row beneath, 2026-10-20
+
+bugs/r14-le3 (src `7de27b9`: the fix as first committed; the reviews folded fixups into it, the final fix `40b4856`,
+whose src differs from it in comments and one helper's declaration form (`overlapsApart`, an arrow made a function) only, so the run stands for it; from bugs/round-14 a922fec4 through the prep move 003edf31: the parsers keep the Header
+trait as `UiNode.heading`, and in a reading-order listing a heading listed before a target it overlaps is drawn over
+it — `ui-tree/reading-order.ts#headingsOver`, ADR 0015's amendment "a heading listed before";
+docs/bugs/2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md), run from that branch's working
+tree with the records commit's live-known.ts; the lab app as installed (no app change). The averi-lab iPhone 17
+simulator (3AB1E82E, iOS 27.0, 402x874), WDA on port 8120, idb through a companion of this run's own on gRPC 10913
+(`IDB_COMPANION=localhost:10913`); shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources idb,wda --groups visibility
+--cells scroll-sticky --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r14-le3-1.json | 7de27b9 | 6 | 6 | 0 | 0 |
+| ios-vis-r14-le3-2.json | 7de27b9 | 6 | 6 | 0 | 0 (the same case lines) |
+
+- **`scroll_until R` with `fully: true`** (idb and WDA): no longer "fully visible after 0 swipes" under the pinned
+  header — R is covered where it launches (`51,142`, its top 24 pt under the header), one stroke on the list
+  (offset 24 → 0) brings it out whole at `51,166`, "fully visible after 1 swipe", and the case's tap fires R. Struck
+  off scripts/truth/live-known.ts (it was LE3's `stop-claim` on `visible`). Under idb the eyes' clip-line question
+  (LE2's, ADR 0013 refined 2026-10-20) is asked only of a stop about to be claimed; R covered where it launches is
+  none (the record does not log the eyes' asks).
+- **`tap R`**: `Tapped` at its clear centre (201,174), R alone fired — as before.
+- **`scroll_until R`** (plain): reached with no swipe, now worded "visible after 0 swipes — PARTLY UNDER … "Sticky
+  header" (0,110 402x56), drawn over it — 63% of it shows, its centre clear"; ok as before.
+- Not run live: R's colour assert (live.ts has no assert cases); its replayed rows are green.
+
 <!-- averi: this checkout (rejudged from docs/truth/live-records/ios-vis.json) -->
 # Live golden: 351 cases, 270 ok, 14 loud, 67 mismatches (3 not known), 0 skipped
 

@@ -1127,7 +1127,8 @@
     {
       "n": "LE3",
       "note": "2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["40b4856"],
       "verified": "golden",
       "defect": "^passed on|fully visible",
       "checks": [
@@ -1136,7 +1137,7 @@
         "ios-iphone17-ios27/scroll-sticky.idb.json R colour",
         "ios-iphone17-ios27/scroll-sticky.idb.json R fully"
       ],
-      "remark": "No fix yet: red at HEAD."
+      "remark": "Red before the fix (003edf31, its first parent: the reading-order peers moved into ui-tree/reading-order.ts, golden 0 changed; and at every commit before it). Fixed by round 14's 40b4856: the parsers keep the Header trait (UiNode.heading), and a heading listed before a target it overlaps, in a reading-order listing, is drawn over it (ui-tree/reading-order.ts#headingsOver, ADR 0015's amendment 'a heading listed before') — R's colour fails closed naming the header on idb and WDA, and fully: true does not stop on R under it."
     },
     {
       "n": "LE4",
