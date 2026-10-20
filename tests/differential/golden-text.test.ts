@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, type Expectation } from '../../scripts/differential/golden-spec.js';
-import { verdictOf, type CalibrationEntry, type SideRun } from '../../scripts/truth/calibrate.js';
+import { verdictOf, type CalibrationEntry } from '../../scripts/truth/calibrate.js';
+import type { SideRun } from '../../scripts/truth/side-run.js';
 import { goldenReport, skippedCheck, type GoldenCheck } from '../../scripts/differential/golden.js';
 import { ocrDecision, ocrSkip } from '../../scripts/differential/ocr-probe.js';
 import { isRecognizerBinary } from '../../scripts/differential/fake-device.js';

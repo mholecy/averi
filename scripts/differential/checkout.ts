@@ -7,8 +7,9 @@ import { join, resolve } from 'node:path';
  * `worktrees` (named for its role, so OLD and NEW at one commit are two checkouts), node_modules linked in. Only a
  * worktree this run created is removed afterwards (`cleanup`) — one found in place is someone's, and stays. A directory
  * found in place under the checkout's name is used only when it is a checkout of the wanted commit: its own top level,
- * its HEAD that commit — anything else is refused, not replayed as that commit. A git command that fails throws with
- * git's own stderr (gitReason), so a side that cannot be checked out says why.
+ * its HEAD that commit, no change of its own (git status but the linked node_modules; calibrate's side cache would keep
+ * its run as the commit's) — anything else is refused, not replayed as that commit. A git command that fails throws
+ * with git's own stderr (gitReason), so a side that cannot be checked out says why.
  */
 export function codeRoot(repo: string, spec: string, role: string, worktrees: string): { root: string; cleanup?: () => void } {
   if (existsSync(join(spec, 'src/mcp/tools.ts'))) return { root: resolve(spec) };
@@ -33,6 +34,9 @@ export function codeRoot(repo: string, spec: string, role: string, worktrees: st
     }
     if (top === undefined || realpathSync(top) !== realpathSync(root)) throw new Error(`checkout: ${root} is in place but no checkout of its own — remove it or pick another directory`);
     if (head !== full) throw new Error(`checkout: ${root} is in place at ${head?.slice(0, 7)}, not ${sha} — remove it or pick another directory`);
+    // node_modules is the link this file makes, untracked where the commit's .gitignore names only a directory
+    const changed = git('-C', root, 'status', '--porcelain', '--', '.', ':(exclude)node_modules');
+    if (changed !== '') throw new Error(`checkout: ${root} is in place at ${sha} with changes of its own (${changed.split('\n')[0].trim()}) — remove it or pick another directory`);
     return { root };
   }
   git('-C', repo, 'worktree', 'add', '--detach', root, full);

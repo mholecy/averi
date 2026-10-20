@@ -1,5 +1,6 @@
 import type { GoldenCheck } from '../differential/golden.js';
-import { expected, unrecorded, WORKING_TREE, type NoteResult } from './calibrate.js';
+import { expected, unrecorded, type NoteResult } from './calibrate.js';
+import { WORKING_TREE } from './side-run.js';
 
 /**
  * The calibration's report (calibrate.ts, which holds the model and the command line): docs/truth/calibration.md's

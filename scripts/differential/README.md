@@ -326,7 +326,8 @@ rows, or why none can be (needs a cell, phase 2b, a live run, OCR; a residual), 
 its class — and writes `docs/truth/calibration.md`:
 
 ```sh
-node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]] [--out docs/truth/calibration.md] [--remove]
+node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]] [--out docs/truth/calibration.md] [--remove] \
+  [--cache <dir>] [--no-cache]
 ```
 
 A note is CALIBRATED when every row it names is red before with the note's own symptom (`defect`, matched against the
@@ -342,12 +343,24 @@ and red after that the note does not name is reported as regressed elsewhere, an
 (`tests/differential/golden/presented.known.ts` for L1, `forms.known.ts` for L2) owns the ratchet and calibration.json
 only the note→rows link, so a fix that strikes their rows off KNOWN turns them OPEN-NOT-REPRODUCED, and calibrate exits
 1, until the note becomes `calibrate` with its fix. Checkouts (`differential-cal-<sha>`) are kept for the next run and
-reused only when they are at that commit; `--remove` removes those this run created. Exit code 1 on a verdict other than
-the note's `expect`, or an unrecorded regression. A golden process that printed no JSON or was killed is run once more;
-a side that still does not load says why (the exit code or signal and the last lines of stderr, or git's stderr), and
-`--out` then leaves its file as it is and writes `<out>.failed`. With `--note`, which runs some notes only, `--out`
-writes `<out>.partial`, the full report left as it is. `tests/truth/calibration.test.ts` pins the table against
-docs/bugs and the git history, and the verdicts, the canary, the wiring and a side that fails as pure functions.
+reused only when they are at that commit with no change of their own; `--remove` removes those this run created. Exit
+code 1 on a verdict other than the note's `expect`, or an unrecorded regression. A golden process that printed no JSON
+or was killed is run once more; a side that still does not load says why (the exit code or signal and the last lines of
+stderr, or git's stderr), and `--out` then leaves its file as it is and writes `<out>.failed`. With `--note`, which runs
+some notes only, `--out` writes `<out>.partial`, the full report left as it is. The sides run half the cores at once,
+and each side that loaded is kept in a cache (`scripts/truth/side-cache.ts`; `<worktrees>/side-cache` unless `--cache`
+names another directory) under a key of the side (a commit's SHA; the working tree's `src/` as on disk) and everything
+of the harness its run depends on: every file under `scripts/differential`, `scripts/truth` (but `calibration.json`,
+which golden never reads, and the Markdown), `tests/differential/golden` and `tests/fixtures`, the corpus, the `src`
+this checkout's harness loads itself (the run-time import closure of `golden.ts`), `package-lock.json`, the node version
+and the host's `ocr` rows: skipped (a sandbox skips them, so its runs never stand in outside it), or asked and read by
+the host's recognizer (its `swiftc` toolchain and macOS build). So a run after a table edit or a fix outside that
+closure replays only the sides whose key changed; the console names the sides taken from the cache. A side whose key
+changed while it ran (the harness or `src/` edited mid-run) is not kept. `--no-cache` runs every side and keeps the runs
+afresh (a refresh: the cache is written, not bypassed). Entries are never pruned — none can be served stale, the key
+being the content; delete `<worktrees>/side-cache` to reclaim the space, and the next run is cold.
+`tests/truth/calibration.test.ts` pins the table against docs/bugs and the git history, and the verdicts, the canary,
+the wiring, a side that fails and the pool as pure functions; `tests/truth/side-cache.test.ts` the key and the cache.
 
 ## Corpus format
 

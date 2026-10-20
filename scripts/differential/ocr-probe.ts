@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Whether the golden mode's `ocr` rows can be asked on this host (golden.ts#ocrAvailability) — decided by the HARNESS's
@@ -39,6 +40,8 @@ export interface ProbeOutcome {
   platform: NodeJS.Platform;
   /** `swiftc --version` failed: its error code (`ENOENT`: no compiler) and message. Absent when it answered. */
   compiler?: { code?: unknown; message: string };
+  /** What `swiftc --version` answered: the toolchain every recognizer (the probe's, each side's) is compiled with. */
+  toolchain?: string;
   /** The probe's output (its readings, or `ERROR …`), or why it could not be built or run. */
   run?: { stdout: string } | { error: string };
 }
@@ -82,11 +85,20 @@ export async function probeRecognizer(exec: HostExec, png: string): Promise<Prob
         await rm(source, { force: true });
       }
     }
-    return { platform, run: { stdout: (await exec(binary, [png])).stdout.toString('utf8') } };
+    return { platform, toolchain, run: { stdout: (await exec(binary, [png])).stdout.toString('utf8') } };
   } catch (e) {
-    return { platform, run: { error: e instanceof Error ? e.message : String(e) } };
+    return { platform, toolchain, run: { error: e instanceof Error ? e.message : String(e) } };
   }
 }
+
+/** The image the harness's probe reads (any committed screenshot: only whether Vision runs at all is asked of it). */
+const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-iphone17-ios27/form-basic.png', import.meta.url));
+
+/**
+ * The harness's probe (probeRecognizer on its own image): what golden.ts#ocrAvailability decides the `ocr` rows by, and
+ * what calibrate's side cache keys the host by (side-cache.ts#thisHost) — one probe, so the two cannot disagree.
+ */
+export const probeHarness = (exec: HostExec): Promise<ProbeOutcome> => probeRecognizer(exec, OCR_PROBE_PNG);
 
 /**
  * What golden does with the probe's verdict (golden.ts#ocrAvailability): `ask` the rows (no reason to skip), `skip`

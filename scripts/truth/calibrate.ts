@@ -1,13 +1,15 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
-import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
-import { runSide, sideLine, type SideDeps } from './calibrate-run.js';
+import type { GoldenCheck } from '../differential/golden.js';
+import { runSide, runSides, type SideDeps } from './calibrate-run.js';
 import { calibrationReport, verdictCell } from './calibration-report.js';
 import { FAMILIES } from './schema.js';
+import { harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
+import { WORKING_TREE, type SideRun } from './side-run.js';
 
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
@@ -29,20 +31,24 @@ import { FAMILIES } from './schema.js';
  *   OPEN-NOT-REPRODUCED   an open note with a row green, or red without the defect, in the working tree
  *   NOT-ASKED             a named row the run did not ask (a wrong key, or a cell that went broken), or skipped (an
  *                         `ocr` row on a host with no working recognizer: golden.ts#ocrAvailability)
- *   SIDE-DOES-NOT-LOAD    golden could not run over that commit's src, or its run fails the canary (`sideRunOf`: a
- *                         harness or JavaScript error in a reply, a device command the fake does not model, or the
- *                         `open` cell not green) — the reason is reported
+ *   SIDE-DOES-NOT-LOAD    golden could not run over that commit's src, or its run fails the canary
+ *                         (side-run.ts#sideRunOf: a harness or JavaScript error in a reply, a device command the fake
+ *                         does not model, or the `open` cell not green) — the reason is reported
  *
  * Every row of the corpus is compared too: a row green before and red after that the note does not name has REGRESSED
  * ELSEWHERE at the fix — reported with the verdict, and unexpected unless the note's `regressions` records it (`broke`
  * the after commit, the row in `rows`).
  *
  *   node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]]
- *     [--out docs/truth/calibration.md] [--remove]
+ *     [--out docs/truth/calibration.md] [--remove] [--cache <dir>] [--no-cache]
  *
  * The checkouts (checkout.ts, `differential-cal-<sha>` under --worktrees) are kept for the next run; --remove removes
  * the checkouts THIS run created (one found in place stays). An open note is judged on the working tree — this checkout
- * as it is on disk, uncommitted changes included.
+ * as it is on disk, uncommitted changes included. The sides run several at once (half the cores), and each side that
+ * loaded is kept in the cache (side-cache.ts; `<worktrees>/side-cache` unless --cache names another directory) under a
+ * key of the side and everything of the harness its run depends on, so the next run replays only the sides whose key
+ * changed; --no-cache runs every side and keeps the runs afresh. Entries are never pruned (none can be served stale);
+ * delete the cache's directory to reclaim the space. The console names the sides taken from the cache.
  * Exit code 1 when a note's verdict is not the one it expects (`expect`; CALIBRATED, or OPEN-RED for an open note), or
  * a note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more
  * (calibrate-run.ts#runSide; said on the console only, so the report stays the same); a side that still does not load
@@ -209,37 +215,6 @@ export interface Calibration {
   excluded: { note: string; why: string }[];
 }
 
-/** The side an open note is judged on: this checkout as it is on disk, not its committed HEAD. */
-export const WORKING_TREE = 'working tree';
-
-/**
- * A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it.
- */
-export const keyOf = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
-/** The capture a row key names (`<run>/<file>`). */
-export const captureOf = (key: string) => key.slice(0, key.indexOf(' '));
-/** A capture of the `open` cell — every target open, every row green on any side that works. */
-export const isOpenCell = (recording: string) => /\/open\.[^/]+$/.test(recording);
-
-/** What one side answered: its checks by key, or why it does not count as loaded. */
-export type SideRun = { checks: Map<string, GoldenCheck> } | { error: string };
-
-/**
- * One side's golden JSON as a SideRun — or not loaded, by the canary: a side miswired (a constructor taken wrong, an
- * export renamed) still prints JSON, every reply an error that a row expecting a refusal would accept. So a side counts
- * only when no check carries a fault (golden.ts#faultsOf: a harness or JavaScript error, an unmodelled device command)
- * and the `open` cell was replayed and is green.
- */
-export function sideRunOf(json: GoldenJson): SideRun {
-  const checks = json.results.flatMap((r) => r.checks);
-  const faults = checks.flatMap((c) => (c.faults ?? []).map((f) => `${keyOf(c)}: ${f}`));
-  const open = checks.filter((c) => isOpenCell(c.recording));
-  if (open.length === 0) faults.push('the open cell was not replayed');
-  faults.push(...open.filter((c) => c.mismatch !== undefined).map((c) => `${keyOf(c)} (open cell) red: ${c.mismatch}`));
-  if (faults.length > 0) return { error: `canary: ${faults.length} fault${faults.length === 1 ? '' : 's'}; first ${faults[0].slice(0, 300)}` };
-  return { checks: new Map(checks.map((c) => [keyOf(c), c])) };
-}
-
 /**
  * A note as the pairs it is judged on: the note itself (its own pair; `pairs` dropped) and, for each further pair, the
  * note with that pair's sides, rows, symptom and expectation, numbered `<n>.<i>` from 2 (the note's own pair `<n>.1`
@@ -313,13 +288,29 @@ export function withSides(e: CalibrationEntry, parentOf: ParentOf): CalibrationE
  * The first parent from git in `repo`, as a short SHA (SHORT_SHA; git lengthens one that would be ambiguous). A commit
  * that is not there (a shallow clone, a SHA mistyped) is an error naming it: calibrate needs the history it replays.
  */
-export const gitParentOf =
-  (repo: string): ParentOf =>
-  (commit) => {
+export function gitParentOf(repo: string): ParentOf {
+  const known = new Map<string, string>();
+  return (commit) => {
+    let parent = known.get(commit);
+    if (parent !== undefined) return parent;
     try {
-      return execFileSync('git', ['-C', repo, 'rev-parse', `--short=${SHORT_SHA}`, '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+      parent = execFileSync('git', ['-C', repo, 'rev-parse', `--short=${SHORT_SHA}`, '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     } catch {
       throw new Error(`calibrate: ${commit} is no commit with a first parent in ${repo} — calibrate needs the commits' history`);
+    }
+    known.set(commit, parent);
+    return parent;
+  };
+}
+
+/** A side's full SHA from git in `repo`; undefined when it names no commit there (runSide then says why). */
+export const gitCommitOf =
+  (repo: string) =>
+  (side: string): string | undefined => {
+    try {
+      return execFileSync('git', ['-C', repo, 'rev-parse', '--verify', `${side}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    } catch {
+      return undefined;
     }
   };
 
@@ -437,7 +428,14 @@ export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({
-    options: { worktrees: { type: 'string' }, note: { type: 'string' }, out: { type: 'string' }, remove: { type: 'boolean' } },
+    options: {
+      worktrees: { type: 'string' },
+      note: { type: 'string' },
+      out: { type: 'string' },
+      remove: { type: 'boolean' },
+      cache: { type: 'string' },
+      'no-cache': { type: 'boolean' },
+    },
   });
   const repo = fileURLToPath(new URL('../..', import.meta.url));
   const table = JSON.parse(await readFile(join(repo, 'scripts/truth/calibration.json'), 'utf8')) as Calibration;
@@ -451,15 +449,21 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     args: (root) => ['--import', 'tsx', join(repo, 'scripts/differential/golden.ts'), '--corpus', join(repo, table.corpus), '--side', root, '--json'],
     checkout: (sha) => codeRoot(repo, sha, 'cal', worktrees),
   };
-  const runs = new Map<string, SideRun>();
-  const created: (() => void)[] = [];
-  for (const side of plan(entries)) {
-    const started = Date.now();
-    const outcome = await runSide(side, repo, deps);
-    if (outcome.cleanup !== undefined) created.push(outcome.cleanup);
-    runs.set(side, outcome.run);
-    console.error(sideLine(side, outcome, (Date.now() - started) / 1000));
-  }
+  const cacheDir = resolve(values.cache ?? join(worktrees, 'side-cache'));
+  const sides = plan(entries);
+  const jobs = Math.max(1, Math.floor(availableParallelism() / 2));
+  const started = Date.now();
+  const host = await thisHost();
+  const commitOf = gitCommitOf(repo);
+  const { runs, cleanups, cached } = await runSides(sides, {
+    run: (side) => runSide(side, repo, deps),
+    cache: sideCache(cacheDir),
+    keys: () => sideKeys(repo, harnessDigest(repo, table.corpus, host), commitOf),
+    mode: values['no-cache'] === true ? 'refresh' : 'reuse',
+    jobs,
+    log: (line) => console.error(line),
+  });
+  console.error(`calibrate: ${sides.length} sides in ${((Date.now() - started) / 1000).toFixed(1)} s — ${cached.length} from the cache (${cacheDir}), ${sides.length - cached.length} run, ${jobs} at once`);
   const rs = results(entries, runs);
   const report = calibrationReport(rs);
   const out = values.out === undefined ? undefined : resolve(values.out);
@@ -470,6 +474,6 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   else if (path !== out) console.error(`calibrate: ${unloaded(rs).length} note(s) on a side that did not load — ${values.out} left as it is; the report is in ${path}`);
   if (stale !== undefined) await rm(stale, { force: true });
   for (const r of rs) if (r.verdict !== undefined) console.error(`${r.entry.n.padEnd(4)} ${verdictCell(r).replace(/\*\*/g, '')}`);
-  if (values.remove === true) for (const cleanup of created) cleanup();
+  if (values.remove === true) for (const cleanup of cleanups) cleanup();
   process.exitCode = code;
 }

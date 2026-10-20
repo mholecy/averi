@@ -122,7 +122,7 @@ These steps follow the implementation round the truth lab has used since round 1
 8. **Update the records.**
    - The note's Status: "fixed at <commit>, measured by …".
    - If the fix refines a recorded decision, update its ADR in the same change.
-   - Set the note's calibration.json entry to `calibrate`, with `fix: [<commits>]` (short SHAs, the note's own fix first: its first parent is the red side; usually the oldest). Its `checks` are the note's rows among the keys step 6 listed to strike. Then run calibrate in full (not `--note`, which writes `.partial`): it must say `CALIBRATED`. Commit the report it writes with the table: the tests check the table's sides against it.
+   - Set the note's calibration.json entry to `calibrate`, with `fix: [<commits>]` (short SHAs, the note's own fix first: its first parent is the red side; usually the oldest). Its `checks` are the note's rows among the keys step 6 listed to strike. Then run calibrate in full (not `--note`, which writes `.partial`): it must say `CALIBRATED`. Only the sides whose cache key changed run again: the fix's new sides; the table is not in the key, but a fix in the src the harness loads is, and replays every side. Commit the report it writes with the table: the tests check the table's sides against it.
      - Don't write `before` or `after`. calibrate derives them: `before` is the first fix's first parent, `after` is the last fix. A further pair's `before` is its `after`'s first parent.
      - Write `after` only to judge another commit: an earlier fix, or, with `afterNotFix`, a commit that is no fix. A pair with `afterNotFix` also gives its `before`.
 9. **Review.** Run a review loop with an independent, read-only reviewer, against the note as the spec. Fix what it finds and repeat until it approves. Then merge, and update this file.
@@ -154,8 +154,11 @@ npm run lint
 # the catalog of lab cells vs captures
 node --import tsx scripts/truth/catalog.ts --check
 
-# calibrate: replays each note's before/after commits (outside the sandbox; checks out temporary worktrees)
-node --import tsx scripts/truth/calibrate.ts --worktrees <scratch dir> --out docs/truth/calibration.md --remove
+# calibrate: replays each note's before/after commits (outside the sandbox; checks out temporary worktrees),
+# half the cores at once; a side whose src and harness are unchanged comes from the cache (<scratch dir>/side-cache,
+# or --cache <dir>; the key covers the harness, the side's src, node and the host's recognizer); --no-cache replays
+# every side and refreshes the cache
+node --import tsx scripts/truth/calibrate.ts --worktrees <scratch dir> --out docs/truth/calibration.md --remove [--no-cache]
 
 # live, iOS lab simulator (WDA on port 8120 only)
 node --import tsx scripts/truth/live.ts --udid 3AB1E82E-47C1-4BEF-9F89-1FF62DBBC348 --wda-port 8120 \
