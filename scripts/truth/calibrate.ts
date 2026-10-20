@@ -1,13 +1,14 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
-import { runSide, sideLine, type SideDeps } from './calibrate-run.js';
+import { runSide, runSides, type SideDeps } from './calibrate-run.js';
 import { calibrationReport, verdictCell } from './calibration-report.js';
 import { FAMILIES } from './schema.js';
+import { harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
 
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
@@ -38,11 +39,14 @@ import { FAMILIES } from './schema.js';
  * the after commit, the row in `rows`).
  *
  *   node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]]
- *     [--out docs/truth/calibration.md] [--remove]
+ *     [--out docs/truth/calibration.md] [--remove] [--cache <dir>] [--no-cache]
  *
  * The checkouts (checkout.ts, `differential-cal-<sha>` under --worktrees) are kept for the next run; --remove removes
  * the checkouts THIS run created (one found in place stays). An open note is judged on the working tree — this checkout
- * as it is on disk, uncommitted changes included.
+ * as it is on disk, uncommitted changes included. The sides run several at once (half the cores), and each side that
+ * loaded is kept in the cache (side-cache.ts; `<worktrees>/side-cache` unless --cache names another directory) under a
+ * key of the side and everything of the harness its run depends on, so the next run replays only the sides whose key
+ * changed; --no-cache runs every side and keeps the runs afresh. The console names the sides taken from the cache.
  * Exit code 1 when a note's verdict is not the one it expects (`expect`; CALIBRATED, or OPEN-RED for an open note), or
  * a note regressed elsewhere unrecorded. A golden process that printed no JSON or was killed is run once more
  * (calibrate-run.ts#runSide; said on the console only, so the report stays the same); a side that still does not load
@@ -313,13 +317,29 @@ export function withSides(e: CalibrationEntry, parentOf: ParentOf): CalibrationE
  * The first parent from git in `repo`, as a short SHA (SHORT_SHA; git lengthens one that would be ambiguous). A commit
  * that is not there (a shallow clone, a SHA mistyped) is an error naming it: calibrate needs the history it replays.
  */
-export const gitParentOf =
-  (repo: string): ParentOf =>
-  (commit) => {
+export function gitParentOf(repo: string): ParentOf {
+  const known = new Map<string, string>();
+  return (commit) => {
+    let parent = known.get(commit);
+    if (parent !== undefined) return parent;
     try {
-      return execFileSync('git', ['-C', repo, 'rev-parse', `--short=${SHORT_SHA}`, '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+      parent = execFileSync('git', ['-C', repo, 'rev-parse', `--short=${SHORT_SHA}`, '--verify', `${commit}^1^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     } catch {
       throw new Error(`calibrate: ${commit} is no commit with a first parent in ${repo} — calibrate needs the commits' history`);
+    }
+    known.set(commit, parent);
+    return parent;
+  };
+}
+
+/** A side's full SHA from git in `repo`; undefined when it names no commit there (runSide then says why). */
+export const gitCommitOf =
+  (repo: string) =>
+  (side: string): string | undefined => {
+    try {
+      return execFileSync('git', ['-C', repo, 'rev-parse', '--verify', `${side}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    } catch {
+      return undefined;
     }
   };
 
@@ -437,7 +457,14 @@ export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({
-    options: { worktrees: { type: 'string' }, note: { type: 'string' }, out: { type: 'string' }, remove: { type: 'boolean' } },
+    options: {
+      worktrees: { type: 'string' },
+      note: { type: 'string' },
+      out: { type: 'string' },
+      remove: { type: 'boolean' },
+      cache: { type: 'string' },
+      'no-cache': { type: 'boolean' },
+    },
   });
   const repo = fileURLToPath(new URL('../..', import.meta.url));
   const table = JSON.parse(await readFile(join(repo, 'scripts/truth/calibration.json'), 'utf8')) as Calibration;
@@ -451,15 +478,19 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     args: (root) => ['--import', 'tsx', join(repo, 'scripts/differential/golden.ts'), '--corpus', join(repo, table.corpus), '--side', root, '--json'],
     checkout: (sha) => codeRoot(repo, sha, 'cal', worktrees),
   };
-  const runs = new Map<string, SideRun>();
-  const created: (() => void)[] = [];
-  for (const side of plan(entries)) {
-    const started = Date.now();
-    const outcome = await runSide(side, repo, deps);
-    if (outcome.cleanup !== undefined) created.push(outcome.cleanup);
-    runs.set(side, outcome.run);
-    console.error(sideLine(side, outcome, (Date.now() - started) / 1000));
-  }
+  const cacheDir = resolve(values.cache ?? join(worktrees, 'side-cache'));
+  const sides = plan(entries);
+  const jobs = Math.max(1, Math.floor(availableParallelism() / 2));
+  const started = Date.now();
+  const { runs, cleanups, cached } = await runSides(sides, {
+    run: (side) => runSide(side, repo, deps),
+    cache: sideCache(cacheDir),
+    keyOf: sideKeys(repo, harnessDigest(repo, table.corpus, await thisHost(repo)), gitCommitOf(repo)),
+    reuse: values['no-cache'] !== true,
+    jobs,
+    log: (line) => console.error(line),
+  });
+  console.error(`calibrate: ${sides.length} sides in ${((Date.now() - started) / 1000).toFixed(1)} s — ${cached.length} from the cache (${cacheDir}), ${sides.length - cached.length} run, ${jobs} at once`);
   const rs = results(entries, runs);
   const report = calibrationReport(rs);
   const out = values.out === undefined ? undefined : resolve(values.out);
@@ -470,6 +501,6 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   else if (path !== out) console.error(`calibrate: ${unloaded(rs).length} note(s) on a side that did not load — ${values.out} left as it is; the report is in ${path}`);
   if (stale !== undefined) await rm(stale, { force: true });
   for (const r of rs) if (r.verdict !== undefined) console.error(`${r.entry.n.padEnd(4)} ${verdictCell(r).replace(/\*\*/g, '')}`);
-  if (values.remove === true) for (const cleanup of created) cleanup();
+  if (values.remove === true) for (const cleanup of cleanups) cleanup();
   process.exitCode = code;
 }

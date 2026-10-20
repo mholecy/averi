@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { GoldenCheck, GoldenJson } from '../../scripts/differential/golden.js';
 import { VERBS as GOLDEN_VERBS } from '../../scripts/differential/golden-spec/judges.js';
-import { failureOf, runSide, sideLine, sideRunFromOutput, type ProcessError, type SideDeps } from '../../scripts/truth/calibrate-run.js';
+import { failureOf, pool, runSide, runSides, sideLine, sideRunFromOutput, type ProcessError, type SideDeps, type SideOutcome, type Sides } from '../../scripts/truth/calibrate-run.js';
 import { calibrationReport, verdictCell } from '../../scripts/truth/calibration-report.js';
 import {
   captureOf,
@@ -573,5 +573,130 @@ describe('calibrate.ts — a side that fails (runSide, failureOf, disposition)',
     expect(disposition(ok, '/d/c.md', true)).toEqual({ path: '/d/c.md.partial', code: 0 });
     expect(disposition(lost, '/d/c.md', true)).toEqual({ path: '/d/c.md.partial', code: 1 });
     expect(disposition(ok, undefined, true)).toEqual({ code: 0 });
+  });
+});
+
+describe('calibrate-run.ts — the sides several at once, from the cache where kept (pool, runSides)', () => {
+  /** A task that waits for its own release: how many run at once, and in what order they start. */
+  const gated = () => {
+    let running = 0;
+    let most = 0;
+    const started: number[] = [];
+    const release = new Map<number, () => void>();
+    const task = async (i: number) => {
+      started.push(i);
+      most = Math.max(most, ++running);
+      await new Promise<void>((done) => release.set(i, done));
+      running--;
+      return i * 10;
+    };
+    return { task, started, release, most: () => most };
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it('pool: at most `jobs` at once, the next started as soon as one finishes, the results in order', async () => {
+    const g = gated();
+    const all = pool([1, 2, 3, 4, 5], 2, g.task);
+    await tick();
+    expect(g.started).toEqual([1, 2]);
+    g.release.get(2)!();
+    await tick();
+    expect(g.started).toEqual([1, 2, 3]);
+    for (const i of [1, 3, 4, 5]) {
+      await tick();
+      g.release.get(i)!();
+    }
+    expect(await all).toEqual([10, 20, 30, 40, 50]);
+    expect(g.most()).toBe(2);
+  });
+
+  it('pool: no more workers than items, and none for none', async () => {
+    const g = gated();
+    const all = pool([1], 8, g.task);
+    await tick();
+    g.release.get(1)!();
+    expect(await all).toEqual([10]);
+    expect(await pool([], 4, g.task)).toEqual([]);
+  });
+
+  const loaded = (n: number): SideRun => side({ [K1]: n === 0 ? undefined : `red ${n}` });
+  /** Sides over a fake run and an in-memory cache: what was run, kept and logged. */
+  const sides = (over: Partial<Sides> = {}, kept = new Map<string, SideRun>()) => {
+    const ran: string[] = [];
+    const puts: string[] = [];
+    const log: string[] = [];
+    const s: Sides = {
+      run: async (sideName): Promise<SideOutcome> => {
+        ran.push(sideName);
+        return { run: sideName === 'bad' ? { error: 'no checkout: x' } : loaded(ran.length), cleanup: () => undefined };
+      },
+      cache: {
+        get: async (key) => kept.get(key),
+        put: async (key, run) => {
+          puts.push(key);
+          if (!('error' in run)) kept.set(key, run);
+        },
+      },
+      keyOf: (sideName) => (sideName === WORKING_TREE ? undefined : `key-${sideName}`),
+      reuse: true,
+      jobs: 2,
+      log: (line) => log.push(line),
+      ...over,
+    };
+    return { s, ran, puts, log, kept };
+  };
+
+  it('cold: every side run and kept under its key; warm: none run, every run as kept, the hits named', async () => {
+    const cold = sides();
+    const first = await runSides(['aaaaaaa', 'bbbbbbb'], cold.s);
+    expect(cold.ran.sort()).toEqual(['aaaaaaa', 'bbbbbbb']);
+    expect(cold.puts.sort()).toEqual(['key-aaaaaaa', 'key-bbbbbbb']);
+    expect(first.cached).toEqual([]);
+    expect(first.cleanups).toHaveLength(2);
+    const warm = sides({}, cold.kept);
+    const second = await runSides(['aaaaaaa', 'bbbbbbb'], warm.s);
+    expect(warm.ran).toEqual([]);
+    expect(warm.puts).toEqual([]);
+    expect(second.runs).toEqual(first.runs);
+    expect(second.cached).toEqual(['aaaaaaa', 'bbbbbbb']);
+    expect(second.cleanups).toEqual([]);
+    expect(warm.log.sort()).toEqual(['calibrate: aaaaaaa from the cache', 'calibrate: bbbbbbb from the cache']);
+  });
+
+  it('--no-cache (reuse false): a kept side is run all the same, and kept afresh', async () => {
+    const kept = new Map<string, SideRun>([['key-aaaaaaa', loaded(0)]]);
+    const t = sides({ reuse: false }, kept);
+    const { runs, cached } = await runSides(['aaaaaaa'], t.s);
+    expect(t.ran).toEqual(['aaaaaaa']);
+    expect(cached).toEqual([]);
+    expect(runs.get('aaaaaaa')).toEqual(loaded(1));
+    expect(kept.get('key-aaaaaaa')).toEqual(loaded(1));
+  });
+
+  it('a side with no key is run and not kept; one that did not load is run again next time', async () => {
+    const t = sides();
+    await runSides([WORKING_TREE, 'bad'], t.s);
+    expect(t.puts).toEqual(['key-bad']);
+    expect(t.kept.size).toBe(0);
+    const again = sides({}, t.kept);
+    await runSides([WORKING_TREE, 'bad'], again.s);
+    expect(again.ran.sort()).toEqual(['bad', WORKING_TREE].sort());
+  });
+
+  it('the runs keyed by side whatever order they finish in, at most `jobs` at once', async () => {
+    const g = gated();
+    const t = sides({ jobs: 2, run: async (sideName) => ({ run: loaded(await g.task(Number(sideName))) }) });
+    const all = runSides(['1', '2', '3'], t.s);
+    await tick();
+    expect(g.started).toEqual([1, 2]);
+    // finished out of order: 2, then 3 (started in its place), then 1
+    for (const i of [2, 3, 1]) {
+      await tick();
+      g.release.get(i)!();
+    }
+    const { runs } = await all;
+    expect([...runs.keys()]).toEqual(['1', '2', '3']);
+    expect(runs.get('3')).toEqual(loaded(30));
+    expect(g.most()).toBe(2);
   });
 });

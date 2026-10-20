@@ -1,10 +1,12 @@
 import type { GoldenJson } from '../differential/golden.js';
 import { sideRunOf, WORKING_TREE, type SideRun } from './calibrate.js';
+import type { SideCache } from './side-cache.js';
 
 /**
- * Running one side of the calibration (calibrate.ts, which holds the model and the command line): golden as a process
+ * Running the sides of the calibration (calibrate.ts, which holds the model and the command line): golden as a process
  * over a commit's checkout or the working tree, its stdout read as a SideRun, a process that failed itself run once
- * more, and why a side did not load. tests/truth/calibration.test.ts pins it with a fake golden and checkout.
+ * more, and why a side did not load (runSide); every side of a run taken from the cache (side-cache.ts) or run, several
+ * at once (runSides). tests/truth/calibration.test.ts pins it with a fake golden, checkout and cache.
  */
 
 const lastLine = (stdout: string) => stdout.trim().split('\n').at(-1) ?? '';
@@ -69,6 +71,8 @@ export interface SideOutcome {
   cleanup?: () => void;
   /** Why the first golden process failed, when the side was run twice. */
   retried?: string;
+  /** Taken from the cache, not run. */
+  cached?: true;
 }
 
 /**
@@ -98,7 +102,56 @@ export async function runSide(side: string, repo: string, deps: SideDeps): Promi
   return { run: (await once()).run, cleanup: code.cleanup, retried: first.failed };
 }
 
-/** The console line for a side: ran, or DID NOT LOAD with why; and why it was run twice. */
+/** The console line for a side: ran, from the cache, or DID NOT LOAD with why; and why it was run twice. */
 export const sideLine = (side: string, o: SideOutcome, seconds: number): string =>
-  `calibrate: ${side} ${'error' in o.run ? `DID NOT LOAD — ${o.run.error}` : 'ran'} in ${seconds.toFixed(1)} s` +
-  (o.retried === undefined ? '' : ` (run twice: the first golden process failed — ${o.retried})`);
+  o.cached === true
+    ? `calibrate: ${side} from the cache`
+    : `calibrate: ${side} ${'error' in o.run ? `DID NOT LOAD — ${o.run.error}` : 'ran'} in ${seconds.toFixed(1)} s` +
+      (o.retried === undefined ? '' : ` (run twice: the first golden process failed — ${o.retried})`);
+
+/** Calls `task` on every item, at most `jobs` at once, each started as soon as one finishes; the results in order. */
+export async function pool<T, R>(items: readonly T[], jobs: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    for (let i = next++; i < items.length; i = next++) out[i] = await task(items[i]);
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(jobs, items.length)) }, worker));
+  return out;
+}
+
+/** How runSides runs the sides: one side's run, the cache and its keys, how many at once. */
+export interface Sides {
+  /** One side's run (runSide over the real golden and checkouts). */
+  run: (side: string) => Promise<SideOutcome>;
+  cache: SideCache;
+  /** A side's cache key (side-cache.ts#sideKeys); undefined: run it, never keep it. */
+  keyOf: (side: string) => string | undefined;
+  /** Whether a kept run stands in for the side; false (`--no-cache`): every side is run, and kept afresh. */
+  reuse: boolean;
+  jobs: number;
+  /** Told each side's console line (sideLine) as it is done. */
+  log: (line: string) => void;
+}
+
+/**
+ * Every side's run, by side: from the cache where a run is kept under its key (`reuse`), else run — `jobs` at once
+ * (pool) — and kept. The checkouts the runs created are handed back for --remove, and the sides taken from the cache
+ * are named.
+ */
+export async function runSides(sides: readonly string[], s: Sides): Promise<{ runs: Map<string, SideRun>; cleanups: (() => void)[]; cached: string[] }> {
+  const outcomes = await pool(sides, s.jobs, async (side): Promise<SideOutcome> => {
+    const started = Date.now();
+    const key = s.keyOf(side);
+    const kept = key === undefined || !s.reuse ? undefined : await s.cache.get(key);
+    const outcome: SideOutcome = kept !== undefined ? { run: kept, cached: true } : await s.run(side);
+    if (key !== undefined && outcome.cached === undefined) await s.cache.put(key, outcome.run);
+    s.log(sideLine(side, outcome, (Date.now() - started) / 1000));
+    return outcome;
+  });
+  return {
+    runs: new Map(sides.map((side, i) => [side, outcomes[i].run])),
+    cleanups: outcomes.flatMap((o) => (o.cleanup === undefined ? [] : [o.cleanup])),
+    cached: sides.filter((_, i) => outcomes[i].cached === true),
+  };
+}
