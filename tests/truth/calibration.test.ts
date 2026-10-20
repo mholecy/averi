@@ -7,29 +7,26 @@ import { VERBS as GOLDEN_VERBS } from '../../scripts/differential/golden-spec/ju
 import { failureOf, pool, runSide, runSides, sideLine, sideRunFromOutput, type ProcessError, type SideDeps, type SideOutcome, type Sides } from '../../scripts/truth/calibrate-run.js';
 import { calibrationReport, verdictCell } from '../../scripts/truth/calibration-report.js';
 import {
-  captureOf,
   disposition,
   entriesOf,
   failing,
   gitParentOf,
-  isOpenCell,
   notesOf,
   pairsOf,
   plan,
   regressedElsewhere,
   results,
-  sideRunOf,
   STATUSES,
   VERDICTS,
   verdictOf,
   withSides,
-  WORKING_TREE,
   type Calibration,
   type CalibrationEntry,
   type LiveCalibration,
   type ParentOf,
-  type SideRun,
 } from '../../scripts/truth/calibrate.js';
+import type { LoadedRun } from '../../scripts/truth/side-cache.js';
+import { captureOf, isOpenCell, sideRunOf, WORKING_TREE, type SideRun } from '../../scripts/truth/side-run.js';
 
 // The calibration table (scripts/truth/calibration.json) — data, pinned here: its shape, its commits against the git
 // history, and that every bug note is in it, as a note calibrated (or why it cannot be) or as one excluded with its
@@ -619,9 +616,9 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
     expect(await pool([], 4, g.task)).toEqual([]);
   });
 
-  const loaded = (n: number): SideRun => side({ [K1]: n === 0 ? undefined : `red ${n}` });
+  const loaded = (n: number): LoadedRun => side({ [K1]: n === 0 ? undefined : `red ${n}` }) as LoadedRun;
   /** Sides over a fake run and an in-memory cache: what was run, kept and logged. */
-  const sides = (over: Partial<Sides> = {}, kept = new Map<string, SideRun>()) => {
+  const sides = (over: Partial<Sides> = {}, kept = new Map<string, LoadedRun>()) => {
     const ran: string[] = [];
     const puts: string[] = [];
     const log: string[] = [];
@@ -634,11 +631,11 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
         get: async (key) => kept.get(key),
         put: async (key, run) => {
           puts.push(key);
-          if (!('error' in run)) kept.set(key, run);
+          kept.set(key, run);
         },
       },
-      keyOf: (sideName) => (sideName === WORKING_TREE ? undefined : `key-${sideName}`),
-      reuse: true,
+      keys: () => (sideName) => (sideName === WORKING_TREE ? undefined : `key-${sideName}`),
+      mode: 'reuse',
       jobs: 2,
       log: (line) => log.push(line),
       ...over,
@@ -663,9 +660,9 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
     expect(warm.log.sort()).toEqual(['calibrate: aaaaaaa from the cache', 'calibrate: bbbbbbb from the cache']);
   });
 
-  it('--no-cache (reuse false): a kept side is run all the same, and kept afresh', async () => {
-    const kept = new Map<string, SideRun>([['key-aaaaaaa', loaded(0)]]);
-    const t = sides({ reuse: false }, kept);
+  it("--no-cache (mode 'refresh'): a kept side is run all the same, and kept afresh", async () => {
+    const kept = new Map<string, LoadedRun>([['key-aaaaaaa', loaded(0)]]);
+    const t = sides({ mode: 'refresh' }, kept);
     const { runs, cached } = await runSides(['aaaaaaa'], t.s);
     expect(t.ran).toEqual(['aaaaaaa']);
     expect(cached).toEqual([]);
@@ -676,11 +673,29 @@ describe('calibrate-run.ts — the sides several at once, from the cache where k
   it('a side with no key is run and not kept; one that did not load is run again next time', async () => {
     const t = sides();
     await runSides([WORKING_TREE, 'bad'], t.s);
-    expect(t.puts).toEqual(['key-bad']);
-    expect(t.kept.size).toBe(0);
+    expect(t.puts).toEqual([]);
     const again = sides({}, t.kept);
     await runSides([WORKING_TREE, 'bad'], again.s);
     expect(again.ran.sort()).toEqual(['bad', WORKING_TREE].sort());
+  });
+
+  it("a side whose key changed while it ran (the harness or src edited mid-run) is not kept, and its line says so", async () => {
+    let edits = 0;
+    const t = sides({
+      keys: () => {
+        const at = edits;
+        return (sideName) => `key-${sideName}-${at}`;
+      },
+      run: async (sideName) => {
+        if (sideName === 'edited') edits++;
+        return { run: loaded(1) };
+      },
+      jobs: 1,
+    });
+    const { runs } = await runSides(['aaaaaaa', 'edited'], t.s);
+    expect(t.puts).toEqual(['key-aaaaaaa-0']);
+    expect(runs.get('edited')).toEqual(loaded(1));
+    expect(t.log[1]).toMatch(/^calibrate: edited ran in [\d.]+ s \(not kept: the harness or the side's src was edited while it ran\)$/);
   });
 
   it('the runs keyed by side whatever order they finish in, at most `jobs` at once', async () => {

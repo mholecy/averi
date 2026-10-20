@@ -4,11 +4,12 @@ import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
-import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
+import type { GoldenCheck } from '../differential/golden.js';
 import { runSide, runSides, type SideDeps } from './calibrate-run.js';
 import { calibrationReport, verdictCell } from './calibration-report.js';
 import { FAMILIES } from './schema.js';
 import { harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
+import { WORKING_TREE, type SideRun } from './side-run.js';
 
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
@@ -30,9 +31,9 @@ import { harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
  *   OPEN-NOT-REPRODUCED   an open note with a row green, or red without the defect, in the working tree
  *   NOT-ASKED             a named row the run did not ask (a wrong key, or a cell that went broken), or skipped (an
  *                         `ocr` row on a host with no working recognizer: golden.ts#ocrAvailability)
- *   SIDE-DOES-NOT-LOAD    golden could not run over that commit's src, or its run fails the canary (`sideRunOf`: a
- *                         harness or JavaScript error in a reply, a device command the fake does not model, or the
- *                         `open` cell not green) — the reason is reported
+ *   SIDE-DOES-NOT-LOAD    golden could not run over that commit's src, or its run fails the canary
+ *                         (side-run.ts#sideRunOf: a harness or JavaScript error in a reply, a device command the fake
+ *                         does not model, or the `open` cell not green) — the reason is reported
  *
  * Every row of the corpus is compared too: a row green before and red after that the note does not name has REGRESSED
  * ELSEWHERE at the fix — reported with the verdict, and unexpected unless the note's `regressions` records it (`broke`
@@ -211,37 +212,6 @@ export interface Calibration {
   corpus: string;
   notes: CalibrationEntry[];
   excluded: { note: string; why: string }[];
-}
-
-/** The side an open note is judged on: this checkout as it is on disk, not its committed HEAD. */
-export const WORKING_TREE = 'working tree';
-
-/**
- * A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it.
- */
-export const keyOf = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
-/** The capture a row key names (`<run>/<file>`). */
-export const captureOf = (key: string) => key.slice(0, key.indexOf(' '));
-/** A capture of the `open` cell — every target open, every row green on any side that works. */
-export const isOpenCell = (recording: string) => /\/open\.[^/]+$/.test(recording);
-
-/** What one side answered: its checks by key, or why it does not count as loaded. */
-export type SideRun = { checks: Map<string, GoldenCheck> } | { error: string };
-
-/**
- * One side's golden JSON as a SideRun — or not loaded, by the canary: a side miswired (a constructor taken wrong, an
- * export renamed) still prints JSON, every reply an error that a row expecting a refusal would accept. So a side counts
- * only when no check carries a fault (golden.ts#faultsOf: a harness or JavaScript error, an unmodelled device command)
- * and the `open` cell was replayed and is green.
- */
-export function sideRunOf(json: GoldenJson): SideRun {
-  const checks = json.results.flatMap((r) => r.checks);
-  const faults = checks.flatMap((c) => (c.faults ?? []).map((f) => `${keyOf(c)}: ${f}`));
-  const open = checks.filter((c) => isOpenCell(c.recording));
-  if (open.length === 0) faults.push('the open cell was not replayed');
-  faults.push(...open.filter((c) => c.mismatch !== undefined).map((c) => `${keyOf(c)} (open cell) red: ${c.mismatch}`));
-  if (faults.length > 0) return { error: `canary: ${faults.length} fault${faults.length === 1 ? '' : 's'}; first ${faults[0].slice(0, 300)}` };
-  return { checks: new Map(checks.map((c) => [keyOf(c), c])) };
 }
 
 /**
@@ -482,11 +452,13 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const sides = plan(entries);
   const jobs = Math.max(1, Math.floor(availableParallelism() / 2));
   const started = Date.now();
+  const host = await thisHost();
+  const commitOf = gitCommitOf(repo);
   const { runs, cleanups, cached } = await runSides(sides, {
     run: (side) => runSide(side, repo, deps),
     cache: sideCache(cacheDir),
-    keyOf: sideKeys(repo, harnessDigest(repo, table.corpus, await thisHost(repo)), gitCommitOf(repo)),
-    reuse: values['no-cache'] !== true,
+    keys: () => sideKeys(repo, harnessDigest(repo, table.corpus, host), commitOf),
+    mode: values['no-cache'] === true ? 'refresh' : 'reuse',
     jobs,
     log: (line) => console.error(line),
   });

@@ -1,5 +1,5 @@
 import type { GoldenJson } from '../differential/golden.js';
-import { sideRunOf, WORKING_TREE, type SideRun } from './calibrate.js';
+import { sideRunOf, WORKING_TREE, type SideRun } from './side-run.js';
 import type { SideCache } from './side-cache.js';
 
 /**
@@ -73,6 +73,8 @@ export interface SideOutcome {
   retried?: string;
   /** Taken from the cache, not run. */
   cached?: true;
+  /** Run, loaded, and not kept: what its key covers was edited while it ran (runSides), so no key names the run. */
+  unkept?: true;
 }
 
 /**
@@ -102,12 +104,16 @@ export async function runSide(side: string, repo: string, deps: SideDeps): Promi
   return { run: (await once()).run, cleanup: code.cleanup, retried: first.failed };
 }
 
-/** The console line for a side: ran, from the cache, or DID NOT LOAD with why; and why it was run twice. */
+/**
+ * The console line for a side: ran, from the cache, or DID NOT LOAD with why; why it was run twice; and that a run was
+ * not kept.
+ */
 export const sideLine = (side: string, o: SideOutcome, seconds: number): string =>
   o.cached === true
     ? `calibrate: ${side} from the cache`
     : `calibrate: ${side} ${'error' in o.run ? `DID NOT LOAD — ${o.run.error}` : 'ran'} in ${seconds.toFixed(1)} s` +
-      (o.retried === undefined ? '' : ` (run twice: the first golden process failed — ${o.retried})`);
+      (o.retried === undefined ? '' : ` (run twice: the first golden process failed — ${o.retried})`) +
+      (o.unkept === undefined ? '' : ' (not kept: the harness or the side\'s src was edited while it ran)');
 
 /** Calls `task` on every item, at most `jobs` at once, each started as soon as one finishes; the results in order. */
 export async function pool<T, R>(items: readonly T[], jobs: number, task: (item: T) => Promise<R>): Promise<R[]> {
@@ -125,10 +131,13 @@ export interface Sides {
   /** One side's run (runSide over the real golden and checkouts). */
   run: (side: string) => Promise<SideOutcome>;
   cache: SideCache;
-  /** A side's cache key (side-cache.ts#sideKeys); undefined: run it, never keep it. */
-  keyOf: (side: string) => string | undefined;
-  /** Whether a kept run stands in for the side; false (`--no-cache`): every side is run, and kept afresh. */
-  reuse: boolean;
+  /**
+   * The sides' keys as the checkout is on disk now (side-cache.ts#sideKeys; undefined: run the side, never keep it) —
+   * taken when the run starts, and again when a side has run: its run is kept only under the key it was run at.
+   */
+  keys: () => (side: string) => string | undefined;
+  /** `reuse`: a run kept under the side's key stands in for it; `refresh` (--no-cache): every side run, kept afresh. */
+  mode: 'reuse' | 'refresh';
   jobs: number;
   /** Told each side's console line (sideLine) as it is done. */
   log: (line: string) => void;
@@ -136,16 +145,21 @@ export interface Sides {
 
 /**
  * Every side's run, by side: from the cache where a run is kept under its key (`reuse`), else run — `jobs` at once
- * (pool) — and kept. The checkouts the runs created are handed back for --remove, and the sides taken from the cache
- * are named.
+ * (pool) — and kept if it loaded (one that did not may have failed itself, and is run again next time) and its key held
+ * while it ran (an edit mid-run: the run is of neither content). The checkouts the runs created are handed back for
+ * --remove, and the sides taken from the cache are named.
  */
 export async function runSides(sides: readonly string[], s: Sides): Promise<{ runs: Map<string, SideRun>; cleanups: (() => void)[]; cached: string[] }> {
+  const keyOf = s.keys();
   const outcomes = await pool(sides, s.jobs, async (side): Promise<SideOutcome> => {
     const started = Date.now();
-    const key = s.keyOf(side);
-    const kept = key === undefined || !s.reuse ? undefined : await s.cache.get(key);
-    const outcome: SideOutcome = kept !== undefined ? { run: kept, cached: true } : await s.run(side);
-    if (key !== undefined && outcome.cached === undefined) await s.cache.put(key, outcome.run);
+    const key = keyOf(side);
+    const kept = key === undefined || s.mode === 'refresh' ? undefined : await s.cache.get(key);
+    let outcome: SideOutcome = kept !== undefined ? { run: kept, cached: true } : await s.run(side);
+    if (key !== undefined && outcome.cached === undefined && !('error' in outcome.run)) {
+      if (s.keys()(side) === key) await s.cache.put(key, outcome.run);
+      else outcome = { ...outcome, unkept: true };
+    }
     s.log(sideLine(side, outcome, (Date.now() - started) / 1000));
     return outcome;
   });

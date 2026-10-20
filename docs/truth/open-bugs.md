@@ -156,7 +156,8 @@ node --import tsx scripts/truth/catalog.ts --check
 
 # calibrate: replays each note's before/after commits (outside the sandbox; checks out temporary worktrees),
 # half the cores at once; a side whose src and harness are unchanged comes from the cache (<scratch dir>/side-cache,
-# or --cache <dir>); --no-cache replays every side
+# or --cache <dir>; the key covers the harness, the side's src, node and the host's recognizer); --no-cache replays
+# every side and refreshes the cache
 node --import tsx scripts/truth/calibrate.ts --worktrees <scratch dir> --out docs/truth/calibration.md --remove [--no-cache]
 
 # live, iOS lab simulator (WDA on port 8120 only)

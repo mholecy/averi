@@ -34,6 +34,32 @@ describe('codeRoot — a directory in place under the checkout name', () => {
   });
 });
 
+describe('codeRoot — a checkout in place with changes of its own', () => {
+  it('is refused, a changed file or an added one — never replayed as its commit; clean again, it is used', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'averi-checkout-'));
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    try {
+      const repo = join(dir, 'repo');
+      mkdirSync(join(repo, 'node_modules'), { recursive: true });
+      writeFileSync(join(repo, '.gitignore'), 'node_modules/\n'); // as before d77c1052: the linked node_modules untracked
+      writeFileSync(join(repo, 'a.ts'), 'export const a = 1;\n');
+      git('init', '-q', repo);
+      git('-C', repo, 'add', '.');
+      git('-C', repo, 'commit', '-q', '-m', 'x');
+      const sha = git('-C', repo, 'rev-parse', 'HEAD');
+      const { root } = codeRoot(repo, sha, 'cal', dir);
+      expect(codeRoot(repo, sha, 'cal', dir)).toEqual({ root }); // in place and clean (the linked node_modules not a change)
+      writeFileSync(join(root, 'a.ts'), 'export const a = 2;\n');
+      expect(() => codeRoot(repo, sha, 'cal', dir)).toThrow(/with changes of its own \(M a\.ts\)/);
+      git('-C', root, 'checkout', '--', 'a.ts');
+      writeFileSync(join(root, 'b.ts'), 'export const b = 1;\n');
+      expect(() => codeRoot(repo, sha, 'cal', dir)).toThrow(/with changes of its own \(\?\? b\.ts\)/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('codeRoot — a directory in place inside another checkout', () => {
   it.skipIf(!existsSync(join(ROOT, '.git')))('is refused: git answers for the checkout around it, not for the directory', () => {
     const sha = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();

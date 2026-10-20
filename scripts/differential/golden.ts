@@ -12,7 +12,7 @@ import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
 import { hostExec, useRecognizer } from './fake-device.js';
-import { ocrDecision, ocrSkip, probeRecognizer } from './ocr-probe.js';
+import { ocrDecision, ocrSkip, probeHarness } from './ocr-probe.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -79,9 +79,6 @@ export const checkOf = (recording: string, target: string, verb: Verb, says: str
   return { recording, target, verb, says, ...(mismatch !== undefined && { mismatch }), reply: outcome.reply, kind: replyKind(outcome.reply), calls: sent(outcome), ...(read !== undefined && { read }), ...(faults.length > 0 && { faults }) };
 };
 
-/** The image the probe reads (any committed screenshot: only whether Vision runs at all is asked of it). */
-const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-iphone17-ios27/form-basic.png', import.meta.url));
-
 /**
  * Whether the `ocr` rows can be judged here, once per process: undefined to ask them — the fake device then runs the
  * host's recognizer for every side (useRecognizer('vision')) — else why not. Decided by the harness's own probe
@@ -91,7 +88,7 @@ const OCR_PROBE_PNG = fileURLToPath(new URL('../../tests/fixtures/truth/ios-ipho
  */
 let ocrProbe: Promise<string | undefined> | undefined;
 export function ocrAvailability(): Promise<string | undefined> {
-  ocrProbe ??= probeRecognizer(hostExec, OCR_PROBE_PNG).then((o) => {
+  ocrProbe ??= probeHarness(hostExec).then((o) => {
     const d = ocrDecision(ocrSkip(o), process.env);
     if (d.ask) useRecognizer('vision');
     return d.ask ? undefined : d.skip;
