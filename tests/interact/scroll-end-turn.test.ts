@@ -71,6 +71,12 @@ describe('the end proof — the tree lists where a scroll view\'s content ends (
     expect(clips.contentToward(carousel, 'left')).toMatchObject({ kind: 'ends', view: { rect: carousel } });
   });
 
+  it('an EMPTY scroll view (nothing of area under it — an empty state, a lazy stack\'s unrealised stretch) proves no end: blank, as on uiautomator', () => {
+    const list: Rect = { x: 0, y: 180, width: 402, height: 600 };
+    const tree = node({ role: 'container', unclippedFrames: true, rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'scrollable', rect: list, children: [node({ role: 'other', rect: { x: 0, y: 180, width: 402, height: 0 } })] })] });
+    expect(sceneOf(tree).clips.contentToward(list, 'bottom')).toMatchObject({ kind: 'blank', view: { rect: list } });
+  });
+
   it('uiautomator\'s dialect (rects cut to their clipping scroll container) never proves an end: content past the edge would read flush with it', () => {
     const list: Rect = { x: 0, y: 303, width: 1080, height: 605 };
     const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'scrollable', rect: list, clipsDescendants: true, children: [node({ role: 'button', rect: { x: 128, y: 303, width: 825, height: 176 } })] })] });

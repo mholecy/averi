@@ -11,7 +11,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type UnseenStrokes } from './scroll-rounds.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
 import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, revealText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
@@ -746,6 +746,23 @@ function touchedText({ at, on, container }: TouchedOn): string {
   return `they touched down at ${at.x},${at.y} on ${on.role}${label}${id} at ${rectText(on.rect)}, drawn over the list ${rectText(container)}, which may have taken them`;
 }
 
+/**
+ * Strokes over a scroll view whose reads listed none of its content where their motion would show
+ * (scroll-rounds.ts#UnseenStrokes), at a bound: `after the last 5 swipes over the scroll container 0,550 1080x1670 the
+ * tree listed none of its content where a swipe's motion would show (blank space, content with no node, or a node cut
+ * at both of the container's edges), so how far they moved it is unknown — the element may lie further down: raise
+ * maxSwipes or timeoutMs`. "How far", not "whether": the first of them may have carried the last content shown off
+ * the viewport, which shows it moved — but not how far.
+ */
+function unseenText({ strokes, within, toward }: UnseenStrokes): string {
+  const which = strokes === 1 ? 'the last swipe' : `the last ${strokes} swipes`;
+  return (
+    `after ${which} over the scroll container ${rectText(within)} the tree listed none of its content where a swipe's motion would show ` +
+    `(blank space, content with no node, or a node cut at both of the container's edges), so how far ${strokes === 1 ? 'it' : 'they'} moved it is unknown — ` +
+    `the element may lie further ${toward}: raise maxSwipes or timeoutMs`
+  );
+}
+
 /** What the target was short of at the bound — one switch over the shortfall. */
 function shortText(short: Shortfall): string {
   switch (short.of) {
@@ -773,7 +790,7 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':
-      return `${withMissNote('element never appeared in the tree', short.miss)}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}`;
+      return `${withMissNote('element never appeared in the tree', short.miss)}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}${short.unseen !== undefined ? `; ${unseenText(short.unseen)}` : ''}`;
     case 'gone':
       return `element was in the viewport ${whenInFrame(short.inFrameAfter)} but did not stay — it is no longer in the tree (a fling carried it off? a lazy list drops what scrolls away)`;
     case 'left':

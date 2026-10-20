@@ -1,5 +1,5 @@
 import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
@@ -434,10 +434,36 @@ export interface ReadTime {
 export type Shortfall =
   | { of: 'readFailed'; error: Error }
   | InFrameShort
-  | { of: 'absent'; unsearched?: Edge; miss?: Miss }
+  | { of: 'absent'; unsearched?: Edge; miss?: Miss; unseen?: UnseenStrokes }
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: AppliedKeyboard; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
+
+/**
+ * The strokes in a row, up to the bound, whose reads listed none of the content of the scroll view they went over
+ * (`within`) — `Clips.contentToward`'s `blank`: blank space, or content that dumps no node — so how far they moved it
+ * is unknown (UNMOVED_STROKES_EXHAUST's blank read; the first may show it moved, by carrying the last content listed
+ * off the viewport, but none shows how far). All over one scroll view, one way: a stroke over another, or the other
+ * way, starts the count again. `toward`: the way they went, where the content lies. An `absent`
+ * failure at maxSwipes or the deadline carries it: without it, "never appeared" at the bound reads as "not there",
+ * where the target may lie further on.
+ * docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md
+ */
+export interface UnseenStrokes {
+  readonly strokes: number;
+  readonly within: Rect;
+  readonly toward: Direction;
+}
+
+/**
+ * `unseen` with one more blank read over `within`, toward `toward` — counted on only over the same scroll view, the same
+ * way. (No absent target's call turns today — a turn needs a sighting, and a read that finds the target ends the count
+ * — so the way is a guard ahead of one that does.)
+ */
+function unseenAfter(unseen: UnseenStrokes | undefined, within: Rect, toward: Direction): UnseenStrokes {
+  const goesOn = unseen !== undefined && unseen.toward === toward && sameRectWithinPixel(unseen.within, within);
+  return { strokes: goesOn ? unseen.strokes + 1 : 1, within: { ...within }, toward };
+}
 
 /** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
 export interface PastSide {
@@ -520,6 +546,23 @@ export const SETTLE_CONFIRM_READS = 3;
  * with no indicator in the tree (a shimmer drawn as plain views, a
  * silent fetch) can still be called exhausted after the two strokes.
  * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
+ *
+ * A BLANK read is no evidence either way (lab note LV1, ADR 0021's 2026-10-21 refinement): the read after a stroke,
+ * the target not in it, whose tree lists none of the content of the scroll view the stroke went over where its
+ * motion would show (interact/stroke-plan.ts#strokedContent, geometry.ts#Clips.contentToward's `blank`: an empty
+ * viewport, or only nodes cut at both of its edges). uiautomator dumps no scroll offset, and Compose no content
+ * container, so blank space — a spacer, an image or a chart with no node — dumps the same tree at every offset:
+ * measured, the lab app's `tabbar-floating` read "the last 2 … did not change the screen" after 4 strokes while each
+ * moved the list ~860 px, F one stroke away. Such a read is no unmoved read — the streak starts again, a reset, not a
+ * freeze, the conservative side; nor a moved one: only a changed fingerprint sets `State.treeMoved` — and the strokes
+ * run on to the bound, where an `absent` failure says the last of them went over blank content (`UnseenStrokes`: raise
+ * maxSwipes or timeoutMs). The streak keeps its meaning — the same stroke twice left a tree that WOULD show motion
+ * unchanged — so "did not change the screen" stays true. Cost: none wherever the list shows content along the stroke's
+ * axis (every committed capture's largest scroll view does, down and up, and sideways too:
+ * tests/ui-tree/listed-content.test.ts); over a blank viewport, strokes up to the bound (2.8–4.1 s each on the lab
+ * AVD), a true end with a blank viewport included. Residual: a node inside the scroll view that does not move with its
+ * content (a sticky header child) reads as content shown, so a blank stretch under it still reads exhausted after the
+ * two.
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
 
@@ -818,6 +861,8 @@ interface State {
   /** A read after a stroke found the whole tree changed from the read before — the content moved at least once (`Shortfall.absent`'s `unsearched`: not a screen no stroke ever changed). */
   readonly treeMoved: boolean;
   readonly treeUnmovedStrokes: number;
+  /** The strokes in a row whose reads were blank (`UnseenStrokes`); undefined after any read after a stroke that was not. */
+  readonly unseen: UnseenStrokes | undefined;
   /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
   readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
   /** The last read that read, its tree and the screen's identity — what ui-tree/read-tree.ts#screenChangedUnder compares the next one with; undefined until a read reads. */
@@ -879,6 +924,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     backPending: false,
     prevFingerprint: undefined,
     treeUnmovedStrokes: 0,
+    unseen: undefined,
     treeMoved: false,
     detents: undefined,
     screenBefore: undefined,
@@ -1098,7 +1144,8 @@ interface Observed {
    * target (not the flush check's probe) that moved nothing: every match where it was, or, with no target in the tree,
    * the whole tree unchanged; never while a progress node shows, nor of a stroke that touched down on a node drawn over
    * its scroll view (`touchedOn`: that node may have taken it, and the fast fail names it first); and only of a scroll
-   * view that scrolls along the stroke's axis (geometry.ts#Clips.contentToward). What counts as proof, stated: the tree's
+   * view that scrolls along the stroke's axis (geometry.ts#Clips.contentToward's `ends`; a `blank` read is no proof,
+   * nor evidence of an unmoved tree at all: UNMOVED_STROKES_EXHAUST). What counts as proof, stated: the tree's
    * listing of the content, not the strokes — a stroke not taken moves nothing too, but cannot make a list's content
    * end where the tree shows it ending; and the read unmoved besides, so a list still settling (a bounce at its end,
    * momentum from an earlier stroke) reads moved and proves nothing until a read finds it still.
@@ -1128,10 +1175,18 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // This read against the one before it, after a stroke: every match where it was, the whole tree as it was.
   let allUnmoved = false;
   let treeUnmoved = false;
+  // What this read lists of the content of the scroll view the last stroke went over (stroke-plan.ts#strokedContent):
+  // asked at most once a read — a walk of the tree and of its subtree, no device call. Boxed so that an answer of
+  // undefined (no scroll view stroked) is told from "not asked yet".
+  let content: { readonly of: ListedContent | undefined } | undefined;
+  const listed = (): ListedContent | undefined => (content ??= { of: s.lastSent === undefined ? undefined : strokedContent(s.strokes, facts, s.lastSent) }).of;
   if (current === 'stroke') {
     // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST):
-    // the same streak rule, over the fingerprint.
-    treeUnmoved = s.prevFingerprint === fingerprint && !loading;
+    // the same streak rule, over the fingerprint — and a read that lists none of the stroked scroll view's content
+    // (`blank`) is no evidence either way: it is no unmoved read, so the streak starts again.
+    const stroked = found.length === 0 ? listed() : undefined;
+    s.unseen = stroked?.kind === 'blank' && s.lastSent !== undefined ? unseenAfter(s.unseen, stroked.view.rect, s.lastSent) : undefined;
+    treeUnmoved = s.prevFingerprint === fingerprint && !loading && s.unseen === undefined;
     if (s.prevFingerprint !== undefined && s.prevFingerprint !== fingerprint) s.treeMoved = true;
     const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
     s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
@@ -1223,7 +1278,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
   const proof =
     current === 'stroke' && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, s.lastDrawn) === undefined
-      ? strokedContent(s.strokes, facts, s.lastSent)
+      ? listed()
       : undefined;
   const ends = proof?.kind === 'ends' ? proof.view : undefined;
   const exhausted =
@@ -1881,7 +1936,9 @@ function shortfall(s: State, { readError, found, best, viewport, cover, miss, un
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
     // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
     const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
-    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }), ...(miss !== undefined && { miss }) };
+    // Strokes over blank content up to a bound that is not the content's end: they may have moved it (UnseenStrokes).
+    const unseen = by.of === 'exhausted' ? undefined : s.unseen;
+    return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }), ...(miss !== undefined && { miss }), ...(unseen !== undefined && { unseen }) };
   }
   // In the tree: scroll-read.ts#judge scores every match, so this read judged one and `past` is this read's.
   return {
