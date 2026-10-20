@@ -17,11 +17,10 @@ const cover = (label: string, at: Rect, more: Partial<Omit<Cover, 'node'>> = {})
 });
 
 describe('coverOf — the record of a node among the covers', () => {
-  it('finds the first record of the node, by identity, and none for a node that is no cover', () => {
+  it('finds the record of the node, by identity, and none for a node that is no cover', () => {
     const bar = cover('Continue', rect(24, 780, 354, 44));
     const peer = cover('W', rect(51, 448, 300, 64), { order: { kind: 'untold' } });
     expect(coverOf([bar, peer], peer.node)).toBe(peer);
-    expect(coverOf([bar, peer, { ...peer, order: { kind: 'drawn' } }], peer.node)).toBe(peer);
     expect(coverOf([bar], node({ role: 'button', label: 'W', rect: rect(51, 448, 300, 64) }))).toBeUndefined();
   });
 });

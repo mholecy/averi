@@ -5,7 +5,8 @@ import { containsPoint } from './geometry.js';
  * A COVER: one node drawn over a target, as the draw order found it (draw-order.ts#DrawOrder.exposure) — the one record
  * every reader of a target's covers asks, instead of a list per tag joined by membership. draw-order.ts builds them;
  * the standing carries them (standing.ts#StandingFacts.covers); the tap, `scroll_until` and the pixel assert read them.
- * This module owns the record and its few queries.
+ * This module owns the record and its few queries. Until the overlaid edge is a Cover too (round 10, T1b), the touch and
+ * pixel judgements name their cover as a node, and the sentence finds its record here (`coverOf`).
  *
  * - `reach`: where it presses over the target — its rect, a pinned bar's reach run down to the screen's bottom, a
  *   floating tab bar's item raised by its bar's lift, or the whole screen for a presented layer's cover
@@ -39,7 +40,7 @@ export interface Cover {
  */
 export type CoverOrder = { readonly kind: 'drawn' } | { readonly kind: 'untold' } | { readonly kind: 'seenOver' };
 
-/** The record of `node` among `covers` (the first, as covers are listed in draw order), or undefined when it is none of them. */
+/** The record of `node` among `covers` (`exposure` lists a node once), or undefined when it is none of them. */
 export const coverOf = (covers: readonly Cover[], node: UiNode): Cover | undefined => covers.find((c) => c.node === node);
 
 /** The cover drawn on top at `point` — the last of `covers` whose reach contains it — or undefined. */
