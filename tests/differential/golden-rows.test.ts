@@ -288,6 +288,52 @@ describe('R-fully on a flush edge: the stop\'s probe is the device\'s to answer,
   });
 });
 
+// scroll-sticky-cut's R as captured (VA1): its piece cut at the merged sticky header pinned at its list's top, the stop's
+// probe drags down from inside the list, toward the top edge — the edge the reply names lies on the header's bottom.
+const PINNED_FLUSH =
+  'Element id:"lab.edges.A" fully visible after 1 swipe; its top edge lies on the edge of container id:lab.edges.header (0,303 1080x154), pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut there';
+const DOWN_PROBE = 'adb shell input swipe 540 600 540 777 300';
+
+describe('R-fully on an edge flush under a header pinned in its scroll view (VA1): the truth bears out the edge at the chrome\'s inner edge', () => {
+  const sticky = (header: Rect) =>
+    expectations(
+      'android',
+      target('chrome-overlap:stickyHeader', { frame: rect(128, 391, 825, 176), visible: rect(128, 391, 825, 176), piece: rect(128, 457, 825, 110), scrollView: 'list' }),
+      { ...CELL, screen: { width: 1080, height: 2220 }, scrollViews: { list: rect(0, 303, 1080, 1238) }, chrome: { stickyHeader: header } },
+      'uiautomator',
+    );
+  it('its piece begins at the bottom of a chrome lying in its scroll view, flush with its top, and the probe drags toward it from inside the list: accepted', () => {
+    expect(verdict(sticky(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toBeUndefined();
+  });
+  it('a chrome that ends short of the piece, or is not pinned at the list\'s top, bears out nothing: red; and no probe toward it: red', () => {
+    expect(verdict(sticky(rect(0, 303, 1080, 140)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/\(its top edge is not flush with its scroll view list in the truth \(391 vs 303\)\)/);
+    expect(verdict(sticky(rect(0, 320, 1080, 137)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/its top edge is not flush/);
+    expect(verdict(sticky(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH))).toMatch(/\(no swipe from inside its scroll view list toward its top edge\)/);
+  });
+  it('a chrome flush with the piece and the list\'s top but not lying in the list (wider than it), or beside the piece, not across its edge: red', () => {
+    const narrow = (header: Rect) =>
+      expectations(
+        'android',
+        target('chrome-overlap:stickyHeader', { frame: rect(128, 391, 825, 176), visible: rect(128, 391, 825, 176), piece: rect(128, 457, 825, 110), scrollView: 'list' }),
+        { ...CELL, screen: { width: 1080, height: 2220 }, scrollViews: { list: rect(100, 303, 880, 1238) }, chrome: { stickyHeader: header } },
+        'uiautomator',
+      );
+    expect(verdict(narrow(rect(100, 303, 880, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toBeUndefined();
+    expect(verdict(narrow(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/its top edge is not flush/);
+    expect(verdict(narrow(rect(960, 303, 20, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/its top edge is not flush/);
+  });
+  it('at the far edge (bottom), where src pins nothing, a chrome pinned at the list\'s bottom flush with the piece bears out nothing: red', () => {
+    const footer = expectations(
+      'android',
+      target('chrome-overlap:stickyHeader', { frame: rect(128, 1300, 825, 176), visible: rect(128, 1300, 825, 176), piece: rect(128, 1300, 825, 110), scrollView: 'list' }),
+      { ...CELL, screen: { width: 1080, height: 2220 }, scrollViews: { list: rect(0, 303, 1080, 1238) }, chrome: { footer: rect(0, 1410, 1080, 131) } },
+      'uiautomator',
+    );
+    const reply = PINNED_FLUSH.replace('its top edge', 'its bottom edge').replace(') top and', ') bottom and');
+    expect(verdict(footer, 'fully', out(reply, ['adb shell input swipe 540 1300 540 1123 300']))).toMatch(/its bottom edge is not flush/);
+  });
+});
+
 describe('R-fully: fully: true never calls a cut target "visible" where it is, whatever it swiped', () => {
   const rs = rows(target('partly-centre-in', { visible: rect(51, 670, 300, 50) }));
   it.each([

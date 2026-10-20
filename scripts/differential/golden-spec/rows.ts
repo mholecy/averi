@@ -1,7 +1,7 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { axisOf, directionOf, otherAxis, navigationBandTakes, parseGeometry, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
+import { axisOf, directionOf, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -279,20 +279,44 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth, as
 
 const NOT_PROBED = 'no flush probe said';
 
+/** A side a flush probe names (replies.ts#flushProbedSide). */
+type Side = NonNullable<ReturnType<typeof flushProbedSide>>;
+const edgeOf = (r: Rect, side: Side): number => ({ top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width })[side];
+/** Within a pixel/point. */
+const withinPixel = (a: number, b: number) => Math.abs(a - b) <= 1;
+
+/**
+ * `piece` ends on `side` at the inner edge of one of `chrome` lying in the scroll view `sv`, pinned at its same edge
+ * (within a pixel) and reaching across the piece's edge (overlapping it along that edge, not beside it) — flushProbe's
+ * second form. At the content's start only (top, left), as a sticky header pins (src/ui-tree/later-edges.ts#PinnedEdge).
+ */
+function underPinnedChrome(side: Side, piece: Rect, sv: Rect, chrome: readonly Rect[]): boolean {
+  const inner = side === 'top' ? 'bottom' : side === 'left' ? 'right' : undefined;
+  if (inner === undefined) return false;
+  const across = (c: Rect) => (side === 'top' ? c.x < piece.x + piece.width && piece.x < c.x + c.width : c.y < piece.y + piece.height && piece.y < c.y + c.height);
+  return chrome.some((c) => rectInside(c, sv) && withinPixel(edgeOf(c, side), edgeOf(sv, side)) && withinPixel(edgeOf(c, inner), edgeOf(piece, side)) && across(c));
+}
+
 /**
  * Why a stop's flush probe does not stand, judged by the truth — undefined when it does: the reply names a side
- * (replies.ts#flushProbedSide); what shows of the target (TargetTruth.visible) ends on that side at its scroll view's edge (within a
- * pixel/point); and a swipe touched down inside that scroll view dragging toward that edge (a bottom edge: the finger
- * moves up, as the content must to bring what lies below it into view).
+ * (replies.ts#flushProbedSide); what shows of the target (TargetTruth.visible) ends on that side at its scroll view's
+ * edge (within a pixel/point) — or, at a top or left edge, its piece (TargetTruth.piece, what the app's chrome leaves
+ * of it) ends there at the inner edge of a chrome lying in that scroll view, pinned at its same edge and reaching
+ * across the piece's (a sticky header at its list's top: where the scroll view shows nothing of its content past it, as
+ * at its own edge — the probe's doctrine, extended, not lowered: VA1,
+ * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md); and a swipe touched down inside
+ * that scroll view dragging toward that edge (a bottom edge: the finger moves up, as the content must to bring what
+ * lies below it into view).
  */
-export function flushProbe(o: Outcome, t: Pick<TargetTruth, 'visible' | 'scrollView'>, cell: Pick<CellTruth, 'scrollViews'>): string | undefined {
+export function flushProbe(o: Outcome, t: Pick<TargetTruth, 'visible' | 'piece' | 'scrollView'>, cell: Pick<CellTruth, 'scrollViews' | 'chrome'>): string | undefined {
   const side = flushProbedSide(o.reply);
   if (side === undefined) return NOT_PROBED;
   const sv = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
   const v = t.visible ?? undefined;
   if (sv === undefined || v === undefined) return `no scroll view or visible part in the truth to bear out its ${side} edge`;
-  const edge = (r: Rect) => ({ top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width })[side];
-  if (Math.abs(edge(v) - edge(sv)) > 1) return `its ${side} edge is not flush with its scroll view ${t.scrollView} in the truth (${edge(v)} vs ${edge(sv)})`;
+  const piece = t.piece ?? undefined;
+  const flush = withinPixel(edgeOf(v, side), edgeOf(sv, side)) || (piece !== undefined && underPinnedChrome(side, piece, sv, Object.values(cell.chrome ?? {})));
+  if (!flush) return `its ${side} edge is not flush with its scroll view ${t.scrollView} in the truth (${edgeOf(v, side)} vs ${edgeOf(sv, side)})`;
   const toward = strokes(o).some(({ from, to }) => {
     const drag = { bottom: to.y < from.y, top: to.y > from.y, right: to.x < from.x, left: to.x > from.x }[side];
     return drag && within(from, sv);

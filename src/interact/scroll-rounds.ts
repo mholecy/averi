@@ -1,5 +1,6 @@
 import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
@@ -350,10 +351,15 @@ export interface DetentMove {
  * clipping ancestor — a row taller than its list, cut at both ends, reads
  * exactly the list's rect. Never probed (one probe cannot tell which side,
  * if either, is cut), so never checked — and never a plain "fully visible".
+ *
+ * `pinned`: the flush edge lies not on the container's own edge but on the inner edge of a node pinned in it at that
+ * side, drawn after the match (ui-tree/later-edges.ts#PinnedEdge: a merged sticky header) — the scroll view shows
+ * nothing of its content past it, so it is that edge the probe asks about. With `fills`, the pinned one of the two is
+ * always `edges[0]`: a node pins at the content's start only (top, left), and the far edge is the container's own.
  */
 export type Flush =
-  | ({ edge: Edge; container: Rect } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
-  | { edges: readonly [Edge, Edge]; container: Rect; checked: false; why: 'fills' };
+  | ({ edge: Edge; container: Rect; pinned?: QuotedNode } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
+  | { edges: readonly [Edge, Edge]; container: Rect; pinned?: QuotedNode; checked: false; why: 'fills' };
 
 /**
  * Which bound ended the scroll: the same stroke twice moved nothing (with
@@ -576,19 +582,32 @@ export const UNMOVED_STROKES_EXHAUST = 2;
  * TOUCH_SLOP anyway (a tiny screen) never reports `checked`: it may have
  * been a tap that moved nothing.
  *
+ * A node PINNED in the nearest scroll view counts as its edge
+ * (ui-tree/later-edges.ts#PinnedEdge, `Scene.pinnedEdges`): Compose also
+ * subtracts what a later node covers, so a row under a merged sticky header
+ * pinned at its list's top is dumped from the header's bottom — and so is a
+ * first row at rest, whole under it: the same tree (measured, the lab's
+ * scroll-sticky-cut R `128,457 825x110` under the header `0,303 1080x154`;
+ * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md).
+ * The probe goes toward the header from inside the list; the stop names it
+ * (`Flush.pinned`). At the content's start only (top, left), where a sticky
+ * header pins: at the far edge that shape is the next row cut at the fold.
+ *
  * Residuals, stated: Android's View bounds are cut to every
  * ancestor, not only scrollers, and Compose also subtracts what an overlay
  * sibling covers — a row cut by a pinned bar drawn over the list reads cut
  * at the bar's edge, not flush with any scroller, so it is not probed (the
- * bar itself is a cover, ui-tree/standing.ts#Scene's); a RecyclerView with padding
+ * bar itself is a cover, ui-tree/standing.ts#Scene's; a bar outside the list
+ * is a flush neighbour, the eyes'); a RecyclerView with padding
  * and clipToPadding draws a row cut at its padding edge while the row's
  * rect runs to the view's edge — not flush, not probed.
  *
  * Cost, stated: one stroke (it spends one of `maxSwipes` and counts in the
  * reply's swipes), one settle and one tree read — plus, on Android, what a
  * round's keyboard reading costs (ui-tree/keyboard-cover.ts) — on every
- * `fully: true` stop flush with a clipping container, legitimate ones
- * included (a first row at rest). iOS has no clipping container
+ * `fully: true` stop flush with a clipping container or under a node pinned
+ * in it, legitimate ones included (a first row at rest, under a sticky
+ * header or not). iOS has no clipping container
  * (types.ts#UiNode.clipsDescendants), so it never probes. At the bound —
  * no swipe or time left — the stop is reported with `flush.checked` false
  * and a sentence saying it may be cut.
@@ -612,25 +631,43 @@ export const PROBE_REACH = 0.25;
  */
 export const PROBE_MAX_TRAVEL_FRACTION = 0.08;
 
+/** A flush edge of the match: on its container's own edge, or on a node `pinned` in its nearest at that side (`Flush`). */
+interface FlushEdge {
+  readonly edge: Edge;
+  readonly pinned?: QuotedNode;
+}
+
 /**
  * Where the match lies flush, of `chain` (clipping ancestors, nearest
  * first; `flushEdges`, ui-tree/geometry.ts, along the scroll's axis, within
- * a pixel): the nearest it is flush with on ONE edge along the scroll — that
- * edge and the ancestor's index, the probe's question — else, when it
- * fills the NEAREST along the scroll, both edges (`fills`: reported, never
- * probed); undefined when neither.
+ * a pixel — and, for the NEAREST, the match's `pinned` edges along it, laid
+ * flush under a node pinned in it, ui-tree/later-edges.ts#PinnedEdge: where
+ * that scroll view's content ends as it shows): the nearest it is flush with
+ * on ONE edge along the scroll — that edge and the ancestor's index, the
+ * probe's question — else, when it fills the NEAREST along the scroll, both
+ * edges (`fills`: reported, never probed); undefined when neither.
  */
 function flushWith(
   rect: Rect,
   chain: readonly Rect[],
+  pinned: readonly PinnedEdge[],
   direction: Direction,
-): { edge: Edge; at: number } | { fills: readonly [Edge, Edge] } | undefined {
-  for (const [at, container] of chain.entries()) {
-    const edges = flushEdges(rect, container, axisOf(direction));
-    if (edges.length === 1) return { edge: edges[0], at };
+): (FlushEdge & { at: number }) | { fills: readonly [Edge, Edge]; pinned?: QuotedNode } | undefined {
+  const axis = axisOf(direction);
+  const edgesAt = (at: number): FlushEdge[] => {
+    const own: FlushEdge[] = flushEdges(rect, chain[at], axis).map((edge) => ({ edge }));
+    if (at !== 0) return own;
+    const under = pinned.filter((p) => axisOfEdge(p.edge) === axis && !own.some((o) => o.edge === p.edge)).map((p) => ({ edge: p.edge, pinned: quoted(p.by) }));
+    return [...own, ...under].sort((a, b) => EDGES.indexOf(a.edge) - EDGES.indexOf(b.edge));
+  };
+  for (const at of chain.keys()) {
+    const edges = edgesAt(at);
+    if (edges.length === 1) return { ...edges[0], at };
   }
-  const nearest = chain.length === 0 ? [] : flushEdges(rect, chain[0], axisOf(direction));
-  return nearest.length === 2 ? { fills: [nearest[0], nearest[1]] } : undefined;
+  const nearest = chain.length === 0 ? [] : edgesAt(0);
+  if (nearest.length !== 2) return undefined;
+  const under = nearest.find((e) => e.pinned !== undefined)?.pinned;
+  return { fills: [nearest[0].edge, nearest[1].edge], ...(under !== undefined && { pinned: under }) };
 }
 
 /** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
@@ -1677,24 +1714,25 @@ interface FlushRound {
  */
 function flushCheck(s: Mutable<State>, { best, facts, probeHeld, probeStroked, gesture, cover, offered, seen, ask }: FlushRound): Flush | Next | undefined {
   const chain = facts.scene.clips.scrollersOf(best.node);
-  const flushed = flushWith(best.node.rect, chain, s.rules.direction);
+  const flushed = flushWith(best.node.rect, chain, facts.scene.pinnedEdges(best.node), s.rules.direction);
   if (flushed === undefined) return undefined;
-  if ('fills' in flushed) return { edges: flushed.fills, container: chain[0], checked: false, why: 'fills' };
+  if ('fills' in flushed) return { edges: flushed.fills, container: chain[0], ...(flushed.pinned !== undefined && { pinned: flushed.pinned }), checked: false, why: 'fills' };
   const { edge, at } = flushed;
   const container = chain[at];
-  if (probeHeld) return probeStroked ? { edge, container, checked: true } : { edge, container, checked: false, why: 'tap' };
+  const where = { edge, container, ...(flushed.pinned !== undefined && { pinned: flushed.pinned }) };
+  if (probeHeld) return probeStroked ? { ...where, checked: true } : { ...where, checked: false, why: 'tap' };
   // With no gesture box (`RoundSeen.screen` absent) nothing has room and the stop says `room` — the wrong reason (it
   // is "no screen box"), accepted as unreachable in practice: screenBox throws only when the device's size is
   // unusable AND the tree has no window, and adapters/viewport-memo.ts keeps a successful size for the session — so it
   // takes a device reporting 0×0 throughout, and a tree whose window stood in on an earlier round (else the frame is
   // 0×0 and no stop is ever visible) but not on this one.
-  const noRoom = { edge, container, checked: false, why: 'room' } as const;
-  if (probeAcrossOnly({ toward: SIDES[edge].reveals, facts, scrollViews: chain.slice(at) })) return { edge, container, checked: false, why: 'axis' };
+  const noRoom = { ...where, checked: false, why: 'room' } as const;
+  if (probeAcrossOnly({ toward: SIDES[edge].reveals, facts, scrollViews: chain.slice(at) })) return { ...where, checked: false, why: 'axis' };
   const maxTravel = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(s.frame.box.width, s.frame.box.height));
   const probeOver = (keyboardTop: number | undefined) =>
     planProbe(s.strokes, { toward: SIDES[edge].reveals, reach: PROBE_REACH, maxTravel, gesture, facts, scrollViews: chain.slice(at), keyboardTop });
   if (probeOver(undefined) === undefined) return noRoom;
-  if (s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) return { edge, container, checked: false, why: 'budget' };
+  if (s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) return { ...where, checked: false, why: 'budget' };
   // Clear of a keyboard as any stroke is — and one the moot rule never asked about (the stop was clean either way) is
   // asked about now: the probe touches down on the container's lower part for a bottom edge, which may be under the
   // band.
