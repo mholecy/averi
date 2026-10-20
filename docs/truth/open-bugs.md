@@ -103,16 +103,18 @@ These steps follow the implementation round the truth lab has used since round 1
 2. **Reproduce it red.**
    - Find the note's rows: `git grep <note-file-name> -- tests/differential/golden scripts/truth`.
    - Run golden. The row must be a known MISMATCH, with the reply the note quotes.
+   - Run it again with `--json` (each check's reply is in it) and keep that output outside the repo: it is the base for step 6. Replay at least what step 6 will: a capture the base did not replay is named, not compared.
 3. **Test first, at the seam.** Write a vitest over the real captured tree (`tests/fixtures/truth/...` or `tests/fixtures/...`). It must fail before the fix.
 4. **Fix the src.**
    - Prefer one deep module with a small interface.
    - A new concept gets a name and a type, not a flag or a positional boolean. No speculative generality.
    - Module docs say what the module decides and why, and cite notes by path, not task or review history.
 5. **Mutation-check every new test.** Break the fix, see the test fail, then restore it.
-6. **Golden again.**
+6. **Golden again, against the base.**
+   - Run golden with `--against <base.json>`. It prints every check whose verdict, reply, device calls or faults changed (of the captures both runs replayed), the KNOWN rows to strike — green now, or no longer asked — per family file, and the captures whose check count differs from COUNTS.
    - The note's rows must turn green, and there must be no new mismatch.
-   - Strike the green rows from `tests/differential/golden/*.known.ts`, keeping the COUNTS honest.
-   - Diff against the run before the fix: `--json` gives the rows; every changed reply must be explained.
+   - Every changed reply must be explained.
+   - Strike the listed rows from `tests/differential/golden/*.known.ts` by hand, and write the listed COUNTS. The rows are built with `keys(...)` over tag lists, so the report does not rewrite the files.
 7. **Live, if the bug is from a device.**
    - Run the note's live cases on the lab device and commit the record under `docs/truth/live-records/`.
    - Pin it in `tests/truth/live-rejudge.test.ts`, and strike the entry from `scripts/truth/live-known.ts`.
@@ -120,7 +122,7 @@ These steps follow the implementation round the truth lab has used since round 1
 8. **Update the records.**
    - The note's Status: "fixed at <commit>, measured by …".
    - If the fix refines a recorded decision, update its ADR in the same change.
-   - Set the note's calibration.json entry to `calibrate`, with `fix: [<commits>]` (short SHAs, the note's own fix first: its first parent is the red side; usually the oldest). Then run calibrate in full (not `--note`, which writes `.partial`): it must say `CALIBRATED`. Commit the report it writes with the table: the tests check the table's sides against it.
+   - Set the note's calibration.json entry to `calibrate`, with `fix: [<commits>]` (short SHAs, the note's own fix first: its first parent is the red side; usually the oldest). Its `checks` are the note's rows among the keys step 6 listed to strike. Then run calibrate in full (not `--note`, which writes `.partial`): it must say `CALIBRATED`. Commit the report it writes with the table: the tests check the table's sides against it.
      - Don't write `before` or `after`. calibrate derives them: `before` is the first fix's first parent, `after` is the last fix. A further pair's `before` is its `after`'s first parent.
      - Write `after` only to judge another commit: an earlier fix, or, with `afterNotFix`, a commit that is no fix. A pair with `afterNotFix` also gives its `before`.
 9. **Review.** Run a review loop with an independent, read-only reviewer, against the note as the spec. Fix what it finds and repeat until it approves. Then merge, and update this file.
@@ -141,6 +143,8 @@ Run all commands from the repo root (or a worktree) with `node --import tsx`. In
 ```sh
 # golden: replays the committed captures, no device (a few minutes)
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--json] [--side <other checkout>] [--only <cell>]
+# golden against an earlier --json run: changed checks, KNOWN rows to strike, COUNTS to write
+node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --against <base.json> [--only <cell>]
 # OCR rows need the host's Vision recognizer: run outside the sandbox, or they are skipped
 
 # unit tests and types

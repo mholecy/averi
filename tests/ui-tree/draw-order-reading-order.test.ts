@@ -5,12 +5,13 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { seenOrderOf, type OrderSeen } from '../../src/ui-tree/seen-order.js';
+import { coverNodes, tagged } from '../helpers/covers.js';
 import { node } from '../helpers/fake.js';
 
 /**
  * The controls listed BEFORE a control target it overlaps, in a listing given in READING order (idb's flat list; a WDA
  * sibling run sorted by top — SwiftUI's), are covers of it when one holds its centre: the order does not say which is
- * drawn on top, and the cover is named `unordered` — as is an overlapping control listed after it (a cover by draw
+ * drawn on top, and the cover's order is `untold` (ui-tree/cover.ts#CoverOrder) — as is an overlapping control listed after it (a cover by draw
  * order). A target pinned at the screen's bottom keeps its place on top; a run not sorted by top
  * keeps its order as draw order.
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
@@ -33,9 +34,8 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     const t = await tree();
     const w = byId(t, `${prefix}.W`);
     const seen = drawOrder(t).exposure(byId(t, `${prefix}.C`), IPHONE);
-    expect(seen.covers).toContain(w);
+    expect(tagged(seen.covers).filter((c) => c.order !== 'drawn')).toEqual([{ node: w, order: 'untold', presented: false }]);
     expect(seen.centreCover).toBe(w);
-    expect(seen.unordered).toEqual([w]);
     expect(seen.tapAt).toBeUndefined();
     // W is a cover, so what shows is already clear of it: nothing more to say of the part a tap may be aimed at.
     expect(seen.aimedClearOf).toEqual([]);
@@ -48,8 +48,7 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     const t = await tree();
     const c = byId(t, 'lab.blur-menu.C');
     const seen = drawOrder(t).exposure(byId(t, 'lab.blur-menu.W'), IPHONE);
-    expect(seen.covers).toEqual([c]);
-    expect(seen.unordered).toEqual([c]);
+    expect(tagged(seen.covers)).toEqual([{ node: c, order: 'untold', presented: false }]);
   });
 
   it('a control listed before that only overlaps the edge of a target, clear of its centre, is no cover of it: two cards 4 pt over each other', () => {
@@ -59,7 +58,6 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     const t = node({ role: 'other', rect: { ...IPHONE }, children: [node({ role: 'other', rect: { ...IPHONE }, readingOrder: true, children: [first, second] })] });
     const seen = drawOrder(t).exposure(second, IPHONE);
     expect(seen.covers).toEqual([]);
-    expect(seen.unordered).toEqual([]);
     expect(seen.shows).toBe(1);
   });
 
@@ -75,7 +73,7 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
         ? node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, readingOrder: true, children: [node({ role: 'other', label: 'Screen', rect: { ...IPHONE } }), w, c, toast] })
         : node({ role: 'other', rect: { ...IPHONE }, children: [node({ role: 'other', rect: { ...IPHONE }, readingOrder: true, children: [w, c, toast] })] });
     const seen = drawOrder(t).exposure(c, IPHONE);
-    expect(seen.covers).toEqual([toast]);
+    expect(tagged(seen.covers)).toEqual([{ node: toast, order: 'untold', presented: false }]);
     expect(seen.centreCover).toBe(toast);
     // The only piece of C clear of the toast, 400–440, lies on W down to 430: 10 pt left, under the 24 a tap needs.
     expect(seen.tapAt).toBeUndefined();
@@ -91,8 +89,7 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     const tabs = ['Home', 'Pay', 'Cards', 'More'].map((label, i) => node({ role: 'button', label, rect: { x: 37 + 82 * i, y: 755, width: 82, height: 64 } }));
     const t = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, readingOrder: true, children: [node({ role: 'other', label: 'Screen', rect: { ...IPHONE } }), row, fab, ...tabs] });
     const seen = drawOrder(t).exposure(row, IPHONE);
-    expect(seen.covers).toEqual([fab]);
-    expect(seen.unordered).toEqual([]);
+    expect(tagged(seen.covers)).toEqual([{ node: fab, order: 'drawn', presented: false }]);
     expect(seen.tapAt).toMatchObject({ moved: false });
   });
 
@@ -101,8 +98,10 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
     const row = [...everyNode(t)].find((n) => n.label?.startsWith('Loan repayment'))!;
     const seen = drawOrder(t).exposure(row, IPHONE);
     // SWIFT payment (45,453 312x52) holds its centre (201,461); To my account (45,397 312x52) its top 14 pt — both covers.
-    expect(seen.covers.map((n) => n.label)).toEqual(['To my account', 'SWIFT payment']);
-    expect(seen.unordered).toEqual(seen.covers);
+    expect(tagged(seen.covers).map(({ node: n, order }) => [n.label, order])).toEqual([
+      ['To my account', 'untold'],
+      ['SWIFT payment', 'untold'],
+    ]);
     expect(seen.tapAt).toBeUndefined();
   });
 
@@ -118,7 +117,7 @@ describe('a control listed before a control it partly overlaps, in a reading-ord
 
   it("a WDA sibling run NOT sorted by top keeps its order as draw order: Contacts' Add photo is no cover of Remove photo", async () => {
     const t = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-new-contact.json', import.meta.url), 'utf8'));
-    expect(drawOrder(t).exposure(byLabel(t, 'Remove photo'), IPHONE).covers.map((n) => n.label)).not.toContain('Add photo');
+    expect(drawOrder(t).exposure(byLabel(t, 'Remove photo'), IPHONE).covers.map((c) => c.node.label)).not.toContain('Add photo');
   });
 });
 
@@ -140,7 +139,7 @@ describe("the parsers mark a listing given in reading order (UiNode.readingOrder
 /**
  * THE ORDER SEEN (ui-tree/seen-order.ts): what a screenshot showed of two controls the listing does not order enters the
  * draw order as an input — a peer seen UNDER the target is no cover of it (nor a part a moved tap keeps clear of), a peer
- * seen OVER it stays a cover, named `seenOver` instead of `unordered`; an untold pair is today's.
+ * seen OVER it stays a cover, its order `seenOver` instead of `untold`; an untold pair is today's.
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
 describe('the order a screenshot saw, handed to the draw order', () => {
@@ -156,8 +155,6 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const c = byId(t, 'lab.blur-menu.C');
     const seen = drawOrder(t, seenOrderOf(w, [{ peer: c, seen: 'over', ...HEX }])).exposure(w, IPHONE);
     expect(seen.covers).toEqual([]);
-    expect(seen.unordered).toEqual([]);
-    expect(seen.seenOver).toEqual([]);
     expect(seen.aimedClearOf).toEqual([]);
     expect(seen.shows).toBe(1);
     expect(seen.tapAt).toEqual({ point: { x: 201, y: 480 }, moved: false });
@@ -168,10 +165,8 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const w = byId(t, 'lab.blur-menu.W');
     const c = byId(t, 'lab.blur-menu.C');
     const seen = drawOrder(t, seenOrderOf(w, [{ peer: c, seen: 'over', ...HEX }])).exposure(c, IPHONE);
-    expect(seen.covers).toEqual([w]);
+    expect(tagged(seen.covers)).toEqual([{ node: w, order: 'seenOver', presented: false }]);
     expect(seen.centreCover).toBe(w);
-    expect(seen.seenOver).toEqual([w]);
-    expect(seen.unordered).toEqual([]);
     expect(seen.tapAt).toBeUndefined();
   });
 
@@ -180,8 +175,8 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const w = byId(t, 'lab.blur-menu.W');
     const c = byId(t, 'lab.blur-menu.C');
     const order = drawOrder(t, seenOrderOf(c, [{ peer: w, seen: 'over', ...HEX }]));
-    expect(order.exposure(w, IPHONE)).toMatchObject({ covers: [c], seenOver: [c], unordered: [] });
-    expect(order.exposure(c, IPHONE)).toMatchObject({ covers: [], seenOver: [], unordered: [], tapAt: { point: { x: 201, y: 502 }, moved: false } });
+    expect(tagged(order.exposure(w, IPHONE).covers)).toEqual([{ node: c, order: 'seenOver', presented: false }]);
+    expect(order.exposure(c, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 502 }, moved: false } });
   });
 
   it.each(trees)('%s: an untold pair is the listing\'s untold order, as with no screenshot', async (_n, tree) => {
@@ -192,6 +187,6 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const { coverAt: _a, ...told } = drawOrder(t, seenOrderOf(w, untold)).exposure(w, IPHONE);
     const { coverAt: _b, ...listed } = drawOrder(t).exposure(w, IPHONE);
     expect(told).toEqual(listed);
-    expect(listed.unordered).toEqual([c]);
+    expect(tagged(listed.covers)).toEqual([{ node: c, order: 'untold', presented: false }]);
   });
 });

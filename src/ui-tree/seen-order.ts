@@ -2,7 +2,7 @@ import type { UiNode } from '../adapters/types.js';
 
 /**
  * THE ORDER SEEN: what one screenshot showed of two controls a listing in READING order does not order — which of the
- * two is drawn on top in their overlap (draw-order.ts#Exposure.unordered; docs/adr/0015-flat-list-reading-order-break.md,
+ * two is drawn on top in their overlap (cover.ts#CoverOrder's `untold`; docs/adr/0015-flat-list-reading-order-break.md,
  * amended). The eyes' second question answers it (ui-tree/eyes.ts#Eyes.order, judged by verify/eyes.ts#judgeOrder);
  * this module holds the answer as the draw order takes it — an INPUT of the pure draw order
  * (draw-order.ts#drawOrder's `orderSeen`), so the draw order stays synchronous and replayable, and a tree-only caller, which

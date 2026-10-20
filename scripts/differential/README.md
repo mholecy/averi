@@ -139,14 +139,20 @@ larger leg on it, either way — a turn back too): a stroke across a carousel's 
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
-  [--only <cell>[,<cell>…]] [--json]
+  [--only <cell>[,<cell>…]] [--json | --against <base.json>]
 ```
 
 `--only` keeps the captures a token names (a cell, a capture with or without its extension, either behind its run; a
-token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. A check whose
-reply is a harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake device's
-`differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
-(`golden.ts#faultsOf`) — no evidence about the tool either way. Exit code 1 on a mismatch, a broken target or a fault.
+token naming none is an error); `--json` prints the results as data (`GoldenJson`) in place of the report. `--against`
+a `--json` file of an earlier run (the one before a fix) prints, in place of the report, what changed since
+(`golden-diff.ts`): every check whose verdict, reply, device calls or faults differ, and every check only one run asks —
+of the captures both runs replayed (one only this run replayed is named, not compared); the ratchet's KNOWN rows this
+run finds green or no longer asks, as the keys to strike, per family file (a row skipped for want of OCR, or of a
+capture not replayed, is held, as by the ratchet); and each capture whose check count differs from COUNTS. It rewrites
+no `*.known.ts`: their rows are built over tag lists, edited by hand. A check whose reply is a harness or JavaScript
+error (`THROW`, "is not a function", "Cannot read properties of", the fake device's `differential:`) or whose call sent
+a command the fake does not model (`UNMODELLED`) carries it as `faults` (`golden.ts#faultsOf`) — no evidence about the
+tool either way. Exit code 1 on a mismatch, a broken target or a fault.
 `tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, the checks per
 capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their class, their reply's kind
 (`scripts/truth/replies.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they

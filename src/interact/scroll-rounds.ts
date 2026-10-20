@@ -1149,11 +1149,11 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // `direction: "up"` flung it to 771 under CONTINUE and swiped up six
     // times more. The target is right there: the strokes turn at once.
     // Where a cover presses, as exposure judged it (the standing's
-    // `facts.reaches`): CONTINUE pinned at idb's flat list reaches the
+    // `facts.covers`, ui-tree/cover.ts#Cover.reach): CONTINUE pinned at idb's flat list reaches the
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, courseOf(s), cover, f));
-    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.reaches.some(overFar));
+    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => overFar(c.reach)));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyondFarEdgeIn(farFacts(best), courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
@@ -1464,11 +1464,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // dismiss it: one more read with no stroke between, then stop — or, should the screen be gone by
     // then, the read above stops as any other. Without a confirm left, stop on this read.
     // The standing's own remedy decides it (ui-tree/standing.ts#Remedy, presented first, whatever the kind) — when the
-    // presented surface lies over it IN this read's frame (`facts.presented`). One the standing judged of the node
+    // presented surface lies over it IN this read's frame (a `presented` one of `facts.covers`, ui-tree/cover.ts#Cover). One the standing judged of the node
     // alone (draw-order.ts#DrawOrder.presentedOver: nothing of that surface over what shows of it) is the stroke's to
     // ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
-    if (remedy?.of === 'presented' && best.standing.facts.presented !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
+    if (remedy?.of === 'presented' && best.standing.facts.covers.some((c) => c.presented)) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — no swipe tells which is
     // on top or moves it out from under the other: stop.
     if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver')) {

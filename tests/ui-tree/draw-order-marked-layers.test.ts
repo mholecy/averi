@@ -16,8 +16,10 @@ import { IPHONE, judged, list, popover, rect, sheet } from '../helpers/presented
 const desc = (n: UiNode | undefined): string | undefined => n && `${n.role} ${n.identifier ?? n.label ?? ''} ${n.rect.x},${n.rect.y} ${n.rect.width}x${n.rect.height}`.replace('  ', ' ');
 const exposed = (tree: UiNode, target: UiNode) => {
   const seen = drawOrder(tree).exposure(target, IPHONE);
-  return { covers: seen.covers.map(desc), centreCover: desc(seen.centreCover), presented: seen.presented.map(desc), shows: seen.shows, tapAt: seen.tapAt };
+  return { covers: seen.covers.map((c) => ({ node: desc(c.node), order: c.order.kind, presented: c.presented })), centreCover: desc(seen.centreCover), shows: seen.shows, tapAt: seen.tapAt };
 };
+/** A cover drawn over the target that is the surface of the screen presented over it (`Cover.presented`) — or, `presented: false`, any other. */
+const surface = (node: string, presented = true) => ({ node, order: 'drawn', presented });
 
 const SHEET_PROMPT = 'other Are you sure? 10,78 240x169';
 const LAYER = 'container 0,0 402x874';
@@ -26,7 +28,7 @@ describe('a layer typed by its element: the element is its one cover, outside th
   it('a row of the screen beneath is covered by the action sheet alone, reaching the whole screen — the dim before it is drawn on it, no cover of its own', () => {
     const { row, layer: beneath } = list();
     const { layer } = popover();
-    expect(exposed(judged(beneath, layer), row)).toEqual({ covers: [SHEET_PROMPT], centreCover: SHEET_PROMPT, presented: [SHEET_PROMPT], shows: 0, tapAt: undefined });
+    expect(exposed(judged(beneath, layer), row)).toEqual({ covers: [surface(SHEET_PROMPT)], centreCover: SHEET_PROMPT, shows: 0, tapAt: undefined });
   });
 
   it('a node of the typed layer ITSELF is not beneath it: the popover\'s own `dismiss popup` — the way to close it — and its buttons are reached at their centre', () => {
@@ -35,8 +37,8 @@ describe('a layer typed by its element: the element is its one cover, outside th
     const tree = judged(beneath, layer);
     // The popover's own button lies on its dim as on any node drawn before it — an ordinary cover, no presented
     // surface.
-    expect(exposed(tree, dim)).toMatchObject({ covers: ['button Discard Changes 10,160 240x44'], presented: [], tapAt: { point: { x: 201, y: 437 }, moved: false } });
-    expect(exposed(tree, discard)).toMatchObject({ covers: [], presented: [], tapAt: { moved: false } });
+    expect(exposed(tree, dim)).toMatchObject({ covers: [surface('button Discard Changes 10,160 240x44', false)], tapAt: { point: { x: 201, y: 437 }, moved: false } });
+    expect(exposed(tree, discard)).toMatchObject({ covers: [], tapAt: { moved: false } });
     expect(drawOrder(tree).presentedOver(dim)).toBeUndefined();
     expect(desc(drawOrder(tree).presentedOver(row))).toBe(SHEET_PROMPT);
   });
@@ -48,9 +50,8 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     const { row, layer: beneath } = list();
     const { layer } = sheet();
     expect(exposed(judged(beneath, layer), row)).toEqual({
-      covers: [LAYER, 'button add phone 20,690 362x52'],
+      covers: [surface(LAYER), surface('button add phone 20,690 362x52')],
       centreCover: 'button add phone 20,690 362x52',
-      presented: [LAYER, 'button add phone 20,690 362x52'],
       shows: 0,
       tapAt: undefined,
     });
@@ -59,7 +60,7 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
   it('where nothing of the layer draws — the status strip above the sheet — the anonymous layer is the cover named', () => {
     const { title, layer: beneath } = list();
     const { layer } = sheet();
-    expect(exposed(judged(beneath, layer), title)).toEqual({ covers: [LAYER], centreCover: LAYER, presented: [LAYER], shows: 0, tapAt: undefined });
+    expect(exposed(judged(beneath, layer), title)).toEqual({ covers: [surface(LAYER)], centreCover: LAYER, shows: 0, tapAt: undefined });
   });
 
   it('the presented questions agree at every touch-down: `presentedAt` names what of the layer is on top there, else the layer; `presentedOver` the last drawn', () => {
@@ -77,7 +78,7 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     const { field, cancel, layer } = sheet();
     const tree = judged(beneath, layer);
     for (const own of [field, cancel]) {
-      expect(exposed(tree, own)).toMatchObject({ covers: [], presented: [], tapAt: { moved: false } });
+      expect(exposed(tree, own)).toMatchObject({ covers: [], tapAt: { moved: false } });
       expect(drawOrder(tree).presentedOver(own)).toBeUndefined();
     }
   });
@@ -129,6 +130,6 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     const { layer } = popover();
     const tree = judged(beneath, sheetLayer, layer);
     expect(exposed(tree, row).centreCover).toBe(SHEET_PROMPT);
-    expect(exposed(tree, field)).toMatchObject({ covers: [SHEET_PROMPT], centreCover: SHEET_PROMPT, shows: 0 });
+    expect(exposed(tree, field)).toMatchObject({ covers: [surface(SHEET_PROMPT)], centreCover: SHEET_PROMPT, shows: 0 });
   });
 });
