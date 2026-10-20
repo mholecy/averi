@@ -1410,7 +1410,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
     // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
     const { facts } = best.standing;
-    // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover.
+    // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover —
+    // neutral either way today: an overlaid cover lies over a node in no scroll view, which has no flush neighbour to ask of.
     const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.some(drawOrderFound) }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame) : undefined;
     // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
     // last refused them — no confirm, no screenshot; this stroke's read, short as before.

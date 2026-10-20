@@ -457,8 +457,8 @@ export interface StandingFacts {
   /**
    * draw-order.ts#Exposure's, inside the frame below the status band (the pixel's: where that meets what it reads): the
    * covers (cover.ts#Cover: each with where it presses, its order against the node, and whether it is the surface of a
-   * screen presented over it), the one over the centre, and what shows. And, on a `fully` stop or a pixel standing
-   * that found no cover, the node at its overlaid edge (`OverlaidEdge`), appended as its cover (cover.ts#overlaidCover,
+   * screen presented over it), the one over the centre, and what shows. And, on a `fully` stop that found no cover or a pixel
+   * standing with no pixel cover, the node at its overlaid edge (`OverlaidEdge`), appended as its cover (cover.ts#overlaidCover,
    * the order `overlaid`): on the `fully` stop before the order is decided, so it is also there when an earlier rule
    * wins (where the point lies, a cut: `stopOrdered`); on the pixel's only when it is the cover, where no cover paints
    * a pixel it reads (draw-order.ts#paintsOver) — so its node may also be among the exposure's covers, as one that paints none. No cover the draw
