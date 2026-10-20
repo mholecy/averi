@@ -1,5 +1,15 @@
 # BUG: on Android a row Compose cuts at a sticky header — its content cut with it — reads whole: `fully: true` calls it "fully visible" and the colour assert passes on the cut rect
 
+> **Status (2026-10-20, round 9): still open.** Round 9's B4-L1 fix first read the merged sticky header, pinned at its
+> list's top, as an OVERLAY of R (`fix/r9-b4l1` `7755978c`: `fully` covered by it, the colour assert failing closed —
+> both golden rows green). On the device `scroll_until R fully: true` then stroked the list 66→877→439→1→205 and timed
+> out with R under the header (docs/truth/live-records/android-vis-r9-b4l1-sticky.json). The tree cannot tell the two:
+> at rest (offset 0) R lies WHOLE and flush under the header, dumped exactly as the row it cuts here, so the clause
+> would refuse `fully` and fail the pixel assert on every first row under a full-bleed sticky header. `e6ed7d43` dropped
+> it (ADR 0013, refined 2026-10-20: never a neighbour in the node's own scroll view). What could tell them is motion: a
+> flush probe toward the header, as `scroll_until`'s probe at a clipping container's edge (interact/scroll-rounds.ts
+> #PROBE_REACH) — for `fully`; the pixel assert has no probe.
+
 **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's ground truth
 (`tests/fixtures/truth/android-averi_lab-api33/scroll-sticky-cut.*`, captured by scripts/truth/capture-android.ts on the
 `averi_lab` AVD, Android 13 (API 33), 1080x2220, gesture navigation). averi = mobile-verify `truth/r3-variants` on

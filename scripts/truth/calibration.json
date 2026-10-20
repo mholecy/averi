@@ -1239,20 +1239,24 @@
         "android-averi_lab-api33/scroll-sticky-cut.xml R colour",
         "android-averi_lab-api33/scroll-sticky-cut.xml R fully"
       ],
-      "remark": "No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744)."
+      "remark": "No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744). Round 9's B4-L1 fix first read the sticky header as an overlay of the row (7755978): golden green, but on the device scroll_until R fully stroked the list away and timed out (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) — at rest a first row lies whole and flush under its sticky header, the same tree as the row it cuts; e6ed7d4 dropped the clause (ADR 0013, refined 2026-10-20). Left for a flush probe toward the header."
     },
     {
       "n": "B4-L1",
       "note": "2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["7755978", "e6ed7d4"],
+      "before": "706dfae",
+      "after": "e6ed7d4",
       "verified": "golden",
       "defect": "fully visible where it is|^passed on|^reached where it is under-chrome",
       "checks": [
         "android-averi_lab-api33/pinned-bar.xml P fully",
         "android-averi_lab-api33/pinned-bar.xml P colour",
+        "android-averi_lab-api33/text-under-bar.xml P colour",
         "android-averi_lab-api33/text-under-bar.xml P.id scroll_until"
       ],
-      "remark": "No fix yet: red at HEAD. bars.known.ts and text.known.ts own the ratchet; this entry only links the note to its rows (the `fully` stop, the colour assert passing on P's uncovered part, and the plain stop on text-under-bar's P — its centre under the pinned button — asked by its identifier, which reads it reached: the same uncovered-bounds form on the plain-stop path, not fullyStanding's)."
+      "remark": "Fixed by round 9 on fix/r9-b4l1 (ui-tree/standing.ts#OverlaidEdge; ADR 0013 refined 2026-10-20): on Android's trees a node laid flush across a node's top or bottom edge, drawn after it outside its subtree and its scroll view, that reaches past it at both ends is an overlay the source cut the node at — the `fully` stop and the pixel assert name it as the cover, and a role-less non-text node cut by it to a strip is a sliver. 7755978 also read a sticky header in the row's own list as one (VA1); the device refused that clause (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) and e6ed7d4 dropped it: the pair is e6ed7d4 and 706dfae (fix/round-9 after L4's W half). Before: P fully visible after 0 swipes, both colours PASS on the cut rect, text-under-bar's P.id reached. After: P fully fails naming Continue (cut at its bottom edge, may run on under it), both colours FAIL closed naming Continue, text-under-bar's P.id cut to a sliver by Continue. Live (android-vis-r9-b4l1.json): every tap as before, nothing else changed."
     },
     {
       "n": "F2A1",

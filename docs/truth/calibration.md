@@ -59,7 +59,7 @@ open note on the working tree. See the script for the verdicts.
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | open | working tree | OPEN-RED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | open | working tree | OPEN-RED |
-| B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | open | working tree | OPEN-RED |
+| B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → e6ed7d4 | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | open | working tree | OPEN-RED |
@@ -1141,18 +1141,24 @@ Raised by B2 review round 1 (MAJOR-1), when R-stroke began to hold a stroke to t
   - RED android-averi_lab-api33/scroll-sticky-cut.xml R colour — passed on #00897B: PASS  element id:"lab.scroll-sticky-cut.R" fill within dE00 8 of #00897B — sampled #00897B (dominant, 100% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/scroll-sticky-cut.xml R fully — fully visible where it is chrome-overlap:stickyHeader, after 0 swipe(s) that move nothing: Element id:"lab.scroll-sticky-cut.R" fully visible after 0 swipes
 
-No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744).
+No fix yet: red at HEAD, and with the same symptom at #9's before (10fb02b) and fix (d2b7744). Round 9's B4-L1 fix first read the sticky header as an overlay of the row (7755978): golden green, but on the device scroll_until R fully stroked the list away and timed out (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) — at rest a first row lies whole and flush under its sticky header, the same tree as the row it cuts; e6ed7d4 dropped the clause (ADR 0013, refined 2026-10-20). Left for a flush probe toward the header.
 
-## B4-L1: OPEN-RED
+## B4-L1: CALIBRATED
 
 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md — defect: `fully visible where it is|^passed on|^reached where it is under-chrome`
 
-- working tree:
+- before 706dfae:
   - RED android-averi_lab-api33/pinned-bar.xml P fully — fully visible where it is chrome-overlap:pinned, after 0 swipe(s) that move nothing: Element id:"lab.pinned-bar.P" fully visible after 0 swipes
   - RED android-averi_lab-api33/pinned-bar.xml P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 100% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 1.000
+  - RED android-averi_lab-api33/text-under-bar.xml P colour — passed on #FCE4EC: PASS  element id:"lab.text-under-bar.P" fill within dE00 8 of #FCE4EC — sampled #FCE4EC (dominant, 100% of region) vs expected #FCE4EC → dE00 0.00 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/text-under-bar.xml P.id scroll_until — reached where it is under-chrome:pinned, after 0 swipe(s) that move nothing: Element id:"lab.text-under-bar.P" fully visible after 0 swipes
+- after e6ed7d4:
+  - ok android-averi_lab-api33/pinned-bar.xml P fully — ERROR scroll_until id:"lab.pinned-bar.P" failed after 3 swipes — element is in the viewport but cut at its bottom edge by container id:lab.pinned-bar.continue (66,1956 948x154), drawn after it — the dump (Compose's, on A
+  - ok android-averi_lab-api33/pinned-bar.xml P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — container id:lab.pinned-bar.continue (66,1956 948x154) meets the element's bottom edge (element 127,1846 825x110), drawn after it — the dump (Compose's,
+  - ok android-averi_lab-api33/text-under-bar.xml P colour — FAIL  element id:"lab.text-under-bar.P" fill within dE00 8 of #FCE4EC — container id:lab.text-under-bar.continue (66,1956 948x154) meets the element's bottom edge (element 127,1934 825x22), drawn after it — the dump (Com
+  - ok android-averi_lab-api33/text-under-bar.xml P.id scroll_until — ERROR scroll_until id:"lab.text-under-bar.P" failed after 2 swipes — element is in the viewport but cut at its bottom edge by container id:lab.text-under-bar.continue (66,1956 948x154), drawn after it — the dump (Compose
 
-No fix yet: red at HEAD. bars.known.ts and text.known.ts own the ratchet; this entry only links the note to its rows (the `fully` stop, the colour assert passing on P's uncovered part, and the plain stop on text-under-bar's P — its centre under the pinned button — asked by its identifier, which reads it reached: the same uncovered-bounds form on the plain-stop path, not fullyStanding's).
+Fixed by round 9 on fix/r9-b4l1 (ui-tree/standing.ts#OverlaidEdge; ADR 0013 refined 2026-10-20): on Android's trees a node laid flush across a node's top or bottom edge, drawn after it outside its subtree and its scroll view, that reaches past it at both ends is an overlay the source cut the node at — the `fully` stop and the pixel assert name it as the cover, and a role-less non-text node cut by it to a strip is a sliver. 7755978 also read a sticky header in the row's own list as one (VA1); the device refused that clause (docs/truth/live-records/android-vis-r9-b4l1-sticky.json) and e6ed7d4 dropped it: the pair is e6ed7d4 and 706dfae (fix/round-9 after L4's W half). Before: P fully visible after 0 swipes, both colours PASS on the cut rect, text-under-bar's P.id reached. After: P fully fails naming Continue (cut at its bottom edge, may run on under it), both colours FAIL closed naming Continue, text-under-bar's P.id cut to a sliver by Continue. Live (android-vis-r9-b4l1.json): every tap as before, nothing else changed.
 
 ## F2A1: CALIBRATED
 
