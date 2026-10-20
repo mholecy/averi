@@ -25,10 +25,10 @@ import { ocrDecision, ocrSkip, probeRecognizer } from './ocr-probe.js';
  *
  * The side defaults to this checkout; an older commit's src is loaded by this checkout's harness (side.ts). `--only`
  * keeps the captures a token names (selectRecordings); `--json` prints the results as data (GoldenJson) in place of the
- * report — scripts/truth/calibrate.ts reads it; `--against` a `--json` file of an earlier run prints, in place of the report,
- * what changed since (golden-diff.ts: changed checks, the KNOWN rows to strike, the COUNTS to write). A check whose reply is a harness or JavaScript error, or whose call
- * sent a command the fake device does not model, carries it as `faults` (faultsOf), in the JSON and the report. Exit
- * code 1 on a mismatch, a broken target or a fault.
+ * report — scripts/truth/calibrate.ts reads it; `--against` a `--json` file of an earlier run prints, in place of the
+ * report, what changed since (golden-diff.ts: changed checks, the KNOWN rows to strike, the COUNTS to write). A check
+ * whose reply is a harness or JavaScript error, or whose call sent a command the fake device does not model, carries it
+ * as `faults` (faultsOf), in the JSON and the report. Exit code 1 on a mismatch, a broken target or a fault.
  */
 
 export interface GoldenCheck {
@@ -263,8 +263,8 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     throw new Error('usage: golden.ts --corpus <dir> [--side <ref|path>] [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json | --against <base.json>]');
   }
   // The base is read first: a missing file, or one no `--json` run wrote, fails before any replay.
-  const base = values.against === undefined ? undefined : (JSON.parse(await readFile(resolve(values.against), 'utf8')) as Partial<GoldenJson>).results;
-  if (values.against !== undefined && !Array.isArray(base)) throw new Error(`golden --against: ${values.against} is no golden --json output`);
+  const against = values.against;
+  const base = against === undefined ? undefined : (await import('./golden-diff.js')).baseOf(await readFile(resolve(against), 'utf8'), against);
   // The checkout first: git runs before the fake device refuses every process.
   const { codeRoot } = await import('./checkout.js');
   const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -281,11 +281,11 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     const corpus = selectRecordings((await loadCorpus(resolve(values.corpus))).filter((r) => r.truth !== undefined), parseOnly(values.only));
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
-    if (base !== undefined) {
+    if (against !== undefined && base !== undefined) {
       // The ratchet's files are this checkout's: the rows to strike and the counts to write are in them.
       const { KNOWN_FILES } = await import('../../tests/differential/golden/files.js');
       const { diffReport, goldenDiff } = await import('./golden-diff.js');
-      console.log(diffReport(values.against!, base, results, goldenDiff(base, results, KNOWN_FILES)));
+      console.log(diffReport(against, goldenDiff(base, results, KNOWN_FILES)));
     } else console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results));
     process.exitCode = exitCode(results);
   } finally {

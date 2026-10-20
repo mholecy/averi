@@ -103,7 +103,7 @@ These steps follow the implementation round the truth lab has used since round 1
 2. **Reproduce it red.**
    - Find the note's rows: `git grep <note-file-name> -- tests/differential/golden scripts/truth`.
    - Run golden. The row must be a known MISMATCH, with the reply the note quotes.
-   - Keep this run's `--json` output outside the repo: it is the base for step 6.
+   - Run it again with `--json` (each check's reply is in it) and keep that output outside the repo: it is the base for step 6. Replay at least what step 6 will: a capture the base did not replay is named, not compared.
 3. **Test first, at the seam.** Write a vitest over the real captured tree (`tests/fixtures/truth/...` or `tests/fixtures/...`). It must fail before the fix.
 4. **Fix the src.**
    - Prefer one deep module with a small interface.
@@ -111,7 +111,7 @@ These steps follow the implementation round the truth lab has used since round 1
    - Module docs say what the module decides and why, and cite notes by path, not task or review history.
 5. **Mutation-check every new test.** Break the fix, see the test fail, then restore it.
 6. **Golden again, against the base.**
-   - Run golden with `--against <base.json>`. It prints every check whose verdict, reply, device calls or faults changed, the KNOWN rows now green (per family file), and the captures whose check count differs from COUNTS.
+   - Run golden with `--against <base.json>`. It prints every check whose verdict, reply, device calls or faults changed (of the captures both runs replayed), the KNOWN rows to strike — green now, or no longer asked — per family file, and the captures whose check count differs from COUNTS.
    - The note's rows must turn green, and there must be no new mismatch.
    - Every changed reply must be explained.
    - Strike the listed rows from `tests/differential/golden/*.known.ts` by hand, and write the listed COUNTS. The rows are built with `keys(...)` over tag lists, so the report does not rewrite the files.
