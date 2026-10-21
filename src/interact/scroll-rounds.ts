@@ -2,7 +2,7 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, belowStatusBand, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
-import { nodeIdentity, screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
+import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
@@ -12,9 +12,9 @@ import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/st
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { carriedUnder, type CarriedUnder } from './motion-shown.js';
-import { carried, motionShownOf, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
-import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
+import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type CarriedUnder, type LedgerRead, type MotionLedger, type Moved, type Since, type Streaks, type UnseenStrokes } from './motion-ledger.js';
+import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
+import { axisOf, OPPOSITE, SIDES, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -30,7 +30,13 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  * match judged best, the frames — is interact/scroll-read.ts#judgeRead's,
  * which `round` calls once per read that read; where the match stands for
  * the stop (in frame, covered, cut, under a band) is
- * ui-tree/standing.ts#Scene.standing's, which that module asks.
+ * ui-tree/standing.ts#Scene.standing's, which that module asks. Whether
+ * anything MOVED between reads — the judged match, every match, the tree,
+ * the identical-stroke streaks, slowing, the carry sample, the blank
+ * strokes, the region the motion showed — is the motion ledger's
+ * (interact/motion-ledger.ts), which `round` shows each round once and
+ * asks; what the round makes of its answers (stuck, exhausted, the end
+ * proof, the settle confirm) stays here.
  *
  * Pure: no adapter, no clock, no I/O, no exceptions but the protocol's own
  * (below). Deterministic: the same state and seen give the same step, so a
@@ -65,7 +71,8 @@ import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Dir
  *
  * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead),
  * then `ask order` for a best match covered by a control the listing does not order (ADR 0024) and the judgement again
- * on what the eyes saw; motion observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
+ * on what the eyes saw; the motion ledger shown the round (`seeMotion`, before the stroke plan sees the read); motion
+ * observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
  * PROBE_REACH; then `ask unlocated` on a `fully: true` stop with no cover under it; then `ask eyes` on a stop that would
  * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
@@ -149,7 +156,7 @@ export interface RoundSeen {
  */
 type ThisRead = Pick<ReadJudgement, 'facts' | 'frames' | 'uncutFrames'> & {
   readonly read: RoundRead;
-  /** The judged match's stop, held back by the region its motion showed (interact/motion-shown.ts#carriedUnder) — at the far edge, it turns the strokes as a target there does. */
+  /** The judged match's stop, held back by the region its motion showed (interact/motion-ledger.ts#heldBack) — at the far edge, it turns the strokes as a target there does. */
   readonly heldBack: CarriedUnder | undefined;
 };
 
@@ -406,7 +413,7 @@ export interface ReadTime {
  * - `absent`: not in the last tree, and never in the frame before it —
  *   `unsearched` the side the strokes never
  *   read, when there is evidence it is the only one left: a stroke changed
- *   the screen (`State.treeMoved`), then the caller's own strokes no longer
+ *   the screen (motion-ledger.ts#treeMoved), then the caller's own strokes no longer
  *   did (`exhausted`, `tree`), and none of them touched down on a node drawn
  *   over the list — the content ran to its end the caller's way, every row
  *   on that side through the tree, so a target this list holds lies on the
@@ -445,32 +452,6 @@ export type Shortfall =
   | { of: 'gone'; inFrameAfter: number }
   | { of: 'left'; inTreeAfter: number; past?: PastSide }
   | { of: 'offFrame'; rect: Rect; inFrameAfter?: number; viewport: Rect; cover?: AppliedKeyboard; eitherWayUp: boolean; past?: PastSide; outside?: UiNode };
-
-/**
- * The strokes in a row, up to the bound, whose reads listed none of the content of the scroll view they went over
- * (`within`) — `Clips.contentToward`'s `blank`: blank space, or content that dumps no node — so how far they moved it
- * is unknown (UNMOVED_STROKES_EXHAUST's blank read; the first may show it moved, by carrying the last content listed
- * off the viewport, but none shows how far). All over one scroll view, one way: a stroke over another, or the other
- * way, starts the count again. `toward`: the way they went, where the content lies. An `absent`
- * failure at maxSwipes or the deadline carries it: without it, "never appeared" at the bound reads as "not there",
- * where the target may lie further on.
- * docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md
- */
-export interface UnseenStrokes {
-  readonly strokes: number;
-  readonly within: Rect;
-  readonly toward: Direction;
-}
-
-/**
- * `unseen` with one more blank read over `within`, toward `toward` — counted on only over the same scroll view, the same
- * way. (No absent target's call turns today — a turn needs a sighting, and a read that finds the target ends the count
- * — so the way is a guard ahead of one that does.)
- */
-function unseenAfter(unseen: UnseenStrokes | undefined, within: Rect, toward: Direction): UnseenStrokes {
-  const goesOn = unseen !== undefined && unseen.toward === toward && sameRectWithinPixel(unseen.within, within);
-  return { strokes: goesOn ? unseen.strokes + 1 : 1, within: { ...within }, toward };
-}
 
 /** The side a read found the target wholly beyond, and whether it was dumped clipped out past it (UiNode.clippedOut) rather than read past it on the screen. */
 export interface PastSide {
@@ -561,10 +542,10 @@ export const SETTLE_CONFIRM_READS = 3;
  * container, so blank space — a spacer, an image or a chart with no node — dumps the same tree at every offset:
  * measured, the lab app's `tabbar-floating` read "the last 2 … did not change the screen" after 4 strokes while each
  * moved the list ~860 px, F one stroke away. Such a read is no unmoved read — the streak starts again, a reset, not a
- * freeze, the conservative side; nor a moved one: only a changed fingerprint sets `State.treeMoved` — and the strokes
- * run on to the bound, where an `absent` failure says the last of them went over blank content (`UnseenStrokes`: raise
- * maxSwipes or timeoutMs). The streak keeps its meaning — the same stroke twice left a tree that WOULD show motion
- * unchanged — so "did not change the screen" stays true. Cost: none wherever the list shows content along the stroke's
+ * freeze, the conservative side; nor a moved one: only a changed fingerprint sets the motion ledger's
+ * motion-ledger.ts#treeMoved — and the strokes run on to the bound, where an `absent` failure says the last of them
+ * went over blank content (motion-ledger.ts#UnseenStrokes: raise maxSwipes or timeoutMs). The streak keeps its
+ * meaning — the same stroke twice left a tree that WOULD show motion unchanged — so "did not change the screen" stays true. Cost: none wherever the list shows content along the stroke's
  * axis (every committed capture's largest scroll view does, down and up, and sideways too:
  * tests/ui-tree/listed-content.test.ts); over a blank viewport, strokes up to the bound (2.8–4.1 s each on the lab
  * AVD), a true end with a blank viewport included. Residual: a node inside the scroll view that does not move with its
@@ -720,9 +701,6 @@ function flushWith(
   return { fills: [nearest[0].edge, nearest[1].edge], ...(under !== undefined && { pinned: under }) };
 }
 
-/** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
-type Since = 'start' | 'stroke' | 'settle';
-
 declare const opaque: unique symbol;
 
 /** The reducer's state — what the caller holds between rounds and hands back. Opaque: only `round` reads it (the fields are `State`'s). */
@@ -785,20 +763,13 @@ interface State {
   // defect) or "it is off the frame for good" — and a stop after a stroke
   // holds only once a read finds it still.
   readonly since: Since;
-  /** Every match's rect at the last read that read, and the judged match's at the last read that had one. */
-  readonly prevRects: readonly Rect[] | undefined;
-  readonly prevBest: Rect | undefined;
-  /** Identical strokes in a row after which every match, and the judged match, stayed put — the stroke the streak was counted for (`sameStroke`). */
-  readonly allUnmovedStrokes: number;
-  readonly bestUnmovedStrokes: number;
-  readonly streakDrawn: Stroke | undefined;
   /**
-   * The last stroke drawn — a probe's too — as the driver handed it back (`RoundSeen.drawn`): set by the read after it,
-   * kept through every read until the next one is drawn (a stroke held for a presented screen's confirming read is not
-   * drawn, and changes nothing); undefined until the first. The streak's, the probe's and `touchedOn`'s, and the side
-   * it pushed the content toward is the one `carriedUnder` bands besides `way`.
+   * THE MOTION LEDGER (interact/motion-ledger.ts): every "did it move" across the run — what each read is compared
+   * with (the last read's rects, fingerprint, judged rect and identity), the identical-stroke streaks, the last stroke
+   * drawn, the motion over the last settle, the blank strokes, and the region the motion showed on a tree that tells no
+   * scroll view. Shown each round's read and stroke once (`seeMotion`), asked through its queries.
    */
-  readonly lastDrawn: Stroke | undefined;
+  readonly motion: MotionLedger;
   /** Some read saw the target SHORT of the far edge (`beyondFarEdge`) — so a later read beyond it means a fling carried it across. */
   readonly seenShort: boolean;
   /**
@@ -813,8 +784,6 @@ interface State {
   readonly carriedPast: boolean;
   /** Confirming reads spent since the last stroke (SETTLE_CONFIRM_READS is per stroke) — a slowing fling's spend none (`Observed.slowing`). */
   readonly confirmReads: number;
-  /** How far the judged match moved over the settle pause before the last read (`motionOf`), the same node at both reads — undefined when that read followed a stroke, or did not read it so. */
-  readonly lastMotion: number | undefined;
   /**
    * The `presented` stop the last read that read would have made — its judged match under a presented screen, or its
    * next stroke touching down on one — held for one more read with no stroke between (`round`): the next read that
@@ -827,8 +796,6 @@ interface State {
   readonly lastStroke: Direction;
   /** Direction changes — a stroke drawn the other way from the one before — for the shortening and the failure text. */
   readonly turns: number;
-  /** The judged match's identity at the last read that had one (ui-tree/read-tree.ts#nodeIdentity): a motion is measured only of the same node (`carried`). */
-  readonly prevKey: string | undefined;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   readonly inFrameAfter: number | undefined;
   /** The probe in flight (PROBE_REACH): the judged match's rect and edge when it was sent. Cleared by the next read that reads. */
@@ -869,13 +836,6 @@ interface State {
    */
   readonly stuckOn: Direction | undefined;
   readonly backPending: boolean;
-  /** The whole tree's fingerprint at the last read that read, and identical strokes in a row after which it was unchanged. */
-  readonly prevFingerprint: string | undefined;
-  /** A read after a stroke found the whole tree changed from the read before — the content moved at least once (`Shortfall.absent`'s `unsearched`: not a screen no stroke ever changed). */
-  readonly treeMoved: boolean;
-  readonly treeUnmovedStrokes: number;
-  /** The strokes in a row whose reads were blank (`UnseenStrokes`); undefined after any read after a stroke that was not. */
-  readonly unseen: UnseenStrokes | undefined;
   /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
   readonly detents: { readonly first: SheetDetent | undefined; readonly last: SheetDetent | undefined } | undefined;
   /** The last read that read, its tree and the screen's identity — what ui-tree/read-tree.ts#screenChangedUnder compares the next one with; undefined until a read reads. */
@@ -908,22 +868,15 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     coveredRounds: 0,
     strokes: startStrokes(),
     since: 'start',
-    prevRects: undefined,
-    prevBest: undefined,
-    allUnmovedStrokes: 0,
-    bestUnmovedStrokes: 0,
-    streakDrawn: undefined,
-    lastDrawn: undefined,
+    motion: startLedger(),
     seenShort: false,
     carriedPast: false,
     confirmReads: 0,
-    lastMotion: undefined,
     presentedHold: undefined,
     strokesSent: 0,
     endTurn: undefined,
     lastStroke: rules.direction,
     turns: 0,
-    prevKey: undefined,
     inFrameAfter: undefined,
     probe: undefined,
     eyesRefused: undefined,
@@ -935,10 +888,6 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     strokedToward: [],
     stuckOn: undefined,
     backPending: false,
-    prevFingerprint: undefined,
-    treeUnmovedStrokes: 0,
-    unseen: undefined,
-    treeMoved: false,
     detents: undefined,
     screenBefore: undefined,
     touchDowns: [],
@@ -1116,21 +1065,9 @@ function showsOnlyPast(rect: Rect, far: Edge, cover: Rect, frame: Rect): boolean
   return across && (far === 'top' || far === 'left' ? lo < from && hi > from && hi <= to : hi > to && lo < to && lo >= from);
 }
 
-/** The same set of rects, each within a pixel — every match where it was. Empty sets say nothing. */
-function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
-  if (a.length === 0 || a.length !== b.length) return false;
-  const left = [...a];
-  return b.every((r) => {
-    const i = left.findIndex((l) => sameRectWithinPixel(l, r));
-    if (i < 0) return false;
-    left.splice(i, 1);
-    return true;
-  });
-}
-
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
-/** What one read that read says about motion (`observe`). */
+/** What one read that read says about motion (`observe`): the motion ledger's answer (interact/motion-ledger.ts#Moved), and what the round makes of it. */
 interface Observed {
   /** The judged match is where the previous read's judged match was. */
   bestUnmoved: boolean;
@@ -1139,6 +1076,8 @@ interface Observed {
    * less than the read before it found it moved. Such a read spends none of the confirming budget.
    */
   slowing: boolean;
+  /** The ledger's streaks after this read: the end proof counts the unmoved strokes from them (`endProof`). */
+  streaks: Streaks;
   /**
    * UNMOVED_STROKES_EXHAUST identical strokes in a row left the JUDGED match
    * where it was — the `fully: true` clipped stop's "content exhausted".
@@ -1169,51 +1108,18 @@ interface Observed {
 /**
  * One read that read (`ThisRead`): every match found, the one judged, the
  * frames it was judged in, and the swipe count — recorded into `s`. `current` is what the
- * read followed. Where the target stands against the far edge is recorded
+ * read followed; `moved`, what the motion ledger made of it (interact/motion-ledger.ts#seeMotion, asked by `round`
+ * before the stroke plan saw the read); `listed`, what it lists of the content of the scroll view the last stroke
+ * went over (`round`'s memo of stroke-plan.ts#strokedContent). Where the target stands against the far edge is recorded
  * HERE, on every read — a stop round strokes nothing, and a target seen
  * short only at a stop the confirming read then lost must still turn the
  * next stroke.
  */
-function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined): Observed {
+function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged | undefined, moved: Moved, listed: () => ListedContent | undefined): Observed {
   const { read, facts, frames, uncutFrames } = now;
   const { found } = read;
-  const { fingerprint, loading } = facts;
-  const rects = found.map((n) => ({ ...n.rect }));
-  const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
-  // The same node's motion over the settle pause before this read (`motionOf`) — a read after a stroke measures the
-  // stroke too, and keeps none — and whether it moved less than over the pause before: a fling slowing.
-  const motion = current === 'settle' && best !== undefined && s.prevBest !== undefined && s.prevKey === nodeIdentity(best.node) ? motionOf(s.prevBest, best.node.rect) : undefined;
-  const slowing = motion !== undefined && s.lastMotion !== undefined && motion < s.lastMotion;
-  s.lastMotion = motion;
-  // This read against the one before it, after a stroke: every match where it was, the whole tree as it was.
-  let allUnmoved = false;
-  let treeUnmoved = false;
-  // What this read lists of the content of the scroll view the last stroke went over (stroke-plan.ts#strokedContent):
-  // asked at most once a read — a walk of the tree and of its subtree, no device call. Boxed so that an answer of
-  // undefined (no scroll view stroked) is told from "not asked yet".
-  let content: { readonly of: ListedContent | undefined } | undefined;
-  const listed = (): ListedContent | undefined => (content ??= { of: s.lastSent === undefined ? undefined : strokedContent(s.strokes, facts, s.lastSent) }).of;
-  if (current === 'stroke') {
-    // The whole tree, for a target not in it (UNMOVED_STROKES_EXHAUST):
-    // the same streak rule, over the fingerprint — and a read that lists none of the stroked scroll view's content
-    // (`blank`) is no evidence either way: it is no unmoved read, so the streak starts again.
-    const stroked = found.length === 0 ? listed() : undefined;
-    s.unseen = stroked?.kind === 'blank' && s.lastSent !== undefined ? unseenAfter(s.unseen, stroked.view.rect, s.lastSent) : undefined;
-    treeUnmoved = s.prevFingerprint === fingerprint && !loading && s.unseen === undefined;
-    if (s.prevFingerprint !== undefined && s.prevFingerprint !== fingerprint) s.treeMoved = true;
-    const sameAsStreak = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
-    s.treeUnmovedStrokes = !treeUnmoved ? 0 : s.treeUnmovedStrokes > 0 && sameAsStreak ? s.treeUnmovedStrokes + 1 : 1;
-    // Every match, not only the judged one, for "exhausted": with several matches off the frame the judged one is the first
-    // in tree order, which can be a static duplicate (another page, a
-    // hidden copy) while the real one moved.
-    allUnmoved = s.prevRects !== undefined && sameRects(s.prevRects, rects);
-    const same = s.streakDrawn !== undefined && s.lastDrawn !== undefined && sameStroke(s.streakDrawn, s.lastDrawn);
-    s.allUnmovedStrokes = !allUnmoved ? 0 : s.allUnmovedStrokes > 0 && same ? s.allUnmovedStrokes + 1 : 1;
-    s.bestUnmovedStrokes = !bestUnmoved ? 0 : s.bestUnmovedStrokes > 0 && same ? s.bestUnmovedStrokes + 1 : 1;
-    s.streakDrawn = s.lastDrawn;
-  }
-  s.prevRects = rects;
-  s.prevFingerprint = fingerprint;
+  const { loading } = facts;
+  const { unmoved, streaks, slowing, carry } = moved;
   s.carriedPast = false;
   // Dropped (the lazy-list note, UNMOVED_STROKES_EXHAUST's): the last read had the target SHORT of the far
   // edge of the content's last motion — inside the frame, under the
@@ -1236,17 +1142,9 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const farRead = farFacts(best);
     s.dropped = undefined;
     s.inTreeAfter = s.swipes;
-    // What the stroke just sent carried the target (interact/stroke-plan.ts#carried, the carry model): only on a tree
-    // that lists it where it lies (`listedWhereItLies` — WDA's unclipped frames, as `stillNeeds` asks), only after a
-    // stroke of the course (not the probe), and only of the SAME node at the same size — a judged match that switched
-    // to another node, or one that changed size, moved by no stroke.
-    const key = nodeIdentity(best.node);
-    const same = s.prevBest !== undefined && s.prevKey === key && sameSize(s.prevBest, best.node.rect);
-    if (current === 'stroke' && s.probe === undefined && same && s.prevBest !== undefined && s.lastSent !== undefined && s.lastDrawn !== undefined && farRead.listedWhereItLies === true) {
-      s.strokes = carried(s.strokes, { moved: motionToward(s.prevBest, best.node.rect, s.lastSent), drawn: s.lastDrawn });
-    }
-    s.prevKey = key;
-    s.prevBest = { ...best.node.rect };
+    // What the stroke just sent carried the target (interact/stroke-plan.ts#carried, the carry model): the ledger's
+    // sample (`Moved.carry`), offered only where `round` allowed one (`ledgerRead`).
+    if (carry !== undefined) s.strokes = carried(s.strokes, carry);
     // In EVERY frame the round judged in: a target beyond the far edge one
     // way up but across both edges the other is not turned for. Or dumped
     // clipped out past it, or cut to a sliver at it (`beyondFarEdgeIn`).
@@ -1288,26 +1186,51 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // proof needs `Clips.contentToward`'s `ends`, which only a tree of unclipped frames (WDA's) answers — no real source gives both. The
   // probe's own answer is the stop it checks (pinned, on a synthetic tree carrying both marks, in
   // tests/interact/scroll-end-turn.test.ts).
-  const unmovedNow = (offFrame && allUnmoved && !loading) || (found.length === 0 && treeUnmoved);
+  const unmovedNow = (offFrame && unmoved.all && !loading) || (found.length === 0 && unmoved.tree);
   // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
   // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
   const proof =
-    current === 'stroke' && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, s.lastDrawn) === undefined
+    current === 'stroke' && unmovedNow && s.lastSent !== undefined && touchedOn(s.strokes, facts, lastDrawn(s.motion)) === undefined
       ? listed()
       : undefined;
   const ends = proof?.kind === 'ends' ? proof.view : undefined;
   const exhausted =
-    offFrame && (s.allUnmovedStrokes >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
+    offFrame && (streaks.all >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
       ? 'matches'
-      : current === 'stroke' && found.length === 0 && (s.treeUnmovedStrokes >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
+      : current === 'stroke' && found.length === 0 && (streaks.tree >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
         ? 'tree'
         : undefined;
   return {
-    bestUnmoved,
+    bestUnmoved: unmoved.judged,
     slowing,
-    stuck: current === 'stroke' && s.bestUnmovedStrokes >= UNMOVED_STROKES_EXHAUST,
+    streaks,
+    stuck: current === 'stroke' && streaks.judged >= UNMOVED_STROKES_EXHAUST,
     exhausted,
     ends: exhausted === undefined ? undefined : ends,
+  };
+}
+
+/**
+ * What the motion ledger is shown of a read that read (interact/motion-ledger.ts#LedgerRead): every match, the judged
+ * one, the facts — and what only the round knows. Of a read after a stroke that found no target, whether it listed none
+ * of the stroked scroll view's content (`listed`'s `blank`, UnseenStrokes). Where a carry sample may be offered: after
+ * a stroke of the course (not the flush check's probe), on a tree that lists the target where it lies
+ * (`listedWhereItLies` — WDA's unclipped frames, as `stillNeeds` asks). For the region the motion showed on a tree that
+ * tells no scroll view (idb's): the gesture box below iOS's status band, where a touch goes to the status bar, not the
+ * app.
+ */
+function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly UiNode[], best: Judged | undefined, screen: UsableScreen | undefined, listed: () => ListedContent | undefined): LedgerRead {
+  const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
+  const carryToward = current === 'stroke' && s.probe === undefined && best?.standing.facts.listedWhereItLies === true ? s.lastSent : undefined;
+  const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
+  return {
+    since: current,
+    found,
+    judged: best?.node,
+    facts,
+    ...(shows !== undefined && { gesture: shows }),
+    ...(blank?.kind === 'blank' && s.lastSent !== undefined && { blank: { within: blank.view.rect, toward: s.lastSent } }),
+    ...(carryToward !== undefined && { carryToward }),
   };
 }
 
@@ -1414,29 +1337,6 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
 }
 
 /**
- * How far `to` lies from `from`: the largest of the differences in x, y, width and height — what a read finds a node
- * moved since the read before, for `Observed.slowing`. A fling's motion shrinks read for read; an animation's does not.
- */
-const motionOf = (from: Rect, to: Rect): number => Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y), Math.abs(to.width - from.width), Math.abs(to.height - from.height));
-
-/** The same size within a pixel each way: a node that grew or shrank (a header collapsing) did not just move. */
-const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
-
-/** How far `to` lies from `from` the way content moves for a stroke toward `toward` (for `down`, up the screen): negative when the other way. */
-function motionToward(from: Rect, to: Rect, toward: Direction): number {
-  switch (toward) {
-    case 'down':
-      return from.y - to.y;
-    case 'up':
-      return to.y - from.y;
-    case 'right':
-      return from.x - to.x;
-    case 'left':
-      return to.x - from.x;
-  }
-}
-
-/**
  * One round: what `seen` means for the scroll, and the next step (the
  * module doc has the protocol, the order and the bound). Pure.
  */
@@ -1451,10 +1351,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const ask = (asked: 'witness' | 'unlocated' | EyesQuestion): Next => ({ state, step: typeof asked === 'string' ? { do: 'ask', what: asked } : { do: 'ask', what: 'eyes', question: asked } });
   const { fully } = s.rules;
   const current = s.since;
-  if (seen.drawn !== undefined) {
-    s.lastDrawn = seen.drawn;
-    s.touchDowns = [...s.touchDowns, seen.drawn.from];
-  }
+  if (seen.drawn !== undefined) s.touchDowns = [...s.touchDowns, seen.drawn.from];
 
   const read = 'error' in seen.read ? undefined : seen.read;
   const readError = 'error' in seen.read ? seen.read.error : undefined;
@@ -1497,24 +1394,32 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     s.lastCover = cover;
     s.coveredRounds++;
   }
+  const gesture = seen.screen?.oriented;
+  // What this read lists of the content of the scroll view the last stroke went over (stroke-plan.ts#strokedContent):
+  // asked at most once a read — a walk of the tree and of its subtree, no device call — for the blank read and the
+  // tree's end proof (`observe`). Boxed so that an answer of undefined (no scroll view stroked) is told from "not asked
+  // yet".
+  let content: { readonly of: ListedContent | undefined } | undefined;
+  const listed = (): ListedContent | undefined => (content ??= { of: s.lastSent === undefined || judged === undefined ? undefined : strokedContent(s.strokes, judged.facts, s.lastSent) }).of;
+  // THE MOTION LEDGER (interact/motion-ledger.ts) sees the stroke drawn and, when the tree read, the read — once, before
+  // anything asks it: a read that did not read says nothing about motion, and the comparisons wait for the next one
+  // that does.
+  const motion = seeMotion(s.motion, { drawn: seen.drawn, ...(judged !== undefined && { read: ledgerRead(s, current, judged.facts, found, best, seen.screen, listed) }) });
+  s.motion = motion.ledger;
   // What the strokes after this read keep of it (interact/stroke-plan.ts#seeRead): the line its strokes stay above
   // (`ReadJudgement.strokeLine`) — a round whose tree did not read keeps the last read round's, as its cover — and,
   // when it found the target, the target's scroll views with what this read draws over each — on a tree that tells none
-  // (idb's), where the screen showed the target's content moving: the gesture box below iOS's status band, where a
-  // touch goes to the status bar, not the app.
-  const gesture = seen.screen?.oriented;
-  const shows = gesture === undefined ? undefined : belowStatusBand(gesture, seen.screen);
-  if (judged !== undefined) s.strokes = seeRead(s.strokes, { facts: judged.facts, line: judged.strokeLine, target: best?.node, ...(shows !== undefined && { gesture: shows }) });
-  // A read that did not read says nothing about motion: the comparisons
-  // wait for the next one that does.
-  // A stop the region its content was seen moving through holds back (interact/motion-shown.ts#carriedUnder): no stop,
+  // (idb's), the region the ledger saw its content moving through (interact/motion-ledger.ts#regionOf).
+  const region = regionOf(s.motion);
+  if (judged !== undefined) s.strokes = seeRead(s.strokes, { facts: judged.facts, line: judged.strokeLine, target: best?.node, ...(region !== undefined && { region }) });
+  // A stop the region its content was seen moving through holds back (interact/motion-ledger.ts#heldBack): no stop,
   // the strokes go on — turned toward it at the far edge (`observe`) — and the stuck and bound failures name it
   // (`under`). After the last stroke drawn, not this read's `seen.drawn`: a stop is claimed only on a confirming read,
   // where `seen.drawn` is undefined, and a fling carries the target on into the pushed side's band between the two.
-  const heldBack = best !== undefined && stops(best) ? carriedUnder(motionShownOf(s.strokes), best.node.rect, fully ? 'fully' : 'stop', s.lastDrawn) : undefined;
+  const heldBack = best !== undefined && stops(best) ? heldBackBy(s.motion, best.node.rect, fully ? 'fully' : 'stop') : undefined;
   const under: Extract<InFrameShort, { of: 'carriedUnder' }> | undefined = best !== undefined && heldBack !== undefined ? { of: 'carriedUnder', judged: best, under: heldBack } : undefined;
   const now: ThisRead | undefined = read === undefined || judged === undefined ? undefined : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames, heldBack };
-  const observed = now === undefined ? undefined : observe(s, current, now, best);
+  const observed = now === undefined || motion.moved === undefined ? undefined : observe(s, current, now, best, motion.moved, listed);
   if (now !== undefined) s.detents = { first: s.detents === undefined ? now.facts.detent : s.detents.first, last: now.facts.detent };
   // The probe this read answers (PROBE_REACH) — kept across a read that did
   // not read, which is read again below rather than stroked away from.
@@ -1552,7 +1457,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       const probeHeld = probed !== undefined && sameRectWithinPixel(probed.rect, best.node.rect);
       // …and was a stroke: one drawn shorter than twice the slop may have
       // been a tap, and a tap moves nothing whatever lies beyond the edge.
-      const probeStroked = probeHeld && s.lastDrawn !== undefined && strokeLength(s.lastDrawn) >= 2 * TOUCH_SLOP;
+      const drawn = lastDrawn(s.motion);
+      const probeStroked = probeHeld && drawn !== undefined && strokeLength(drawn) >= 2 * TOUCH_SLOP;
       // A stop after a stroke is reported only once a read finds the target
       // where the last one did (SETTLE_CONFIRM_READS): a fling can carry it
       // on, or out of the frame, after the settle read caught it inside. A
@@ -1675,8 +1581,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // very scroll view that proved it — turn once toward it, rather than fail with that direction as advice. Only while a
   // swipe and time are left for it: at the bound the failure names the side, as before.
   const ends = observed?.ends;
-  if (exhausted === 'matches' && ends !== undefined && best !== undefined && now !== undefined && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs && turnsAtEnd(s, best, ends, now.facts)) {
-    turnAtEnd(s, ends);
+  if (exhausted === 'matches' && ends !== undefined && best !== undefined && now !== undefined && observed !== undefined && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs && turnsAtEnd(s, best, ends, now.facts)) {
+    turnAtEnd(s, ends, observed.streaks);
     exhausted = undefined;
   }
   // The stroke this round would draw, asked of the plan once (interact/stroke-plan.ts#planStroke): toward the course's
@@ -1685,7 +1591,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // that surface; the course holds for it or sends the stroke.
   const { toward, reach, turn } = nextStroke(s);
   const still = s.lastFound === undefined ? undefined : stillNeeds(s.lastFound, toward);
-  const plan = planStroke(s.strokes, { toward, reach, gesture, read: now === undefined ? undefined : { facts: now.facts, target: best?.node }, ...(still !== undefined && { still }) });
+  const plan = planStroke(s.strokes, { toward, reach, gesture, read: now === undefined ? undefined : { facts: now.facts, target: best?.node }, ...(still !== undefined && { still }), ...(!overRegion(s.motion, toward) && { screenBox: true }) });
   // The plan's memory, kept at once whatever becomes of the stroke — the candidates it judged, the latest cut of the
   // target's scroll views, and the scroll view it chose, which only sending makes the last stroke's (`strokeSent`,
   // below). Kept here, before any branch, so a presented hold cannot leave it behind; a bound is a stop, whose state
@@ -1699,7 +1605,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (seen.unlocated === undefined) return ask('unlocated');
       unlocated = seen.unlocated;
     }
-    const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s.strokes, now.facts, s.lastDrawn);
+    const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s.strokes, now.facts, lastDrawn(s.motion));
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
     // since the reader's next step would otherwise be another scroll that lands there (the plan's `presented`).
     // Quoted only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe
@@ -1712,7 +1618,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           lastStroke: s.lastStroke,
           unchanged: exhausted,
           ...(touched !== undefined && { touched }),
-          ...(ends !== undefined && { ends: endProof(s, s.lastStroke, ends, exhausted) }),
+          ...(ends !== undefined && observed !== undefined && { ends: endProof(s, s.lastStroke, ends, exhausted, observed.streaks) }),
         }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
@@ -1876,10 +1782,10 @@ function stop(s: Mutable<State>, outcome: ScrollOutcome): { state: Rounds; step:
 /**
  * The end proof over `view` as the stop carries it (`EndProof`): the strokes' `way`, the scroll view quoted, and the
  * one count of the strokes that moved nothing — every match's (`matches`) or the whole tree's (`tree`, a target not in
- * it), never more than the swipes sent.
+ * it), from the motion ledger's `streaks` of this read — never more than the swipes sent.
  */
-function endProof(s: State, way: Direction, view: UiNode, unchanged: 'matches' | 'tree'): EndProof {
-  return { way, scrollView: quoted(view), unmoved: Math.min(unchanged === 'tree' ? s.treeUnmovedStrokes : s.allUnmovedStrokes, s.swipes) };
+function endProof(s: State, way: Direction, view: UiNode, unchanged: 'matches' | 'tree', streaks: Streaks): EndProof {
+  return { way, scrollView: quoted(view), unmoved: Math.min(unchanged === 'tree' ? streaks.tree : streaks.all, s.swipes) };
 }
 
 /**
@@ -1901,9 +1807,9 @@ function turnsAtEnd(s: State, best: Judged, view: UiNode, facts: TreeFacts): boo
  * Not a fling's turn: `lastStroke` is set to the new course, so the next stroke keeps its reach (`nextStroke`) and
  * `turns` — the failure's "turned round N times: a fling" — does not count it.
  */
-function turnAtEnd(s: Mutable<State>, view: UiNode): void {
+function turnAtEnd(s: Mutable<State>, view: UiNode, streaks: Streaks): void {
   const from = courseOf(s);
-  s.endTurn = { ...endProof(s, from, view, 'matches'), to: OPPOSITE[from], after: s.swipes };
+  s.endTurn = { ...endProof(s, from, view, 'matches', streaks), to: OPPOSITE[from], after: s.swipes };
   s.lastStroke = OPPOSITE[from];
   s.seenShort = true;
   s.carriedPast = false;
@@ -1956,9 +1862,9 @@ function shortfall(s: State, { readError, found, best, viewport, cover, miss, he
     if (left !== undefined) return { of: 'gone', inFrameAfter: left };
     if (s.inTreeAfter !== undefined) return { of: 'left', inTreeAfter: s.inTreeAfter, ...(past !== undefined && { past }) };
     // Never found: no turn was drawn (each needs a sighting), so the far side is unstroked.
-    const ranToEnd = s.treeMoved && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
+    const ranToEnd = treeMoved(s.motion) && by.of === 'exhausted' && by.unchanged === 'tree' && by.touched === undefined;
     // Strokes over blank content up to a bound that is not the content's end: they may have moved it (UnseenStrokes).
-    const unseen = by.of === 'exhausted' ? undefined : s.unseen;
+    const unseen = by.of === 'exhausted' ? undefined : unseenStrokes(s.motion);
     return { of: 'absent', ...(ranToEnd && { unsearched: FAR_EDGE[courseOf(s)].far }), ...(miss !== undefined && { miss }), ...(unseen !== undefined && { unseen }) };
   }
   // In the tree: scroll-read.ts#judge scores every match, so this read judged one and `past` is this read's.
