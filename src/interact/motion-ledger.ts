@@ -174,8 +174,9 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   const { since, found, judged, facts, gesture, blank, carryToward } = read;
   const rects = found.map((n) => ({ ...n.rect }));
   const before = m.judged;
-  const identity = judged === undefined ? undefined : nodeIdentity(judged);
-  const sameNode = before !== undefined && before.identity === identity;
+  // This read's judged match as the ledger keeps it: kept until a read judges another.
+  const now = judged === undefined ? undefined : { rect: { ...judged.rect }, identity: nodeIdentity(judged) };
+  const sameNode = before !== undefined && before.identity === now?.identity;
   const judgedUnmoved = judged !== undefined && before !== undefined && sameRectWithinPixel(before.rect, judged.rect);
   // The same node's motion over the settle pause before this read (`motionOf`) — a read after a stroke measures the
   // stroke too, and keeps none — and whether it moved less than over the pause before: a fling slowing.
@@ -211,7 +212,7 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   const region = judged === undefined ? m.region : isUntold(facts.scene.clips.drawnIn(judged)) ? seeRegion(m.region, facts.tree, judged, gesture) : NO_REGION;
   const next: Memory = {
     rects,
-    judged: judged === undefined || identity === undefined ? before : { rect: { ...judged.rect }, identity },
+    judged: now ?? before,
     fingerprint: facts.fingerprint,
     streaks,
     streakDrawn,

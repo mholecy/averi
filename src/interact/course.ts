@@ -22,8 +22,8 @@ import { axisOf, OPPOSITE, type Direction } from './swipe.js';
  * - `nextStroke(course)` — the way (the caller's; back after a fling carried the target past or a lazy list dropped
  *   it; back once when it is stuck; the end turn's after it), the reach (halved by each turn) and what the target still
  *   needs of the stroke (LV5's window, the carry model's to apply).
- * - `sent(course, stroke)`, `probeSent(course, toward)` — a course stroke sent, or the flush check's probe (`probeOf`:
- *   its way and reach).
+ * - `sent(course, { toward, turn })`, `probeSent(course, toward)` — a course stroke sent (`nextStroke`'s way and
+ *   turn), or the flush check's probe (`probeOf`: its way and reach).
  * - `stuckTurn(course, …)`, `turnBack(course, on)` — the stuck turn's way and its stroke back.
  * - `turnAtEnd(course, …)` — the end turn (`EndTurn`), one transition.
  * - `lastSent`, `courseFacts` — what the motion ledger's read, the stops and the failures read.

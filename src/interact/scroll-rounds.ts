@@ -770,10 +770,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
  * app.
  */
 function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly UiNode[], best: Judged | undefined, screen: UsableScreen | undefined, listed: () => ListedContent | undefined): LedgerRead {
-  const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
-  const carryToward = current === 'stroke' && s.probe === undefined && best?.standing.facts.listedWhereItLies === true ? lastSent(s.course) : undefined;
-  const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
   const sentToward = lastSent(s.course);
+  const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
+  const carryToward = current === 'stroke' && s.probe === undefined && best?.standing.facts.listedWhereItLies === true ? sentToward : undefined;
+  const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
   return {
     since: current,
     found,
