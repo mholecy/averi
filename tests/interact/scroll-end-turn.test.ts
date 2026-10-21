@@ -11,7 +11,7 @@ import { node } from '../helpers/fake.js';
 import { decided, failureOf, play, resultOf, strokesToward, type Row } from '../helpers/rounds.js';
 
 /**
- * The END TURN (interact/scroll-rounds.ts#EndTurn; lab note LV4,
+ * The END TURN (interact/course.ts#EndTurn; lab note LV4,
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md)
  * and the end proof it rests on (#Observed.ends, interact/stroke-plan.ts#strokedContent, ui-tree/geometry.ts#Clips.contentToward),
  * over the real WDA capture of the lab app's `scroll-bounded` at rest: `lower` (0,380 402x180) at its top, its content
@@ -103,7 +103,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     const played = play(IPHONE, rows);
     expect(strokesToward(played)).toEqual(['up', 'down', 'down', 'down', 'down']);
     // The turned strokes keep the full reach: no fling carried F past — it was never near.
-    // (The last is shortened to what F still needs once a stroke was measured to carry it: scroll-rounds.ts#stillNeeds, LV5.)
+    // (The last is shortened to what F still needs once a stroke was measured to carry it: course.ts#stillNeeds, LV5.)
     expect(played.steps.flatMap((s) => (s.do === 'stroke' ? [decided(s)] : [])).slice(0, 4)).toMatchObject([{ reach: 1 }, { reach: 1 }, { reach: 1 }, { reach: 1 }]);
     expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { way: 'up', to: 'down', after: 1, unmoved: 1 } });
     expect(describeScrollResult(resultOf(played))).toBe(

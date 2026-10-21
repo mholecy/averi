@@ -178,13 +178,13 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   one that never holds still, or a stop at the deadline, is reported with
  *   `settled: false`. A fling that carried the target across the frame —
  *   beyond its far edge, after a read saw it short of that — turns the next
- *   stroke round (scroll-rounds.ts#nextStroke), instead of swiping on into
+ *   stroke round (course.ts#nextStroke), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
  *   moved nothing), and every turn halves the reach of the strokes after it
  *   (equal flings both ways ping-ponged to `maxSwipes`).
  *   A target a lazy list dropped right after a read had it
  *   short of the far edge turns the strokes back too
- *   (scroll-rounds.ts#observe, `dropped`). A failure counts the turns, and
+ *   (course.ts#seeTarget, `dropped`). A failure counts the turns, and
  *   one after the target was in the frame — or only in the tree — says so
  *   rather than "never".
  * - The fling itself:
@@ -221,7 +221,7 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * #clipsOf, `Clips.scrollersOf`, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
  * one of them is answered with one short probe toward that edge, drawn over
  * a container with room for it above the keyboard (scroll-rounds.ts
- * #PROBE_REACH has the rule and its cost; interact/stroke-plan.ts the box).
+ * #flushCheck has the rule and its cost; interact/stroke-plan.ts the box).
  * Only the screen box comes from here — the round decides the stroke's.
  *
  * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input

@@ -101,7 +101,7 @@ export interface RoundRead {
  * - its `scene`, once a round: the judgement (`judge`, `Scene.standing`); a match's clipping ancestors, nearest first
  *   (`clips.scrollersOf`) — Android's scroll containers, to whose edges uiautomator cuts the match's bounds (most
  *   of the time: ui-tree/geometry.ts#Clips.drawnIn judges a rect past them); empty when it has none (every node of
- *   an iOS tree) — for the `fully: true` stop's flush check (PROBE_REACH) and the box the strokes are drawn in (interact/stroke-plan.ts#planStroke); what is drawn OVER a
+ *   an iOS tree) — for the `fully: true` stop's flush check (scroll-rounds.ts#flushCheck) and the box the strokes are drawn in (interact/stroke-plan.ts#planStroke); what is drawn OVER a
  *   clipping container (the floating tab bar) — `order.drawnOver`, what a stroke over it keeps clear of
  *   (stroke-plan.ts#strokeRoom cuts the box above them), and `order.drawnOverAt`, the one a stroke that still touched
  *   down on it names (stroke-plan.ts#touchedOn), asked of the rects `clips.scrollersOf` and `mainScroller` give,
@@ -306,7 +306,7 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   }
   // The frames this read was judged in — the screen above an applied
   // keyboard, else every box that counts — for where the target stands
-  // against the far edge (scroll-rounds.ts#observe, #beyondFarEdge), cut by
+  // against the far edge (course.ts#seeTarget, #beyondFarEdge), cut by
   // standing's own band cut (ui-tree/standing.ts#farEdgeFrames), which reads
   // the best standing's band for the navigation cut.
   const { frames, uncutFrames } = farEdgeFrames(screen, best?.standing, cover?.above);

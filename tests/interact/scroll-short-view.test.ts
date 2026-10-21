@@ -11,7 +11,7 @@ import { play, type Row } from '../helpers/rounds.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 
 /**
- * What the target still needs (interact/scroll-rounds.ts#stillNeeds, lab note LV5,
+ * What the target still needs (interact/course.ts#stillNeeds, lab note LV5,
  * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md): a
  * stroke's reach no further than the target still needs, at what a stroke of this scroll was measured to carry it. The
  * rounds are driven against a model of the measured physics over the lab app's real `scroll-bounded` WDA capture:

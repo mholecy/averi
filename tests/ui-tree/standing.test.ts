@@ -1457,7 +1457,7 @@ describe('Scene.standing — the drawn frame on Android: bounds uiautomator did 
       const standing = scene.standing(s, PIXEL, purpose);
       expect(standing).toMatchObject({ kind: 'offScreen', at: { x: 541, y: 1563 }, scroller: { rect: LOWER } });
       expect(standing.facts.visible).toBeCloseTo(22 / 88);
-      // Cut by the drawn frame, but not listed where it lies: no window for the carry model (interact/scroll-rounds.ts#stillNeeds).
+      // Cut by the drawn frame, but not listed where it lies: no window for the carry model (interact/course.ts#stillNeeds).
       expect(standing.facts.drawn).toEqual(LOWER);
       expect(standing.facts.listedWhereItLies).toBeUndefined();
     }

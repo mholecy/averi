@@ -354,7 +354,7 @@ export interface UiNode {
    * nothing in the rect says the rest exists. Read by
    * ui-tree/geometry.ts#clipsOf, which `scroll_until`'s round asks for
    * each match's such ancestors so a `fully: true` stop flush with one is
-   * checked before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
+   * checked before it is reported (interact/scroll-rounds.ts#flushCheck).
    * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
    *
    * A flag, not a role: mapping a Compose scroller to
@@ -366,7 +366,7 @@ export interface UiNode {
    * change what they match; and ui-tree/draw-order.ts's
    * CONTENT_FRAMED_ROLES would start excusing those frames. Absent on iOS:
    * WDA and idb report a node's frame unclipped — a row under the top bar
-   * reads at y -48, past the frame (interact/scroll-rounds.ts#beyondFarEdge
+   * reads at y -48, past the frame (interact/course.ts#beyondFarEdge
    * is built on that) — so there is nothing to mark. Absent too on an
    * Android node that cannot scroll now (`scrollable="false"`: a list whose
    * content fits), whose children are not cut by it.
@@ -453,7 +453,7 @@ export interface UiNode {
    * `bottom`, `left`, `right` likewise. Read by a miss's zero-area note
    * (ui-tree/miss.ts#missOf, `zeroArea`), by `scroll_until`, which reads a
    * node clipped out past its far edge as beyond it
-   * (interact/scroll-rounds.ts#observe), and by the cut-sliver rule, to which a descendant
+   * (interact/course.ts#seeTarget), and by the cut-sliver rule, to which a descendant
    * clipped out past an edge its ancestor lies flush with is evidence of a
    * cut there (ui-tree/geometry.ts#evidentCut). Absent on iOS and on every
    * node dumped the right way round.
@@ -521,7 +521,7 @@ export interface UiNode {
    * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read by
    * ui-tree/draw-order.ts#listsUnclippedFrames: a scroll view's axis is read off its content past its frame
    * (ui-tree/scroll-containers.ts#scrollAxis), its end off none (geometry.ts#Clips.contentToward), and `scroll_until`'s carry
-   * model measures a row's motion as the content's (interact/scroll-rounds.ts#stillNeeds). Not what cuts a node by
+   * model measures a row's motion as the content's (interact/course.ts#stillNeeds). Not what cuts a node by
    * what scrolls above it: geometry.ts#Clips.drawnIn does that on every tree that lists ancestry. A mark of the
    * source, like `flatList`: ui-tree knows no platform. Absent on Android's trees (uiautomator cuts most nodes' bounds
    * to their scroll container; not all: lab note LE1,

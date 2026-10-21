@@ -175,7 +175,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     purpose, its rules its judgement (`fullyStanding`): an edge past the
  *     frame first (`clipped`, only this purpose's); no cut — a stop flush
  *     with a clipping container is scroll_until's flush probe's
- *     (interact/scroll-rounds.ts#PROBE_REACH); any cover covers (the one
+ *     (interact/scroll-rounds.ts#flushCheck); any cover covers (the one
  *     over the centre, else the last drawn, else — none found — the node
  *     at its overlaid edge, later-edges.ts#OverlaidEdge, cover.ts#overlaidCover); the system bands judged as a
  *     region (below, Why so; `systemBar.band`, only this purpose's); and,
@@ -340,7 +340,7 @@ export interface Scene {
    * THE PINNED EDGES of the node (later-edges.ts#PinnedEdge, the classification's `pinnedInScrollView`), top before
    * left, empty when none: an edge laid flush under a node pinned in the node's own scroll view (a merged sticky
    * header), where Compose may have cut it — the twin of `flushNeighbours` inside the scroll view. One reader:
-   * `scroll_until`'s `fully: true` flush probe (interact/scroll-rounds.ts#PROBE_REACH).
+   * `scroll_until`'s `fully: true` flush probe (interact/scroll-rounds.ts#flushCheck).
    */
   pinnedEdges(node: UiNode): readonly PinnedEdge[];
 }
@@ -446,12 +446,12 @@ export interface StandingFacts {
   readonly minPiece?: number;
   /** The node's cut to a sliver under `minPiece` — by its scroll container (geometry.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
-  /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
+  /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/course.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
   /**
    * With `drawn` only, on a tree whose source lists the node where it lies (geometry.ts#DrawnFrame.listedWhereItLies, WDA's):
    * `drawn` is then the window a row moves through as the content does — the one tree on which `scroll_until`'s carry
-   * model measures a stroke's carry (interact/scroll-rounds.ts#stillNeeds).
+   * model measures a stroke's carry (interact/course.ts#stillNeeds).
    */
   readonly listedWhereItLies?: true;
 }
@@ -1293,7 +1293,7 @@ function stopStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judge
  * The `fully` stop's standing (`Scene`'s contract) — the plain stop's frame
  * and order, with its own rules: an edge past the frame first (`clipped`);
  * no container's sliver (a stop flush with a clipping container is scroll_until's flush
- * probe's, interact/scroll-rounds.ts#PROBE_REACH), a sliver cut by a node
+ * probe's, interact/scroll-rounds.ts#flushCheck), a sliver cut by a node
  * drawn after it all the same (`cutByLater`: no probe sees it); any cover covers (the
  * one over the centre, else the last drawn, else the node at its overlaid edge,
  * later-edges.ts#OverlaidEdge, appended to `facts.covers` as its cover, cover.ts#overlaidCover); and the system bands judged as

@@ -342,7 +342,7 @@ export class IosAdapter implements DeviceAdapter {
    * dropped row now turns the stroke too (interact/scroll-rounds.ts) —
    * and, on WDA's trees, no stroke reaches further than the target still
    * needs at what a stroke of the scroll was seen to carry it, the fling
-   * included (interact/scroll-rounds.ts#stillNeeds: a 108-pt drag flung a
+   * included (interact/course.ts#stillNeeds: a 108-pt drag flung a
    * 180-pt scroll view ~259 pt, past a 116-pt window, one run in three).
    * Unmeasured: an iOS List under WDA that drops its rows.
    */

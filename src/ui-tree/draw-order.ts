@@ -333,7 +333,7 @@ export interface Exposure {
    * - its REACH: its rect, or — for a node pinned at a flat list's bottom (`bottomPinned`) — its reach (`pinnedReach`),
    *   raised by its bar's lift for a floating tab bar's item (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`), or the whole
    *   screen for a presented layer's cover. The rects `shows`, `largest` and cover.ts#coverAtPoint are judged against, so a caller
-   *   asking where a cover lies over the target (scroll-rounds.ts#overFarSide) asks of the same rect;
+   *   asking where a cover lies over the target (course.ts#overFarSide) asks of the same rect;
    * - its ORDER (cover.ts#CoverOrder): `untold` for a control of a run given in reading order that overlaps it, listed
    *   before it or after (reading-order.ts#readingOrderOf, `UiNode.readingOrder`) — the one drawn on top may be either: named as
    *   overlapping the node, which is on top not told, and no scroll advised (ui-tree/standing.ts#Remedy's
@@ -1555,7 +1555,7 @@ export function listsAncestry(tree: UiNode): boolean {
  * Whether the tree's source reports every frame unclipped (`UiNode.unclippedFrames`: WDA's) — a scroll view's
  * content at its laid-out rect past the scroll view's frame, always — so the content past a frame says which way it
  * scrolls and where it ends (geometry.ts#Clips.axesOf, #Clips.contentToward), and a row's motion as it comes in is the
- * content's (interact/scroll-rounds.ts#farFacts, the carry model's `window`); its negation, on a nested tree, is a
+ * content's (interact/course.ts#farFacts, the carry model's `window`); its negation, on a nested tree, is a
  * source that cuts a node's bounds at what is drawn after it (later-edges.ts#laterEdgesIn: Compose's). Not what the
  * drawn frame asks (geometry.ts#Clips.drawnIn, on every tree that lists ancestry: uiautomator too lists some content
  * past its frame). The second half of the tree's dialect (`listsAncestry`'s doc).

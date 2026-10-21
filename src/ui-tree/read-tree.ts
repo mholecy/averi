@@ -385,7 +385,7 @@ export function screenIdentity(tree: UiNode): ScreenIdentity {
 
 /**
  * THE SAME NODE ACROSS READS: a node's identity — its role, id and label; its rect is what moves. Two reads' nodes of
- * one identity are taken for one node: by interact/scroll-rounds.ts#observe, for the judged match's motion and the
+ * one identity are taken for one node: by interact/motion-ledger.ts#seeMotion, for the judged match's motion and the
  * carry model's samples, and by interact/motion-shown.ts#listingOf, for the nodes carried with an idb target. It
  * cannot tell apart duplicates of one label (two rows labelled alike): a caller that needs one node per identity drops
  * those.

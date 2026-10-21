@@ -43,7 +43,7 @@ the read a fling comes to rest in (decision 5).
       last of which did not move it …` when the ones before moved it) — the proof in the words of the one-stroke stop's
       failure (decision 3; scroll-text.ts#endText, one wording for both since round 6's code review).
    The caller's direction is always stroked first. The turn keeps the full reach — no fling carried the target past;
-   it was never near — and is not counted among the fling's turns (`scroll-rounds.ts#EndTurn`).
+   it was never near — and is not counted among the fling's turns (`course.ts#EndTurn`).
 2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedContent`,
    `ui-tree/geometry.ts#Clips.contentToward`, its `ends`): on the read right after a stroke toward the target (never the flush probe):
    every match where it was (with no target, the whole tree unchanged), no progress node shown, the stroke touching
@@ -65,7 +65,7 @@ the read a fling comes to rest in (decision 5).
 3. **The one-stroke stop.** With that proof the scroll ends after the first unmoved stroke (bound `exhausted`,
    `ends`: `(swiping up did not move it: the tree lists the content of … ending at its top — content exhausted)`),
    where `UNMOVED_STROKES_EXHAUST`'s two identical unmoved strokes stay the rule wherever the tree cannot list the end.
-4. **The carry model (LV5)** (`stroke-plan.ts#carried`, `scroll-rounds.ts#stillNeeds`): on the same trees, the read
+4. **The carry model (LV5)** (`stroke-plan.ts#carried`, `course.ts#stillNeeds`): on the same trees, the read
    after a stroke measures what it carried the target, per point of the finger's actual travel, of the same node at
    the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept — kept for the
    scroll view the stroke went over: a carry measured over one is never applied to a stroke over another (the plan

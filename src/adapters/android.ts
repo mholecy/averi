@@ -1488,7 +1488,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
  * across it, and no sideways one was seen. The grown rect is cut to the
  * nearest clipping ancestor's, as uiautomator cut the descendants, so a node
  * cut by the list's own edge (or by the display) is not widened past it —
- * the flush probe (interact/scroll-rounds.ts#PROBE_REACH) judges that one —
+ * the flush probe (interact/scroll-rounds.ts#flushCheck) judges that one —
  * and a node in no clipping container is left as dumped: the overlay cut
  * was measured inside a scroller only. A node with no area (collapsed, or
  * scrolled off) stays so: widening it would make a target of a node the

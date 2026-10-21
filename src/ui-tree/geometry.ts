@@ -674,7 +674,7 @@ export interface Clips {
    * round asks it of each match (interact/scroll-read.ts#TreeFacts), to
    * tell a `fully: true` stop whose edge sits exactly on a clipping
    * ancestor's — possibly cut there — from one inside them all
-   * (interact/scroll-rounds.ts#PROBE_REACH), and to pick the box its strokes
+   * (interact/scroll-rounds.ts#flushCheck), and to pick the box its strokes
    * are drawn in. The whole chain, not the nearest alone: a card that fills a horizontal carousel's
    * height is flush with BOTH of the carousel's edges — one probe cannot
    * tell — while the carousel itself is cut by the vertical list around it,
@@ -756,7 +756,7 @@ export interface Clips {
    * `fully: true` claim's edges (ui-tree/eyes.ts#eyesQuestion's clip lines).
    * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
    * Rects stay as listed
-   * (`scroll_until`'s far edge, interact/scroll-rounds.ts#beyondFarEdge, reads a row's rect past the frame); the
+   * (`scroll_until`'s far edge, interact/course.ts#beyondFarEdge, reads a row's rect past the frame); the
    * standing cuts what it judges by this frame (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first
    * ask, its ancestors' frames shared along a branch; each ask then meets them with the node's own rect
    * (`overhangAsFlush`), a constant.
@@ -889,7 +889,7 @@ export interface DrawnFrame {
   /**
    * Whether the tree's source lists the node WHERE IT LIES (`clipsOf`'s `unclipped`, draw-order.ts#listsUnclippedFrames:
    * WDA's): then `frame` is the window the content moves through, and a row's motion as it comes in is the content's —
-   * what `scroll_until`'s carry model measures (interact/scroll-rounds.ts#stillNeeds), through
+   * what `scroll_until`'s carry model measures (interact/course.ts#stillNeeds), through
    * ui-tree/standing.ts#StandingFacts.listedWhereItLies. Not on uiautomator's trees, which cut most rows to their
    * scroll container (a row coming in reads short).
    */
@@ -1074,7 +1074,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
  * mp-native's SWIFT form on Android lists `details_toggle` at `66,1924 948x55`, ending at 1979, under its form
  * `[0,242][1080,1978]` — the CONTINUE bar starts at 1979, so the form's 1978 and the toggle's 1979 are the same line;
  * cut there by a pixel, the toggle read `clipped` where the `fully` stop's flush probe is the rule
- * (interact/scroll-rounds.ts#PROBE_REACH).
+ * (interact/scroll-rounds.ts#flushCheck).
  */
 function overhangAsFlush(rect: Rect, frame: Rect): Rect {
   const flush = new Set(flushEdges(rect, frame));
@@ -1104,7 +1104,7 @@ export function axisOfEdge(edge: Edge): ScrollAxis {
  * `axis` only when given (top and bottom are the vertical's), else both —
  * in `clippedEdges`' order; none when the container has no area.
  * `scroll_until`'s `fully: true` stop asks it along the scroll
- * (scroll-rounds.ts#PROBE_REACH), and the cut-sliver rule (`evidentCut`)
+ * (scroll-rounds.ts#flushCheck), and the cut-sliver rule (`evidentCut`)
  * asks the same question, not a copy of it.
  */
 export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'horizontal'): Edge[] {
