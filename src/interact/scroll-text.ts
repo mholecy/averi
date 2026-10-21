@@ -8,14 +8,15 @@ import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause, type Cover } from '../ui-tree/cover.js';
 import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, type ScrollViewCut } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
+import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
-import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
-import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, revealText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
+import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
+import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result

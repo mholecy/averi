@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { EDGES } from '../../src/ui-tree/geometry.js';
-import { coverName, cutRemedy, cutSliverText, pastSideText, revealText, underKeyboardText, untriedSideText } from '../../src/interact/target-text.js';
+import { revealText } from '../../src/ui-tree/sides.js';
+import { coverName, cutRemedy, cutSliverText, pastSideText, underKeyboardText, untriedSideText } from '../../src/interact/target-text.js';
 
 /**
  * The phrases a cut or a side target is said in, one wording for the tap's

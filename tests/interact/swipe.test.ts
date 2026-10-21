@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { axisOfEdge } from '../../src/ui-tree/geometry.js';
+import { SIDES } from '../../src/ui-tree/sides.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
-import { axisOf, dragMs, EDGE_TOWARD, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, SIDES, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
+import { axisOf, dragMs, EDGE_TOWARD, MIN_DRAG_MS, MIN_STROKE_FRACTION, sameStroke, screenBox, shortenStroke, swipeScreen, swipeVector, swipeVectorAbove, TOUCH_SLOP } from '../../src/interact/swipe.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 
 // The scroll loop's settle pause is recorded, not waited on.
