@@ -412,7 +412,9 @@ describe('defaultFactory — the wiring the injected factories above never see',
     // (the pins above rely on the same), so no WebDriverAgent, xcodebuild or
     // idb is started here.
     resetWdaPortAllocatorForTests();
-    const kindOf = (adapter: DeviceAdapter) => (adapter as IosAdapter).treeSourceKind;
+    // Nothing above the adapter dispatches on the kind; the one thing it changes the adapter says is its keyboard
+    // advice (ios.ts#keyboardAdvice), so the wiring is read off that.
+    const kindOf = (adapter: DeviceAdapter) => ((adapter as IosAdapter).keyboardAdvice.includes('with treeSource: idb no guard acts') ? 'idb' : 'wda');
     expect(kindOf(defaultFactory('ios', 'AAAA-1111'))).toBe('idb');
     expect(kindOf(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }))).toBe('idb');
     expect(kindOf(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }))).toBe('wda');
