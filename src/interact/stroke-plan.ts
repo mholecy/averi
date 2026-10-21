@@ -1,6 +1,5 @@
-import { sameRect, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
+import { sameRect, type Point, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
 import { containsPoint, isUntold, quoted, rectIntersection, toldFrame, type ListedContent, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
-import { goesOver, NO_MOTION, seeMotion, type MotionMemory, type MotionShown } from './motion-shown.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -22,13 +21,14 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * - `startStrokes()` — the plan's memory before any read; `seeRead(memory, read)` — what one read that read leaves
  *   for the strokes after it: the keyboard line its strokes stay above, and, when it found the target, the target's
  *   scroll views with what that read draws over each — on a tree that tells none, the region the target's motion
- *   showed (`MotionShown`). One call a read that read; the round holds the memory and reads none of it but that region
- *   (`motionShownOf`).
+ *   showed, as the round's motion ledger tells it (`SeenRead.region`, interact/motion-ledger.ts#regionOf). One call a
+ *   read that read; the round holds the memory and reads none of it.
  * - `planStroke(memory, ask)` — the stroke toward the target this round would draw (`toward` and `reach` are the
- *   round's course, `round`'s to decide), over this round's gesture box, with this round's facts or none: the
- *   `PlannedStroke` (its points among it), the presented surface its touch-down lies on (`PresentedTouchDown`, asked
- *   of the scene at the points as sent: ui-tree/standing.ts#Scene.presentedAt), and ONE memory to keep whatever the
- *   round does with the stroke (held for a presented screen's confirming read, held back at a bound, or sent).
+ *   round's course, `round`'s to decide; `screenBox` the motion ledger's), over this round's gesture box, with this
+ *   round's facts or none: the `PlannedStroke` (its points among it), the presented surface its touch-down lies on
+ *   (`PresentedTouchDown`, asked of the scene at the points as sent: ui-tree/standing.ts#Scene.presentedAt), and ONE
+ *   memory to keep whatever the round does with the stroke (held for a presented screen's confirming read, held back at
+ *   a bound, or sent).
  * - `planProbe(memory, ask)` — the `fully: true` flush check's probe (scroll-rounds.ts#PROBE_REACH): over the first of
  *   the given scroll views with room, never the screen box — undefined when none has room.
  * - `strokeSent(memory)` — the plan's stroke (or probe) was sent: the scroll view it chose becomes the one the last
@@ -36,9 +36,6 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  *   held for a confirming read keeps the candidates it judged, never the scroll view it would have gone over.
  * - `touchedOn(memory, facts, drawn)` — the node drawn over the container the last stroke sent went over that its
  *   touch-down hit (ui-tree/draw-order.ts#DrawOrder.drawnOverAt), for the fast fail's sentence.
- * - `motionShownOf(memory)` — the region the target's motion showed on a tree that tells no scroll view (idb), kept
- *   by `seeRead` (interact/motion-shown.ts#MotionShown): the round asks it whether it holds back a stop
- *   (interact/motion-shown.ts#carriedUnder), and reads nothing else of the memory.
  *
  * Presentation is asked through its interface — `Scene.presentedAt` and the draw order's `drawnOver` / `drawnOverAt` —
  * whose facts ui-tree/presentation.ts owns (one adapter per tree source); the plan reads no mark, no shape and no
@@ -83,16 +80,17 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * strokes went over the screen box, and a content-up stroke touched down at the screen's 0.2 — on
  * `tabbar-floating`, y 175, in the 200-pt header above the list: it moved nothing (lab note LV3). There the scroll
  * view is what the reads SHOW: once two reads see the target carried, the nodes carried with it by the same delta were
- * seen moving through a part of the screen below the status band (interact/motion-shown.ts, which owns it: two at least,
- * cut at what held still — chrome), and that region is the target's one scroll
- * view — its axis the motion's, nothing drawn over it, nothing nested — judged as any other (room, 60 %, the keyboard
+ * seen moving through a part of the screen below the status band (interact/motion-ledger.ts, which owns it and tells
+ * the plan, `SeenRead.region`: two at least, cut at what held still — chrome), and that region is the target's one
+ * scroll view — its axis the motion's, nothing drawn over it, nothing nested — judged as any other (room, 60 %, the keyboard
  * line) for a stroke that carries content back the other way from how it was first seen moving
- * (interact/motion-shown.ts#goesOver); one moving it that way keeps the screen box, the stroke that made the region.
+ * (interact/motion-ledger.ts#overRegion, which the round passes as `StrokeAsk.screenBox`); one moving it that way keeps
+ * the screen box, the stroke that made the region.
  * Before a read sees the target move — the scroll's first stroke — the screen box, as before. Only where the
  * tree tells no scroll view: Android and WDA list ancestry and plan as above, untouched. Cost: no device call; one
  * walk of the listed nodes a read under idb. And the stop: a target in the band short of where a stroke over the
  * region touches down, or carried past the region toward a node that held still (under a header idb lists it
- * beneath), is no stop (interact/motion-shown.ts#carriedUnder, asked by the round) — the strokes go on over the
+ * beneath), is no stop (interact/motion-ledger.ts#heldBack, asked by the round) — the strokes go on over the
  * region, turned toward it at the far edge. Residuals (docs/adr/0010-pixel-assert-keyboard-first.md, residual 6): the
  * first stroke; a target not in the tree (no anchor); rows idb lists past the clip widen the region over what clips
  * them; a region narrower than the list (few rows listed) gives shorter strokes.
@@ -118,9 +116,10 @@ export interface StrokeMemory {
 interface Memory {
   /**
    * The target's scroll views (`targetScrollers`, or on a tree that tells none the region its motion showed,
-   * `motion`), nearest first, each with what is drawn over it, at the last read that found the target — refreshed by
-   * every plan with that round's read (`planStroke`: the latest cut, not the oldest, is the one a read that has lost a
-   * rect falls back to); undefined until a read finds the target. Kept across reads that do not find it.
+   * `SeenRead.region`), nearest first, each with what is drawn over it, at the last read that found the target —
+   * refreshed by every plan with that round's read (`planStroke`: the latest cut, not the oldest, is the one a read
+   * that has lost a rect falls back to); undefined until a read finds the target. Kept across reads that do not find
+   * it.
    */
   readonly target: readonly ScrollView[] | undefined;
   /** The candidates the last plan judged its stroke's scroll view from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry. */
@@ -133,27 +132,28 @@ interface Memory {
   readonly chosen: Rect | undefined;
   /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did (UNMEASURED_CARRY stands in, `carryOver`). */
   readonly carry: { readonly within: Rect | undefined; readonly perPoint: number } | undefined;
-  /** Where the target's content was seen moving on a tree that tells no scroll view, and the read the next is measured against (interact/motion-shown.ts#MotionMemory): kept across a read that finds no target, dropped by a read that finds it on a told tree. */
-  readonly motion: MotionMemory;
 }
 
 const open = (m: StrokeMemory): Memory => m as unknown as Memory;
 const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
-/** The region the target's motion showed, on a tree that tells no scroll view (`Memory.motion`; interact/motion-shown.ts#MotionShown) — undefined on any other, and until two reads saw the target carried. */
-export const motionShownOf = (memory: StrokeMemory): MotionShown | undefined => open(memory).motion.shown;
-
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, carry: undefined, motion: NO_MOTION });
+  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, carry: undefined });
 }
 
-/** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and what of the screen shows the app to a touch — the round's gesture box below iOS's status band (`motionShown`). */
+/** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
 export interface SeenRead {
-  readonly facts: Pick<TreeFacts, 'scene' | 'tree'>;
+  readonly facts: Pick<TreeFacts, 'scene'>;
   readonly line: KeyboardLine | undefined;
   readonly target: UiNode | undefined;
-  readonly gesture?: Rect;
+  readonly region?: ScrollRegion;
+}
+
+/** The region the target's motion showed on a tree that tells no scroll view of it — where on the screen its carried content was seen moving, and the axis it moved on (interact/motion-ledger.ts#regionOf, motion-shown.ts#MotionShown): its one scroll view, as far as the strokes know. */
+export interface ScrollRegion {
+  readonly rect: Rect;
+  readonly axis: ScrollAxis;
 }
 
 /**
@@ -167,21 +167,18 @@ export interface SeenRead {
  * that is not one of the target's ancestors is a list that cannot hold the target.
  *
  * On a tree that tells no scroll view of the target (idb's), its one scroll view is the region its motion showed
- * (`MotionShown`, kept with the read the next is measured against: interact/motion-shown.ts#seeMotion): none until
- * two reads saw the target carried — the screen box, as before. A read that finds the target where the tree tells
- * its scroll views keeps neither the listing nor the region.
+ * (`region`, the round's motion ledger's: interact/motion-ledger.ts#regionOf): none until two reads saw the target
+ * carried — the screen box, as before.
  */
-export function seeRead(memory: StrokeMemory, { facts, line, target, gesture }: SeenRead): StrokeMemory {
+export function seeRead(memory: StrokeMemory, { facts, line, target, region }: SeenRead): StrokeMemory {
   const m = open(memory);
-  // A read that found no target keeps the listing before it: the next read that finds it is measured against that one.
+  // A read that found no target keeps the target's scroll views of the last read that did.
   if (target === undefined) return close({ ...m, line });
   if (!isUntold(facts.scene.clips.drawnIn(target))) {
-    return close({ ...m, line, motion: NO_MOTION, target: targetScrollers(facts, target).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) })) });
+    return close({ ...m, line, target: targetScrollers(facts, target).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) })) });
   }
-  const motion = seeMotion(m.motion, facts.tree, target, gesture);
-  const { shown } = motion;
   // Nothing is listed over it (idb lists no draw order over a scroll view), and nothing nested in it.
-  return close({ ...m, line, motion, target: shown === undefined ? [] : [{ rect: { ...shown.rect }, over: [], axes: { axis: shown.axis, nested: [] } }] });
+  return close({ ...m, line, target: region === undefined ? [] : [{ rect: { ...region.rect }, over: [], axes: { axis: region.axis, nested: [] } }] });
 }
 
 /** What a round asks of the plan for its stroke toward the target. */
@@ -196,6 +193,12 @@ export interface StrokeAsk {
   readonly read: { readonly facts: Pick<TreeFacts, 'scene' | 'mainScroller'>; readonly target: UiNode | undefined } | undefined;
   /** What the target still needs of this stroke, when the round knows (scroll-rounds.ts#stillNeeds) — the carry model's to apply (`carried`). */
   readonly still?: StillNeeds;
+  /**
+   * Over the gesture box whole, whatever the scroll views: on a tree that tells none, a stroke moving the content the
+   * way the motion was first seen moving it — the stroke that made the region keeps the screen box
+   * (interact/motion-ledger.ts#overRegion, false). Absent: the scroll views as judged.
+   */
+  readonly screenBox?: true;
 }
 
 /** What the target still needs of a stroke (scroll-rounds.ts#stillNeeds): the distance to its window's middle, and how far the window lets it travel while whole in it. */
@@ -258,13 +261,13 @@ export interface StrokePlan {
  * layer the tree marks as presented, off that layer's own scroll views. Only the touch-down is asked: it is where the
  * gesture is recognised. Undefined when this round did not read or the stroke has no box.
  */
-export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, gesture, read, still }: StrokeAsk): StrokePlan {
+export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, gesture, read, still, screenBox }: StrokeAsk): StrokePlan {
   const m = open(memory);
   const candidates = candidatesOf(m, read?.facts);
   const kept = m.line?.y;
   // On a tree that tells no scroll view, only a stroke carrying content back over where it was seen moving goes over
-  // that region (motion-shown.ts#goesOver); one moving it the way it was first seen moving keeps the screen box.
-  const over = m.motion.shown === undefined || goesOver(m.motion.shown, toward) ? candidates : [];
+  // that region; one moving it the way it was first seen moving keeps the screen box (`screenBox`).
+  const over = screenBox === true ? [] : candidates;
   const room = strokeRoom(gesture, over, toward, kept, 'any axis');
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
@@ -361,7 +364,7 @@ export interface TouchedOn {
  * that a cut would leave no room above. Undefined when the stroke went over the gesture box whole (no scroll view to
  * be drawn over: the screen box), when this tree holds no scroll view of the remembered rect (the list moved; the
  * stroke was still cut by the overlays kept with it, `ScrollView`; or idb's, whose region its motion showed is no node
- * of the tree, `MotionShown`), or when it touched down on nothing drawn over its
+ * of the tree, `ScrollRegion`), or when it touched down on nothing drawn over its
  * scroll view. One scan of the tree, at the stop only.
  * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
  */
@@ -381,7 +384,7 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
  * which cannot tell a list at its end from strokes not taken); never on a tree that does not list content past its
  * scroll view's frame (Android's: `contentToward`). Undefined when the stroke went over the gesture box whole (no
  * scroll view: a screen with none, or idb's flat list before a read saw the target move), or when this tree holds no
- * scroll view of that rect — idb's always: it lists no scroll view, and the region its motion showed (`MotionShown`)
+ * scroll view of that rect — idb's always: it lists no scroll view, and the region its motion showed (`ScrollRegion`)
  * is no node of it, so a blank read never forms there (`Clips.contentToward` answers no tree without ancestry). Asked by
  * the round of the read after a stroke; one walk of that scroll view's subtree.
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
@@ -408,7 +411,7 @@ export function strokedContent(memory: StrokeMemory, facts: Pick<TreeFacts, 'sce
  * gesture box whole as one too): a fling is that scroll view's, so a carry measured over one is never applied to a
  * stroke over another — `strokeRoom` falling back to an outer scroll view, or the target found in another list — and
  * a sample over another scroll view replaces it (`carryOver`). A sample is the round's to offer only of the same
- * node at the same size, on a tree that lists it where it lies (scroll-rounds.ts#observe); here it is dropped when it
+ * node at the same size (interact/motion-ledger.ts#Moved.carry), on a tree that lists it where it lies; here it is dropped when it
  * moved the wrong way, when the stroke was no stroke (under twice TOUCH_SLOP: a tap), or when it lies past
  * CARRY_CEILING × the travel — no fling carries that far: content inserted above, a nested scroll carried by an outer
  * one, a match the tree renamed in place. The LARGEST sample is kept, not the last: a read taken mid-fling understates
@@ -502,10 +505,10 @@ const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined
  * node as clipping, so its `scrollersOf` is empty for every node; on Android the two name the same scroll views where
  * every one clips, and the chain, asked first, also names one of no area). Both empty — a target under none — is the
  * screen box; idb's flat list, which lists no scroll view, is not asked (`seeRead`: the region its motion showed,
- * `MotionShown`). Measured (the lab app's `scroll-bounded`, WDA): with the chain alone the stroke for
+ * `ScrollRegion`). Measured (the lab app's `scroll-bounded`, WDA): with the chain alone the stroke for
  * a row of the bounded `lower` (0,380 402x180) was drawn over the screen, touching down at (201,699) below it on the
  * bare background — nothing moved, and the reply called the content exhausted while naming `lower`; the turned stroke
- * for `tabbar-floating`'s R touched down at y 175, in the header above its list (WDA's; idb's is `motionShown`'s).
+ * for `tabbar-floating`'s R touched down at y 175, in the header above its list (WDA's; idb's is the motion ledger's region).
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
  * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md
  */

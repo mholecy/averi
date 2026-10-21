@@ -8,14 +8,14 @@ import { EDGE_TOWARD, OPPOSITE, SIDES, swipeVector, type Direction } from './swi
  * the target's content was seen moving between reads (`MotionShown`), which strokes go over it (`goesOver`), and which
  * stops it holds back (`carriedUnder`). Lab note LV3,
  * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md; the rule
- * and its cost, docs/adr/0010-pixel-assert-keyboard-first.md residual 6. The interface (tested through
- * interact/stroke-plan.ts, whose memory keeps the region, and the round):
- * - `seeMotion(memory, tree, target, gesture)` — what the strokes keep of the motion after one read that found the
- *   target (`MotionMemory`): the region so far (`MotionShown`), and the read the next is measured against; one walk.
+ * and its cost, docs/adr/0010-pixel-assert-keyboard-first.md residual 6. THE MOTION LEDGER's internal module
+ * (interact/motion-ledger.ts, which alone calls it and keeps its memory; tested through the ledger's interface):
+ * - `seeRegion(memory, tree, target, gesture)` — what the ledger keeps of the region after one read that found the
+ *   target (`RegionMemory`): the region so far (`MotionShown`), and the read the next is measured against; one walk.
  * - `goesOver(shown, toward)` — whether a stroke toward `toward` goes over the region (else the screen box).
  * - `carriedUnder(shown, target, of, drawn)` — whether the region holds back a stop on `target` (`CarriedUnder`), asked
- *   by interact/scroll-rounds.ts#round; what the stuck and bound failures say (interact/scroll-text.ts).
- * Judged per read from the region and the last stroke drawn (the round's `lastDrawn`): no device call, no I/O.
+ *   through interact/motion-ledger.ts#heldBack; what the stuck and bound failures say (interact/scroll-text.ts).
+ * Judged per read from the region and the last stroke drawn (the ledger's `lastDrawn`): no device call, no I/O.
  */
 
 /**
@@ -56,6 +56,9 @@ interface HeldStop {
  * content away from that edge touches down (swipe.ts#swipeVector). Sound: a stroke touching down at the line lands on
  * chrome and moves nothing, or lands on content — and then no chrome on that side reaches past the line; so a target
  * is never claimed short of it, whatever idb lists under a header. `band`: the region's part between edge and line.
+ * A residual of locality, stated: the line is computed here, over the region whole (`carriedUnder`'s `line`, its one
+ * place), not asked of the stroke plan, whose real stroke over the region is cut by a keyboard line and kept off nested
+ * scroll views (interact/stroke-plan.ts#planStroke); the two agree while neither applies.
  */
 export interface HeldBand extends HeldStop {
   readonly by: 'band';
@@ -87,7 +90,7 @@ export const goesOver = (shown: MotionShown, toward: Direction): boolean => EDGE
  * rect) — `CarriedUnder` — or undefined (no region: a tree that tells a scroll view, idb before two reads saw the
  * target carried). Two holds, the band first:
  * - THE BAND (`HeldBand`), on the side `way` names and the side `drawn` — the last stroke drawn
- *   (scroll-rounds.ts#State.lastDrawn), on every read until the next — pushed the content toward. Measured live on the
+ *   (motion-ledger.ts#lastDrawn), on every read until the next — pushed the content toward. Measured live on the
  *   lab's `tabbar-dense` (rows every 60 pt): rows carried under the header grew the region up to its title (110), and R
  *   carried back to 158 and 143, inside it, was claimed — the tap to the header. The last stroke, not only on the read
  *   right after it: a stop after a stroke is claimed on a confirming read, and a fling carries the target on into the
@@ -133,25 +136,25 @@ function pushedBy({ from, to }: Stroke): Edge {
 }
 
 /**
- * What the strokes keep of the motion between reads, on a tree that tells no scroll view (`seeMotion`): the region so
+ * What the ledger keeps of the region between reads, on a tree that tells no scroll view (`seeRegion`): the region so
  * far (`MotionShown`; undefined until two reads saw the target carried), and the listing of the last read that listed
  * the target once — what the next read that finds it is measured against.
  */
-export interface MotionMemory {
+export interface RegionMemory {
   readonly shown: MotionShown | undefined;
   readonly listing: Listing | undefined;
 }
 
-/** The motion memory before any read: no region, nothing to measure against. */
-export const NO_MOTION: MotionMemory = { shown: undefined, listing: undefined };
+/** The region memory before any read: no region, nothing to measure against. */
+export const NO_REGION: RegionMemory = { shown: undefined, listing: undefined };
 
 /**
- * The motion memory after a read that found `target` on `tree` (idb's), `gesture` what of the screen shows the app to
+ * The region memory after a read that found `target` on `tree` (idb's), `gesture` what of the screen shows the app to
  * a touch: the region after this read (`motionShown`), and this read's listing kept for the next — unless it lists the
  * target more than once: then it is no read to measure the next against, and the one before stands. A read that found
  * no target is not seen: the next read that finds it is measured against the last that did.
  */
-export function seeMotion(memory: MotionMemory, tree: UiNode, target: UiNode, gesture: Rect | undefined): MotionMemory {
+export function seeRegion(memory: RegionMemory, tree: UiNode, target: UiNode, gesture: Rect | undefined): RegionMemory {
   const listing = listingOf(tree, target, gesture);
   return { shown: motionShown(memory.shown, memory.listing, listing), listing: listing.nodes.has(listing.target) ? listing : memory.listing };
 }

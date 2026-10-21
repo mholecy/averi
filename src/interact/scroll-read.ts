@@ -8,7 +8,7 @@ import { lookAt, lookTold, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import type { CarriedUnder } from './motion-shown.js';
+import type { CarriedUnder } from './motion-ledger.js';
 import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 

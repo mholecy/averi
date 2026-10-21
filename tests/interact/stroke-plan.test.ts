@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Point, type Rect, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { carriedUnder as heldBack } from '../../src/interact/motion-shown.js';
-import { MIN_STROKE_BOX, motionShownOf, planProbe, planStroke, seeRead, startStrokes, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
+import { heldBack, overRegion, regionOf, seeMotion, startLedger, type MotionLedger } from '../../src/interact/motion-ledger.js';
+import { MIN_STROKE_BOX, planProbe, planStroke, seeRead, startStrokes, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { shortenStroke, swipeVector, swipeVectorAbove, type Direction } from '../../src/interact/swipe.js';
 import { containsPoint, largestScroller, rectIntersection } from '../../src/ui-tree/geometry.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -496,10 +496,25 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     children: n.children.map((c) => shifted(c, dy, moves)),
   });
   const r = (tree: UiNode): UiNode | undefined => [...everyNode(tree)].find((n) => n.identifier === 'lab.tabbar-floating.R');
-  /** The memory after the reads of `trees`, in order, each with its R as the target and the phone's gesture box. */
-  const seen = (trees: UiNode[], shows: Rect, target = r): StrokeMemory => trees.reduce((m, tree) => seeRead(m, { facts: factsOf(tree), line: undefined, target: target(tree), gesture: shows }), startStrokes());
-  /** Whether the region the reads in `memory` showed holds back a stop on `target` (motion-shown.ts#carriedUnder), as the round asks it — after `drawn`, the last stroke drawn before the read (scroll-rounds.ts#State.lastDrawn). */
-  const carriedUnder = (memory: StrokeMemory, target: Rect, of: 'stop' | 'fully', drawn?: Stroke) => heldBack(motionShownOf(memory), target, of, drawn);
+  /** The round's motion ledger and stroke memory after the reads of `trees`, in order, each with its R as the target and `shows` the gesture box: the ledger sees each read first, and tells the plan its region (scroll-rounds.ts#round). */
+  interface Seen {
+    readonly ledger: MotionLedger;
+    readonly memory: StrokeMemory;
+  }
+  const seen = (trees: UiNode[], shows: Rect, target = r): Seen =>
+    trees.reduce<Seen>(
+      ({ ledger, memory }, tree) => {
+        const t = target(tree);
+        const next = seeMotion(ledger, { drawn: undefined, read: { since: 'start', found: t === undefined ? [] : [t], judged: t, facts: { ...factsOf(tree), fingerprint: '', loading: false }, gesture: shows } }).ledger;
+        const region = regionOf(next);
+        return { ledger: next, memory: seeRead(memory, { facts: factsOf(tree), line: undefined, target: t, ...(region !== undefined && { region }) }) };
+      },
+      { ledger: startLedger(), memory: startStrokes() },
+    );
+  /** The region the reads in `s` showed (motion-ledger.ts#regionOf). */
+  const regionAfter = (s: Seen) => regionOf(s.ledger);
+  /** Whether the region the reads in `s` showed holds back a stop on `target`, as the round asks the ledger (motion-ledger.ts#heldBack) — after `drawn`, the last stroke drawn before the read, shown to the ledger as the round shows it. */
+  const heldBackAfter = (s: Seen, target: Rect, of: 'stop' | 'fully', drawn?: Stroke) => heldBack(drawn === undefined ? s.ledger : seeMotion(s.ledger, { drawn }).ledger, target, of);
   /** R at `y`. */
   const rAt = (y: number): Rect => ({ x: 24, y, width: 354, height: 52 });
   /** The turned stroke over SHOWN (finger down: it pushes the content toward the bottom), and the first, flinging stroke over the screen (it pushes it toward the top). */
@@ -508,7 +523,8 @@ describe('the region the motion showed — a target whose tree tells no scroll v
   /** The plan after the reads of `trees`, for a stroke `toward` at `reach`, this round's read the last; `shows` what of the screen shows the app (the phone, or below its status band). */
   const planAfter = (trees: UiNode[], toward: Direction, reach: number, shows: Rect = PHONE, target = r) => {
     const last = trees.at(-1)!;
-    return planStroke(seen(trees, shows, target), { toward, reach, gesture: PHONE, read: { facts: factsOf(last), target: target(last) } }).stroke;
+    const { ledger, memory } = seen(trees, shows, target);
+    return planStroke(memory, { toward, reach, gesture: PHONE, read: { facts: factsOf(last), target: target(last) }, ...(!overRegion(ledger, toward) && { screenBox: true }) }).stroke;
   };
   /** The rows carried with R at the first read, on the screen: T 24,300 and R 24,721 (F lies at 2200, below it) — cut above the tab bar's buttons (y 755), which held still. */
   const SHOWN: Rect = { x: 24, y: 300, width: 354, height: 455 };
@@ -592,42 +608,42 @@ describe('the region the motion showed — a target whose tree tells no scroll v
   it('the band (`HeldBand`): R carried back toward the top, the way the first sample saw the content move, is held until its centre lies past the line a stroke over the region touches down on (391 of SHOWN 300–755), whatever held still — R at 114 (the measured group run), 280 and 317 held, 400 claimed; `fully: true` until all of it lies past', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const region = seen([at, shifted(at, 1108), shifted(at, 607)], PHONE);
-    expect(motionShownOf(region)).toMatchObject({ rect: SHOWN, way: 'top' });
-    expect(carriedUnder(region, rAt(114), 'stop')).toEqual({ by: 'band', edge: 'top', region: SHOWN, line: 391, band: { x: 24, y: 300, width: 354, height: 91 }, part: false });
-    expect(carriedUnder(region, rAt(280), 'stop')).toMatchObject({ by: 'band', edge: 'top' });
-    expect(carriedUnder(region, rAt(317), 'stop')).toMatchObject({ by: 'band', edge: 'top' });
-    expect(carriedUnder(region, rAt(364), 'stop')).toMatchObject({ by: 'band', edge: 'top' });
-    expect(carriedUnder(region, rAt(366), 'stop')).toBeUndefined();
+    expect(regionAfter(region)).toMatchObject({ rect: SHOWN, way: 'top' });
+    expect(heldBackAfter(region, rAt(114), 'stop')).toEqual({ by: 'band', edge: 'top', region: SHOWN, line: 391, band: { x: 24, y: 300, width: 354, height: 91 }, part: false });
+    expect(heldBackAfter(region, rAt(280), 'stop')).toMatchObject({ by: 'band', edge: 'top' });
+    expect(heldBackAfter(region, rAt(317), 'stop')).toMatchObject({ by: 'band', edge: 'top' });
+    expect(heldBackAfter(region, rAt(364), 'stop')).toMatchObject({ by: 'band', edge: 'top' });
+    expect(heldBackAfter(region, rAt(366), 'stop')).toBeUndefined();
     // `fully: true` asks all of it: R at 380 has its top 11 pt short of the line, its centre past it.
-    expect(carriedUnder(region, rAt(380), 'fully')).toMatchObject({ by: 'band', edge: 'top', part: true });
-    expect(carriedUnder(region, rAt(391), 'fully')).toBeUndefined();
+    expect(heldBackAfter(region, rAt(380), 'fully')).toMatchObject({ by: 'band', edge: 'top', part: true });
+    expect(heldBackAfter(region, rAt(391), 'fully')).toBeUndefined();
     // Not the other side's band: the first sample carried the content toward the top, and no stroke was drawn before.
-    expect(carriedUnder(region, rAt(690), 'stop')).toBeUndefined();
+    expect(heldBackAfter(region, rAt(690), 'stop')).toBeUndefined();
     // Whatever held still: with the header's title gone, the band holds all the same.
     const untitled = { ...at, children: at.children.filter((c) => c.label !== 'Header') };
-    expect(carriedUnder(seen([untitled, shifted(untitled, 1108), shifted(untitled, 607)], PHONE), rAt(114), 'stop')).toMatchObject({ by: 'band', edge: 'top', line: 391 });
+    expect(heldBackAfter(seen([untitled, shifted(untitled, 1108), shifted(untitled, 607)], PHONE), rAt(114), 'stop')).toMatchObject({ by: 'band', edge: 'top', line: 391 });
   });
 
   it('the band on the side the last stroke drawn before the read pushed the content toward, too: after the turned stroke over the region (391 → 528, pushing it down), R short of the bottom line (665) is held; with no stroke before, or the flinging one (pushing it up), the bottom is as before — claimed', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const region = seen([at, shifted(at, 1108), shifted(at, 607)], PHONE);
-    expect(carriedUnder(region, rAt(650), 'stop', TURNED)).toEqual({ by: 'band', edge: 'bottom', region: SHOWN, line: 665, band: { x: 24, y: 665, width: 354, height: 90 }, part: false });
-    expect(carriedUnder(region, rAt(650), 'stop')).toBeUndefined();
-    expect(carriedUnder(region, rAt(650), 'stop', FLUNG)).toBeUndefined();
+    expect(heldBackAfter(region, rAt(650), 'stop', TURNED)).toEqual({ by: 'band', edge: 'bottom', region: SHOWN, line: 665, band: { x: 24, y: 665, width: 354, height: 90 }, part: false });
+    expect(heldBackAfter(region, rAt(650), 'stop')).toBeUndefined();
+    expect(heldBackAfter(region, rAt(650), 'stop', FLUNG)).toBeUndefined();
     // Its centre (646) short of the line: claimed; `fully: true`, its bottom (672) past it: held, in part.
-    expect(carriedUnder(region, rAt(620), 'stop', TURNED)).toBeUndefined();
-    expect(carriedUnder(region, rAt(620), 'fully', TURNED)).toMatchObject({ by: 'band', edge: 'bottom', part: true });
+    expect(heldBackAfter(region, rAt(620), 'stop', TURNED)).toBeUndefined();
+    expect(heldBackAfter(region, rAt(620), 'fully', TURNED)).toMatchObject({ by: 'band', edge: 'bottom', part: true });
     // A stroke across the axis pushes the content toward neither end: no band on either side but the first motion's.
-    expect(carriedUnder(region, rAt(650), 'stop', { from: { x: 300, y: 500 }, to: { x: 100, y: 510 } })).toBeUndefined();
+    expect(heldBackAfter(region, rAt(650), 'stop', { from: { x: 300, y: 500 }, to: { x: 100, y: 510 } })).toBeUndefined();
   });
 
   it('`way` is the side the content moved toward at the FIRST sample, kept: an `up` call whose first stroke moved nothing, whose turned one carried the rows up (top), then back down — top still; a stroke moving the content that way keeps the screen box (699), one moving it the other way goes over the region (391)', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const reads = [at, at, shifted(at, 400), shifted(at, 200)];
-    expect(motionShownOf(seen(reads.slice(0, 3), PHONE))).toMatchObject({ rect: SHOWN, way: 'top' });
+    expect(regionAfter(seen(reads.slice(0, 3), PHONE))).toMatchObject({ rect: SHOWN, way: 'top' });
     // The second sample (T carried down to 100, under the header: the region grows to the title, 110) keeps it.
     const grown: Rect = { x: 24, y: 110, width: 354, height: 645 };
-    expect(motionShownOf(seen(reads, PHONE))).toMatchObject({ rect: grown, way: 'top' });
+    expect(regionAfter(seen(reads, PHONE))).toMatchObject({ rect: grown, way: 'top' });
     const back = planAfter(reads, 'up', 1);
     expect(back.box).toEqual(grown);
     expect(back.points?.from).toEqual({ x: 201, y: 239 });
@@ -636,7 +652,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     expect(forward.points?.from).toEqual({ x: 201, y: 699 });
     // Seen first moving down: the other way round.
     const down = [shifted(at, 400), shifted(at, 400), at];
-    expect(motionShownOf(seen(down, PHONE))).toMatchObject({ rect: SHOWN, way: 'bottom' });
+    expect(regionAfter(seen(down, PHONE))).toMatchObject({ rect: SHOWN, way: 'bottom' });
     expect(planAfter(down, 'up', 1).box).toEqual(PHONE);
     expect(planAfter(down, 'down', 1).box).toEqual(SHOWN);
   });
@@ -649,37 +665,37 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     // The region forms (24,300 354x455) before the late node shows; the read after carries the rows past the edge, the node held still across both.
     const pill: Rect = { x: 150, y: 754.5, width: 100, height: 16 };
     const down = seen([at, plus(shifted(at, 946, rows), pill), plus(shifted(at, -79, rows), pill)], PHONE);
-    expect(motionShownOf(down)).toMatchObject({ rect: SHOWN, way: 'top' });
-    expect(carriedUnder(down, rAt(800), 'stop')).toEqual({ by: 'still', edge: 'bottom', region: SHOWN, still: { role: 'other', label: 'Late', identifier: null, rect: pill }, part: false });
-    expect(carriedUnder(down, rAt(720), 'fully')).toMatchObject({ by: 'still', edge: 'bottom', part: true });
+    expect(regionAfter(down)).toMatchObject({ rect: SHOWN, way: 'top' });
+    expect(heldBackAfter(down, rAt(800), 'stop')).toEqual({ by: 'still', edge: 'bottom', region: SHOWN, still: { role: 'other', label: 'Late', identifier: null, rect: pill }, part: false });
+    expect(heldBackAfter(down, rAt(720), 'fully')).toMatchObject({ by: 'still', edge: 'bottom', part: true });
     const bar: Rect = { x: 150, y: 280, width: 100, height: 20.5 };
     const up = seen([shifted(at, 400, rows), plus(at, bar), plus(shifted(at, 690, rows), bar)], PHONE);
-    expect(motionShownOf(up)).toMatchObject({ rect: SHOWN, way: 'bottom' });
-    expect(carriedUnder(up, rAt(114), 'stop')).toMatchObject({ by: 'still', edge: 'top', still: { label: 'Late', rect: bar }, part: false });
+    expect(regionAfter(up)).toMatchObject({ rect: SHOWN, way: 'bottom' });
+    expect(heldBackAfter(up, rAt(114), 'stop')).toMatchObject({ by: 'still', edge: 'top', still: { label: 'Late', rect: bar }, part: false });
     // A title collapsing in place (its origin kept, its height shrinking as the list scrolls) held still all the same.
     const collapsing = (t: UiNode, height: number): UiNode => ({ ...t, children: t.children.map((c) => (c.label === 'Header' ? { ...c, rect: { ...c.rect, height } } : c)) });
     const shrunk = seen([shifted(at, 400, rows), collapsing(at, 12)], PHONE);
-    expect(carriedUnder(shrunk, rAt(30), 'stop')).toMatchObject({ by: 'still', edge: 'top', still: { label: 'Header', rect: { x: 173 } } });
+    expect(heldBackAfter(shrunk, rAt(30), 'stop')).toMatchObject({ by: 'still', edge: 'top', still: { label: 'Header', rect: { x: 173 } } });
   });
 
   it('the still-facing hold faces the ROWS, not the target: a badge 40 pt wide at x 330 — beside the header\'s centred title (173–229) — carried past the region\'s top is held toward the title all the same; with nothing still facing the rows there, not held', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const title = [...everyNode(at)].find((n) => n.label === 'Header')!;
     const memory = seen([shifted(at, 400), at], PHONE);
-    expect(motionShownOf(memory)).toMatchObject({ rect: SHOWN, way: 'bottom' });
+    expect(regionAfter(memory)).toMatchObject({ rect: SHOWN, way: 'bottom' });
     const badge: Rect = { x: 330, y: 200, width: 40, height: 20 };
-    expect(carriedUnder(memory, badge, 'stop')).toEqual({ by: 'still', edge: 'top', region: SHOWN, still: { role: title.role, label: 'Header', identifier: title.identifier, rect: title.rect }, part: false });
+    expect(heldBackAfter(memory, badge, 'stop')).toEqual({ by: 'still', edge: 'top', region: SHOWN, still: { role: title.role, label: 'Header', identifier: title.identifier, rect: title.rect }, part: false });
     // The title moved to the screen's right edge, beside the region's 24–378: nothing past its top faces the rows.
     const aside = (n: UiNode): UiNode => ({ ...n, ...(n.label === 'Header' && { rect: { ...n.rect, x: 382, width: 20 } }), children: n.children.map(aside) });
-    expect(carriedUnder(seen([aside(shifted(at, 400)), aside(at)], PHONE), badge, 'stop')).toBeUndefined();
+    expect(heldBackAfter(seen([aside(shifted(at, 400)), aside(at)], PHONE), badge, 'stop')).toBeUndefined();
   });
 
   it('a short list — the target under the tab bar: the first motion carried the content up, and the last stroke pushed it up again (the list at its end, flung back), R carried past the region\'s bottom under the tab bar, on a side neither covers, is held by the tab bar\'s buttons, which held still; with no tab bar, claimed as before', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const region = seen([at, shifted(at, 1108), shifted(at, 607)], PHONE);
-    expect(carriedUnder(region, rAt(790), 'stop', FLUNG)).toMatchObject({ by: 'still', edge: 'bottom', still: { identifier: 'lab.tabbar-floating.tab.home', rect: { y: 755 } }, part: false });
+    expect(heldBackAfter(region, rAt(790), 'stop', FLUNG)).toMatchObject({ by: 'still', edge: 'bottom', still: { identifier: 'lab.tabbar-floating.tab.home', rect: { y: 755 } }, part: false });
     const noBar = { ...at, children: at.children.filter((c) => !(c.identifier ?? '').includes('.tab.')) };
-    expect(carriedUnder(seen([noBar, shifted(noBar, 1108), shifted(noBar, 607)], PHONE), rAt(790), 'stop', FLUNG)).toBeUndefined();
+    expect(heldBackAfter(seen([noBar, shifted(noBar, 1108), shifted(noBar, 607)], PHONE), rAt(790), 'stop', FLUNG)).toBeUndefined();
   });
 
   it('what held still BESIDE the rows is no chrome: a floating button (330,480) or a section index (370,210 30x520) cuts nothing, and R drawn at 400, past the band\'s line (391), is not held back', async () => {
@@ -687,7 +703,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     for (const beside of [{ x: 330, y: 480, width: 56, height: 56 }, { x: 370, y: 210, width: 30, height: 520 }]) {
       const at = { ...capture, children: [...capture.children, node({ role: 'button', label: 'Beside', rect: beside })] };
       expect(planAfter([at, shifted(at, 1108)], 'up', 0.5).box).toEqual(SHOWN);
-      expect(carriedUnder(seen([at, shifted(at, 1108), shifted(at, 607)], PHONE), rAt(400), 'stop', TURNED)).toBeUndefined();
+      expect(heldBackAfter(seen([at, shifted(at, 1108), shifted(at, 607)], PHONE), rAt(400), 'stop', TURNED)).toBeUndefined();
     }
   });
 
@@ -705,8 +721,8 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     const at = { ...capture, children: [...capture.children, node({ role: 'other', label: 'Index', rect: { x: 370, y: 210, width: 30, height: 520 } }), node({ role: 'button', label: 'Compose', rect: { x: 171, y: 690, width: 60, height: 56 } })] };
     expect(planAfter([at, shifted(at, 1108)], 'up', 0.5).box).toEqual({ x: 24, y: 300, width: 354, height: 390 });
     const memory = seen([at, shifted(at, 1108), shifted(at, 607)], PHONE);
-    expect(carriedUnder(memory, rAt(400), 'stop', TURNED)).toBeUndefined();
-    expect(carriedUnder(memory, rAt(340), 'stop', TURNED)).toMatchObject({ by: 'band', line: 378 });
+    expect(heldBackAfter(memory, rAt(400), 'stop', TURNED)).toBeUndefined();
+    expect(heldBackAfter(memory, rAt(340), 'stop', TURNED)).toMatchObject({ by: 'band', line: 378 });
   });
 
   it('the band\'s edges as measured: a node ending exactly on the rows\' middle line reaches it; a node past the region\'s side covers only what of it lies across the region', async () => {
@@ -735,9 +751,9 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     const capture = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const at = { ...capture, children: [...capture.children.filter((c) => c.label !== 'Header'), node({ role: 'text', label: '9:41', rect: { x: 180, y: 20, width: 42, height: 20 } })] };
     const belowBand: Rect = { x: 0, y: 62, width: 402, height: 812 };
-    expect(carriedUnder(seen([shifted(at, 400), at], belowBand), rAt(114), 'stop')).toBeUndefined();
+    expect(heldBackAfter(seen([shifted(at, 400), at], belowBand), rAt(114), 'stop')).toBeUndefined();
     // On the whole screen, the clock held still in it: it faces the rows.
-    expect(carriedUnder(seen([shifted(at, 400), at], PHONE), rAt(114), 'stop')).toMatchObject({ by: 'still', still: { label: '9:41' } });
+    expect(heldBackAfter(seen([shifted(at, 400), at], PHONE), rAt(114), 'stop')).toMatchObject({ by: 'still', still: { label: '9:41' } });
   });
 
   it('no sample from a target that changed size between the reads, or moved a point at most: the screen box', async () => {
@@ -771,9 +787,9 @@ describe('the region the motion showed — a target whose tree tells no scroll v
       );
     const card1 = (tree: UiNode): UiNode | undefined => [...everyNode(tree)].find((n) => n.identifier === 'card.1');
     const sideways = seen([page(0, 0), page(250, 0)], PHONE, card1);
-    expect(motionShownOf(sideways)).toMatchObject({ axis: 'horizontal', rect: { x: 24, y: 300, width: 378, height: 200 } });
+    expect(regionAfter(sideways)).toMatchObject({ axis: 'horizontal', rect: { x: 24, y: 300, width: 378, height: 200 } });
     const thenDown = seen([page(0, 0), page(250, 0), page(250, 200)], PHONE, card1);
-    expect(motionShownOf(thenDown)).toMatchObject({ axis: 'vertical', rect: { x: 74, y: 300, width: 328, height: 400 } });
+    expect(regionAfter(thenDown)).toMatchObject({ axis: 'vertical', rect: { x: 74, y: 300, width: 328, height: 400 } });
   });
 
   // The hold's limit, a residual (docs/adr/0010-pixel-assert-keyboard-first.md, residual 6): idb lists rows carried
@@ -787,16 +803,16 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     const row7 = (tree: UiNode): UiNode | undefined => [...everyNode(tree)].find((n) => n.identifier === 'row.7');
     const belowBand: Rect = { x: 0, y: 62, width: 402, height: 812 };
     const memory = seen([dense, shifted(dense, 1108, rows), shifted(dense, 560, rows)], belowBand, row7);
-    expect(motionShownOf(memory)).toMatchObject({ rect: { y: 110, height: 645 }, way: 'top' });
-    expect(carriedUnder(memory, { x: 24, y: 160, width: 354, height: 52 }, 'stop')).toMatchObject({ by: 'band', edge: 'top', line: 239 });
-    expect(carriedUnder(memory, { x: 24, y: 214, width: 354, height: 52 }, 'stop')).toBeUndefined();
+    expect(regionAfter(memory)).toMatchObject({ rect: { y: 110, height: 645 }, way: 'top' });
+    expect(heldBackAfter(memory, { x: 24, y: 160, width: 354, height: 52 }, 'stop')).toMatchObject({ by: 'band', edge: 'top', line: 239 });
+    expect(heldBackAfter(memory, { x: 24, y: 214, width: 354, height: 52 }, 'stop')).toBeUndefined();
   });
 
   it('no region, no hold: one read (idb before any motion), and WDA\'s twin, which tells its list', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
-    expect(carriedUnder(seen([at], PHONE), { x: 24, y: 114, width: 354, height: 52 }, 'stop')).toBeUndefined();
+    expect(heldBackAfter(seen([at], PHONE), { x: 24, y: 114, width: 354, height: 52 }, 'stop')).toBeUndefined();
     const wda = parseWdaSource(await load('tabbar-floating.wda.json'));
-    expect(carriedUnder(seen([wda, shifted(wda, 1108), shifted(wda, 607)], PHONE), { x: 24, y: 114, width: 354, height: 52 }, 'stop')).toBeUndefined();
+    expect(heldBackAfter(seen([wda, shifted(wda, 1108), shifted(wda, 607)], PHONE), { x: 24, y: 114, width: 354, height: 52 }, 'stop')).toBeUndefined();
   });
 
   it('a read between that does not find the target, or lists it twice, keeps the read before: the motion is measured across it', async () => {
