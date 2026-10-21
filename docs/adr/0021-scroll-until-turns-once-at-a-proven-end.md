@@ -153,8 +153,9 @@ the read a fling comes to rest in (decision 5).
     as content shown and still ends after two unchanged reads; never of a scroll view the tree says scrolls on the
     other axis and holding no scroll view that may scroll on this one, whose content moves none that way — while a
     ViewPager, horizontal by its class, over a vertical list of its own rect reads by that list's content). `scroll-rounds.ts#observe` asks it once a read after a stroke
-    with the target not in the tree (`stroke-plan.ts#strokedContent`; undefined over the gesture box whole — idb, a
-    screen with no scroll view — where the rule is unchanged): a `blank` read is no evidence — it counts as moved, the
+    with the target not in the tree (`stroke-plan.ts#strokedContent`; undefined over the gesture box whole — a screen
+    with no scroll view — and under idb, whose region its motion showed is no node of the tree: the rule is unchanged
+    there): a `blank` read is no evidence — it counts as moved, the
     streak starts again (a reset, not a freeze), and an `absent` failure at maxSwipes or the deadline says so
     (`UnseenStrokes`, counted over one scroll view, one way): `; after the last 5 swipes over the scroll container
     0,550 1080x1670 the tree listed none of its content where a swipe's motion would show (blank space, content with no
@@ -189,7 +190,9 @@ the read a fling comes to rest in (decision 5).
       at timeoutMs 30000 (`blank:tabbar-floating.F`); scroll-bounded O and F LOUD at the 15 s deadline after 5 strokes
       into `upper` (one every 2.8 s), saying the last 4 went over it while the tree listed none of its content (the
       clause's first wording, at `bd1c1107`; at `770344ae` its final one, above, the same 4 of 5), no unchanged claim; `turn:scroll-bounded.F` unchanged (2 unmoved, `upper` listing W and P).
-- **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged.
+- **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged. The turn's stroke under
+  idb goes over the region the target's motion showed once two reads saw it carried, when it carries content back the other way from how it was first seen moving (2026-10-21, lab note LV3: ADR
+  0010's residual 6, refined) — the turn itself is decided as before.
 
 ## Consequences and residuals
 

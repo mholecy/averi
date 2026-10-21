@@ -33,7 +33,6 @@ import type { ReplyKind } from './replies.js';
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
-const LV3 = 'bug:2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
@@ -90,8 +89,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:scroll-bounded.S', 'scroll:scroll-bounded.O'], IDB_NO_SCROLL_VIEW, 'stop-claim', 'visible'),
   ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O', 'scroll:scroll-bounded.S.fully'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
   ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
-  // LV3 under idb only (no scroll view listed: its turned stroke still touches down in the header); fixed under WDA.
-  ...each('ios idb', ['scroll:tabbar-floating.R'], LV3, 'R-direction', 'refused'),
+  // LV3's idb entry (R-direction on `refused`: the turned strokes touching down at y 175, in the header) struck off by
+  // round 14's bugs/r14-lv3 (02aabfa6: a stroke carrying content back goes over the region the rows carried with R
+  // showed, and a stop short of where such a stroke touches down, or past the region toward what held still, is held —
+  // ADR 0010 residual 6, refined 2026-10-21): idb's tabbar-floating R ok three of three, tabbar-dense R five of five and
+  // its last row L three of three (at 02aabfa6's src), the idb visibility group with nothing not known (ios-vis-r14-lv3*.json).
   // sheet-long-list's F and L: idb lists the table's labels without their identifiers (and no row below the fold), so
   // neither is ever in its tree — an honest not-reached, its strokes unjudged since round 7's recapture records them
   // unlisted (TargetTruth.listed); until then F read R-direction, filed as
