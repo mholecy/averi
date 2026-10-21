@@ -354,7 +354,7 @@ export interface UiNode {
    * nothing in the rect says the rest exists. Read by
    * ui-tree/geometry.ts#clipsOf, which `scroll_until`'s round asks for
    * each match's such ancestors so a `fully: true` stop flush with one is
-   * checked before it is reported (interact/scroll-rounds.ts#PROBE_REACH).
+   * checked before it is reported (interact/scroll-rounds.ts#flushCheck).
    * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
    *
    * A flag, not a role: mapping a Compose scroller to
@@ -453,7 +453,7 @@ export interface UiNode {
    * `bottom`, `left`, `right` likewise. Read by a miss's zero-area note
    * (ui-tree/miss.ts#missOf, `zeroArea`), by `scroll_until`, which reads a
    * node clipped out past its far edge as beyond it
-   * (interact/scroll-rounds.ts#observe), and by the cut-sliver rule, to which a descendant
+   * (interact/course.ts#seeTarget), and by the cut-sliver rule, to which a descendant
    * clipped out past an edge its ancestor lies flush with is evidence of a
    * cut there (ui-tree/geometry.ts#evidentCut). Absent on iOS and on every
    * node dumped the right way round.

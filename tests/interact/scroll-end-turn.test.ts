@@ -11,7 +11,7 @@ import { node } from '../helpers/fake.js';
 import { decided, failureOf, play, resultOf, strokesToward, type Row } from '../helpers/rounds.js';
 
 /**
- * The END TURN (interact/scroll-rounds.ts#EndTurn; lab note LV4,
+ * The END TURN (interact/course.ts#EndTurn; lab note LV4,
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md)
  * and the end proof it rests on (#Observed.ends, interact/stroke-plan.ts#strokedContent, ui-tree/geometry.ts#Clips.contentToward),
  * over the real WDA capture of the lab app's `scroll-bounded` at rest: `lower` (0,380 402x180) at its top, its content

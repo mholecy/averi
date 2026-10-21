@@ -23,7 +23,7 @@ the sentence (`interact/target-text.ts#cutSliverText`).
 The other purposes share that order but judge less or more in it:
 
 - **The `fully` stop judges no sliver.** A stop flush with a clipping container is the flush probe's to check
-  (`scroll-rounds.ts#PROBE_REACH`), so the cut step never applies to it. Since 2026-10-20 (round 14, VA1; ADR 0013) so
+  (`scroll-rounds.ts#flushCheck`), so the cut step never applies to it. Since 2026-10-20 (round 14, VA1; ADR 0013) so
   is a stop flush under a node pinned at its scroll view's top or left inside that scroll view — a merged sticky header
   (`ui-tree/later-edges.ts#PinnedEdge`): the probe goes toward the pinned node's inner edge.
 - **The pixel assert judges the keyboard first** (ADR 0010). It never judges off the screen, and its only cut is at the

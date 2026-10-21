@@ -161,7 +161,7 @@ export const MIN_STROKE_FRACTION = 0.03;
  * side along the stroke (its height for up/down, its width for
  * left/right) — and never longer than the stroke given. Used by `scroll_until`
  * to shorten the stroke after each turn round a target a fling carried past
- * (interact/scroll-rounds.ts#nextStroke), so the distance left shrinks
+ * (interact/course.ts#nextStroke), so the distance left shrinks
  * however far the app flings. Pure.
  */
 export function shortenStroke(stroke: Stroke, factor: number, side: number): Stroke {

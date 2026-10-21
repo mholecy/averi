@@ -1011,7 +1011,7 @@ uiautomator trees a fling keeps its scroll view's rect and is excused, a dismiss
      taken;
    - a target whose presented screen the tree does not show as one (residuals 2, 3, 5); a stroke whose touch-down lies
      off every presented surface, wherever its path goes; a row of the presented screen itself, on its own screen; and
-     the flush probe of a `fully: true` stop (scroll-rounds.ts#PROBE_REACH, Android's cut bounds), which is not asked.
+     the flush probe of a `fully: true` stop (scroll-rounds.ts#flushCheck, Android's cut bounds), which is not asked.
    The stroke box (`drawnOver`) is unchanged.
    **Closed for WDA** (2026-10-15): the first case, a target not in the tree, is not stroked for beneath a marked
    layer — the topmost one, unless the touch-down lies on a scroll view of its own (residuals 13 and 14); the second,

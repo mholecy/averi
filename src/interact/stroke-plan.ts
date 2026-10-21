@@ -3,6 +3,7 @@ import { containsPoint, isUntold, quoted, rectIntersection, toldFrame, type List
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
+import type { StillNeeds } from './course.js';
 import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
@@ -29,7 +30,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  *   (`PresentedTouchDown`, asked of the scene at the points as sent: ui-tree/standing.ts#Scene.presentedAt), and ONE
  *   memory to keep whatever the round does with the stroke (held for a presented screen's confirming read, held back at
  *   a bound, or sent).
- * - `planProbe(memory, ask)` — the `fully: true` flush check's probe (scroll-rounds.ts#PROBE_REACH): over the first of
+ * - `planProbe(memory, ask)` — the `fully: true` flush check's probe (scroll-rounds.ts#flushCheck): over the first of
  *   the given scroll views with room, never the screen box — undefined when none has room.
  * - `strokeSent(memory)` — the plan's stroke (or probe) was sent: the scroll view it chose becomes the one the last
  *   stroke went over (for `touchedOn`). The one thing the round adds to a plan's memory, and only on sending: a plan
@@ -183,7 +184,7 @@ export function seeRead(memory: StrokeMemory, { facts, line, target, region }: S
 
 /** What a round asks of the plan for its stroke toward the target. */
 export interface StrokeAsk {
-  /** Where the content lies for this stroke — the round's course (scroll-rounds.ts#nextStroke). */
+  /** Where the content lies for this stroke — the round's course (course.ts#nextStroke). */
   readonly toward: Direction;
   /** Its reach, 1 until the first turn, halved by each (swipe.ts#shortenStroke). */
   readonly reach: number;
@@ -199,12 +200,6 @@ export interface StrokeAsk {
    * (interact/motion-ledger.ts#overRegion, false). Absent: the scroll views as judged.
    */
   readonly screenBox?: true;
-}
-
-/** What the target still needs of a stroke (course.ts#stillNeeds): the distance to its window's middle, and how far the window lets it travel while whole in it. */
-export interface StillNeeds {
-  readonly needs: number;
-  readonly slack: number;
 }
 
 /**
@@ -296,7 +291,7 @@ export interface ProbeAsk {
   /** The way that reveals the flush edge. */
   readonly toward: Direction;
   readonly reach: number;
-  /** The cap on its finger travel (scroll-rounds.ts#PROBE_MAX_TRAVEL_FRACTION). */
+  /** The cap on its finger travel (course.ts#PROBE_MAX_TRAVEL_FRACTION). */
   readonly maxTravel: number;
   readonly gesture: Rect | undefined;
   /** This round's facts: what is drawn over each scroll view. */
@@ -308,7 +303,7 @@ export interface ProbeAsk {
 }
 
 /**
- * The flush check's probe (scroll-rounds.ts#PROBE_REACH): over the first of `scrollViews` with room for a stroke
+ * The flush check's probe (scroll-rounds.ts#flushCheck): over the first of `scrollViews` with room for a stroke
  * toward `toward` above the keyboard and what is drawn over it — never the screen box: undefined is NO ROOM (a stop
  * reported unchecked, not probed; over the screen it would touch down off the scroll view and move nothing whatever
  * is cut). `memory`: the memory with the scroll view it chose, for `strokeSent` once the probe is sent.

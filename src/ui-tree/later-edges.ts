@@ -46,7 +46,7 @@ import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './
  * across an edge of any class but `none`; a role-less strip only on an `overlaid` edge), the `fully` stop's and the pixel
  * assert's overlaid cover (`LaterEdges.overlaid`, cover.ts#overlaidCover), `Scene.flushNeighbours` (the eyes'
  * trigger, ui-tree/eyes.ts, which leaves out a neighbour spanning the screen — a question about the screen, not the
- * edge), and `Scene.pinnedEdges` (the `fully` stop's flush probe, interact/scroll-rounds.ts#PROBE_REACH). Edges are
+ * edge), and `Scene.pinnedEdges` (the `fully` stop's flush probe, interact/scroll-rounds.ts#flushCheck). Edges are
  * asked top, bottom, left, right; the overlay top and bottom only (every measured Compose cut is vertical; sideways a
  * row's padded overflow icon reaches past its neighbour's ends).
  *

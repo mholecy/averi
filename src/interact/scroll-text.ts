@@ -77,7 +77,7 @@ export interface ScrollUntilResult {
   /**
    * Set on a `fully: true` stop whose edge along the scroll lies exactly on
    * its scroll container's edge (Android only:
-   * interact/scroll-rounds.ts#PROBE_REACH) — where uiautomator cuts a
+   * interact/scroll-rounds.ts#flushCheck) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
    * `checked`: a probe swipe toward that edge moved nothing, so nothing
    * does (the probe is one of `swipes`). Not checked (`why`, scroll-rounds.ts
@@ -108,7 +108,7 @@ export interface ScrollUntilResult {
   eyes?: EyesFinding;
   /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
-  /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (scroll-rounds.ts#EndTurn); the reply says so. */
+  /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (course.ts#EndTurn); the reply says so. */
   endTurn?: EndTurn;
 }
 
@@ -284,13 +284,13 @@ function unmovedText({ after, unmoved, way }: EndTurn): string {
 }
 
 /**
- * The end proof's one wording (scroll-rounds.ts#EndProof), in the end turn's clause and the bound's failure:
+ * The end proof's one wording (course.ts#EndProof), in the end turn's clause and the bound's failure:
  * `the tree lists the content of scrollable (0,380 402x180) ending at its top`.
  */
 const endText = ({ way, scrollView }: EndProof): string => `the tree lists the content of ${nodeText(scrollView)} ending at its ${EDGE_TOWARD[way]}`;
 
 /**
- * The end turn's clause (scroll-rounds.ts#EndTurn), before the detent's in every reply and failure that made one —
+ * The end turn's clause (course.ts#EndTurn), before the detent's in every reply and failure that made one —
  * `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
  * averi turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end
  * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made. Exported for the
@@ -307,7 +307,7 @@ export const endTurnText = (turn: EndTurn | undefined): string =>
 const detentText = (detent: DetentMove | undefined): string => (detent === undefined ? '' : `; the sheet moved from its ${detent.from} detent to ${detent.to}`);
 
 /**
- * The flush clause (scroll-rounds.ts#PROBE_REACH): what the stop's edge on
+ * The flush clause (scroll-rounds.ts#flushCheck): what the stop's edge on
  * its scroll container means — checked by a probe, or not checked. The
  * container is quoted as a node's rect (`rectText`): it is one. Exported for
  * the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins
