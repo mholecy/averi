@@ -103,7 +103,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     const played = play(IPHONE, rows);
     expect(strokesToward(played)).toEqual(['up', 'down', 'down', 'down', 'down']);
     // The turned strokes keep the full reach: no fling carried F past — it was never near.
-    // (The last is shortened to what F still needs once a stroke was measured to carry it: scroll-rounds.ts#stillNeeds, LV5.)
+    // (The last is shortened to what F still needs once a stroke was measured to carry it: course.ts#stillNeeds, LV5.)
     expect(played.steps.flatMap((s) => (s.do === 'stroke' ? [decided(s)] : [])).slice(0, 4)).toMatchObject([{ reach: 1 }, { reach: 1 }, { reach: 1 }, { reach: 1 }]);
     expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 5, endTurn: { way: 'up', to: 'down', after: 1, unmoved: 1 } });
     expect(describeScrollResult(resultOf(played))).toBe(

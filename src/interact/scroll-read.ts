@@ -306,7 +306,7 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   }
   // The frames this read was judged in — the screen above an applied
   // keyboard, else every box that counts — for where the target stands
-  // against the far edge (scroll-rounds.ts#observe, #beyondFarEdge), cut by
+  // against the far edge (scroll-rounds.ts#observe, course.ts#beyondFarEdge), cut by
   // standing's own band cut (ui-tree/standing.ts#farEdgeFrames), which reads
   // the best standing's band for the navigation cut.
   const { frames, uncutFrames } = farEdgeFrames(screen, best?.standing, cover?.above);

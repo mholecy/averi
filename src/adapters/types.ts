@@ -366,7 +366,7 @@ export interface UiNode {
    * change what they match; and ui-tree/draw-order.ts's
    * CONTENT_FRAMED_ROLES would start excusing those frames. Absent on iOS:
    * WDA and idb report a node's frame unclipped — a row under the top bar
-   * reads at y -48, past the frame (interact/scroll-rounds.ts#beyondFarEdge
+   * reads at y -48, past the frame (interact/course.ts#beyondFarEdge
    * is built on that) — so there is nothing to mark. Absent too on an
    * Android node that cannot scroll now (`scrollable="false"`: a list whose
    * content fits), whose children are not cut by it.
@@ -521,7 +521,7 @@ export interface UiNode {
    * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read by
    * ui-tree/draw-order.ts#listsUnclippedFrames: a scroll view's axis is read off its content past its frame
    * (ui-tree/scroll-containers.ts#scrollAxis), its end off none (geometry.ts#Clips.contentToward), and `scroll_until`'s carry
-   * model measures a row's motion as the content's (interact/scroll-rounds.ts#stillNeeds). Not what cuts a node by
+   * model measures a row's motion as the content's (interact/course.ts#stillNeeds). Not what cuts a node by
    * what scrolls above it: geometry.ts#Clips.drawnIn does that on every tree that lists ancestry. A mark of the
    * source, like `flatList`: ui-tree knows no platform. Absent on Android's trees (uiautomator cuts most nodes' bounds
    * to their scroll container; not all: lab note LE1,

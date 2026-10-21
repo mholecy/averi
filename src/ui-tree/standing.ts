@@ -446,12 +446,12 @@ export interface StandingFacts {
   readonly minPiece?: number;
   /** The node's cut to a sliver under `minPiece` — by its scroll container (geometry.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
-  /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/scroll-rounds.ts#beyondFarEdgeIn). */
+  /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/course.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
   /**
    * With `drawn` only, on a tree whose source lists the node where it lies (geometry.ts#DrawnFrame.listedWhereItLies, WDA's):
    * `drawn` is then the window a row moves through as the content does — the one tree on which `scroll_until`'s carry
-   * model measures a stroke's carry (interact/scroll-rounds.ts#stillNeeds).
+   * model measures a stroke's carry (interact/course.ts#stillNeeds).
    */
   readonly listedWhereItLies?: true;
 }

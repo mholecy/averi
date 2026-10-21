@@ -756,7 +756,7 @@ export interface Clips {
    * `fully: true` claim's edges (ui-tree/eyes.ts#eyesQuestion's clip lines).
    * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
    * Rects stay as listed
-   * (`scroll_until`'s far edge, interact/scroll-rounds.ts#beyondFarEdge, reads a row's rect past the frame); the
+   * (`scroll_until`'s far edge, interact/course.ts#beyondFarEdge, reads a row's rect past the frame); the
    * standing cuts what it judges by this frame (ui-tree/standing.ts#Scene). Cost: one walk of the tree, on the first
    * ask, its ancestors' frames shared along a branch; each ask then meets them with the node's own rect
    * (`overhangAsFlush`), a constant.
@@ -889,7 +889,7 @@ export interface DrawnFrame {
   /**
    * Whether the tree's source lists the node WHERE IT LIES (`clipsOf`'s `unclipped`, draw-order.ts#listsUnclippedFrames:
    * WDA's): then `frame` is the window the content moves through, and a row's motion as it comes in is the content's —
-   * what `scroll_until`'s carry model measures (interact/scroll-rounds.ts#stillNeeds), through
+   * what `scroll_until`'s carry model measures (interact/course.ts#stillNeeds), through
    * ui-tree/standing.ts#StandingFacts.listedWhereItLies. Not on uiautomator's trees, which cut most rows to their
    * scroll container (a row coming in reads short).
    */

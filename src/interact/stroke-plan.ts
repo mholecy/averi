@@ -191,7 +191,7 @@ export interface StrokeAsk {
   readonly gesture: Rect | undefined;
   /** This round's read, when its tree read: the facts, and the judged target's node — the presented question is asked on its behalf, or, undefined, on behalf of none. */
   readonly read: { readonly facts: Pick<TreeFacts, 'scene' | 'mainScroller'>; readonly target: UiNode | undefined } | undefined;
-  /** What the target still needs of this stroke, when the round knows (scroll-rounds.ts#stillNeeds) — the carry model's to apply (`carried`). */
+  /** What the target still needs of this stroke, when the round knows (course.ts#stillNeeds) — the carry model's to apply (`carried`). */
   readonly still?: StillNeeds;
   /**
    * Over the gesture box whole, whatever the scroll views: on a tree that tells none, a stroke moving the content the
@@ -201,7 +201,7 @@ export interface StrokeAsk {
   readonly screenBox?: true;
 }
 
-/** What the target still needs of a stroke (scroll-rounds.ts#stillNeeds): the distance to its window's middle, and how far the window lets it travel while whole in it. */
+/** What the target still needs of a stroke (course.ts#stillNeeds): the distance to its window's middle, and how far the window lets it travel while whole in it. */
 export interface StillNeeds {
   readonly needs: number;
   readonly slack: number;

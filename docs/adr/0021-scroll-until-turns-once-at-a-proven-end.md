@@ -65,7 +65,7 @@ the read a fling comes to rest in (decision 5).
 3. **The one-stroke stop.** With that proof the scroll ends after the first unmoved stroke (bound `exhausted`,
    `ends`: `(swiping up did not move it: the tree lists the content of … ending at its top — content exhausted)`),
    where `UNMOVED_STROKES_EXHAUST`'s two identical unmoved strokes stay the rule wherever the tree cannot list the end.
-4. **The carry model (LV5)** (`stroke-plan.ts#carried`, `scroll-rounds.ts#stillNeeds`): on the same trees, the read
+4. **The carry model (LV5)** (`stroke-plan.ts#carried`, `course.ts#stillNeeds`): on the same trees, the read
    after a stroke measures what it carried the target, per point of the finger's actual travel, of the same node at
    the same size, a sample past 4 × the travel (or the wrong way, or a tap's) dropped, the largest kept — kept for the
    scroll view the stroke went over: a carry measured over one is never applied to a stroke over another (the plan

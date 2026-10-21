@@ -112,7 +112,7 @@ above its scroll view's top too.
   read "past" as more than a pixel already.
 - **The carry model stays WDA's** (`ui-tree/geometry.ts#DrawnFrame.listedWhereItLies`, true only where
   `draw-order.ts#listsUnclippedFrames`; the standing hands it on as `StandingFacts.listedWhereItLies`, which
-  `interact/scroll-rounds.ts#stillNeeds` asks): the drawn frame no longer tells the dialect, and on Android a row's
+  `interact/course.ts#stillNeeds` asks): the drawn frame no longer tells the dialect, and on Android a row's
   rect as it comes in is mostly cut to its scroll view, so its motion is no measure of the content's. The dialect is
   read in ui-tree, by the drawn frame's owner, not again by `scroll_until`.
 - **The sliver rule stays for a rect cut flush** (ADR 0013): a rect cut flush with its container is judged by the
