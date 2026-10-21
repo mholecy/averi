@@ -341,8 +341,8 @@ const configSchema = z
              * 2026-08-12, docs/plans/ios-wda-tree-source.md §Problem). The
              * same goes for a native SwiftUI identifier on a container
              * (`.accessibilityElement(children: .contain)`, measured
-             * 2026-10-05) — a `wait:` on one under idb says so when it
-             * times out (flow/engine.ts waitTimeoutHint).
+             * 2026-10-05) — a `wait:` or a `scroll_until` on one under idb
+             * says so when it gives up (ui-tree/miss.ts, `containerId`).
              * No `auto` value — deferred until the Phase 4 latency
              * measurement of /source on deep trees. The kinds are the
              * tree-source seam's (adapters/ios-node.ts), spelled once.

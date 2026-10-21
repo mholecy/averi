@@ -44,7 +44,7 @@ describe('a raw WDA capture is read through the side\'s own WDA parser', () => {
       ['nav.tab_cards', '711', true],
       ['nav.tab_more', '711', true],
     ]);
-    expect(adapter.treeSourceKind).toBe('wda');
+    expect(tree.flatList).toBeUndefined();
   });
 
   it('Contacts New Contact: the content WDA parks at the sheet\'s origin is placed at its cell, below the screen', async () => {
@@ -65,7 +65,7 @@ describe('a raw idb capture is read by the side\'s IdbTreeSource, its describe-a
   it('the flat list under a synthetic 0x0 root marked flatList, one child per element', async () => {
     const adapter = recordedAdapter(side, recording({ platform: 'ios', source: 'idb', form: 'raw', payload: await fixture('idb-swift-form-continue.json') }), { platform: 'ios', screen: IPHONE, frame: IPHONE });
     const tree = await adapter.uiTree();
-    expect([tree.flatList, at(tree), tree.children.length, adapter.treeSourceKind]).toEqual([true, '0,0 0x0', 9, 'idb']);
+    expect([tree.flatList, at(tree), tree.children.length]).toEqual([true, '0,0 0x0', 9]);
     expect(deviceCalls()).toEqual(['idb ui describe-all --json']);
   });
 });

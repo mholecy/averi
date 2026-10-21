@@ -157,6 +157,33 @@ export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
 }
 
 /**
+ * What a caller points at: a selector string (the MCP tools' vocabulary,
+ * `'id:login_button'`) or an ElementSpec (the flow descriptors'). Resolution
+ * is the same either way; only the lookup differs. Here, with the two
+ * lookups, because a miss (miss.ts) asks of the target too.
+ */
+export type Target = Selector | ElementSpec;
+
+/** Every match, unfiltered — interact/resolve.ts#preferred is the policy over them, and a miss (miss.ts) asks of them. */
+export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
+  typeof target === 'string' ? findAll(tree, target) : findBySpec(tree, target);
+
+/** A node with area — one a tap may act on: interact/resolve.ts#preferred keeps only these, and a miss whose matches have none says so (miss.ts, `zeroArea`). */
+export const hasArea = (node: UiNode): boolean => node.rect.width > 0 && node.rect.height > 0;
+
+/**
+ * The id a target names ALONE — one exact `id` and nothing else (`id:"x"`, `{ id: x }`) — or undefined. Only then is
+ * "no tree read held a match" a statement about the id (miss.ts's `containerId`): the fields AND (`matches`), so
+ * `{ id, text }` misses with the id in every read when the text is what never matched; and a regex id (`id~"…"`)
+ * names no one id.
+ */
+export function soleIdOf(target: Target): string | undefined {
+  const conditions = typeof target === 'string' ? parseSelector(target) : conditionsOf(target);
+  const [only, ...more] = conditions;
+  return more.length === 0 && only?.field === 'id' && only.op === 'eq' ? only.value : undefined;
+}
+
+/**
  * Roles a user can operate. Used to disambiguate selectors that also match
  * decorative text (e.g. on iOS a field's title and error label share the
  * field's accessibilityIdentifier).

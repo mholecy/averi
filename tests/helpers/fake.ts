@@ -1,4 +1,3 @@
-import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
@@ -96,8 +95,6 @@ export function iosLoginFake({
 export class FakeAdapter implements DeviceAdapter {
   /** Assignable: the fake stands in for both platforms (a fill's keyboard dismissal, a verify run's legs). */
   platform: 'android' | 'ios' = 'android';
-  /** Assignable, like `platform`: what a bound iOS adapter would report (the flow engine's wait hint reads it). undefined = unknown. */
-  treeSourceKind: IosTreeSourceKind | undefined = undefined;
   /** Assignable: the fake's typing lands when typeText returns (types.ts#TypingDelivery); a test of Android's queue sets `may-arrive-late`. */
   typingDelivery: TypingDelivery = 'on-return';
   current: string;
@@ -385,7 +382,6 @@ export function idbFloatingLabelFake(label: string, value: string | null): FakeA
     'form',
   );
   fake.platform = 'ios';
-  fake.treeSourceKind = 'idb';
   fake.keyboard = undefined; // as IosAdapter: no oracle
   return fake;
 }

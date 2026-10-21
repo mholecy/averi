@@ -7,7 +7,7 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setT
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js';
 import { EngineSession } from '../../src/flow/launch.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
 
@@ -116,7 +116,6 @@ const screens = () => ({
 function stuckIdb(stuck: (read: number) => boolean, start: 'pin' | 'home' = 'pin') {
   const fake = new FakeAdapter(screens(), start);
   fake.platform = 'ios';
-  fake.treeSourceKind = 'idb';
   const source = new IdbTreeSource({ udid: 'D34212DB', exec: stuckExec });
   const readable = fake.uiTree.bind(fake);
   const state = { reads: 0, stuck };
@@ -398,7 +397,6 @@ describe('waits and asserts on the stuck tree fail closed', () => {
     const { fake } = stuckIdb(always);
     const error = await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'wait_login_screen' }));
     expect(error.message).toMatch(/last UI tree read failed: idb returned an empty accessibility tree/);
-    expect(error.message).not.toContain(idbContainerIdHint('login_screen'));
     expect(error.message).not.toContain('no tree read contained');
   });
 });

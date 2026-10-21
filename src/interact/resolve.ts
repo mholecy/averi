@@ -1,11 +1,8 @@
-import type { DeviceAdapter, Selector, UiNode } from '../adapters/types.js';
-import { describeElementSpec, type ElementSpec } from '../ui-tree/element-spec.js';
-import type { Edge } from '../ui-tree/geometry.js';
+import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
-import { findAll, findBySpec, preferInteractive } from '../ui-tree/selectors.js';
-import { SIDES } from './swipe.js';
-import { pastSideText, revealText } from './target-text.js';
+import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -32,19 +29,12 @@ import { pastSideText, revealText } from './target-text.js';
  * had.
  */
 
-/**
- * What a caller points at: a selector string (the MCP tools' vocabulary,
- * `'id:login_button'`) or an ElementSpec (the flow descriptors'). Resolution
- * is the same either way; only the lookup differs.
- */
-export type Target = Selector | ElementSpec;
+// What a caller points at, and every match of it: ui-tree/selectors.ts's (a miss asks of the target too, ui-tree/miss.ts);
+// interact's verbs import them from here.
+export { findTarget, type Target } from '../ui-tree/selectors.js';
 
 export const describeTarget = (target: Target): string =>
   typeof target === 'string' ? target : describeElementSpec(target);
-
-/** Every match, unfiltered — resolveNow is the policy over them, and `scroll_until` judges them through `matchesToJudge`. */
-export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
-  typeof target === 'string' ? findAll(tree, target) : findBySpec(tree, target);
 
 /**
  * THE preference among a target's matches, before the caller's Ambiguity:
@@ -56,7 +46,7 @@ export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
  * `scroll_until`'s judgement (`matchesToJudge`) both read it.
  */
 export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: string } | { survivors: UiNode[] } {
-  const survivors = found.filter((n) => n.rect.width > 0 && n.rect.height > 0);
+  const survivors = found.filter(hasArea);
   if (survivors.length === 1) return { chosen: survivors[0] };
   const pick = survivors.length > 1 ? preferInteractive(survivors) : undefined;
   return pick === undefined ? { survivors } : { chosen: pick.node, note: pick.note };
@@ -354,13 +344,10 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
 
 /**
  * A wait that never resolved its target, worded for what it waited for —
- * nothing about settling — and for what its last read saw (ui-tree/miss.ts#missOf,
- * the one decision; this wait's own fact is the zero-area match, `zeroAreaHint`:
- * idb reports a node scrolled above the top of a scroll view as 0×0, and the wait
- * read "to appear" for a node the snapshot showed; still absence for
- * ElementNotFoundError's purpose — nothing was ever ACTIONABLE, and a collapsed
- * view, the case the zero-area rule was written for, carries its id at 0×0 too,
- * which is why the hint names both. docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md).
+ * nothing about settling — and for why its last read did not hold it
+ * (ui-tree/miss.ts#missOf, the one decision, asked with the target: a match
+ * only at 0×0 is the fact this wait's filter makes — still absence for
+ * ElementNotFoundError's purpose, nothing was ever ACTIONABLE).
  * The miss's note goes beneath the headline (pollTimeoutMessage drops it when the
  * last read failed: `unread`). A `presented` miss says itself in place of the
  * headline, as a plain Error: beneath a presented window listed alone the target is
@@ -368,33 +355,18 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * this headline, never "(not present)", as scroll_until's stop there).
  */
 function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number; lastTree?: UiNode }): Error {
-  const miss = missOf({ tree: outcome.lastTree, readError: outcome.readError }, (tree) => zeroAreaHint(tree, target));
+  const miss = unsaidByTheTap(missOf({ tree: outcome.lastTree, readError: outcome.readError, target }));
   if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, missNote(miss)), { sighted: false, ...outcome, miss });
 }
 
-/** The hint beneath a never-resolved wait whose last tree matched the target only at 0×0. */
-const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
-
 /**
- * The hint for a target this tree matched, but only with zero-area nodes —
- * resolveNow's filter, the reason it answered `undefined` — or undefined
- * when it matched nothing (or something resolveNow took). When every such
- * match was dumped clipped out of its scroll container (Android's inverted
- * bounds, adapters/types.ts#UiNode.clippedOut: Settings' `Apps`
- * under the collapsing app bar read "0×0" for a `126x-239` node), it says
- * where, and the direction that scrolls it back when they agree; else
- * ZERO_AREA_HINT.
+ * The tap's and fill's wait does not say idb's container-id fact (`containerId`) — not in its message, not in the
+ * miss its absence carries to an optional step's skip line: it said nothing of it before the miss knew the target
+ * (round 15, a refactor that changed no tap reply), and what idb's dialect should say to a tap is NI1's decision
+ * (docs/truth/open-bugs.md): it reads as `none`. A flow's `wait:` and `scroll_until` say it.
  */
-function zeroAreaHint(tree: UiNode, target: Target): string | undefined {
-  const matched = findTarget(tree, target);
-  if (matched.length === 0) return undefined;
-  const sides = new Set(matched.map((n) => n.clippedOut));
-  if (sides.has(undefined)) return ZERO_AREA_HINT;
-  const [only, ...more] = [...sides] as Edge[];
-  if (more.length > 0) return `it matched only nodes clipped out ${[only, ...more].map((side) => SIDES[side].past).join(' or ')} its scroll container — scroll_until it first`;
-  return `it matched only nodes ${pastSideText(only, true)} (scrolled past it) — ${revealText(only)} first`;
-}
+const unsaidByTheTap = (miss: Miss): Miss => (miss.of === 'containerId' ? { of: 'none' } : miss);
 
 /**
  * Wait only for the target to APPEAR — one round that resolves it under the

@@ -1,6 +1,6 @@
 # BUG (diagnostics): a `wait` on an id idb never surfaces times out after 30 s with no hint why
 
-> **Status (2026-10-08):** fixed on main in `c5dd5eb` (2026-10-06) — an id-only `wait:` on iOS idb times out naming the cause (`no tree read contained id:…`, `flow/engine.ts#idbContainerIdHint`); since `d165ce4` (2026-10-08) a timeout whose last tree read was bare quotes the bare-tree note (`ui-tree/verdict.ts#bareTimeoutNote`) instead.
+> **Status (2026-10-08):** fixed on main in `c5dd5eb` (2026-10-06) — an id-only `wait:` on iOS idb times out naming the cause (`no tree read contained id:…`, `flow/engine.ts#idbContainerIdHint`; since round 15, 2026-10-21, the `containerId` fact of `ui-tree/miss.ts#missOf`, read from the tree's own idb mark, which `scroll_until` says too); since `d165ce4` (2026-10-08) a timeout whose last tree read was bare quotes the bare-tree note (`ui-tree/verdict.ts#bareTimeoutNote`) instead.
 
 **Measured 2026-10-05 21:26 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS default idb tree
 source), iPhone 17 simulator iOS 26.5. Filed from the SWIFT-payment journey-developer run

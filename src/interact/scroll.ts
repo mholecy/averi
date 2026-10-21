@@ -261,6 +261,7 @@ export async function scrollUntilVisible(
     maxSwipes: opts.maxSwipes ?? DEFAULT_MAX_SWIPES,
     fully: opts.fully === true,
     timeoutMs: opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS,
+    target,
   };
   let state: Rounds = startRounds(rules, asBuilt);
   let drawn: Stroke | undefined;

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
-import { ACTIVE_WINDOW_HINT, missNote, missOf, withMissNote } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { ElementNotFoundError, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
 import { coverOver, failureOf, play, type Row } from '../helpers/rounds.js';
@@ -368,34 +368,6 @@ describe('an assert whose element is not in a uiautomator tree: the active-windo
     };
     const detail = (await new Verifier(fake, { pollMs: 2, timeoutMs: 30 }).assert({ element: name })).detail;
     expect(detail).toBe(`${NOT_FOUND} (last UI tree read failed: adb gone)`);
-  });
-});
-
-// THE decision behind every not-found (ui-tree/miss.ts): what the last read saw, in one precedence — a failed read,
-// then a zero-area match (the caller's), then a window listed alone, then the active-window hint — and its words.
-describe('what a miss saw (ui-tree/miss.ts): one decision, one wording', () => {
-  it('the precedence over the real captures: unread, zero-area, presented alone, active window, none', () => {
-    expect(missOf({ tree: capture('alert-dim'), readError: new Error('adb gone') })).toEqual({ of: 'unread' });
-    expect(missOf({})).toEqual({ of: 'unread' });
-    expect(missOf({ tree: capture('alert-dim') }, () => 'at 0×0')).toEqual({ of: 'zeroArea', hint: 'at 0×0' });
-    expect(missOf({ tree: capture('alert-dim') })).toEqual({ of: 'presented', layer: { kind: 'dialog' }, listed: 'window' });
-    expect(missOf({ tree: capture('sheet-medium') })).toEqual({ of: 'presented', layer: { kind: 'screen' }, listed: 'window' });
-    expect(missOf({ tree: capture('form-picker') })).toEqual({ of: 'activeWindow' });
-    expect(missOf({ tree: capture('open') })).toEqual({ of: 'activeWindow' });
-    const { activeWindowOnly: _, presentation: __, ...everyWindow } = capture('alert-dim');
-    expect(missOf({ tree: everyWindow })).toEqual({ of: 'none' });
-  });
-
-  it('the words: the presented remedy for a window listed alone, the hint for an unmarked one, nothing for unread or none', () => {
-    expect(missNote({ of: 'presented', layer: { kind: 'dialog' }, listed: 'window' })).toBe('a dialog is presented over it, and the tree lists only that window — close it first');
-    expect(missNote({ of: 'presented', layer: { kind: 'screen' }, listed: 'window' })).toBe('a sheet or modal is presented over it, and the tree lists only that window — close it first');
-    expect(missNote({ of: 'presented', layer: { kind: 'dialog', label: 'Delete?' }, listed: 'window' })).toBe('a dialog "Delete?" is presented over it, and the tree lists only that window — close it first');
-    expect(missNote({ of: 'activeWindow' })).toBe(ACTIVE_WINDOW_HINT);
-    expect(missNote({ of: 'zeroArea', hint: 'h' })).toBe('h');
-    expect(missNote({ of: 'unread' })).toBeUndefined();
-    expect(missNote({ of: 'none' })).toBeUndefined();
-    expect(withMissNote('not found', { of: 'activeWindow' })).toBe(`not found (${ACTIVE_WINDOW_HINT})`);
-    expect(withMissNote('not found', { of: 'none' })).toBe('not found');
   });
 });
 

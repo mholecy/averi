@@ -1,40 +1,15 @@
 import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type ScrollAxis, type Stroke } from '../adapters/types.js';
 import { axisOfEdge, inferScreenSize, type Edge } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
+import type { Direction } from '../ui-tree/sides.js';
 import { usableScreenOf, type UsableScreen } from '../ui-tree/usable-screen.js';
 
-export type Direction = 'up' | 'down' | 'left' | 'right';
+// The four sides' words and the four ways live with the tree (ui-tree/sides.ts: a miss words them too); the stroke and
+// its sentences read them from here.
+export { SIDES, type Direction, type SideWords } from '../ui-tree/sides.js';
 
 /** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
 export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
-
-/** What one side of a rect means to a scroll and to a sentence (`SIDES`). */
-export interface SideWords {
-  /**
-   * The `scroll_until` direction (where the content lies) that reveals what
-   * lies past this edge: content beyond the top lies up, and so on — read by
-   * `scroll_until`'s probe and its stroke toward a cut edge
-   * (scroll-rounds.ts), by the tap's cut-sliver remedy (target-text.ts#cutRemedy,
-   * which `scroll_until`'s sliver failures quote) and by the hints for a node
-   * past a side (target-text.ts#revealText, #untriedSideText).
-   */
-  readonly reveals: Direction;
-  /** Where a node past this edge lies, before what it lies past: `clipped out above its scroll container`, `left of the viewport` (target-text.ts#pastSideText, resolve.ts#zeroAreaHint). */
-  readonly past: string;
-  /** The same side standing alone: `if it lies to the left` (target-text.ts#untriedSideText). */
-  readonly lies: string;
-}
-
-/**
- * Each EDGE of a rect's words — one table, a field per use, so the four
- * sides are spelled once (target-text.ts's sentences and resolve.ts's hint read it too).
- */
-export const SIDES: Readonly<Record<Edge, SideWords>> = {
-  top: { reveals: 'up', past: 'above', lies: 'above' },
-  bottom: { reveals: 'down', past: 'below', lies: 'below' },
-  left: { reveals: 'left', past: 'left of', lies: 'to the left' },
-  right: { reveals: 'right', past: 'right of', lies: 'to the right' },
-};
 
 /**
  * The edge past which lies the content a scroll toward `direction` (where the content lies) brings in — its top for
