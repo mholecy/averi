@@ -38,7 +38,10 @@ import { countOf } from '../util/count.js';
  * frames are points, the same units idb rects use, so the coordinates agree.
  */
 export interface IosTreeSource {
-  /** The configured kind this source serves — what the adapter reports as its `treeSourceKind`. */
+  /**
+   * The configured kind this source serves (mcp/registry.ts wires it). No reader above the adapter dispatches on it: a
+   * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts).
+   */
   readonly kind: IosTreeSourceKind;
   read(): Promise<UiNode>;
   /**

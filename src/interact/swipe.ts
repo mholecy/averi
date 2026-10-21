@@ -1,12 +1,12 @@
-import { usableSize, type DeviceAdapter, type DeviceScreen, type Point, type Rect, type ScrollAxis, type Stroke } from '../adapters/types.js';
+import { usableSize, type DeviceAdapter, type DeviceScreen, type Rect, type ScrollAxis, type Stroke } from '../adapters/types.js';
 import { axisOfEdge, inferScreenSize, type Edge } from '../ui-tree/geometry.js';
 import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
 import type { Direction } from '../ui-tree/sides.js';
 import { usableScreenOf, type UsableScreen } from '../ui-tree/usable-screen.js';
 
-// The four sides' words and the four ways live with the tree (ui-tree/sides.ts: a miss words them too); the stroke and
-// its sentences read them from here.
-export { SIDES, type Direction, type SideWords } from '../ui-tree/sides.js';
+// The four ways live with the four sides' words (ui-tree/sides.ts: a miss words them too, and ui-tree imports no verb);
+// the stroke and its sentences read the way from here, the words (`SIDES`) from there.
+export type { Direction } from '../ui-tree/sides.js';
 
 /** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
 export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };

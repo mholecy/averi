@@ -1,21 +1,22 @@
 import { type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, belowStatusBand, EDGES, flushEdges, quoted, sameRectWithinPixel, toldFrame, type Cut, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, belowStatusBand, EDGES, flushEdges, quoted, sameRectWithinPixel, toldFrame, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
-import { tapPoint, type Target } from '../ui-tree/selectors.js';
+import { hasArea, tapPoint } from '../ui-tree/selectors.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
-import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/standing.js';
+import { outsideItsScrollView, type Remedy } from '../ui-tree/standing.js';
+import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
-import type { WaitEvidence } from './resolve.js';
-import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Since, type Streaks, type UnseenStrokes } from './motion-ledger.js';
+import type { Target, WaitEvidence } from './resolve.js';
+import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
+import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type UnseenStrokes } from './motion-ledger.js';
 import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeOf, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
-import { axisOf, SIDES, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
+import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -728,7 +729,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     if (carry !== undefined) s.strokes = carried(s.strokes, carry);
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
   }
-  const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some((n) => n.rect.width > 0 && n.rect.height > 0);
+  const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some(hasArea);
   // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved, and never while a
   // progress node shows (content may yet load there). The flush probe (`flushCheck`) never meets it, by the trees'
   // dialects: a probe is planned only over CLIPPING ancestors (`scrollersOf`), which only Android's tree marks, and the
@@ -769,10 +770,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
  * app.
  */
 function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly UiNode[], best: Judged | undefined, screen: UsableScreen | undefined, listed: () => ListedContent | undefined): LedgerRead {
-  const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
-  const carryToward = current === 'stroke' && s.probe === undefined && best?.standing.facts.listedWhereItLies === true ? lastSent(s.course) : undefined;
-  const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
   const sentToward = lastSent(s.course);
+  const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
+  const carryToward = current === 'stroke' && s.probe === undefined && best?.standing.facts.listedWhereItLies === true ? sentToward : undefined;
+  const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
   return {
     since: current,
     found,

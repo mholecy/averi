@@ -8,7 +8,6 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import { IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
-import type { IosTreeSourceKind } from './ios-node.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground } from './ios-foreground.js';
 import { appInfoNames } from './simctl-appinfo.js';
@@ -67,15 +66,6 @@ export class IosAdapter implements DeviceAdapter {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
-  }
-
-  /**
-   * The injected source's kind — which backend this adapter reads its tree with, as the registry wired it
-   * (mcp/registry.ts). No reader above the adapter dispatches on it: a tree says its own source by its marks
-   * (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts).
-   */
-  get treeSourceKind(): IosTreeSourceKind {
-    return this.treeSource.kind;
   }
 
   /** `xcrun simctl` under the DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */

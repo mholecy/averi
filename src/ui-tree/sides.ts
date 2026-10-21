@@ -4,7 +4,8 @@ import type { Edge } from './geometry.js';
  * The words of a rect's four sides, spelled once: where a node past a side lies, and the `scroll_until` direction that
  * brings it back. Here, in ui-tree, because a miss words them (miss.ts: a target matched only by nodes clipped out of
  * their scroll container) and ui-tree imports no verb; interact/'s stroke and sentences read the same table
- * (interact/swipe.ts re-exports it with `Direction`, interact/target-text.ts says its phrases with it).
+ * from here (interact/swipe.ts re-exports `Direction` alone, the verb's way; interact/target-text.ts says its phrases with
+ * the table).
  */
 
 /** A `scroll_until` direction (where the content lies), a swipe's (where the finger travels): the four ways. */

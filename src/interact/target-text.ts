@@ -57,9 +57,6 @@ export function underKeyboardText(centre: Point, lineY: number): string {
   return `under the soft keyboard: its centre (${centre.x},${centre.y}) lies below the keyboard's top edge at y ${lineY}`;
 }
 
-/** The scroll that brings back a node lying past `side` (ui-tree/sides.ts, where a miss's zero-area note reads it too). */
-export { revealText } from '../ui-tree/sides.js';
-
 /** The direction to try for a target that may lie past `side` and was never read there: `if it lies above, try direction: "up"`. */
 export function untriedSideText(side: Edge): string {
   return `if it lies ${SIDES[side].lies}, try direction: "${SIDES[side].reveals}"`;

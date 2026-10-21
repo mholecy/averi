@@ -808,9 +808,13 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    (2026-10-18, the orchestrator's decision under the owner's delegation): EVERY reply that says a target is not in
    such a tree says what that miss saw, once — the reason above was the absent assert's, which passes there and says
    no not-found, so it never applied to "not found". One module decides it and words it (ui-tree/miss.ts): `missOf`,
-   of the LAST read the miss made (ui-tree/read-tree.ts#pollTree's `lastTree`), answers one of `unread` (the read
-   error is the story), `zeroArea` (the caller's 0×0 match, which says the target IS in the tree), `presented` (a
-   window listed alone — decision 4's remedy), `activeWindow` (this hint) or `none` (WDA, idb), in that precedence;
+   of the target and the LAST read the miss made (ui-tree/read-tree.ts#pollTree's `lastTree`), answers one of
+   `unread` (the read error is the story), `zeroArea` (the target matched in that tree only by 0×0 nodes, which says
+   it IS in the tree — asked by the miss itself since round 15, no longer the caller's), `presented` (a window listed
+   alone — decision 4's remedy), `activeWindow` (this hint), `containerId` (since round 15: idb's flat list, by the
+   tree's own mark, and a target naming an id alone — an id on a container idb never lists; a possibility, said by a
+   flow's `wait:`, as its hint said before, and now by `scroll_until`; the tap's and fill's wait read it as `none`,
+   interact/resolve.ts#unsaidByTheTap, until NI1, and an assert, which passes no target, never gets it) or `none` (WDA, idb), in that precedence;
    `missNote` words it; the replies only pick the layout — beneath a thrown poll timeout's headline (the tap's, fill's
    and presence check's wait, a flow's `wait:` on a present element), after a one-line not-found in a parenthesis
    (`withMissNote`: `scroll_until`'s "element never appeared in the tree", its `covered` stop under a keyboard over

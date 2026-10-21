@@ -2,7 +2,7 @@ import type { Rect, Stroke, UiNode } from '../adapters/types.js';
 import { isUntold, sameRectWithinPixel } from '../ui-tree/geometry.js';
 import { nodeIdentity } from '../ui-tree/read-tree.js';
 import { carriedUnder, goesOver, NO_REGION, seeRegion, type CarriedUnder, type MotionShown, type RegionMemory } from './motion-shown.js';
-import type { TreeFacts } from './scroll-read.js';
+import type { Since, TreeFacts } from './scroll-read.js';
 import { sameStroke, type Direction } from './swipe.js';
 
 export type { CarriedUnder, MotionShown } from './motion-shown.js';
@@ -14,7 +14,8 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * stroke, the last stroke drawn, the motion over the last settle, and, on a tree that tells no scroll view, the region
  * the motion showed (interact/motion-shown.ts, its internal module).
  *
- * The interface, which is also the test surface (tests/interact/motion-ledger.test.ts):
+ * The interface, which is also the test surface (tests/interact/motion-ledger.test.ts; the region over measured idb
+ * captures, with the plan's stroke over it, tests/interact/motion-region.test.ts):
  * - `startLedger()` — nothing read, nothing drawn.
  * - `seeMotion(ledger, { drawn, read })` — one call a round: the stroke the driver handed back (`drawn`, the round's
  *   `RoundSeen.drawn`) and, when the round's tree read, that read (`LedgerRead`). Answers what the read says about
@@ -41,9 +42,6 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  *
  * Pure: no adapter, no clock, no I/O.
  */
-
-/** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
-export type Since = 'start' | 'stroke' | 'settle';
 
 /**
  * The strokes in a row, up to the bound, whose reads listed none of the content of the scroll view they went over
@@ -174,8 +172,9 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   const { since, found, judged, facts, gesture, blank, carryToward } = read;
   const rects = found.map((n) => ({ ...n.rect }));
   const before = m.judged;
-  const identity = judged === undefined ? undefined : nodeIdentity(judged);
-  const sameNode = before !== undefined && before.identity === identity;
+  // This read's judged match as the ledger keeps it: kept until a read judges another.
+  const now = judged === undefined ? undefined : { rect: { ...judged.rect }, identity: nodeIdentity(judged) };
+  const sameNode = before !== undefined && before.identity === now?.identity;
   const judgedUnmoved = judged !== undefined && before !== undefined && sameRectWithinPixel(before.rect, judged.rect);
   // The same node's motion over the settle pause before this read (`motionOf`) — a read after a stroke measures the
   // stroke too, and keeps none — and whether it moved less than over the pause before: a fling slowing.
@@ -211,7 +210,7 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   const region = judged === undefined ? m.region : isUntold(facts.scene.clips.drawnIn(judged)) ? seeRegion(m.region, facts.tree, judged, gesture) : NO_REGION;
   const next: Memory = {
     rects,
-    judged: judged === undefined || identity === undefined ? before : { rect: { ...judged.rect }, identity },
+    judged: now ?? before,
     fingerprint: facts.fingerprint,
     streaks,
     streakDrawn,

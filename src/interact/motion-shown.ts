@@ -1,7 +1,8 @@
 import { everyNode, rectIntersection, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
 import { quoted, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { nodeIdentity } from '../ui-tree/read-tree.js';
-import { EDGE_TOWARD, OPPOSITE, SIDES, swipeVector, type Direction } from './swipe.js';
+import { SIDES } from '../ui-tree/sides.js';
+import { EDGE_TOWARD, OPPOSITE, swipeVector, type Direction } from './swipe.js';
 
 /**
  * THE SCROLL VIEW THE MOTION SHOWS, on a tree that tells none — idb's flat list (ui-tree/geometry.ts#DrawnUntold): where
