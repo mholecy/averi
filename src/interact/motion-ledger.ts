@@ -14,7 +14,8 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * stroke, the last stroke drawn, the motion over the last settle, and, on a tree that tells no scroll view, the region
  * the motion showed (interact/motion-shown.ts, its internal module).
  *
- * The interface, which is also the test surface (tests/interact/motion-ledger.test.ts):
+ * The interface, which is also the test surface (tests/interact/motion-ledger.test.ts; the region over measured idb
+ * captures, with the plan's stroke over it, tests/interact/motion-region.test.ts):
  * - `startLedger()` — nothing read, nothing drawn.
  * - `seeMotion(ledger, { drawn, read })` — one call a round: the stroke the driver handed back (`drawn`, the round's
  *   `RoundSeen.drawn`) and, when the round's tree read, that read (`LedgerRead`). Answers what the read says about
