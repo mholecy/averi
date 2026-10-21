@@ -6,7 +6,7 @@ import { nodeIdentity, screenChangedUnder, screenIdentity, type IdentifiedRead, 
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
-import { tapPoint } from '../ui-tree/selectors.js';
+import { tapPoint, type Target } from '../ui-tree/selectors.js';
 import { missOf, type Miss } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -94,6 +94,8 @@ export interface RoundRules {
   fully: boolean;
   maxSwipes: number;
   timeoutMs: number;
+  /** What the scroll looks for — asked of only by a miss (ui-tree/miss.ts#missOf); absent in a table of rounds, which hands each read its matches and gets the miss's facts of the tree alone. */
+  target?: Target;
 }
 
 /** One tree read as the round is handed it (scroll-read.ts#RoundRead) — part of this protocol (`RoundSeen.read`), so it is importable from here. */
@@ -1655,7 +1657,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (read === undefined && s.presentedHold !== undefined) return stop(s, s.presentedHold);
   // What this round's read saw, for a target no round matched (ui-tree/miss.ts — the not-found's note; asked only at a
   // stop that may say "never appeared", so a round that goes on pays no presentation walk).
-  const missed = (): Miss | undefined => (s.everFound ? undefined : missOf({ tree: read?.tree, readError }));
+  const missed = (): Miss | undefined => (s.everFound ? undefined : missOf({ tree: read?.tree, readError, target: s.rules.target }));
   const evidence: WaitEvidence = { sighted: s.everFound, treesRead: s.treesRead, readError };
   // A keyboard that leaves nothing above it: nothing but its own UI can be
   // judged, and no stroke can start on the content — fail now, naming it,

@@ -4,7 +4,6 @@
  * Everything above this layer is platform-agnostic. See ARCHITECTURE.md §3.
  */
 
-import type { IosTreeSourceKind } from './ios-node.js';
 
 export type Platform = 'android' | 'ios';
 
@@ -451,8 +450,8 @@ export interface UiNode {
    * nor in the frame. `rect` is clamped to zero size at the container's
    * edge (`y` 297, height 0), so it is never a target, and this says which
    * way it went: `top` — clipped out above its scroll container — and
-   * `bottom`, `left`, `right` likewise. Read by the wait's hint
-   * (interact/resolve.ts#zeroAreaHint), by `scroll_until`, which reads a
+   * `bottom`, `left`, `right` likewise. Read by a miss's zero-area note
+   * (ui-tree/miss.ts#missOf, `zeroArea`), by `scroll_until`, which reads a
    * node clipped out past its far edge as beyond it
    * (interact/scroll-rounds.ts#observe), and by the cut-sliver rule, to which a descendant
    * clipped out past an edge its ancestor lies flush with is evidence of a
@@ -472,7 +471,8 @@ export interface UiNode {
    * cover of a content target (`flatListReadingOrder`), and a node pinned
    * at the list's bottom covers down to the screen's bottom
    * (`bottomPinned`) — and asks an on-target text to repeat the target
-   * (`onTarget`), the sibling guard being void there. A mark of the source,
+   * (`onTarget`), the sibling guard being void there; and by ui-tree/miss.ts#missOf, for idb's dialect: an id
+   * set on a container is in no idb read (`containerId`). A mark of the source,
    * like `ofKeyboard` and `clipsDescendants`: ui-tree knows no platform,
    * and the shape alone (a rectless root over leaves) would also match a
    * test's or a future source's tree that is not idb's. Absent on WDA and
@@ -510,7 +510,7 @@ export interface UiNode {
    * platform. Absent on WDA's trees (every window of the app, the keyboard's too) and idb's flat list (which lists
    * only a presented layer as well — measured on the lab's SwiftUI alert and sheets — but not by window: its parser
    * marks the root presented only when the list holds UIKit's dismiss region, adapters/ios-tree-source.ts
-   * #listsPresentedLayer, and an idb miss gives no hint otherwise, ADR 0018's residual 6).
+   * #listsPresentedLayer, and an idb miss names no presented layer otherwise, ADR 0018's residual 6).
    */
   activeWindowOnly?: true;
   /**
@@ -901,21 +901,6 @@ export type TypingDelivery = 'on-return' | 'may-arrive-late';
 
 export interface DeviceAdapter {
   readonly platform: Platform;
-  /**
-   * Which backend `uiTree()` actually reads with, when the adapter has one
-   * and the distinction exists — the iOS adapter reports its tree source's
-   * kind (idb or wda; always one — discovery.ts); Android has one tree and
-   * says nothing. The adapter is the source of truth here, not averi.yaml:
-   * a layer above that re-derived the kind from the config would agree
-   * with the registry only as long as nobody paired a FlowEngine with an
-   * adapter built elsewhere.
-   * Diagnostic only — nothing above dispatches on it. Required, not
-   * optional, so an implementation or a wrapper that forgets it fails to
-   * compile instead of silently losing the hint; `undefined` is the
-   * declared answer for "none".
-   */
-  readonly treeSourceKind: IosTreeSourceKind | undefined;
-
   /** Reinstall triggers the app's login requirement — intentional. */
   install(appPath: string): Promise<void>;
   /**

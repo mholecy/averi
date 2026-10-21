@@ -1,5 +1,4 @@
-import type { IosTreeSourceKind } from '../adapters/ios-node.js';
-import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { fillField, FillValueFailure } from '../interact/fill.js';
 import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
@@ -10,7 +9,7 @@ import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
-import { describeElementSpec, SELECTOR_FIELDS, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
+import { describeElementSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
@@ -1263,21 +1262,8 @@ export class FlowEngine {
   private async runWait(spec: StepPayload<'wait'>): Promise<void> {
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.waitTimeoutMs;
     const cond: Condition = spec.element ? { element: spec.element } : { state: spec.state };
-    await this.waitFor(cond, timeoutMs, describeCondition(cond), (lastTree) => this.waitHint(cond, lastTree));
+    await this.waitFor(cond, timeoutMs, describeCondition(cond), (lastTree) => waitTimeoutHint(cond, lastTree));
     this.log('wait', describeCondition(cond));
-  }
-
-  /**
-   * The engine's half of `waitTimeoutHint`: platform and tree-source kind
-   * both come from the ADAPTER, never from `app.ios.treeSource` — why is on
-   * `DeviceAdapter.treeSourceKind` (adapters/types.ts). An adapter that does
-   * not say (unknown kind) gets no idb hint. `lastTree` is the wait's last
-   * tree read, which the active-window hint is a fact of. Only the `wait:` step asks;
-   * ensureStateLadder's state waits and branch polls describe conditions a single
-   * id does not own.
-   */
-  private waitHint(cond: Condition, lastTree: UiNode | undefined): { hint?: string; miss?: Miss } {
-    return { hint: waitTimeoutHint(cond, this.adapter.platform, this.adapter.treeSourceKind, lastTree), miss: waitMiss(cond, lastTree) };
   }
 
   /**
@@ -1648,66 +1634,34 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
 }
 
 /**
- * What idb's flat tree can never show, said once, for the wait timeout to
- * quote: an identifier set on a CONTAINER. idb returns accessibility
- * elements only, so a SwiftUI `.accessibilityElement(children: .contain)`
- * with an identifier, or a React Native `testID` on a non-interactive host
- * view, is in no read at all — a wait on it is not late, it is hopeless
- * (measured 2026-10-05, docs/bugs/2026-10-06-wait-timeout-no-hint-for-ids-
- * idb-cannot-see.md: 30 s of timeout, indistinguishable from a slow screen).
- * Worded as a possible cause: the caller only knows the id was in no tree it
- * read. Lives here, not with the tree source: "wait on a button/row id" is
- * flow-step advice.
+ * The flow-step advice after idb's container-id note (ui-tree/miss.ts, `containerId`: an identifier set on a
+ * container is in no idb read at all): wait on an id idb DOES show. Lives here, not with the miss: "wait on a
+ * button/row id" is advice for a `wait:` step.
  */
-export const idbContainerIdHint = (id: string): string =>
-  `no tree read contained id:${JSON.stringify(id)}. iOS treeSource: idb never exposes an identifier set on a container — ` +
-  'SwiftUI .accessibilityElement(children: .contain), React Native testID on a non-interactive view. ' +
-  'If the screen is showing, set app.ios.treeSource: wda in averi.yaml, or wait on a button/row id idb does show';
+const WAIT_ON_A_SHOWN_ID = 'or wait on a button/row id idb does show';
 
 /**
- * The probable cause a `wait:` timeout may name, or nothing — only for a
- * step that waited for an element to be PRESENT (`absent` waits are about
- * something that stayed; a state/any/all condition is not one target's
- * story). Two causes, each a fact about the tree source, on platforms that
- * never meet:
- * - what the last tree read saw (`waitMiss`, ui-tree/miss.ts#missOf, which
- *   decides it for every not-found reply): a source that lists the active
- *   window only (uiautomator) — a window it lists alone, presented over the
- *   screen beneath, or one it does not mark that may hide the element;
- * - idb's container id, which fires only when every part holds: the device
- *   is iOS, its tree source is idb, and the step waited for the element by
- *   its ID ALONE. Only then is the
- * timeout a statement about the id: findBySpec ANDs every selector field
- * (ui-tree/selectors.ts conditionsOf), so `{ id, text }` can time out with
- * the id in every read and the text the one that never matched — and the
- * id-only presence check (ui-tree/verdict.ts `presenceVerdict`: found.length > 0) is what makes "no
- * tree read contained this id" a fact rather than a guess. Under idb that
- * is what an identifier on a container looks like (idbContainerIdHint).
- * Everything else stays silent: `absent` waits are about something that
- * stayed, text/label selectors are not what idb drops, and a state/any/all
- * condition is not one id's story. Pure — the engine supplies the adapter's
- * platform and kind, and the wait's last tree (waitHint).
+ * What a `wait:` timeout says beneath its headline, and the miss its error carries — only for a step that waited for
+ * an element to be PRESENT (`absent` waits are about something that stayed; a state/any/all condition is not one
+ * target's story): why the last tree read did not hold the element (ui-tree/miss.ts#missOf, asked with the
+ * element: it decides every not-found reply), its note (`missNote`) — and after idb's container-id note, the
+ * flow-step advice (`WAIT_ON_A_SHOWN_ID`). The miss reads the tree source from the tree's own mark
+ * (`UiNode.flatList`), not from the adapter or averi.yaml: idb's parser marks every tree it gives
+ * (adapters/ios-tree-source.ts#markIdbDialect) and no other source does, and a read that failed has no tree to say
+ * anything of — its error is the story (pollTimeoutMessage drops the hint beneath a failed last read).
+ *
+ * The miss rides on the error (`WaitMissedError`, for an optional step's skip line) except idb's container-id one,
+ * which the skip line has never said: round 15 moved the fact into the miss and changed no flow reply; whether the
+ * skip line should say it is left to NI1 (docs/truth/open-bugs.md), with the tap's (interact/resolve.ts
+ * #unsaidByTheTap).
  */
-export function waitTimeoutHint(
-  cond: Condition,
-  platform: Platform,
-  treeSource: IosTreeSourceKind | undefined,
-  lastTree?: UiNode,
-): string | undefined {
-  const miss = waitMiss(cond, lastTree);
-  const spec = cond.element;
-  if (miss === undefined || spec === undefined) return undefined;
+export function waitTimeoutHint(cond: Condition, lastTree: UiNode | undefined): { hint?: string; miss?: Miss } {
+  if (cond.element === undefined || cond.absent) return {};
+  const miss = missOf({ tree: lastTree, target: cond.element });
   const note = missNote(miss);
-  if (note !== undefined) return note;
-  if (platform !== 'ios' || treeSource !== 'idb') return undefined;
-  const fields = SELECTOR_FIELDS.filter((f) => spec[f] !== undefined);
-  if (fields.length !== 1 || fields[0] !== 'id' || spec.id === undefined) return undefined;
-  return idbContainerIdHint(spec.id);
+  if (miss.of === 'containerId') return { hint: `${note}, ${WAIT_ON_A_SHOWN_ID}` };
+  return { hint: note, miss };
 }
-
-/** What a `wait:`'s last tree saw of an element it waited to be PRESENT (ui-tree/miss.ts#missOf); undefined for any other condition. */
-export const waitMiss = (cond: Condition, lastTree: UiNode | undefined): Miss | undefined =>
-  cond.element === undefined || cond.absent ? undefined : missOf({ tree: lastTree });
 
 /**
  * A tap step's `timeout:` is step configuration, not selector vocabulary —

@@ -317,7 +317,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
   });
 
-  it("treeSourceKind is the injected source's kind — the flow engine's wait hint reads it from here, not from averi.yaml", () => {
+  it("treeSourceKind is the injected source's kind", () => {
     const bound = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: fakeSource().source });
     expect(bound.treeSourceKind).toBe('idb');
     const wda = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: { ...fakeSource().source, kind: 'wda' } });

@@ -69,7 +69,11 @@ export class IosAdapter implements DeviceAdapter {
     this.treeSource = opts.treeSource;
   }
 
-  /** The injected source's kind (DeviceAdapter.treeSourceKind). */
+  /**
+   * The injected source's kind — which backend this adapter reads its tree with, as the registry wired it
+   * (mcp/registry.ts). No reader above the adapter dispatches on it: a tree says its own source by its marks
+   * (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts).
+   */
   get treeSourceKind(): IosTreeSourceKind {
     return this.treeSource.kind;
   }

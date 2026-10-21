@@ -407,15 +407,15 @@ describe('defaultFactory — the wiring the injected factories above never see',
     expect(wdaPortFor('X')).toBe(8101);
   });
 
-  it('a bound ios adapter REPORTS the kind it was built with — an omitted kind as idb — so the engine never re-derives it from the config', () => {
+  it('a bound ios adapter reads with the kind it was built with — an omitted kind as idb', () => {
     // Construction only: a wda source allocates a port and nothing else
     // (the pins above rely on the same), so no WebDriverAgent, xcodebuild or
     // idb is started here.
     resetWdaPortAllocatorForTests();
-    expect(defaultFactory('ios', 'AAAA-1111').treeSourceKind).toBe('idb');
-    expect(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }).treeSourceKind).toBe('idb');
-    expect(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }).treeSourceKind).toBe('wda');
-    expect(defaultFactory('android', 'emulator-5554').treeSourceKind).toBeUndefined();
+    const kindOf = (adapter: DeviceAdapter) => (adapter as IosAdapter).treeSourceKind;
+    expect(kindOf(defaultFactory('ios', 'AAAA-1111'))).toBe('idb');
+    expect(kindOf(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }))).toBe('idb');
+    expect(kindOf(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }))).toBe('wda');
   });
 
   it('the default discovery lists android with adb and ios with simctl — the platform reaches the right listing', async () => {

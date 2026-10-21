@@ -2,14 +2,13 @@ import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { cutAtLaterText } from '../ui-tree/cover.js';
 import { outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { SIDES } from './swipe.js';
+import { clippedOutText, SIDES } from '../ui-tree/sides.js';
 
 /**
  * The phrases a target cut to a sliver, lying past a side, or lying under
  * the soft keyboard, is said in —
  * one wording for every verb that says it: the tap's refusal (tap-judgement.ts),
- * the wait's hint (resolve.ts#zeroAreaHint), `scroll_until`'s failures
- * (scroll-text.ts) and the dismissal picker's skip lines
+ * `scroll_until`'s failures (scroll-text.ts) and the dismissal picker's skip lines
  * (keyboard-dismissal.ts#whyNotTapped) — and the picker's short name for a
  * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
  * the shared wording. Phrases, not policies: what counts as cut is
@@ -20,12 +19,13 @@ import { SIDES } from './swipe.js';
  * design, like ui-tree/system-bar.ts: delete it and each shared sentence
  * reappears in its two or three callers.
  *
- * Its words for a side come from one other interact/ module: swipe.ts#SIDES
- * — `past` and `lies` (where a node past a side lies) and `reveals` (the
- * `scroll_until` direction that brings it back, which `cutRemedy` and
- * `revealText` name). The table stays in swipe.ts because the stroke reads
- * `reveals` too, and one table spells the four sides once. Still a leaf:
- * swipe.ts imports nothing from interact/, so this module pulls in no verb.
+ * Its words for a side come from ui-tree/sides.ts#SIDES — `past` and `lies`
+ * (where a node past a side lies) and `reveals` (the `scroll_until` direction
+ * that brings it back, which `cutRemedy` and `revealText` name). The table
+ * lives in ui-tree because a miss words a node clipped out past a side too
+ * (ui-tree/miss.ts), and one table spells the four sides once; `revealText`
+ * and the clipped-out phrase live beside it for the same reason. A leaf: it
+ * imports nothing from interact/, so this module pulls in no verb.
  */
 
 /**
@@ -34,11 +34,11 @@ import { SIDES } from './swipe.js';
  * viewport` when its rect lies there — or `above its scroll view <node>` when
  * it lies past the edge of what that scroll view draws, on the screen
  * (`scrollView`, the drawn frame's: a WDA row where it lies, or an Android rect uiautomator dumped past its scroll
- * view) — the one wording of it, for the
- * wait's hint (resolve.ts) and `scroll_until`'s failure (scroll-text.ts).
+ * view) — the one wording of it, for `scroll_until`'s failure (scroll-text.ts); its clipped-out phrase is
+ * ui-tree/sides.ts#clippedOutText, which a miss's zero-area note says too (ui-tree/miss.ts).
  */
 export function pastSideText(side: Edge, clippedOut: boolean, scrollView?: UiNode): string {
-  if (clippedOut) return `clipped out ${SIDES[side].past} its scroll container`;
+  if (clippedOut) return clippedOutText([side]);
   // Past the edge of what its scroll view draws, that scroll view on the screen (ui-tree/standing.ts, the drawn frame).
   return scrollView === undefined ? `${SIDES[side].past} the viewport` : outsideScrollViewText(scrollView, SIDES[side].past);
 }
@@ -57,8 +57,8 @@ export function underKeyboardText(centre: Point, lineY: number): string {
   return `under the soft keyboard: its centre (${centre.x},${centre.y}) lies below the keyboard's top edge at y ${lineY}`;
 }
 
-/** The scroll that brings back a node lying past `side`: `scroll_until it with direction: "up"` (swipe.ts#SIDES). */
-export const revealText = (side: Edge): string => `scroll_until it with direction: "${SIDES[side].reveals}"`;
+/** The scroll that brings back a node lying past `side` (ui-tree/sides.ts, where a miss's zero-area note reads it too). */
+export { revealText } from '../ui-tree/sides.js';
 
 /** The direction to try for a target that may lie past `side` and was never read there: `if it lies above, try direction: "up"`. */
 export function untriedSideText(side: Edge): string {
@@ -179,7 +179,7 @@ export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: nu
  */
 export const wholeThinWayPast = (by: UiNode): string => `only if a screenshot shows it whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
 
-/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (swipe.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
+/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (ui-tree/sides.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
 export function cutRemedy(edge: Edge): string {
   const direction = SIDES[edge].reveals;
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;

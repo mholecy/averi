@@ -60,3 +60,23 @@ here an identifier set on a UIKit table cell's label, not a container.
 The live golden keeps asking these targets by their id (a `text:` selector would test another thing): the cases stay
 KNOWN under this note (scripts/truth/live-known.ts `NO_ID`) — `idb tap:sheet-long-list.R`,
 `idb tap:sheet-long-list-short.R` (`tap-refused`) and `idb scroll:sheet-long-list-short.F` (`not-reached`).
+
+## Round 15 (2026-10-21): the miss knows the target — prep, not the fix
+
+`ui-tree/miss.ts#missOf` now takes the target and reads idb's dialect from the tree's own mark (`UiNode.flatList`):
+an id-alone target no idb read held is the `containerId` fact. So, on this screen, today:
+
+- `scroll_until` by id says `element never appeared in the tree (no tree read contained id:"lab.sheet-long-list.R".
+  iOS treeSource: idb never exposes an identifier set on a container — … set app.ios.treeSource: wda in averi.yaml)` —
+  the remedy right, the cause named the container one, which is not this one (the golden's sheet-long-list R/F/L and
+  sheet-long-list-short R/F rows since round 15);
+- `wait:` says the same, with its flow advice (as since `c5dd5eb`);
+- `tap`/`fill` say nothing of it, and neither does an optional `wait:`'s or `tap:`'s skip line: three places hold
+  that back on purpose (round 15 changed no reply but `scroll_until`'s) — `interact/resolve.ts#unsaidByTheTap`, the
+  dropped carry in `flow/engine.ts#waitTimeoutHint`, and `verify/poll-verdict.ts#notFound`, which asks without the
+  assert's selector.
+
+For the fix: a new `Miss` kind reaches `tap`, `scroll_until` and `wait` through `missOf` with no edit to them
+(`unsaidByTheTap` maps `containerId` only). To tell "a row listed by its text, its id dropped" from "an id on a
+container" the miss has only (tree, id-alone selector): it may need what the row's text is expected to be, or the
+two kinds may have to be worded as one possibility.

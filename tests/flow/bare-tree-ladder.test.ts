@@ -5,11 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 // every poll cadence collapses to one event-loop turn; deadlines are
 // Date.now-based and still fire.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
-import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, idbContainerIdHint, type TraceEntry } from '../../src/flow/engine.js';
+import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js';
 import { EngineSession } from '../../src/flow/launch.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
@@ -136,7 +136,6 @@ function timeline(at: (ms: number, read: number) => UiNode | Error, platform: 'a
   fake.platform = platform;
   // The screen in the trees' own units (the absent conditions ask for it): uiautomator's pixels, WDA's points.
   fake.viewportSize = platform === 'ios' ? { width: 402, height: 874 } : { width: 1080, height: 2400 };
-  if (platform === 'ios') fake.treeSourceKind = 'wda';
   const state = { t0: undefined as number | undefined, reads: 0 };
   fake.uiTree = async () => {
     state.t0 ??= Date.now();
@@ -493,11 +492,11 @@ flows:
   });
 
   it('wait: on an id under iOS idb, a bare last tree gets the bare note — not the idb container-id hint, which is about what a rendered tree held', async () => {
-    const { fake } = timeline(() => WDA_SPLASH, 'ios');
-    fake.treeSourceKind = 'idb';
+    // The splash marked as idb's list: the miss reads the tree source from the tree's own mark (ui-tree/miss.ts).
+    const { fake } = timeline(() => markIdbDialect(structuredClone(WDA_SPLASH)), 'ios');
     const error = await failure(FlowEngine.run(ABSENT_CFG, fake, FAST, { flow: 'wait_login' }));
     expect(error.message.split('\n')[1]).toMatch(/^ {2}\(the last UI tree read was bare, 7 nodes/);
-    expect(error.message).not.toContain(idbContainerIdHint('login_screen'));
+    expect(error.message).not.toContain('no tree read contained');
   });
 
   it('branch: an absent arm is not taken on the decor; the poll goes on and takes it once the screen renders', async () => {
@@ -583,11 +582,7 @@ describe('iOS 27 idb: SpringBoard\'s launch tree is bare — no wipe, no absence
     ax('Button', '1', { x: 40, y: 500, width: 100, height: 64 }, 'pin_key_1'),
   );
   const LAUNCH = (ms: number) => (ms < 60 ? ICON_ZOOM : ms < 150 ? STATUS_ONLY : IDB_LOGIN);
-  const idbTimeline = (at: (ms: number) => UiNode) => {
-    const t = timeline(at, 'ios');
-    t.fake.treeSourceKind = 'idb';
-    return t;
-  };
+  const idbTimeline = (at: (ms: number) => UiNode) => timeline(at, 'ios');
 
   it('ensure_state right after launch_app: the entry probe reads bare, the second look finds the state — "already active", nothing wiped', async () => {
     const { fake } = idbTimeline(LAUNCH);
