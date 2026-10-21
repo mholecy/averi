@@ -2,7 +2,7 @@ import type { Rect, Stroke, UiNode } from '../adapters/types.js';
 import { isUntold, sameRectWithinPixel } from '../ui-tree/geometry.js';
 import { nodeIdentity } from '../ui-tree/read-tree.js';
 import { carriedUnder, goesOver, NO_REGION, seeRegion, type CarriedUnder, type MotionShown, type RegionMemory } from './motion-shown.js';
-import type { TreeFacts } from './scroll-read.js';
+import type { Since, TreeFacts } from './scroll-read.js';
 import { sameStroke, type Direction } from './swipe.js';
 
 export type { CarriedUnder, MotionShown } from './motion-shown.js';
@@ -42,9 +42,6 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  *
  * Pure: no adapter, no clock, no I/O.
  */
-
-/** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
-export type Since = 'start' | 'stroke' | 'settle';
 
 /**
  * The strokes in a row, up to the bound, whose reads listed none of the content of the scroll view they went over

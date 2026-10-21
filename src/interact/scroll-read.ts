@@ -54,6 +54,9 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
  * match per box that counts, and per match again above an applied cover.
  */
 
+/** What a read followed: the scroll's start, a stroke, or a settle pause that sent nothing (a confirming read). */
+export type Since = 'start' | 'stroke' | 'settle';
+
 /**
  * A tree that read, as the round needs it: the TREE itself — the round
  * derives what it asks of it (`TreeFacts`) — the matches the driver found

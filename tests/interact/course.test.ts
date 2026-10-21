@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { courseFacts, nextStroke, probeOf, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type Sighting } from '../../src/interact/course.js';
-import type { Since } from '../../src/interact/motion-ledger.js';
+import type { Since } from '../../src/interact/scroll-read.js';
 import { judgeRead } from '../../src/interact/scroll-read.js';
 import type { Direction } from '../../src/interact/swipe.js';
 import type { Edge } from '../../src/ui-tree/geometry.js';
