@@ -44,8 +44,8 @@ the read a fling comes to rest in (decision 5).
       failure (decision 3; scroll-text.ts#endText, one wording for both since round 6's code review).
    The caller's direction is always stroked first. The turn keeps the full reach — no fling carried the target past;
    it was never near — and is not counted among the fling's turns (`scroll-rounds.ts#EndTurn`).
-2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedEnd`,
-   `ui-tree/geometry.ts#Clips.endsAt`): on the read right after a stroke toward the target (never the flush probe):
+2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedContent`,
+   `ui-tree/geometry.ts#Clips.contentToward`, its `ends`): on the read right after a stroke toward the target (never the flush probe):
    every match where it was (with no target, the whole tree unchanged), no progress node shown, the stroke touching
    down on nothing drawn over its scroll view, and the tree LISTING that scroll view's content ending at the edge the
    stroke brings content in through — no node of it past that edge — for a scroll view that scrolls along that axis
@@ -133,6 +133,62 @@ the read a fling comes to rest in (decision 5).
   R-direction's turn, which WDA's turn cases keep. F2A1's phone was cited here as an unmoved scroll on the replay
   (`form-keyboard.xml`: the replayed tree never moves, 3 swipes — `540 1034 → 424` twice, then one back up); live
   (case k7) ONE stroke at `540,1034` moved the form 167 px and stopped on phone — no unmoved stroke at all.
+  - **Refined 2026-10-21 (round 14, lab note LV1,
+    docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md): the rule
+    counts only reads that list content of the stroked scroll view able to show motion.** Measured: the lab app's
+    `tabbar-floating` `list` 0,550 1080x1670 (Compose `verticalScroll`, which dumps no content container) lists T and
+    R and nothing else, F lying at content y 5500 px past a blank stretch. Live, the strokes moved it 0→858→1714→2578→3437;
+    after the second R was gone too, and the third and fourth read the same empty list — `failed after 4 swipes (the
+    last 2, swiping down, did not change the screen …)` with F one stroke away. `scroll-bounded`'s `upper` (W at 10 dp,
+    P at 180 dp of 700) read empty after its second stroke, and its third moved it 435 px. An unchanged tree says the
+    content did not move only where the stroked scroll view lists a node whose edge along the stroke's axis lies off
+    the frame's own edges, where it would move. So `Clips.endsAt` became `geometry.ts#Clips.contentToward`, the one
+    question of what a read lists of that scroll view's content toward the stroke's edge (`ListedContent`): `ends`
+    (the WDA proof above, unchanged), `listed`, or `blank` — no node of some area under it with an edge on that axis more
+    than a pixel off both of the frame's edges (an empty viewport, or only a node cut at both ends; a rule of the frame
+    alone, so WDA's unclipped frames are blank only when truly empty — and an empty WDA scroll view, which proved `ends`
+    before, is now `blank`: no end proof over an empty state or a lazy stack's unrealised stretch, the strokes run to
+    the bound; not of rows that each span the frame on that axis lying apart across it, `stackedAcross` — the lab
+    app's `form-picker` list, whose class names no axis, lists 14 full-width rows: a sideways stroke over it reads them
+    as content shown and still ends after two unchanged reads; never of a scroll view the tree says scrolls on the
+    other axis and holding no scroll view that may scroll on this one, whose content moves none that way — while a
+    ViewPager, horizontal by its class, over a vertical list of its own rect reads by that list's content). `scroll-rounds.ts#observe` asks it once a read after a stroke
+    with the target not in the tree (`stroke-plan.ts#strokedContent`; undefined over the gesture box whole — idb, a
+    screen with no scroll view — where the rule is unchanged): a `blank` read is no evidence — it counts as moved, the
+    streak starts again (a reset, not a freeze), and an `absent` failure at maxSwipes or the deadline says so
+    (`UnseenStrokes`, counted over one scroll view, one way): `; after the last 5 swipes over the scroll container
+    0,550 1080x1670 the tree listed none of its content where a swipe's motion would show (blank space, content with no
+    node, or a node cut at both of the container's edges), so how far they moved it is unknown — the element may lie
+    further down: raise maxSwipes or timeoutMs`. "How far", not "whether": the first of those strokes may show the
+    content moved, by carrying the last of it listed off the viewport — but none shows how far.
+    - **"did not change the screen" kept:** the streak keeps its meaning — the same stroke twice left a tree that
+      would show motion unchanged — so the sentence is true wherever it is still said; no replayed reply changed
+      (golden against 85109487: 0 of 1413 checks; every committed Android capture's largest scroller reads `listed`
+      toward all four edges, pinned in tests/ui-tree/listed-content.test.ts).
+    - **Cost:** none wherever the list shows content. Over a blank viewport the strokes run to the bound the call
+      already allowed, 2.8–4.1 s each on the lab AVD — a true end with a blank viewport included (`upper` at its end
+      1320, a list ending in a footer taller than its viewport: up to maxSwipes−2 more strokes, ≈5–6 s on
+      `scroll-bounded` O and F), reported honestly at the bound.
+    - **Residuals:** a node inside the scroll view that does not move with its content (a sticky header child) reads
+      as content shown, so a blank stretch under it still reads exhausted after two strokes; so too content laid
+      out in two columns, or a full-height decor node beside a container, each cut at both ends (`stackedAcross`
+      reads them as rows lying apart — the price of a sideways stroke over a list of full-width rows ending honestly);
+      and at drag speed the
+      15 s default reaches about 4–5 Android strokes, so a target past a long blank stretch may fail at the deadline
+      (docs/bugs/2026-10-09-android-scroll-until-default-budget-too-short-at-drag-speed.md) — the new clause names
+      the remedy.
+    - **Rejected:** fingerprinting the content container's bounds (the note's option (a): Compose dumps none, and a
+      View child is cut to the viewport, so its rect never moves); a screenshot diff per stroke (blank content draws
+      the same pixels, at a screencap a stroke); the scroll offset from the device (no source dumps it — `scrollable`
+      stays true at the end, above — and it needs a new adapter query); a third stroke, or N for blank (the blank
+      stretch has no bound length — 2400 dp here — so any N is arbitrary); wording alone (keeps the false "not found"
+      under budget, the bug); a `blank` flag on the fingerprint in `TreeFacts` (wider, and it splits one question
+      about the stroked view across two modules).
+    - **Live (2026-10-21, averi_lab, twice at the fix's first form `bd1c1107`: docs/truth/live-records/android-vis-r14-lv1.json, -2.json; once at `770344ae`, `00ed9ec8`'s src but for names and comments: -3.json):**
+      tabbar-floating F visible after 5 swipes at (540,1598), one every 3.2 s, the list 0→861→…→4273, Tapped F — also
+      at timeoutMs 30000 (`blank:tabbar-floating.F`); scroll-bounded O and F LOUD at the 15 s deadline after 5 strokes
+      into `upper` (one every 2.8 s), saying the last 4 went over it while the tree listed none of its content (the
+      clause's first wording, at `bd1c1107`; at `770344ae` its final one, above, the same 4 of 5), no unchanged claim; `turn:scroll-bounded.F` unchanged (2 unmoved, `upper` listing W and P).
 - **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged.
 
 ## Consequences and residuals
@@ -148,7 +204,7 @@ the read a fling comes to rest in (decision 5).
   kept. Both are the device check's to confirm (`ios wda turn:scroll-bounded.F`, `ios wda scroll:scroll-bounded.F`).
 - Two tolerances meet across reads, on purpose: whether a stroke moved the match ("unmoved") forgives under a pixel
   (`sameRectWithinPixel`), while the proof's and the carry's scroll view is found again by its EXACT rect
-  (`Clips.endsAt`, `stroke-plan.ts#carryOver`, as `axesOf` and `drawnOver` find it — round 6's code review, S1/P5).
+  (`Clips.contentToward`, `stroke-plan.ts#carryOver`, as `axesOf` and `drawnOver` find it — round 6's code review, S1/P5).
   WDA's rects reach the tree rounded (ios-node.ts), so a scroll view at rest keeps its rect; one that moves by a pixel
   between reads loses the proof (no turn after one stroke: the two-stroke rule decides) or the carry (no shortened
   final stroke), both the safe side. The live cases are where such a 1-px flip would show:

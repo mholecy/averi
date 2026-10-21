@@ -1,5 +1,21 @@
 # BUG: on Android `scroll_until` for a row the tree does not list yet says "the last 2 swipes did not change the screen: content exhausted" while the list is still moving — through content that dumps no node
 
+> **Status (2026-10-21, round 14): fixed** at `00ed9ec8` (bugs/r14-lv1; prep `04bc882a`; ADR 0021 refined
+> 2026-10-21): a read after a stroke whose tree lists none of the stroked scroll view's content where its motion would
+> show (`ui-tree/geometry.ts#Clips.contentToward`'s `blank`: an empty viewport, or only nodes cut at both its edges)
+> is no evidence the stroke moved nothing — the two-stroke streak starts again, and an `absent` failure at maxSwipes or
+> the deadline says the last swipes went over blank content (`interact/scroll-rounds.ts#UnseenStrokes`: raise
+> maxSwipes or timeoutMs). Measured live on averi_lab twice at the fix's first form `bd1c1107` (docs/truth/live-records/android-vis-r14-lv1.json,
+> -2.json) and once at `770344ae` (-3.json, the clause's final wording; `00ed9ec8` is that src but for names and comments; docs/truth/live-android-2026-10-18-visibility.md, round 14's LV1 section): tabbar-floating F "visible after
+> 5 swipes", list 0→861→…→4273, Tapped F — also at timeoutMs 30000 (`blank:tabbar-floating.F`); scroll-bounded O and F
+> an honest LOUD at the 15 s deadline after 5 strokes into `upper`, with the blank clause and no unchanged claim;
+> `turn:scroll-bounded.F` unchanged. Golden against `85109487`: 0 of 1413 checks changed (a replayed tree never
+> moves; every committed Android capture's largest scroller lists content that shows motion). Live only: still in
+> calibration.json `excluded`, its `why` saying so; the three live KNOWN entries struck off. Residuals (ADR 0021): a
+> non-moving node inside the scroll view (a sticky header child) still reads as content shown; at drag speed the 15 s
+> default reaches 4–5 Android strokes, so a target past a long blank stretch may fail at the deadline — the clause
+> names the remedy.
+
 Lab note LV1. **Measured 2026-10-16** on the dedicated `averi_lab` AVD (`emulator-5554`, Android 13 / API 33,
 1080x2220, gesture navigation), averi = `arch/round-20`'s `src/` (`debc9b2`), through the live golden
 (`scripts/truth/live.ts --serial emulator-5554 --groups visibility`, the registry's own AndroidAdapter), the lab app's

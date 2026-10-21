@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Rect, Stroke, UiNode } from '../../src/adapters/types.js';
+import { everyNode, type Rect, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve.js';
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRead, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult, scrollFailure } from '../../src/interact/scroll-text.js';
+import { parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
@@ -1689,7 +1691,8 @@ describe('round — a target uiautomator dumped CLIPPED OUT of its scroll contai
   });
 
   it('measured (round 8\'s B1 gap, re-run at 35d5997): plain from `Apps` clipped out past the top, four strokes down, dropped, the screen then unchanged — the failure says where it lay and the way back, not "off the viewport, or under the soft keyboard … (a fling?)"', () => {
-    const gone = (rest: string): Row => ({ found: [], scroller, rest });
+    // The list still lists its other rows (`mainScroller`'s default row): a read of it shows the content's motion.
+    const gone = (rest: string): Row => ({ found: [], mainScroller: scroller, rest });
     const played = play(SETTINGS, [clippedOut('top'), gone('a'), gone('b'), gone('b'), gone('b')]);
     expect(strokesToward(played)).toEqual(['down', 'down', 'down', 'down']); // the owner's default: no turn on the first read
     const error = failureOf(played, 'text:"Apps"');
@@ -2451,5 +2454,138 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
 
   it('only along the scroll: a sideways scroll asks no probe of a top edge pinned so', () => {
     expect(resultOf(play({ ...FULLY_ANDROID, direction: 'right' }, [read('cut')])).flush).toBeUndefined();
+  });
+});
+
+describe('round — a read that lists none of the stroked scroll view\'s content (blank) is no evidence the stroke moved nothing (lab note LV1)', () => {
+  /**
+   * docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md, over the
+   * real capture of the lab app's `tabbar-floating` at rest: `list` 0,550 1080x1670 lists T and R and nothing else;
+   * F's content top is 5500 px, past a blank stretch. The live strokes moved the list 0→858→1714→2578→3437: after the
+   * first T is gone and R is at 941, after the second R is gone too, and the third and fourth read the same empty list —
+   * "failed after 4 swipes (the last 2 … did not change the screen)" while the list moved 860 px a stroke.
+   */
+  const CAPTURE = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/tabbar-floating.xml', import.meta.url), 'utf8'));
+  const LAB_LIST: Rect = { x: 0, y: 550, width: 1080, height: 1670 };
+  const F_ID = 'lab.tabbar-floating.F';
+  const DEFAULTS: Rules = { direction: 'down', fully: false, maxSwipes: 6, timeoutMs: 15_000, screen: { width: 1080, height: 2220 } };
+  const rowId = (n: UiNode): string | undefined => n.identifier?.replace('lab.tabbar-floating.', '');
+  /** The capture with `list`'s children replaced by `content` (T and R at rest when undefined). */
+  const listing = (content?: (rows: readonly UiNode[]) => UiNode[]): UiNode => {
+    const walk = (n: UiNode): UiNode => (rowId(n) === 'list' && content !== undefined ? { ...n, children: content(n.children) } : { ...n, children: n.children.map(walk) });
+    return walk(CAPTURE);
+  };
+  const read = (tree: UiNode): Row => ({ tree, found: [...everyNode(tree)].filter((n) => n.identifier === F_ID) });
+  const AT_REST = read(listing());
+  const R_ONLY = read(listing((rows) => rows.filter((r) => rowId(r) === 'R').map((r) => ({ ...r, rect: { ...r.rect, y: 941 } }))));
+  const BLANK = read(listing(() => []));
+  const F_IN = read(listing((rows) => rows.filter((r) => rowId(r) === 'R').map((r) => ({ ...r, identifier: F_ID, label: 'Target F', rect: { x: 66, y: 1760, width: 948, height: 143 } }))));
+  const touchDowns = (played: Played) => played.steps.flatMap((s) => (s.do === 'stroke' ? [drawnFor(s).from] : []));
+  const NEVER = 'element never appeared in the tree (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first)';
+  const UNSEEN = (n: number) =>
+    `after the last ${n} swipes over the scroll container 0,550 1080x1670 the tree listed none of its content where a swipe's motion would show (blank space, content with no node, or a node cut at both of the container's edges), so how far they moved it is unknown — the element may lie further down: raise maxSwipes or timeoutMs`;
+
+  it('the live sequence: two blank reads in a row do not end the scroll — F comes in on the fifth stroke, "visible after 5 swipes", every stroke inside the list clear of the tab bar', () => {
+    const played = play(DEFAULTS, [AT_REST, R_ONLY, BLANK, BLANK, BLANK, F_IN, F_IN]);
+    expect(played.outcome).toMatchObject({ kind: 'visible' });
+    expect(describeScrollResult(resultOf(played))).toMatch(/visible after 5 swipes/);
+    expect(touchDowns(played)).toEqual(Array(5).fill({ x: 540, y: 1598 }));
+  });
+
+  it('blank to the bound: maxSwipes, all 6 strokes sent, and the failure says the blank strokes may have moved it — never "did not change the screen"', () => {
+    const played = play(DEFAULTS, [AT_REST, R_ONLY, BLANK, BLANK, BLANK, BLANK, BLANK]);
+    expect(touchDowns(played)).toHaveLength(6);
+    const error = failureOf(played, `id:"${F_ID}"`);
+    expect(error.message).toBe(`scroll_until id:"${F_ID}" failed after 6 swipes (maxSwipes) — ${NEVER}; ${UNSEEN(5)}`);
+  });
+
+  it('blank at the deadline: the timeout\'s words, then the same clause', () => {
+    const rows = [AT_REST, R_ONLY, BLANK, BLANK, { ...BLANK, elapsedMs: 15_400 }];
+    const error = failureOf(play(DEFAULTS, rows), `id:"${F_ID}"`);
+    expect(error.message).toMatch(/^scroll_until id:"lab\.tabbar-floating\.F" failed after 15400ms \(timeout 15000ms; 4 swipes sent; /);
+    expect(error.message).toContain(`— ${NEVER}; ${UNSEEN(3)}`);
+  });
+
+  it('a blank read resets the streak: listed and unchanged once, then blank, then listed and unchanged once again — two unchanged reads, never two in a row: no exhaustion', () => {
+    const played = play(DEFAULTS, [AT_REST, R_ONLY, R_ONLY, BLANK, R_ONLY, R_ONLY, BLANK]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' } });
+  });
+
+  it('a read that lists the content unchanged after a blank stretch still needs its own two strokes: blank, then R twice unchanged — exhausted after the second', () => {
+    const played = play(DEFAULTS, [AT_REST, BLANK, BLANK, R_ONLY, R_ONLY, R_ONLY]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree' } });
+    expect(touchDowns(played)).toHaveLength(5);
+  });
+
+  it('pinned: content listed and unchanged still ends the scroll after 2 strokes (row_40\'s shape, on the real list) — "did not change the screen", no clause', () => {
+    const error = failureOf(play(DEFAULTS, [AT_REST, R_ONLY, R_ONLY, R_ONLY]), `id:"${F_ID}"`);
+    expect(error.message).toBe(
+      `scroll_until id:"${F_ID}" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — ${NEVER} — if it lies above, try direction: "up"`,
+    );
+  });
+
+  it('pinned: a blank list with a progress node shown runs to the bound as either would alone', () => {
+    const row: Row = { found: [], mainScroller: LAB_LIST, mainContent: [], loading: true };
+    expect(play(DEFAULTS, Array(7).fill(row)).outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' } });
+  });
+
+  /** A uiautomator dump: `outer` (a scroll view at 0,200 1080x1800) holding `inner` of its very rect, if any, holding `rows`. */
+  const tabDump = (outer: string, inner: string | undefined, rows: readonly [number, number, string][]): UiNode => {
+    const attrs = (cls: string, b: string, scrollable: boolean, text = '', id = '') =>
+      `index="0" text="${text}" resource-id="${id}" class="${cls}" package="x" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="${scrollable}" long-clickable="false" password="false" selected="false" bounds="${b}"`;
+    const listed = rows.map(([y0, y1, label]) => `<node ${attrs('android.widget.TextView', `[0,${y0}][1080,${y1}]`, false, label, label === 'F' ? 'tgt' : '')} />`).join('');
+    return parseDump(
+      `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0"><node ${attrs('android.widget.FrameLayout', '[0,0][1080,2220]', false)}>` +
+        `<node ${attrs(outer, '[0,200][1080,2000]', true)}>` +
+        (inner === undefined ? listed : `<node ${attrs(inner, '[0,200][1080,2000]', true)}>${listed}</node>`) +
+        `</node></node></hierarchy>`,
+    );
+  };
+  const tabRead = (tree: UiNode): Row => ({ tree, found: [...everyNode(tree)].filter((n) => n.identifier === 'tgt') });
+
+  it('a ViewPager (horizontal by its class) over a vertical RecyclerView of its rect: the list\'s blank stretch is no evidence either — F comes in on the fifth stroke', () => {
+    const pager = (rows: readonly [number, number, string][]) => tabRead(tabDump('androidx.viewpager.widget.ViewPager', 'androidx.recyclerview.widget.RecyclerView', rows));
+    const played = play(DEFAULTS, [pager([[300, 500, 'A'], [900, 1100, 'B']]), pager([[250, 450, 'B']]), pager([]), pager([]), pager([]), pager([[1500, 1700, 'F']]), pager([[1500, 1700, 'F']])]);
+    expect(played.outcome).toMatchObject({ kind: 'visible' });
+    expect(describeScrollResult(resultOf(played))).toMatch(/visible after 5 swipes/);
+  });
+
+  it('a stroke across a vertical list of full-width rows (direction right): the rows show no sideways motion, yet the list scrolls on y alone — two unchanged reads end it, as before', () => {
+    const list = tabRead(tabDump('android.widget.ScrollView', undefined, [[300, 500, 'A'], [900, 1100, 'B']]));
+    const played = play({ ...DEFAULTS, direction: 'right' }, [list, list, list]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree' } });
+    expect(touchDowns(played)).toHaveLength(2);
+  });
+
+  it('the real form-picker list (14 full-width rows, its axis unnamed by its class), stroked sideways: the rows show no x motion, yet they are its content — two unchanged reads end it, as before', () => {
+    const tree = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/form-picker.xml', import.meta.url), 'utf8'));
+    for (const direction of ['right', 'left'] as const) {
+      const played = play({ ...DEFAULTS, direction }, [read(tree), read(tree), read(tree)]);
+      expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree' } });
+      expect(touchDowns(played)).toHaveLength(2);
+    }
+  });
+
+  it('the blank count is of strokes over ONE scroll view: both lists blank, the strokes go over the larger — when the other grows larger and takes them, the clause counts its strokes alone and names it', () => {
+    const A: Rect = { x: 0, y: 200, width: 1080, height: 900 };
+    const B = (height: number): Rect => ({ x: 0, y: 1150, width: 1080, height });
+    const screen = (bHeight: number): Row => ({
+      found: [],
+      tree: node({
+        role: 'container',
+        rect: { x: 0, y: 0, width: 1080, height: 2220 },
+        children: [node({ role: 'scrollable', rect: A, clipsDescendants: true }), node({ role: 'scrollable', rect: B(bHeight), clipsDescendants: true })],
+      }),
+    });
+    const played = play(DEFAULTS, [screen(400), screen(400), screen(400), screen(400), screen(1000), screen(1000), screen(1000)]);
+    expect(touchDowns(played).map((p) => (containsPoint(A, p) ? 'A' : 'B'))).toEqual(['A', 'A', 'A', 'A', 'B', 'B']);
+    const error = failureOf(played, `id:"${F_ID}"`);
+    expect(error.message).toContain('; after the last 2 swipes over the scroll container 0,1150 1080x1000 the tree listed none of its content');
+  });
+
+  it('pinned: idb\'s flat list lists no scroll view — nothing to call blank — so an unchanged tree still ends it after 2', () => {
+    const flat = (rest: string): Row => ({ found: [], rest, flatList: true });
+    const played = play({ ...DEFAULTS, screen: { width: 402, height: 874 } }, [flat('a'), flat('b'), flat('b'), flat('b')]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree' } });
   });
 });

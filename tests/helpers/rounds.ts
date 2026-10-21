@@ -46,6 +46,13 @@ export interface Row {
   /** Another clipping container in the tree, beside the matches' (the screen's own list, for geometry.ts#largestScroller); default none. */
   mainScroller?: Rect;
   /**
+   * What `mainScroller` lists of its content; default one fixed row (`mainRow`) whose bottom lies inside it, so a
+   * stroke over it that leaves the tree unchanged reads as one that moved nothing — the content shows motion
+   * (ui-tree/geometry.ts#Clips.contentToward). `[]`: the list shows none of its content (blank space), and a read of
+   * it is no evidence either way.
+   */
+  mainContent?: readonly UiNode[];
+  /**
    * The rest of the screen — a text node of this label (read-tree.ts
    * #treeFingerprint reads it): two rows with the same matches, containers
    * and `rest` are the same tree. Default none, so rows that differ in
@@ -104,7 +111,7 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
 /**
  * The tree a row read: the screen, the matches inside their clipping
  * containers (outermost first, each `clipsDescendants`), `mainScroller`
- * beside them, the nodes drawn `over` them, a progress node when `loading`,
+ * beside them (listing `mainContent`), the nodes drawn `over` them, a progress node when `loading`,
  * and `rest`. The round
  * derives every tree fact from it (scroll-read.ts#TreeFacts) as it does
  * from a device's — the row says what is ON the screen, never what the
@@ -127,7 +134,7 @@ export function treeOf(row: Row, screen: DeviceScreen): UiNode {
     role: 'container',
     rect: { x: 0, y: 0, ...screen },
     children: [
-      ...(row.mainScroller !== undefined ? [node({ role: 'container', identifier: 'main_scroller', rect: { ...row.mainScroller }, clipsDescendants: true })] : []),
+      ...(row.mainScroller !== undefined ? [node({ role: 'container', identifier: 'main_scroller', rect: { ...row.mainScroller }, clipsDescendants: true, children: [...(row.mainContent ?? [mainRow(row.mainScroller)])] })] : []),
       ...inScrollers,
       ...(row.over ?? []),
       ...(row.loading === true ? [node({ role: 'progress', rect: { x: 500, y: 100, width: 80, height: 80 } })] : []),
@@ -135,6 +142,13 @@ export function treeOf(row: Row, screen: DeviceScreen): UiNode {
     ],
   });
 }
+
+/**
+ * The main scroller's content by default (`Row.mainContent`): a row of no label nor id flush with its top, half its
+ * height — its bottom edge inside, where the content's motion would show. The same row on every read: rows that differ
+ * in nothing still read as one unchanged screen.
+ */
+export const mainRow = (list: Rect): UiNode => node({ role: 'other', rect: { x: list.x, y: list.y, width: list.width, height: Math.floor(list.height / 2) } });
 
 const contains = (root: UiNode, n: UiNode): boolean => root.children.some((c) => c === n || contains(c, n));
 

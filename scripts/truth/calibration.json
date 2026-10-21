@@ -1450,7 +1450,7 @@
     },
     {
       "note": "2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md",
-      "why": "lab finding LV1: scroll dynamics, live only (live.ts --serial, case scroll:tabbar-floating.F)"
+      "why": "lab finding LV1: scroll dynamics, live only (live.ts --serial, cases scroll:tabbar-floating.F, scroll:scroll-bounded.O, scroll:scroll-bounded.F: a replayed tree never moves, so no row reproduces a list moving through blank content); fixed live by round 14's 00ed9ec8 (bugs/r14-lv1: a read listing none of the stroked scroll view's content is no evidence the stroke moved nothing — ADR 0021, refined 2026-10-21) — tabbar-floating F visible after 5 swipes and Tapped, also at timeoutMs 30000 (blank:tabbar-floating.F), scroll-bounded O and F an honest LOUD at the deadline saying the last swipes went over blank content, in two runs of two at its first form bd1c1107 (android-vis-r14-lv1.json, -2.json) and once more at 770344ae (00ed9ec8's src but for names and comments) with the clause's final wording (-3.json); its three live KNOWN entries struck off"
     },
     {
       "note": "2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md",

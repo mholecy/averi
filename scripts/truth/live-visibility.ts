@@ -543,7 +543,43 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     const t = truth.targets.find((x) => x.tag === r.tag);
     if (t?.scrollView !== undefined) cases.push(atRestCase(truth.cell, t, t.scrollView));
   }
+  for (const b of BLANK_STRETCH.filter((x) => x.cell === truth.cell && platform === 'android')) {
+    const t = truth.targets.find((x) => x.tag === b.tag);
+    if (t?.scrollView !== undefined) cases.push(blankStretchCase(truth.cell, t, t.scrollView, b.timeoutMs));
+  }
   return cases;
+}
+
+/**
+ * The blank-stretch cases (LV1, docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md):
+ * a target past a stretch of its list that dumps no node — tabbar-floating's F, 2000 dp down a list that lists only T
+ * and R before it. The plain scroll case asks it under the 15 s default, which at drag speed may expire before the
+ * fifth stroke reaches F (an honest timeout there); this one gives the call the time, so its promise is proven: the
+ * reads over the blank stretch end nothing, and the scroll reaches F and taps it.
+ */
+export const BLANK_STRETCH: readonly { cell: string; tag: string; timeoutMs: number }[] = [{ cell: 'tabbar-floating', tag: 'F', timeoutMs: 30_000 }];
+
+function blankStretchCase(cell: string, t: TargetTruth, view: string, timeoutMs: number): VisibilityCase {
+  return {
+    id: `blank:${cell}.${t.tag}`,
+    cell,
+    says: `scroll_until ${t.tag} down past the blank stretch of ${view} (no node between R and ${t.tag}), timeoutMs ${timeoutMs}: the blank reads end nothing — it stops on ${t.tag}, every stroke on ${view} bringing it closer, then the tap fires it (LV1)`,
+    calls: [
+      { tool: 'scroll_until', args: { selector: selectorOf(t), direction: 'down', timeoutMs } },
+      { tool: 'tap', args: { selector: selectorOf(t) } },
+    ],
+    judge: (s, replies, launched, _source, after) => judgeBlankStretch(t.tag, view, replies, s, launched, after[0] ?? s),
+  };
+}
+
+/**
+ * A blank-stretch case's judge (BLANK_STRETCH): judgeScroll's stop and tap, and nothing less — a loud failure, which
+ * judgeScroll accepts as honest, is this case's MISMATCH: the call had the time, so not reaching the target is the
+ * blank stretch read as the content's end again.
+ */
+export function judgeBlankStretch(tag: string, view: string, replies: readonly string[], final: LabState, launched: LabState, atStop: LabState = final): LiveVerdict {
+  const verdict = judgeScroll({ tag, view, fully: false, platform: 'android' }, replies, final, launched, atStop);
+  return verdict.outcome === 'LOUD' ? { ...verdict, outcome: 'MISMATCH', cls: 'failed-holds', why: `past a blank stretch with the time to reach it, yet ${verdict.why}` } : verdict;
 }
 
 /**

@@ -773,20 +773,42 @@ export interface Clips {
    */
   axesOf(container: Rect): ScrollAxes | undefined;
   /**
-   * The scroll view of rect `scroller` (found as `axesOf` finds its scroll view: scroll-containers.ts#isScrollViewOf,
-   * that exact rect — the one the stroke plan remembered and drew over, whose cut and axes the same read finds by it
-   * exactly; one moved by a pixel is found by none of them, and no proof is the safe answer), when the tree shows its
-   * CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more than a pixel — so nothing
-   * of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED frames only (`unclipped`,
-   * WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content above a list's
-   * top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its content container
-   * at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). Undefined when it does not end there, when no
-   * scroll view of that rect is in this tree, and on every other tree: uiautomator cuts most rects to their scroll
-   * container, so content past an edge reads flush with it (or is not listed at all) — that it does not cut some
-   * (`drawnIn`'s lab note) proves no end where it does — and idb's flat list lists no
-   * scroll view. What a node past the edge may be — a row, a parked cell's content (ADR 0019), a pinned header — is not
-   * asked: any of them says "not provably the end", the safe answer. And only for a scroll view that scrolls ALONG that
-   * edge's axis (scroll-containers.ts#scrollAxis: its content listed running on past its frame on that axis —
+   * What this tree lists of the content of the scroll view of rect `scroller` toward its `edge` (`ListedContent`) —
+   * the scroll view found as `axesOf` finds its scroll view (scroll-containers.ts#isScrollViewOf, that exact rect — the
+   * one the stroke plan remembered and drew over, whose cut and axes the same read finds by it exactly; one moved by a
+   * pixel is found by none of them, and undefined, no answer, is the safe one; so too on a tree that lists no
+   * ancestry, whose nesting is no scroll view's content).
+   *
+   * `blank`: nothing under it of some area has an edge along `edge`'s axis more than a pixel off both of the frame's
+   * own edges on that axis (`showsMotion`) — so this read could not show the content moving: an empty viewport, or a
+   * node cut at both ends (an undescribed image spanning it) — but not rows that each span it lying apart across it
+   * (`stackedAcross`: a sideways stroke over a vertical list of full-width rows reads them as listed). uiautomator cuts
+   * a node to its scroll view, so the edge that moves with the content lies INSIDE the frame; WDA's unclipped frames put
+   * it past, so there only a truly empty scroll view is blank — and blank comes before the end proof below: an empty
+   * WDA scroll view (an empty state, or a lazy stack's unrealised stretch) is `blank`, never `ends`, and a stroke over
+   * it runs to the bound. A rule of the frame alone, before the dialect's guards. Measured (lab note LV1,
+   * docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md): the lab
+   * app's `tabbar-floating` `list` 0,550 1080x1670 (a Compose verticalScroll, which dumps no content container) lists
+   * T and R and nothing else; two strokes past R it lists nothing, and two more strokes read the same empty list while
+   * each moved it ~860 px — "did not change the screen" was the dump's, not the list's. Not of a scroll view the tree
+   * says scrolls on the OTHER axis (scroll-containers.ts#scrollAxis) and holds no scroll view that may scroll on this
+   * one: its content moves none that way — a carousel's cards fill its height, and a vertical stroke over it moves
+   * nothing of it — so its read is `listed`, evidence as it was. A ViewPager (horizontal by its class) over a vertical
+   * list of its own rect is not such a view: the list under it is what a vertical stroke moves. What `blank` cannot
+   * tell: a node inside the scroll view that does not move with its content (a sticky header child) shows an edge
+   * inside and reads `listed`, so a blank stretch under it still reads unchanged.
+   *
+   * `ends`: the tree shows its CONTENT ENDING at its `edge`: no node under it of some area lies past that edge by more
+   * than a pixel — so nothing of its content lies that way, and no stroke can bring any in. On a tree of UNCLIPPED
+   * frames only (`unclipped`, WDA's): there a scroll view's content keeps its laid-out rect wherever it lies, so content
+   * above a list's top is listed above it (the lab app's `scroll-bounded`: `lower` 0,380 402x180 at rest lists its
+   * content container at 0,380 402x1300 — nothing above its top, 1120 pt below its bottom). `listed`, not `ends`, when
+   * it does not end there, and on every other tree: uiautomator cuts most rects to their scroll container, so content
+   * past an edge reads flush with it (or is not listed at all) — that it does not cut some (`drawnIn`'s lab note)
+   * proves no end where it does — and idb's flat list lists no scroll view. What a node past the edge may be — a row,
+   * a parked cell's content (ADR 0019), a pinned header — is not asked: any of them says "not provably the end", the
+   * safe answer. And only for a scroll view that scrolls ALONG that edge's axis (scroll-containers.ts#scrollAxis: its
+   * content listed running on past its frame on that axis —
    * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
    * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
    * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
@@ -798,10 +820,18 @@ export interface Clips {
    * lazy list resting on a boundary is a false proof (one stroke, then a turn or a failure that calls the content
    * exhausted). What makes it rare, not impossible: a list at rest lies on a boundary by chance (a flung list stops
    * anywhere along a row), and the stroke must also go untaken, with nothing drawn over its touch-down (that withholds
-   * the proof). Cost: one walk of that scroll view's subtree, per ask (asked at most once a round, after a stroke).
+   * the proof). Cost, per ask (asked at most once a round, after a stroke): one walk of the tree to find the scroll
+   * view, and one of its subtree.
    */
-  endsAt(scroller: Rect, edge: Edge): UiNode | undefined;
+  contentToward(scroller: Rect, edge: Edge): ListedContent | undefined;
 }
+
+/**
+ * What a read lists of a scroll view's content toward one of its edges (`Clips.contentToward`): its content ENDING
+ * there (`ends`, the scroll view quoted); none of it where its motion would show (`blank`, the scroll view quoted:
+ * whether a stroke moved it, this read cannot say); or content that shows its motion and runs on (`listed`).
+ */
+export type ListedContent = { readonly kind: 'ends'; readonly view: UiNode } | { readonly kind: 'listed' } | { readonly kind: 'blank'; readonly view: UiNode };
 
 /** A scroll view's axis and those of the scroll views nested in it (`Clips.axesOf`). */
 export interface ScrollAxes {
@@ -866,6 +896,47 @@ export interface DrawnFrame {
   readonly listedWhereItLies: boolean;
 }
 
+/** `Clips.contentToward`'s answer for content listed, not ending at the edge asked. */
+const LISTED: ListedContent = { kind: 'listed' };
+
+/**
+ * How far off both of its scroll view's edges along an axis a node's edge must lie to show the content's motion
+ * (`Clips.contentToward`'s `blank`): more than a pixel, as `flushEdges` reads "past", and the end proof (`ends`) by
+ * this constant — an edge within a pixel of the frame's is the cut's, a rounding of the source's bounds.
+ */
+const MOTION_EDGE_SLACK = 1;
+
+/**
+ * `rect`, a node under the scroll view of rect `frame`, has an edge along `axis` that would move with the content:
+ * one more than `MOTION_EDGE_SLACK` off both of the frame's edges on that axis — inside the frame (uiautomator cuts a
+ * node to its scroll view, so the edge that moves lies inside) or past it (WDA's unclipped frames).
+ */
+function showsMotion(rect: Rect, frame: Rect, axis: ScrollAxis): boolean {
+  const [f0, f1] = axis === 'vertical' ? [frame.y, frame.y + frame.height] : [frame.x, frame.x + frame.width];
+  const [r0, r1] = axis === 'vertical' ? [rect.y, rect.y + rect.height] : [rect.x, rect.x + rect.width];
+  const off = (e: number): boolean => Math.abs(e - f0) > MOTION_EDGE_SLACK && Math.abs(e - f1) > MOTION_EDGE_SLACK;
+  return off(r0) || off(r1);
+}
+
+/**
+ * Whether `nodes` (under a scroll view, none showing motion along `axis`: each spans its frame that way) hold two that
+ * lie apart along the OTHER axis — content laid out across the stroke, not one thing cut at both ends: the full-width
+ * rows of a vertical list a sideways stroke goes over (measured: the lab app's `form-picker`, a list whose axis its
+ * class does not say, lists 14 rows each 0..1080 — none has an x edge inside, yet they are its content, shown). Its
+ * read is evidence as any listing is; LV1's blank viewport lists nothing, and an undescribed image spanning it one
+ * node. Its price: two columns, or a full-height decor line beside a container, each cut at both ends, read as content
+ * shown too, so a blank stretch under them still reads unchanged (ADR 0021's residuals).
+ * Apart: one ends within `MOTION_EDGE_SLACK` of where the other begins, or before (a rounding of the bounds
+ * overlaps rows that touch by a pixel). One node is apart from itself only when it is no wider across than
+ * `MOTION_EDGE_SLACK` (a hairline spanning the viewport): it then reads as content shown, the conservative side.
+ */
+function stackedAcross(nodes: readonly UiNode[], axis: ScrollAxis): boolean {
+  const span = (r: Rect): [number, number] => (axis === 'vertical' ? [r.x, r.x + r.width] : [r.y, r.y + r.height]);
+  const firstEnd = Math.min(...nodes.map((n) => span(n.rect)[1]));
+  const lastStart = Math.max(...nodes.map((n) => span(n.rect)[0]));
+  return firstEnd <= lastStart + MOTION_EDGE_SLACK;
+}
+
 /**
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
@@ -873,7 +944,7 @@ export interface DrawnFrame {
  * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry), which
  * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
  * frames unclipped (draw-order.ts#listsUnclippedFrames), which `axesOf` and
- * `endsAt` ask — the two readers of the tree's dialect, both in draw order.
+ * `contentToward` ask — the two readers of the tree's dialect, both in draw order.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
@@ -967,28 +1038,38 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     axes.set(found, facts);
     return facts;
   };
-  const endsAt = (scroller: Rect, edge: Edge): UiNode | undefined => {
-    if (!ancestry || !unclipped) return undefined;
+  const contentToward = (scroller: Rect, edge: Edge): ListedContent | undefined => {
+    if (!ancestry) return undefined;
     const view = [...everyNode(tree)].find((n) => isScrollViewOf(n, scroller));
     if (view === undefined) return undefined;
-    // Only along the axis it scrolls on: a carousel lists nothing below its bottom because it scrolls sideways.
-    if (scrollAxis(view, unclipped) !== axisOfEdge(edge)) return undefined;
+    const axis = axisOfEdge(edge);
+    const scrollsOn = scrollAxis(view, unclipped);
+    // A scroll view the tree says scrolls on the OTHER axis has no content that moves along this one — a carousel's
+    // cards fill its height, and a vertical stroke over it moves none of it: its read unmoved is evidence as it is —
+    // unless a scroll view under it may scroll on this one (a ViewPager's page, a RecyclerView of its very rect).
+    const subtree = [...everyNode(view)].filter((n) => n !== view);
+    if (scrollsOn !== undefined && scrollsOn !== axis && !subtree.some((n) => scrolls(n) && scrollAxis(n, unclipped) !== scrollsOn)) return LISTED;
+    const under = subtree.filter((d) => rectArea(d.rect) > 0);
+    // Before the dialect's guard: a rule of the frame alone, true on every tree that lists ancestry — unless what spans
+    // it is laid out along the other axis (`stackedAcross`: rows of a list a stroke goes across).
+    if (!under.some((d) => showsMotion(d.rect, view.rect, axis)) && !stackedAcross(under, axis)) return { kind: 'blank', view };
+    // Only along the axis it scrolls on (an axis the tree cannot tell proves nothing), and on unclipped frames only.
+    if (!unclipped || scrollsOn !== axis) return LISTED;
     const r = view.rect;
     const past: Record<Edge, (d: Rect) => boolean> = {
-      top: (d) => d.y < r.y - 1,
-      bottom: (d) => d.y + d.height > r.y + r.height + 1,
-      left: (d) => d.x < r.x - 1,
-      right: (d) => d.x + d.width > r.x + r.width + 1,
+      top: (d) => d.y < r.y - MOTION_EDGE_SLACK,
+      bottom: (d) => d.y + d.height > r.y + r.height + MOTION_EDGE_SLACK,
+      left: (d) => d.x < r.x - MOTION_EDGE_SLACK,
+      right: (d) => d.x + d.width > r.x + r.width + MOTION_EDGE_SLACK,
     };
-    const under = [...everyNode(view)].filter((d) => d !== view && rectArea(d.rect) > 0);
-    return under.some((d) => past[edge](d.rect)) ? undefined : view;
+    return under.some((d) => past[edge](d.rect)) ? LISTED : { kind: 'ends', view };
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, endsAt };
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, contentToward };
 }
 
 /**
  * `frame` with every edge `rect` is flush with (`flushEdges`: within a unit, a px on Android, a pt on WDA) and runs past
- * moved out onto `rect`'s: there the rect is FLUSH with its scroll view's edge, not past it (`endsAt` reads past as more
+ * moved out onto `rect`'s: there the rect is FLUSH with its scroll view's edge, not past it (`contentToward` reads past as more
  * than a unit too) — a rounding of the source's bounds, which the drawn frame must not read as a cut. Measured:
  * mp-native's SWIFT form on Android lists `details_toggle` at `66,1924 948x55`, ending at 1979, under its form
  * `[0,242][1080,1978]` — the CONTINUE bar starts at 1979, so the form's 1978 and the toggle's 1979 are the same line;
@@ -1011,7 +1092,7 @@ export function across(rect: Rect, edge: Edge): number {
 
 /**
  * The axis along which content comes in through `edge`: `vertical` for the top or bottom, `horizontal` for a side —
- * the one edge → axis mapping, read by `Clips.endsAt` and scroll_until's sentences (interact/scroll-text.ts), and by
+ * the one edge → axis mapping, read by `Clips.contentToward` and scroll_until's sentences (interact/scroll-text.ts), and by
  * interact/swipe.ts#axisOf for a direction (through its EDGE_TOWARD), so ui-tree imports nothing of interact.
  */
 export function axisOfEdge(edge: Edge): ScrollAxis {

@@ -64,7 +64,7 @@ export function scrolls(n: UiNode): boolean {
 /**
  * `n` is THE scroll view of rect `container`: it scrolls, with exactly that rect — the one test by which a scroll view
  * remembered as a rect is found again in a tree, first in tree order (draw-order.ts#DrawOrder.drawnOver, which also
- * leaves out the keyboard's own nodes, geometry.ts#Clips.axesOf and #Clips.endsAt).
+ * leaves out the keyboard's own nodes, geometry.ts#Clips.axesOf and #Clips.contentToward).
  */
 export function isScrollViewOf(n: UiNode, container: Rect): boolean {
   return scrolls(n) && sameRect(n.rect, container);

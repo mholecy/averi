@@ -316,7 +316,8 @@ export async function pollTree<T>(
  * (2026-10-09, interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST). Cheap:
  * one walk, no copy — a round's tree is a few hundred nodes; kept as 8
  * characters, not the tree. Here because it is a question about a READ,
- * asked of two of them.
+ * asked of two of them. An unchanged fingerprint says the content did not move only where the stroked scroll view
+ * lists some of it where motion shows: a blank viewport dumps the same tree at every offset (geometry.ts#Clips.contentToward's `blank`).
  */
 export function treeFingerprint(tree: UiNode): string {
   let h = 0x811c9dc5;
