@@ -1,7 +1,7 @@
 import { ANDROID, IOS, keys, type KnownFile } from './known.js';
 
-// The bars family's ratchet (fixtures/apps/cells/bars.json): bands, pinned-bar, tabbar-floating, tabbar-hidden-push
-// (iOS only) and fab, their rows chosen by each target's measured geometry (golden-spec/bars.ts, edges.ts, base.ts).
+// The bars family's ratchet (fixtures/apps/cells/bars.json): bands, pinned-bar, tabbar-floating, tabbar-dense (iOS only),
+// tabbar-hidden-push (iOS only) and fab, their rows chosen by each target's measured geometry (golden-spec/bars.ts, edges.ts, base.ts).
 
 // The FAB host (calibration.json #24): averi's reading, accepted in round 13, is that the transparent full-width host
 // holding only the FAB is a cover over everything in its band — a target beside the FAB is refused, its colour fails
@@ -36,6 +36,8 @@ export const bars: KnownFile = {
     [`${IOS}/pinned-bar.wda.json`]: 7,
     [`${IOS}/tabbar-floating.idb.json`]: 9,
     [`${IOS}/tabbar-floating.wda.json`]: 9,
+    [`${IOS}/tabbar-dense.idb.json`]: 6,
+    [`${IOS}/tabbar-dense.wda.json`]: 6,
     [`${IOS}/tabbar-hidden-push.idb.json`]: 9,
     [`${IOS}/tabbar-hidden-push.wda.json`]: 9,
     [`${IOS}/fab.idb.json`]: 9,

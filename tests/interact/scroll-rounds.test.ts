@@ -4,6 +4,7 @@ import { everyNode, type Rect, type Stroke, type UiNode } from '../../src/adapte
 import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve.js';
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRead, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult, scrollFailure } from '../../src/interact/scroll-text.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
@@ -2154,6 +2155,170 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
     const sent = strokes(played);
     expect(sent.map((s) => s.box)).toEqual([LIST, LIST]);
     for (const { from } of sent) expect(containsPoint(LIST, from)).toBe(true);
+  });
+
+  // Its idb twin: idb's flat list lists no scroll view (the target's is untold), so before a read sees R move the stroke
+  // goes over the screen; once two reads see it carried, with T, the turned stroke goes over where they were seen
+  // moving (motion-shown.ts#MotionShown) — inside the list (0,200 402x640, state.json), not in the header at y 175.
+  it('tabbar-floating under idb: the capture with T, R and F carried 1108 pt (as measured live) — the first stroke over the screen (699), the turned one touching down inside the list (391), where T and R were seen moving', () => {
+    const LIST: Rect = { x: 0, y: 200, width: 402, height: 640 };
+    const raw = readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/tabbar-floating.idb.json', import.meta.url), 'utf8');
+    const ROWS = new Set(['lab.tabbar-floating.T', 'lab.tabbar-floating.R', 'lab.tabbar-floating.F']);
+    const shifted = (n: UiNode, dy: number): UiNode => ({ ...n, ...(ROWS.has(n.identifier ?? '') && { rect: { ...n.rect, y: n.rect.y - dy } }), children: n.children.map((c) => shifted(c, dy)) });
+    const idbRow = (offset: number): Row => {
+      const tree = shifted(parseIdbDescribeAll(raw), offset);
+      return { tree, found: [...everyNode(tree)].filter((n) => n.identifier === 'lab.tabbar-floating.R') };
+    };
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [idbRow(0), idbRow(1108), idbRow(1108)]);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+    const [first, turned] = strokes(played);
+    expect(first.from).toEqual({ x: 201, y: 699 });
+    expect(turned.from).toEqual({ x: 201, y: 391 });
+    expect(containsPoint(LIST, turned.from)).toBe(true);
+  });
+
+  // The stop the region holds back (motion-shown.ts#carriedUnder): measured live, the turned stroke carried R back to y
+  // 114, under the header idb lists it beneath, and the plain stop claimed it there — the tap went to the header. Now no
+  // stop short of the line a stroke over the region touches down on (391 of 24,300 354x455), on the side the content
+  // was first seen moving toward (the top): the strokes go on over the region; R left there, the failure says so.
+  describe('tabbar-floating under idb: R carried back under the header is no stop', () => {
+    const raw = readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/tabbar-floating.idb.json', import.meta.url), 'utf8');
+    const ROWS = new Set(['lab.tabbar-floating.T', 'lab.tabbar-floating.R', 'lab.tabbar-floating.F']);
+    const shifted = (n: UiNode, dy: number): UiNode => ({ ...n, ...(ROWS.has(n.identifier ?? '') && { rect: { ...n.rect, y: n.rect.y - dy } }), children: n.children.map((c) => shifted(c, dy)) });
+    const idbRow = (offset: number): Row => {
+      const tree = shifted(parseIdbDescribeAll(raw), offset);
+      return { tree, found: [...everyNode(tree)].filter((n) => n.identifier === 'lab.tabbar-floating.R') };
+    };
+    const BAND = 'lay above y 391, where a stroke over where its content was seen moving (24,300 354x455) touches down carrying content away from its top edge — in the band 24,300 354x91 or past it';
+
+    it('R at y 114 (offset 607), then at 317 (404): no stop, either — two more strokes over the region (391); R at 380 (341), its centre past the line, stops after 4 swipes', () => {
+      const played = play({ ...IPHONE, maxSwipes: 5 }, [idbRow(0), idbRow(1108), idbRow(607), idbRow(404), idbRow(341), idbRow(341)]);
+      expect(strokesToward(played)).toEqual(['down', 'up', 'up', 'up']);
+      expect(strokes(played).slice(1).map((s) => s.from)).toEqual([{ x: 201, y: 391 }, { x: 201, y: 391 }, { x: 201, y: 391 }]);
+      expect(resultOf(played)).toMatchObject({ swipes: 4, visible: 1 });
+    });
+
+    it('a floating button beside the rows held still (330,480): no chrome — R carried to 380 stops after 2 swipes, as without it', () => {
+      const beside = (row: Row): Row => ({ ...row, tree: { ...row.tree!, children: [...row.tree!.children, node({ role: 'button', label: 'Beside', rect: { x: 330, y: 480, width: 56, height: 56 } })] } });
+      const played = play({ ...IPHONE, maxSwipes: 5 }, [idbRow(0), idbRow(1108), idbRow(341), idbRow(341)].map(beside));
+      expect(resultOf(played)).toMatchObject({ swipes: 2, visible: 1 });
+    });
+
+    it('fully: true asks all of it — R left at 369, its top 22 pt short of the line (centre past it): no stop, and the failure says only part of it lay there', () => {
+      const played = play({ ...IPHONE, fully: true, maxSwipes: 3 }, [idbRow(0), idbRow(1108), idbRow(352), idbRow(352)]);
+      const { message } = failureOf(played, 'id:lab.tabbar-floating.R');
+      expect(message).toContain(`part of it ${BAND}`);
+    });
+
+    it('only a match that would stop is held back: R left at y -39, a quarter of it on the screen, is short of a stop already — the failure says it is clipped at the top, not where it was carried', () => {
+      const played = play({ ...IPHONE, maxSwipes: 3 }, [idbRow(0), idbRow(1108), idbRow(760), idbRow(760)]);
+      const { message } = failureOf(played, 'id:lab.tabbar-floating.R');
+      expect(message).toContain('CLIPPED at top');
+      expect(message).not.toContain('where its content was seen moving');
+    });
+
+    it('R left at y 114 by strokes that no longer move it: the stuck failure says so too, no stop claimed', () => {
+      const played = play({ ...IPHONE, maxSwipes: 8 }, [idbRow(0), idbRow(1108), ...Array.from({ length: 3 }, () => idbRow(607))]);
+      const { message } = failureOf(played, 'id:lab.tabbar-floating.R');
+      expect(message).toContain(`element is on the screen but it ${BAND} — the tree lists no scroll view and lists a row carried under a header or a bar where it would lie, so whether it is drawn there it cannot tell, and no stop was claimed on it`);
+      expect(message).toContain('no longer moves it');
+      expect(message).toContain('under treeSource: wda the tree lists the scroll view, and scroll_until judges the element in it.');
+    });
+
+    it('R left at y 114 to the bound: an honest failure — it lay short of the line a stroke over where its content was seen moving touches down on; no stop claimed', () => {
+      const played = play({ ...IPHONE, maxSwipes: 3 }, [idbRow(0), idbRow(1108), idbRow(607), idbRow(607)]);
+      const { message } = failureOf(played, 'id:lab.tabbar-floating.R');
+      expect(message).toContain(`it ${BAND}`);
+      expect(message).toContain('(last rect {"x":24,"y":114,"width":354,"height":52}); under treeSource: wda the tree lists the scroll view, and scroll_until judges the element in it.');
+    });
+  });
+
+  // The lab's tabbar-dense (lab note LV3, its cell): tabbar-floating's header and tab bar over rows every 60 pt, R the
+  // eighth (720). Rows carried back under the 200-pt header, which idb lists there, grow the region up to the header's
+  // title (24,110 354x645); measured live, the turned stroke carried R back to 143 and 158, inside that region, and the
+  // stop claimed it — the tap went to the header. The band (motion-shown.ts#HeldBand) holds it short of the line 239.
+  describe('tabbar-dense under idb: the turned stroke over the region, the band short of its line', () => {
+    const raw = readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/tabbar-dense.idb.json', import.meta.url), 'utf8');
+    const carried = (n: UiNode): boolean => /^lab\.tabbar-dense\.(row\.\d+|R|L)$/.test(n.identifier ?? '');
+    const shifted = (n: UiNode, dy: number): UiNode => ({ ...n, ...(carried(n) && { rect: { ...n.rect, y: n.rect.y - dy } }), children: n.children.map((c) => shifted(c, dy)) });
+    /** The capture with the rows carried `offset` pt toward the list's end, the target `of` (R, or the last row L); `tick`, a clock's label (a node whose text changes on every read). */
+    const denseRow = (offset: number, tick?: string, of: 'R' | 'L' = 'R'): Row => {
+      const at = shifted(parseIdbDescribeAll(raw), offset);
+      const tree = tick === undefined ? at : { ...at, children: [...at.children, node({ role: 'text', identifier: 'clock', label: tick, rect: { x: 300, y: 70, width: 80, height: 16 } })] };
+      return { tree, found: [...everyNode(tree)].filter((n) => n.identifier === `lab.tabbar-dense.${of}`) };
+    };
+    /** R flung past the top by the first stroke (1100), carried back by the turned one to 150 — under the header — then to 400. */
+    const R_REPLAY = [0, 1100, 570, 320, 320];
+
+    it('R from the list\'s top: the first stroke over the screen (699), the turned ones over the region (239, inside the list, not 175 in the header); R carried back to 150 is held, at 400 it stops — after 3 swipes', () => {
+      const played = play(IPHONE, R_REPLAY.map((o) => denseRow(o)));
+      expect(strokesToward(played)).toEqual(['down', 'up', 'up']);
+      expect(strokes(played).map((s) => s.from.y)).toEqual([699, 239, 239]);
+      expect(resultOf(played)).toMatchObject({ swipes: 3, visible: 1 });
+    });
+
+    it('a ticking label (a clock whose text changes on every read) changes nothing: the same strokes, the same stop', () => {
+      const ticking = play(IPHONE, R_REPLAY.map((o, i) => denseRow(o, `9:4${i}`)));
+      const still = play(IPHONE, R_REPLAY.map((o) => denseRow(o)));
+      expect(ticking.steps.map(decided)).toEqual(still.steps.map(decided));
+      expect(strokes(ticking)).toEqual(strokes(still));
+      expect(resultOf(ticking)).toEqual(resultOf(still));
+    });
+
+    it('R left at 150 to the bound: the LOUD names the band and the line, and the remedy', () => {
+      const played = play({ ...IPHONE, maxSwipes: 3 }, [0, 1100, 570, 570].map((o) => denseRow(o)));
+      const { message } = failureOf(played, 'id:R');
+      expect(message).toContain(
+        'scroll_until id:R failed after 3 swipes (maxSwipes) — element reached the screen but it lay above y 239, where a stroke over where its content was seen moving (24,110 354x645) touches down carrying content away from its top edge — in the band 24,110 354x129 or past it — ' +
+          'the tree lists no scroll view and lists a row carried under a header or a bar where it would lie, so whether it is drawn there it cannot tell, and no stop was claimed on it (last rect {"x":24,"y":150,"width":354,"height":52}); under treeSource: wda the tree lists the scroll view, and scroll_until judges the element in it.',
+      );
+    });
+
+    // The pushed side's band holds on every read until the next stroke, not only on the one right after it: a stop
+    // after a stroke is claimed on a confirming read, and a fling carries the target on between the two. The turned
+    // stroke (content carried down) reads R mid-fling at 474, short of the bottom band; the confirming read finds it at
+    // 654, centre 680 — in the band (below the line 627) the content was pushed toward, over the tab bar's top: held.
+    it('a fling carrying R on after the turned stroke: the read right after it finds R short of the bottom band (474), the confirming read in it (654) — held to the bound, the LOUD names the bottom band', () => {
+      const played = play({ ...IPHONE, maxSwipes: 2 }, [0, 1100, 246, 66].map((o) => denseRow(o)));
+      expect(strokes(played).map((s) => s.from.y)).toEqual([699, 239]);
+      const { message } = failureOf(played, 'id:R');
+      expect(message).toContain('it lay below y 627, where a stroke over where its content was seen moving (24,110 354x645) touches down carrying content away from its bottom edge — in the band 24,627 354x128 or past it');
+      expect(message).toContain('(last rect {"x":24,"y":654,"width":354,"height":52})');
+    });
+
+    // The forward side stays base's (motion-shown.ts#goesOver): a stroke moving the content the way it was first seen
+    // moving keeps the screen box, and only `way` and the last stroke's pushed side are banded — L, the last row, at
+    // the list's end (680, centre 706: in the region's bottom band, which no stroke pushed content toward) is claimed.
+    it('L at the list\'s end: every stroke forward over the screen box (699), the region formed or not; L at 680 is claimed after 4 swipes', () => {
+      const played = play({ ...IPHONE, maxSwipes: 6 }, [0, 600, 1200, 1800, 1960, 1960].map((o) => denseRow(o, undefined, 'L')));
+      expect(strokesToward(played)).toEqual(['down', 'down', 'down', 'down']);
+      expect(strokes(played).map((s) => s.from.y)).toEqual([699, 699, 699, 699]);
+      expect(resultOf(played)).toMatchObject({ swipes: 4, visible: 1 });
+    });
+
+    it('an `up` call, the content first seen carried down: R carried past the region\'s top toward the header\'s title, which held still, is no stop — the stuck LOUD names the title', () => {
+      const played = play({ ...IPHONE, direction: 'up', maxSwipes: 3 }, [1100, 680, 680, 680].map((o) => denseRow(o)));
+      const { message } = failureOf(played, 'id:R');
+      expect(message).toContain('element is on the screen but it lay past the top edge of where its content was seen moving (24,110 354x645), toward text "Header" (173,90 56x20), which held still while it moved');
+      expect(message).toContain('under treeSource: wda the tree lists the scroll view, and scroll_until judges the element in it.');
+    });
+  });
+
+  // The motion is measured on what of the screen shows the app — below iOS's status band, where a touch goes to the
+  // status bar: carousel-in-list's B flung by the first stroke from 1060 to -48 (the page's end, measured live) shows
+  // only its top 16 pt, under the band, and a 24-pt sliver of the carousel's card — one node below the band, no
+  // scroll view; the turned stroke goes over the screen box (175), as before the motion, not into the band (45).
+  it('carousel-in-list under idb: B flung to the page\'s end, under the status band — the turned stroke over the screen box (175), never touching down in the band', () => {
+    const raw = readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/carousel-in-list.idb.json', import.meta.url), 'utf8');
+    const shifted = (n: UiNode, dy: number): UiNode => ({ ...n, ...(/^lab\.carousel-in-list\./.test(n.identifier ?? '') && { rect: { ...n.rect, y: n.rect.y - dy } }), children: n.children.map((c) => shifted(c, dy)) });
+    const box: Rect = { x: 0, y: 0, width: 402, height: 874 };
+    const idbRow = (offset: number): Row => {
+      const tree = shifted(parseIdbDescribeAll(raw), offset);
+      return { tree, found: [...everyNode(tree)].filter((n) => n.identifier === 'lab.carousel-in-list.B'), screen: { box, boxes: [box], oriented: box, from: 'device', statusBand: 62 } };
+    };
+    const played = play({ ...IPHONE, maxSwipes: 2 }, [idbRow(0), idbRow(1108), idbRow(1108)]);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+    expect(strokes(played).map((s) => s.from)).toEqual([{ x: 201, y: 699 }, { x: 201, y: 175 }]);
   });
 
   // LE4's note, its residual: Account Detail's card carousel (24,138 354x85, read horizontal from its cards past its

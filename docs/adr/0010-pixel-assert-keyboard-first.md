@@ -169,7 +169,9 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    short scroll view (the SWIFT form's text field at `42,817`, the lab's O and S) is refused only where something the
    flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`), and otherwise
    tapped and stopped on; `scroll_until` strokes over the screen's middle, which may miss the scroll view that holds
-   it (the lab's F, C). Why not more: a screenshot per tap or plain stop would double the cost of the commonest verbs
+   it (the lab's F, C) — until two reads see the target carried, then a stroke carrying content back goes over the
+   region its motion showed (residual 6, refined 2026-10-21). Why not more: a screenshot per tap or plain stop would
+   double the cost of the commonest verbs
    under the default tree source (idb), and nothing cheaper sees the clip — idb's `Scrollable` trait marks 372 of the
    409 nodes idb lists in the 33 iOS lab captures (the 32 above and the React Native app's), contents and all, and an
    element "listed past the screen" is no clip (13 of those 33 captures, 11 with nothing cut); refusing every untold node would refuse 88 green taps. The remedy is the tree source that lists
@@ -181,7 +183,134 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    `Clips.drawnIn`'s `scrollers`), and what WDA draws over such a scroll view cuts the stroke as on Android
    (`draw-order.ts#DrawOrder.drawnOver` finds its container among the nodes that scroll). Lab notes LE4 and LV3
    (docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). Still so under idb, which
-   lists no scroll view.
+   lists no scroll view — **refined 2026-10-21** (round 14, lab note LV3,
+   docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md; fix
+   `02aabfa6`, `interact/motion-shown.ts`):
+   - **The bar**, judged PER CALL against the code before the fix (`e267ebfc`): a call that ended in an honest failure
+     there and in a false stop here is a new false stop, whatever false stops the fix removes elsewhere — the agent
+     that asked for X gets "Tapped X" where it got "failed", and the tap lands on a header. Measured on a physics replay
+     of the lab's `tabbar-dense` and `tabbar-floating` captures (the list shifted as each stroke would carry it; a touch
+     on the header or the tab bar moving nothing; 41 grids — drag ratios 0.6–3, seven starts, the rows of the list, both
+     directions, plain stop and `fully: true`; header centred, to one side, with no node, 200–300 pt deep; no tab-bar
+     node; a plain list; a scroll begun mid-list; rebounds at the end of 1–3 reads; drifts of 60, 300 and 500 pt
+     beginning with the first stroke; a bar from 680; a 50-pt slip; jitter at the ends; each of strokes 1–5 dropped; a
+     ticking label; `tabbar-floating` with the list's end at 1960–2100 pt, rebounds, no tab-bar node — 46 660 calls).
+   - **The rule** (`MotionShown`, `goesOver`, `carriedUnder`; judged per read from the region and the last stroke
+     drawn — the round's `lastDrawn`, a field it already kept — no tree read added, no new state):
+     1. THE REGION: once two reads see the target moved, the nodes carried with it by its delta (within a 20th of it:
+        idb reads a list mid-fling node by node), two at least on the screen below the status band, bounded in both
+        reads and cut at the chrome that held still in a band across the rows (`chromeOf`, `stillCut`: the header's
+        title, the tab bar's buttons; a floating button or a section index beside the rows is none) — 24,300 354x455 on
+        `tabbar-floating`, 24,110 354x645 on `tabbar-dense`, whose rows idb lists under the header up to its title.
+        `way`: the side the content moved toward at the FIRST sample on the axis, kept (a bounce, a rebound or a jitter
+        flips the latest).
+     2. PLACEMENT: a stroke moving content the other way from `way` goes over the region — the turned stroke touches
+        down at (201,391) on `tabbar-floating`, (201,239) on `tabbar-dense`, inside the list, not at 175 in the header,
+        where it moved nothing. A stroke moving it `way` keeps the screen box: the stroke that made the region, so the
+        forward side is the code's before (forward over the region too: 94 new false stops without a tab-bar node).
+     3. THE BAND (`HeldBand`): a match whose centre (for `fully: true` any of it) lies short of the line a stroke
+        over the region touches down on (`swipe.ts#swipeVector`: the region's centre less SWIPE_REACH_FRACTION of its
+        length — 391 on `tabbar-floating`, 239 on `tabbar-dense`), on the side `way` names and on the side the last
+        stroke drawn pushed the content toward, is no stop. The last stroke's side holds on every read until the next
+        stroke, the confirming reads included: a stop after a stroke is claimed only on a confirming read, and a fling
+        carries the target on into that side's band between the read right after the stroke and it — judged on the read
+        right after the stroke alone, 100 new false stops on a replay where that read sees a share of the stroke's
+        motion (0.3–0.9, one grid 1) and the next the rest (51 860 calls, 30 grids); on every read, 1 (residual (f)).
+        Sound as a refusal: a stroke touching down at the line lands on chrome and moves nothing, or lands on content —
+        and then no chrome on that side reaches past the line; so a target carried toward that side is never claimed
+        before it lies past the line, whatever idb lists under a header. It closes the false `Tapped` measured live at
+        an intermediate form (05a16a9a's src, records on `bugs/r14-lv3-vouching-abandoned`): rows carried under
+        `tabbar-dense`'s header grew the region to the title (110), and R carried back to 158 and 143, inside it, was
+        claimed — the tap went to the header (2 runs of 13).
+     4. STILL-FACING: a match past the region's edge toward a node that held still facing the rows (across the axis,
+        the region's span — not the match's: a narrow target beside a centred title faces it all the same) is no stop,
+        on any side — R carried to 114 under `tabbar-floating`'s header, toward its title; on a short list, a row under
+        the tab bar's buttons on a side neither the first motion nor the last stroke covers. Kept against the reset
+        design, which dropped it: without it, new false stops per call on short lists — 2 on a 300-pt list, 4 with no
+        header node, 8 with every row a target — and none with it. It faces any node that held still, not only the
+        chrome `stillCut` cuts at (`chromeOf`): a refusal only, so the broader set can only refuse more; on every grid
+        here `chromeOf`'s set holds back the same stops, call for call.
+     5. A held match at the far edge turns the strokes, as a target across that edge does; at a stuck or bound end an
+        honest LOUD names the band and its line ("it lay above y 239, where a stroke over where its content was seen
+        moving (24,110 354x645) touches down carrying content away from its top edge — in the band 24,110 354x129 or
+        past it — … no stop was claimed on it"), or the still node (`toward text "Header" (173,90 56x20), which held
+        still while it moved`), and the remedy, `treeSource: wda`.
+   - **What it costs**, per call against `e267ebfc`. On the 41 grids: ONE new false stop (DRIFT 500, below); 7 ok →
+     fail, every one an honest LOUD (a row stuck under the tab bar's buttons after a drift, a floating F in a 145-pt
+     region); +1 stroke on 188 of the 17 903 calls ok in both, +2 on 66, +3…+5 on 22 (the floating grids); no read more.
+     Base's own false stops after a stroke 1490 → 255 (254 where base has them, and the DRIFT-500 one), calls ok 17 911
+     → 20 297. Under a ticking label and the rebounds: no new false stop and no ok → fail (the rule reads no rest; the
+     label moves one call's stroke count, ok in 4 or 7, never a verdict). Live, an `up` call to the page's top pays
+     strokes: the first stroke carries the page down to its top (`way` bottom), the turned stroke over the region pushes
+     the content up, and a confirming read finds the target in the band on that side and holds it — the strokes
+     alternate (the screen box's 175, the region's 376) until it lies past the line: `scroll-top-edge`'s and
+     `scroll-top-edge-end`'s T 1 → 4–6 swipes against round 7, their turn cases 1 → 3, carousel-in-list's B 2 → 4; all
+     ok and Tapped, no read more. Beyond the 41 grids, on the review's: under a fling (above; 51 860 calls) 1 new false
+     stop (residual (f)), 22 ok → fail, +1075 strokes over 760 calls; on 31 more
+     grids (50 512 calls: 300- and 600-pt lists, headers 100–150 pt or to one side, a bar from 600 or 680, drifts of
+     −300…500 pt, rebounds, slips, jitter, dropped strokes, the floating rows under most of these) 4 new false stops,
+     all DRIFT 500 (residual (a)), and 63 ok → fail, every one an honest LOUD naming the band — 45 on a 300-pt list with
+     every row a target, started past its end (rows 10 and 11, `down`: the first read sees the content carried down, and
+     the row, near the tab bar at the list's end, lies in the bottom band — an artifact of the replay, whose start is
+     not clamped to the list, not a device's behaviour), 4 of the floating F at drag ratios 4 and 6, the rest after a
+     drift, a jitter or under a 100-pt header, where the turned strokes spend the budget alternating to the bound. Under
+     a CAUGHT fling (the same 30 fling grids, a stroke's touch-down stopping what the fling had left; 51 860 calls): 6
+     new false stops, none on the rule's own path — one the coincident app scroll (`F 3 700 row.20 up` at a 300-pt
+     drift, residual (a)), five on a 600-pt list started past its end (`S * 1700 row.12 down`, the replay's unclamped
+     start); 51 ok → fail, all honest LOUDs, 20 of them at a fling of 0.3; +1272 strokes over 874 calls. 31 of the 51
+     are L at the list's end: there "L at the end stays the code's before" does not hold — base confirms L at 833, under
+     the tab bar, and the fling carries it on to 680, claimed; here the still-facing hold refuses it at 833, each stroke
+     after it catches the fling, L crawls a third of a stroke at a time and the bound (8) finds it under the tab bar's
+     button. Live (idb, the lab simulator, at `02aabfa6`'s src): tabbar-dense R (201,699), (201,239), (201,239), Tapped
+     R, five of five — once after a 4th stroke, (201,699), the turned strokes' fling having carried R past the bottom
+     line, held on the confirming read; tabbar-floating R (201,699), then (201,391) three times, Tapped R, three of
+     three, once after a 5th the same way; tabbar-dense L by the screen box's strokes as before, three of three; the idb
+     visibility group with nothing not known — swipes up where the band holds a target near its list's end (against
+     round 7: scroll-top-edge T 1 → 4–6, its turn cases 1 → 3; carousel-in-list B 2 → 4)
+     (docs/truth/live-ios-2026-10-18-visibility.md, round 14 LV3). Grids and harness: the round's scratch
+     (`lv3-reset/grid.sh`, `zz-b.test.ts`; the fling's `zz-c.test.ts`), not committed.
+   - **Rejected: the pushed sides kept over the call** — every side a stroke of the call pushed content toward stays
+     banded (sticky; derivable from the course's `strokedToward`, no new state). It closes residual (f) and the
+     DRIFT-500 calls, but a side pushed by strokes that moved nothing (touching down on the header) stays banded,
+     refuses an honest stop, and the next stroke carries the row under a deep header: 2 new false stops under a fling
+     (`F 1 700 row.20 up` at a 300-pt header), +41 ok → fail and +329 strokes over the grids above.
+   - **Rejected: motion-proof vouching** — crediting the touch-downs of strokes that moved the content, reads at rest
+     before such a stroke, magnitude gates, end probes, least strokes, a lone-target mode (`2c9956f9` and its records
+     `4bda76a0`, kept on `bugs/r14-lv3-vouching-abandoned`, not landed). (A) Credit taken from the tree cannot tell the
+     stroke's motion from an overscroll or the app's own scroll coinciding with it: on the replay, a rebound at the
+     list's end, a fling still running or a drift beginning with the stroke credited a touch-down on the header — false
+     stops reachable (3 new at DRIFT 300, 9 at DRIFT 500, per call). (B) It needs reads at rest, and one ticking label
+     (a clock, a rate) means none is: every idb stop after a stroke failed — 1034 ok → fail of 2224 on the all-rows
+     grid; 39 ok → fail on the standard grid, 209 on all rows, 170 with deep headers, 202 under rebounds. Cost: up to 5–6
+     strokes and about 2 reads more a call.
+   - **Rejected: eyes** — a screenshot judging a stop in the band, LE2's clip line read the other way round (the
+     orchestrator's decision, 2026-10-21): (1) the band they would judge is bounded by where content is vouched for,
+     and a call that starts mid-list, rows already under the header at its first read, has none there — nothing for the
+     eyes to tell a drawn row from; (2) a clip line read the other way round takes whatever is not the screen beside the
+     row for the row drawn: the header's title glyphs, a back button, a blurred or translucent header — and iOS's
+     default navigation bar is translucent (a material idb lists as no node), its content showing through — all read as
+     "drawn" over a row beneath them; (3) it was never asked live (every after-run's read after the turned stroke caught
+     R mid-fling past the region) and costs a screenshot, 0.6 s.
+   - **Residuals**: (a) THE COINCIDENT APP SCROLL — an app scroll that coincides with the first stroke (which landed on
+     the header) sets `way` wrong: the strokes that move the content then go over the region and the turned ones keep
+     the screen box; measured at 300 and 500 pt — at a 500-pt scroll, one call in 1120 on the standard rows (`F 3 700
+     row.20 up`: row.20 claimed at 136, under the header — the 41 grids' one new false stop), 3 in 5600 with every row a
+     target, 1 in 420 on the floating rows (`S 3 700 x.R up`); none at 60 or 300 pt there, but one at 300 pt under a
+     caught fling (above). `way` from the course instead closes it and opens 349 (in an `up` call the strokes that move
+     content are the turned ones). (b) Chrome idb does not list, or whose extent it cannot show, reached by the forward
+     stroke — the code's before, residual 5 (base's own false stops, 255 left on the 41 grids: 254 where base has them,
+     and the DRIFT-500 one); remedy `treeSource: wda`. (c) The first stroke is the
+     screen box's: nothing has moved yet (residual 5). (d) A target not in the tree (a lazy list's unlabelled rows, NI1)
+     gives no region. (e) A target in the band that the strokes cannot carry past the line (the list's first row reached
+     from above at the list's top, a floating row in a short region) is refused to the stuck or bound end — an honest
+     failure naming the band, never a stop; and L at the list's end under a fling its strokes catch (above). The cells
+     started past the list's end (`short300all`, `f7s600`) are the replay's unclamped start, not device behaviour. (f) A
+     BAR NO NODE NAMES, reached through the turned strokes: with neither a header nor a tab-bar node the region is the
+     gesture box (24,62 354x812, `way` top); under a fling the turned strokes carry the row past the bottom, the forward
+     stroke brings it back to 699–751, its foot under the unlisted bar at 743, on the bottom side, which neither `way`
+     nor that stroke bands — claimed `fully` (`F 3 300 row.20 down`, a fling of 0.7, 1 call in 1120; base's turned
+     strokes touched down on the header, moved nothing and failed honestly). Residual 5's mechanism: nothing in the tree
+     says the bar is there.
 7. **A stroke across a scroll view's axis** (LE4's residual) — **refined 2026-10-18** (round 22, `arch/r22-axis`): the
    stroke's scroll view is taken among the target's scroll views that scroll ALONG the stroke or whose axis the tree
    cannot tell, nearest first, and inside it the stroke's path keeps off every nested scroll view that scrolls only

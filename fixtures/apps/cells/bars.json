@@ -1,6 +1,6 @@
 {
   "family": "bars",
-  "note": "System bands and app chrome over targets (phase 3 B4; calibration.json #11, #14, #21, #22, #23 static part, #24, #26). bands: targets against the status and navigation bands, edge to edge (on Android under gesture navigation, `navigation`); bands-three-button (Android only): the same screen captured under three-button navigation (`navigation`), beside bands' gesture capture in the same run (#23). pinned-bar: a button pinned at the bottom over a target's edge. tabbar-floating: a floating tab bar over a scroll view running to the screen's bottom — a row in the strip of its surface above its items, a row far below the fold. tabbar-hidden-push (iOS only, layer tab-host): a screen pushed over a tab host that hides the tab bar. fab: a transparent full-width host holding only a FAB, targets beside the FAB. Every cell reports safeArea, its scroll view's clip and its chrome's frames. App files: AveriLab/Bars.swift, Bars.kt.",
+  "note": "System bands and app chrome over targets (phase 3 B4; calibration.json #11, #14, #21, #22, #23 static part, #24, #26). bands: targets against the status and navigation bands, edge to edge (on Android under gesture navigation, `navigation`); bands-three-button (Android only): the same screen captured under three-button navigation (`navigation`), beside bands' gesture capture in the same run (#23). pinned-bar: a button pinned at the bottom over a target's edge. tabbar-floating: a floating tab bar over a scroll view running to the screen's bottom — a row in the strip of its surface above its items, a row far below the fold. tabbar-dense (iOS only, round 14, LV3's review): tabbar-floating's header and tab bar over a list of rows every 60 pt (52 tall, grey, each listed: lab.tabbar-dense.row.<k>), R the eighth (24,720 354x52 on the iPhone 17, as tabbar-floating's R) — a turned stroke can carry it back under the header among the rows idb lists there; L the last, which at the list's end lies at 24,680, above the tab bar. tabbar-hidden-push (iOS only, layer tab-host): a screen pushed over a tab host that hides the tab bar. fab: a transparent full-width host holding only a FAB, targets beside the FAB. Every cell reports safeArea, its scroll view's clip and its chrome's frames. App files: AveriLab/Bars.swift, Bars.kt.",
   "cells": [
     {
       "id": "bands",
@@ -42,6 +42,15 @@
         { "tag": "T", "color": "#1E88E5", "slot": 0, "declared": "open", "scrollView": "list" },
         { "tag": "R", "color": "#E53935", "slot": 1, "declared": "open", "scrollView": "list" },
         { "tag": "F", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "tabbar-dense",
+      "layer": "none",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "R", "color": "#E53935", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "L", "color": "#43A047", "slot": 1, "declared": "open", "scrollView": "list" }
       ]
     },
     {

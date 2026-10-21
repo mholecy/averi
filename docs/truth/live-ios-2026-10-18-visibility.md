@@ -1231,3 +1231,50 @@ Known but ok this run: wda scroll:carousel-in-list.C
     scroll_until → Element id:"lab.carousel-in-list.C" visible after 1 swipe — CLIPPED at left, 50% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box; still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match
     tap → ERROR id:"lab.carousel-in-list.C" is outside its scroll view scrollable (24,138 354x85) at (23,181): only 50% of it (rect -155,138 355x85) is drawn, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped
     app: C -154.3,138 354x85 (centre-out); carousel clip 24,138 354x85 offset 532.3333333333334 (launched 0); strokes carousel 0→532.3; fired nothing; touches (307.0,181.0)
+
+# Round 14, LV3: under idb the turned stroke goes over the region the motion showed, 2026-10-21
+
+bugs/r14-lv3 (src `02aabfa6`, from bugs/round-14 e267ebfc through the prep `807cb30c` and the lab cell `d805c5e4`: under
+idb a stroke carrying content back the other way from how it was first seen moving goes over the region the rows
+carried with the target showed; a stop short of the line such a stroke touches down on — on the side the content was
+first seen moving toward and the side the last stroke pushed it — or past the region toward a still node facing the
+rows, is held: `interact/motion-shown.ts`, ADR 0010 residual 6 refined 2026-10-21;
+docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md), run from
+that branch's working tree with the records commit's live-known.ts; the lab app as installed (no app change). The
+averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), idb through a companion of this run's own on gRPC 10931
+(`IDB_COMPANION=localhost:10931`); shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --sources idb --groups visibility [--cells <cell> --cases
+<case>] --record <file>`. Run 2026-10-21 19:04–19:08 at `02aabfa6`'s src, after review round 1's one change of
+behaviour (the side the last stroke pushed the content toward banded on every read until the next stroke, not only on
+the read right after it); the records replace those of the fix's first form, run at 17:37–18:01 the same day.
+
+| record (docs/truth/live-records/) | case | runs | ok | touches |
+|---|---|---|---|---|
+| ios-vis-r14-lv3-dense-R-1…5.json | idb `scroll:tabbar-dense.R` | 5 | 5 | four runs (201,699), (201,239), (201,239); fully visible after 3 swipes, Tapped R (R at 515–590); one run (-5) (201,699), (201,239), (201,239), (201,699); after 4, R at 315 |
+| ios-vis-r14-lv3-dense-L-1…3.json | idb `scroll:tabbar-dense.L` | 3 | 3 | (201,699) twice to the list's end, as before the fix; L at 680, Tapped L after 2 |
+| ios-vis-r14-lv3-floating-R-1…3.json | idb `scroll:tabbar-floating.R` | 3 | 3 | (201,699), then (201,391) three times; fully visible after 4 swipes, Tapped R (R at 580–593); one run (-2) one stroke more, (201,699), after 5, R at 307 |
+| ios-vis-r14-lv3.json | the idb visibility group | 1 | — | 149 cases, 111 ok, 7 loud, 31 mismatches, none not known |
+
+- **The turned stroke touches down inside the list**: (201,239) on tabbar-dense (the region 24,110 354x645: rows idb
+  lists under the header grow it to the title), (201,391) on tabbar-floating (24,300 354x455) — not (201,175) in the
+  header, where it moved nothing. On tabbar-dense R is held while its centre lies above 239 and claimed past it; no
+  stop under the header in eight runs. tabbar-floating R costs one stroke more than at the fix's earliest forms (4, not
+  3): R at 317 lies short of 391 and is held for one more stroke.
+- **The pushed side held on the confirming reads** (the round-1 change): in two runs of eight the turned strokes'
+  fling carried R on, past the bottom line (627 on tabbar-dense, 664 on tabbar-floating), after the read right after
+  the stroke — held, where the fix's first form claimed it on the confirming read; one forward stroke over the screen
+  box (201,699) brought it up to 315 and 307, Tapped. Against the first form's records: dense R 3 swipes in five of
+  five then, four of five now (one 4); floating R 4 in three of three then, two of three now (one 5).
+- **The forward side is the code's before**: tabbar-dense L, the last row, reached by the screen box's (201,699)
+  strokes alone and stopped at the list's end.
+- **The group**, against the fix's first form's group record of the same day (the records this one replaces) and
+  round 7's final idb record (ios-idb-vis-r7final.json, rejudged at this src; tabbar-dense's 4 cases new): no verdict
+  changed — the same 111 ok, 7 loud, 31 mismatches, all known. Swipe counts against the first form: `scroll-top-edge`'s
+  T 2 → 4, `fully` 2 → 6, `scroll-top-edge-end`'s T 2 → 5, `fully` 2 → 6 (an `up` call: the first stroke carries the
+  page down to its top, `way` bottom; after the turned stroke over the region (376), which pushes the content up, a
+  confirming read finds T in the band on that side and holds it — touches (201,175), (201,376), (201,175), then over
+  the region (373, 369, …) until it lies past the line; all ok and Tapped); their turn cases 3, as then; `carousel-in-list`'s B 5 → 4;
+  tabbar-dense L 3 → 2. Against round 7 (before the fix): `scroll-top-edge`'s and `scroll-top-edge-end`'s T 1 → 4–6,
+  their turn cases 1 → 3; carousel-in-list's B 2 → 4 (the first stroke flings the page to its end, B under the status
+  band, and the turned strokes go over the short region the rows near the top showed ((227,95), 36 pt each) until B's
+  centre is past its line).

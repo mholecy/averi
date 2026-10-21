@@ -473,6 +473,16 @@
       ]
     },
     {
+      "id": "tabbar-dense",
+      "family": "bars",
+      "layer": "none",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "R", "color": "#E53935", "slot": 0, "declared": "open", "scrollView": "list" },
+        { "tag": "L", "color": "#43A047", "slot": 1, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
       "id": "tabbar-hidden-push",
       "family": "bars",
       "layer": "tab-host",

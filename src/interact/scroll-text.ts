@@ -12,6 +12,7 @@ import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type UnseenStrokes } from './scroll-rounds.js';
+import type { CarriedUnder } from './motion-shown.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, SIDES, type Direction } from './swipe.js';
 import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, revealText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
@@ -242,6 +243,30 @@ function surfaceText({ edge, by, depth, surface, own }: SurfaceFinding): string 
   if (by === CLIP_LINE) return `its ${edge} ${depth} pt read as the screen beside them (${surface}), not its own ${own}: cut at the edge of a scroll view the tree does not list (a screenshot)`;
   return `its ${edge} ${depth} px show ${surface}, the colour beside ${nodeText(by)} drawn after it, not its own ${own} (a screenshot)`;
 }
+
+/**
+ * A stop the region the motion showed held back (interact/motion-shown.ts#CarriedUnder), as the stuck and bound
+ * sentences say it: where the element lay against where its content was seen moving — short of the line a stroke over
+ * it touches down on (`band`), or past its edge toward the node that held still (`still`) — and why no stop was claimed.
+ */
+function carriedUnderText(under: CarriedUnder): string {
+  const it = under.part ? 'part of it' : 'it';
+  const seen = `where its content was seen moving (${rectText(under.region)})`;
+  if (under.by === 'still') {
+    return (
+      `${it} lay past the ${under.edge} edge of ${seen}, toward ${nodeText(under.still)}, which held still while it moved — ` +
+      `the tree lists no scroll view, so whether it is drawn there, or lies under that (a header, a bar), it cannot tell, and no stop was claimed on it`
+    );
+  }
+  const at = `${axisOfEdge(under.edge) === 'vertical' ? 'y' : 'x'} ${under.line}`;
+  return (
+    `${it} lay ${SIDES[under.edge].past} ${at}, where a stroke over ${seen} touches down carrying content away from its ${under.edge} edge — in the band ${rectText(under.band)} or past it — ` +
+    `the tree lists no scroll view and lists a row carried under a header or a bar where it would lie, so whether it is drawn there it cannot tell, and no stop was claimed on it`
+  );
+}
+
+/** The remedy for a tree that lists no scroll view (idb), as the sentences that need one say it. */
+const UNTOLD_SCROLL_VIEW_REMEDY = 'under treeSource: wda the tree lists the scroll view, and scroll_until judges the element in it';
 
 /** What the eyes saw, as a shortfall's head: `PARTLY UNDER a surface the tree does not list: …`, or at a clip line `CUT at a line the tree does not list: …` (`surfaceText`). */
 const unlistedText = (finding: SurfaceFinding): string =>
@@ -497,6 +522,13 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${surfaceText(short.finding)} — and the content is exhausted: ` +
               `swiping ${o.lastStroke} no longer moves it${away}. That surface stays over it at the end of the content — ${why}. ${last}`,
+        };
+      }
+      if (short.of === 'carriedUnder') {
+        return {
+          message:
+            `scroll_until ${describe} failed after ${n} — element is on the screen but ${carriedUnderText(short.under)} — and swiping ${o.lastStroke} no longer moves it${neither}; ` +
+              `${UNTOLD_SCROLL_VIEW_REMEDY}. ${last}`,
         };
       }
       if (short.of === 'covered') {
@@ -779,6 +811,8 @@ function shortText(short: Shortfall): string {
     }
     case 'unlisted':
       return `element reached the viewport but stayed ${unlistedText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
+    case 'carriedUnder':
+      return `element reached the screen but ${carriedUnderText(short.under)} (last rect ${JSON.stringify(short.judged.node.rect)}); ${UNTOLD_SCROLL_VIEW_REMEDY}`;
     case 'systemBar': {
       const { judged } = short;
       const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;

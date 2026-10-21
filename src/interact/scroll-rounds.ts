@@ -1,8 +1,8 @@
 import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, belowStatusBand, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
-import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
+import { nodeIdentity, screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
@@ -12,7 +12,8 @@ import { outsideItsScrollView, type Remedy, type SystemBar } from '../ui-tree/st
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type TreeFacts } from './scroll-read.js';
-import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
+import { carriedUnder, type CarriedUnder } from './motion-shown.js';
+import { carried, motionShownOf, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StillNeeds, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { axisOf, OPPOSITE, SIDES, sameStroke, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
@@ -144,7 +145,11 @@ export interface RoundSeen {
  * back) and the line its strokes stay above. One value, so the steps after
  * the judgement read the same facts.
  */
-type ThisRead = Pick<ReadJudgement, 'facts' | 'frames' | 'uncutFrames'> & { readonly read: RoundRead };
+type ThisRead = Pick<ReadJudgement, 'facts' | 'frames' | 'uncutFrames'> & {
+  readonly read: RoundRead;
+  /** The judged match's stop, held back by the region its motion showed (interact/motion-shown.ts#carriedUnder) — at the far edge, it turns the strokes as a target there does. */
+  readonly heldBack: CarriedUnder | undefined;
+};
 
 /** What to do next. */
 export type RoundStep =
@@ -781,10 +786,16 @@ interface State {
   /** Every match's rect at the last read that read, and the judged match's at the last read that had one. */
   readonly prevRects: readonly Rect[] | undefined;
   readonly prevBest: Rect | undefined;
-  /** Identical strokes in a row after which every match, and the judged match, stayed put — the stroke the streak was counted for, and the last one drawn (`sameStroke`). */
+  /** Identical strokes in a row after which every match, and the judged match, stayed put — the stroke the streak was counted for (`sameStroke`). */
   readonly allUnmovedStrokes: number;
   readonly bestUnmovedStrokes: number;
   readonly streakDrawn: Stroke | undefined;
+  /**
+   * The last stroke drawn — a probe's too — as the driver handed it back (`RoundSeen.drawn`): set by the read after it,
+   * kept through every read until the next one is drawn (a stroke held for a presented screen's confirming read is not
+   * drawn, and changes nothing); undefined until the first. The streak's, the probe's and `touchedOn`'s, and the side
+   * it pushed the content toward is the one `carriedUnder` bands besides `way`.
+   */
   readonly lastDrawn: Stroke | undefined;
   /** Some read saw the target SHORT of the far edge (`beyondFarEdge`) — so a later read beyond it means a fling carried it across. */
   readonly seenShort: boolean;
@@ -814,7 +825,7 @@ interface State {
   readonly lastStroke: Direction;
   /** Direction changes — a stroke drawn the other way from the one before — for the shortening and the failure text. */
   readonly turns: number;
-  /** The judged match's identity at the last read that had one (`identityOf`): a motion is measured only of the same node (`carried`). */
+  /** The judged match's identity at the last read that had one (ui-tree/read-tree.ts#nodeIdentity): a motion is measured only of the same node (`carried`). */
   readonly prevKey: string | undefined;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   readonly inFrameAfter: number | undefined;
@@ -1169,7 +1180,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
   // The same node's motion over the settle pause before this read (`motionOf`) — a read after a stroke measures the
   // stroke too, and keeps none — and whether it moved less than over the pause before: a fling slowing.
-  const motion = current === 'settle' && best !== undefined && s.prevBest !== undefined && s.prevKey === identityOf(best.node) ? motionOf(s.prevBest, best.node.rect) : undefined;
+  const motion = current === 'settle' && best !== undefined && s.prevBest !== undefined && s.prevKey === nodeIdentity(best.node) ? motionOf(s.prevBest, best.node.rect) : undefined;
   const slowing = motion !== undefined && s.lastMotion !== undefined && motion < s.lastMotion;
   s.lastMotion = motion;
   // This read against the one before it, after a stroke: every match where it was, the whole tree as it was.
@@ -1227,7 +1238,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // that lists it where it lies (`listedWhereItLies` — WDA's unclipped frames, as `stillNeeds` asks), only after a
     // stroke of the course (not the probe), and only of the SAME node at the same size — a judged match that switched
     // to another node, or one that changed size, moved by no stroke.
-    const key = identityOf(best.node);
+    const key = nodeIdentity(best.node);
     const same = s.prevBest !== undefined && s.prevKey === key && sameSize(s.prevBest, best.node.rect);
     if (current === 'stroke' && s.probe === undefined && same && s.prevBest !== undefined && s.lastSent !== undefined && s.lastDrawn !== undefined && farRead.listedWhereItLies === true) {
       s.strokes = carried(s.strokes, { moved: motionToward(s.prevBest, best.node.rect, s.lastSent), drawn: s.lastDrawn });
@@ -1261,7 +1272,9 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(best.node.rect, courseOf(s), cover, f));
     // Only the covers the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover: the overlaid
     // one (`overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
-    const atFarEdge = best.standing.facts.visible > 0 && (beyond || best.standing.facts.covers.some((c) => drawOrderFound(c) && overFar(c.reach)));
+    // Or held back by the region its motion showed at that edge (`ThisRead.heldBack`: in its band, or past it toward
+    // chrome): under a header there, the strokes turn to bring it in, as for a target across the edge.
+    const atFarEdge = best.standing.facts.visible > 0 && (beyond || now.heldBack?.edge === far || best.standing.facts.covers.some((c) => drawOrderFound(c) && overFar(c.reach)));
     s.carriedPast = (beyond && s.seenShort) || atFarEdge;
     if (!beyondFarEdgeIn(farRead, courseOf(s), uncutFrames)) s.seenShort = true;
     if (best.standing.facts.visible > 0) s.inFrameAfter = s.swipes;
@@ -1398,9 +1411,6 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
   return need <= 0 ? undefined : { needs: need + slack / 2, slack };
 }
 
-/** A judged match's identity across reads, for the carry model's samples: its role, id and label — a node's rect is what moves. */
-const identityOf = (n: UiNode): string => JSON.stringify([n.role, n.identifier, n.label]);
-
 /**
  * How far `to` lies from `from`: the largest of the differences in x, y, width and height — what a read finds a node
  * moved since the read before, for `Observed.slowing`. A fling's motion shrinks read for read; an animation's does not.
@@ -1487,12 +1497,21 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   }
   // What the strokes after this read keep of it (interact/stroke-plan.ts#seeRead): the line its strokes stay above
   // (`ReadJudgement.strokeLine`) — a round whose tree did not read keeps the last read round's, as its cover — and,
-  // when it found the target, the target's scroll views with what this read draws over each.
-  if (judged !== undefined) s.strokes = seeRead(s.strokes, { facts: judged.facts, line: judged.strokeLine, target: best?.node });
+  // when it found the target, the target's scroll views with what this read draws over each — on a tree that tells none
+  // (idb's), where the screen showed the target's content moving: the gesture box below iOS's status band, where a
+  // touch goes to the status bar, not the app.
+  const gesture = seen.screen?.oriented;
+  const shows = gesture === undefined ? undefined : belowStatusBand(gesture, seen.screen);
+  if (judged !== undefined) s.strokes = seeRead(s.strokes, { facts: judged.facts, line: judged.strokeLine, target: best?.node, ...(shows !== undefined && { gesture: shows }) });
   // A read that did not read says nothing about motion: the comparisons
   // wait for the next one that does.
-  const gesture = seen.screen?.oriented;
-  const now: ThisRead | undefined = read === undefined || judged === undefined ? undefined : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames };
+  // A stop the region its content was seen moving through holds back (interact/motion-shown.ts#carriedUnder): no stop,
+  // the strokes go on — turned toward it at the far edge (`observe`) — and the stuck and bound failures name it
+  // (`under`). After the last stroke drawn, not this read's `seen.drawn`: a stop is claimed only on a confirming read,
+  // where `seen.drawn` is undefined, and a fling carries the target on into the pushed side's band between the two.
+  const heldBack = best !== undefined && stops(best) ? carriedUnder(motionShownOf(s.strokes), best.node.rect, fully ? 'fully' : 'stop', s.lastDrawn) : undefined;
+  const under: Extract<InFrameShort, { of: 'carriedUnder' }> | undefined = best !== undefined && heldBack !== undefined ? { of: 'carriedUnder', judged: best, under: heldBack } : undefined;
+  const now: ThisRead | undefined = read === undefined || judged === undefined ? undefined : { read, facts: judged.facts, frames: judged.frames, uncutFrames: judged.uncutFrames, heldBack };
   const observed = now === undefined ? undefined : observe(s, current, now, best);
   if (now !== undefined) s.detents = { first: s.detents === undefined ? now.facts.detent : s.detents.first, last: now.facts.detent };
   // The probe this read answers (PROBE_REACH) — kept across a read that did
@@ -1524,7 +1543,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const refused = s.eyesRefused;
     const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameQuestion(refused.asked, question);
     if (refusedAgain) unlisted = { ...refused.short, judged: best };
-    if (stops(best) && !refusedAgain) {
+    if (stops(best) && !refusedAgain && under === undefined) {
       // The probe moved nothing: the match is where it was sent from — the
       // stop holds (it held still through a stroke), and nothing lies
       // beyond its flush edge.
@@ -1620,7 +1639,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       const outward = (!fully && sliver !== undefined && SIDES[sliver.edge].reveals === stuckOn) || (unlisted !== undefined && SIDES[unlisted.finding.edge].reveals === stuckOn);
       const otherWay = backUnmoved ? 'unmoved' : outward ? 'outward' : s.strokedToward.includes(OPPOSITE[stuckOn]) ? 'stroked' : 'untried';
       const turnBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
-      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: unlisted ?? shortOf(best), lastStroke: stuckOn, viewport, otherWay });
+      if (!turnBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: unlisted ?? under ?? shortOf(best), lastStroke: stuckOn, viewport, otherWay });
       s.stuckOn = stuckOn;
       s.backPending = true;
     }
@@ -1701,7 +1720,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       kind: 'bound',
       swipes: s.swipes,
       by,
-      short: shortfall(s, { readError, found, best, viewport, cover, miss, unlisted }, by),
+      short: shortfall(s, { readError, found, best, viewport, cover, miss, held: unlisted ?? under }, by),
       turns: s.turns,
       ...(s.lastCover !== undefined && { keyboard: { cover: s.lastCover, rounds: s.coveredRounds, read: s.treesRead } }),
       unlocated,
@@ -1914,8 +1933,8 @@ interface BoundRound {
   readonly cover: AppliedKeyboard | undefined;
   /** What this round's read saw of a target no round matched (ui-tree/miss.ts#missOf) — an `absent` failure carries it. */
   readonly miss: Miss | undefined;
-  /** What the eyes saw over the best match this round, when that alone kept a `fully: true` stop from being claimed. */
-  readonly unlisted: Extract<InFrameShort, { of: 'unlisted' }> | undefined;
+  /** What alone kept a stop on the best match from being claimed this round: what the eyes saw over it (`fully: true`), or the region its motion showed (`carriedUnder`). */
+  readonly held: Extract<InFrameShort, { of: 'unlisted' | 'carriedUnder' }> | undefined;
 }
 
 /**
@@ -1925,9 +1944,9 @@ interface BoundRound {
  * found, the side left unread when the strokes ran to the end of the
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
-function shortfall(s: State, { readError, found, best, viewport, cover, miss, unlisted }: BoundRound, by: BoundBy): Shortfall {
+function shortfall(s: State, { readError, found, best, viewport, cover, miss, held }: BoundRound, by: BoundBy): Shortfall {
   if (readError !== undefined) return { of: 'readFailed', error: readError };
-  if (unlisted !== undefined) return unlisted;
+  if (held !== undefined) return held;
   if (best !== undefined && best.standing.facts.visible > 0) return shortOf(best);
   const left = s.inFrameAfter;
   const past = s.lastPast !== undefined && !s.strokedToward.includes(SIDES[s.lastPast.side].reveals) ? s.lastPast : undefined;

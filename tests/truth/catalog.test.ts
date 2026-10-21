@@ -51,6 +51,7 @@ describe('the cell catalog', () => {
       'bars/bands-three-button',
       'bars/pinned-bar',
       'bars/tabbar-floating',
+      'bars/tabbar-dense',
       'bars/tabbar-hidden-push',
       'bars/fab',
       'false-covers/own-parts',
