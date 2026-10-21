@@ -50,7 +50,8 @@ import type { Verdict } from './verdict.js';
  * would move a decision away from the layer that can make it.
  *
  * What two reads say of each other lives here too: whether they are one
- * screen (`ScreenIdentity`, `sameScreen`, `anotherScreen`) and whether the
+ * screen (`ScreenIdentity`, `sameScreen`, `anotherScreen`), which of their
+ * nodes are one node (`nodeIdentity`), and whether the
  * strokes between them changed it (`screenChangedUnder`, `ScreenChange`) —
  * the one notion of which screen a read is, asked by fill's read-back and by
  * `scroll_until`'s round (interact/scroll-rounds.ts#round), which only calls
@@ -381,6 +382,14 @@ export function screenIdentity(tree: UiNode): ScreenIdentity {
   }
   return { ids, identifiers: [...identifiers] };
 }
+
+/**
+ * THE SAME NODE ACROSS READS: a node's identity — its role, id and label; its rect is what moves. Two reads' nodes of
+ * one identity are taken for one node: by interact/scroll-rounds.ts#observe, for the judged match's motion and the
+ * carry model's samples. It cannot tell apart duplicates of one label (two rows labelled alike): a caller that needs one
+ * node per identity drops those.
+ */
+export const nodeIdentity = (n: UiNode): string => JSON.stringify([n.role, n.identifier, n.label]);
 
 /** `a` and `b` are the same screen by identity: the very same ids (`ScreenIdentity`). */
 export const sameScreen = (a: ScreenIdentity, b: ScreenIdentity): boolean => a.ids.size === b.ids.size && [...a.ids].every((id) => b.ids.has(id));

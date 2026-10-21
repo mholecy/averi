@@ -2,7 +2,7 @@ import { type ClippedSide, type DeviceScreen, type Point, type Rect, type Stroke
 import { axisOfEdge, EDGES, flushEdges, quoted, rectIntersection, sameRectWithinPixel, toldFrame, type Cut, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
-import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
+import { nodeIdentity, screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
@@ -814,7 +814,7 @@ interface State {
   readonly lastStroke: Direction;
   /** Direction changes — a stroke drawn the other way from the one before — for the shortening and the failure text. */
   readonly turns: number;
-  /** The judged match's identity at the last read that had one (`identityOf`): a motion is measured only of the same node (`carried`). */
+  /** The judged match's identity at the last read that had one (ui-tree/read-tree.ts#nodeIdentity): a motion is measured only of the same node (`carried`). */
   readonly prevKey: string | undefined;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   readonly inFrameAfter: number | undefined;
@@ -1169,7 +1169,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   const bestUnmoved = best !== undefined && s.prevBest !== undefined && sameRectWithinPixel(s.prevBest, best.node.rect);
   // The same node's motion over the settle pause before this read (`motionOf`) — a read after a stroke measures the
   // stroke too, and keeps none — and whether it moved less than over the pause before: a fling slowing.
-  const motion = current === 'settle' && best !== undefined && s.prevBest !== undefined && s.prevKey === identityOf(best.node) ? motionOf(s.prevBest, best.node.rect) : undefined;
+  const motion = current === 'settle' && best !== undefined && s.prevBest !== undefined && s.prevKey === nodeIdentity(best.node) ? motionOf(s.prevBest, best.node.rect) : undefined;
   const slowing = motion !== undefined && s.lastMotion !== undefined && motion < s.lastMotion;
   s.lastMotion = motion;
   // This read against the one before it, after a stroke: every match where it was, the whole tree as it was.
@@ -1227,7 +1227,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
     // that lists it where it lies (`listedWhereItLies` — WDA's unclipped frames, as `stillNeeds` asks), only after a
     // stroke of the course (not the probe), and only of the SAME node at the same size — a judged match that switched
     // to another node, or one that changed size, moved by no stroke.
-    const key = identityOf(best.node);
+    const key = nodeIdentity(best.node);
     const same = s.prevBest !== undefined && s.prevKey === key && sameSize(s.prevBest, best.node.rect);
     if (current === 'stroke' && s.probe === undefined && same && s.prevBest !== undefined && s.lastSent !== undefined && s.lastDrawn !== undefined && farRead.listedWhereItLies === true) {
       s.strokes = carried(s.strokes, { moved: motionToward(s.prevBest, best.node.rect, s.lastSent), drawn: s.lastDrawn });
@@ -1397,9 +1397,6 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
   const slack = Math.max(0, wLen - len);
   return need <= 0 ? undefined : { needs: need + slack / 2, slack };
 }
-
-/** A judged match's identity across reads, for the carry model's samples: its role, id and label — a node's rect is what moves. */
-const identityOf = (n: UiNode): string => JSON.stringify([n.role, n.identifier, n.label]);
 
 /**
  * How far `to` lies from `from`: the largest of the differences in x, y, width and height — what a read finds a node
