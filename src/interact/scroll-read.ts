@@ -8,6 +8,7 @@ import { lookAt, lookTold, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import type { CarriedUnder } from './motion-shown.js';
 import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 
@@ -446,7 +447,9 @@ export type InFrameShort =
       finding: SurfaceFinding;
       /** The round's keyboard reading's cover as offered — applied or not, the witness not asked (the band was moot: the match lies above it) — for the remedy's "if it is up". */
       offered?: { lineY: number; remedy: KeyboardRemedy };
-    };
+    }
+  /** A stop on a tree that tells no scroll view (idb) held back by the region its content was seen moving through — in its band, or past it toward a node that held still (interact/motion-shown.ts#CarriedUnder) — never `shortOf`'s, the round's (scroll-rounds.ts#round). */
+  | { of: 'carriedUnder'; judged: Judged; under: CarriedUnder };
 
 /**
  * What a judged match in the frame is short of a stop (`stops`) — the one
@@ -461,7 +464,7 @@ export type InFrameShort =
  * that does not stop the round: a match that stops it is reported before
  * any stuck or bound test — a broken invariant, and throws.
  */
-export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' }> {
+export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' | 'carriedUnder' }> {
   const s = j.standing;
   switch (s.kind) {
     case 'clipped':
