@@ -533,6 +533,28 @@
       "truth": "tabbar-floating.truth.json"
     },
     {
+      "file": "tabbar-dense.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tabbar-dense.png",
+      "truth": "tabbar-dense.truth.json"
+    },
+    {
+      "file": "tabbar-dense.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tabbar-dense.png",
+      "truth": "tabbar-dense.truth.json"
+    },
+    {
       "file": "tabbar-hidden-push.wda.json",
       "source": "wda",
       "form": "raw",

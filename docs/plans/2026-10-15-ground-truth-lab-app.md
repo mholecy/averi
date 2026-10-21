@@ -325,7 +325,8 @@ holding only what is extra. Round 4 (truth/r4-followups) adds `scroll-sticky-vie
 R's content an Android View (AndroidView) — the container cut at the header, the View listed whole, #9's own shape:
 #9 CALIBRATED on it (10fb02b → d2b7744); VA1 stays the all-Compose row's (round 14 adds `scroll-sticky-rest`, Android:
 scroll-sticky-cut at offset 0, R whole and flush under the merged header — the same tree as VA1's cut row, the case that
-refused round 9's overlay rule; `fully: true` stops on it after one flush probe). And `form-keyboard-floating` (Android, `ime:
+refused round 9's overlay rule; `fully: true` stops on it after one flush probe; and `tabbar-dense`, iOS, LV3's review: tabbar-floating's header and tab bar over 40 listed grey rows every 60 pt,
+R the eighth at 24,720 as tabbar-floating's R — a turned stroke carries rows under the header, which idb lists there). And `form-keyboard-floating` (Android, `ime:
 floating`): form-keyboard with Gboard switched to Floating by hand on averi_lab (the grid → the Floating tile; no adb
 command or setting switches Gboard's mode — tried nothing else; docked again after): the strip `[0,2088][1080,2220]` the
 inset, the panel `(71,1092,1008,1884)` the touchable region's second rect, four fields' centres under it

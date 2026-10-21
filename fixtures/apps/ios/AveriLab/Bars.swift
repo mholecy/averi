@@ -15,11 +15,16 @@ struct BarsScreen: View {
     var body: some View {
         switch cell.id {
         case "tabbar-hidden-push": HiddenTabPush(cell: cell)
-        case "bands", "pinned-bar", "tabbar-floating", "fab": BarsHost(cell: cell)
+        case "bands", "pinned-bar", "tabbar-floating", "tabbar-dense", "fab": BarsHost(cell: cell)
         default: UnbuiltCell(cell: cell)
         }
     }
 }
+
+/// `tabbar-dense`'s rows: 40, every 60 pt, R the eighth (index 7), L the last; their grey no target's.
+private let denseRows = 40
+private let denseTarget = 7
+private let denseRowColour = Color(hex: "#90A4AE")
 
 /// The tab bar's and the pinned button's colours: none of them a target's.
 private let chromeColour = Color(hex: "#263238")
@@ -65,7 +70,7 @@ struct BarsHost: View {
                 switch cell.id {
                 case "bands": Bands(cell: cell, screen: screen, insets: insets)
                 case "pinned-bar": PinnedBar(cell: cell, screen: screen, insets: insets)
-                case "tabbar-floating": TabbarFloating(cell: cell, screen: screen, insets: insets)
+                case "tabbar-floating", "tabbar-dense": TabbarFloating(cell: cell, screen: screen, insets: insets)
                 default: FabCell(cell: cell, screen: screen, insets: insets)
                 }
             }
@@ -135,6 +140,11 @@ struct PinnedBar: View {
 /// pill's surface takes a tap (`button tabBar.surface`) and is no accessibility element (as the measured app's: no node
 /// has its rect), an item logs `tab <name>`. T lies in the open; R at 24,721 354x52 on the iPhone 17, its centre in the
 /// strip of the pill above its items (calibration.json #14); F far below the fold (#11's neighbour).
+/// `tabbar-dense` (round 14, LV3's review): the same header, list and tab bar over 40 grey rows every 60 pt (52 tall,
+/// from 100 pt into the content, each a listed button `lab.tabbar-dense.row.<k>` that logs `row <k>`), R the eighth —
+/// and L the last, at 24,680 when the list is at its end, above the tab bar —
+/// at 24,720 354x52 on the iPhone 17, as tabbar-floating's R — so a stroke that carries R under the header carries rows
+/// there too, which idb lists where they would lie.
 struct TabbarFloating: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
@@ -146,15 +156,38 @@ struct TabbarFloating: View {
         let pillTop = screen.height - 44 - 87
         let row = CGSize(width: screen.width - 48, height: 52)
         let x = screen.width / 2
+        let content: CGFloat = cell.id == "tabbar-dense" ? 2600 : 2400
         Text("Header").position(x: x, y: header / 2)
         ScrollView {
             ZStack(alignment: .topLeading) {
-                Color.white.frame(width: screen.width, height: 2400)
-                BarTarget(cell: cell, tag: "T", size: row).position(x: x, y: 100 + row.height / 2)
-                BarTarget(cell: cell, tag: "R", size: row).position(x: x, y: pillTop + 4 - header)
-                BarTarget(cell: cell, tag: "F", size: row).position(x: x, y: 2000 + row.height / 2)
+                Color.white.frame(width: screen.width, height: content)
+                if cell.id == "tabbar-dense" {
+                    ForEach(0..<denseRows, id: \.self) { k in
+                        let y = 100 + CGFloat(k) * 60 + row.height / 2
+                        if k == denseTarget {
+                            BarTarget(cell: cell, tag: "R", size: row).position(x: x, y: y)
+                        } else if k == denseRows - 1 {
+                            BarTarget(cell: cell, tag: "L", size: row).position(x: x, y: y)
+                        } else {
+                            Button {
+                                lab.event("row", "\(k)")
+                            } label: {
+                                Rectangle().fill(denseRowColour)
+                            }
+                            .buttonStyle(Flat())
+                            .frame(width: row.width, height: row.height)
+                            .accessibilityIdentifier("lab.\(cell.id).row.\(k)")
+                            .accessibilityLabel("Row \(k)")
+                            .position(x: x, y: y)
+                        }
+                    }
+                } else {
+                    BarTarget(cell: cell, tag: "T", size: row).position(x: x, y: 100 + row.height / 2)
+                    BarTarget(cell: cell, tag: "R", size: row).position(x: x, y: pillTop + 4 - header)
+                    BarTarget(cell: cell, tag: "F", size: row).position(x: x, y: 2000 + row.height / 2)
+                }
             }
-            .frame(width: screen.width, height: 2400)
+            .frame(width: screen.width, height: content)
         }
         .labScroll("list", lab)
         .frame(width: screen.width, height: screen.height - header - insets.bottom)

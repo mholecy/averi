@@ -1,0 +1,51 @@
+{
+  "cell": "tabbar-dense",
+  "chrome": {
+    "tabBar": {
+      "height": 87,
+      "width": 354,
+      "x": 24,
+      "y": 743
+    }
+  },
+  "events": [],
+  "frames": {
+    "L": {
+      "height": 52,
+      "width": 354,
+      "x": 24,
+      "y": 2640
+    },
+    "R": {
+      "height": 52,
+      "width": 354,
+      "x": 24,
+      "y": 720
+    }
+  },
+  "offsets": {
+    "list": 0
+  },
+  "ready": true,
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  },
+  "scrollViews": {
+    "list": {
+      "height": 640,
+      "width": 402,
+      "x": 0,
+      "y": 200
+    }
+  }
+}

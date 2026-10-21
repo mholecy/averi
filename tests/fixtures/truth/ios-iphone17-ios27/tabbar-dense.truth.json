@@ -1,0 +1,103 @@
+{
+  "cell": "tabbar-dense",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "R",
+      "id": "lab.tabbar-dense.R",
+      "color": "#E53935",
+      "declared": "open",
+      "frame": {
+        "height": 52,
+        "width": 354,
+        "x": 24,
+        "y": 720
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,746.0"
+        },
+        {
+          "kind": "button",
+          "tag": "tabBar.surface"
+        }
+      ],
+      "drawn": 0.466,
+      "seen": "#E53935",
+      "geometry": "under-chrome:tabBar",
+      "visible": {
+        "x": 24,
+        "y": 720,
+        "width": 354,
+        "height": 52
+      },
+      "piece": {
+        "x": 24,
+        "y": 720,
+        "width": 354,
+        "height": 23
+      },
+      "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "reachedAtPiece": true
+    },
+    {
+      "tag": "L",
+      "id": "lab.tabbar-dense.L",
+      "color": "#43A047",
+      "declared": "open",
+      "frame": {
+        "height": 52,
+        "width": 354,
+        "x": 24,
+        "y": 2640
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "list",
+      "listed": {
+        "wda": true,
+        "idb": true
+      },
+      "unprobed": "its centre (201,2666) lies off the 402x874 screen"
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "list": {
+      "height": 640,
+      "width": 402,
+      "x": 0,
+      "y": 200
+    }
+  },
+  "chrome": {
+    "tabBar": {
+      "height": 87,
+      "width": 354,
+      "x": 24,
+      "y": 743
+    }
+  }
+}
