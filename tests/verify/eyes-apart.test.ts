@@ -64,7 +64,7 @@ describe('apartOfFrame — the region against the screen beside it, on one frame
       }
     }
     expect(blends).toEqual(['lab.carousel-in-list.C', 'lab.scroll-bounded.O']);
-  });
+  }, 30_000); // a pass over every lab capture: ~5 s alone, the default limit
 });
 
 /**

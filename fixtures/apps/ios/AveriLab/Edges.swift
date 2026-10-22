@@ -36,6 +36,9 @@ enum EdgeLayout {
                 // off-screen, #4).
                 EdgeScroller(id: "lower", top: 380, height: 180, content: 1300, offset: 0, rows: [("S", 172), ("O", 240), ("F", 1000)]),
             ]
+        case "scroll-bounded-footer":
+            // scroll-bounded's lower, O alone (EdgesFooter.swift adds the Continue under its clip).
+            return [EdgeScroller(id: "lower", top: 380, height: 180, content: 1300, offset: 0, rows: [("O", 240)])]
         case "scroll-top-edge":
             // page, the whole screen, scrolled 382: A above the screen (-282 – -218: off-screen); T resting in the
             // status band, cut by the screen's top (-2–62), its centre 30 under the status bar itself: status-band,
@@ -69,6 +72,8 @@ struct EdgesScreen: View {
             Color.white
             if cell.id == "scroll-sticky" {
                 StickyList(cell: cell, screen: screen)
+            } else if cell.id == "scroll-bounded-footer" {
+                FooterScreen(cell: cell, screen: screen)
             } else if cell.id == "carousel-in-list" {
                 CarouselList(cell: cell, screen: screen)
             } else {

@@ -38,6 +38,7 @@ describe('the cell catalog', () => {
       'forms/form-picker',
       'forms/form-shared-id',
       'edges/scroll-bounded',
+      'edges/scroll-bounded-footer',
       'edges/scroll-sticky',
       'edges/scroll-bounded-flush',
       'edges/scroll-sticky-cut',

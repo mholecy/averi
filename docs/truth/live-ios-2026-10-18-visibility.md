@@ -1278,3 +1278,30 @@ the read right after it); the records replace those of the fix's first form, run
   their turn cases 1 → 3; carousel-in-list's B 2 → 4 (the first stroke flings the page to its end, B under the status
   band, and the turned strokes go over the short region the rows near the top showed ((227,95), 36 pt each) until B's
   centre is past its line).
+
+# Round 16, LE2's rest: a control past the reading-order break that holds the row's centre, 2026-10-22
+
+bugs/r16-le2 (src `19525e29`, from bugs/round-16 4ee14f1c: `ui-tree/draw-order.ts#exposure`'s `orderUntold`, ADR 0015
+amended 2026-10-22; docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md), run
+from that branch's working tree on the new lab cell `scroll-bounded-footer` (fixtures/apps/ios/AveriLab/EdgesFooter.swift:
+`lower`'s clip 380–560, O past it at 620–684, and a Continue button `16,600 370x56` under the clip, listed after O in
+idb's flat list, its top above O's, holding O's centre (201,652); the lab app built from the branch and installed by
+this run). The averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120, idb through a companion of
+this run's own on gRPC 10951 (`IDB_COMPANION=localhost:10951`); shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources idb,wda --groups visibility
+--cells scroll-bounded-footer --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | mismatches |
+|---|---|---|---|---|
+| ios-vis-r16-le2-1.json | 19525e29 | 4 | 2 | 2 (both known: ADR 0010 residual 5) |
+
+- **At the base (`4ee14f1c`, `--side`, idb only)**: `tap O` says `Tapped` and the app logged `button footer.continue` —
+  the tap fired Continue; `scroll_until O` says "fully visible after 0 swipes" (outside its scroll view, not visible),
+  then the tap fires Continue.
+- **At the fix, idb**: `tap O` is moved clear of Continue to the part of O below it, (201,670), and says so ("its centre
+  (201,652) is overlapped by button "Continue" …, the two listed in reading order: which is drawn on top is not told;
+  tapped the uncovered part 300x28"); the app logged no button, one touch at (201,670). `scroll_until O` stops before any
+  swipe, naming Continue as overlapping its centre, the order not told. Both stay `tap-claim` on `Tapped` for the
+  tap that follows (the background below the clip: ADR 0010's residual 5, known).
+- **WDA**: the tap refused outside its scroll view, nothing fired; `scroll_until` stops on O after 2 swipes (list
+  0→239.7), Tapped O — as the truth does.

@@ -1,5 +1,18 @@
 # BUG: under idb, a row past its scroll view's clip is judged on the screen alone — a row outside the scroll view is `Tapped` on the background and its colour assert PASSES on the background, a sliver is `Tapped`, and both stops call cut rows "fully visible"
 
+> **Status (2026-10-22, round 16): the harmful remainder fixed at `19525e29` (bugs/r16-le2); the rest still ADR 0010's
+> residual 5, now narrowed to "nothing listed beneath".** The shape that fired a control: under idb a row past its clip,
+> listed BEFORE a control under the clip whose top lies above the row's (`Continue 16,600 370x56`, listed after the row)
+> and which holds the row's centre — ADR 0015's reading-order break excused Continue as a cover, so `tap O` was
+> `reachable` at (201,652), on Continue, and `Tapped O` FIRED it; the colour passed on Continue's colour, the plain stop
+> said visible. A control past the break that overlaps the target and holds its centre is now a cover whose order is
+> not told (`draw-order.ts#exposure`, ADR 0015 amended 2026-10-22, ADR 0024's third trigger): measured on the new lab
+> cell `scroll-bounded-footer` (O; its idb and WDA captures in tests/fixtures/truth/ios-iphone17-ios27) — the colour
+> assert fails closed, the plain stop refuses before any swipe, the tap is moved clear of Continue to (201,670) and
+> fires nothing (live, idb, docs/truth/live-records/ios-vis-r16-le2-1.json; at the base the app logged
+> `button footer.continue`); golden against `4ee14f1c`: 1425 checks, 0 changed; WDA answers all three rows as the truth
+> does. Still the residual, KNOWN: the row's tap says `Tapped`, on the background below the clip, and no swipe is sent.
+
 > **Status (2026-10-20, round 14): partly fixed; the rest an accepted residual (ADR 0010's residual 5).** Fixed at
 > `11daf08` (bugs/r14-le2), measured by the golden mode (against `3b6d2b0a`: exactly the four rows below changed, all
 > green), calibrate (CALIBRATED, `3b6d2b0` → `11daf08`) and the lab simulator (two runs,

@@ -343,6 +343,15 @@
       ]
     },
     {
+      "id": "scroll-bounded-footer",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "O", "color": "#FB8C00", "slot": 0, "declared": "open", "scrollView": "lower" }
+      ]
+    },
+    {
       "id": "scroll-sticky",
       "family": "edges",
       "layer": "none",

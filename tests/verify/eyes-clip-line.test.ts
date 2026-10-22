@@ -156,5 +156,5 @@ describe('judgeEyes — no clip line where nothing cuts the target', () => {
       }
     }
     expect(cut).toEqual(['lab.scroll-bounded.P', 'lab.scroll-bounded.S']);
-  });
+  }, 30_000); // a pass over every lab capture: ~5 s alone, the default limit
 });

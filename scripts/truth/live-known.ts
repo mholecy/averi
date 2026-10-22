@@ -88,6 +88,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:scroll-bounded.P.fully'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   ...each('ios idb', ['scroll:scroll-bounded.S', 'scroll:scroll-bounded.O'], IDB_NO_SCROLL_VIEW, 'stop-claim', 'visible'),
   ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O', 'scroll:scroll-bounded.S.fully'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
+  // LE2's rest, scroll-bounded-footer (round 16; the Continue under the clip listed after O, holding its centre): the tap no
+  // longer fires Continue — it is moved clear to (201,670) and the plain stop refuses before any swipe — but the row
+  // past the clip is still Tapped, on the background (ios-vis-r16-le2-1.json): the residual, a tap-claim on Tapped.
+  ...each('ios idb', ['tap:scroll-bounded-footer.O', 'scroll:scroll-bounded-footer.O'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
   ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   // LV3's idb entry (R-direction on `refused`: the turned strokes touching down at y 175, in the header) struck off by
   // round 14's bugs/r14-lv3 (02aabfa6: a stroke carrying content back goes over the region the rows carried with R

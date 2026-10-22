@@ -379,6 +379,28 @@
       "truth": "scroll-bounded.truth.json"
     },
     {
+      "file": "scroll-bounded-footer.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-bounded-footer.png",
+      "truth": "scroll-bounded-footer.truth.json"
+    },
+    {
+      "file": "scroll-bounded-footer.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "scroll-bounded-footer.png",
+      "truth": "scroll-bounded-footer.truth.json"
+    },
+    {
       "file": "scroll-sticky.wda.json",
       "source": "wda",
       "form": "raw",

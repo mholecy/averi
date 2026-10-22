@@ -3,7 +3,8 @@
 Status: accepted 2026-10-19 (orchestrator's decision for round 9, L4's remaining half, on the owner's standing: speed
 and stability of results; the agent's hands must not be stuck on a false refusal where a cheap, reliable signal
 exists). Implemented on `fix/r9-l4w`. Amends ADR 0015 (its 2026-10-19 amendment's first residual closed, its second
-narrowed) and extends ADR 0013 (the eyes get a second question).
+narrowed) and extends ADR 0013 (the eyes get a second question). Amended 2026-10-22 (round 16, LE2's rest): a third
+trigger for the order question (below, "WHEN").
 
 ## Context
 
@@ -66,6 +67,13 @@ dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
   so keeping it saves nothing, and each round's unlock rests on its own frame.
 - Wired at the composition roots with `verify/eyes.ts#eyesOn` (`mcp/tools.ts#guardOpts`, `flow/engine.ts`'s
   `acting`), as the first question is; interact/ imports no verify/.
+
+A third trigger (2026-10-22, round 16, LE2's rest): the order is also untold for a control listed AFTER the target, past
+a reading-order break (ADR 0015), that overlaps it and holds its centre — idb lists no scroll view, so a row past its
+scroll view's clip and the `Continue` under the clip listed after it are one untold pair (the lab's
+`scroll-bounded-footer`: the overlap reads Continue's colour, the row's band the page's — the screenshot tells the row
+under, or not at all). The question is the same, asked of the same standing (`covered`, remedy `unordered`), by the
+same three verbs; nothing is added to its interface or its cost on any other tap.
 
 WHAT is asked, per `unordered` cover (a peer): where the two overlap (in the standing's frame), each one's CLEAR BANDS
 along the overlap's edges (the strips of it beside the overlap, outside the other by construction, each no deeper than

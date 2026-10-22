@@ -1,0 +1,59 @@
+{
+  "cell": "scroll-bounded-footer",
+  "layer": "none",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "O",
+      "id": "lab.scroll-bounded-footer.O",
+      "color": "#FB8C00",
+      "declared": "open",
+      "frame": {
+        "height": 64,
+        "width": 300,
+        "x": 51,
+        "y": 620
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,652.0"
+        },
+        {
+          "kind": "button",
+          "tag": "footer.continue"
+        }
+      ],
+      "drawn": 0,
+      "seen": "#263238",
+      "geometry": "outside-scroll-view",
+      "visible": null,
+      "piece": null,
+      "scrollView": "lower",
+      "listed": {
+        "wda": true,
+        "idb": true
+      }
+    }
+  ],
+  "safeArea": {
+    "bottom": 34,
+    "left": 0,
+    "right": 0,
+    "top": 62
+  },
+  "scrollViews": {
+    "lower": {
+      "height": 180,
+      "width": 402,
+      "x": 0,
+      "y": 380
+    }
+  }
+}
