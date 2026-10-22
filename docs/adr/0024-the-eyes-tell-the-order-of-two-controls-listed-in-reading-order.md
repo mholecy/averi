@@ -76,8 +76,8 @@ under, or not at all). The question is the same, asked of the same standing (`co
 same three verbs; nothing is added to its interface. Its remedy is worded for a menu and is wrong for the clip shape
 (a residual, KNOWN): the plain stop on O says no scroll tells which is on top, though a scroll would (WDA reaches O
 after 2 swipes), and "if it is the one on top, tap it by coordinates" at O's centre would press Continue — safe, as
-it refuses; `treeSource: wda` answers it. It is asked of more targets (a plain stop and a colour assert each pay a
-screenshot; a tap only where no tappable piece is left clear of the peer): over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests) (ADR 0015's
+it refuses; `treeSource: wda` answers it. It is asked of more targets (a plain stop pays a screenshot, a tap only where
+no tappable piece is left clear of the peer; the colour assert asks on the frame it measures, none added): over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests) (ADR 0015's
 2026-10-22 amendment).
 
 WHAT is asked, per `unordered` cover (a peer): where the two overlap (in the standing's frame), each one's CLEAR BANDS

@@ -202,9 +202,9 @@ control is a cover whose order is not told (cover.ts#CoverOrder's `untold`), as 
 already was. A target that is itself a flat list's bottom chrome (a floating tab bar's item) has no reading-order peers at all
 (`peersOf` answers none — before, after or to keep a moved tap clear of): the bar is drawn over the rows (tabbar-dense's items, `Row 8` listed after them over their centres). Whether it is drawn over the target (a menu) or the target is cut by a clip beneath it (a row past its
 scroll view) is the order question ADR 0024's eyes answer — that question is reused as is; there is no new interface.
-The cost lies on that shape only — one screenshot per plain stop and colour assert where a control listed after the
-target holds its centre, and per tap only where no tappable piece is left clear of it (O's tap moves clear to (201,670)
-and asks nothing; W's and `row_swift`'s ask): over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests).
+The cost lies on that shape only — one screenshot per plain stop where a control listed after the target holds its
+centre, and per tap only where no tappable piece is left clear of it (O's tap moves clear to (201,670) and asks
+nothing; W's and `row_swift`'s ask); the colour assert asks on the frame it measures, none added: over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests).
 
 Measured (golden against `4ee14f1c`, 1425 checks): 0 checks changed on the existing corpus; the new cell's colour row
 fails closed, its plain stop refuses before any swipe, its tap moves clear of Continue to (201,670), nothing fires
