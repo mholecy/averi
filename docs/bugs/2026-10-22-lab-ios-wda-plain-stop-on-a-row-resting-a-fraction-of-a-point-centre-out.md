@@ -17,8 +17,9 @@ fix: the same stroke and the same kind of stop come out of the src before it (`4
 
 `scroll_until id:"lab.scroll-bounded-footer.O" direction: down` under WDA strokes `lower` once; the fling carries its
 content far enough that O rests clipped at the top, its centre inside the clip — "visible after 1 swipe — CLIPPED at
-top, 54–83 %" in four runs at the fix's src, 78 % in one at `4ee14f1c` (whose other run took 2 swipes to "fully
-visible") — the live judge's `ok`. Once, in the first of the fix's five runs, the stroke carried it 272.7 pt:
+top, 54–83 %" in four runs at `cefccf3d`'s src (one committed, ios-vis-r16-le2-3.json; three unrecorded repeats of
+the case), 78 % in one unrecorded `--side` run at `4ee14f1c` (whose other run took 2 swipes to "fully visible") — the
+live judge's `ok`. Once, in the first run at `cefccf3d` (ios-vis-r16-le2-2.json), the stroke carried it 272.7 pt:
 
 ```
 app:   O 51,347.3 300x64 — centre y 379.3, the clip's top 380: centre 0.7 pt outside (the truth's `centre-out`)

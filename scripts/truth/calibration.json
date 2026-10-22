@@ -243,7 +243,8 @@
         {
           "rows": ["ios-iphone17-ios27/chooser-over-list.idb.json O tap", "ios-iphone17-ios27/chooser-over-list.idb.json O scroll_until", "ios-iphone17-ios27/chooser-over-list.idb.json S tap", "ios-iphone17-ios27/chooser-over-list.idb.json S scroll_until"],
           "broke": "13d68a2",
-          "why": "round 16's chooser-over-list (mp-native's chooser rebuilt): the cover judgement 13d68a2 introduced reads the card's rows as under the list listed after them (O under the date header, S under R; green at 16ae6bb) — the shape of mp-native's founding capture, green again by ADR 0015's reading-order break (not bisected); S red again from LE2's rest (19525e2), the accepted residual (#LE2)"
+          "fixed": "8a55d2b",
+          "why": "round 16's chooser-over-list (mp-native's chooser rebuilt): the cover judgement 13d68a2 introduced reads the card's rows as under the list listed after them (O under the date header, S under R; green at 16ae6bb) — the shape of mp-native's founding capture; green again at 8a55d2b, ADR 0015's reading-order break (red at its first parent 20053ae, golden --side); S red again from LE2's rest (19525e2), the accepted residual (#LE2)"
         }
       ],
       "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."

@@ -924,7 +924,8 @@ const NOT_DRAWN = {
    * this row: neither is marked.
    */
   flatListReadingOrder: {
-    target: (placed, { readingBreak, bottomChrome, readingOrder }) => placed.at >= readingBreak && !bottomChrome.has(placed) && !readingOrder.coversAfter.has(placed),
+    // `about.readingOrder` read last: the getter walks the siblings only for a node past the break.
+    target: (placed, about) => placed.at >= about.readingBreak && !about.bottomChrome.has(placed) && !about.readingOrder.coversAfter.has(placed),
   },
 
   /**

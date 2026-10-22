@@ -8,10 +8,11 @@
 > said visible. A control past the break that overlaps the target and holds its centre is now a cover whose order is
 > not told (`reading-order.ts#ReadingOrder`'s `coversAfter`, read by the break's own row `draw-order.ts#NOT_DRAWN`'s
 > `flatListReadingOrder` since the branch's review; ADR 0015 amended 2026-10-22, ADR 0024's third trigger). It asks the
-> eyes of 3 nodes over the 128 trees of the committed corpus: this O, the lab menu's W in `blur-menu-grouped` (its
+> eyes of the targets ADR 0015's amendment measures over the committed corpus: this O, the lab menu's W in `blur-menu-grouped` (its
 > screenshot sees W on top: verdicts unchanged, one screenshot per tap and plain stop where there was none), and
 > mp-native's chooser `row_swift` — refused unless the eyes see it on top, and on real pixels they cannot: a false
-> refusal ACCEPTED as a residual (ADR 0015's amendment, its residuals; measured on the chooser's lab rebuild, below).
+> refusal ACCEPTED as a residual (ADR 0015's amendment, its residuals; measured on the chooser's lab rebuild, below,
+> whose S is the fourth).
 > Measured on the new lab
 > cell `scroll-bounded-footer` (O; its idb and WDA captures in tests/fixtures/truth/ios-iphone17-ios27) — the colour
 > assert fails closed, the plain stop refuses before any swipe, the tap is moved clear of Continue to (201,670) and
