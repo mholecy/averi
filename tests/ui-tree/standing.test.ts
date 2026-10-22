@@ -140,7 +140,7 @@ describe('Scene.standing for scroll_until\'s stop — measured cases, fixture ×
     ['idb scrolled under the top bar, position 2: Back, plain', () => idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos2'), 'BackButton', IPHONE, PLAIN, { kind: 'reachable', at: { x: 44, y: 84 } }],
     ['…position 6: payee_country_select under CONTINUE, plain', () => idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos6'), 'swift_payment.form.payee_country_select', IPHONE, PLAIN, { kind: 'covered', cover: 'swift_payment.form.continue_button' }],
     // A modal listed before the content it is drawn over: its rows and the picker stand clear.
-    ['idb modal listed before content: the chooser\'s SWIFT row, plain', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', IPHONE, PLAIN, { kind: 'reachable', at: { x: 201, y: 479 } }],
+    ['idb modal listed before content: the chooser\'s SWIFT row, plain: row_0 holds its centre, order untold', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', IPHONE, PLAIN, { kind: 'covered', cover: 'transactions.list.row_0' }],
     ['…the value-date picker, plain', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'swift_payment.form.value_date_picker', IPHONE, PLAIN, { kind: 'reachable', at: { x: 205, y: 479 } }],
     // A Compose button's text under its own control is no cover of it.
     ['Android Compose snapshot, logged out: LOGIN, plain', async () => ({ ...(JSON.parse(await fixture('android-ui-snapshot-compose.json')).screens.loggedOut as UiNode), paddedTouchTargets: true as const }), 'LOGIN', PIXEL, PLAIN, { kind: 'reachable', at: { x: 540, y: 1463 } }],
@@ -802,7 +802,8 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
     ],
     // A modal listed before the content it is drawn over: the chooser's rows and the picker stand clear; CONTINUE, listed last, still covers.
     ['idb modal: the chooser\'s own-transfer row, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_own', { kind: 'reachable', at: { x: 201, y: 423 } }],
-    ['…its SWIFT row, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', { kind: 'reachable', at: { x: 201, y: 479 } }],
+    // …its SWIFT row lies under row_0, listed after it and holding its centre: a cover whose order is not told (the eyes tell it, ADR 0024).
+    ['…its SWIFT row, covered by row_0 (order untold)', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', { kind: 'covered', cover: 'transactions.list.row_0', largest: { x: 45, y: 487, width: 312, height: 18 } }],
     ['…the value-date picker, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'swift_payment.form.value_date_picker', { kind: 'reachable', at: { x: 205, y: 479 } }],
     ['…behind the picker, Payee’s name under CONTINUE', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'Payee’s name', { kind: 'covered', cover: 'swift_payment.form.continue_button' }],
     // The number pad up, CONTINUE lifted onto it: value_date_select under it, nothing of it shows above the keyboard; a row under the keys is under the keyboard.

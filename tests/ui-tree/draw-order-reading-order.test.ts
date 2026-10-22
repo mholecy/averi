@@ -4,9 +4,67 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { sceneOf } from '../../src/ui-tree/standing.js';
+import { treeScreen } from '../../src/ui-tree/usable-screen.js';
 import { seenOrderOf, type OrderSeen } from '../../src/ui-tree/seen-order.js';
 import { coverNodes, tagged } from '../helpers/covers.js';
 import { node } from '../helpers/fake.js';
+
+/**
+ * A row past its scroll view's clip, in idb's flat list (which lists no scroll view): `scroll-bounded`'s O `51,620 300x64`, a
+ * control `Continue` just under the clip listed AFTER it whose top lies ABOVE O's top (a reading-order break, ADR 0015) and
+ * which holds O's centre. The break excuses every node from Continue on as a cover, so `tap O` was `reachable` at the
+ * centre — on Continue, and `Tapped O` fired it. A control that overlaps the target and holds its centre is a cover
+ * whose order is not told whatever the break says: the eyes tell it (ADR 0024).
+ * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
+ */
+describe('a control listed after a target, past a reading-order break, that holds its centre is a cover whose order is not told', () => {
+  const raw = async () => JSON.parse(await truth('scroll-bounded.idb.json')) as Record<string, unknown>[];
+  const continueAt = (template: Record<string, unknown>, y: number): Record<string, unknown> => ({
+    ...template,
+    AXUniqueId: 'lab.scroll-bounded.continue',
+    AXLabel: 'Continue',
+    frame: { x: 16, y, width: 370, height: 56 },
+  });
+  const tree = async (listed: 'after' | 'before', y: number) => {
+    const list = await raw();
+    const button = continueAt(list[4]!, y);
+    return parseIdbDescribeAll(JSON.stringify(listed === 'after' ? [...list, button] : [list[0], button, ...list.slice(1)]));
+  };
+
+  it('Continue 16,600 370x56 listed after O (top 600 above O 620, centre 652 on it): untold, the tap moved clear of it, the plain stop covered', async () => {
+    const t = await tree('after', 600);
+    const [o, cont] = [byId(t, 'lab.scroll-bounded.O'), byId(t, 'lab.scroll-bounded.continue')];
+    const seen = drawOrder(t).exposure(o, IPHONE);
+    expect(tagged(seen.covers)).toEqual([{ node: cont, order: 'untold', presented: false }]);
+    expect(seen.centreCover?.node).toBe(cont);
+    // 656–684 is clear of Continue: 28 pt, a tap's piece.
+    expect(seen.tapAt).toEqual({ point: { x: 201, y: 670 }, moved: true, piece: { x: 51, y: 656, width: 300, height: 28 } });
+    const stop = sceneOf(t).standing(o, treeScreen(t), { of: 'stop' });
+    expect(stop).toMatchObject({ kind: 'covered', remedy: { of: 'unordered' } });
+  });
+
+  it('Continue 16,640 listed after O: its top is below O\'s, no break — a cover as before (a control listed after that holds the centre is untold in any listing in reading order)', async () => {
+    const t = await tree('after', 640);
+    const seen = drawOrder(t).exposure(byId(t, 'lab.scroll-bounded.O'), IPHONE);
+    expect(tagged(seen.covers)).toEqual([{ node: byId(t, 'lab.scroll-bounded.continue'), order: 'untold', presented: false }]);
+  });
+
+  it('Continue listed BEFORE O is the reading-order cover it was: untold, with the same moved tap', async () => {
+    const t = await tree('before', 600);
+    const seen = drawOrder(t).exposure(byId(t, 'lab.scroll-bounded.O'), IPHONE);
+    expect(tagged(seen.covers)).toEqual([{ node: byId(t, 'lab.scroll-bounded.continue'), order: 'untold', presented: false }]);
+  });
+
+  it('Continue seen UNDER O is no cover (the screenshot overrides the listing); seen OVER it, a cover named so', async () => {
+    const t = await tree('after', 600);
+    const [o, cont] = [byId(t, 'lab.scroll-bounded.O'), byId(t, 'lab.scroll-bounded.continue')];
+    const HEX = { overlap: '#1E88E5', own: '#1E88E5', other: '#E53935' };
+    expect(drawOrder(t, seenOrderOf(o, [{ peer: cont, seen: 'over', ...HEX }])).exposure(o, IPHONE).covers).toEqual([]);
+    const over = drawOrder(t, seenOrderOf(o, [{ peer: cont, seen: 'under', ...HEX }])).exposure(o, IPHONE);
+    expect(tagged(over.covers)).toEqual([{ node: cont, order: 'seenOver', presented: false }]);
+  });
+});
 
 /**
  * The controls listed BEFORE a control target it overlaps, in a listing given in READING order (idb's flat list; a WDA

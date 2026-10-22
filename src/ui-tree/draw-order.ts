@@ -896,6 +896,16 @@ const NOT_DRAWN = {
    * are `flatListChrome`'s and never break: a menu listed after the content
    * that reaches past the band still covers them.
    *
+   * Not every node past the break is excused (`DrawOrder.exposure`'s
+   * `orderUntold`): a CONTROL that overlaps the target and holds its centre
+   * is a cover whose order is not told (reading-order.ts#peersOf's
+   * `unordered`), the eyes tell it (ADR 0024) — idb lists no scroll view, so a
+   * row past its scroll view's clip is listed before the `Continue 16,600
+   * 370x56` just under the clip, whose top lies above the row's, and the
+   * break read it as a row drawn over Continue (`tap` pressed Continue).
+   * Measured: scroll-bounded-footer O (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md);
+   * mp-native's chooser `row_swift` now lies under `row_0` listed after it.
+   *
    * Residuals, stated (accepted by the owner): a menu, sheet or popover
    * listed after the content that starts ABOVE a content target is no
    * cover of it — nor is anything listed after such a node (a false
@@ -1747,13 +1757,17 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
       // A presented layer's cover reaches the whole screen and draws whatever the rows say (presentation.ts#PresentedOver).
       const wholeScreen = (p: Placed): boolean => about?.over.wholeScreen(p) === true;
+      // A reading-order break (`flatListReadingOrder`) excuses the nodes listed past it as covers — except a control that overlaps the target and
+      // holds its centre: where idb's flat list tells no clip, its order against the target is not told (a row past its scroll view's clip, a
+      // `Continue` under it), so it is a cover whose order the eyes tell (reading-order.ts#peersOf's `unordered`).
+      const orderUntold = (p: Placed): boolean => places.length > 0 && p.at > places[0].at && (peers?.unordered.has(p) === true || peers?.seenOver.has(p) === true);
       const reachOf = (p: Placed): Rect => (wholeScreen(p) ? { ...screen } : reach(p));
       const met =
         shown === undefined || about === undefined
           ? []
           : [...before, ...laterFor(places, about).filter((p) => peers?.seenUnder.has(p) !== true)]
               .filter((p) => rectIntersection(reachOf(p), shown) !== undefined)
-              .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: wholeScreen(p) || drawsOverTarget(p, about), wholeScreen: wholeScreen(p) }));
+              .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: wholeScreen(p) || orderUntold(p) || drawsOverTarget(p, about), wholeScreen: wholeScreen(p) }));
       const covers = met
         .filter((c) => c.draws)
         .map((c): Cover => ({

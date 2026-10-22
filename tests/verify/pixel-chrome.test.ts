@@ -96,6 +96,8 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)': 20,
       // mp-native's payment-type chooser row over `Loan repayment` (24,435), listed after it in idb's reading order (L4's rule).
       'button "SWIFT payment" (45,453 312x52)': 1,
+      // …and `Loan repayment` itself over the chooser's SWIFT row: listed after it, holding its centre, a cover whose order is not told whatever the reading-order break says (ADR 0015, 2026-10-22; the eyes tell it).
+      'button "Loan repayment, 17.07.2026, +602,00 EUR" (24,435 354x52)': 1,
       'button (948,99 110x110)': 2, // Compose's top-bar button over the screen-sized root
       'container "!, Open debugger to view warnings." (10,787 382x49)': 4,
       'container (66,1840 948x248)': 6,
@@ -125,7 +127,8 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'button "Continue to summary" (24,512 354x44, reaching 24,512 354x77)': 1,
       'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)': 19,
       // idb's Application node, judged as an element: every node of the flat list after it lies over its sample.
-      'button "Loan repayment, 17.07.2026, +602,00 EUR" (24,435 354x52)': 1,
+      // …twice since 2026-10-22: it is also a cover of the chooser's SWIFT row, listed after it and holding its centre (ADR 0015's amendment; the eyes tell the order).
+      'button "Loan repayment, 17.07.2026, +602,00 EUR" (24,435 354x52)': 2,
       'button "Priority*, Standard" (24,390 354x52)': 1,
       'button "Priority*, Standard" (24,399 354x52)': 1,
       'button "Priority*, Standard" (24,406 354x52)': 1,
