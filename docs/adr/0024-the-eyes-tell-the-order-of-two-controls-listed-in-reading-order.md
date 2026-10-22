@@ -3,7 +3,8 @@
 Status: accepted 2026-10-19 (orchestrator's decision for round 9, L4's remaining half, on the owner's standing: speed
 and stability of results; the agent's hands must not be stuck on a false refusal where a cheap, reliable signal
 exists). Implemented on `fix/r9-l4w`. Amends ADR 0015 (its 2026-10-19 amendment's first residual closed, its second
-narrowed) and extends ADR 0013 (the eyes get a second question).
+narrowed) and extends ADR 0013 (the eyes get a second question). Amended 2026-10-22 (round 16, LE2's rest): a third
+trigger for the order question (below, "WHEN").
 
 ## Context
 
@@ -66,6 +67,20 @@ dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
   so keeping it saves nothing, and each round's unlock rests on its own frame.
 - Wired at the composition roots with `verify/eyes.ts#eyesOn` (`mcp/tools.ts#guardOpts`, `flow/engine.ts`'s
   `acting`), as the first question is; interact/ imports no verify/.
+
+A third trigger (2026-10-22, round 16, LE2's rest): the order is also untold for a control listed AFTER the target, past
+a reading-order break (ADR 0015), that overlaps it and holds its centre — idb lists no scroll view, so a row past its
+scroll view's clip and the `Continue` under the clip listed after it are one untold pair (the lab's
+`scroll-bounded-footer`: the overlap reads Continue's colour, the row's band the page's — the screenshot tells the row
+under, or not at all). The question is the same, asked of the same standing (`covered`, remedy `unordered`), by the
+same three verbs; nothing is added to its interface. Its remedy is worded for a menu and is wrong for the clip shape
+(a residual, KNOWN): the plain stop on O says no scroll tells which is on top, though a scroll would (WDA reaches O
+after 2 swipes), and "if it is the one on top, tap it by coordinates" at O's centre would press Continue — safe, as
+it refuses; `treeSource: wda` answers it. It is asked of more targets (a plain stop pays a screenshot, a tap only where
+no tappable piece is left clear of the peer; the colour assert asks on the frame it measures, none added) — which
+targets, over the committed corpus, ADR 0015's 2026-10-22 amendment measures. On real pixels the question cannot tell
+either of its lab shapes: scroll-bounded-footer's O (drawn nowhere, the screen beside white) and the chooser's S
+(residual 1, below).
 
 WHAT is asked, per `unordered` cover (a peer): where the two overlap (in the standing's frame), each one's CLEAR BANDS
 along the overlap's edges (the strips of it beside the overlap, outside the other by construction, each no deeper than
@@ -137,10 +152,13 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 - Live on the lab simulator: see the bug note's Status and docs/truth/live-ios-2026-10-18-visibility.md (round 9's
   section).
 
-## Residuals
+## Residuals accepted
 
 1. **Alike looks** (two white rows, no dim, no shadow): untold, today's refusal — the safe direction. Such menus' rows
-   stay refused; the lab's blur and mp-native's dim are what give the signal.
+   stay refused; the lab's blur and mp-native's dim are what give the signal. Measured on real pixels (round 16): the
+   chooser rebuilt at mp-native's geometry (`presented/chooser-over-list`) — S white on its white card over the row
+   R it is drawn over, R's bands on the card too: untold, S refused under idb (ADR 0015's 2026-10-22 amendment, its
+   accepted residual); the dim lies beyond the card, where no band of the pair reaches.
 2. **A transparent top control over a surface ending within a pixel of its edges**: the opacity guard reads a band
    against what lies around its control — past the edge the band faces and sideways past its side edges on the band's
    rows, each strip whole and as its thin slice against the control — and against the screen beside the two (review
@@ -162,8 +180,9 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 5. Controls as wide as the screen leave no screen beside them: untold, the refusal kept (ADR 0013's screen-spanning
    residual, for this question).
 6. mp-native's chooser (`idb-modal-listed-before-content.json`) has no png: its `Loan repayment` row stays refused in
-   the tests; live, its bands beside the SWIFT overlap are its own dimmed sides and SWIFT's white below — told or untold,
-   never unlocked unless the overlap reads its own colour.
+   the tests. Its lab rebuild (`chooser-over-list`, round 16) measures it: R, beneath the card, is refused under idb and
+   WDA, nothing fired; its bands beside the overlap lie on the card, not on its own dimmed sides — untold, never
+   unlocked.
 7. **A two-tone peer on top, split at the target's edge** (review round 1): a peer drawn over the target whose part over
    the overlap is the target's own colour (within ΔE00 2) and whose part past the target's edge is another — its colour
    boundary lying exactly on the target's edge — is pixel for pixel the frame of the target drawn on top: the overlap,

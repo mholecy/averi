@@ -1,5 +1,38 @@
 # BUG: under idb, a row past its scroll view's clip is judged on the screen alone — a row outside the scroll view is `Tapped` on the background and its colour assert PASSES on the background, a sliver is `Tapped`, and both stops call cut rows "fully visible"
 
+> **Status (2026-10-22, round 16): the harmful remainder fixed at `19525e29` + `9fd4aff2` (bugs/r16-le2); the rest still ADR 0010's
+> residual 5, now narrowed to "nothing listed beneath".** The shape that fired a control: under idb a row past its clip,
+> listed BEFORE a control under the clip whose top lies above the row's (`Continue 16,600 370x56`, listed after the row)
+> and which holds the row's centre — ADR 0015's reading-order break excused Continue as a cover, so `tap O` was
+> `reachable` at (201,652), on Continue, and `Tapped O` FIRED it; the colour passed on Continue's colour, the plain stop
+> said visible. A control past the break that overlaps the target and holds its centre is now a cover whose order is
+> not told (`reading-order.ts#ReadingOrder`'s `coversAfter`, read by the break's own row `draw-order.ts#NOT_DRAWN`'s
+> `flatListReadingOrder` since the branch's review; ADR 0015 amended 2026-10-22, ADR 0024's third trigger). It asks the
+> eyes of the targets ADR 0015's amendment measures over the committed corpus: this O, the lab menu's W in `blur-menu-grouped` (its
+> screenshot sees W on top: verdicts unchanged, one screenshot per tap and plain stop where there was none), and
+> mp-native's chooser `row_swift` — refused unless the eyes see it on top, and on real pixels they cannot: a false
+> refusal ACCEPTED as a residual (ADR 0015's amendment, its residuals; measured on the chooser's lab rebuild, below,
+> whose S is the fourth).
+> Measured on the new lab
+> cell `scroll-bounded-footer` (O; its idb and WDA captures in tests/fixtures/truth/ios-iphone17-ios27) — the colour
+> assert fails closed, the plain stop refuses before any swipe, the tap is moved clear of Continue to (201,670) and
+> fires nothing (live, idb, docs/truth/live-records/ios-vis-r16-le2-1.json; at the base the app logged
+> `button footer.continue`); golden against `4ee14f1c`: 1425 checks, 0 changed; WDA answers all three rows as the truth
+> does. Still the residual, KNOWN: the row's tap says `Tapped`, on the background below the clip, and no swipe is sent.
+>
+> **Code review (2026-10-22, round 16):** the chooser's cost measured on real pixels. The lab cell
+> `presented/chooser-over-list` rebuilds mp-native's chooser at its geometry (a white card `24,381 354x140` of white
+> option rows O `45,397` and S `45,453` (312x52) over a list dimmed 40 %, R `24,435 354x52` holding S's centre; idb lists the card's
+> rows first): the eyes cannot tell S over R — overlap, S's band and R's bands all the card's white ("it shows the colour
+> around it #FFFFFF beside the overlap") — so under idb S's tap, plain stop and colour assert refuse, nothing tapped, no
+> swipe; live, `tap S` refused and nothing fired in two runs of two (docs/truth/live-records/ios-vis-r16-le2-2.json,
+> -3.json); WDA taps S. ACCEPTED as a residual by the orchestrator: the refusal is the safe direction against a tap that
+> fired the wrong control; one screenshot per tap and plain stop on such a row; remedy `treeSource: wda`. The live cases
+> of this note ran again at the final src (the same -2/-3 records): O's tap moved clear to (201,670), nothing fired; the
+> plain stop refused before any swipe; under WDA refused, then reached by a stroke. Also KNOWN (ADR 0024's third
+> trigger): the refusal's remedy is worded for a menu — "if it is the one on top, tap it by coordinates" at O's centre
+> would press Continue; `treeSource: wda` is the right one there.
+
 > **Status (2026-10-20, round 14): partly fixed; the rest an accepted residual (ADR 0010's residual 5).** Fixed at
 > `11daf08` (bugs/r14-le2), measured by the golden mode (against `3b6d2b0a`: exactly the four rows below changed, all
 > green), calibrate (CALIBRATED, `3b6d2b0` → `11daf08`) and the lab simulator (two runs,

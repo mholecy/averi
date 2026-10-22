@@ -1,0 +1,32 @@
+{
+  "cell": "chooser-over-list",
+  "events": [],
+  "frames": {
+    "O": {
+      "height": 52,
+      "width": 312,
+      "x": 45,
+      "y": 397
+    },
+    "R": {
+      "height": 52,
+      "width": 354,
+      "x": 24,
+      "y": 435
+    },
+    "S": {
+      "height": 52,
+      "width": 312,
+      "x": 45,
+      "y": 453
+    }
+  },
+  "ready": true,
+  "scale": 3,
+  "screen": {
+    "height": 874,
+    "width": 402,
+    "x": 0,
+    "y": 0
+  }
+}

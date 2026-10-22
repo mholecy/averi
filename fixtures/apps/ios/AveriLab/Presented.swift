@@ -7,9 +7,10 @@ import UIKit
 // over the targets (sheet-background), a large sheet holding a UIKit table longer than the screen (sheet-long-list; cut
 // short of the sheet's foot, a footer under it: sheet-long-list-short), a
 // transparent full-screen cover dimming the screen (dim-cover, an RN transparent Modal's shape) and an in-screen menu
-// over a blurred, dimmed backdrop that no tree lists (blur-menu).
+// over a blurred, dimmed backdrop that no tree lists (blur-menu), and mp-native's payment-type chooser — a white card
+// of option rows over a dimmed list, listed before it (chooser).
 
-/// A presented cell's screen, by its layer: the scrolled host, the blur menu, else the slot host (Base.swift#CellScreen)
+/// A presented cell's screen, by its layer: the scrolled host, the blur menu, the chooser, else the slot host (Base.swift#CellScreen)
 /// with the layer raised over it (PresentedLayer).
 struct PresentedScreen: View {
     let cell: Cell
@@ -18,6 +19,7 @@ struct PresentedScreen: View {
         switch cell.layer {
         case "sheet-medium-scrolled": ScrolledHost(cell: cell)
         case "blur-menu", "blur-menu-grouped", "blur-menu-stacked", "blur-menu-unhidden": BlurMenuScreen(cell: cell)
+        case "chooser": ChooserScreen(cell: cell)
         default: CellScreen(cell: cell)
         }
     }
@@ -388,5 +390,144 @@ struct Grouped: ViewModifier {
 
     func body(content: Content) -> some View {
         if on { content.accessibilityElement(children: .contain) } else { content }
+    }
+}
+
+// --- chooser: a white card of option rows presented in-screen over a dimmed list ---
+
+/// mp-native's payment-type chooser (tests/fixtures/idb-modal-listed-before-content.json, `chooser`; ADR 0015), rebuilt
+/// at its measured geometry: a white card (24,381 354×140, no accessibility element) holding the option rows O
+/// (`To my account` 45,397 312×52) and S (`SWIFT payment` 45,453 312×52), white on white, over a list dimmed by a
+/// backdrop no tree lists — date headers (0,y 402×29, Header trait) and white transaction rows (24,y 354×52), R the first
+/// (`row_0` 24,435), whose band 435–487 holds S's centre (201,479). The card and the list are each an accessibility
+/// container of the screen's size, the card's declared first, so idb lists O and S BEFORE the list drawn under them (the
+/// filter icon 348,358 first, its top above both). A touch on the backdrop closes the chooser (`dismissed menu`); one on
+/// the card's own padding does nothing.
+struct ChooserScreen: View {
+    @EnvironmentObject var lab: Lab
+    let cell: Cell
+    @State private var menu = false
+
+    /// Each row's frame and title, by tag: the card's (O, S) and the list's (R; the other list rows carry no tag).
+    static let rows: [String: (CGRect, String)] = [
+        "O": (CGRect(x: 45, y: 397, width: 312, height: 52), "To my account"),
+        "S": (CGRect(x: 45, y: 453, width: 312, height: 52), "SWIFT payment"),
+        "R": (CGRect(x: 24, y: 435, width: 354, height: 52), "Loan repayment, 17.07.2026, +602,00 EUR"),
+    ]
+    static let card = CGRect(x: 24, y: 381, width: 354, height: 140)
+    /// The list beneath: its date headers' tops, and its untagged rows (top, title).
+    static let headers: [(CGFloat, String)] = [(399, "17.07.2026"), (494, "15.07.2026"), (590, "02.07.2026"), (685, "25.06.2026"), (780, "14.06.2026")]
+    static let others: [(CGFloat, String)] = [(531, "Loan repayment, 15.07.2026, +573,00 EUR"), (626, "Loan repayment, 02.07.2026, +627,00 EUR"),
+                                             (721, "Loan repayment, 25.06.2026, +162,00 EUR"), (817, "Loan repayment, 14.06.2026, +208,00 EUR")]
+
+    var body: some View {
+        GeometryReader { geo in
+            let screen = CGSize(width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
+                                height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
+            ZStack(alignment: .topLeading) {
+                if menu {
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 16).fill(Color.white)
+                            .frame(width: Self.card.width, height: Self.card.height)
+                            .contentShape(Rectangle())
+                            .onTapGesture {}
+                            .accessibilityHidden(true)
+                            .position(x: Self.card.midX, y: Self.card.midY)
+                        ForEach(cell.targets.filter(\.onLayer), id: \.tag) { t in
+                            ChooserRow(cell: cell, target: t)
+                        }
+                    }
+                    .frame(width: screen.width, height: screen.height)
+                    .accessibilityElement(children: .contain)
+                    .zIndex(2)
+                    Color.black.opacity(0.4)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            menu = false
+                            lab.event("dismissed", "menu")
+                        }
+                        .accessibilityHidden(true)
+                        .zIndex(1)
+                }
+                ZStack(alignment: .topLeading) {
+                    Color(hex: "#F2F2F7")
+                    Button { lab.event("button", "list.filter") } label: { Image(systemName: "line.3.horizontal.decrease").resizable() }
+                        .buttonStyle(Flat())
+                        .frame(width: 17, height: 10)
+                        .accessibilityLabel("Filter transactions")
+                        .accessibilityIdentifier("lab.\(cell.id).filter")
+                        .position(x: 348 + 8.5, y: 358 + 5)
+                    ForEach(Self.headers, id: \.0) { h in
+                        // One element of the header's whole band (0,y 402×29), as mp-native's date headers are listed.
+                        ZStack(alignment: .leading) {
+                            Color.clear
+                            Text(h.1).font(.footnote).foregroundStyle(.gray).padding(.leading, 24)
+                        }
+                        .frame(width: screen.width, height: 29)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isHeader)
+                            .position(x: screen.width / 2, y: h.0 + 14.5)
+                    }
+                    ForEach(cell.targets.filter { !$0.onLayer }, id: \.tag) { t in
+                        ChooserRow(cell: cell, target: t)
+                    }
+                    ForEach(Self.others, id: \.0) { r in
+                        Button { lab.event("button", "list.row") } label: { RowLabel(title: r.1, color: "#FFFFFF") }
+                            .buttonStyle(Flat())
+                            .frame(width: 354, height: 52)
+                            .position(x: 24 + 177, y: r.0 + 26)
+                    }
+                }
+                .frame(width: screen.width, height: screen.height)
+                .accessibilityElement(children: .contain)
+                .zIndex(0)
+            }
+            .frame(width: screen.width, height: screen.height)
+            .ignoresSafeArea()
+        }
+        .ignoresSafeArea()
+        .task {
+            try? await Task.sleep(for: .milliseconds(300))
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) { menu = true }
+            try? await Task.sleep(for: .milliseconds(800))
+            lab.settled()
+        }
+    }
+}
+
+/// A chooser cell's tagged row at its frame (ChooserScreen.rows): its colour with its title, read by that title.
+private struct ChooserRow: View {
+    @EnvironmentObject var lab: Lab
+    let cell: Cell
+    let target: Target
+
+    var body: some View {
+        let (frame, title) = ChooserScreen.rows[target.tag]!
+        Button {
+            lab.event("tap", target.tag)
+        } label: {
+            RowLabel(title: title, color: target.color)
+        }
+        .buttonStyle(Flat())
+        .frame(width: frame.width, height: frame.height)
+        .accessibilityIdentifier("lab.\(cell.id).\(target.tag)")
+        .accessibilityLabel(title)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { lab.frame(target.tag, $0) }
+        .position(x: frame.midX, y: frame.midY)
+    }
+}
+
+/// A list row's face: its colour, its title in black at its leading edge.
+private struct RowLabel: View {
+    let title: String
+    let color: String
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Rectangle().fill(Color(hex: color))
+            Text(title).font(.subheadline).foregroundStyle(.black).lineLimit(1).padding(.horizontal, 16)
+        }
     }
 }

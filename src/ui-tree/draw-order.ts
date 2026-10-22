@@ -5,7 +5,7 @@ import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSiz
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
-import { readingOrderOf } from './reading-order.js';
+import { readingOrderOf, type ReadingOrder } from './reading-order.js';
 import type { SeenOrder } from './seen-order.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
@@ -417,6 +417,8 @@ interface SeenFor extends Seen {
   readonly paddedTouchTargets: boolean;
   /** How far a label may overhang its own field on this tree's screen, in its units (`labelOverhang`): `ownControl`'s text input. */
   readonly labelOverhang: number;
+  /** What the target's listing, given in reading order, says of its order against its siblings (reading-order.ts#readingOrderOf): the break never excuses its `coversAfter`. */
+  readonly readingOrder: ReadingOrder;
 }
 
 /**
@@ -896,10 +898,20 @@ const NOT_DRAWN = {
    * are `flatListChrome`'s and never break: a menu listed after the content
    * that reaches past the band still covers them.
    *
+   * Nor does the break excuse a control listed after the target that
+   * overlaps it and holds its centre (reading-order.ts#ReadingOrder's
+   * `coversAfter`, `unordered` or `seenOver`): which is drawn on top is not
+   * told, the eyes tell it (ADR 0024) — idb lists no scroll view, so a row
+   * past its scroll view's clip is listed before the `Continue 16,600
+   * 370x56` just under the clip, whose top lies above the row's, and the
+   * break read it as a row drawn over Continue (`tap` pressed Continue).
+   * Measured: scroll-bounded-footer O (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md).
+   *
    * Residuals, stated (accepted by the owner): a menu, sheet or popover
    * listed after the content that starts ABOVE a content target is no
    * cover of it — nor is anything listed after such a node (a false
-   * "clear": the tap may press the menu). So is what follows a node that
+   * "clear": the tap may press the menu), but a control holding the
+   * target's centre (`coversAfter`, above). So is what follows a node that
    * starts above the target for another reason: a floating label listed
    * after its field and above it (`IBAN 42,359` after the field at
    * `42,380`) ends the field's covers — only a pinned bottom bar still
@@ -912,7 +924,8 @@ const NOT_DRAWN = {
    * this row: neither is marked.
    */
   flatListReadingOrder: {
-    target: (placed, { readingBreak, bottomChrome }) => placed.at >= readingBreak && !bottomChrome.has(placed),
+    // `about.readingOrder` read last: the getter walks the siblings only for a node past the break.
+    target: (placed, about) => placed.at >= about.readingBreak && !about.bottomChrome.has(placed) && !about.readingOrder.coversAfter.has(placed),
   },
 
   /**
@@ -1615,19 +1628,29 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
 
   const draws = (placed: Placed): boolean => !ROWS.some((row) => row.drawnOver?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
-  /** What the `target` column knows of `target`: the tree's facts, what is presented over it, and where its reading order breaks. */
-  const asTarget = (target: Placed): SeenFor => ({
-    ...seen,
-    target,
-    over: presentation.over(target.node),
-    flatList,
-    contentFrom,
-    barLine,
-    readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine),
-    bottomChrome,
-    paddedTouchTargets,
-    labelOverhang: overhang,
-  });
+  /**
+   * What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing
+   * in reading order says (reading-order.ts#readingOrderOf) — that one asked on its first read, as `exposure` and the break's row past the break
+   * read it: a question that reads neither walks no siblings for it.
+   */
+  const asTarget = (target: Placed): SeenFor => {
+    let readingOrder: ReadingOrder | undefined;
+    return {
+      ...seen,
+      target,
+      over: presentation.over(target.node),
+      flatList,
+      contentFrom,
+      barLine,
+      readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine),
+      bottomChrome,
+      paddedTouchTargets,
+      labelOverhang: overhang,
+      get readingOrder() {
+        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome }, pinnedTargets, orderSeen));
+      },
+    };
+  };
   /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
@@ -1742,7 +1765,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       const tabsBefore = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       // In a listing given in reading order, what is listed before it but drawn over it: a heading that overlaps it, and the controls that
       // overlap it whose order is not told when one of them holds its centre.
-      const peers = about === undefined ? undefined : readingOrderOf(order, about, pinnedTargets, orderSeen);
+      const peers = about?.readingOrder;
       const before = [...tabsBefore, ...(peers?.before ?? [])].sort((a, b) => a.at - b.at);
       // Everything listed after it that meets what shows, each judged once by the `target` column: a cover, or excused.
       // A presented layer's cover reaches the whole screen and draws whatever the rows say (presentation.ts#PresentedOver).

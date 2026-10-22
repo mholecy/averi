@@ -2479,10 +2479,9 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect(fake.screenshots).toHaveLength(2);
   });
 
-  it('the non-covers the tap was taught stay non-covers: idb\'s modal listed before the content, and the form\'s rows clear of CONTINUE, are measured', async () => {
+  it('the non-covers the tap was taught stay non-covers: idb\'s modal listed before the content (the chooser\'s own-transfer row), and the form\'s rows clear of CONTINUE, are measured', async () => {
     for (const [screen, id] of [
       ['chooser', 'accounts.detail.payment_type_sheet.row_own'],
-      ['chooser', 'accounts.detail.payment_type_sheet.row_swift'],
       ['valueDatePicker', 'swift_payment.form.value_date_picker'],
       ['valueDatePicker', 'swift_payment.form.fees_select'],
     ] as const) {
@@ -2495,6 +2494,19 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
       const c = await new Verifier(fake, FAST).assert({ element: { id }, color: { expected: '#FDFDFD' } });
       expect([id, c.pass, c.detail]).toEqual([id, true, expect.stringContaining('sampled #FDFDFD')]);
     }
+  });
+
+  it('`Loan repayment`, listed after the chooser\'s SWIFT row and holding its centre (drawn under the chooser): a cover whose order is not told, and no screenshot tells it (the capture is one flat colour) — failing closed', async () => {
+    const id = 'accounts.detail.payment_type_sheet.row_swift';
+    const tree = parseIdbDescribeAll(JSON.stringify(MODAL.chooser));
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { ...IPHONE };
+    fake.nextScreenshot = drawnAt(findBySpec(tree, { id })[0]!.rect, '#FDFDFD');
+    const c = await new Verifier(fake, FAST).assert({ element: { id }, color: { expected: '#FDFDFD' } });
+    expect(c.pass).toBe(false);
+    expect(c.detail).toContain('listed in reading order: which is drawn on top is not told');
   });
 
   it('no status band (Android today, a landscape window, or a device size that cannot be read): an element at the top is measured as before', async () => {

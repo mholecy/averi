@@ -2,6 +2,7 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim (phase 1/2);
 // sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS);
+// chooser-over-list (round 16, iOS);
 // bottom-sheet-dialog and dialog-fullscreen (round 7, Android); blur-menu-stacked and blur-menu-unhidden (round 16,
 // ADR 0018 residual 9's probes, iOS).
 
@@ -25,6 +26,8 @@ const unmarkedWindow = (file: string, as: Classed) => [
   ...keys(file, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
   ...keys(file, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(ADB_STROKE), note: 'uiautomator lists only the presented window, unmarked: scroll_until strokes it twice, then "never appeared in the tree" with the active-window hint', as }),
 ];
+/** A modal row listed before the content drawn under it, a content control holding its centre (ADR 0015's 2026-10-22 amendment), that the eyes cannot tell: white on white. */
+const CHOOSER = 'residual:ADR 0024 residual 1 — alike looks (two white rows): untold, refused';
 /**
  * The slot targets' probe points (Base.swift#Slot) and the colour the screenshot shows over each under the blur menu:
  * A, B, D their own blurred and dimmed; C (#00897B) the menu row W's own colour — W is drawn over C's centre.
@@ -144,6 +147,21 @@ export const presented: KnownFile = {
       ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: `fails under the menu row W, seen drawn over it on the screenshot; ${backdrop}`, as: BLUR }),
       ...keys(file, ['C'], ['scroll_until'], { cls: 'no "close it first"', kind: 'refused', calls: [], note: `stops before any swipe, under the menu row W seen drawn over it on the screenshot; ${backdrop}`, as: BLUR }),
     ]),
+    // chooser-over-list (round 16): mp-native's payment-type chooser rebuilt at its measured geometry — the card's rows O and
+    // S listed before the list drawn under them, R (`row_0`) holding S's centre. Under idb S is an untold pair with R (ADR
+    // 0015's 2026-10-22 amendment) and the real screenshot cannot tell it (S, the overlap and R's bands all the card's white:
+    // eyes-order.test.ts): tap, colour and plain stop refuse, nothing tapped, no swipe — the accepted residual; WDA lists
+    // the card over the list and taps S. R, beneath the card: refused under idb (untold) and WDA (S drawn over it), but
+    // never "close it first" — no tree lists the dim (#31); WDA's stop strokes three times on the dim, closing nothing.
+    ...keys(`${IOS}/chooser-over-list.idb.json`, ['S'], ['tap'], { cls: 'not tapped', kind: 'refused', calls: [], note: 'untold under R, which holds its centre; the screenshot cannot tell (white on white)', as: CHOOSER }),
+    ...keys(`${IOS}/chooser-over-list.idb.json`, ['S'], ['colour'], { cls: 'failed', kind: 'FAIL', calls: [], note: 'untold under R, which holds its centre; the screenshot cannot tell (white on white)', as: CHOOSER }),
+    ...keys(`${IOS}/chooser-over-list.idb.json`, ['S'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: [], note: 'stops before any swipe, untold under R; the screenshot cannot tell (white on white)', as: CHOOSER }),
+    ...[`${IOS}/chooser-over-list.idb.json`, `${IOS}/chooser-over-list.wda.json`].flatMap((file) => [
+      ...keys(file, ['R'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: 'refused under the card row S; the dim has no node', as: BLUR }),
+      ...keys(file, ['R'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: 'fails under the card row S; the dim has no node', as: BLUR }),
+    ]),
+    ...keys(`${IOS}/chooser-over-list.idb.json`, ['R'], ['scroll_until'], { cls: 'no "close it first"', kind: 'refused', calls: [], note: 'stops before any swipe, untold under the card row S; the dim has no node', as: BLUR }),
+    ...keys(`${IOS}/chooser-over-list.wda.json`, ['R'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: 'strokes for R under the card row S; the dim has no node', as: BLUR }),
     // LAB FINDING (calibration.json L4, its residual) — fixed by docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
     // (docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md): the menu row W, listed in
     // reading order just before C, which it is drawn over, read as covered by C under idb and WDA; the eyes now tell
@@ -176,5 +194,7 @@ export const presented: KnownFile = {
     [`${IOS}/blur-menu-stacked.wda.json`]: 18,
     [`${IOS}/blur-menu-unhidden.idb.json`]: 18,
     [`${IOS}/blur-menu-unhidden.wda.json`]: 18,
+    [`${IOS}/chooser-over-list.idb.json`]: 9,
+    [`${IOS}/chooser-over-list.wda.json`]: 9,
   },
 };

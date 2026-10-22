@@ -406,3 +406,80 @@ describe('the colour assert — the order seen on the frame it measures, no capt
     expect(w.reads).toBeGreaterThan(1);
   });
 });
+
+// A control listed AFTER a row, past the reading-order break, holding the row's centre (scroll-bounded's O `51,620 300x64` and a
+// `Continue 16,600 370x56` just under its scroll view's clip): the draw order makes it an untold cover and this question tells it
+// (docs/adr/0015-flat-list-reading-order-break.md, the 2026-10-22 amendment).
+describe('the order question over a control listed after the row, past the break — Continue over the row', () => {
+  const BLUE = [30, 136, 229] as const;
+  const RED = [229, 57, 53] as const;
+  const tree = async () => {
+    const list = JSON.parse((await file('scroll-bounded.idb.json')).toString('utf8')) as Record<string, unknown>[];
+    const button = { ...list[4], AXUniqueId: 'lab.scroll-bounded.continue', AXLabel: 'Continue', frame: { x: 16, y: 600, width: 370, height: 56 } };
+    return parseIdbDescribeAll(JSON.stringify([...list, button]));
+  };
+
+  // The plain stop asks the question; the tap moves clear of Continue to O's 656–684 and asks nothing.
+  const stopQuestion = (t: UiNode): OrderQuestion | undefined => {
+    const o = byId(t, 'lab.scroll-bounded.O');
+    return orderQuestion(t, o, sceneOf(t).standing(o, USABLE, { of: 'stop' }));
+  };
+
+  it('asked of O: Continue is the peer, the overlap 51,620 300x36, O\'s band below it 656–684', async () => {
+    const t = await tree();
+    const q = stopQuestion(t)!;
+    expect(q.pairs.map(({ peer, overlap, nodeBands }) => ({ peer: peer.identifier, overlap, nodeBands }))).toEqual([
+      { peer: 'lab.scroll-bounded.continue', overlap: { x: 51, y: 620, width: 300, height: 36 }, nodeBands: [{ x: 51, y: 656, width: 300, height: 28 }] },
+    ]);
+  });
+
+  it('the overlap reads Continue\'s colour and O\'s band the row\'s own: O is seen UNDER Continue, which the draw order names a cover seenOver', async () => {
+    const t = await tree();
+    const [o, cont] = [byId(t, 'lab.scroll-bounded.O'), byId(t, 'lab.scroll-bounded.continue')];
+    const img = paint([
+      [cont.rect, BLUE],
+      [{ x: 51, y: 656, width: 300, height: 28 }, RED],
+    ]);
+    const answer = judgeOrder(img, 1, stopQuestion(t)!);
+    expect(answer).toEqual([{ peer: cont, seen: 'under', overlap: '#1E88E5', own: '#E53935', other: '#1E88E5' }]);
+    const standing = sceneOf(t, seenOrderOf(o, answer)).standing(o, USABLE, { of: 'stop' });
+    expect(standing).toMatchObject({ kind: 'covered', cover: { node: cont, order: { kind: 'seenOver' } }, remedy: { of: 'seenOver' } });
+  });
+});
+
+// mp-native's payment-type chooser rebuilt in the lab at its measured geometry (chooser-over-list: the white card 24,381
+// 354x140 holding O and S, white on white, over a dimmed list of white rows; idb lists the card's rows before the list, R —
+// `row_0` 24,435 — holding S's centre): on the real screenshot the eyes cannot tell S drawn over R, so S is refused under
+// idb (ADR 0015's 2026-10-22 amendment, its accepted residual). And scroll-bounded-footer's O, past its clip, against
+// Continue: untold too — the plain stop refuses, as the order it rests on is not told.
+describe('the judge over the lab captures — where the eyes cannot tell, on real pixels', () => {
+  const stopOf = async (cell: string, id: string, of: 'tap' | 'stop') => {
+    const t = parseIdbDescribeAll((await file(`${cell}.idb.json`)).toString('utf8'));
+    const n = byId(t, id);
+    return { t, q: orderQuestion(t, n, sceneOf(t).standing(n, USABLE, { of }))! };
+  };
+  const WHITE_AROUND = 'it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there';
+
+  it.each(['tap', 'stop'] as const)('chooser-over-list.png: asked of S (%s), R is the peer — overlap, S\'s band and R\'s bands all the card\'s white: untold', async (of) => {
+    const { t, q } = await stopOf('chooser-over-list', 'lab.chooser-over-list.S', of);
+    expect(q.pairs.map(({ peer, overlap, nodeBands, peerBands }) => ({ peer: peer.identifier, overlap, nodeBands, peerBands }))).toEqual([
+      {
+        peer: 'lab.chooser-over-list.R',
+        overlap: { x: 45, y: 453, width: 312, height: 34 },
+        nodeBands: [{ x: 45, y: 487, width: 312, height: 18 }],
+        // R's band above S lies on O and the card between them; its side strips on the card's padding
+        peerBands: [
+          { x: 45, y: 435, width: 312, height: 18 },
+          { x: 24, y: 453, width: 21, height: 34 },
+          { x: 357, y: 453, width: 21, height: 34 },
+        ],
+      },
+    ]);
+    expect(judgeOrder(await png('chooser-over-list.png'), 3, q)).toEqual([{ peer: byId(t, 'lab.chooser-over-list.R'), seen: 'untold', why: WHITE_AROUND }]);
+  });
+
+  it('scroll-bounded-footer.png: asked of O (the plain stop), Continue is untold — O is drawn nowhere, the screen beside is white', async () => {
+    const { t, q } = await stopOf('scroll-bounded-footer', 'lab.scroll-bounded-footer.O', 'stop');
+    expect(judgeOrder(await png('scroll-bounded-footer.png'), 3, q)).toEqual([{ peer: byId(t, 'lab.scroll-bounded-footer.continue'), seen: 'untold', why: WHITE_AROUND }]);
+  });
+});

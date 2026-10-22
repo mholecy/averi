@@ -5,6 +5,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, type UiNode } from '../../src/adapters/types.js';
 import { coverAtPoint } from '../../src/ui-tree/cover.js';
 import { drawOrder, labelOverhang, minTapPiece } from '../../src/ui-tree/draw-order.js';
+import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { rectCentre, rectWithin } from '../../src/ui-tree/geometry.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
@@ -1068,13 +1069,19 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     describe('the reading-order break (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md): later nodes from the first one starting above a content target are no cover of it', () => {
       const screenOf = (name: string) => parseIdbDescribeAll(JSON.stringify(MODAL.screens[name]));
 
-      it('the payment-type chooser, listed before the transaction list it is drawn over: row_own and row_swift are uncovered, tapped at their centres', () => {
+      it('the payment-type chooser, listed before the transaction list it is drawn over: row_own is uncovered, tapped at its centre; row_0, listed after row_swift and drawn under the chooser, holds row_swift\'s centre: an untold cover, the eyes tell it', () => {
         const tree = screenOf('chooser');
         const order = drawOrder(tree);
-        for (const [id, centre] of [['row_own', { x: 201, y: 423 }], ['row_swift', { x: 201, y: 479 }]] as const) {
-          const row = tree.children.find((n) => n.identifier === `accounts.detail.payment_type_sheet.${id}`)!;
-          expect(order.exposure(row, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: centre, moved: false } });
-        }
+        const byId = (id: string) => tree.children.find((n) => n.identifier === id)!;
+        expect(order.exposure(byId('accounts.detail.payment_type_sheet.row_own'), IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 201, y: 423 }, moved: false } });
+        // The break excuses row_0 as a cover, but the listing cannot tell a modal's row from a row of the list behind it where the two meet: a control that
+        // holds the centre is a cover whose order is not told (docs/adr/0015-flat-list-reading-order-break.md, the 2026-10-22 amendment).
+        const swift = byId('accounts.detail.payment_type_sheet.row_swift');
+        const row0 = byId('transactions.list.row_0');
+        expect(tagged(order.exposure(swift, IPHONE).covers)).toEqual([{ node: row0, order: 'untold', presented: false }]);
+        // …and the screenshot sees row_0 under the chooser's row: nothing covers it, tapped at its centre as before.
+        const HEX = { overlap: '#FFFFFF', own: '#FFFFFF', other: '#F5F5F5' };
+        expect(drawOrder(tree, seenOrderOf(swift, [{ peer: row0, seen: 'over', ...HEX }])).exposure(swift, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 201, y: 479 }, moved: false } });
       });
 
       it('…where the break falls: for row_own at filter_icon (358 < 397) — date_header_0 (399) and row_0 (435), listed before it, would cover; for row_swift at once', () => {

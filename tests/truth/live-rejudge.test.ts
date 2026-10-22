@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -158,6 +158,18 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-r14-le1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-idb-vis-r14-le2-1.json', 'visibility', { cases: 18, ok: 9, loud: 0, mismatches: 9 }],
     ['ios-idb-vis-r14-le2-2.json', 'visibility', { cases: 18, ok: 9, loud: 0, mismatches: 9 }],
+    // Round 16's LE2 rest (bugs/r16-le2: a control past the reading-order break that holds the target's centre is an untold cover):
+    // scroll-bounded-footer's O under idb — the tap moved clear of Continue to (201,670), nothing fired (at the base it
+    // fired button footer.continue), the plain stop refused before any swipe; the tap case and the scroll case's own tap
+    // after that refusal both Tapped on the background, known (residual 5) — and under WDA refused / stopped inside `lower`
+    // after 2 swipes, Tapped.
+    ['ios-vis-r16-le2-1.json', 'visibility', { cases: 4, ok: 2, loud: 0, mismatches: 2 }],
+    // Its code review (round 16): the same two cases at the final src, and mp-native's chooser rebuilt (chooser-over-list) —
+    // under idb S refused, nothing fired (LOUD: the eyes cannot tell it over R on the real screenshot, white on white), O
+    // Tapped, R refused; under WDA O and S Tapped, R refused, its stop stroking the dim (#31). -2.json holds WDA's one
+    // intermittent stop on footer O 0.7 pt past the clip (live-known.ts), -3.json none.
+    ['ios-vis-r16-le2-2.json', 'visibility,dismissal', { cases: 12, ok: 7, loud: 1, mismatches: 4 }],
+    ['ios-vis-r16-le2-3.json', 'visibility,dismissal', { cases: 12, ok: 8, loud: 1, mismatches: 3 }],
     // Round 14's fix of LE3 (bugs/r14-le3 40b4856, a heading listed before is drawn over the target): scroll-sticky's
     // six cases ok under idb and WDA, twice — R's `fully: true` no longer stops under the pinned header: one stroke
     // (list 24→0), R whole at 51,166, fully visible after 1 swipe, Tapped; its tap and plain stop as before.

@@ -39,6 +39,7 @@ const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-i
 const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
+const CENTRE_A_POINT_OUT = 'bug:2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md';
 
 /**
  * A known case: its note, the rule it fails by (live-visibility.ts#VerdictClass), the kind of reply that verdict rests
@@ -88,6 +89,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:scroll-bounded.P.fully'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   ...each('ios idb', ['scroll:scroll-bounded.S', 'scroll:scroll-bounded.O'], IDB_NO_SCROLL_VIEW, 'stop-claim', 'visible'),
   ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O', 'scroll:scroll-bounded.S.fully'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
+  // LE2's rest, scroll-bounded-footer (round 16; the Continue under the clip listed after O, holding its centre): the tap no
+  // longer fires Continue — it is moved clear to (201,670) and the plain stop refuses before any swipe — but the row
+  // past the clip is still Tapped, on the background: by the tap case, and by the scroll case's own tap after its
+  // refused stop (ios-vis-r16-le2-1.json): the residual, a tap-claim on Tapped in both.
+  ...each('ios idb', ['tap:scroll-bounded-footer.O', 'scroll:scroll-bounded-footer.O'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
   ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   // LV3's idb entry (R-direction on `refused`: the turned strokes touching down at y 175, in the header) struck off by
   // round 14's bugs/r14-lv3 (02aabfa6: a stroke carrying content back goes over the region the rows carried with R
@@ -156,6 +162,16 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // (94fc318b: ios-vis-r8-l4-3.json, -4.json). Struck off by round 16's in-window backdrop (bugs/r16-blur 7fd1ee57,
   // adapters/wda-source.ts#inWindowBackdrops): stopped before any swipe, "close it first", nothing stroked, in two runs
   // of two (ios-vis-r16-blur-1.json, -2.json) — with blur-menu-grouped's A, B, D tap and scroll entries under WDA below.
+  // chooser-over-list's R (round 16, mp-native's chooser rebuilt): WDA lists the card row S over it (drawn over, its
+  // order told) and no node for the dim, so the stop is refused after three strokes on the dim (175, 175, 699), "content
+  // exhausted"; the strokes close nothing (no `dismissed` logged) — blur-menu-grouped C's shape (ios-vis-r16-le2-2.json).
+  ...each('ios wda', ['scroll:chooser-over-list.R'], BLUR, 'presented-stroke', 'refused'),
+  // scroll-bounded-footer's O under WDA (round 16): its one stroke on `lower` flings 240–273 pt, so O rests 54–83 %
+  // clipped at the top, its centre inside the clip — ok, then Tapped; once (ios-vis-r16-le2-2.json) at 272.7, O at
+  // 347.3, its centre 0.7 pt above the clip's top 380: "visible … CLIPPED at top, 49 %" against the truth's centre-out,
+  // the tap at (201,380) then fired O. A fraction of a point WDA's whole-point frames do not tell; the same stroke and
+  // stop at 4ee14f1c (the src before LE2's rest), so not this fix's.
+  ...each('ios wda', ['scroll:scroll-bounded-footer.O'], CENTRE_A_POINT_OUT, 'stop-claim', 'visible', { intermittent: true }),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
     // scroll-sticky's R with `fully: true` struck off by round 14's LE3 fix (40b4856: a heading listed before is drawn

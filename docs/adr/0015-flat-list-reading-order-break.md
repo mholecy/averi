@@ -7,7 +7,8 @@ meets WDA's nested tree too (its residual "WDA's nested tree and Android's never
 alone). Amended again 2026-10-19 (round 9) by docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md:
 a screenshot tells the order the listing does not — the amendment's first residual closed, its second narrowed (below).
 Amended 2026-10-20 (round 14, LE3): a heading listed before a target it overlaps is drawn over it — see "Amendment: a
-heading listed before" below.
+heading listed before" below. Amended 2026-10-22 (round 16, LE2's rest): the break no longer excuses a control that overlaps the
+target and holds its centre — see "Amendment: a control past the break that holds the centre" below.
 
 ## Context
 
@@ -181,3 +182,71 @@ docs/bugs/2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneat
 - A menu, toast or popover listed after a heading it lies over is now still covered by the heading where they overlap
   apart: a false refusal, the safe direction.
 
+## Amendment: a control past the break that holds the centre (2026-10-22, round 16, LE2's rest)
+
+### Context
+
+The break's last residual ("a menu, sheet or popover listed after the content that starts ABOVE a content target is no
+cover of it … a false clear: the tap may press the menu") had a harmful shape under idb, which lists no scroll view
+(docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md, ADR 0010's residual 5):
+the lab's `scroll-bounded-footer` O `51,620 300x64`, a row past its scroll view's clip, is listed BEFORE a `Continue
+16,600 370x56` under the clip whose top (600) lies above the row's (620) and which holds its centre (201,652). The
+break excused Continue — and everything after it — as a cover, so `tap O` was `reachable` at (201,652), on Continue,
+and `Tapped O` FIRED Continue (the lab probe: `button footer.continue`); the colour assert passed on Continue's colour;
+the plain stop said visible. The listing cannot tell this shape from a modal's row listed before the list row it is drawn
+over: mp-native's chooser `row_swift`, whose centre the transaction row `row_0` (listed after, drawn UNDER the chooser)
+holds, is the same pair of facts.
+
+### Decision
+
+A reading-order break excuses the later nodes as covers EXCEPT a control that overlaps the target and holds its centre
+(reading-order.ts#ReadingOrder's `coversAfter`: `peersOf`'s `unordered` or `seenOver` listed after the target, read by
+the break's own row, draw-order.ts#NOT_DRAWN's `flatListReadingOrder` — every other row's excuse stands): such a
+control is a cover whose order is not told (cover.ts#CoverOrder's `untold`), as an overlapping control listed before it
+already was. A target that is itself a flat list's bottom chrome (a floating tab bar's item) has no reading-order peers at all
+(`peersOf` answers none — before, after or to keep a moved tap clear of): the bar is drawn over the rows (tabbar-dense's items, `Row 8` listed after them over their centres). Whether it is drawn over the target (a menu) or the target is cut by a clip beneath it (a row past its
+scroll view) is the order question ADR 0024's eyes answer — that question is reused as is; there is no new interface.
+The cost lies on that shape only — one screenshot per plain stop where a control listed after the target holds its
+centre, and per tap only where no tappable piece is left clear of it (O's tap moves clear to (201,670) and asks
+nothing; W's and `row_swift`'s ask); the colour assert asks on the frame it measures, none added. This amendment owns
+that measurement (ADR 0010's residual 5 and ADR 0024's third trigger cite it): over every iOS tree of the committed
+fixtures (103 trees, 5498 nodes, each judged as a target; pinned in tests/ui-tree/draw-order-reading-order.test.ts,
+"the untold covers listed after their target") the untold covers listed after a target are six pairs, four of them
+the rule's — the new cell's O; the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its
+screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none); mp-native's
+chooser `row_swift`; and S of `chooser-over-list`, the chooser rebuilt in the lab (refused: the eyes cannot tell it,
+below) — and blur-menu's W under C (idb and WDA), untold before the rule.
+
+Measured (golden against `4ee14f1c`, 1425 checks): 0 checks changed on the existing corpus; the new cell's colour row
+fails closed, its plain stop refuses before any swipe, its tap moves clear of Continue to (201,670), nothing fires
+(live, idb: `ios-vis-r16-le2-1.json`). Six existing tests move with mp-native's `row_swift` (untold under `row_0`;
+reachable at (201,479) when the screenshot sees `row_0` under).
+
+### Residuals of the amendment
+
+- ~~A control listed after the target and above it, holding its centre, is excused as a cover (the break's residual).~~
+  Closed for controls over the centre. A control over the target's edge only (not its centre), a non-control (text), and a
+  menu or sheet that lies clear of the centre stay excused, as before.
+- The tap still says `Tapped` for a row past a clip with nothing listed beneath it, and for this one moved clear of
+  Continue — on the background (ADR 0010's residual 5, narrowed).
+- **A false refusal, accepted** (2026-10-22, round 16's orchestrator for the owner; docs/truth/open-bugs.md,
+  Priority 3): under idb a modal or sheet row listed before the content drawn under it, where a content control holds
+  its centre — mp-native's chooser `row_swift` under `row_0`, the pattern this ADR was written for — is an untold pair:
+  it costs one screenshot per tap and plain stop, and where the eyes cannot tell it is refused (tap, plain stop and
+  colour assert: "which is drawn on top is not told"; nothing tapped, no swipe). `row_swift` was `Tapped` at its
+  centre before (correctly: this ADR's founding capture). MEASURED on real pixels (round 16's code review), on the
+  lab's rebuild of the chooser at its geometry — `presented/chooser-over-list`: a white card `24,381 354x140` of white
+  option rows O `45,397 312x52` and S `45,453 312x52` over a list dimmed 40 %, its date headers `0,y 402x29` and white
+  rows `24,y 354x52`, R (`row_0`) `24,435` holding S's centre; idb lists the card's rows first, exactly as the founding
+  capture (tests/fixtures/truth/ios-iphone17-ios27/chooser-over-list.*): the eyes CANNOT tell. S's band below the
+  overlap (487–505), the overlap, and R's bands — above it (435–453, on O and the card between) and beside it (24–45,
+  357–378, on the card's padding) — all read the card's white: "it shows the colour around it #FFFFFF beside the
+  overlap: it may draw nothing there" (tests/verify/eyes-order.test.ts). Live under idb, `tap S` refused and nothing
+  fired, in two runs of two (docs/truth/live-records/ios-vis-r16-le2-2.json, -3.json; the live golden's LOUD, a target a
+  tap reaches refused); O `Tapped`; R refused. Under WDA the card is listed over the list: S `Tapped`. Why accepted: the
+  refusal is the safe direction against a measured tap that fired the wrong control (scroll-bounded-footer's
+  Continue), and no tree-level rule separates the two (the review tried two: a break more than the target's height
+  above it refuses the chooser's `row_own` and the picker's `Value date`; "the break node itself holds the centre"
+  lets a footer label listed before Continue bring the harm back). Remedy: `treeSource: wda`. Not measured: a card no
+  wider than its rows (45–357), whose row's side strips would show the dimmed list — the eyes may tell it there. The
+  way out not taken: teach ADR 0024's question to read a peer's bands that show something else — a design change.

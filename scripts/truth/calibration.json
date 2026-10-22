@@ -243,6 +243,12 @@
           "broke": "13d68a2",
           "fixed": "8c0fb41",
           "why": "the same cover judgement on idb's flat list: N's label read as under its own field (green at 16ae6bb), green again from 8c0fb41 (fix/r6-ios-top) — first-parent bisect over round 7's RN corpus: red at b75b8b5 … dff7381, green at 8c0fb41 and every merge after; no note (the RN corpus did not exist then), LR1/LR2's rows on the other sources fixed by ce19c23 + f3a7043"
+        },
+        {
+          "rows": ["ios-iphone17-ios27/chooser-over-list.idb.json O tap", "ios-iphone17-ios27/chooser-over-list.idb.json O scroll_until", "ios-iphone17-ios27/chooser-over-list.idb.json S tap", "ios-iphone17-ios27/chooser-over-list.idb.json S scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "8a55d2b",
+          "why": "round 16's chooser-over-list (mp-native's chooser rebuilt): the cover judgement 13d68a2 introduced reads the card's rows as under the list listed after them (O under the date header, S under R; green at 16ae6bb) — the shape of mp-native's founding capture; green again at 8a55d2b, ADR 0015's reading-order break (red at its first parent 20053ae, golden --side); S red again from LE2's rest (19525e2), the accepted residual (#LE2)"
         }
       ],
       "remark": "The refined fix 8a55d2b is the one that re-broke the idb rows (see regressions)."
@@ -1158,7 +1164,8 @@
       "n": "LE2",
       "note": "2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md",
       "status": "calibrate",
-      "fix": ["11daf08"],
+      "fix": ["11daf08", "19525e2", "9fd4aff"],
+      "after": "11daf08",
       "verified": "golden",
       "defect": "fully visible|^passed on",
       "checks": [
@@ -1167,7 +1174,41 @@
         "ios-iphone17-ios27/scroll-bounded.idb.json O colour",
         "ios-iphone17-ios27/carousel-in-list.idb.json C colour"
       ],
-      "remark": "Red before the fix (3b6d2b0a, its first parent; and at every commit before it: src called it a residual, ui-tree/geometry.ts#Clips.drawnIn undefined on idb's flat list). Partly fixed by round 14's 11daf08: the drawn frame is untold on idb (geometry.ts#DrawnUntold) and the eyes look where a claim rests on it — O's and C's colour, their region reading as the screen beside it (#FFFFFF, #EEEEEE), fail closed (verify/eyes.ts#apartOfFrame, no capture added); P's and S's fully: true stops see the clip line (bottom 24 pt, 56 pt) on one screenshot and fail after two unmoved strokes. The rest — S and O Tapped, S and O reached by the plain stop, F's and C's strokes over the screen — is ADR 0010's residual 5, accepted (the owner's delegation, round 14): its six KNOWN rows filed as that residual. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen. WDA answers all of the note's rows as the truth does."
+      "regressions": [
+        {
+          "rows": ["ios-iphone17-ios27/chooser-over-list.idb.json S tap", "ios-iphone17-ios27/chooser-over-list.idb.json S colour", "ios-iphone17-ios27/chooser-over-list.idb.json S scroll_until"],
+          "broke": "9fd4aff",
+          "why": "the cost of LE2's rest (19525e2, kept by 9fd4aff): under idb the chooser's card row S, listed before R which holds its centre, is an untold pair, and on its real screenshot the eyes cannot tell (white on white) — refused; ADR 0015's 2026-10-22 amendment, its residual accepted 2026-10-22 (presented.known.ts files the rows as ADR 0024's residual 1)"
+        }
+      ],
+      "remark": "Red before the fix (3b6d2b0a, its first parent; and at every commit before it: src called it a residual, ui-tree/geometry.ts#Clips.drawnIn undefined on idb's flat list). Partly fixed by round 14's 11daf08: the drawn frame is untold on idb (geometry.ts#DrawnUntold) and the eyes look where a claim rests on it — O's and C's colour, their region reading as the screen beside it (#FFFFFF, #EEEEEE), fail closed (verify/eyes.ts#apartOfFrame, no capture added); P's and S's fully: true stops see the clip line (bottom 24 pt, 56 pt) on one screenshot and fail after two unmoved strokes. The rest — S and O Tapped, S and O reached by the plain stop, F's and C's strokes over the screen — is ADR 0010's residual 5, accepted (the owner's delegation, round 14): its six KNOWN rows filed as that residual. Round 6 (iOS capture, 2026-10-18): carousel-in-list's C, a card wholly right of its carousel's clip (378,138 354x85 against 24,138 354x85), 7 % of it on the screen. WDA answers all of the note's rows as the truth does. Round 16, the harmful remainder (bugs/r16-le2, 19525e2): under idb a row past its scroll view's clip, with a Continue under the clip listed AFTER it, its top above the row's and holding its centre, was excused as a cover by ADR 0015's reading-order break — scroll-bounded-footer's O was Tapped and the tap FIRED Continue (the lab probe at (201,652) fires button footer.continue), its colour passed on Continue's #263238, the plain stop said fully visible after 0 swipes. A control past the break that overlaps the target and holds its centre is a cover whose order is not told (reading-order.ts#ReadingOrder's coversAfter, read by the break's own row): the colour assert fails closed, the plain stop is refused before any swipe, the tap moved clear to (201,670) — nothing fires; what stays is the same residual (Tapped on the background, no swipe), its two rows KNOWN.",
+      "pairs": [
+        {
+          "before": "4ee14f1",
+          "after": "9fd4aff",
+          "checks": [
+            "ios-iphone17-ios27/scroll-bounded-footer.idb.json O tap",
+            "ios-iphone17-ios27/scroll-bounded-footer.idb.json O colour",
+            "ios-iphone17-ios27/scroll-bounded-footer.idb.json O scroll_until"
+          ],
+          "defect": "^Tapped id:\"lab.scroll-bounded-footer.O\"$|^passed on|fully visible after 0 swipes",
+          "expect": "CALIBRATED-ON-DEFECT",
+          "remark": "The harmful remainder, on the new lab cell scroll-bounded-footer (round 16; WDA answers all three rows as the truth does). Before (4ee14f1c): the tap is Tapped with no moved point (idb ui tap 201 652 — on Continue, which the lab probe shows firing), the colour passed on #263238 (Continue's), the plain stop said fully visible after 0 swipes. After (19525e2, and 9fd4aff, its review round: the rule moved into the break's own row, the rows unchanged): the colour fails closed, naming Continue as overlapping, the order not told; the plain stop stops before any swipe; the tap is moved to the part below Continue (201,670). The tap and the stop stay red for another class (ADR 0010 residual 5: Tapped on the background below the clip, no swipe toward a row the tree does not place in a scroll view), KNOWN."
+        }
+      ],
+      "live": [
+        {
+          "platform": "ios",
+          "pair": 2,
+          "sources": ["idb"],
+          "before": "4ee14f1",
+          "after": "19525e2",
+          "cases": ["tap:scroll-bounded-footer.O", "scroll:scroll-bounded-footer.O"],
+          "verdict": "CALIBRATED-ON-DEFECT",
+          "remark": "Before (a --side run of 4ee14f1c, idb): tap O says Tapped and the app logged button footer.continue (Continue fired, the truth probe's own result); scroll_until O says fully visible after 0 swipes, then the tap fires Continue. After (docs/truth/live-records/ios-vis-r16-le2-1.json at 19525e2): the tap is moved clear of Continue to (201,670), the app logged nothing (one touch); scroll_until stops before any swipe, naming Continue — both still tap-claim on Tapped for the tap that follows, on the background (ADR 0010 residual 5, known). WDA ok in the same run. Again at the code review's src (cefccf3d: 9fd4aff's rule, the reading order asked lazily), twice (ios-vis-r16-le2-2.json, -3.json): the same replies under idb, nothing fired.",
+          "summary": "docs/truth/live-ios-2026-10-18-visibility.md"
+        }
+      ]
     },
     {
       "n": "LE3",
@@ -1532,6 +1573,10 @@
     {
       "note": "2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md",
       "why": "residual found by round 7's A6: `scroll_until … fully: true` on form-keyboard's phone after `back` is refused under the next field's title, which its 132-px touch target overlaps by 6 px, though the 99 px it draws are whole — live only (driven directly over MCP: docs/truth/live-records/android-k7-fully-eyes-direct.jsonl), no golden row (the replay asks no `fully: true` of phone) and no live.ts case asks it; open"
+    },
+    {
+      "note": "2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md",
+      "why": "lab finding (round 16's LE2 code review): under WDA a plain stop on a row whose fling left its centre 0.7 pt past its scroll view's clip, \"visible … CLIPPED at top, 49%\", the tap then firing the row — live only and intermittent (live.ts --udid, case scroll:scroll-bounded-footer.O under WDA: once in five runs at the fix's src, docs/truth/live-records/ios-vis-r16-le2-2.json; the same kind of stop at 4ee14f1c): a replayed tree never moves, so no row reproduces a fling's rest; open"
     }
   ]
 }

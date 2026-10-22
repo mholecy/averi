@@ -38,6 +38,14 @@ export const edges: KnownFile = {
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 652'], note: 'idb lists no scroll view — Tapped on the background', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'visible', calls: [], note: 'idb lists no scroll view — visible after 0 swipes', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['F'], ['scroll_until'], { cls: BESIDE_LOWER, kind: 'refused', calls: twice(IDB_STROKE), note: 'idb lists no scroll view — the screen\'s stroke, beside the scroll view holding F', as: IDB_NO_SCROLL_VIEW }),
+    // LE2's rest on scroll-bounded-footer (round 16, the harmful remainder): O, a row past `lower`'s clip, with a Continue
+    // under the clip listed AFTER it and holding its centre (the truth probe at (201,652) fires Continue). A control past
+    // the reading-order break that holds the target's centre is a cover whose order is not told (ui-tree/draw-order.ts,
+    // ADR 0015 amended): the colour assert fails closed, the plain stop refuses before any swipe, and the tap is moved
+    // clear of Continue to (201,670) — it no longer presses Continue. What stays is the residual: the tap still says
+    // Tapped, on the background below the clip, and no scroll_until swipe is sent.
+    ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 670'], note: 'idb lists no scroll view — moved clear of Continue, Tapped on the background beneath the clip', as: IDB_NO_SCROLL_VIEW }),
+    ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'refused', calls: [], note: 'idb lists no scroll view — refused before any swipe: Continue overlaps its centre, the order not told', as: IDB_NO_SCROLL_VIEW }),
     // LE2 across, on carousel-in-list's C (the card right of the carousel's clip, 378,138 354x85 against its
     // scrollable 24,138 354x85): idb lists no carousel, so scroll_until strokes sideways across the SCREEN's middle
     // (y 437, below the carousel), twice right, then once back, failing "content exhausted" — the residual. Its colour
@@ -82,6 +90,8 @@ export const edges: KnownFile = {
     [`${IOS}/scroll-top-edge.wda.json`]: 7,
     [`${IOS}/scroll-top-edge-end.idb.json`]: 7,
     [`${IOS}/scroll-top-edge-end.wda.json`]: 7,
+    [`${IOS}/scroll-bounded-footer.idb.json`]: 3,
+    [`${IOS}/scroll-bounded-footer.wda.json`]: 3,
     [`${IOS}/carousel-in-list.idb.json`]: 9,
     [`${IOS}/carousel-in-list.wda.json`]: 9,
   },

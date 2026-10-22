@@ -147,6 +147,17 @@
       ]
     },
     {
+      "id": "chooser-over-list",
+      "family": "presented",
+      "layer": "chooser",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "O", "color": "#FFFFFF", "slot": 0, "in": "layer", "declared": "open" },
+        { "tag": "S", "color": "#FFFFFF", "slot": 1, "in": "layer", "declared": "open" },
+        { "tag": "R", "color": "#FFFFFF", "slot": 0, "declared": "presented-over" }
+      ]
+    },
+    {
       "id": "dialog-fullscreen",
       "family": "presented",
       "layer": "dialog-fullscreen",
@@ -368,6 +379,15 @@
         { "tag": "S", "color": "#43A047", "slot": 2, "declared": "open", "scrollView": "lower" },
         { "tag": "O", "color": "#FB8C00", "slot": 3, "declared": "open", "scrollView": "lower" },
         { "tag": "F", "color": "#8E24AA", "slot": 4, "declared": "open", "scrollView": "lower" }
+      ]
+    },
+    {
+      "id": "scroll-bounded-footer",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "O", "color": "#FB8C00", "slot": 0, "declared": "open", "scrollView": "lower" }
       ]
     },
     {
