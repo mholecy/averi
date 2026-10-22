@@ -963,8 +963,8 @@ tests/fixtures/truth/ios-iphone17-ios27) measured what WDA lists of it:
   first by its top (0), so nothing tells whether it is drawn over the targets below it.
 - idb lists no trace of the hidden backdrop; the unhidden one only as an unlabelled `GenericElement 0,0 402x874`.
 
-**Decision.** The WDA parser marks an IN-WINDOW BACKDROP a presented `screen` (adapters/wda-source.ts#
-inWindowBackdrops), so the marks adapter covers what is listed before it (ui-tree/presentation.ts#byMarks): in the
+**Decision.** The WDA parser marks an IN-WINDOW BACKDROP presented, kind `backdrop` (adapters/wda-source.ts#
+inWindowBackdrops; adapters/types.ts#PresentationKind — judged as a `screen` layer, worded apart), so the marks adapter covers what is listed before it (ui-tree/presentation.ts#byMarks): in the
 app's Window, when nothing else of that Window is marked, a childless element of a structural role inside one of the
 Window's layers (never a layer itself: those are the flags rule's, where a bare shown leaf after a hidden layer presents
 nothing), screen-sized, listed after a sibling that is the screen beneath (screen-sized too, at the same origin,
@@ -975,13 +975,27 @@ WDA payload in tests/fixtures (59) only the three grouped blur menus are marked;
 (A, B, D refused "close it first", their colour failing closed, scroll_until stopping before any swipe; C gains "close
 it first"), none elsewhere. No device read is added: the mark is read off the tree the verb already holds.
 
+**Its own kind, its own words (code review, 2026-10-22).** The mark rests on one empty element WDA lists over the
+whole screen, which an overlay that lets touches through matches too (the first residual below), so it is not told as
+a sheet or modal: the refusal names the evidence and the way out a screenshot gives (ui-tree/standing.ts#
+presentedRemedy) — "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after its
+content) — close it first; no scroll moves it out from under that backdrop; if a screenshot shows no menu up, the
+backdrop is an overlay that lets touches through: tap it by coordinates" (`scroll_until`: "… and a swipe on it may close
+the menu; … swipe and tap by coordinates"; the colour/ocr assert: "… judge the element on that screenshot"). The
+refusal is not weakened: a tap by id is still refused, no stroke is sent, the assert still fails closed; only the
+agent's own look at the screen moves past it, through tools averi does not judge (the tap's and swipe's x/y). Both
+variants take the kind: a shown backdrop over a screen beneath wholly `isVisible="0"` is stronger evidence, but a
+screenshot shows its menu too, so the way out never misleads there. Golden against the tip before it: the same 36
+checks, verdicts and device calls, only the presented clause reworded.
+
 Residuals of the amendment:
 
 - **The flags cannot tell a backdrop from a hidden overlay that passes touches.** A hidden (`0/0`) screen-sized leaf
   listed after the screen's content at its origin is read as a backdrop whether it takes the touch or not: an
   accessibility-hidden overlay with `.allowsHitTesting(false)` (RN `pointerEvents="none"`) — a decorative tint, a
   loading shimmer — refuses every tap beneath it, "close it first", the colour failing closed, `scroll_until`
-  stopping before any swipe: a false refusal, the safe direction, unmeasured in any app. A real RN capture comes near
+  stopping before any swipe: a false refusal, the safe direction, unmeasured in any app — with a way out in the reply
+  (a screenshot shows no menu: tap by coordinates; above), so the agent is not stuck. A real RN capture comes near
   it (tests/fixtures/wda-source-rn-myport.json: a hidden `Other 0,0 402x874` listed after the screen's content at its
   origin, not marked only because it wraps one more hidden `Other`).
 - **The sweep is weak evidence against false positives.** Over the 59 raw WDA payloads in tests/fixtures (about 13 of
@@ -1129,7 +1143,7 @@ Residuals of the amendment:
    Remedy for app teams: `.accessibilityAddTraits(.isModal)` on the menu, which hides the screen beneath from the tree
    (a tap there then finds no target), or a LABELLED accessibility element on the backdrop (a structural leaf with
    only an identifier in the target's own screen is excused) — and `treeSource: wda`, under which a grouped menu's
-   backdrop is read as a presented screen.
+   backdrop is read as a presented one (`backdrop`, the amendment "an in-window backdrop").
 10. **An app-drawn strip at a list's bottom with no node is not seen** (round-16 device check, 2026-10-14; residual 9's
    class). mp-native's Account Detail: the raw WDA ancestry is `ScrollView transactions.list.container` from y 180 to
    874 → its content → `row_4` from y 816 to 869, and no node clips at y 839, yet the capture shows an opaque blank

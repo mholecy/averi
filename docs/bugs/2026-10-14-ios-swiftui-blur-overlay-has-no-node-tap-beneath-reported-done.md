@@ -1,13 +1,15 @@
 # BUG: an in-screen SwiftUI overlay menu with a blurred, dimmed backdrop has no node in either iOS tree, so a tap on the screen beneath it is reported "Tapped" while the backdrop takes it and only closes the menu
 
-> **Status (2026-10-22, round 16): partly fixed** at `7fd1ee5` (bugs/r16-blur; the probes it rests on at `5f33c10`),
+> **Status (2026-10-22, round 16): partly fixed** at `7fd1ee5` + `73ef14e` (its review's fix: the screen beneath
+> screen-sized, the rule read only with the flags) + the code review's own kind (`backdrop`, its remedy naming the
+> evidence and a way out) (bugs/r16-blur; the probes it rests on at `5f33c10`),
 > under WDA where the backdrop is listed after the screen beneath at its origin: adapters/wda-source.ts#
-> inWindowBackdrops marks the backdrop a presented `screen` (ADR 0018, "Amendment: an in-window backdrop"). Measured by
+> inWindowBackdrops marks the backdrop presented, kind `backdrop` (ADR 0018, "Amendment: an in-window backdrop"). Measured by
 > the round's probes (WDA lists siblings of the same top in draw order: blur-menu-grouped and blur-menu-stacked, two
 > declaration orders, one listing; a hidden tap-catcher beneath its content listed first, unmarked), the golden mode
 > (against `5f33c10`: 36 checks change, all on the three grouped WDA trees — A, B, D refused "close it first", their
 > colour failing closed, scroll_until stopping before any swipe; C gains "close it first" — none elsewhere), calibrate
-> (calibration.json #31, CALIBRATED, `5f33c10` → `7fd1ee5`) and the lab simulator (docs/truth/live-records/
+> (calibration.json #31, CALIBRATED, `5f33c10` → `7fd1ee5`, again → `73ef14e`) and the lab simulator (docs/truth/live-records/
 > ios-vis-r16-blur-1.json, -2.json: the three grouped cells' A–D refused, nothing fired or stroked, K and W Tapped,
 > twice). **Stands** (ADR 0018 residual 9): under idb, which lists no trace of the hidden backdrop; under WDA in a
 > reading-order run (the ungrouped blur-menu: the backdrop listed first by its top, its order untold); and for
@@ -15,7 +17,8 @@
 > .isModal)` on the menu, or a labelled accessibility element on the backdrop, and `treeSource: wda`.
 > The rule's own residual (ADR 0018, the amendment's): WDA's flags cannot tell the backdrop from a hidden screen-sized
 > overlay that passes touches (`.allowsHitTesting(false)`) listed after the screen's content — read as a backdrop, a
-> false refusal, unmeasured in any app.
+> false refusal, unmeasured in any app; the reply names the evidence and the way out ("if a screenshot shows no menu
+> up, the backdrop is an overlay that lets touches through: tap it by coordinates").
 
 **Measured 2026-10-14 22:21–22:23 UTC** on the iPhone 17 simulator, iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt).
 averi = mobile-verify `arch/round-13` @ `d407256` (`dist/`, stdio via the HTTP daemon on port 47893), both `treeSource: wda`

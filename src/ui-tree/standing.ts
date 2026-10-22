@@ -468,7 +468,7 @@ const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
   popover: { article: 'a', noun: 'popover' },
   dialog: { article: 'a', noun: 'dialog' },
 };
-/** The words for `layer` when the source typed it; undefined for a `screen` layer, or none. */
+/** The words for `layer` when the source typed it; undefined for a `screen` or `backdrop` layer, or none. */
 const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (layer === undefined || !isTyped(layer.kind) ? undefined : TYPED_WORDS[layer.kind]);
 
 /**
@@ -477,20 +477,39 @@ const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (
  * `an alert "Delete?"`), a `screen` layer, or none, `a sheet or modal`.
  */
 export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
+  if (layer?.kind === 'backdrop') return BACKDROP;
   const typed = typedWords(layer);
   return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${JSON.stringify(layer.label)}` : ''}`;
 };
+
+/**
+ * A `backdrop` layer's words (adapters/types.ts#PresentationKind): what it is taken for, the evidence it rests on —
+ * one empty element WDA lists over the whole screen, which a hidden overlay that lets touches through (a decorative
+ * tint, `.allowsHitTesting(false)`, RN `pointerEvents="none"`) matches too (ADR 0018, the amendment "an in-window
+ * backdrop", its residual) — and the way out then: a screenshot shows whether a menu is up; with none, what is beneath
+ * the overlay takes a touch by coordinates (the tap and swipe tools' x/y, which judge nothing), or is judged on that
+ * screenshot. The refusal stands: only the agent's look at the screen moves past it.
+ * docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
+ */
+const BACKDROP = "a menu's backdrop";
+const BACKDROP_EVIDENCE = '(an empty element WDA lists over the whole screen, after its content) — close it first';
+const NO_MENU = 'if a screenshot shows no menu up, the backdrop is an overlay that lets touches through:';
 
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
  * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
  * since no scroll moves the node out from under it. A layer the tree source types (an alert, an action sheet, a
- * popover; Android's floating window, a dialog: `layer`) is named by its kind and label; a `screen` layer, or none, is "a screen … (a modal or a sheet)".
+ * popover; Android's floating window, a dialog: `layer`) is named by its kind and label; a `backdrop` by its evidence,
+ * with the way out when a screenshot shows no menu (`BACKDROP`); a `screen` layer, or none, is "a screen … (a modal or a sheet)".
  * The one clause of a remedy kept here, in the UI-tree layer both verbs and the pixel assert may import, as
  * system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
 export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
+  if (layer?.kind === 'backdrop')
+    return what === 'it'
+      ? `${BACKDROP} is presented over it ${BACKDROP_EVIDENCE}; no scroll moves it out from under that backdrop; ${NO_MENU} tap it by coordinates`
+      : `${BACKDROP} is presented over the element ${BACKDROP_EVIDENCE}; ${NO_MENU} judge the element on that screenshot`;
   const typed = typedWords(layer);
   return typed !== undefined
     ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
@@ -504,6 +523,8 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
  * `scroll_until` description quotes (mcp/tools.ts).
  */
 export const presentedStop = (layer?: MarkedLayer): string => {
+  if (layer?.kind === 'backdrop')
+    return `${BACKDROP} is presented over it ${BACKDROP_EVIDENCE}; no scroll moves it out from under that backdrop, and a swipe on it may close the menu; ${NO_MENU} swipe and tap by coordinates`;
   const typed = typedWords(layer);
   return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };

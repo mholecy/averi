@@ -271,19 +271,24 @@ export const SCREEN_SIZED_FRACTION = 0.9;
 /**
  * The kinds of PRESENTED LAYER a tree source marks (`UiNode.presentation`) — one closed set: three WDA types by an
  * element (`alert`, `actionSheet`, `popover`); `dialog`, the window uiautomator dumps when it floats over what it was
- * opened from (adapters/android.ts#presentedWindow); and `screen`, a presented screen WDA shows by its visibility
- * flags, or the uiautomator window whose scrim lies above its sheet.
+ * opened from (adapters/android.ts#presentedWindow); `screen`, a presented screen WDA shows by its visibility
+ * flags, or the uiautomator window whose scrim lies above its sheet; and `backdrop`, an IN-WINDOW BACKDROP WDA's flags
+ * show over the screen beneath it (adapters/wda-source.ts#inWindowBackdrops: a SwiftUI menu's dimmed tap-catcher in
+ * the screen's own container) — judged as a `screen` layer is, but on weaker evidence: one empty element WDA lists
+ * over the whole screen, which a hidden overlay that lets touches through matches too, so its remedy names that
+ * evidence and the way out (ui-tree/standing.ts#presentedRemedy).
  */
-export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'dialog' | 'screen';
+export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'dialog' | 'screen' | 'backdrop';
 
 /**
- * A kind a source TYPES — every kind but `screen`: by an element the layer holds (`UiNode.presentationElement`) under
- * WDA, by the window's own shape (`dialog`) under uiautomator, where the layer is its own cover.
+ * A kind a source TYPES — every kind but the two its visibility flags show (`screen`, `backdrop`): by an element the
+ * layer holds (`UiNode.presentationElement`) under WDA, by the window's own shape (`dialog`) under uiautomator, where
+ * the layer is its own cover.
  */
-export type TypedPresentationKind = Exclude<PresentationKind, 'screen'>;
+export type TypedPresentationKind = Exclude<PresentationKind, 'screen' | 'backdrop'>;
 
-/** `kind` is typed by an element (`TypedPresentationKind`), not a `screen` the source shows by its visibility flags. */
-export const isTyped = (kind: PresentationKind): kind is TypedPresentationKind => kind !== 'screen';
+/** `kind` is typed by an element (`TypedPresentationKind`), not a `screen` or `backdrop` the source shows by its visibility flags. */
+export const isTyped = (kind: PresentationKind): kind is TypedPresentationKind => kind !== 'screen' && kind !== 'backdrop';
 
 /** Normalized accessibility tree node — identical shape on both platforms. */
 export interface UiNode {
@@ -608,10 +613,11 @@ export interface UiNode {
    *   transparent modals (iPhone 17, iOS 27). The flags of a whole LAYER beneath and of a visible later one, never one
    *   node's, never a target's own: corroboration, never one flag alone. Only in a payload carrying the flags; a
    *   layer typed is not also `screen`. The keyboard's and the input host's Windows are never searched;
-   * - by the same flags, `screen`, on an IN-WINDOW BACKDROP (adapters/wda-source.ts#inWindowBackdrops, ADR 0018's
+   * - by the same flags, `backdrop`, on an IN-WINDOW BACKDROP (adapters/wda-source.ts#inWindowBackdrops, ADR 0018's
    *   amendment "an in-window backdrop"): not a layer but a childless structural screen-sized node INSIDE one of the
    *   app Window's layers, listed after the screen beneath at its origin and over it by WDA's flags (a SwiftUI menu's
-   *   dimmed backdrop in the screen's own container) — only when nothing else of that Window is marked.
+   *   dimmed backdrop in the screen's own container) — only when nothing else of that Window is marked; judged as a
+   *   `screen` layer, its remedy worded apart (`PresentationKind`).
    * The source's fact, not a shape draw order infers: a marked layer covers what lies OUTSIDE it and is drawn before
    * it, through the whole screen, whatever the frames around it; its own nodes are not beneath it (a popover's dismiss
    * region, an alert's buttons are reached).

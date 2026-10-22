@@ -229,9 +229,11 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * THE MARKS ADAPTER: the layers the tree source marks presented (`markOf`), read on every tree. A LAYER it marks covers
  * every node drawn before it and outside it through the whole screen — a typed layer (WDA's alert, action sheet or
  * popover) through its element alone, its one cover; a `screen` layer (one WDA's visibility flags show presented)
- * reaching the whole screen with its own nodes covering where they draw — each that screen's surface. No
- * stacked-screens, window or bare-frame condition: those are the shape fallback's inferences (`byShape`), which the
- * mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's one window, idb's flat list —
+ * reaching the whole screen with its own nodes covering where they draw — each that screen's surface; a `backdrop`
+ * (WDA's in-window backdrop, a childless node inside a layer) judged as a `screen` layer, its own cover with no nodes
+ * of its own, whatever is listed after it outside it (its menu card) not beneath it — only its words differ
+ * (standing.ts#presentedRemedy). No stacked-screens, window or bare-frame condition: those are the shape fallback's
+ * inferences (`byShape`), which the mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's one window, idb's flat list —
  * nothing of the tree lies outside it, so it covers no target, and for no target its cover takes every touch-down
  * (`topmostAt`).
  */

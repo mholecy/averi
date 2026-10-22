@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { presentedLayerName, presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 
 // The presented clause, per kind of marked layer (ui-tree/standing.ts#presentedRemedy, #presentedStop): a layer the
 // source types is named by its kind and label; a `screen` layer, or none marked, gets the presented screen's words.
@@ -17,5 +17,17 @@ describe('presentedRemedy / presentedStop — the words per kind of presented la
     expect(presentedRemedy('it', { kind: 'screen' })).toBe(presentedRemedy('it'));
     expect(presentedStop({ kind: 'screen' })).toBe(presentedStop());
     expect(presentedStop()).toBe('a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen, and a swipe on it may dismiss it');
+  });
+
+  it('a `backdrop` (an in-window backdrop, one empty element WDA lists over the screen) names that evidence and the way out when a screenshot shows no menu', () => {
+    const evidence = "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after its content) — close it first";
+    const noMenu = 'if a screenshot shows no menu up, the backdrop is an overlay that lets touches through:';
+    expect(presentedRemedy('it', { kind: 'backdrop' })).toBe(`${evidence}; no scroll moves it out from under that backdrop; ${noMenu} tap it by coordinates`);
+    expect(presentedRemedy('the element', { kind: 'backdrop' })).toBe(
+      "a menu's backdrop is presented over the element (an empty element WDA lists over the whole screen, after its content) — close it first; " +
+        `${noMenu} judge the element on that screenshot`,
+    );
+    expect(presentedStop({ kind: 'backdrop' })).toBe(`${evidence}; no scroll moves it out from under that backdrop, and a swipe on it may close the menu; ${noMenu} swipe and tap by coordinates`);
+    expect(presentedLayerName({ kind: 'backdrop' })).toBe("a menu's backdrop");
   });
 });

@@ -11,7 +11,7 @@ import { flushProbedSide, presentedRemedySaid, windowHintSaid } from '../../scri
 // active-window hint (#ACTIVE_WINDOW_HINT), which is no presented remedy.
 
 /** Every presentation kind — the type check below fails when src adds one this list lacks. */
-const KINDS = ['alert', 'actionSheet', 'popover', 'dialog', 'screen'] as const satisfies readonly PresentationKind[];
+const KINDS = ['alert', 'actionSheet', 'popover', 'dialog', 'screen', 'backdrop'] as const satisfies readonly PresentationKind[];
 const everyKind: Exclude<PresentationKind, (typeof KINDS)[number]> extends never ? true : false = true;
 
 const LAYERS: readonly (MarkedLayer | undefined)[] = [undefined, ...KINDS.flatMap((kind) => [{ kind }, { kind, label: 'Delete account?' }])];
