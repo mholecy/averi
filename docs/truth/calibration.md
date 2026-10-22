@@ -1366,10 +1366,10 @@ A text note judged on the real pixels by the host's recognizer (NOT-ASKED where 
 - working tree:
   - RED ios-iphone17-ios27/sheet-long-list.idb.json R tap — not tapped: ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list.R" to appear
   - RED ios-iphone17-ios27/sheet-long-list.idb.json R colour — failed: FAIL  element id:"lab.sheet-long-list.R" fill within dE00 8 of #1E88E5 — not found within 1 s
-  - RED ios-iphone17-ios27/sheet-long-list.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element neve
+  - RED ios-iphone17-ios27/sheet-long-list.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken — idb lists onl
   - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R tap — not tapped: ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list-short.R" to appear
   - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R colour — failed: FAIL  element id:"lab.sheet-long-list-short.R" fill within dE00 8 of #1E88E5 — not found within 1 s
-  - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — elemen
+  - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — stopped: ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken — idb lis
 
 No fix yet: red at HEAD — R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply says why (review round 4, P4). presented.known.ts owns the ratchet; this entry links the note to its rows. Live: scripts/truth/live-known.ts NO_ID (idb tap:sheet-long-list.R, tap:sheet-long-list-short.R, scroll:sheet-long-list-short.F).
 
