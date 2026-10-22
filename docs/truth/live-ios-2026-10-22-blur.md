@@ -99,7 +99,8 @@ stroke before a read of the call has read — tests only, not run live.) Reprodu
 - **sheet-background's A and B** (content above): two feelers from (201,175), the app logging two touches and nothing
   dismissed — in all five runs (the two cell runs and the three alone); the reply the unmoved stop, "… or the swipes were
   not taken — idb lists only what a presented sheet, alert or cover leaves to accessibility, nothing beneath it: if one
-  is up, close it first) — element never appeared in the tree …". `presented-stroke` on `not found` (residual 6, known;
+  is up, close it first) — element never appeared in the tree …". (The note's words since changed, after these runs, to "…leaves to accessibility: if the element lies beneath
+  one, close it first" — the words only; the strokes and the stop the same.) `presented-stroke` on `not found` (residual 6, known;
   live-known.ts re-filed them with C, D and the alert's and cover's, no longer the loud `presented-changed` after a
   dismissal). Before (round 7 to `da68586f`): the full stroke dismissed the sheet every run.
 - **alert-dim, dim-cover (A–D), sheet-background C and D**: two strokes on the layer, nothing dismissed, as before (A

@@ -1553,9 +1553,9 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
 /**
  * Whether the tree's nesting is its nodes' ancestry: false for idb's flat
  * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
- * tree's dialect is read here and nowhere else outside draw order and its
- * reading-order module — this and `listsUnclippedFrames` (a third,
- * reading-order.ts#listsInReadingOrder, is that module's alone) — what geometry.ts#clipsOf's `inScroller` and
+ * tree's dialect is read here and in its reading-order module — this and `listsUnclippedFrames` (a third,
+ * reading-order.ts#listsInReadingOrder, is that module's alone); outside draw order only ui-tree/miss.ts reads the
+ * same mark, for a miss (`containerId`) and for strokes (`topLayerOnlySource`) — what geometry.ts#clipsOf's `inScroller` and
  * `drawnIn` ask, through ui-tree/standing.ts#sceneOf, and the pixel
  * standing's flat-list root (ui-tree/standing.ts#Standing,
  * `covered.overRoot`).

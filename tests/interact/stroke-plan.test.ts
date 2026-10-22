@@ -43,7 +43,7 @@ const after = (tree: UiNode, { target, keyboardTop }: { target?: UiNode; keyboar
 
 /** The plan of one read of `tree` for a stroke `toward`, at `reach`, over `gesture`: the stroke as sent. */
 function planOn(tree: UiNode, toward: Direction, opts: { target?: UiNode; keyboardTop?: number; reach?: number; gesture?: Rect } = {}) {
-  return planStroke(after(tree, opts), { toward, reach: opts.reach ?? 1, gesture: opts.gesture ?? BOX, read: { facts: factsOf(tree), target: opts.target } });
+  return planStroke(after(tree, opts), { kind: 'full', toward, reach: opts.reach ?? 1, gesture: opts.gesture ?? BOX, read: { facts: factsOf(tree), target: opts.target } });
 }
 
 /** The list alone, with `over` drawn after it — the screen's largest scroller, the target not read yet. */
@@ -52,22 +52,22 @@ const listUnder = (list: Rect, over: Rect[] = []): UiNode => screenOf([scroller(
 describe('the points — the stroke the driver sends, made once by the plan', () => {
   it('over the screen box (no scroll view): the box\'s own stroke — swipeVector, swipeVectorAbove under a keyboard, shortenStroke at a reach', () => {
     const bare = screenOf([]);
-    expect(planOn(bare, 'down').stroke).toEqual({ toward: 'down', reach: 1, box: BOX, points: swipeVector(BOX, 'down', 'content') });
-    expect(planOn(bare, 'down', { keyboardTop: 1398 }).stroke).toEqual({ toward: 'down', reach: 1, coverTop: 1398, box: BOX, points: swipeVectorAbove(BOX, 1398, 'down', 'content') });
+    expect(planOn(bare, 'down').stroke).toEqual({ kind: 'full', toward: 'down', reach: 1, box: BOX, points: swipeVector(BOX, 'down', 'content') });
+    expect(planOn(bare, 'down', { keyboardTop: 1398 }).stroke).toEqual({ kind: 'full', toward: 'down', reach: 1, coverTop: 1398, box: BOX, points: swipeVectorAbove(BOX, 1398, 'down', 'content') });
     expect(planOn(bare, 'down', { reach: 0.5 }).stroke.points).toEqual(shortenStroke(swipeVector(BOX, 'down', 'content'), 0.5, 2220));
   });
 
   it('over a scroll view\'s box: a content-up stroke touches down inside the list (1021), not on the header above it (444) — its length the list\'s', () => {
     expect(planOn(screenOf([]), 'up').stroke.points?.from.y).toBe(444);
     const settings = listUnder(SETTINGS);
-    expect(planOn(settings, 'up').stroke).toEqual({ toward: 'up', reach: 1, box: SETTINGS, points: { from: { x: 540, y: 1021 }, to: { x: 540, y: 1871 } } });
+    expect(planOn(settings, 'up').stroke).toEqual({ kind: 'full', toward: 'up', reach: 1, box: SETTINGS, points: { from: { x: 540, y: 1021 }, to: { x: 540, y: 1871 } } });
     expect(planOn(settings, 'up', { reach: 0.25 }).stroke.points).toEqual({ from: { x: 540, y: 1021 }, to: { x: 540, y: 1234 } });
     expect(planOn(settings, 'down', { keyboardTop: 1398 }).stroke.points).toEqual(swipeVectorAbove(SETTINGS, 1398, 'down', 'content'));
   });
 
   it('no gesture box (swipe.ts#screenBox threw): no box and no points — the driver throws why — and no touch-down to ask about', () => {
-    const plan = planStroke(startStrokes(), { toward: 'down', reach: 1, gesture: undefined, read: { facts: factsOf(listUnder(LIST)), target: undefined } });
-    expect(plan.stroke).toEqual({ toward: 'down', reach: 1 });
+    const plan = planStroke(startStrokes(), { kind: 'full', toward: 'down', reach: 1, gesture: undefined, read: { facts: factsOf(listUnder(LIST)), target: undefined } });
+    expect(plan.stroke).toEqual({ kind: 'full', toward: 'down', reach: 1 });
     expect(plan.presented).toBeUndefined();
   });
 });
@@ -105,7 +105,7 @@ describe('room — a box under MIN_STROKE_BOX along the stroke is no stroke box:
 describe('a node drawn over the scroll view (docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md)', () => {
   it('measured: the list under the floating tab bar — a content-down stroke is cut above the bar\'s host and touches down at 1638, not at 1942 on the bar; the uncut stroke is the list\'s own', () => {
     const cut = planOn(listUnder(LIST, [BAR]), 'down').stroke;
-    expect(cut).toEqual({ toward: 'down', reach: 1, coverTop: 1840, box: LIST, points: { from: { x: 540, y: 1638 }, to: { x: 540, y: 1028 } } });
+    expect(cut).toEqual({ kind: 'full', toward: 'down', reach: 1, coverTop: 1840, box: LIST, points: { from: { x: 540, y: 1638 }, to: { x: 540, y: 1028 } } });
     const uncut = planOn(listUnder(LIST), 'down').stroke.points;
     expect(uncut).toEqual({ from: { x: 540, y: 1942 }, to: { x: 540, y: 1104 } });
     expect(uncut !== undefined && containsPoint(BAR, uncut.from)).toBe(true);
@@ -114,7 +114,7 @@ describe('a node drawn over the scroll view (docs/bugs/2026-10-09-android-scroll
   });
 
   it('only a CONTENT-DOWN stroke is cut: a content-up one touches down at 0.2 of the list, above the bar, keeping its reach; a sideways one is not cut either', () => {
-    expect(planOn(listUnder(LIST, [BAR]), 'up').stroke).toEqual({ toward: 'up', reach: 1, box: LIST, points: { from: { x: 540, y: 1104 }, to: { x: 540, y: 1942 } } });
+    expect(planOn(listUnder(LIST, [BAR]), 'up').stroke).toEqual({ kind: 'full', toward: 'up', reach: 1, box: LIST, points: { from: { x: 540, y: 1104 }, to: { x: 540, y: 1942 } } });
     expect(planOn(listUnder(LIST, [BAR]), 'left').stroke.coverTop).toBeUndefined();
   });
 
@@ -164,7 +164,7 @@ describe('a node drawn over the scroll view (docs/bugs/2026-10-09-android-scroll
 
   it('the list\'s own rows are not drawn over it: a row in its lower half cuts nothing', () => {
     const row = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 2150, width: 948, height: 73 } });
-    expect(planOn(screenOf([scroller(LIST, [row])]), 'down', { target: row }).stroke).toEqual({ toward: 'down', reach: 1, box: LIST, points: { from: { x: 540, y: 1942 }, to: { x: 540, y: 1104 } } });
+    expect(planOn(screenOf([scroller(LIST, [row])]), 'down', { target: row }).stroke).toEqual({ kind: 'full', toward: 'down', reach: 1, box: LIST, points: { from: { x: 540, y: 1942 }, to: { x: 540, y: 1104 } } });
   });
 });
 
@@ -341,7 +341,7 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     const row = ROW();
     const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, cards(CAROUSEL)), row])]);
     const first = planOn(tree, 'down', { target: row, gesture: PHONE });
-    expect(planStroke(strokeSent(first.memory), { toward: 'down', reach: 1, gesture: PHONE, read: undefined }).stroke).toEqual(first.stroke);
+    expect(planStroke(strokeSent(first.memory), { kind: 'full', toward: 'down', reach: 1, gesture: PHONE, read: undefined }).stroke).toEqual(first.stroke);
   });
 
   it('the probe never goes over a scroll view that scrolls only across it: flush with a carousel\'s bottom, over the page outward — the carousel alone is no room (unchecked), never a probe that moves nothing', () => {
@@ -360,7 +360,7 @@ describe('the memory — what a plan keeps for a round whose tree did not read, 
     const tree = screenOf([scroller(LIST, [r]), cover(BAR)]);
     const first = planOn(tree, 'down', { target: r, keyboardTop: 1700 });
     expect(first.stroke).toMatchObject({ box: LIST, coverTop: 1700 });
-    const blind = planStroke(strokeSent(first.memory), { toward: 'down', reach: 1, gesture: BOX, read: undefined });
+    const blind = planStroke(strokeSent(first.memory), { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: undefined });
     expect(blind.stroke).toEqual(first.stroke);
     expect(blind.presented).toBeUndefined();
   });
@@ -369,11 +369,11 @@ describe('the memory — what a plan keeps for a round whose tree did not read, 
     const r = row(-300);
     const found = after(screenOf([scroller(LIST, [r]), cover(BAR)]), { target: r });
     const moved = factsOf(listUnder({ x: 0, y: 401, width: 1080, height: 1753 }, [BAR]));
-    expect(planStroke(found, { toward: 'down', reach: 1, gesture: BOX, read: { facts: moved, target: undefined } }).stroke).toMatchObject({ box: LIST, coverTop: 1840 });
-    const banner = planStroke(found, { toward: 'down', reach: 1, gesture: BOX, read: { facts: factsOf(listUnder(LIST, [{ x: 0, y: 1700, width: 1080, height: 100 }])), target: undefined } });
+    expect(planStroke(found, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts: moved, target: undefined } }).stroke).toMatchObject({ box: LIST, coverTop: 1840 });
+    const banner = planStroke(found, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts: factsOf(listUnder(LIST, [{ x: 0, y: 1700, width: 1080, height: 100 }])), target: undefined } });
     expect(banner.stroke.coverTop).toBe(1700);
     for (const kept of [banner.memory, strokeSent(banner.memory)]) {
-      expect(planStroke(kept, { toward: 'down', reach: 1, gesture: BOX, read: { facts: moved, target: undefined } }).stroke.coverTop).toBe(1700);
+      expect(planStroke(kept, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts: moved, target: undefined } }).stroke.coverTop).toBe(1700);
     }
   });
 });
@@ -464,7 +464,7 @@ describe('the presented touch-down — asked of the scene at the points as sent'
         key === 'presentedAt' ? (point: Point, on?: UiNode) => (asked.push({ ...point }), target.presentedAt(point, on)) : Reflect.get(target, key, receiver),
     });
     const facts = { tree, scene: recording, mainScroller: largestScroller(tree) };
-    const recorded = planStroke(seeRead(startStrokes(), { facts, line: undefined, target: field }), { toward: 'down', reach: 1, gesture: { x: 0, y: 0, width: 402, height: 874 }, read: { facts, target: field } });
+    const recorded = planStroke(seeRead(startStrokes(), { facts, line: undefined, target: field }), { kind: 'full', toward: 'down', reach: 1, gesture: { x: 0, y: 0, width: 402, height: 874 }, read: { facts, target: field } });
     expect(asked).toEqual([recorded.stroke.points?.from]);
     expect(asked).toEqual([{ x: 201, y: 329 }]);
   });

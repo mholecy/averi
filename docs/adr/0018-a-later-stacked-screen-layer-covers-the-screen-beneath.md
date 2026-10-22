@@ -955,7 +955,7 @@ large sheet's blank content, the one gesture that dismisses a swipe-dismissable 
 loud `presented-changed`. Beneath alert-dim and dim-cover (A–D) and the sheet's C and D nothing is dismissed: two
 strokes on the layer, the unmoved stop. idb's tree gives no evidence of the layer before the first stroke (the sheet's
 button alone). So `scroll_until` FEELS before it strokes: on a tree that lists only what a presented layer leaves
-(ui-tree/miss.ts#listsOnlyTheTopLayer, idb's flat list; the call's evidence `unfelt`, interact/scroll-rounds.ts#CallEvidence), for a target NEVER SEEN in the call, a
+(ui-tree/miss.ts#topLayerOnlySource, idb's flat list; the call's evidence `unfelt`, interact/scroll-rounds.ts#CallEvidence), for a target NEVER SEEN in the call, a
 stroke toward content `up` is a feeler (interact/stroke-plan.ts#StrokeKind, `FEELER`) while no stroke of the call has
 moved the tree (motion-ledger.ts#treeMoved): the full stroke's touch-down, its travel capped at 160 pt, sent over
 600 ms (`PlannedStroke.durationMs`, which the driver, interact/scroll.ts, passes to `swipe` over the adapter's own
@@ -1003,6 +1003,10 @@ tell the change. Now no stroke is sent until a read of the call has read (intera
 `unread`): the round reads again after a settle, to the deadline, where the timeout says "no UI tree read succeeded,
 and no swipe is drawn blind …" with the last error; once a read has read, a failed read later strokes on as before
 (the read before it is compared with the next). Not run live (golden reads one tree per case, all of which read).
+**A rule for every tree source**, not idb's alone: the round asks no platform (WDA and uiautomator as idb), so on
+Android and under WDA too a call whose reads all fail sends no swipe and says so at the deadline (a reply that read
+"1 swipe sent" after a failed first read now reads "no swipe was sent"). The reads before the first that reads spend no
+confirming read (final code review, N1): a target that read finds under a presented screen still gets its own.
 
 ## Amendment: an in-window backdrop (2026-10-22)
 

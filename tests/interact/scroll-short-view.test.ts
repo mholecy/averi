@@ -116,12 +116,12 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
   const f = [...everyNode(CAPTURE)].find((n) => n.identifier === F);
   const read = seeRead(startStrokes(), { facts, line: undefined, target: f });
   /** The memory once a stroke over `lower` was sent: what the read after it measures is `lower`'s carry. */
-  const seen = strokeSent(planStroke(read, { toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory);
+  const seen = strokeSent(planStroke(read, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory);
   /** A stroke of `travel` points straight up the screen. */
   const drag = (travel: number) => ({ from: { x: 201, y: 524 }, to: { x: 201, y: 524 - travel } });
   /** The travel of the stroke the plan draws over `lower` (its full stroke: 108) for what F still needs. */
   const travelFor = (memory: StrokeMemory, needs: number, slack = 116): number => {
-    const { points } = planStroke(memory, { toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f }, still: { needs, slack } }).stroke;
+    const { points } = planStroke(memory, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f }, still: { needs, slack } }).stroke;
     if (points === undefined) throw new Error('no points');
     return points.from.y - points.to.y;
   };
@@ -160,7 +160,7 @@ describe('the carry model (interact/stroke-plan.ts#carried): per point of finger
     const overBox = carried(read, { moved: 263, drawn: drag(108) });
     expect(travelFor(overBox, 153)).toBe(108);
     // Then a stroke over `lower`, which carried less: its own sample, not the larger one measured over the box.
-    const thenLower = carried(strokeSent(planStroke(overBox, { toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory), { moved: 194, drawn: drag(108) });
+    const thenLower = carried(strokeSent(planStroke(overBox, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory), { moved: 194, drawn: drag(108) });
     expect(travelFor(thenLower, 153)).toBeCloseTo(153 / (194 / 108), 0);
   });
 

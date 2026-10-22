@@ -3,7 +3,7 @@ import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrol
 import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { withMissNote } from '../ui-tree/miss.js';
+import { TOP_LAYER_ONLY_HINT, withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause, type Cover } from '../ui-tree/cover.js';
 import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, type ScrollViewCut } from '../ui-tree/standing.js';
@@ -12,7 +12,7 @@ import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall, type UnlistedLayer } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
@@ -731,11 +731,6 @@ function shortClause(judged: Judged): string {
   }
 }
 
-/** What a tree source that lists only a presented layer's leavings does not list, as the unmoved stop says it (scroll-rounds.ts#UnlistedLayer). */
-const UNLISTED_LAYER: Record<UnlistedLayer, string> = {
-  idb: 'idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first',
-};
-
 /** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */
 export function boundText(by: BoundBy, swipes: number): string {
   switch (by.of) {
@@ -753,7 +748,7 @@ export function boundText(by: BoundBy, swipes: number): string {
         return `after ${swipesText(swipes)} (${which} ${verb}: ${endText(by.ends)} — content exhausted)`;
       }
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
-      const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${UNLISTED_LAYER[by.unlisted]}` : ''}`;
+      const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
     case 'maxSwipes':

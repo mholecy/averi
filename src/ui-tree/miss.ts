@@ -61,15 +61,30 @@ export type Miss =
   | { readonly of: 'none' };
 
 /**
- * Whether the tree's source lists only what a presented layer leaves to accessibility and shows no sign of a layer it
- * does not mark: idb's flat list (its own mark, `UiNode.flatList`, as `containerId` reads it) — a large-detent sheet,
- * an alert, a transparent cover over the screen leave only their own controls listed, or none (ADR 0018, "idb's
- * presented layer", residuals). A fact of the tree source's dialect, read from the tree, for the reader that must act
- * before a miss is judged: `scroll_until`'s strokes for a target never seen (interact/scroll-rounds.ts#CallEvidence).
+ * A tree source that lists only what a presented layer leaves to accessibility and shows no sign of a layer it does
+ * not mark: idb's flat list — a large-detent sheet, an alert, a transparent cover over the screen leave only their own
+ * controls listed, or none (ADR 0018, "idb's presented layer", residuals).
  */
-export function listsOnlyTheTopLayer(tree: UiNode): boolean {
-  return tree.flatList === true;
+export type TopLayerOnlySource = 'idb';
+
+/**
+ * The tree's source when it lists only the top layer (`TopLayerOnlySource`), read from the tree: idb's own mark,
+ * `UiNode.flatList` — the mark `containerId` reads, and draw-order.ts#listsAncestry the same mark as the tree's
+ * nesting. For the reader that must act before a miss is judged: `scroll_until`'s strokes for a target never seen
+ * (interact/scroll-rounds.ts#CallEvidence). Undefined for a tree that lists its presented layers or its scroll views.
+ */
+export function topLayerOnlySource(tree: UiNode): TopLayerOnlySource | undefined {
+  return tree.flatList === true ? 'idb' : undefined;
 }
+
+/**
+ * THE hint of strokes that moved nothing on a tree whose source lists only the top layer (`TopLayerOnlySource`), as
+ * `scroll_until`'s unmoved stop says it (interact/scroll-text.ts#boundText) — a possibility, never the cause, as
+ * `ACTIVE_WINDOW_HINT` is.
+ */
+export const TOP_LAYER_ONLY_HINT: Record<TopLayerOnlySource, string> = {
+  idb: 'idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first',
+};
 
 /** THE hint of a miss on a tree whose source lists the active window only and marks no window presented (`Miss`'s `activeWindow`). */
 export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';

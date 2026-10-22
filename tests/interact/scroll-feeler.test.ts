@@ -48,7 +48,7 @@ describe('scroll_until on idb, a content-up stroke for a target never seen: a fe
     expect(sent[0]).toMatchObject({ kind: 'feeler', durationMs: 600 });
     expect(travel(sent[0])).toBe(160);
     for (const s of sent.slice(1)) {
-      expect(s.kind).toBeUndefined();
+      expect(s.kind).toBe('full');
       expect(s.durationMs).toBeUndefined();
       expect(travel(s)).toBeGreaterThan(160);
     }
@@ -65,20 +65,20 @@ describe('scroll_until on idb, a content-up stroke for a target never seen: a fe
     const seenA = { tree, found: tree.children.filter((n) => n.label === 'A') };
     const sent = strokes(play(UP, [seenA, seenA, seenA]));
     expect(sent.length).toBeGreaterThan(0);
-    for (const s of sent) expect([s.kind, s.durationMs]).toEqual([undefined, undefined]);
+    for (const s of sent) expect([s.kind, s.durationMs]).toEqual(['full', undefined]);
   });
 
   it('a push-up (content below) is never a feeler: the finger moving up dismisses no sheet', () => {
     const played = play(DOWN, [{ tree: sheet(), found: [] }, { tree: sheet(), found: [] }, { tree: sheet(), found: [] }]);
     expect(strokes(played).map((s) => [s.kind, s.durationMs])).toEqual([
-      [undefined, undefined],
-      [undefined, undefined],
+      ['full', undefined],
+      ['full', undefined],
     ]);
   });
 
   it('a tree that lists its scroll views (not idb\'s flat list) is never felt: full strokes', () => {
     const played = play(UP, [{ found: [], mainScroller: { x: 0, y: 100, width: 402, height: 700 } }, { found: [], mainScroller: { x: 0, y: 100, width: 402, height: 700 } }, { found: [], mainScroller: { x: 0, y: 100, width: 402, height: 700 } }]);
-    expect(strokes(played).every((s) => s.kind === undefined && s.durationMs === undefined)).toBe(true);
+    expect(strokes(played).every((s) => s.kind === 'full' && s.durationMs === undefined)).toBe(true);
   });
 });
 

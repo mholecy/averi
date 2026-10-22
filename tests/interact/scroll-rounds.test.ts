@@ -67,7 +67,7 @@ describe('round — the protocol', () => {
     const seen = { read: readOf([formRow(1906)], { cover: UP_IME }), elapsedMs: 0, readMs: 0 };
     const asked = round(state, seen);
     expect(asked).toEqual({ state, step: { do: 'ask', what: 'witness' } });
-    expect(decided(round(state, { ...seen, corroborated: true }).step)).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398 });
+    expect(decided(round(state, { ...seen, corroborated: true }).step)).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, coverTop: 1398 });
   });
 
   it('a stroke owes its drawn stroke to the next round; a round given one unasked, or none when owed, or any round after the stop, throws', () => {
@@ -159,7 +159,7 @@ describe('round — the soft keyboard', () => {
   it('Android, symptom 1: a row WHOLLY under the IME is not "fully visible after 0 swipes" — it is scrolled out from under it first', () => {
     const played = play({ ...ANDROID, fully: true }, reads([1906, 1306, 1306], formRow, { cover: UP_IME })); // the measured rect: y 1906–1979, inside the IME
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
-    expect(decided(played.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398, box: SCREEN_1080 }); // no clipping container: the screen box
+    expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, coverTop: 1398, box: SCREEN_1080 }); // no clipping container: the screen box
     // The witness on the round the band changes; none on the moot stop. `unlocated` is put to a SHOWN reading, which asks nothing.
     expect(played.rounds.map((r) => r.asks)).toEqual([['witness'], [], ['unlocated']]);
     // Clear of the band at the stop: the band changes nothing there, so it is not reported (review 2026-10-08).
@@ -405,9 +405,9 @@ describe('round — after the device check', () => {
     expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] }); // not "fully visible after 1 swipe"
     // Turned round: content up, its reach halved on the turn.
     expect(played.steps.map(decided)).toEqual([
-      { do: 'stroke', toward: 'down', reach: 1, coverTop: 572, box: IPHONE_BOX },
+      { do: 'stroke', kind: 'full', toward: 'down', reach: 1, coverTop: 572, box: IPHONE_BOX },
       { do: 'confirm' },
-      { do: 'stroke', toward: 'up', reach: 0.5, coverTop: 572, box: IPHONE_BOX },
+      { do: 'stroke', kind: 'full', toward: 'up', reach: 0.5, coverTop: 572, box: IPHONE_BOX },
       { do: 'confirm' },
       expect.objectContaining({ do: 'stop' }),
     ]); // five reads: round 0; 300 (stop) and its confirmation -48; 94 (stop) and its confirmation 94
@@ -661,14 +661,14 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   it('the measured Fees row, cut by the top bar to {y:242, height:92}, with the DEFAULT direction down: probed TOWARD the top edge (content up), inside the container — never stroked away', () => {
     // At rest the row starts 51 px above 242; the probe moves the content down 260 px: the row reads whole at 451.
     const played = play(FULLY_ANDROID, [formRead(242, 92), formRead(451), formRead(451)]);
-    expect(decided(played.steps[0])).toEqual({ do: 'stroke', toward: 'up', reach: 0.25, box: FORM, probe: true, maxTravel: 177 });
+    expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'up', reach: 0.25, box: FORM, probe: true, maxTravel: 177 });
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] }); // no flush left: the row is whole
   });
 
   it('the measured Priority row, cut by CONTINUE to {y:1846, height:132}: probed toward the bottom edge (content down)', () => {
     const played = play(FULLY_ANDROID, [formRead(1846, 132), formRead(1586), formRead(1586)]);
-    expect(probeOf(played).map(decided)).toEqual([{ do: 'stroke', toward: 'down', reach: 0.25, box: FORM, probe: true, maxTravel: 177 }]);
+    expect(probeOf(played).map(decided)).toEqual([{ do: 'stroke', kind: 'full', toward: 'down', reach: 0.25, box: FORM, probe: true, maxTravel: 177 }]);
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
   });
 
@@ -775,10 +775,10 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     const row: Row = { found: [match({ x: 66, y: 1300, width: 948, height: 98 })], scroller: RESIZED, cover: UP_IME };
     const played = play(FULLY_ANDROID, [row, { ...row, found: [match({ x: 66, y: 1100, width: 948, height: 143 })] }, { ...row, found: [match({ x: 66, y: 1100, width: 948, height: 143 })] }]);
     expect(played.rounds[0].asks).toEqual(['witness']);
-    expect(decided(played.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, coverTop: 1398, box: RESIZED, probe: true, maxTravel: 177 });
+    expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 0.25, coverTop: 1398, box: RESIZED, probe: true, maxTravel: 177 });
     // Denied: the probe is drawn over the container whole.
     const denied = play(FULLY_ANDROID, [{ ...row, corroborated: false }, row]);
-    expect(decided(denied.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, box: RESIZED, probe: true, maxTravel: 177 });
+    expect(decided(denied.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 0.25, box: RESIZED, probe: true, maxTravel: 177 });
   });
 });
 
@@ -838,7 +838,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
       { found: [] },
     ]);
     expect(played.steps.flatMap((st) => (st.do === 'stroke' ? [st.box] : []))).toEqual([LIST, OTHER, OTHER, OTHER]);
-    expect(decided(play({ ...IPHONE, maxSwipes: 1 }, [{ found: [] }, { found: [] }]).steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: IPHONE_BOX });
+    expect(decided(play({ ...IPHONE, maxSwipes: 1 }, [{ found: [] }, { found: [] }]).steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, box: IPHONE_BOX });
   });
 
   /** A read without the target, the rest of the screen reading `rest`. */
@@ -888,21 +888,21 @@ describe('round — the flush check across nested clipping containers, and a pro
     // The card shorter than the carousel: flush with the carousel's bottom only — the nearest ancestor flush on one edge.
     const row: Row = { found: [card(1978 - strip + 4)], scrollers: [carousel(strip), LIST] };
     const played = play(FULLY_ANDROID, [row, row]);
-    expect(decided(played.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 0.25, box: LIST, probe: true, maxTravel: 177 });
+    expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 0.25, box: LIST, probe: true, maxTravel: 177 });
     expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: carousel(strip), checked: true });
   });
 
   it('a card that FILLS its carousel\'s height (flush with both its edges), the carousel cut by the list to 78 of 400 px: probed against the list it is cut by — not "fully visible after 0 swipes"', () => {
     const row: Row = { found: [card(1900)], scrollers: [carousel(78), LIST] };
     const played = play(FULLY_ANDROID, [row, row]);
-    expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down', box: LIST, probe: true });
+    expect(played.steps[0]).toMatchObject({ do: 'stroke', kind: 'full', toward: 'down', box: LIST, probe: true });
     expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: LIST, checked: true });
   });
 
   it('the strokes toward the target too are drawn over its first clipping ancestor with room for one: the list, not the carousel strip it was read in', () => {
     // Read in the strip but not judged in the frame (no area left of it): the scroll strokes on.
     const row: Row = { found: [match({ x: 40, y: 1978, width: 600, height: 0 }, 'card')], scrollers: [carousel(30), LIST] };
-    expect(decided(play({ ...FULLY_ANDROID, maxSwipes: 1 }, [row, row]).steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: LIST });
+    expect(decided(play({ ...FULLY_ANDROID, maxSwipes: 1 }, [row, row]).steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, box: LIST });
   });
 
   it('not probed only when flush with BOTH edges of every clipping ancestor (it fills them all) — and then reported unchecked, `fills`, against the nearest', () => {
@@ -952,7 +952,7 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(resultOf(lone).flush).toEqual({ edge: 'top', container: UNDER, checked: false, why: 'room' });
     expect(lone.asks).toEqual(['witness', 'unlocated']); // the band asked about before the room above it is judged
     const nested = play(FULLY_ANDROID, [row([UNDER, LIST]), row([UNDER, LIST])]);
-    expect(nested.steps[0]).toMatchObject({ do: 'stroke', toward: 'up', coverTop: 1398, box: LIST, probe: true });
+    expect(nested.steps[0]).toMatchObject({ do: 'stroke', kind: 'full', toward: 'up', coverTop: 1398, box: LIST, probe: true });
     expect(resultOf(nested).flush).toEqual({ edge: 'top', container: UNDER, checked: true });
   });
 
@@ -960,10 +960,10 @@ describe('round — the flush check across nested clipping containers, and a pro
     const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
     const row: Row = { found: [match({ x: 66, y: 1700, width: 948, height: 73 }, 'row')], scrollers: [UNDER, LIST], cover: UP_IME }; // wholly under the IME
     const played = play({ ...FULLY_ANDROID, maxSwipes: 1 }, [row, row]);
-    expect(decided(played.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 1, coverTop: 1398, box: LIST });
+    expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, coverTop: 1398, box: LIST });
     // With the keyboard down the nearer one has room, and is the one.
     const down = play({ ...FULLY_ANDROID, maxSwipes: 1 }, [{ ...row, found: [match({ x: 66, y: 2300, width: 948, height: 73 }, 'row')], cover: undefined }, row]);
-    expect(decided(down.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: { x: 0, y: 1340, width: 1080, height: 800 } });
+    expect(decided(down.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, box: { x: 0, y: 1340, width: 1080, height: 800 } });
   });
 
   it('a stroke toward a target not read yet: the screen\'s largest scroller is met above the keyboard too — one running on under the IME from 58 px above it leaves no room, so the stroke goes over the screen box; a failed read\'s stroke, which keeps that scroller and that cover, likewise', () => {
@@ -979,7 +979,7 @@ describe('round — the flush check across nested clipping containers, and a pro
     ]);
     // With the keyboard down it has room, and is the box.
     const down = play({ ...ANDROID, maxSwipes: 1 }, [{ found: [], mainScroller: UNDER, rest: 'a' }, { found: [], rest: 'b' }]);
-    expect(decided(down.steps[0])).toEqual({ do: 'stroke', toward: 'down', reach: 1, box: UNDER });
+    expect(decided(down.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, box: UNDER });
   });
 
   it('a read that finds the target in no container with room drops the last read\'s container — stale, maybe another list — and strokes over the screen box (code review of deep/r3-scroll, P5)', () => {
@@ -2115,7 +2115,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     it('a row of the presented sheet itself, below the sheet\'s fold, is stroked for: the touch-down lies on its own screen\'s form (the New Contact sheet\'s "add url" at y 901)', () => {
       const cell = cellOf('contactsSheet', 'add url');
       const played = play(IPHONE, [cell, cell]);
-      expect(played.steps[0]).toMatchObject({ do: 'stroke', toward: 'down' });
+      expect(played.steps[0]).toMatchObject({ do: 'stroke', kind: 'full', toward: 'down' });
     });
   });
 });

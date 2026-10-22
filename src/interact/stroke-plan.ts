@@ -96,13 +96,12 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * first stroke; a target not in the tree (no anchor); rows idb lists past the clip widen the region over what clips
  * them; a region narrower than the list (few rows listed) gives shorter strokes.
  *
- * THE FEELER, a kind of stroke (`StrokeKind`, `FEELER`): the round may ask for one (`StrokeAsk.kind`), and the plan
- * makes it from the same touch-down as the full stroke, its travel capped and its time given (`PlannedStroke.durationMs`,
- * which the driver sends instead of the adapter's own). The round asks on idb's flat list, for a target never seen,
- * toward content above, while no stroke of the call has moved the tree (scroll-rounds.ts#strokeKind): idb shows no
- * sign of a large sheet, an alert or a cover, and the full pull-down dismissed the large sheet; the feeler leaves it
- * (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "idb's presented layer", Decision 3, with
- * the measurement). Which kind is the round's to decide; how long and how slow a feeler is, the plan's.
+ * THE FEELER, a kind of stroke (`StrokeKind`, `FEELER`): the round asks for a kind with every stroke (`StrokeAsk.kind`),
+ * and the plan makes a feeler from the same touch-down as the full stroke, its travel capped and its time given
+ * (`PlannedStroke.durationMs`, which the driver sends instead of the adapter's own), so a sheet the tree does not list
+ * springs back (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "idb's presented layer",
+ * Decision 3, with the measurement). When to ask for one is the round's (scroll-rounds.ts#CallEvidence, `unfelt`);
+ * how long and how slow a feeler is, the plan's.
  *
  * Pure: no adapter, no clock, no I/O.
  */
@@ -208,22 +207,22 @@ export interface StrokeAsk {
    * (interact/motion-ledger.ts#overRegion, false). Absent: the scroll views as judged.
    */
   readonly screenBox?: true;
-  /** The kind of stroke the round asks for (`StrokeKind`); absent, a full one. */
-  readonly kind?: StrokeKind;
+  /** The kind of stroke the round asks for (`StrokeKind`). */
+  readonly kind: StrokeKind;
 }
 
 /**
- * The kinds of stroke a round may ask for. Absent from a `StrokeAsk`, a FULL stroke: the plan's reach over its box, at
- * the adapter's own speed. A `feeler`: the same touch-down, its travel capped and sent slowly (`FEELER`), so a
- * swipe-dismissable sheet the tree does not list springs back where a list still moves — the round asks for one on a
- * tree that tells no presented layer and no scroll view (idb's flat list), for a target never seen, while no stroke of
- * the call has moved the tree (scroll-rounds.ts#strokeKind). Measured on the lab's large sheet (sheet-background, iPhone 17
+ * The kinds of stroke a round may ask for. A `full` stroke: the plan's reach over its box (a probe's travel capped by
+ * the probe), at the adapter's own speed.
+ * A `feeler`: the same touch-down, its travel capped and sent slowly (`FEELER`), so a swipe-dismissable sheet the tree
+ * does not list springs back where a list still moves — when the round asks for one is scroll-rounds.ts#CallEvidence's
+ * `unfelt`. Measured on the lab's large sheet (sheet-background, iPhone 17
  * simulator, iOS 27.0, 2026-10-22; three tries of two strokes each from (201,175), finger moving down): it springs
  * back from 120–350 pt in 600–900 ms and from 120–300 pt in 300 ms, and is DISMISSED by 400 pt in 900 ms, by 200 pt
  * in 150 ms and by the full stroke, 524 pt in 300 ms. So a feeler is 160 pt in 600 ms — under half the distance that
  * held and a fifth of the speed that dismissed (ADR 0018, "idb's presented layer", its 2026-10-22 feeler).
  */
-export type StrokeKind = 'feeler';
+export type StrokeKind = 'full' | 'feeler';
 
 /** A feeler's cap on its finger travel (pt) and the time it is sent over (ms) — `StrokeKind`'s measurement. */
 export const FEELER = { maxTravel: 160, durationMs: 600 } as const;
@@ -244,8 +243,8 @@ export interface PlannedStroke {
   box?: Rect;
   maxTravel?: number;
   points?: Stroke;
-  /** A feeler's (`StrokeKind`); absent for a full stroke. */
-  kind?: StrokeKind;
+  /** The kind asked for (`StrokeKind`). */
+  kind: StrokeKind;
   /** The time the driver sends `points` over, a feeler's (`FEELER`) — the one field besides `points` production reads; absent, the adapter's own. */
   durationMs?: number;
 }
@@ -305,7 +304,8 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
     ...(coverTop !== undefined && { coverTop }),
     ...(box !== undefined && { box: { ...box } }),
     ...(points !== undefined && { points }),
-    ...(feeler !== undefined && { kind: 'feeler', maxTravel: feeler.maxTravel, durationMs: feeler.durationMs }),
+    kind,
+    ...(feeler !== undefined && { maxTravel: feeler.maxTravel, durationMs: feeler.durationMs }),
   };
   const press = read === undefined || points === undefined ? undefined : read.facts.scene.presentedAt(points.from, read.target);
   const presented = press === undefined || points === undefined ? undefined : { ...press, touchDown: points.from };
@@ -358,7 +358,7 @@ export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gest
   const { box, coverTop } = room;
   const points = scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box, maxTravel });
   return {
-    stroke: { toward, reach, ...(coverTop !== undefined && { coverTop }), box: { ...box }, maxTravel, points },
+    stroke: { toward, reach, ...(coverTop !== undefined && { coverTop }), box: { ...box }, maxTravel, points, kind: 'full' },
     memory: close({ ...open(memory), chosen: { ...room.within } }),
   };
 }

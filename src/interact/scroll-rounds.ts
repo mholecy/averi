@@ -7,7 +7,7 @@ import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { hasArea, tapPoint } from '../ui-tree/selectors.js';
-import { listsOnlyTheTopLayer, missOf, type Miss } from '../ui-tree/miss.js';
+import { missOf, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type Remedy } from '../ui-tree/standing.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -337,24 +337,17 @@ export type Flush =
  * stroke touched down on a node drawn over its container, that node:
  * `touchedOn`), `maxSwipes`, or the deadline. `ends`: the exhaustion was PROVEN by the tree — the scroll view the
  * last stroke went over lists its content ending that way (`EndProof`, its `way` the `lastStroke`) — after its
- * `unmoved` strokes (one, where UNMOVED_STROKES_EXHAUST's two are the proof otherwise).
+ * `unmoved` strokes (one, where UNMOVED_STROKES_EXHAUST's two are the proof otherwise). `unlisted`: why strokes for a
+ * target never seen may have moved nothing, beside the content's end — the tree source lists only the top layer
+ * (ui-tree/miss.ts#TopLayerOnlySource), so they may have landed on a sheet, alert or cover it does not list; carried by
+ * the unmoved stop of a call whose strokes are `unfelt` (`CallEvidence`) and said where that stop names no other cause
+ * (scroll-text.ts#boundText: no end proven, nothing named under the touch-down) — a possibility, never the cause
+ * (ui-tree/miss.ts#TOP_LAYER_ONLY_HINT); no device call.
  */
 export type BoundBy =
-  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: UnlistedLayer }
+  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: TopLayerOnlySource }
   | { of: 'maxSwipes' }
   | { of: 'timeout'; timeoutMs: number; elapsedMs: number; reads: ReadTime };
-
-/**
- * Why strokes for a target never seen may have moved nothing, beside the content's end (BoundBy's `unlisted`): the tree
- * source lists only what a presented layer leaves to accessibility — idb's flat list (ui-tree/miss.ts#listsOnlyTheTopLayer),
- * which shows no sign of a large sheet, an alert or a cover over the screen (ADR 0018, "idb's presented layer",
- * residuals) — so the strokes may have landed on one. Carried by the unmoved stop of a call whose strokes are `unfelt`
- * (`CallEvidence`: none moved the tree, the target never seen — a list that moved and then stopped ran to its end), and
- * said where that stop names no other cause
- * (scroll-text.ts#boundText: no end proven, nothing named under the touch-down).
- * A possibility, never the cause, as the uiautomator note is (ui-tree/miss.ts#ACTIVE_WINDOW_HINT); no device call.
- */
-export type UnlistedLayer = 'idb';
 
 /**
  * The tree reads of a scroll that timed out: how many (every round reads once, a failed read included), how long they
@@ -1069,7 +1062,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // that surface; the course holds for it or sends the stroke.
   const next = nextStroke(s.course);
   const { toward, reach, still } = next;
-  const kind = strokeKind(s, toward);
+  const learnt = callEvidence(s);
+  const kind = strokeKind(learnt, toward);
   const plan = planStroke(s.strokes, {
     toward,
     reach,
@@ -1077,7 +1071,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     read: now === undefined ? undefined : { facts: now.facts, target: best?.node },
     ...(still !== undefined && { still }),
     ...(!overRegion(s.motion, toward) && { screenBox: true }),
-    ...(kind !== undefined && { kind }),
+    kind,
   });
   // The plan's memory, kept at once whatever becomes of the stroke — the candidates it judged, the latest cut of the
   // target's scroll views, and the scroll view it chose, which only sending makes the last stroke's (`strokeSent`,
@@ -1107,7 +1101,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           unchanged: exhausted,
           ...(touched !== undefined && { touched }),
           ...(ends !== undefined && observed !== undefined && { ends: { way: course.lastStroke, ...endProof(s, ends, exhausted, observed.streaks) } }),
-          ...(unlistedLayer(s) !== undefined && { unlisted: unlistedLayer(s) }),
+          ...(learnt.of === 'unfelt' && { unlisted: learnt.source }),
         }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
@@ -1370,41 +1364,34 @@ function detentMove({ detents }: State): DetentMove | undefined {
 
 /**
  * WHAT THE CALL HAS LEARNT ABOUT WHERE ITS STROKES LAND — the one question behind the stroke's kind (`strokeKind`), the
- * unmoved stop's note (BoundBy's `unlisted`) and the rule that no stroke is drawn blind (`round`):
+ * unmoved stop's note (BoundBy's `unlisted`), the rule that no stroke is drawn blind (`round`) and a bound's `neverRead`:
  * - `unread`: no tree read of the call has read — nothing shows what the screen is, and nothing is there to tell a
  *   stroke changed it (`screenBefore`): no stroke;
- * - `unfelt`: the last read that read is of a source that lists only what a presented layer leaves to accessibility
- *   (ui-tree/miss.ts#listsOnlyTheTopLayer: idb's flat list, which shows no sign of a large sheet, an alert or a
- *   cover over the screen — ADR 0018, "idb's presented layer"), the target never seen and no stroke of the call has
- *   moved the tree (motion-ledger.ts#treeMoved): the strokes may land on such a layer — `source` names the tree source
- *   the stop's note speaks of;
+ * - `unfelt`: the last read that read is of a source that lists only the top layer (ui-tree/miss.ts#topLayerOnlySource:
+ *   idb's flat list, which shows no sign of a large sheet, an alert or a cover over the screen — ADR 0018, "idb's
+ *   presented layer"), the target never seen and no stroke of the call has moved the tree (motion-ledger.ts#treeMoved):
+ *   the strokes may land on such a layer — `source`, the tree source the stop's note speaks of. THE FEELER's trigger:
+ *   its content-up strokes are feelers (`strokeKind`; interact/stroke-plan.ts#StrokeKind, how a feeler is drawn);
  * - `felt`: anything else — a tree that lists its presented layers or its scroll views (WDA, uiautomator; a layer it
  *   marks is no stroke's, the plan's `presented`), a target the call has seen, a tree a stroke has moved.
  */
-type CallEvidence = { of: 'unread' } | { of: 'unfelt'; source: UnlistedLayer } | { of: 'felt' };
+type CallEvidence = { of: 'unread' } | { of: 'unfelt'; source: TopLayerOnlySource } | { of: 'felt' };
 
 function callEvidence(s: State): CallEvidence {
   const last = s.screenBefore?.tree;
   if (last === undefined) return { of: 'unread' };
-  return listsOnlyTheTopLayer(last) && !s.everFound && !treeMoved(s.motion) ? { of: 'unfelt', source: 'idb' } : { of: 'felt' };
+  const source = topLayerOnlySource(last);
+  return source !== undefined && !s.everFound && !treeMoved(s.motion) ? { of: 'unfelt', source } : { of: 'felt' };
 }
 
 /**
  * The kind of stroke this round sends toward `toward` (interact/stroke-plan.ts#StrokeKind): a FEELER while the call's
- * strokes are `unfelt` (`CallEvidence`), toward content ABOVE (`up`: the finger dragged down — the one stroke that
- * dismisses a swipe-dismissable sheet). Beneath the lab's large sheet, of which idb lists the sheet's button alone, the
- * full stroke from (201,175) dismissed the sheet (ADR 0018 residual 6); a feeler leaves it, and the strokes end at the
- * unmoved stop, which says what idb does not list (`UnlistedLayer`). A list that moves on the feeler gets full strokes
- * after it. Absent: a full stroke — every push-up, and every stroke the call's evidence has `felt`.
+ * strokes are `unfelt`, toward content ABOVE (`up`: the finger dragged down — the one stroke that dismisses a
+ * swipe-dismissable sheet; measured, ADR 0018 residual 6); else a full stroke — every push-up, and every stroke the
+ * call's evidence has `felt`. A list that moves on the feeler gets full strokes after it.
  */
-function strokeKind(s: State, toward: Direction): StrokeKind | undefined {
-  return toward === 'up' && callEvidence(s).of === 'unfelt' ? 'feeler' : undefined;
-}
-
-/** The tree source the unmoved stop's note names (BoundBy's `unlisted`), while the call's strokes are `unfelt` (`CallEvidence`). */
-function unlistedLayer(s: State): UnlistedLayer | undefined {
-  const evidence = callEvidence(s);
-  return evidence.of === 'unfelt' ? evidence.source : undefined;
+function strokeKind(evidence: CallEvidence, toward: Direction): StrokeKind {
+  return toward === 'up' && evidence.of === 'unfelt' ? 'feeler' : 'full';
 }
 
 /**
@@ -1436,7 +1423,7 @@ interface BoundRound {
  * content without a turn (`Shortfall.absent`'s `unsearched`).
  */
 function shortfall(s: State, { readError, found, best, viewport, cover, miss, held }: BoundRound, by: BoundBy): Shortfall {
-  if (readError !== undefined) return s.treesRead === 0 ? { of: 'neverRead', error: readError } : { of: 'readFailed', error: readError };
+  if (readError !== undefined) return callEvidence(s).of === 'unread' ? { of: 'neverRead', error: readError } : { of: 'readFailed', error: readError };
   if (held !== undefined) return held;
   if (best !== undefined && best.standing.facts.visible > 0) return shortOf(best);
   const left = s.inFrameAfter;

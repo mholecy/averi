@@ -72,7 +72,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
   const planAfter = (trees: UiNode[], toward: Direction, reach: number, shows: Rect = PHONE, target = r) => {
     const last = trees.at(-1)!;
     const { ledger, memory } = seen(trees, shows, target);
-    return planStroke(memory, { toward, reach, gesture: PHONE, read: { facts: factsOf(last), target: target(last) }, ...(!overRegion(ledger, toward) && { screenBox: true }) }).stroke;
+    return planStroke(memory, { kind: 'full', toward, reach, gesture: PHONE, read: { facts: factsOf(last), target: target(last) }, ...(!overRegion(ledger, toward) && { screenBox: true }) }).stroke;
   };
   /** The rows carried with R at the first read, on the screen: T 24,300 and R 24,721 (F lies at 2200, below it) — cut above the tab bar's buttons (y 755), which held still. */
   const SHOWN: Rect = { x: 24, y: 300, width: 354, height: 455 };
