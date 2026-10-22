@@ -61,6 +61,8 @@ describe('a control listed after a target, past a reading-order break, that hold
     const [o, cont] = [byId(t, 'lab.scroll-bounded.O'), byId(t, 'lab.scroll-bounded.continue')];
     const HEX = { overlap: '#1E88E5', own: '#1E88E5', other: '#E53935' };
     expect(drawOrder(t, seenOrderOf(o, [{ peer: cont, seen: 'over', ...HEX }])).exposure(o, IPHONE).covers).toEqual([]);
+    // …for every question of O, not only the tap's: the break excuses a peer seen under (`coversAfter` keeps none).
+    expect(drawOrder(t, seenOrderOf(o, [{ peer: cont, seen: 'over', ...HEX }])).coversOf(o, IPHONE)).toEqual([]);
     const over = drawOrder(t, seenOrderOf(o, [{ peer: cont, seen: 'under', ...HEX }])).exposure(o, IPHONE);
     expect(tagged(over.covers)).toEqual([{ node: cont, order: 'seenOver', presented: false }]);
   });

@@ -1627,7 +1627,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
 
   const draws = (placed: Placed): boolean => !ROWS.some((row) => row.drawnOver?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
-  /** What the `target` column knows of `target`: the tree's facts, what is presented over it, and where its reading order breaks. */
+  /** What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing in reading order says (reading-order.ts#readingOrderOf). */
   const asTarget = (target: Placed): SeenFor => ({
     ...seen,
     target,

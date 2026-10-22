@@ -165,12 +165,13 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
      2026-10-20): P (cut at `upper`'s 330) and S (at `lower`'s 560) are no longer "fully visible". It cannot see a
      clip with no plain screen beside the target (a full-width row) or a scroll view the colour of what lies beneath
      it (ADR 0013's residuals): there the claim stays the tree's.
-   - **Narrowed 2026-10-22** (round 16, LE2's rest, `19525e29`): a CONTROL listed after the row, past the reading-order
+   - **Narrowed 2026-10-22** (round 16, LE2's rest, `19525e29` + `9fd4aff2`): a CONTROL listed after the row, past the reading-order
      break, that overlaps it and holds its centre is a cover whose order is not told (ADR 0015 amended; ADR 0024
      gets a third trigger): the lab's `scroll-bounded-footer` O, a Continue `16,600 370x56` under the clip listed after
      it with its top above the row's, was `Tapped` — the tap FIRED Continue — its colour passed on Continue's colour and
      the plain stop said "fully visible after 0 swipes". Now the colour assert and the plain stop refuse (the order
-     question is asked where a control listed after the row holds its centre: one screenshot; over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests)) and the tap is moved clear of
+     question is asked where a control listed after the row holds its centre — one screenshot per plain stop and colour
+     assert, and per tap only where no tappable piece is left clear of it (O's tap moves clear and asks nothing); over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests)) and the tap is moved clear of
      Continue; what the row's tap says is still `Tapped`, on the background below the clip.
    What stays, accepted: where NOTHING IS LISTED BENEATH the row (no control over its centre), the tap, the plain stop
    and the strokes are judged on the screen alone — an element below a

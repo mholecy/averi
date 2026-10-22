@@ -199,11 +199,12 @@ A reading-order break excuses the later nodes as covers EXCEPT a control that ov
 (reading-order.ts#ReadingOrder's `coversAfter`: `peersOf`'s `unordered` or `seenOver` listed after the target, read by
 the break's own row, draw-order.ts#NOT_DRAWN's `flatListReadingOrder` — every other row's excuse stands): such a
 control is a cover whose order is not told (cover.ts#CoverOrder's `untold`), as an overlapping control listed before it
-already was. A target that is itself a flat list's bottom chrome (a floating tab bar's item) has no such peer: the bar is
-drawn over the rows (tabbar-dense's items, `Row 8` listed after them over their centres). Whether it is drawn over the target (a menu) or the target is cut by a clip beneath it (a row past its
+already was. A target that is itself a flat list's bottom chrome (a floating tab bar's item) has no reading-order peers at all
+(`peersOf` answers none — before, after or to keep a moved tap clear of): the bar is drawn over the rows (tabbar-dense's items, `Row 8` listed after them over their centres). Whether it is drawn over the target (a menu) or the target is cut by a clip beneath it (a row past its
 scroll view) is the order question ADR 0024's eyes answer — that question is reused as is; there is no new interface.
-The cost lies on that shape only — one screenshot per tap, plain stop or colour assert where a control listed after the
-target holds its centre: over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests).
+The cost lies on that shape only — one screenshot per plain stop and colour assert where a control listed after the
+target holds its centre, and per tap only where no tappable piece is left clear of it (O's tap moves clear to (201,670)
+and asks nothing; W's and `row_swift`'s ask): over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests).
 
 Measured (golden against `4ee14f1c`, 1425 checks): 0 checks changed on the existing corpus; the new cell's colour row
 fails closed, its plain stop refuses before any swipe, its tap moves clear of Continue to (201,670), nothing fires
@@ -217,8 +218,17 @@ reachable at (201,479) when the screenshot sees `row_0` under).
   menu or sheet that lies clear of the centre stay excused, as before.
 - The tap still says `Tapped` for a row past a clip with nothing listed beneath it, and for this one moved clear of
   Continue — on the background (ADR 0010's residual 5, narrowed).
-- mp-native's chooser `row_swift` was `Tapped` at its centre (correctly: the chooser is drawn over `row_0`) and is now
-  refused unless the screenshot sees `row_0` under it. UNMEASURED on a device: the capture has no png (ADR 0024's
-  residual 6), so whether the eyes tell this pair (the chooser's white row over the dimmed list row) is not known; where
-  they cannot, it is a false refusal (tap, plain stop and colour assert: "which is drawn on top is not told"), the safe
-  direction. Remedy: `treeSource: wda`.
+- **A LIKELY FALSE REFUSAL, pending the owner's acceptance** (docs/truth/open-bugs.md, Priority 3): mp-native's chooser
+  `row_swift` was `Tapped` at its centre (correctly: the chooser is drawn over `row_0` — this ADR's founding capture) and
+  is now refused unless the screenshot sees `row_0` under it. No png of that screen exists (ADR 0024's residual 6) and
+  no device runs mp-native here; on a synthesized screenshot (a white chooser card over a dimmed list, card 16–386 or
+  45–357 wide — the round-16 review) the eyes CANNOT tell: the chooser row is white on a white card, and `row_0`'s
+  clear band above `row_swift` (435–453) is the card's white too, so "the colour around it beside the overlap" holds
+  and the answer is untold — tap, plain stop and colour assert refuse ("which is drawn on top is not told"; nothing
+  tapped, no swipe). The same holds for any modal or sheet row listed before the content behind it where a content
+  control holds its centre — the mp-native pattern this ADR was written for. No tree-level rule separates it from the
+  harmful shape (the review tried two: a break more than the target's height above it refuses the chooser's `row_own`
+  and the picker's `Value date`; "the break node itself holds the centre" lets a footer label listed before Continue
+  bring the harm back). The safe direction; remedy `treeSource: wda`. Ways out, the owner's to choose: accept it; a png
+  or device run of the chooser; or teach ADR 0024's question to read the peer's bands that show something else
+  (`row_0`'s side strips 24–45, the dimmed list) — a design change.

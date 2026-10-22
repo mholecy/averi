@@ -11,11 +11,13 @@ import type { SeenOrder } from './seen-order.js';
  * node it is drawn over, and the draw order's rule "listed later = drawn later" (draw-order.ts#DrawOrder's doc) does
  * not hold there. This module is the one owner of "listed before, but drawn over" in such a listing: which siblings
  * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header) or a
- * control whose order against it the listing does not tell (`peersOf`) — which covers' order is not told, and which
- * siblings a moved tap must keep clear of. draw-order.ts#DrawOrder.exposure asks it once per target and joins its answer to the draw order's own
- * covers; it knows nothing of rows, presented layers or reaches.
- * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target" and "a heading
- * listed before")
+ * control whose order against it the listing does not tell (`peersOf`) — which covers' order is not told, which
+ * siblings a moved tap must keep clear of, and which controls listed AFTER it stay covers past the draw order's
+ * reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once for every question of a target
+ * (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the break's row
+ * (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or reaches.
+ * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target", "a heading
+ * listed before" and "a control past the break that holds the centre")
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
 

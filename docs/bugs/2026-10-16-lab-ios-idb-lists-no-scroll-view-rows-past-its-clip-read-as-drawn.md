@@ -1,6 +1,6 @@
 # BUG: under idb, a row past its scroll view's clip is judged on the screen alone — a row outside the scroll view is `Tapped` on the background and its colour assert PASSES on the background, a sliver is `Tapped`, and both stops call cut rows "fully visible"
 
-> **Status (2026-10-22, round 16): the harmful remainder fixed at `19525e29` (bugs/r16-le2); the rest still ADR 0010's
+> **Status (2026-10-22, round 16): the harmful remainder fixed at `19525e29` + `9fd4aff2` (bugs/r16-le2); the rest still ADR 0010's
 > residual 5, now narrowed to "nothing listed beneath".** The shape that fired a control: under idb a row past its clip,
 > listed BEFORE a control under the clip whose top lies above the row's (`Continue 16,600 370x56`, listed after the row)
 > and which holds the row's centre — ADR 0015's reading-order break excused Continue as a cover, so `tap O` was
@@ -10,8 +10,8 @@
 > `flatListReadingOrder` since the branch's review; ADR 0015 amended 2026-10-22, ADR 0024's third trigger). It asks the
 > eyes of 3 nodes over the 128 trees of the committed corpus: this O, the lab menu's W in `blur-menu-grouped` (its
 > screenshot sees W on top: verdicts unchanged, one screenshot per tap and plain stop where there was none), and
-> mp-native's chooser `row_swift` (no png: refused unless the eyes see it on top, unmeasured on a device — ADR 0015's
-> amendment, its residuals). Measured on the new lab
+> mp-native's chooser `row_swift` (no png: refused unless the eyes see it on top, and on a synthesized screenshot they
+> cannot — a likely false refusal, pending the owner's acceptance: ADR 0015's amendment, its residuals). Measured on the new lab
 > cell `scroll-bounded-footer` (O; its idb and WDA captures in tests/fixtures/truth/ios-iphone17-ios27) — the colour
 > assert fails closed, the plain stop refuses before any swipe, the tap is moved clear of Continue to (201,670) and
 > fires nothing (live, idb, docs/truth/live-records/ios-vis-r16-le2-1.json; at the base the app logged

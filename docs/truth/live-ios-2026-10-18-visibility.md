@@ -1281,7 +1281,7 @@ the read right after it); the records replace those of the fix's first form, run
 
 # Round 16, LE2's rest: a control past the reading-order break that holds the row's centre, 2026-10-22
 
-bugs/r16-le2 (src `19525e29`, from bugs/round-16 4ee14f1c: `ui-tree/draw-order.ts#exposure`'s `orderUntold`, ADR 0015
+bugs/r16-le2 (src `19525e29`, from bugs/round-16 4ee14f1c: `ui-tree/draw-order.ts#exposure`'s `orderUntold` — since `9fd4aff2`, its review round, the break's own row reading reading-order.ts#ReadingOrder's `coversAfter`, O's replies unchanged in replay; ADR 0015
 amended 2026-10-22; docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md), run
 from that branch's working tree on the new lab cell `scroll-bounded-footer` (fixtures/apps/ios/AveriLab/EdgesFooter.swift:
 `lower`'s clip 380–560, O past it at 620–684, and a Continue button `16,600 370x56` under the clip, listed after O in
