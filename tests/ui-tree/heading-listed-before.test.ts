@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
@@ -9,6 +9,7 @@ import { sceneOf, type PixelPurpose, type Standing, type PixelStanding } from '.
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { coverNodes, tagged } from '../helpers/covers.js';
+import { iosTrees } from '../helpers/ios-trees.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -112,27 +113,6 @@ describe('a heading listed before a target it overlaps, in a reading-order listi
 });
 
 describe('the rule over every iOS tree of tests/fixtures: only the scroll-sticky R gains a heading as its cover', () => {
-  /** Every iOS tree a fixture holds, as its parser reads it — the idb lists (one array, an `elements` one, or a `screens` or `positions` map of them) and the WDA sources; an idb fixture of no known shape fails the test, not skipped. */
-  const iosTrees = async (): Promise<[string, UiNode][]> => {
-    const trees: [string, UiNode][] = [];
-    const dirs = [new URL('../fixtures/', import.meta.url), new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url), new URL('../fixtures/truth/ios-rn-iphone17-ios27/', import.meta.url)];
-    for (const dir of dirs) {
-      // `*-ui-snapshot-*`: averi's own snapshot (UiNode), no source's tree — nothing of it to parse
-      for (const file of (await readdir(dir)).filter((f) => f.endsWith('.json') && !f.includes('-ui-snapshot-'))) {
-        const text = await readFile(new URL(file, dir), 'utf8');
-        if (file.startsWith('idb-') || file.endsWith('.idb.json')) {
-          const json = JSON.parse(text) as unknown;
-          const shaped = json as { screens?: Record<string, unknown[]>; positions?: Record<string, unknown[]>; elements?: unknown[] };
-          const lists = Array.isArray(json) ? [json] : [...Object.values(shaped.screens ?? shaped.positions ?? {}), ...(shaped.elements ? [shaped.elements] : [])];
-          if (lists.length === 0) throw new Error(`${file}: an idb fixture of no known shape`);
-          lists.forEach((list, i) => trees.push([`${file}#${i}`, parseIdbDescribeAll(JSON.stringify(list))]));
-        } else if (file.startsWith('wda-') || file.endsWith('.wda.json')) {
-          trees.push([file, parseWdaSource(text)]);
-        }
-      }
-    }
-    return trees;
-  };
   const withoutHeadings = (n: UiNode): UiNode => {
     const { heading: _h, children, ...rest } = n;
     return { ...rest, children: children.map(withoutHeadings) };

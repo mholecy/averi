@@ -802,7 +802,7 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
     ],
     // A modal listed before the content it is drawn over: the chooser's rows and the picker stand clear; CONTINUE, listed last, still covers.
     ['idb modal: the chooser\'s own-transfer row, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_own', { kind: 'reachable', at: { x: 201, y: 423 } }],
-    // …its SWIFT row lies under row_0, listed after it and holding its centre: a cover whose order is not told (the eyes tell it, ADR 0024).
+    // …row_0, listed after its SWIFT row (drawn under the chooser) and holding its centre, is a cover whose order is not told (the eyes tell it, ADR 0024).
     ['…its SWIFT row, covered by row_0 (order untold)', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', { kind: 'covered', cover: 'transactions.list.row_0', largest: { x: 45, y: 487, width: 312, height: 18 } }],
     ['…the value-date picker, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'swift_payment.form.value_date_picker', { kind: 'reachable', at: { x: 205, y: 479 } }],
     ['…behind the picker, Payee’s name under CONTINUE', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'Payee’s name', { kind: 'covered', cover: 'swift_payment.form.continue_button' }],

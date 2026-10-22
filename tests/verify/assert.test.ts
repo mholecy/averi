@@ -2496,7 +2496,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     }
   });
 
-  it('the chooser\'s SWIFT row lies under `Loan repayment`, listed after it and holding its centre: a cover whose order is not told, and no screenshot tells it (the capture is one flat colour) — failing closed', async () => {
+  it('`Loan repayment`, listed after the chooser\'s SWIFT row and holding its centre (drawn under the chooser): a cover whose order is not told, and no screenshot tells it (the capture is one flat colour) — failing closed', async () => {
     const id = 'accounts.detail.payment_type_sheet.row_swift';
     const tree = parseIdbDescribeAll(JSON.stringify(MODAL.chooser));
     const fake = new FakeAdapter({ s: tree }, 's');

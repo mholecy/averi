@@ -59,8 +59,8 @@ export interface ReadingOrder {
   readonly seenUnder: ReadonlySet<Placed>;
   readonly listedBefore: readonly Placed[];
   /**
-   * The controls listed AFTER the target that hold its centre and are not seen under it (`unordered` or `seenOver`):
-   * covers whatever the draw order's reading-order break says of them (draw-order.ts#NOT_DRAWN's `flatListReadingOrder`
+   * The controls listed AFTER the target that hold its centre and are not seen under it — the part of `unordered` ∪
+   * `seenOver` listed after it, named for the one reader that needs them apart: covers whatever the draw order's reading-order break says of them (draw-order.ts#NOT_DRAWN's `flatListReadingOrder`
    * excuses none of these).
    */
   readonly coversAfter: ReadonlySet<Placed>;

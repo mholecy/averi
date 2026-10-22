@@ -1627,20 +1627,29 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
 
   const draws = (placed: Placed): boolean => !ROWS.some((row) => row.drawnOver?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
-  /** What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing in reading order says (reading-order.ts#readingOrderOf). */
-  const asTarget = (target: Placed): SeenFor => ({
-    ...seen,
-    target,
-    over: presentation.over(target.node),
-    flatList,
-    contentFrom,
-    barLine,
-    readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine),
-    bottomChrome,
-    paddedTouchTargets,
-    labelOverhang: overhang,
-    readingOrder: readingOrderOf(order, { target, flatList, contentFrom, bottomChrome }, pinnedTargets, orderSeen),
-  });
+  /**
+   * What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing
+   * in reading order says (reading-order.ts#readingOrderOf) — that one asked on its first read, as `exposure` and the break's row past the break
+   * read it: a question that reads neither walks no siblings for it.
+   */
+  const asTarget = (target: Placed): SeenFor => {
+    let readingOrder: ReadingOrder | undefined;
+    return {
+      ...seen,
+      target,
+      over: presentation.over(target.node),
+      flatList,
+      contentFrom,
+      barLine,
+      readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine),
+      bottomChrome,
+      paddedTouchTargets,
+      labelOverhang: overhang,
+      get readingOrder() {
+        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome }, pinnedTargets, orderSeen));
+      },
+    };
+  };
   /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
   const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */

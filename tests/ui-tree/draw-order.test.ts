@@ -1069,7 +1069,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     describe('the reading-order break (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md): later nodes from the first one starting above a content target are no cover of it', () => {
       const screenOf = (name: string) => parseIdbDescribeAll(JSON.stringify(MODAL.screens[name]));
 
-      it('the payment-type chooser, listed before the transaction list it is drawn over: row_own is uncovered, tapped at its centre; row_swift lies under row_0 listed after it (the transaction row holds its centre): an untold cover, the eyes tell it', () => {
+      it('the payment-type chooser, listed before the transaction list it is drawn over: row_own is uncovered, tapped at its centre; row_0, listed after row_swift and drawn under the chooser, holds row_swift\'s centre: an untold cover, the eyes tell it', () => {
         const tree = screenOf('chooser');
         const order = drawOrder(tree);
         const byId = (id: string) => tree.children.find((n) => n.identifier === id)!;

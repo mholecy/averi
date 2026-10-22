@@ -178,8 +178,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-vis-r14-le2-2.json', 'visibility', { cases: 18, ok: 9, loud: 0, mismatches: 9 }],
     // Round 16's LE2 rest (bugs/r16-le2: a control past the reading-order break that holds the target's centre is an untold cover):
     // scroll-bounded-footer's O under idb — the tap moved clear of Continue to (201,670), nothing fired (at the base it
-    // fired button footer.continue), the plain stop refused before any swipe; both Tapped on the background, known (residual
-    // 5) — and under WDA refused / stopped inside `lower` after 2 swipes, Tapped.
+    // fired button footer.continue), the plain stop refused before any swipe; the tap case and the scroll case's own tap
+    // after that refusal both Tapped on the background, known (residual 5) — and under WDA refused / stopped inside `lower`
+    // after 2 swipes, Tapped.
     ['ios-vis-r16-le2-1.json', 'visibility', { cases: 4, ok: 2, loud: 0, mismatches: 2 }],
     // Round 14's fix of LE3 (bugs/r14-le3 40b4856, a heading listed before is drawn over the target): scroll-sticky's
     // six cases ok under idb and WDA, twice — R's `fully: true` no longer stops under the pinned header: one stroke
