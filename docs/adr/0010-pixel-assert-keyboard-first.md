@@ -170,7 +170,7 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
      gets a third trigger): the lab's `scroll-bounded-footer` O, a Continue `16,600 370x56` under the clip listed after
      it with its top above the row's, was `Tapped` — the tap FIRED Continue — its colour passed on Continue's colour and
      the plain stop said "fully visible after 0 swipes". Now the colour assert and the plain stop refuse (the order
-     question is asked on that shape only: one screenshot, zero cost on every other tap) and the tap is moved clear of
+     question is asked where a control listed after the row holds its centre: one screenshot; over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests)) and the tap is moved clear of
      Continue; what the row's tap says is still `Tapped`, on the background below the clip.
    What stays, accepted: where NOTHING IS LISTED BENEATH the row (no control over its centre), the tap, the plain stop
    and the strokes are judged on the screen alone — an element below a
@@ -178,11 +178,9 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`), and otherwise
    tapped and stopped on; `scroll_until` strokes over the screen's middle, which may miss the scroll view that holds
    it (the lab's F, C) — until two reads see the target carried, then a stroke carrying content back goes over the
-   region its motion showed (residual 6, refined 2026-10-21). Why not more: a screenshot per tap or plain stop would add
-   roughly 20–40 % wall time to the commonest verbs under the default tree source (idb) — an estimate, not a
-   measurement — but that is not the reason. The reason is untold evidence, and the false refusals it would buy: nothing
-   cheaper sees the clip, and the frame does not either, where nothing lies beneath the row — the row below a short
-   scroll view and an element at rest in a full one look alike — idb's `Scrollable` trait marks 372 of the
+   region its motion showed (residual 6, refined 2026-10-21). Why not more: a screenshot per tap or plain stop would
+   double the cost of the commonest verbs
+   under the default tree source (idb), and nothing cheaper sees the clip — idb's `Scrollable` trait marks 372 of the
    409 nodes idb lists in the 33 iOS lab captures (the 32 above and the React Native app's), contents and all, and an
    element "listed past the screen" is no clip (13 of those 33 captures, 11 with nothing cut); refusing every untold node would refuse 88 green taps. The remedy is the tree source that lists
    the scroll views: `treeSource: wda`, which the tool descriptions name, and under which every one of these rows is

@@ -73,7 +73,8 @@ a reading-order break (ADR 0015), that overlaps it and holds its centre — idb 
 scroll view's clip and the `Continue` under the clip listed after it are one untold pair (the lab's
 `scroll-bounded-footer`: the overlap reads Continue's colour, the row's band the page's — the screenshot tells the row
 under, or not at all). The question is the same, asked of the same standing (`covered`, remedy `unordered`), by the
-same three verbs; nothing is added to its interface or its cost on any other tap.
+same three verbs; nothing is added to its interface. It is asked of more targets: over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests) (ADR 0015's
+2026-10-22 amendment).
 
 WHAT is asked, per `unordered` cover (a peer): where the two overlap (in the standing's frame), each one's CLEAR BANDS
 along the overlap's edges (the strips of it beside the overlap, outside the other by construction, each no deeper than

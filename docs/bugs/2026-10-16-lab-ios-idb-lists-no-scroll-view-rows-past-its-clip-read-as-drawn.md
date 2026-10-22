@@ -6,7 +6,12 @@
 > and which holds the row's centre — ADR 0015's reading-order break excused Continue as a cover, so `tap O` was
 > `reachable` at (201,652), on Continue, and `Tapped O` FIRED it; the colour passed on Continue's colour, the plain stop
 > said visible. A control past the break that overlaps the target and holds its centre is now a cover whose order is
-> not told (`draw-order.ts#exposure`, ADR 0015 amended 2026-10-22, ADR 0024's third trigger): measured on the new lab
+> not told (`reading-order.ts#ReadingOrder`'s `coversAfter`, read by the break's own row `draw-order.ts#NOT_DRAWN`'s
+> `flatListReadingOrder` since the branch's review; ADR 0015 amended 2026-10-22, ADR 0024's third trigger). It asks the
+> eyes of 3 nodes over the 128 trees of the committed corpus: this O, the lab menu's W in `blur-menu-grouped` (its
+> screenshot sees W on top: verdicts unchanged, one screenshot per tap and plain stop where there was none), and
+> mp-native's chooser `row_swift` (no png: refused unless the eyes see it on top, unmeasured on a device — ADR 0015's
+> amendment, its residuals). Measured on the new lab
 > cell `scroll-bounded-footer` (O; its idb and WDA captures in tests/fixtures/truth/ios-iphone17-ios27) — the colour
 > assert fails closed, the plain stop refuses before any swipe, the tap is moved clear of Continue to (201,670) and
 > fires nothing (live, idb, docs/truth/live-records/ios-vis-r16-le2-1.json; at the base the app logged

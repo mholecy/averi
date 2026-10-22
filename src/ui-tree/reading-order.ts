@@ -46,8 +46,8 @@ function listsInReadingOrder(parent: UiNode): boolean {
  * - `before`: the siblings listed BEFORE it that are drawn over it — covers the draw order alone would not give: the
  *   headings over it (`headingsOver`, their order `drawn`) and the controls whose order is not told (`peersOf`'s
  *   `before`); in the walk's order;
- * - `unordered`, `seenOver`, `seenUnder`, `listedBefore`: of the controls whose order is not told (`peersOf`, its doc
- *   says each) — a heading is none of them.
+ * - `unordered`, `seenOver`, `seenUnder`, `listedBefore`, `coversAfter`: of the controls whose order is not told
+ *   (`peersOf`, its doc says each) — a heading is none of them.
  */
 export interface ReadingOrder {
   readonly before: readonly Placed[];
@@ -56,9 +56,22 @@ export interface ReadingOrder {
   /** The peers a screenshot saw drawn UNDER the target: no covers of it, wherever listed (`seen`). */
   readonly seenUnder: ReadonlySet<Placed>;
   readonly listedBefore: readonly Placed[];
+  /**
+   * The controls listed AFTER the target that hold its centre and are not seen under it (`unordered` or `seenOver`):
+   * covers whatever the draw order's reading-order break says of them (draw-order.ts#NOT_DRAWN's `flatListReadingOrder`
+   * excuses none of these).
+   */
+  readonly coversAfter: ReadonlySet<Placed>;
 }
 
-const NONE: ReadingOrder = { before: [], unordered: new Set<Placed>(), seenOver: new Set<Placed>(), seenUnder: new Set<Placed>(), listedBefore: [] };
+const NONE: ReadingOrder = {
+  before: [],
+  unordered: new Set<Placed>(),
+  seenOver: new Set<Placed>(),
+  seenUnder: new Set<Placed>(),
+  listedBefore: [],
+  coversAfter: new Set<Placed>(),
+};
 
 /**
  * What the listing of `about.target`'s parent says of the target's order against its siblings (`ReadingOrder`) —
@@ -111,7 +124,8 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
  * geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a control's own wrapper, its own
  * title) — in idb's flat list from its content on (`contentFrom`: the top bar's are chrome before content, ADR 0004)
  * and none of its bottom chrome (`bottomChrome`: a tab bar's items are covers by their own rule), nor, on a nested
- * tree, a control pinned at the screen's bottom (`pinnedTargets`). Such a listing does not tell which of two
+ * tree, a control pinned at the screen's bottom (`pinnedTargets`); a target that is itself a flat list's bottom chrome
+ * has none (a floating tab bar's items are drawn over what lies under them, tabbar-dense's `Row 8` under `cards`). Such a listing does not tell which of two
  * overlapping controls is drawn on top, so each is a cover of the other whose order is not told (cover.ts#CoverOrder's `untold`):
  * - `before`: the ones listed BEFORE the target, when one of them holds its centre (`tapPoint`) — covers the draw
  *   order alone would not give. Measured: the lab's in-screen menu, idb and WDA (`A 110, B 290, K 380, W 448, C 470, D 650`): W, drawn
@@ -120,10 +134,18 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
  *   `To my account` and `SWIFT payment` rows it lies under (SWIFT payment over its centre). Only when one holds the
  *   centre: siblings that only overlap the target's edges by a few points (a card's shadow, an avatar stack, a badge)
  *   would else fail its colour assert and every `fully` stop on a cover that may lie beneath it.
- * - `unordered`: those, and the ones listed AFTER it that hold its centre (which the draw order already gives as covers):
- *   W, under C listed after it, is refused naming C as overlapping it, its order not told — not as drawn over it, with
- *   a scroll advised. Only over the centre: a floating control listed after a row that only pokes over its edge (a FAB
- *   in idb's flat list, not pinned by shape) keeps its draw order's remedy, a scroll.
+ * - `unordered`: those, and the ones listed AFTER it that hold its centre: W, under C listed after it, is refused
+ *   naming C as overlapping it, its order not told — not as drawn over it, with a scroll advised. Only over the
+ *   centre: a floating control listed after a row that only pokes over its edge (a FAB in idb's flat list, not pinned
+ *   by shape) keeps its draw order's remedy, a scroll.
+ * - `coversAfter`: the ones listed AFTER it that hold its centre, `unordered` or `seenOver` — covers even past the draw
+ *   order's reading-order break (draw-order.ts#NOT_DRAWN's `flatListReadingOrder`), which would else excuse them: idb
+ *   lists no scroll view, so a row past its scroll view's clip is listed before the control just under the clip whose
+ *   top lies above the row's (scroll-bounded-footer: O `51,620 300x64` listed before `Continue 16,600 370x56`, which
+ *   holds its centre) — the break read O as drawn over Continue, and `tap O` pressed Continue. The listing cannot tell
+ *   that shape from a modal's row listed before the list row it is drawn over (mp-native's chooser: `SWIFT payment`
+ *   before `Loan repayment`, which holds its centre), so both are untold and the eyes tell them (ADR 0024).
+ *   docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
  * - `listedBefore`: every one listed before it, cover or not — where a tap moved off a covered centre may not be aimed
  *   (`exposure`'s `tapAt`): W `51,690 300x40` listed before C `51,700 300x120` under a pinned
  *   Continue `0,740`, had C's tap moved to (201,720), on W.
@@ -147,7 +169,7 @@ function peersOf(
 ): ReadingOrder {
   const { target, flatList, contentFrom, bottomChrome } = about;
   const t = target.node;
-  if (!isInteractive(t) || (flatList && target.at < contentFrom)) return NONE;
+  if (!isInteractive(t) || (flatList && (target.at < contentFrom || bottomChrome.has(target)))) return NONE;
   const peers = order.filter(
     (p) =>
       p !== target &&
@@ -169,12 +191,14 @@ function peersOf(
   const kept = peers.filter((p) => peerSeen(p) !== 'under');
   const listedBefore = kept.filter((p) => p.at < target.at);
   const before = listedBefore.some(holdsCentre) ? listedBefore : [];
-  const overlapping = [...before, ...kept.filter((p) => p.at > target.at && holdsCentre(p))];
+  const after = kept.filter((p) => p.at > target.at && holdsCentre(p));
+  const overlapping = [...before, ...after];
   return {
     before,
     unordered: new Set(overlapping.filter((p) => !overIt(p))),
     seenOver: new Set(overlapping.filter(overIt)),
     seenUnder: new Set(peers.filter((p) => peerSeen(p) === 'under')),
     listedBefore,
+    coversAfter: new Set(after),
   };
 }

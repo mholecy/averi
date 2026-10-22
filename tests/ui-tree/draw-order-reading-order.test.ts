@@ -64,6 +64,32 @@ describe('a control listed after a target, past a reading-order break, that hold
     const over = drawOrder(t, seenOrderOf(o, [{ peer: cont, seen: 'under', ...HEX }])).exposure(o, IPHONE);
     expect(tagged(over.covers)).toEqual([{ node: cont, order: 'seenOver', presented: false }]);
   });
+
+  it('over the real capture, scroll-bounded-footer (idb lists O, then Continue): Continue an untold cover of O, the tap moved clear of it to (201,670), the plain stop covered', async () => {
+    const t = await idb('scroll-bounded-footer.idb.json');
+    const [o, cont] = [byId(t, 'lab.scroll-bounded-footer.O'), byId(t, 'lab.scroll-bounded-footer.continue')];
+    const seen = drawOrder(t).exposure(o, IPHONE);
+    expect(tagged(seen.covers)).toEqual([{ node: cont, order: 'untold', presented: false }]);
+    expect(seen.tapAt).toEqual({ point: { x: 201, y: 670 }, moved: true, piece: { x: 51, y: 656, width: 300, height: 28 } });
+    expect(sceneOf(t).standing(o, treeScreen(t), { of: 'stop' })).toMatchObject({ kind: 'covered', remedy: { of: 'unordered' } });
+  });
+
+  it('a floating tab bar\'s item is no target of it: tabbar-dense\'s items (idb lists them first, `Row 8 24,780` after, over their centres at y 787) are uncovered, tapped at their centres — the bar is drawn over the rows', async () => {
+    const t = await idb('tabbar-dense.idb.json');
+    for (const tab of ['home', 'transactions', 'cards', 'more']) {
+      const item = byId(t, `lab.tabbar-dense.tab.${tab}`);
+      const seen = drawOrder(t).exposure(item, IPHONE);
+      expect(seen.covers).toEqual([]);
+      expect(seen.tapAt).toEqual({ point: { x: item.rect.x + 41, y: 787 }, moved: false });
+    }
+  });
+
+  it('only the break\'s excuse gives way: a control listed after the target holding its centre that another row excuses (hidden) stays no cover', () => {
+    const a = node({ role: 'button', label: 'A', identifier: 'a', rect: { x: 51, y: 448, width: 300, height: 64 } });
+    const b = node({ role: 'button', label: 'B', identifier: 'b', rect: { x: 51, y: 470, width: 300, height: 64 }, hidden: true });
+    const root = { ...node({ role: 'container', rect: IPHONE, children: [a, b] }), readingOrder: true as const };
+    expect(drawOrder(root).exposure(a, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 480 }, moved: false } });
+  });
 });
 
 /**

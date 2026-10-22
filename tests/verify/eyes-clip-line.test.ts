@@ -140,7 +140,8 @@ describe('scroll_until under idb — a `fully: true` claim the eyes see cut', ()
  * beside the rows past such a band is no plain colour of its own (verify/eyes.ts#judgeClipLine, step 3).
  */
 describe('judgeEyes — no clip line where nothing cuts the target', () => {
-  it('over the 32 lab captures, only scroll-bounded P and S read cut', async () => {
+  // Every lab capture's PNG decoded and judged (about 4–5 s alone): close to vitest's 5-s default under a loaded run.
+  it('over the 32 lab captures, only scroll-bounded P and S read cut', { timeout: 30_000 }, async () => {
     const { readdir } = await import('node:fs/promises');
     const cells = (await readdir(IOS)).filter((f) => f.endsWith('.idb.json')).map((f) => f.replace('.idb.json', '')).sort();
     expect(cells.length).toBeGreaterThanOrEqual(32);
@@ -156,5 +157,5 @@ describe('judgeEyes — no clip line where nothing cuts the target', () => {
       }
     }
     expect(cut).toEqual(['lab.scroll-bounded.P', 'lab.scroll-bounded.S']);
-  }, 30_000); // a pass over every lab capture: ~5 s alone, the default limit
+  });
 });

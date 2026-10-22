@@ -50,7 +50,8 @@ describe('apartOfFrame — the region against the screen beside it, on one frame
     expect(seen).toMatchObject({ seen: 'untold', why: expect.stringContaining('could not be scaled to the tree: screen width 402 is a CONTENT width') });
   });
 
-  it('a no-op where the element is drawn: over every lab capture, every node idb lists reads apart from the screen beside it (its label, placeholder or border its own) — but the two lying outside their scroll views, nothing of them drawn', async () => {
+  // Every lab capture's PNG decoded and judged (about 5 s for 40 captures): past vitest's 5-s default.
+  it('a no-op where the element is drawn: over every lab capture, every node idb lists reads apart from the screen beside it (its label, placeholder or border its own) — but the two lying outside their scroll views, nothing of them drawn', { timeout: 30_000 }, async () => {
     const cells = (await readdir(IOS)).filter((f) => f.endsWith('.idb.json')).map((f) => f.replace('.idb.json', '')).sort();
     expect(cells.length).toBeGreaterThanOrEqual(32);
     const blends: string[] = [];
@@ -64,7 +65,7 @@ describe('apartOfFrame — the region against the screen beside it, on one frame
       }
     }
     expect(blends).toEqual(['lab.carousel-in-list.C', 'lab.scroll-bounded.O']);
-  }, 30_000); // a pass over every lab capture: ~5 s alone, the default limit
+  });
 });
 
 /**
