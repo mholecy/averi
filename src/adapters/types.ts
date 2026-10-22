@@ -591,8 +591,8 @@ export interface UiNode {
   /**
    * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
    * screen drawn before it (`PresentationKind`), or, under WDA, an in-window backdrop inside one (below) — by the WDA
-   * parser (adapters/wda-source.ts#presentedLayers), one mark per layer, and by the uiautomator parser on the root, the one window it dumps (adapters/android.ts
-   * #presentedWindow: `dialog` for a window that floats off the screen's top and left edges both, and `screen` for one
+   * parser (adapters/wda-source.ts#presentedLayers), one mark per layer, and by the uiautomator parser on the root,
+   * the one window it dumps (adapters/android.ts#presentedWindow: `dialog` for a window that floats off the screen's top and left edges both, and `screen` for one
    * whose clickable, labelled scrim lies screen-wide above its sheet; the root also carries `activeWindowOnly`), and
    * by the idb parser on the root of its flat list (adapters/ios-tree-source.ts#listsPresentedLayer: `screen`, the
    * list holding UIKit's dismiss region over the whole screen — the list is then the presented layer alone).
