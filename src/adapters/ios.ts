@@ -320,7 +320,7 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * The stroke's duration defaults to 300 ms, and `scroll_until` passes
-   * none: this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
+   * none but a feeler's (interact/stroke-plan.ts#FEELER, 600 ms): this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
    * .dragSpeed; decided 2026-10-09 with the Android one). `idb ui swipe
    * --duration` would take one, but nothing measured says which: a
    * UIScrollView decelerates by a rate per ms, its fling roughly linear in

@@ -97,6 +97,9 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
     const error = await scrollUntilVisible(fake, 'id:below_fold', { maxSwipes: 2, timeoutMs: 100, settleMs: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/last UI tree read failed: uiautomator dump returned no XML/);
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    // No read read, so nothing was swiped: a swipe drawn blind could land on a sheet over the screen.
+    expect(fake.swipes).toHaveLength(0);
+    expect((error as Error).message).toMatch(/no swipe was sent; \d+ tree reads? took .*no UI tree read succeeded, and no swipe is drawn blind/);
   });
 });
 

@@ -229,13 +229,13 @@ export type StrokeKind = 'feeler';
 export const FEELER = { maxTravel: 160, durationMs: 600 } as const;
 
 /**
- * A stroke as planned, the driver's to send as `points` — the one field production reads (interact/scroll.ts sends
- * them and hands them back as `drawn`). The others are the plan's ACCOUNT of those points, read by no production code
+ * A stroke as planned, the driver's to send as `points` over `durationMs` — the two fields production reads
+ * (interact/scroll.ts sends them and hands the points back as `drawn`). The others are the plan's ACCOUNT of those points, read by no production code
  * and in no reply: what tests pin of a decision (tests/helpers/rounds.ts#decided) and what a reader of a step sees
  * when debugging it. Toward `toward` (where the content lies), its reach scaled by
  * `reach`, over `box` — the scroll view met with the gesture box, above the keyboard and what is drawn over the
  * scroll view, or the gesture box whole — kept clear of a cover whose top edge is `coverTop`, its finger travel capped
- * at `maxTravel` (a probe's). `box` and `points` are absent only when the round had no gesture box.
+ * at `maxTravel` (a probe's, a feeler's). `box` and `points` are absent only when the round had no gesture box.
  */
 export interface PlannedStroke {
   toward: Direction;

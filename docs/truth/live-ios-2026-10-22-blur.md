@@ -78,7 +78,10 @@ bugs/r16-r6 at `4ad446f5`'s src (from bugs/round-16 `da68586f`; ADR 0018, "idb's
 from that worktree; the lab app built from it and installed before the runs; the averi-lab iPhone 17 simulator
 (3AB1E82E, iOS 27.0), idb through a companion of this run's own on gRPC 10971 (`IDB_COMPANION=localhost:10971`),
 killed by its PID; the simulator shut down after. (A first attempt read every tree as "The simulator's accessibility
-service named no frontmost application" and was discarded; the simulator rebooted, every later read read.) Reproduce
+service named no frontmost application" and was discarded, its record not kept: knowing no tree, its `scroll_until`
+calls stroked FULL and blind — six strokes in sheet-background's A and B — and dismissed the sheet. The simulator
+rebooted, every later read read. That attempt is the evidence for the code review's fix, `CallEvidence`'s `unread`: no
+stroke before a read of the call has read — tests only, not run live.) Reproduce
 (outside the sandbox):
 `node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources idb --groups visibility
 --cells sheet-background,alert-dim,dim-cover,scroll-top-edge,tabbar-dense,tabbar-floating,carousel-in-list --record <file>`.

@@ -615,7 +615,7 @@ alert, and a non-modal sheet.
 | 3 a presentation in a later Window | stands for `screen` (the flags rule is per Window; none measured); a typed layer in any Window covers what is drawn before it | stands |
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
-| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window"), and **on idb** (2026-10-19) for a list holding UIKit's dismiss region; a stroke that changed the screen — no id kept, nothing it touched still listed — is a loud stop, not a claimed one (the amendment "idb's presented layer"); **narrowed on idb** (2026-10-22, its Decision 3): a content-up stroke for a target never seen is a feeler (160 pt in 600 ms) until a stroke has moved the tree — the large sheet springs back, nothing dismissed, the unmoved stop saying what idb does not list; stands for a large sheet holding a list (dismissed once the list reaches its top, the loud stop), for a threshold measured on one simulator and one sheet, and for NI1 (every first `up` stroke a feeler); golden: 37 replies, the note's words only |
+| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window"), and **on idb** (2026-10-19) for a list holding UIKit's dismiss region; a stroke that changed the screen — no id kept, nothing it touched still listed — is a loud stop, not a claimed one (the amendment "idb's presented layer"); **narrowed on idb** (2026-10-22, its Decision 3): a content-up stroke for a target never seen is a feeler (160 pt in 600 ms) until a stroke has moved the tree — the large sheet springs back, nothing dismissed, the unmoved stop saying what idb does not list; no stroke before a read of the call has read; stands for a large sheet holding a list (dismissed once the list reaches its top, the loud stop), for a tree that changes on its own between reads, for a threshold measured on one simulator and one sheet, and for NI1 (every first `up` stroke a feeler); golden: 37 replies, the note's words only |
 | 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | **closed** (2026-10-22) where the backdrop is listed after the screen beneath at its origin — a grouped menu (the amendment "an in-window backdrop"); **stands** in a reading-order run (the ungrouped menu) | stands (idb lists no trace of it) |
@@ -955,7 +955,7 @@ large sheet's blank content, the one gesture that dismisses a swipe-dismissable 
 loud `presented-changed`. Beneath alert-dim and dim-cover (A–D) and the sheet's C and D nothing is dismissed: two
 strokes on the layer, the unmoved stop. idb's tree gives no evidence of the layer before the first stroke (the sheet's
 button alone). So `scroll_until` FEELS before it strokes: on a tree that lists only what a presented layer leaves
-(`UiNode.flatList`, idb's list — interact/scroll-rounds.ts#UnlistedLayer), for a target NEVER SEEN in the call, a
+(ui-tree/miss.ts#listsOnlyTheTopLayer, idb's flat list; the call's evidence `unfelt`, interact/scroll-rounds.ts#CallEvidence), for a target NEVER SEEN in the call, a
 stroke toward content `up` is a feeler (interact/stroke-plan.ts#StrokeKind, `FEELER`) while no stroke of the call has
 moved the tree (motion-ledger.ts#treeMoved): the full stroke's touch-down, its travel capped at 160 pt, sent over
 600 ms (`PlannedStroke.durationMs`, which the driver, interact/scroll.ts, passes to `swipe` over the adapter's own
@@ -963,8 +963,8 @@ default). A swipe-dismissable sheet springs back; a real list moves on it, and e
 the tree is full again. Push-ups (content `down`, the finger moving up), a target the call has seen, and every tree
 that lists its scroll views or marks its presented layers (WDA, uiautomator) are unchanged; a layer the tree marks is
 no stroke's (Decision 1). And the unmoved stop of such a call — the tree unchanged, no stroke moved it, the target never
-seen — adds to its causes "idb lists only what a presented sheet, alert or cover leaves to accessibility, nothing beneath
-it: if one is up, close it first" (BoundBy's `unlisted`, scroll-text.ts#boundText): a possibility, as the uiautomator
+seen — adds to its causes "idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element
+lies beneath one, close it first" (worded for a target beneath, since the target may be the layer's own — sheet-long-list's R — on the code review) (BoundBy's `unlisted`, scroll-text.ts#boundText): a possibility, as the uiautomator
 note is, at no cost. Measured (the lab's averi-lab iPhone 17 simulator, iOS 27.0, sheet-background, `idb ui swipe 201
 175 201 175+t --duration d`, two strokes 400 ms apart, three tries each, the app's own log): the sheet SPRANG BACK from
 t = 120, 200, 300 and 350 pt at d = 900 ms, 160, 200, 250, 300 and 350 pt at 600 ms, 120, 160, 200, 250 and 300 pt at
@@ -991,7 +991,18 @@ dismiss at less — the feeler keeps a margin of two on distance and five on spe
 LIST (a sheet whose content scrolls) is still dismissed once the list reaches its top: the feeler moves the list, the
 tree moves, the strokes are full, and the full pull-down at the list's top dismisses the sheet — Decision 2's loud stop
 says so, the stroke already sent. A target idb never lists (NI1's UIKit rows, an id on a container) makes every call's
-first `up` stroke a feeler. A call whose reads all fail knows no dialect and strokes full (no read, no flat list).
+first `up` stroke a feeler; and a feeler covers 160 pt where a full stroke covers 524, so such a call may need one round more
+(a stroke, its settle and a read). The un-feeling is any change of the tree between reads (motion-ledger.ts#treeMoved),
+not motion along the stroke: a tree that changes on its own beneath the sheet (a clock, a counter, the sheet still
+springing back when the read lands) makes the next stroke full, which may dismiss the sheet — Decision 2's loud stop
+says so; unmeasured (live five of five the sheet's button read still). **No stroke before a read has read** (the code
+review, 2026-10-22): a call whose first reads fail used to stroke full in the device box as built — live, an attempt
+whose every read failed ("no frontmost application") sent six blind full strokes and dismissed the sheet, and one
+failed first read followed by a read of the host would have claimed the target visible, no read before the stroke to
+tell the change. Now no stroke is sent until a read of the call has read (interact/scroll-rounds.ts#CallEvidence,
+`unread`): the round reads again after a settle, to the deadline, where the timeout says "no UI tree read succeeded,
+and no swipe is drawn blind …" with the last error; once a read has read, a failed read later strokes on as before
+(the read before it is compared with the next). Not run live (golden reads one tree per case, all of which read).
 
 ## Amendment: an in-window backdrop (2026-10-22)
 
@@ -1128,10 +1139,12 @@ Residuals of the amendment:
      stroke of the call has moved the tree — measured on the lab's large sheet, which springs back from up to 350 pt
      (600–900 ms) and up to 1000 pt/s and is dismissed by 400 pt or 1333 pt/s; live, sheet-background's A and B no
      longer dismiss it (two feelers, the unmoved stop, "idb lists only what a presented sheet, alert or cover leaves …
-     if one is up, close it first"), alert-dim's and dim-cover's strokes unchanged but the note. Still stroked for, and
+     if the element lies beneath one, close it first"), alert-dim's and dim-cover's strokes unchanged but the note. Still stroked for, and
      still dismissing: a large sheet HOLDING A LIST, once the list reaches its top (the feeler moved it, so the strokes
      are full — Decision 2's loud stop); a sheet that dismisses at less than the feeler (the threshold is measured on one
-     simulator, one sheet); and a target idb never lists (NI1: every call's first `up` stroke is a feeler, no more);
+     simulator, one sheet); a tree that changes on its own between reads (it un-feels the call, `treeMoved` being any change); and a target idb
+     never lists (NI1: every call's first `up` stroke is a feeler, no more). No stroke at all is sent before a read of the
+     call has read (Decision 3's code review: six blind full strokes had dismissed the sheet live);
    - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
      target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
      hidden twin `PopoverDismissRegion` of the sheet's dim in the form's own layer; scroll_until to it, judged either

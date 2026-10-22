@@ -733,7 +733,7 @@ function shortClause(judged: Judged): string {
 
 /** What a tree source that lists only a presented layer's leavings does not list, as the unmoved stop says it (scroll-rounds.ts#UnlistedLayer). */
 const UNLISTED_LAYER: Record<UnlistedLayer, string> = {
-  idb: 'idb lists only what a presented sheet, alert or cover leaves to accessibility, nothing beneath it: if one is up, close it first',
+  idb: 'idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first',
 };
 
 /** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */
@@ -806,6 +806,8 @@ function shortText(short: Shortfall): string {
   switch (short.of) {
     case 'readFailed':
       return `last UI tree read failed: ${short.error.message}`;
+    case 'neverRead':
+      return `no UI tree read succeeded, and no swipe is drawn blind (it could land on a sheet, alert or cover over the screen) — last UI tree read failed: ${short.error.message}`;
     case 'clipped': {
       const { judged } = short;
       const { clipped, visible } = judged.standing.facts;

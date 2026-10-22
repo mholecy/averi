@@ -54,6 +54,20 @@ describe('scroll_until on idb, a content-up stroke for a target never seen: a fe
     }
   });
 
+  it('a target the call has seen is no feeler\'s: its strokes are full', () => {
+    // A, listed above the screen (idb lists every node of the hierarchy, on the screen or not) and never moving.
+    const tree = parseIdbDescribeAll(
+      JSON.stringify([
+        { type: 'Application', AXLabel: 'App', AXUniqueId: null, frame: { x: 0, y: 0, width: 402, height: 874 } },
+        { type: 'Button', AXLabel: 'A', AXUniqueId: 'a', frame: { x: 0, y: -400, width: 402, height: 44 } },
+      ]),
+    );
+    const seenA = { tree, found: tree.children.filter((n) => n.label === 'A') };
+    const sent = strokes(play(UP, [seenA, seenA, seenA]));
+    expect(sent.length).toBeGreaterThan(0);
+    for (const s of sent) expect([s.kind, s.durationMs]).toEqual([undefined, undefined]);
+  });
+
   it('a push-up (content below) is never a feeler: the finger moving up dismisses no sheet', () => {
     const played = play(DOWN, [{ tree: sheet(), found: [] }, { tree: sheet(), found: [] }, { tree: sheet(), found: [] }]);
     expect(strokes(played).map((s) => [s.kind, s.durationMs])).toEqual([
@@ -73,7 +87,7 @@ describe('the unmoved stop for a target never seen under idb says what idb does 
     const played = play(UP, [{ tree: sheet(), found: [] }, { tree: sheet(), found: [] }, { tree: sheet(), found: [] }]);
     expect(failureOf(played, 'label:"A"').message).toBe(
       'scroll_until label:"A" failed after 2 swipes (the last 2, swiping up, did not change the screen: content exhausted, still loading, or the swipes were not taken — ' +
-        'idb lists only what a presented sheet, alert or cover leaves to accessibility, nothing beneath it: if one is up, close it first) — element never appeared in the tree',
+        'idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first) — element never appeared in the tree',
     );
   });
 

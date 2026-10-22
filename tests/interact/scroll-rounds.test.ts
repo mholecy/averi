@@ -124,7 +124,28 @@ describe('round — the judgement and the stop', () => {
     expect(failureOf(slow, 'id:submit_button').message).toMatch(/^scroll_until id:submit_button failed after 38204ms \(timeout 2000ms; no swipe was sent; 1 tree read took 38204ms\) — element in tree but never intersected/);
     // A read that failed took its time too: it is counted with the rest.
     const failing = play(SCROLLING, [{ error: 'WDA /source timed out', readMs: 1_000 }, { found: [button(49_990)], elapsedMs: 2_500, readMs: 1_500 }]);
-    expect(failureOf(failing, 'id:submit_button').message).toContain('failed after 2500ms (timeout 2000ms; 1 swipe sent; 2 tree reads took 2500ms, the last 1500ms)');
+    expect(failureOf(failing, 'id:submit_button').message).toContain('failed after 2500ms (timeout 2000ms; no swipe was sent; 2 tree reads took 2500ms, the last 1500ms)');
+  });
+
+  it('no stroke before the call\'s first read that reads: a failed read is read again, never stroked blind — a stroke with no tree read could land on a sheet the read would have shown', () => {
+    // Live (idb, the lab's large sheet): every read of a call failed, and six full strokes drawn blind dismissed the sheet.
+    const failed: Row = { error: 'idb describe-all returned no frontmost application' };
+    const host = play({ ...SCROLLING, direction: 'up' }, [failed, failed, { found: [button(300)] }]);
+    expect(host.steps.map((st) => st.do)).toEqual(['confirm', 'confirm', 'stop']);
+    expect(resultOf(host)).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    // Reads failing to the deadline: the timeout bound, no swipe sent, and why none was.
+    const never = play({ ...SCROLLING, direction: 'up' }, [failed, failed, { ...failed, elapsedMs: SCROLLING.timeoutMs }]);
+    expect(never.steps.map((st) => st.do)).toEqual(['confirm', 'confirm', 'stop']);
+    expect(failureOf(never, 'id:submit_button').message).toBe(
+      'scroll_until id:submit_button failed after 2000ms (timeout 2000ms; no swipe was sent; 3 tree reads took 0ms, the last 0ms) — no UI tree read succeeded, and no swipe is drawn blind ' +
+        '(it could land on a sheet, alert or cover over the screen) — last UI tree read failed: idb describe-all returned no frontmost application',
+    );
+  });
+
+  it('once a read has read, a failed read later in the call strokes on as before: the read before it is the evidence, and the next read is compared with it', () => {
+    const failed: Row = { error: 'WDA /source timed out' };
+    const played = play(SCROLLING, [{ found: [button(50_000)] }, failed, { found: [button(49_980)] }, { found: [button(49_970)] }, { found: [button(49_960)] }]);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stroke', 'stroke', 'stroke', 'stop']);
   });
 
   it('a stop at 0 swipes was not stroked: reported on its one read, no confirming read', () => {

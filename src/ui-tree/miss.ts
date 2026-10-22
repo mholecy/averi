@@ -60,6 +60,17 @@ export type Miss =
   | { readonly of: 'containerId'; readonly id: string }
   | { readonly of: 'none' };
 
+/**
+ * Whether the tree's source lists only what a presented layer leaves to accessibility and shows no sign of a layer it
+ * does not mark: idb's flat list (its own mark, `UiNode.flatList`, as `containerId` reads it) — a large-detent sheet,
+ * an alert, a transparent cover over the screen leave only their own controls listed, or none (ADR 0018, "idb's
+ * presented layer", residuals). A fact of the tree source's dialect, read from the tree, for the reader that must act
+ * before a miss is judged: `scroll_until`'s strokes for a target never seen (interact/scroll-rounds.ts#CallEvidence).
+ */
+export function listsOnlyTheTopLayer(tree: UiNode): boolean {
+  return tree.flatList === true;
+}
+
 /** THE hint of a miss on a tree whose source lists the active window only and marks no window presented (`Miss`'s `activeWindow`). */
 export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
 
