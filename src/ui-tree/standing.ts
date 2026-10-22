@@ -514,7 +514,7 @@ const backdropRemedy = (what: 'it' | 'the element', wayOut: string): string =>
  */
 export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
   // `it` is a touch's sentence (tap, scroll_until), `the element` the pixel assert's: each its own way out.
-  if (layer?.kind === 'backdrop') return backdropRemedy(what, what === 'it' ? 'tap it by coordinates' : 'judge the element on that screenshot');
+  if (layer?.kind === 'backdrop') return backdropRemedy(what, what === 'it' ? 'tap the target by its coordinates (its centre from ui_snapshot)' : 'judge the element on that screenshot');
   const typed = typedWords(layer);
   return typed !== undefined
     ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
@@ -528,7 +528,7 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
  * `scroll_until` description quotes (mcp/tools.ts).
  */
 export const presentedStop = (layer?: MarkedLayer): string => {
-  if (layer?.kind === 'backdrop') return `${backdropRemedy('it', 'swipe and tap by coordinates')}, and a swipe on it may close the menu`;
+  if (layer?.kind === 'backdrop') return `${backdropRemedy('it', 'swipe, then tap the target, by coordinates')}, and a swipe on it may close the menu`;
   const typed = typedWords(layer);
   return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };

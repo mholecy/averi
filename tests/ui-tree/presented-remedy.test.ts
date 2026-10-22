@@ -24,12 +24,12 @@ describe('presentedRemedy / presentedStop — the words per kind of presented la
     const noMenu = 'if a screenshot shows no menu up, the backdrop is an overlay that lets touches through:';
     // The way out in a parenthesis right after "close it first", so what a caller appends ("; nothing was tapped",
     // ", so none was sent") follows the refusal's own clause, never the way out.
-    expect(presentedRemedy('it', { kind: 'backdrop' })).toBe(`${evidence} (${noMenu} tap it by coordinates); no scroll moves it out from under that backdrop`);
+    expect(presentedRemedy('it', { kind: 'backdrop' })).toBe(`${evidence} (${noMenu} tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop`);
     expect(presentedRemedy('the element', { kind: 'backdrop' })).toBe(
       "a menu's backdrop is presented over the element (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
         `(${noMenu} judge the element on that screenshot); no scroll moves the element out from under that backdrop`,
     );
-    expect(presentedStop({ kind: 'backdrop' })).toBe(`${evidence} (${noMenu} swipe and tap by coordinates); no scroll moves it out from under that backdrop, and a swipe on it may close the menu`);
+    expect(presentedStop({ kind: 'backdrop' })).toBe(`${evidence} (${noMenu} swipe, then tap the target, by coordinates); no scroll moves it out from under that backdrop, and a swipe on it may close the menu`);
     expect(presentedLayerName({ kind: 'backdrop' })).toBe("a menu's backdrop");
   });
 });

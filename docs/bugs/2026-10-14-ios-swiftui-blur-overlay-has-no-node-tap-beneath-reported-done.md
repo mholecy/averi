@@ -18,7 +18,7 @@
 > The rule's own residual (ADR 0018, the amendment's): WDA's flags cannot tell the backdrop from a hidden screen-sized
 > overlay that passes touches (`.allowsHitTesting(false)`) listed after the screen's content — read as a backdrop, a
 > false refusal, unmeasured in any app; the reply names the evidence and the way out ("if a screenshot shows no menu
-> up, the backdrop is an overlay that lets touches through: tap it by coordinates").
+> up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)").
 
 **Measured 2026-10-14 22:21–22:23 UTC** on the iPhone 17 simulator, iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt).
 averi = mobile-verify `arch/round-13` @ `d407256` (`dist/`, stdio via the HTTP daemon on port 47893), both `treeSource: wda`

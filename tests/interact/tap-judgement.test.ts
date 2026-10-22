@@ -360,7 +360,7 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     expect(said(outcome)).toBe(
       'CoveredRefusal: lab.blur-menu-grouped.A is under container (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — ' +
         "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
-        '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap it by coordinates); no scroll moves it out from under that backdrop; nothing was tapped',
+        '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop; nothing was tapped',
     );
   });
 

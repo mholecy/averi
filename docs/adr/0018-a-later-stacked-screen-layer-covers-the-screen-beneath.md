@@ -980,11 +980,11 @@ whole screen, which an overlay that lets touches through matches too (the first 
 a sheet or modal: the refusal names the evidence and the way out a screenshot gives (ui-tree/standing.ts#
 presentedRemedy) — "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the
 screen's content) — close it first (if a screenshot shows no menu up, the backdrop is an overlay that lets touches
-through: tap it by coordinates); no scroll moves it out from under that backdrop" (`scroll_until`: "… (… swipe and tap
-by coordinates); … and a swipe on it may close the menu, so none was sent"; the colour/ocr assert: "… (… judge the
-element on that screenshot) …"). The way out sits right after "close it first", so what a verb appends ("; nothing
-was tapped", ", so none was sent") follows the refusal's clause, never the way out. The
-refusal is not weakened: a tap by id is still refused, no stroke is sent, the assert still fails closed; only the
+through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that
+backdrop". `scroll_until`'s stop gives the way out as "swipe, then tap the target, by coordinates" and ends "no scroll
+moves it out from under that backdrop, and a swipe on it may close the menu, so none was sent"; the colour/ocr
+assert's as "judge the element on that screenshot". The way out sits right after "close it first", so what a verb
+appends ("; nothing was tapped", ", so none was sent") follows the refusal's clause, never the way out. The refusal is not weakened: a tap by id is still refused, no stroke is sent, the assert still fails closed; only the
 agent's own look at the screen moves past it, through tools averi does not judge (the tap's and swipe's x/y). Both
 variants take the kind: a shown backdrop over a screen beneath wholly `isVisible="0"` is stronger evidence, but a
 screenshot shows its menu too, so the way out never misleads there. Golden against the tip before it: the same 36
