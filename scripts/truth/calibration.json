@@ -200,11 +200,15 @@
         {
           "rows": [
             "ios-iphone17-ios27/blur-menu-grouped.idb.json W tap",
-            "ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until"
+            "ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until",
+            "ios-iphone17-ios27/blur-menu-stacked.idb.json W tap",
+            "ios-iphone17-ios27/blur-menu-stacked.idb.json W scroll_until",
+            "ios-iphone17-ios27/blur-menu-unhidden.idb.json W tap",
+            "ios-iphone17-ios27/blur-menu-unhidden.idb.json W scroll_until"
           ],
           "broke": "13d68a2",
           "fixed": "8a55d2b",
-          "why": "the same, on the grouped menu's idb list: green again at 8a55d2b, ADR 0015's reading break (#15)"
+          "why": "the same, on the grouped menu's idb list (and round 16's probes of it, blur-menu-stacked and blur-menu-unhidden, idb's lists alike): green again at 8a55d2b, ADR 0015's reading break (#15)"
         },
         {
           "rows": [
@@ -786,9 +790,50 @@
     {
       "n": "31",
       "note": "2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md",
-      "status": "residual:open (the blur overlay has no node in either tree)",
+      "status": "calibrate",
+      "fix": ["7fd1ee5"],
       "verified": "golden",
-      "remark": "ADR 0018 residual 9. Pinned as KNOWN residual (tests/differential/golden/presented.known.ts) on presented/blur-menu and blur-menu-grouped: A, B, D beneath the backdrop answer Tapped, a colour PASS on the blur and fully visible under idb and WDA; on the grouped WDA tree C is refused under the menu row W drawn over its centre, without 'close it first'. C's other rows (Tapped at a point that fires W) are L4's."
+      "partial": "WDA's grouped blur menus: the backdrop listed after the screen beneath at its origin (blur-menu-grouped, -stacked, -unhidden); idb and WDA's ungrouped reading-order run stay ADR 0018 residual 9",
+      "defect": "^Tapped|^passed on|no \"close it first\"|without \"close it first\"|swiped 3× beneath a presented layer",
+      "checks": [
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json A tap",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json A colour",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json A scroll_until",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json B tap",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json B colour",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json B scroll_until",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json C tap",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json C colour",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json C scroll_until",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json D tap",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json D colour",
+        "ios-iphone17-ios27/blur-menu-grouped.wda.json D scroll_until",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json A tap",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json A colour",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json A scroll_until",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json B tap",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json B colour",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json B scroll_until",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json C tap",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json C colour",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json C scroll_until",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json D tap",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json D colour",
+        "ios-iphone17-ios27/blur-menu-stacked.wda.json D scroll_until",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json A tap",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json A colour",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json A scroll_until",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json B tap",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json B colour",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json B scroll_until",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json C tap",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json C colour",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json C scroll_until",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json D tap",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json D colour",
+        "ios-iphone17-ios27/blur-menu-unhidden.wda.json D scroll_until"
+      ],
+      "remark": "Partly fixed by round 16, 7fd1ee5 on bugs/r16-blur (adapters/wda-source.ts#inWindowBackdrops, ADR 0018 residual 9 refined 2026-10-22): in the app's Window, a childless structural screen-sized element inside a layer, listed after a sibling at its origin that holds content, hidden (0/0) over a sibling showing content or shown over one wholly isVisible=0, is a presented screen, so byMarks covers what is listed before it. The pair is 7fd1ee5 and its first parent 5f33c10 (the round's probes: blur-menu-stacked, blur-menu-unhidden, tap-catcher-beneath, tap-catcher-stacked — WDA lists siblings of the same top in draw order, whatever the declaration order). Before: A, B, D Tapped through the backdrop, their colour a PASS on the blur, fully visible after 0 swipes; C refused under the menu row W without 'close it first', its scroll_until three swipes on the blur. After: each tap refused 'close it first', each colour failing closed, each scroll_until stopped before any swipe. Live (WDA, ios-vis-r16-blur-1.json, -2.json): the three grouped cells' A–D refused, nothing fired or stroked; K, W Tapped. The rest — idb (no trace of the hidden backdrop; the unhidden one only an unlabelled screen-sized GenericElement) and WDA's ungrouped run (the backdrop first by its top, its order untold) — stays ADR 0018 residual 9: its KNOWN rows (presented.known.ts) and live entries filed as that residual. C's other rows (Tapped at a point that fires W) are L4's."
     },
     {
       "n": "32",

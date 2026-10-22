@@ -33,7 +33,7 @@ import type { ReplyKind } from './replies.js';
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
-const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
+const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
@@ -151,10 +151,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // b71cbbb (ios-vis-b71cbbb.json) the stop was claimed on a read still moving, the tap then refused — ok at 11683c3.
   // Its intermittent entry struck off by round 7's A1 (f76be36a, e687fe83, 659fdf00: the unmeasured first stroke cut to
   // 126 pt, the stop judged on the read the fling rests in): C ok, settled, in six runs of six (the same records).
-  // blur-menu-grouped's C: WDA lists the menu row W over it (drawn over, its order told), so the stop is refused —
-  // after three strokes on the blur (no node: residual 9), "content exhausted … a layout defect"; the strokes close
-  // nothing (no `dismissed` logged): so at L4's final src too (94fc318b: ios-vis-r8-l4-3.json, -4.json).
-  ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
+  // blur-menu-grouped's C: WDA lists the menu row W over it (drawn over, its order told), so the stop was refused —
+  // after three strokes on the blur (residual 9), "content exhausted … a layout defect"; so at L4's final src too
+  // (94fc318b: ios-vis-r8-l4-3.json, -4.json). Struck off by round 16's in-window backdrop (bugs/r16-blur 7fd1ee57,
+  // adapters/wda-source.ts#inWindowBackdrops): stopped before any swipe, "close it first", nothing stroked, in two runs
+  // of two (ios-vis-r16-blur-1.json, -2.json) — with blur-menu-grouped's A, B, D tap and scroll entries under WDA below.
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
     // scroll-sticky's R with `fully: true` struck off by round 14's LE3 fix (40b4856: a heading listed before is drawn
@@ -164,12 +165,16 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // so at its final src too (94fc318b: ios-vis-r8-l4-3.json, -4.json).
     // (idb's tap of blur-menu's A came back ok once, in ios-vis-r8-l4-3.json: the run's first case on a freshly booted
     // simulator, a wait that timed out with no tree — nothing tapped, vacuous; Tapped and the menu dismissed in -4.json.)
-    ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', 'tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'], BLUR, 'tap-claim', 'Tapped'),
+    // blur-menu-grouped's A, B, D under WDA struck off by round 16 (7fd1ee57): the backdrop listed after the screen
+    // beneath is a presented screen — each tap refused "close it first", nothing fired, in two runs of two
+    // (ios-vis-r16-blur-1.json, -2.json); under idb, which lists no trace of the backdrop, they stand.
+    ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', ...(src === 'idb' ? ['tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'] : [])], BLUR, 'tap-claim', 'Tapped'),
     // blur-menu's W struck off by round 9's L4 fix (1ef11b9c, ADR 0024): the eyes see it drawn over C — Tapped, it alone
     // fired, under idb and WDA (ios-vis-r9-l4w-1.json, -2.json); refused under C, the order not told, before.
     // The scroll case beneath the blur (round 6's iOS check, first run on iOS): the overlay with no node unseen, the stop
     // at once.
-    ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.D', 'scroll:blur-menu-grouped.A', 'scroll:blur-menu-grouped.B', 'scroll:blur-menu-grouped.D'], BLUR, 'presented-stop', 'visible'),
+    // (blur-menu-grouped's under WDA struck off by round 16, as its taps: stopped before any swipe, "close it first".)
+    ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.D', ...(src === 'idb' ? ['scroll:blur-menu-grouped.A', 'scroll:blur-menu-grouped.B', 'scroll:blur-menu-grouped.D'] : [])], BLUR, 'presented-stop', 'visible'),
     // blur-menu's C: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json, -2.json; no
     // dismissal), struck off at its final src (94fc318b): under a cover whose order is not told scroll_until stops
     // before any swipe, nothing stroked, in two runs of two (ios-vis-r8-l4-3.json, -4.json).

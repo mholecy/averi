@@ -615,7 +615,7 @@ alert, and a non-modal sheet.
 | 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window"), and **on idb** (2026-10-19) for a list holding UIKit's dismiss region; a stroke that changed the screen — no id kept, nothing it touched still listed — is a loud stop, not a claimed one (the amendment "idb's presented layer") |
 | 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
-| 9 an in-window overlay with no node (the PAY blur menu) | stands — decided by the PAY probe: if Account Detail reads `0` under the menu, the flags rule covers it | stands |
+| 9 an in-window overlay with no node (the PAY blur menu) | **closed** (2026-10-22) where the backdrop is listed after the screen beneath at its origin — a grouped menu (the amendment "an in-window backdrop"); **stands** in a reading-order run (the ungrouped menu) | stands (idb lists no trace of it) |
 | 10 a strip with no node at a list's bottom | stands (no presentation) | stands |
 | 11 an undimmed partial sheet: the tap says close, `scroll_until` strokes | **closed**: a marked layer reaches the whole screen, so every touch-down beneath it is on it | stands |
 
@@ -945,6 +945,35 @@ before. A dismiss region short of the whole screen (a popover's on an iPad?) is 
 screen beneath the region too (it would read as the layer's own). Decision 2 is source-agnostic: on WDA and
 uiautomator trees a fling keeps its scroll view's rect and is excused, a dismissal is their marks' to stop for first.
 
+## Amendment: an in-window backdrop (2026-10-22)
+
+Residual 9's menu (mp-native's `PAY` chooser, the lab's blur menus) is a card laid in the screen's own container over a
+dimmed backdrop that takes every touch. The round-16 probes (iPhone 17 simulator, iOS 27.0, WDA 16.1.7; raw captures in
+tests/fixtures/truth/ios-iphone17-ios27) measured what WDA lists of it:
+
+- The SwiftUI `.accessibilityHidden` tap-catcher is listed: a childless `Other 0,0 402x874`, `isVisible="0"`,
+  `isAccessible="0"`. Without `.accessibilityHidden` (`blur-menu-unhidden`) it is listed `isVisible="1"`
+  `isAccessible="1"`, and the screen beneath then reads wholly `isVisible="0"`.
+- WDA lists a container's children by their top, and children of the same top in the order they are DRAWN, whatever
+  order they are declared in: `blur-menu-grouped` (declared card, backdrop, screen beneath; zIndex 2, 1, 0) and
+  `blur-menu-stacked` (declared screen beneath, backdrop, card; no zIndex) list the same — the screen beneath, the
+  backdrop, the card. A hidden screen-wide tap-to-dismiss background drawn BENEATH a screen-sized content container
+  (`tap-catcher-beneath`, a `.background`; `tap-catcher-stacked`, declared first in a ZStack) is listed BEFORE it.
+- In a reading-order run (the ungrouped `blur-menu`: the backdrop and the six targets siblings), the backdrop is listed
+  first by its top (0), so nothing tells whether it is drawn over the targets below it.
+- idb lists no trace of the hidden backdrop; the unhidden one only as an unlabelled `GenericElement 0,0 402x874`.
+
+**Decision.** The WDA parser marks an IN-WINDOW BACKDROP a presented `screen` (adapters/wda-source.ts#
+inWindowBackdrops), so the marks adapter covers what is listed before it (ui-tree/presentation.ts#byMarks): in the
+app's Window, when nothing else of that Window is marked, a childless element of a structural role inside one of the
+Window's layers (never a layer itself: those are the flags rule's, where a bare shown leaf after a hidden layer presents
+nothing), screen-sized, listed after a sibling that starts at the same origin and holds content, when WDA's flags show
+it over that sibling — hidden (`0/0`) over a sibling showing content on the screen, or shown over a sibling wholly
+`isVisible="0"`. A sibling of a smaller top is no evidence (it is listed first whatever is drawn on top). Over every raw
+WDA payload in tests/fixtures (59) only the three grouped blur menus are marked; golden: 36 checks change, all theirs
+(A, B, D refused "close it first", their colour failing closed, scroll_until stopping before any swipe; C gains "close
+it first"), none elsewhere. No device read is added: the mark is read off the tree the verb already holds.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -1060,22 +1089,25 @@ uiautomator trees a fling keeps its scroll view's rect and is excused, a dismiss
    **Closed for WDA** (2026-10-15): the page sheet's layer is marked, so its bare dim no longer matters, and a target
    of the list in the status strip above the sheet is refused, "close it first" (`ContactsListView`, moved there
    before: 12 taps). Stands on a tree whose source did not judge.
-9. **An in-window overlay with no node is not seen** (owner decision Q7 (a), 2026-10-14). mp-native's Account Detail
-   `PAY` menu: a SwiftUI card inserted in the screen's own container over a blurred, dimmed Account Detail. Neither WDA
-   nor idb lists a node for the blur/dim backdrop, so the rows beneath read uncovered: `tap
-   id:transactions.list.row_2` was reported `Tapped` under both tree sources (shim `idb ui tap 201 652`), while the
-   backdrop took the touch and only closed the menu. The tree carries no evidence of the layer, so averi cannot judge
-   it; indirect signs (WDA moving the host's tab bar to its hidden frame, idb dropping it from its list) are not taken
-   as one. The fix is app-side: `.accessibilityAddTraits(.isModal)` on the menu, which hides the screen beneath from
-   the tree (a tap there then finds no target), or an accessibility element on the backdrop. A backdrop element covers
-   the rows only when it is no excused frame — LABELLED (or a button), since a structural leaf with only an identifier
-   in the target's own screen is excused — and it reads as a presented screen only when laid in a screen-sized layer
-   of its own after the screen's, as a sheet's dim is (inserted in the screen's own container, as this menu is, it is
-   an ordinary cover: refused, with "scroll_until it first").
+9. **An in-window overlay the tree does not show over its screen is not seen** (owner decision Q7 (a), 2026-10-14;
+   partly closed 2026-10-22). mp-native's Account Detail `PAY` menu: a SwiftUI card inserted in the screen's own
+   container over a blurred, dimmed Account Detail, whose backdrop takes the touch and only closes the menu: `tap
+   id:transactions.list.row_2` was reported `Tapped` under both tree sources (shim `idb ui tap 201 652`).
    docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
-   Stands (2026-10-15), undecided: the PAY menu was captured only as a normalized snapshot, without flags. A raw
-   `/source` with the menu up decides it — if WDA reports Account Detail wholly `0` there, the flags rule marks the
-   menu's layer; if not (the menu inserted in the screen, no `.isModal`), it stays.
+   **Closed for WDA where the backdrop is listed after the screen beneath at its origin** — the card and the screen
+   beneath each an accessibility container (the lab's `blur-menu-grouped`, `-stacked`, `-unhidden`): see "Amendment:
+   an in-window backdrop". **Stands**:
+   - under idb, which lists no trace of a hidden backdrop (an unhidden one only as an unlabelled screen-sized frame, an
+     excused structural leaf). Inferring it from indirect signs (idb dropping the host's tab bar) or from a screenshot
+     per tap would double the cost of the commonest verbs under the default tree source;
+   - under WDA in a reading-order run (the ungrouped `blur-menu`: the backdrop and the targets siblings), where the
+     backdrop is listed first by its top and its order against the targets is untold;
+   - for mp-native's own menu, until a raw `/source` with it up shows which shape it is (only a normalized snapshot,
+     without flags, was captured).
+   Remedy for app teams: `.accessibilityAddTraits(.isModal)` on the menu, which hides the screen beneath from the tree
+   (a tap there then finds no target), or a LABELLED accessibility element on the backdrop (a structural leaf with
+   only an identifier in the target's own screen is excused) — and `treeSource: wda`, under which a grouped menu's
+   backdrop is read as a presented screen.
 10. **An app-drawn strip at a list's bottom with no node is not seen** (round-16 device check, 2026-10-14; residual 9's
    class). mp-native's Account Detail: the raw WDA ancestry is `ScrollView transactions.list.container` from y 180 to
    874 → its content → `row_4` from y 816 to 869, and no node clips at y 839, yet the capture shows an opaque blank

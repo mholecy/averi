@@ -143,7 +143,7 @@ describe('every note a lab ratchet names is filed', () => {
   });
 
   it('the residual forms: what is recognised and what is not', () => {
-    for (const ok of ['residual:accepted (round 13: the FAB host layer is a cover)', 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)', 'residual:ADR 0018 residual 6 — anything'])
+    for (const ok of ['residual:accepted (round 13: the FAB host layer is a cover)', 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen', 'residual:ADR 0013 residual 1 — a note recording the same residual (calibration.json #24)', 'residual:ADR 0018 residual 6 — anything'])
       expect(residualProblem(ok), ok).toBeUndefined();
     for (const bad of ['residual:accepted (round 13)', 'residual:ADR 0018 residual 99 — no such', 'residual:ADR 9999 residual 1 — no such ADR', 'residual:ADR 0018 residual 9 — x (calibration.json #1)', 'residual:ADR 0018 residual 9', 'residual:'])
       expect(residualProblem(bad), bad).toBeDefined();

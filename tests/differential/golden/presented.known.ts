@@ -7,8 +7,9 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 
 // The lab finding L1's tap and scroll_until rows were this KNOWN's until round 6's fix (d43df5d on arch/r22-l1)
 // struck them off; scripts/truth/calibration.json calibrates the note on them.
-// Phase 3 (B3): the lab findings of the presented cells, open — and the residual of calibration.json #31.
-const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay with no node is not seen (calibration.json #31)';
+// Phase 3 (B3): the lab findings of the presented cells, open — and ADR 0018 residual 9, what of calibration.json #31
+// round 16's in-window backdrop left open.
+const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 /** Review round 4's P4 (calibration.json NI1): idb lists a UIKit table's labels without their identifiers. */
