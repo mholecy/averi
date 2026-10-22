@@ -1098,8 +1098,11 @@ it first"), none elsewhere. No device read is added: the mark is read off the tr
    beneath each an accessibility container (the lab's `blur-menu-grouped`, `-stacked`, `-unhidden`): see "Amendment:
    an in-window backdrop". **Stands**:
    - under idb, which lists no trace of a hidden backdrop (an unhidden one only as an unlabelled screen-sized frame, an
-     excused structural leaf). Inferring it from indirect signs (idb dropping the host's tab bar) or from a screenshot
-     per tap would double the cost of the commonest verbs under the default tree source;
+     excused structural leaf). Indirect signs (idb dropping the host's tab bar) are no evidence of a backdrop. A
+     screenshot per tap gives none either: a dimmed, blurred backdrop reads as the screen beneath it, only darker and
+     softer, and nothing in its pixels tells "covered" from an app's own dim or blur, so a judgement from them would
+     refuse taps on screens nothing covers. The cost is the lesser reason: an estimated +20–40 % of a tap's wall time
+     under the default tree source (not measured);
    - under WDA in a reading-order run (the ungrouped `blur-menu`: the backdrop and the targets siblings), where the
      backdrop is listed first by its top and its order against the targets is untold;
    - for mp-native's own menu, until a raw `/source` with it up shows which shape it is (only a normalized snapshot,
