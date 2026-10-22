@@ -978,8 +978,8 @@ it first"), none elsewhere. No device read is added: the mark is read off the tr
 **Its own kind, its own words (code review, 2026-10-22).** The mark rests on one empty element WDA lists over the
 whole screen, which an overlay that lets touches through matches too (the first residual below), so it is not told as
 a sheet or modal: the refusal names the evidence and the way out a screenshot gives (ui-tree/standing.ts#
-presentedRemedy) — "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after its
-content) — close it first; no scroll moves it out from under that backdrop; if a screenshot shows no menu up, the
+presentedRemedy) — "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the
+screen's content) — close it first; no scroll moves it out from under that backdrop; if a screenshot shows no menu up, the
 backdrop is an overlay that lets touches through: tap it by coordinates" (`scroll_until`: "… and a swipe on it may close
 the menu; … swipe and tap by coordinates"; the colour/ocr assert: "… judge the element on that screenshot"). The
 refusal is not weakened: a tap by id is still refused, no stroke is sent, the assert still fails closed; only the

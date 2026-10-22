@@ -20,11 +20,11 @@ describe('presentedRemedy / presentedStop — the words per kind of presented la
   });
 
   it('a `backdrop` (an in-window backdrop, one empty element WDA lists over the screen) names that evidence and the way out when a screenshot shows no menu', () => {
-    const evidence = "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after its content) — close it first";
+    const evidence = "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first";
     const noMenu = 'if a screenshot shows no menu up, the backdrop is an overlay that lets touches through:';
     expect(presentedRemedy('it', { kind: 'backdrop' })).toBe(`${evidence}; no scroll moves it out from under that backdrop; ${noMenu} tap it by coordinates`);
     expect(presentedRemedy('the element', { kind: 'backdrop' })).toBe(
-      "a menu's backdrop is presented over the element (an empty element WDA lists over the whole screen, after its content) — close it first; " +
+      "a menu's backdrop is presented over the element (an empty element WDA lists over the whole screen, after the screen's content) — close it first; " +
         `${noMenu} judge the element on that screenshot`,
     );
     expect(presentedStop({ kind: 'backdrop' })).toBe(`${evidence}; no scroll moves it out from under that backdrop, and a swipe on it may close the menu; ${noMenu} swipe and tap by coordinates`);

@@ -492,7 +492,7 @@ export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
  * docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
  */
 const BACKDROP = "a menu's backdrop";
-const BACKDROP_EVIDENCE = '(an empty element WDA lists over the whole screen, after its content) — close it first';
+const BACKDROP_EVIDENCE = "(an empty element WDA lists over the whole screen, after the screen's content) — close it first";
 const NO_MENU = 'if a screenshot shows no menu up, the backdrop is an overlay that lets touches through:';
 
 /**
