@@ -105,7 +105,7 @@ stroke before a read of the call has read — tests only, not run live.) Reprodu
 - **alert-dim, dim-cover (A–D), sheet-background C and D**: two strokes on the layer, nothing dismissed, as before (A
   and B as feelers now), each unmoved stop with the note. Their taps refused (timed out), S Tapped.
 - **The cost on the content-up cases** (scroll-top-edge, tabbar-dense, tabbar-floating, carousel-in-list: 21 cases,
-  timed runs of the four cells alternating base `da68586f` and this branch, two each): wall time 197 s and 195 s
+  timed runs of the four cells alternating base `da68586f` and this branch, two each; timed from the run logs, those four records not kept): wall time 197 s and 195 s
   against 199 s and 198 s — within run-to-run noise; the swipes per case the same spread (scroll-top-edge T 5 and 2 at
   the base, 5 and 5 here; tabbar-floating R 4 and 5 at the base, 5 and 5 here; every other case equal). No feeler is
   sent there: idb lists every node of the app's hierarchy, on the screen or not (scroll-top-edge's A at y −282,
