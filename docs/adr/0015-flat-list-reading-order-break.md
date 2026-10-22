@@ -108,6 +108,10 @@ docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-cove
   backdrop that has no node (ADR 0018 residual 9): the amendment closes C's direction only where a menu row holds the
   centre. Nor is a sibling listed before a target and overlapping only its edge a cover of it: a colour assert there
   may sample it.
+- Same-top siblings (2026-10-22, round 16): in a reading-order run WDA lists siblings of the same top in draw order
+  (measured on four SwiftUI probes, ADR 0018's "Amendment: an in-window backdrop"). Only WDA's backdrop rule
+  (adapters/wda-source.ts#inWindowBackdrops) reads that tie as draw order; the cover rule here keeps it untold, the
+  safe direction (a refusal, never a wrong tap).
 
 ## Amendment: a heading listed before (2026-10-20, round 14, LE3)
 

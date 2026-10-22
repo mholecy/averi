@@ -136,9 +136,12 @@ export function parseWdaSourceValue(value: unknown): UiNode {
  * frame too (UiNode.unclippedFrames); and on every node whose two or more children's tops never decrease in the order
  * listed, that run listed in READING order (UiNode.readingOrder) — SwiftUI's: the lab's in-screen menu lists its six
  * buttons `A 110, B 290, K 380, W 448, C 470, D 650` as siblings of one `Other`, W drawn over C by `zIndex`. A run
- * listed out of that order is not reading order, so its order is kept as draw order. THE marks: the parser sets them
- * on every tree, and a WDA `ui_snapshot` capture that lacks them (older captures do) is given them with this, so it is
- * judged as the live source's tree. Returns `tree`.
+ * listed out of that order is not reading order, so its order is kept as draw order. Within a reading-order run,
+ * siblings of the SAME top are listed in draw order (measured: blur-menu-grouped and -stacked list the screen beneath,
+ * the backdrop, the card, whatever the declaration order); only `inWindowBackdrops` takes that tie as draw order — the
+ * reading-order cover rule (ui-tree/reading-order.ts) keeps it untold, the safe direction. THE marks: the parser sets
+ * them on every tree, and a WDA `ui_snapshot` capture that lacks them (older captures do) is given them with this, so
+ * it is judged as the live source's tree. Returns `tree`.
  * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
  */
 export function markWdaDialect<T extends UiNode>(tree: T): T {
@@ -415,9 +418,10 @@ const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement |
  *   screen (a dismissed alert WDA keeps) types nothing, and the flags judge its layer.
  * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them (`flags`, `carriesFlags`): one
  *   layer per Window at most.
- * - AN IN-WINDOW BACKDROP (`screen`, `inWindowBackdrops`), read by the flags too (a flagless payload has none), in
- *   the app's Window and only when nothing else of that Window is marked: an element inside a layer, not a layer itself — the backdrop of a
- *   menu laid in the screen's own container, which covers what is listed before it.
+ * - AN IN-WINDOW BACKDROP (`screen`, `inWindowBackdrops`), by the flags too, so only in a payload carrying them; in
+ *   the app's Window and only when nothing else of that Window is marked: an element INSIDE a layer, not a layer
+ *   itself — the backdrop of a menu laid in the screen's own container, which covers what is listed before it. Every
+ *   such backdrop is marked (no "one per Window" here); the marks adapter takes the topmost (ui-tree/presentation.ts).
  * A layer typed is not also `screen` (one mark a layer).
  */
 function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>, flags: boolean): PresentedLayers {
@@ -447,7 +451,7 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
     const appWindow = window === (windows[0] ?? root);
     const shown = flags ? presentedScreen(window, appWindow) : undefined;
     if (shown !== undefined && !layers.has(shown)) layers.set(shown, 'screen');
-    if (appWindow && !(window.children ?? []).some((layer) => layers.has(layer))) {
+    if (flags && appWindow && !(window.children ?? []).some((layer) => layers.has(layer))) {
       for (const backdrop of inWindowBackdrops(window)) layers.set(backdrop, 'screen');
     }
   }
@@ -509,15 +513,19 @@ function presentedScreen(window: WdaElement, appWindow: boolean): WdaElement | u
  * The IN-WINDOW BACKDROPS of `window` (`UiNode.presentation` `screen`, ADR 0018 residual 9): a SwiftUI menu card laid
  * in the screen's own container over a dimmed backdrop that takes the touch (the lab's blur-menu-grouped, mp-native's
  * Account Detail `PAY` menu). Each is a CHILDLESS element of a structural role (an `Other`) INSIDE one of the
- * Window's layers (never a layer itself: those are `presentedScreen`'s), screen-sized
- * (`SCREEN_SIZED_FRACTION` of the Window), listed after a sibling that starts at the same origin and holds content (an
- * element of a non-structural role) — the screen beneath — when WDA's flags show the backdrop over that sibling:
+ * Window's layers (never a layer itself: those are `presentedScreen`'s), screen-sized (`SCREEN_SIZED_FRACTION` of the
+ * Window), listed after a sibling that is THE SCREEN BENEATH — screen-sized too, starting at the same origin, holding
+ * content (an element of a non-structural role; a header strip at the origin is no screen beneath) — when WDA's flags
+ * show the backdrop over that sibling:
  * - HIDDEN (`.accessibilityHidden`, the menu's tap-catcher): the backdrop `isVisible="0"` and `isAccessible="0"`, the
  *   sibling showing content on the screen (blur-menu-grouped, blur-menu-stacked);
  * - SHOWN (the backdrop an accessibility element): the backdrop `isVisible="1"`, every element of the sibling's subtree
- *   `isVisible="0"` — WDA's own word that the screen beneath is covered, as over a sheet (blur-menu-unhidden).
- * Why "listed after, at the same origin" is "drawn over": WDA lists a container's children by their top, and siblings
- * of the same top in the order they are DRAWN, whatever order they are declared in — measured (iPhone 17 simulator,
+ *   `isVisible="0"` — WDA's own word that the screen beneath is covered, as over a sheet (blur-menu-unhidden; one
+ *   lab cell, no app measured).
+ * Why "listed after, at the same origin" is "drawn over": a run of siblings not in reading order is listed in draw
+ * order already (`markWdaDialect`); in a run listed in READING order (tops never decreasing: ADR 0015, the order of
+ * overlapping siblings untold), siblings of the SAME top are still listed in the order they are DRAWN, whatever order
+ * they are declared in — measured (iPhone 17 simulator,
  * iOS 27.0, WDA 16.1.7, tests/fixtures/truth/ios-iphone17-ios27): blur-menu-grouped (declared card, backdrop, screen
  * beneath; zIndex 2, 1, 0) and blur-menu-stacked (declared screen beneath, backdrop, card; no zIndex) both list the
  * screen beneath, then the backdrop, then the card; tap-catcher-beneath (a hidden tap-to-dismiss `.background` of the
@@ -525,13 +533,21 @@ function presentedScreen(window: WdaElement, appWindow: boolean): WdaElement | u
  * beneath — no backdrop. A sibling of a smaller top is listed first whatever is drawn on top, so it is no evidence:
  * the ungrouped blur-menu lists its backdrop first of seven siblings by top (ADR 0015's reading order), and stays
  * unjudged. idb lists no trace of a hidden backdrop at all.
+ * What the flags cannot tell (ADR 0018, the amendment's residual): a hidden screen-sized leaf that PASSES touches
+ * (`.allowsHitTesting(false)`, RN `pointerEvents="none"`, accessibility-hidden) listed after the screen's content
+ * reads as a backdrop, and taps beneath it are refused — unmeasured in any app.
  */
 function inWindowBackdrops(window: WdaElement): readonly WdaElement[] {
   const screen = usableRect(window.rect);
   if (screen === undefined) return [];
   const content = (e: WdaElement): boolean => !STRUCTURAL_ROLES.has(iosRoleOf(e.type, ROLE_MAP));
   const shownContent = (e: WdaElement): boolean => content(e) && onScreen(e, screen);
-  const sameOrigin = (a: Rect, b: Rect | undefined): boolean => b !== undefined && a.x === b.x && a.y === b.y;
+  const screenSized = (r: Rect): boolean => rectArea(r) >= rectArea(screen) * SCREEN_SIZED_FRACTION;
+  /** `beneath` is the screen beneath a backdrop at `origin`: screen-sized, at its origin, holding content. */
+  const screenBeneath = (origin: Rect, beneath: WdaElement): boolean => {
+    const r = usableRect(beneath.rect);
+    return r !== undefined && r.x === origin.x && r.y === origin.y && screenSized(r) && someIn(beneath, content);
+  };
   /** `backdrop` is drawn over `beneath`, as WDA's flags show it. */
   const over = (backdrop: WdaElement, beneath: WdaElement): boolean =>
     isZero(backdrop.isVisible) ? isZero(backdrop.isAccessible) && someIn(beneath, shownContent) : String(backdrop.isVisible) === '1' && allIn(beneath, (e) => isZero(e.isVisible));
@@ -540,8 +556,8 @@ function inWindowBackdrops(window: WdaElement): readonly WdaElement[] {
     const kids = el.children ?? [];
     kids.forEach((backdrop, i) => {
       const rect = usableRect(backdrop.rect);
-      if (rect === undefined || (backdrop.children ?? []).length > 0 || content(backdrop) || rectArea(rect) < rectArea(screen) * SCREEN_SIZED_FRACTION) return;
-      if (kids.slice(0, i).some((beneath) => sameOrigin(rect, usableRect(beneath.rect)) && someIn(beneath, content) && over(backdrop, beneath))) found.push(backdrop);
+      if (rect === undefined || (backdrop.children ?? []).length > 0 || content(backdrop) || !screenSized(rect)) return;
+      if (kids.slice(0, i).some((beneath) => screenBeneath(rect, beneath) && over(backdrop, beneath))) found.push(backdrop);
     });
     kids.forEach(visit);
   };

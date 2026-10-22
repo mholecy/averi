@@ -13,6 +13,9 @@
 > reading-order run (the ungrouped blur-menu: the backdrop listed first by its top, its order untold); and for
 > mp-native's own menu until a raw `/source` with it up shows its shape. Remedy for the app: `.accessibilityAddTraits(
 > .isModal)` on the menu, or a labelled accessibility element on the backdrop, and `treeSource: wda`.
+> The rule's own residual (ADR 0018, the amendment's): WDA's flags cannot tell the backdrop from a hidden screen-sized
+> overlay that passes touches (`.allowsHitTesting(false)`) listed after the screen's content — read as a backdrop, a
+> false refusal, unmeasured in any app.
 
 **Measured 2026-10-14 22:21–22:23 UTC** on the iPhone 17 simulator, iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt).
 averi = mobile-verify `arch/round-13` @ `d407256` (`dist/`, stdio via the HTTP daemon on port 47893), both `treeSource: wda`

@@ -76,6 +76,11 @@ describe('inWindowBackdrops — each condition of the rule', () => {
     expect(parsed(payload(beneath({ rect: rect(51, 110, 300, 244) }), hiddenBackdrop(), card()))).toEqual([]);
   });
 
+  it('the sibling before it must be the screen\'s size: a header strip at the origin holding a text is no screen beneath', () => {
+    const strip = el('Other', { rect: rect(0, 0, 402, 100), children: [el('StaticText', { label: 'Title', rect: rect(16, 62, 200, 30) })] });
+    expect(parsed(payload(strip, hiddenBackdrop(), card()))).toEqual([]);
+  });
+
   it('the sibling before it must hold content: a bare frame at the origin is no screen beneath', () => {
     expect(parsed(payload(el('Other', { children: [el('Other', { rect: rect(0, 0, 402, 100) })] }), hiddenBackdrop(), card()))).toEqual([]);
     const bare0 = el('Other', { isVisible: '0', children: [el('Other', { isVisible: '0', rect: rect(0, 0, 402, 100) })] });
@@ -100,6 +105,12 @@ describe('inWindowBackdrops — each condition of the rule', () => {
     const partly = beneath({ isVisible: '0', children: [button('A', 110, { isVisible: '0' }), button('B', 290)] });
     expect(parsed(payload(partly, hiddenBackdrop({ isVisible: '1', isAccessible: '1' }), card()))).toEqual([]);
     expect(parsed(payload(beneath(), hiddenBackdrop({ isVisible: '1', isAccessible: '1' }), card()))).toEqual([]);
+  });
+
+  it('a backdrop WDA gives no visibility flag is neither variant: not marked, even over a screen beneath wholly `0`', () => {
+    const wholly0 = beneath({ isVisible: '0', children: [button('A', 110, { isVisible: '0' }), button('B', 290, { isVisible: '0' })] });
+    const { isVisible: _v, ...unflagged } = hiddenBackdrop({ isAccessible: '1' });
+    expect(parsed(payload(wholly0, unflagged, card()))).toEqual([]);
   });
 
   it('inside one of the Window\'s layers, never a layer itself: the same siblings laid as the Window\'s layers are presentedScreen\'s (a bare shown leaf after a hidden layer presents nothing)', () => {

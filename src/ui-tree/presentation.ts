@@ -198,9 +198,9 @@ export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(t
 // ── By marks: the tree source's facts ────────────────────────────────────────────────────────────────────────────
 
 /**
- * A presented layer the tree source marks, as this module reads it (`markOf`): the `layer` (a Window's direct child),
- * its `kind`, the `element` naming a typed layer (`UiNode.presentationElement`: the alert, the action sheet, the
- * popover), and the `cover` that reaches the whole screen for it — that element, else the layer itself.
+ * A presented layer the tree source marks, as this module reads it (`markOf`): the `layer` (a Window's direct child, or
+ * under WDA an in-window backdrop inside one: adapters/wda-source.ts#inWindowBackdrops), its `kind`, the `element`
+ * naming a typed layer (`UiNode.presentationElement`: the alert, the action sheet, the popover), and the `cover` that reaches the whole screen for it — that element, else the layer itself.
  */
 interface PresentedLayer {
   readonly layer: Placed;

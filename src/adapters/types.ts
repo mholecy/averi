@@ -590,8 +590,8 @@ export interface UiNode {
   hidden?: true;
   /**
    * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
-   * screen drawn before it (`PresentationKind`) — by the WDA parser (adapters/wda-source.ts#presentedLayers), one
-   * mark per layer, and by the uiautomator parser on the root, the one window it dumps (adapters/android.ts
+   * screen drawn before it (`PresentationKind`), or, under WDA, an in-window backdrop inside one (below) — by the WDA
+   * parser (adapters/wda-source.ts#presentedLayers), one mark per layer, and by the uiautomator parser on the root, the one window it dumps (adapters/android.ts
    * #presentedWindow: `dialog` for a window that floats off the screen's top and left edges both, and `screen` for one
    * whose clickable, labelled scrim lies screen-wide above its sheet; the root also carries `activeWindowOnly`), and
    * by the idb parser on the root of its flat list (adapters/ios-tree-source.ts#listsPresentedLayer: `screen`, the
@@ -607,7 +607,11 @@ export interface UiNode {
    *   accessibility; WDA reports it whole, invisible — measured on page sheets, SwiftUI half sheets and React Native
    *   transparent modals (iPhone 17, iOS 27). The flags of a whole LAYER beneath and of a visible later one, never one
    *   node's, never a target's own: corroboration, never one flag alone. Only in a payload carrying the flags; a
-   *   layer typed is not also `screen`. The keyboard's and the input host's Windows are never searched.
+   *   layer typed is not also `screen`. The keyboard's and the input host's Windows are never searched;
+   * - by the same flags, `screen`, on an IN-WINDOW BACKDROP (adapters/wda-source.ts#inWindowBackdrops, ADR 0018's
+   *   amendment "an in-window backdrop"): not a layer but a childless structural screen-sized node INSIDE one of the
+   *   app Window's layers, listed after the screen beneath at its origin and over it by WDA's flags (a SwiftUI menu's
+   *   dimmed backdrop in the screen's own container) — only when nothing else of that Window is marked.
    * The source's fact, not a shape draw order infers: a marked layer covers what lies OUTSIDE it and is drawn before
    * it, through the whole screen, whatever the frames around it; its own nodes are not beneath it (a popover's dismiss
    * region, an alert's buttons are reached).

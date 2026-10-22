@@ -511,8 +511,8 @@ sheets and RN modals carry no type. With the layers marked, the shape rule of th
 any raw WDA tree (the same harness diff with and without it).
 
 **Decision (Q2, Q3): the source marks the presented LAYER.** The WDA parser (`adapters/wda-source.ts#presentedLayers`,
-once per payload; the keyboard's and the input host's Windows are never searched) marks a Window's direct child —
-one mark a layer, one closed kind set (`adapters/types.ts#PresentationKind`):
+once per payload; the keyboard's and the input host's Windows are never searched) marks a Window's direct child
+(since 2026-10-22 also an in-window backdrop inside one: "Amendment: an in-window backdrop") — one mark a layer, one closed kind set (`adapters/types.ts#PresentationKind`):
 
 - by TYPE — `alert`, `actionSheet`, `popover`: the layer holds an `Alert`, a `Sheet` (UIKit's action sheet, labelled
   by its message) or a `Popover` whose rect shares area with its Window, in that precedence (Contacts' discard prompt,
@@ -954,8 +954,8 @@ tests/fixtures/truth/ios-iphone17-ios27) measured what WDA lists of it:
 - The SwiftUI `.accessibilityHidden` tap-catcher is listed: a childless `Other 0,0 402x874`, `isVisible="0"`,
   `isAccessible="0"`. Without `.accessibilityHidden` (`blur-menu-unhidden`) it is listed `isVisible="1"`
   `isAccessible="1"`, and the screen beneath then reads wholly `isVisible="0"`.
-- WDA lists a container's children by their top, and children of the same top in the order they are DRAWN, whatever
-  order they are declared in: `blur-menu-grouped` (declared card, backdrop, screen beneath; zIndex 2, 1, 0) and
+- In a run WDA lists in reading order (tops never decreasing, ADR 0015), children of the SAME top are listed in the
+  order they are DRAWN, whatever order they are declared in (a run not in reading order is draw order already): `blur-menu-grouped` (declared card, backdrop, screen beneath; zIndex 2, 1, 0) and
   `blur-menu-stacked` (declared screen beneath, backdrop, card; no zIndex) list the same — the screen beneath, the
   backdrop, the card. A hidden screen-wide tap-to-dismiss background drawn BENEATH a screen-sized content container
   (`tap-catcher-beneath`, a `.background`; `tap-catcher-stacked`, declared first in a ZStack) is listed BEFORE it.
@@ -967,12 +967,31 @@ tests/fixtures/truth/ios-iphone17-ios27) measured what WDA lists of it:
 inWindowBackdrops), so the marks adapter covers what is listed before it (ui-tree/presentation.ts#byMarks): in the
 app's Window, when nothing else of that Window is marked, a childless element of a structural role inside one of the
 Window's layers (never a layer itself: those are the flags rule's, where a bare shown leaf after a hidden layer presents
-nothing), screen-sized, listed after a sibling that starts at the same origin and holds content, when WDA's flags show
+nothing), screen-sized, listed after a sibling that is the screen beneath (screen-sized too, at the same origin,
+holding content), when WDA's flags show
 it over that sibling — hidden (`0/0`) over a sibling showing content on the screen, or shown over a sibling wholly
 `isVisible="0"`. A sibling of a smaller top is no evidence (it is listed first whatever is drawn on top). Over every raw
 WDA payload in tests/fixtures (59) only the three grouped blur menus are marked; golden: 36 checks change, all theirs
 (A, B, D refused "close it first", their colour failing closed, scroll_until stopping before any swipe; C gains "close
 it first"), none elsewhere. No device read is added: the mark is read off the tree the verb already holds.
+
+Residuals of the amendment:
+
+- **The flags cannot tell a backdrop from a hidden overlay that passes touches.** A hidden (`0/0`) screen-sized leaf
+  listed after the screen's content at its origin is read as a backdrop whether it takes the touch or not: an
+  accessibility-hidden overlay with `.allowsHitTesting(false)` (RN `pointerEvents="none"`) — a decorative tint, a
+  loading shimmer — refuses every tap beneath it, "close it first", the colour failing closed, `scroll_until`
+  stopping before any swipe: a false refusal, the safe direction, unmeasured in any app. A real RN capture comes near
+  it (tests/fixtures/wda-source-rn-myport.json: a hidden `Other 0,0 402x874` listed after the screen's content at its
+  origin, not marked only because it wraps one more hidden `Other`).
+- **The sweep is weak evidence against false positives.** Over the 59 raw WDA payloads in tests/fixtures (about 13 of
+  real apps) a structure-only variant of the rule, flags ignored, marks the same three trees: no real capture holds a
+  candidate the flags turn away. The out-of-git device corpus the flags rule was measured on (89 payloads) was not
+  available to this round.
+- **The shown variant rests on one lab cell** (`blur-menu-unhidden`: the backdrop an accessibility element, the screen
+  beneath wholly `isVisible="0"`); no app is measured.
+- **A same-top tie is draw order only here.** The reading-order cover rule (ui-tree/reading-order.ts, ADR 0015) keeps
+  the order of same-top siblings untold; only this rule reads the tie as draw order (the four probes above).
 
 ## Residuals accepted
 
