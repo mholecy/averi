@@ -210,10 +210,12 @@ The cost lies on that shape only — one screenshot per plain stop where a contr
 centre, and per tap only where no tappable piece is left clear of it (O's tap moves clear to (201,670) and asks
 nothing; W's and `row_swift`'s ask); the colour assert asks on the frame it measures, none added. This amendment owns
 that measurement (ADR 0010's residual 5 and ADR 0024's third trigger cite it): over every iOS tree of the committed
-fixtures (103 trees, 5498 nodes, each judged as a target; pinned in tests/ui-tree/draw-order-reading-order.test.ts,
-"the untold covers listed after their target") the untold covers listed after a target are six pairs, four of them
-the rule's — the new cell's O; the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its
-screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none); mp-native's
+fixtures (111 trees, 5581 nodes, each judged as a target — since the merge with round 16's in-window backdrop, whose
+probes added eight; 103 and 5498 on bugs/r16-le2 alone; pinned in tests/ui-tree/draw-order-reading-order.test.ts,
+"the untold covers listed after their target") the untold covers listed after a target are eight pairs, six of them
+the rule's — the new cell's O; the lab's in-screen menu W in `blur-menu-grouped` and in that round's two probes of it,
+`blur-menu-stacked` and `blur-menu-unhidden`, under idb (the L4 shape, ADR 0024's own: its screenshot sees W over C —
+tap and plain stop unchanged, one screenshot each where they took none); mp-native's
 chooser `row_swift`; and S of `chooser-over-list`, the chooser rebuilt in the lab (refused: the eyes cannot tell it,
 below) — and blur-menu's W under C (idb and WDA), untold before the rule.
 

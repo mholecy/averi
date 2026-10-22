@@ -181,7 +181,8 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
    residual, for this question).
 6. mp-native's chooser (`idb-modal-listed-before-content.json`) has no png: its `Loan repayment` row stays refused in
    the tests. Its lab rebuild (`chooser-over-list`, round 16) measures it: R, beneath the card, is refused under idb and
-   WDA, nothing fired; its bands beside the overlap lie on the card, not on its own dimmed sides — untold, never
+   WDA, nothing fired (under WDA "close it first" since the merge with ADR 0018's "an in-window backdrop": WDA lists
+   the dim as a backdrop); its bands beside the overlap lie on the card, not on its own dimmed sides — untold, never
    unlocked.
 7. **A two-tone peer on top, split at the target's edge** (review round 1): a peer drawn over the target whose part over
    the overlap is the target's own colour (within ΔE00 2) and whose part past the target's edge is another — its colour

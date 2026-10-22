@@ -19,6 +19,11 @@
 > overlay that passes touches (`.allowsHitTesting(false)`) listed after the screen's content — read as a backdrop, a
 > false refusal, unmeasured in any app; the reply names the evidence and the way out ("if a screenshot shows no menu
 > up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)").
+> **Merged with bugs/r16-le2 (2026-10-22):** LE2's chooser rebuild `presented/chooser-over-list` dims its list the same
+> way (a hidden childless `Other 0,0 402x874` after the list at its origin), so its R beneath the card is now refused
+> "close it first" under WDA, its stop before any swipe (golden: 3 checks green, added to calibration.json #31; against
+> BLUR's tip 0 changed on the checks both replayed). Not yet live: the record ios-vis-r16-le2-2.json was taken at
+> bugs/r16-le2 alone (three strokes on the dim).
 
 **Measured 2026-10-14 22:21–22:23 UTC** on the iPhone 17 simulator, iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt).
 averi = mobile-verify `arch/round-13` @ `d407256` (`dist/`, stdio via the HTTP daemon on port 47893), both `treeSource: wda`

@@ -973,7 +973,11 @@ it over that sibling — hidden (`0/0`) over a sibling showing content on the sc
 `isVisible="0"`. A sibling of a smaller top is no evidence (it is listed first whatever is drawn on top). Over every raw
 WDA payload in tests/fixtures (59) only the three grouped blur menus are marked; golden: 36 checks change, all theirs
 (A, B, D refused "close it first", their colour failing closed, scroll_until stopping before any swipe; C gains "close
-it first"), none elsewhere. No device read is added: the mark is read off the tree the verb already holds.
+it first"), none elsewhere. Since the merge with ADR 0015's 2026-10-22 amendment (round 16, LE2's two lab cells: 61
+payloads) a fourth is marked, the chooser rebuild `chooser-over-list`: its dim is the same shape (a hidden childless
+`Other 0,0 402x874` listed after the list at its origin, the card after it), so R beneath the card is refused "close it
+first", its colour failing closed, its scroll_until stopped before any swipe (at bugs/r16-le2 alone: refused under the
+card row S without it, three strokes on the dim) — 3 golden checks more, the truth's; nothing else changes. No device read is added: the mark is read off the tree the verb already holds.
 
 **Its own kind, its own words (code review, 2026-10-22).** The mark rests on one empty element WDA lists over the
 whole screen, which an overlay that lets touches through matches too (the first residual below), so it is not told as
@@ -1002,8 +1006,8 @@ Residuals of the amendment:
   it (tests/fixtures/wda-source-rn-myport.json: a hidden `Other 0,0 402x874` listed after the screen's content at its
   origin, not marked only because it wraps one more hidden `Other`).
 - **The sweep is weak evidence against false positives.** Over the 59 raw WDA payloads in tests/fixtures (about 13 of
-  real apps) a structure-only variant of the rule, flags ignored, marks the same three trees: no real capture holds a
-  candidate the flags turn away. The out-of-git device corpus the flags rule was measured on (89 payloads) was not
+  real apps) a structure-only variant of the rule, flags ignored, marks the same three trees (over the 61 since the
+  merge with LE2's cells, the same four): no real capture holds a candidate the flags turn away. The out-of-git device corpus the flags rule was measured on (89 payloads) was not
   available to this round.
 - **The shown variant rests on one lab cell** (`blur-menu-unhidden`: the backdrop an accessibility element, the screen
   beneath wholly `isVisible="0"`); no app is measured.

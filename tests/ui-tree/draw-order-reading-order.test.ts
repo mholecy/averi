@@ -100,8 +100,9 @@ describe('a control listed after a target, past a reading-order break, that hold
 describe('over every iOS tree of the committed fixtures: the untold covers listed after their target', () => {
   // Pinned: every target with a control listed after it whose order against it is not told, over the whole corpus — what the
   // eyes are asked of because of a control listed after (a screenshot per plain stop; per tap where no piece is left clear).
-  // The rule (`coversAfter`) added all but blur-menu's: before it the break excused their cover.
-  it('are scroll-bounded-footer\'s O, blur-menu-grouped\'s W, mp-native\'s chooser row_swift and its lab rebuild\'s S — and the pair a listing already gave', async () => {
+  // The rule (`coversAfter`) added all but blur-menu's: before it the break excused their cover. blur-menu-stacked and
+  // blur-menu-unhidden (round 16's probes of ADR 0018 residual 9) list W and C under idb as blur-menu-grouped does.
+  it('are scroll-bounded-footer\'s O, the grouped blur menus\' W, mp-native\'s chooser row_swift and its lab rebuild\'s S — and the pair a listing already gave', async () => {
     const untold: string[] = [];
     let judged = 0;
     for (const [file, tree] of await iosTrees()) {
@@ -119,6 +120,8 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
     expect(untold).toEqual([
       'idb-modal-listed-before-content.json#0: accounts.detail.payment_type_sheet.row_swift under transactions.list.row_0',
       'blur-menu-grouped.idb.json#0: lab.blur-menu-grouped.W under lab.blur-menu-grouped.C',
+      'blur-menu-stacked.idb.json#0: lab.blur-menu-stacked.W under lab.blur-menu-stacked.C',
+      'blur-menu-unhidden.idb.json#0: lab.blur-menu-unhidden.W under lab.blur-menu-unhidden.C',
       // the ungrouped menu: its rows listed between the targets, no break before C — untold before the rule too
       'blur-menu.idb.json#0: lab.blur-menu.W under lab.blur-menu.C',
       'blur-menu.wda.json: lab.blur-menu.W under lab.blur-menu.C',

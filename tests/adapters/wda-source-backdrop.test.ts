@@ -152,7 +152,9 @@ describe('inWindowBackdrops — two backdrops in one Window', () => {
 });
 
 describe('inWindowBackdrops — the sweep', () => {
-  it('over every raw WDA /source payload in tests/fixtures, a backdrop (a childless node marked presented) is marked in the three grouped blur menus only', async () => {
+  // The lab's chooser rebuild (chooser-over-list, ADR 0015's 2026-10-22 amendment) dims its list with the same shape: a hidden
+  // childless screen-sized leaf listed after the list at its origin, the card after it — its R refused "close it first".
+  it('over every raw WDA /source payload in tests/fixtures, a backdrop (a childless node marked presented) is marked in the three grouped blur menus and the chooser rebuild only', async () => {
     const root = fileURLToPath(new URL('../fixtures/', import.meta.url));
     const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith('.json')).sort();
     const marked: string[] = [];
@@ -165,7 +167,7 @@ describe('inWindowBackdrops — the sweep', () => {
       if ([...everyNode(parseWdaSourceValue(json))].some((n) => n.presentation !== undefined && n.children.length === 0)) marked.push(file);
     }
     expect(payloads).toBeGreaterThan(50);
-    expect(marked).toEqual(['truth/ios-iphone17-ios27/blur-menu-grouped.wda.json', 'truth/ios-iphone17-ios27/blur-menu-stacked.wda.json', 'truth/ios-iphone17-ios27/blur-menu-unhidden.wda.json']);
+    expect(marked).toEqual(['truth/ios-iphone17-ios27/blur-menu-grouped.wda.json', 'truth/ios-iphone17-ios27/blur-menu-stacked.wda.json', 'truth/ios-iphone17-ios27/blur-menu-unhidden.wda.json', 'truth/ios-iphone17-ios27/chooser-over-list.wda.json']);
   });
 });
 

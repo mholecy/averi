@@ -1331,7 +1331,8 @@ after. `--sources idb,wda --groups visibility,dismissal --cells scroll-bounded-f
   fired or stroked.
 - **The chooser, WDA**: the card is listed over the list — O and S Tapped, each fired alone; R refused under S, drawn
   over it; `scroll_until R` refused after three strokes on the dim (175, 175, 699), closing nothing — #31's shape
-  (blur-menu-grouped's C), known.
+  (blur-menu-grouped's C), known. Since the merge with bugs/r16-blur the dim (WDA lists it, hidden, after the list at
+  its origin) is an in-window backdrop: golden refuses R "close it first" and stops before any swipe; not yet run live.
 - **scroll-bounded-footer, idb**: as at 19525e29 — `tap O` moved clear of Continue to (201,670), the app logged no
   button; `scroll_until O` refused before any swipe; both Tapped on the background by the taps that follow (residual 5).
 - **scroll-bounded-footer, WDA**: the tap refused outside its scroll view; `scroll_until O` reached after 1 swipe (the
