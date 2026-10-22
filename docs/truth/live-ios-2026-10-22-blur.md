@@ -6,7 +6,8 @@ Presented.swift's blur-menu-stacked and blur-menu-unhidden, FalseCovers.swift's 
 installed before each run. Reproduce (outside the sandbox):
   node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources wda --groups visibility \
     --cells blur-menu-grouped,blur-menu-stacked,blur-menu-unhidden [--record <file>]
-Records (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): ios-vis-r16-blur-1.json, -2.json.
+Records (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): ios-vis-r16-blur-1.json, -2.json; at the
+merge (§3) ios-vis-r16-merge-1.json, -2.json.
 The previous iOS runs: docs/truth/live-ios-2026-10-19-lab-fixes.md, live-ios-2026-10-18-visibility.md. -->
 
 # What round 16's in-window backdrop measured
@@ -38,3 +39,35 @@ Siblings of the same top are listed in the order they are drawn, not declared. i
 
 Struck off live-known.ts: WDA's tap and scroll cases of blur-menu-grouped's A, B, D, and its C's scroll case (three
 strokes on the blur before). Under idb they stand (ADR 0018 residual 9).
+
+## 3. Round 16 merge, 2026-10-22: LE2's rest beside the in-window backdrop
+
+bugs/round-16 at `4f48c642` (the merge `907433f2` of bugs/r16-le2 into the backdrop's branch, its interaction fix
+`b1457d38`), run from that worktree; the lab app built from it (xcodegen + xcodebuild) and installed before the runs.
+The averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0, 402x874), WDA on 8120 from the lab's own derived data, idb
+through a companion of this run's own on gRPC 10961 (`IDB_COMPANION=localhost:10961`), killed by its PID; the
+simulator shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources idb,wda --groups visibility
+--cells chooser-over-list,blur-menu-grouped,blur-menu-stacked,blur-menu-unhidden,scroll-bounded-footer --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r16-merge-1.json | 4f48c642 | 72 | 51 | 1 | 20 (all known) |
+| ios-vis-r16-merge-2.json | 4f48c642 | 72 | 51 | 1 | 20 (all known) |
+
+- **The one device call the merge changed — chooser-over-list's R under WDA**: `scroll_until R` refused before any
+  swipe, "under button "SWIFT payment" (45,453 312x52) at its centre (201,461), drawn over it — 0% of it shows — a
+  menu's backdrop is presented over it … close it first"; the app logged no stroke, nothing fired, nothing dismissed —
+  in both runs (bugs/r16-le2 alone stroked the dim three times, 175, 175, 699: ios-vis-r16-le2-2.json, -3.json). Its
+  `tap R` refused the same way. Struck off live-known.ts: `ios wda scroll:chooser-over-list.R`.
+- **WDA, the rest**: the three grouped blur menus as in §2 (A–D refused "close it first", nothing fired or stroked; K,
+  W Tapped, each alone fired); chooser-over-list's O and S Tapped, each alone fired; scroll-bounded-footer's tap of O
+  refused outside its scroll view, its `scroll_until` reached O after 2 swipes (lower 0→233, O whole, "fully
+  visible"; 0→240.7, O partly-centre-in, "visible") and Tapped O — the intermittent entry not hit.
+- **idb**: blur-menu-grouped, -stacked and -unhidden's A, B, D each `Tapped` and the menu dismissed, their
+  `scroll_until` "fully visible after 0 swipes" — ADR 0018 residual 9 (idb lists no trace of the backdrop). The
+  stacked and unhidden cells ran under idb live for the first time here; their six cases each are filed with the
+  grouped one's as that residual (live-known.ts; golden-known alike, presented.known.ts). C refused under W, seen so; K
+  and W Tapped. chooser-over-list: S refused (LOUD, ADR 0015's 2026-10-22 residual), O Tapped, R refused, nothing
+  stroked. scroll-bounded-footer's O as LE2's records: the tap moved clear of Continue to (201,670), no button logged;
+  `scroll_until` refused before any swipe; both Tapped on the background by the taps that follow (ADR 0010 residual 5).

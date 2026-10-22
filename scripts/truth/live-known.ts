@@ -165,10 +165,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // chooser-over-list's R (round 16, mp-native's chooser rebuilt): WDA lists the card row S over it (drawn over, its
   // order told) and no node for the dim, so the stop is refused after three strokes on the dim (175, 175, 699), "content
   // exhausted"; the strokes close nothing (no `dismissed` logged) — blur-menu-grouped C's shape (ios-vis-r16-le2-2.json).
-  // Those records were taken at bugs/r16-le2 alone: since its merge with the in-window backdrop the dim WDA lists (a
-  // hidden childless Other 0,0 402x874 after the list) is a backdrop, and golden stops before any swipe, "close it
-  // first" — struck once a device run at the merge reads it ok.
-  ...each('ios wda', ['scroll:chooser-over-list.R'], BLUR, 'presented-stroke', 'refused'),
+  // Those records were taken at bugs/r16-le2 alone. Struck off at the merge with the in-window backdrop (bugs/round-16
+  // 4f48c642): the dim WDA lists (a hidden childless Other 0,0 402x874 after the list) is a backdrop — refused under S,
+  // "close it first", stopped before any swipe, nothing stroked or dismissed, in two runs of two
+  // (ios-vis-r16-merge-1.json, -2.json).
   // scroll-bounded-footer's O under WDA (round 16): its one stroke on `lower` flings 240–273 pt, so O rests 54–83 %
   // clipped at the top, its centre inside the clip — ok, then Tapped; once (ios-vis-r16-le2-2.json) at 272.7, O at
   // 347.3, its centre 0.7 pt above the clip's top 380: "visible … CLIPPED at top, 49 %" against the truth's centre-out,
@@ -186,14 +186,17 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // simulator, a wait that timed out with no tree — nothing tapped, vacuous; Tapped and the menu dismissed in -4.json.)
     // blur-menu-grouped's A, B, D under WDA struck off by round 16 (7fd1ee57): the backdrop listed after the screen
     // beneath is a presented screen — each tap refused "close it first", nothing fired, in two runs of two
-    // (ios-vis-r16-blur-1.json, -2.json); under idb, which lists no trace of the backdrop, they stand.
-    ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', ...(src === 'idb' ? ['tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D'] : [])], BLUR, 'tap-claim', 'Tapped'),
+    // (ios-vis-r16-blur-1.json, -2.json); under idb, which lists no trace of the backdrop, they stand — and so do
+    // blur-menu-stacked's and blur-menu-unhidden's (the round-16 probes, first run under idb at the merge 4f48c642: each
+    // tap Tapped, the menu dismissed, in two runs of two: ios-vis-r16-merge-1.json, -2.json; golden-known alike).
+    ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', ...(src === 'idb' ? ['grouped', 'stacked', 'unhidden'].flatMap((cell) => ['A', 'B', 'D'].map((t) => `tap:blur-menu-${cell}.${t}`)) : [])], BLUR, 'tap-claim', 'Tapped'),
     // blur-menu's W struck off by round 9's L4 fix (1ef11b9c, ADR 0024): the eyes see it drawn over C — Tapped, it alone
     // fired, under idb and WDA (ios-vis-r9-l4w-1.json, -2.json); refused under C, the order not told, before.
     // The scroll case beneath the blur (round 6's iOS check, first run on iOS): the overlay with no node unseen, the stop
     // at once.
-    // (blur-menu-grouped's under WDA struck off by round 16, as its taps: stopped before any swipe, "close it first".)
-    ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.D', ...(src === 'idb' ? ['scroll:blur-menu-grouped.A', 'scroll:blur-menu-grouped.B', 'scroll:blur-menu-grouped.D'] : [])], BLUR, 'presented-stop', 'visible'),
+    // (blur-menu-grouped's under WDA struck off by round 16, as its taps: stopped before any swipe, "close it first";
+    // under idb the three grouped cells' stand, as their taps.)
+    ...each(`ios ${src}`, ['scroll:blur-menu.A', 'scroll:blur-menu.B', 'scroll:blur-menu.D', ...(src === 'idb' ? ['grouped', 'stacked', 'unhidden'].flatMap((cell) => ['A', 'B', 'D'].map((t) => `scroll:blur-menu-${cell}.${t}`)) : [])], BLUR, 'presented-stop', 'visible'),
     // blur-menu's C: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json, -2.json; no
     // dismissal), struck off at its final src (94fc318b): under a cover whose order is not told scroll_until stops
     // before any swipe, nothing stroked, in two runs of two (ios-vis-r8-l4-3.json, -4.json).

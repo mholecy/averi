@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -166,10 +166,8 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-vis-r16-le2-1.json', 'visibility', { cases: 4, ok: 2, loud: 0, mismatches: 2 }],
     // Its code review (round 16): the same two cases at the final src, and mp-native's chooser rebuilt (chooser-over-list) —
     // under idb S refused, nothing fired (LOUD: the eyes cannot tell it over R on the real screenshot, white on white), O
-    // Tapped, R refused; under WDA O and S Tapped, R refused, its stop stroking the dim (#31). -2.json holds WDA's one
-    // intermittent stop on footer O 0.7 pt past the clip (live-known.ts), -3.json none.
-    ['ios-vis-r16-le2-2.json', 'visibility,dismissal', { cases: 12, ok: 7, loud: 1, mismatches: 4 }],
-    ['ios-vis-r16-le2-3.json', 'visibility,dismissal', { cases: 12, ok: 8, loud: 1, mismatches: 3 }],
+    // Tapped, R refused; under WDA O and S Tapped, R refused, its stop stroking the dim (#31) — pinned below since the
+    // merge struck that stroke off.
     // Round 14's fix of LE3 (bugs/r14-le3 40b4856, a heading listed before is drawn over the target): scroll-sticky's
     // six cases ok under idb and WDA, twice — R's `fully: true` no longer stops under the pinned header: one stroke
     // (list 24→0), R whole at 51,166, fully visible after 1 swipe, Tapped; its tap and plain stop as before.
@@ -214,6 +212,13 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // scroll_until stopped before any swipe, nothing stroked or dismissed; K and W Tapped, each alone fired.
     ['ios-vis-r16-blur-1.json', 'visibility', { cases: 30, ok: 30, loud: 0, mismatches: 0 }],
     ['ios-vis-r16-blur-2.json', 'visibility', { cases: 30, ok: 30, loud: 0, mismatches: 0 }],
+    // Round 16's merge (bugs/round-16 4f48c642: LE2's rest beside the in-window backdrop): chooser-over-list,
+    // scroll-bounded-footer and the three grouped blur menus under idb and WDA, twice — under WDA chooser-over-list's R
+    // refused under S, "close it first", its scroll_until stopped before any swipe, nothing stroked or dismissed (LE2's
+    // branch alone stroked the dim three times); the blur menus as bugs/r16-blur's records; under idb the menus' A, B, D
+    // Tapped, the menu dismissed (residual 9, known), S refused (LOUD), footer O as LE2's records.
+    ['ios-vis-r16-merge-1.json', 'visibility', { cases: 72, ok: 51, loud: 1, mismatches: 20 }],
+    ['ios-vis-r16-merge-2.json', 'visibility', { cases: 72, ok: 51, loud: 1, mismatches: 20 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -260,6 +265,25 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${BLUR_WDA.length} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual([...BLUR_WDA].sort());
+    expect(code).toBe(1);
+  });
+});
+
+// Round 16's merge: LE2's chooser records, taken on bugs/r16-le2 alone (cefccf3d), before the in-window backdrop.
+describe('live.ts --rejudge over the committed iOS records of LE2\'s chooser before the merge', () => {
+  // chooser-over-list's R under WDA: its scroll_until stroked the dim three times (175, 175, 699) and refused, "content
+  // exhausted", nothing dismissed — known as residual 9's `presented-stroke` until the merge (4f48c642) read the dim as
+  // an in-window backdrop and stopped before any swipe (ios-vis-r16-merge-1.json, -2.json) and the entry was struck off:
+  // here it reads as recorded, not known — exit 1. -2.json holds WDA's one intermittent stop on footer O 0.7 pt past
+  // the clip (live-known.ts), -3.json none.
+  it.each([
+    ['ios-vis-r16-le2-2.json', { cases: 12, ok: 7, loud: 1, mismatches: 4 }],
+    ['ios-vis-r16-le2-3.json', { cases: 12, ok: 8, loud: 1, mismatches: 3 }],
+  ] as const)('%s: chooser-over-list R\'s WDA strokes not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want) => {
+    const { code, out } = await rejudge(record, 'visibility,dismissal');
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(1 not known\\), 0 skipped$`, 'm'));
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown).toEqual(['scroll:chooser-over-list.R']);
     expect(code).toBe(1);
   });
 });
