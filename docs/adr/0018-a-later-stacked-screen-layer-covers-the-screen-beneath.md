@@ -43,7 +43,10 @@ claim — the tree lists only the active window: if a sheet or a dialog is open 
 Amended again 2026-10-19 (round 7, A5; iOS point 4 of the round-6 device check): idb's flat list holding UIKit's
 dismiss region over the whole screen is a presented layer listed alone, and a stroke that changed the screen stops
 `scroll_until` — residual 6 closed on idb for the medium sheet, and its cost elsewhere turned from a claimed stop into
-a loud one (see "Amendment: idb's presented layer" below).
+a loud one (see "Amendment: idb's presented layer" below). Amended again 2026-10-22 (round 16, open-bugs #9): on idb's
+flat list, a content-up stroke for a target never seen is a FEELER — short and slow — until a stroke of the call has
+moved the tree, so the large sheet idb shows no sign of springs back instead of being dismissed; the unmoved stop
+there says what idb does not list (see the same amendment's Decision 3).
 
 ## Context
 
@@ -612,7 +615,7 @@ alert, and a non-modal sheet.
 | 3 a presentation in a later Window | stands for `screen` (the flags rule is per Window; none measured); a typed layer in any Window covers what is drawn before it | stands |
 | 4 a bar nested in a full-screen host reads as two screens | stands (`scrolledContent`'s draw question) | stands |
 | 5 a later layer under 90 % (a medium sheet, a popover) | **closed for iOS**: UIKit lays a half sheet and a popover in a full-screen layer, marked by the flags or the type | stands (Android) |
-| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window"), and **on idb** (2026-10-19) for a list holding UIKit's dismiss region; a stroke that changed the screen — no id kept, nothing it touched still listed — is a loud stop, not a claimed one (the amendment "idb's presented layer") |
+| 6 `scroll_until` strokes onto a presented screen | **(a) closed** for a target not in the tree (`markedAt`, the topmost layer, but on its own scroll view — residual 13); **(b) closed**: a marked layer's cover is no row's to excuse, `sameFrame` included | stands; (a) **closed on Android** (2026-10-18) for a window its parser marks presented (the amendment "Android's presented window"), and **on idb** (2026-10-19) for a list holding UIKit's dismiss region; a stroke that changed the screen — no id kept, nothing it touched still listed — is a loud stop, not a claimed one (the amendment "idb's presented layer"); **narrowed on idb** (2026-10-22, its Decision 3): a content-up stroke for a target never seen is a feeler (160 pt in 600 ms) until a stroke has moved the tree — the large sheet springs back, nothing dismissed, the unmoved stop saying what idb does not list; stands for a large sheet holding a list (dismissed once the list reaches its top, the loud stop), for a threshold measured on one simulator and one sheet, and for NI1 (every first `up` stroke a feeler); golden: 37 replies, the note's words only |
 | 7 a layer of only empty frames | **closed** for a layer of itemless toolbars and for a dim inside a typed or content-carrying layer (the alert's bare dim, by the typed mark); **closed** (2026-10-16) in the app's Window for a layer of only empty frames with shown frames below it on the screen, after the wholly `0` beneath, no content layer after it (the amendment "a presented layer of only empty frames"); **stands** for a bare frame (a shown layer with no children), a layer whose shown frames all lie off the Window, an empty layer followed by a content leftover parked off the screen, and one in a later Window | stands |
 | 8 a sheet's bare dim excused; the status strip above a large sheet | **closed**: the strip's taps are refused, "close it first" | stands |
 | 9 an in-window overlay with no node (the PAY blur menu) | **closed** (2026-10-22) where the backdrop is listed after the screen beneath at its origin — a grouped menu (the amendment "an in-window backdrop"); **stands** in a reading-order run (the ungrouped menu) | stands (idb lists no trace of it) |
@@ -945,6 +948,51 @@ before. A dismiss region short of the whole screen (a popover's on an iPad?) is 
 screen beneath the region too (it would read as the layer's own). Decision 2 is source-agnostic: on WDA and
 uiautomator trees a fling keeps its scroll view's rect and is excused, a dismissal is their marks' to stop for first.
 
+**Decision 3 — the feeler (2026-10-22, round 16, open-bugs #9; avoid where the tree cannot show the layer).** Live at
+round 16 (bugs/round-16 `da68586f`) only sheet-background's A and B were still dismissed: their target lies above
+(content `up`), so the stroke drags the finger DOWN — the full stroke (201,175) → (201,699) in idb's 300 ms over the
+large sheet's blank content, the one gesture that dismisses a swipe-dismissable sheet — and the reply was Decision 2's
+loud `presented-changed`. Beneath alert-dim and dim-cover (A–D) and the sheet's C and D nothing is dismissed: two
+strokes on the layer, the unmoved stop. idb's tree gives no evidence of the layer before the first stroke (the sheet's
+button alone). So `scroll_until` FEELS before it strokes: on a tree that lists only what a presented layer leaves
+(`UiNode.flatList`, idb's list — interact/scroll-rounds.ts#UnlistedLayer), for a target NEVER SEEN in the call, a
+stroke toward content `up` is a feeler (interact/stroke-plan.ts#StrokeKind, `FEELER`) while no stroke of the call has
+moved the tree (motion-ledger.ts#treeMoved): the full stroke's touch-down, its travel capped at 160 pt, sent over
+600 ms (`PlannedStroke.durationMs`, which the driver, interact/scroll.ts, passes to `swipe` over the adapter's own
+default). A swipe-dismissable sheet springs back; a real list moves on it, and every stroke after the first that moved
+the tree is full again. Push-ups (content `down`, the finger moving up), a target the call has seen, and every tree
+that lists its scroll views or marks its presented layers (WDA, uiautomator) are unchanged; a layer the tree marks is
+no stroke's (Decision 1). And the unmoved stop of such a call — the tree unchanged, no stroke moved it, the target never
+seen — adds to its causes "idb lists only what a presented sheet, alert or cover leaves to accessibility, nothing beneath
+it: if one is up, close it first" (BoundBy's `unlisted`, scroll-text.ts#boundText): a possibility, as the uiautomator
+note is, at no cost. Measured (the lab's averi-lab iPhone 17 simulator, iOS 27.0, sheet-background, `idb ui swipe 201
+175 201 175+t --duration d`, two strokes 400 ms apart, three tries each, the app's own log): the sheet SPRANG BACK from
+t = 120, 200, 300 and 350 pt at d = 900 ms, 160, 200, 250, 300 and 350 pt at 600 ms, 120, 160, 200, 250 and 300 pt at
+300 ms (up to 1000 pt/s) and 160 pt at 200 ms — every try; it was DISMISSED by 400 pt at 900 ms, by 200 pt at 150 ms
+(1333 pt/s) — every try — and by the full 524 pt at 300 ms (one try, and every earlier live run). Two thresholds, then: a distance between 350 and
+400 pt (the large sheet's 812 pt, under half), and a speed between 1000 and 1333 pt/s. The feeler, 160 pt in 600 ms
+(267 pt/s), lies under half the distance that held and a fifth of the speed that dismissed; 120 pt in 900 ms (the
+prototype's) costs 300 ms more a feeler for a margin it does not need. With it, live (idb, `bugs/r16-r6`), sheet-background
+A and B three runs of three (the cases alone) and two of two (the cells' runs, below): two feelers from (201,175), the
+app logging the two touches and NOTHING dismissed, the reply the unmoved stop with the note — `presented-stroke` on
+`not found` (live-known.ts), no longer `presented-changed`. Cost: a feeler is sent only before the call has seen the
+target, and idb lists every node of the app's hierarchy, on the screen or not (scroll-top-edge's A at y −282,
+carousel-in-list's U at −200): on the content-up cases (scroll-top-edge, tabbar-dense, tabbar-floating,
+carousel-in-list) no feeler was sent — the same swipes and wall time as the base (below). Where a lazy list has not
+built the target yet (a UIKit table under idb lists its rows without ids, NI1, or none below the fold), the first stroke
+of an `up` call is a feeler: 160 pt rather than the full 524, 300 ms slower, one short stroke a call before the full
+ones. Golden: 37 replies change by the note's words alone (every idb `scroll_until` for a target no tree lists, stopped
+unmoved — alert-dim, dim-cover, sheet-background A–D, the forms under the keyboard, sheet-long-list's rows, NI1), no
+device call changed: golden reads one tree per case and its never-seen strokes there are push-ups.
+
+**Residuals of Decision 3.** The threshold is measured on one simulator, one sheet (the large detent's 812 pt) and
+idb's own swipe profile: a shorter sheet (a custom detent idb also shows no sign of), a device, or another iOS may
+dismiss at less — the feeler keeps a margin of two on distance and five on speed, not a proof. A large sheet holding a
+LIST (a sheet whose content scrolls) is still dismissed once the list reaches its top: the feeler moves the list, the
+tree moves, the strokes are full, and the full pull-down at the list's top dismisses the sheet — Decision 2's loud stop
+says so, the stroke already sent. A target idb never lists (NI1's UIKit rows, an id on a container) makes every call's
+first `up` stroke a feeler. A call whose reads all fail knows no dialect and strokes full (no read, no flat list).
+
 ## Amendment: an in-window backdrop (2026-10-22)
 
 Residual 9's menu (mp-native's `PAY` chooser, the lab's blur menus) is a card laid in the screen's own container over a
@@ -1074,7 +1122,16 @@ Residuals of the amendment:
      cover) they still are; a stroke that dismisses the layer is no longer a claimed stop when nothing it touched down on
      is listed after it (the layer's rows, its list, its surface gone with it): `scroll_until` stops, saying the swipe
      changed the screen — still claimed when the read lists no id, or when what it touched persists (a row label
-     the screen beneath repeats by role and label — a picker sheet over a list of the same items — or a title);
+     the screen beneath repeats by role and label — a picker sheet over a list of the same items — or a title).
+     **Narrowed on idb** (2026-10-22, round 16, open-bugs #9; "Amendment: idb's presented layer", Decision 3): a
+     content-up stroke for a target never seen is a FEELER, 160 pt in 600 ms from the full stroke's touch-down, until a
+     stroke of the call has moved the tree — measured on the lab's large sheet, which springs back from up to 350 pt
+     (600–900 ms) and up to 1000 pt/s and is dismissed by 400 pt or 1333 pt/s; live, sheet-background's A and B no
+     longer dismiss it (two feelers, the unmoved stop, "idb lists only what a presented sheet, alert or cover leaves …
+     if one is up, close it first"), alert-dim's and dim-cover's strokes unchanged but the note. Still stroked for, and
+     still dismissing: a large sheet HOLDING A LIST, once the list reaches its top (the feeler moved it, so the strokes
+     are full — Decision 2's loud stop); a sheet that dismisses at less than the feeler (the threshold is measured on one
+     simulator, one sheet); and a target idb never lists (NI1: every call's first `up` stroke is a feeler, no more);
    - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
      target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
      hidden twin `PopoverDismissRegion` of the sheet's dim in the form's own layer; scroll_until to it, judged either

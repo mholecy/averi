@@ -361,11 +361,13 @@ export async function scrollUntilVisible(
       // adapters/android.ts#dragSpeed has the measured fling and
       // the time it costs), so one stroke moves the content about its own
       // length and a row cannot cross the list between two reads; else at
-      // the adapter's default duration (iOS).
-      const { points } = step;
+      // the adapter's default duration (iOS). A feeler over the time its plan gives it (`step.durationMs`,
+      // interact/stroke-plan.ts#FEELER), whatever the adapter's: slow, so a sheet the tree does not list springs back.
+      const { points, durationMs } = step;
       if (points === undefined || screen === undefined) throw noBox;
       drawn = points;
-      if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
+      if (durationMs !== undefined) await adapter.swipe(drawn.from, drawn.to, durationMs);
+      else if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
       else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.usable.oriented));
     }
     await sleep(settleMs);

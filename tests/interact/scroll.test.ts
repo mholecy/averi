@@ -9,6 +9,7 @@ import { flingCarry, LazyList } from '../helpers/lazy-list.js';
 import { SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { remedyThenEscape } from '../helpers/escape-order.js';
+import { parseIdbDescribeAll as parseIdbDescribeAllOf } from '../../src/adapters/ios-tree-source.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -1301,5 +1302,25 @@ describe('scrollUntilVisible — a cut by a later node far above the keyboard: t
     const failure = (await scrollUntilVisible(fake, 'id:field', FAST).catch((e: unknown) => e)) as Error;
     expect(failure.message).toContain('The rest of it may stay under that button at the end of the content — a layout defect (no clearance for a pinned bar?) — or it is only that thin');
     expect(failure.message).not.toContain('dismiss it first');
+  });
+});
+
+/**
+ * The feeler at the driver (interact/stroke-plan.ts#StrokeKind; ADR 0018, "idb's presented layer"): beneath the lab's
+ * large sheet idb lists the sheet's button alone, so a content-up stroke for the host's A is sent short and slow — the
+ * plan's points over the plan's time, whatever the adapter's default (idb's 300 ms) — and the sheet springs back.
+ */
+describe('scroll_until\'s feeler on idb, as the driver sends it', () => {
+  it('beneath the large sheet: two swipes from (201,175) of 160 pt, each over 600 ms', async () => {
+    const tree = parseIdbDescribeAllOf(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/sheet-background.idb.json', import.meta.url), 'utf8'));
+    const fake = new FakeAdapter({ sheet: tree }, 'sheet');
+    fake.platform = 'ios';
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    await expect(scrollUntilVisible(fake, 'id:lab.sheet-background.A', { ...FAST, direction: 'up' })).rejects.toThrow(/idb lists only what a presented sheet/);
+    expect(fake.swipes).toEqual([
+      { from: { x: 201, y: 175 }, to: { x: 201, y: 335 }, durationMs: 600 },
+      { from: { x: 201, y: 175 }, to: { x: 201, y: 335 }, durationMs: 600 },
+    ]);
   });
 });

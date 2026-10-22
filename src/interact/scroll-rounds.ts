@@ -14,7 +14,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
 import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type UnseenStrokes } from './motion-ledger.js';
-import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
+import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeOf, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
 import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
 
@@ -339,9 +339,20 @@ export type Flush =
  * `unmoved` strokes (one, where UNMOVED_STROKES_EXHAUST's two are the proof otherwise).
  */
 export type BoundBy =
-  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof }
+  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: UnlistedLayer }
   | { of: 'maxSwipes' }
   | { of: 'timeout'; timeoutMs: number; elapsedMs: number; reads: ReadTime };
+
+/**
+ * Why strokes for a target never seen may have moved nothing, beside the content's end (BoundBy's `unlisted`): the tree
+ * source lists only what a presented layer leaves to accessibility — idb's flat list (`UiNode.flatList`), which shows no
+ * sign of a large sheet, an alert or a cover over the screen (ADR 0018, "idb's presented layer", residuals) — so the
+ * strokes may have landed on one. Carried by the unmoved stop of a call none of whose strokes moved the tree, for a
+ * target never seen (a list that moved and then stopped ran to its end), and said where that stop names no other cause
+ * (scroll-text.ts#boundText: no end proven, nothing named under the touch-down).
+ * A possibility, never the cause, as the uiautomator note is (ui-tree/miss.ts#ACTIVE_WINDOW_HINT); no device call.
+ */
+export type UnlistedLayer = 'idb';
 
 /**
  * The tree reads of a scroll that timed out: how many (every round reads once, a failed read included), how long they
@@ -1047,7 +1058,16 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // that surface; the course holds for it or sends the stroke.
   const next = nextStroke(s.course);
   const { toward, reach, still } = next;
-  const plan = planStroke(s.strokes, { toward, reach, gesture, read: now === undefined ? undefined : { facts: now.facts, target: best?.node }, ...(still !== undefined && { still }), ...(!overRegion(s.motion, toward) && { screenBox: true }) });
+  const kind = strokeKind(s, toward);
+  const plan = planStroke(s.strokes, {
+    toward,
+    reach,
+    gesture,
+    read: now === undefined ? undefined : { facts: now.facts, target: best?.node },
+    ...(still !== undefined && { still }),
+    ...(!overRegion(s.motion, toward) && { screenBox: true }),
+    ...(kind !== undefined && { kind }),
+  });
   // The plan's memory, kept at once whatever becomes of the stroke — the candidates it judged, the latest cut of the
   // target's scroll views, and the scroll view it chose, which only sending makes the last stroke's (`strokeSent`,
   // below). Kept here, before any branch, so a presented hold cannot leave it behind; a bound is a stop, whose state
@@ -1076,6 +1096,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           unchanged: exhausted,
           ...(touched !== undefined && { touched }),
           ...(ends !== undefined && observed !== undefined && { ends: { way: course.lastStroke, ...endProof(s, ends, exhausted, observed.streaks) } }),
+          ...(unfelt(s) !== undefined && { unlisted: unfelt(s) }),
         }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
@@ -1334,6 +1355,30 @@ function detentMove({ detents }: State): DetentMove | undefined {
   const { first, last } = detents;
   if (first === undefined || last === undefined || first.grabbers !== last.grabbers || first.detent === last.detent) return undefined;
   return { from: first.detent, to: last.detent };
+}
+
+/**
+ * The kind of stroke this round sends toward `toward` (interact/stroke-plan.ts#StrokeKind): a FEELER on a tree that lists
+ * only what a presented layer leaves (`unfelt`: idb's flat list), for a target never seen, toward content ABOVE
+ * (`up`: the finger dragged down — the one stroke that dismisses a swipe-dismissable sheet), while no stroke of this
+ * call has moved the tree (motion-ledger.ts#treeMoved). Beneath the lab's large sheet, of which idb lists the sheet's
+ * button alone, the full stroke from (201,175) dismissed the sheet (ADR 0018 residual 6); a feeler leaves it, and the
+ * strokes end at the unmoved stop, which says what idb does not list (`UnlistedLayer`). A list that moves on the feeler
+ * gets full strokes after it. A layer the tree marks presented is no stroke's: the plan's touch-down question holds
+ * (`presented`). Absent: a full stroke — every push-up, every tree that lists its scroll views or its presented layers
+ * (WDA, uiautomator), every stroke after a sighting or after the tree moved.
+ */
+function strokeKind(s: State, toward: Direction): StrokeKind | undefined {
+  return toward === 'up' && unfelt(s) !== undefined ? 'feeler' : undefined;
+}
+
+/**
+ * The source of the last read that read, when it lists only what a presented layer leaves (`UnlistedLayer`: idb's flat
+ * list) and nothing of this call has told the strokes land on content: the target never seen, the tree never moved.
+ * What both the feeler (`strokeKind`) and the unmoved stop's note (BoundBy's `unlisted`) are asked under.
+ */
+function unfelt(s: State): UnlistedLayer | undefined {
+  return s.screenBefore?.tree.flatList === true && !s.everFound && !treeMoved(s.motion) ? 'idb' : undefined;
 }
 
 /**

@@ -311,7 +311,10 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
      stroke — the code's before, residual 5 (base's own false stops, 255 left on the 41 grids: 254 where base has them,
      and the DRIFT-500 one); remedy `treeSource: wda`. (c) The first stroke is the
      screen box's: nothing has moved yet (residual 5). (d) A target not in the tree (a lazy list's unlabelled rows, NI1)
-     gives no region. (e) A target in the band that the strokes cannot carry past the line (the list's first row reached
+     gives no region — and since 2026-10-22 (round 16, open-bugs #9; ADR 0018, "idb's presented layer", Decision 3)
+     its first content-up strokes, until one has moved the tree, are feelers: the screen box's touch-down, 160 pt in
+     600 ms (interact/stroke-plan.ts#StrokeKind), so a large sheet idb shows no sign of springs back; a list moves on
+     the first and gets full strokes after it — one short stroke a call. (e) A target in the band that the strokes cannot carry past the line (the list's first row reached
      from above at the list's top, a floating row in a short region) is refused to the stuck or bound end — an honest
      failure naming the band, never a stop; and L at the list's end under a fling its strokes catch (above). The cells
      started past the list's end (`short300all`, `f7s600`) are the replay's unclamped start, not device behaviour. (f) A
