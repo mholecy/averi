@@ -492,8 +492,14 @@ export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
  * docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
  */
 const BACKDROP = "a menu's backdrop";
-const BACKDROP_EVIDENCE = "(an empty element WDA lists over the whole screen, after the screen's content) — close it first";
-const NO_MENU = 'if a screenshot shows no menu up, the backdrop is an overlay that lets touches through:';
+/**
+ * The `backdrop` remedy over `what`, its way out (`wayOut`: what to do by coordinates or on the screenshot) in a
+ * parenthesis right after "close it first" — so what a caller appends ("; nothing was tapped", ", so none was sent")
+ * follows the refusal's own clause, never the way out.
+ */
+const backdropRemedy = (what: 'it' | 'the element', wayOut: string): string =>
+  `${BACKDROP} is presented over ${what} (an empty element WDA lists over the whole screen, after the screen's content) — close it first ` +
+  `(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: ${wayOut}); no scroll moves ${what} out from under that backdrop`;
 
 /**
  * THE remedy's words for a node beneath a screen presented over its own (`Remedy`'s `presented`), the node named as
@@ -501,15 +507,14 @@ const NO_MENU = 'if a screenshot shows no menu up, the backdrop is an overlay th
  * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-poll.ts): close that screen first,
  * since no scroll moves the node out from under it. A layer the tree source types (an alert, an action sheet, a
  * popover; Android's floating window, a dialog: `layer`) is named by its kind and label; a `backdrop` by its evidence,
- * with the way out when a screenshot shows no menu (`BACKDROP`); a `screen` layer, or none, is "a screen … (a modal or a sheet)".
+ * with the way out when a screenshot shows no menu (`backdropRemedy`); a `screen` layer, or none, is "a screen … (a
+ * modal or a sheet)".
  * The one clause of a remedy kept here, in the UI-tree layer both verbs and the pixel assert may import, as
  * system-bar.ts's words are (the module's doc: who owns a remedy's words).
  */
 export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
-  if (layer?.kind === 'backdrop')
-    return what === 'it'
-      ? `${BACKDROP} is presented over it ${BACKDROP_EVIDENCE}; no scroll moves it out from under that backdrop; ${NO_MENU} tap it by coordinates`
-      : `${BACKDROP} is presented over the element ${BACKDROP_EVIDENCE}; ${NO_MENU} judge the element on that screenshot`;
+  // `it` is a touch's sentence (tap, scroll_until), `the element` the pixel assert's: each its own way out.
+  if (layer?.kind === 'backdrop') return backdropRemedy(what, what === 'it' ? 'tap it by coordinates' : 'judge the element on that screenshot');
   const typed = typedWords(layer);
   return typed !== undefined
     ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
@@ -523,8 +528,7 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
  * `scroll_until` description quotes (mcp/tools.ts).
  */
 export const presentedStop = (layer?: MarkedLayer): string => {
-  if (layer?.kind === 'backdrop')
-    return `${BACKDROP} is presented over it ${BACKDROP_EVIDENCE}; no scroll moves it out from under that backdrop, and a swipe on it may close the menu; ${NO_MENU} swipe and tap by coordinates`;
+  if (layer?.kind === 'backdrop') return `${backdropRemedy('it', 'swipe and tap by coordinates')}, and a swipe on it may close the menu`;
   const typed = typedWords(layer);
   return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };

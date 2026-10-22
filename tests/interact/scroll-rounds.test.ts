@@ -1812,6 +1812,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
   const screens: Record<string, UiNode> = {
     ...(await stackedLayers()),
     // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now.
+    blurMenuGrouped: parseWdaSource(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-grouped.wda.json', import.meta.url), 'utf8')),
     contactsDiscardPopoverKeyboardDown: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8')),
   };
   const rowOf = (key: string, id: string): Row => {
@@ -1855,6 +1856,17 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     const played = play(IPHONE, [rowOf('swiftFeesSheet', 'swift_payment.form.debit_select'), rowOf('swiftFeesSheetExpanded', 'swift_payment.form.debit_select')]);
     expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
     expect(failureOf(played, 'id:swift_payment.form.debit_select').message).toMatch(/^scroll_until id:swift_payment\.form\.debit_select stopped before any swipe — .* so none was sent\. Last rect .* viewport; the sheet moved from its Half screen detent to Expanded$/);
+  });
+
+  it('the lab\'s grouped blur menu (WDA): a row beneath its in-window backdrop stops before any swipe, "so none was sent" after the refusal\'s own clause, the way out right after "close it first"', () => {
+    const played = play(IPHONE, [rowOf('blurMenuGrouped', 'lab.blur-menu-grouped.A'), rowOf('blurMenuGrouped', 'lab.blur-menu-grouped.A')]);
+    expect(strokesToward(played)).toEqual([]);
+    expect(failureOf(played, 'id:lab.blur-menu-grouped.A').message).toBe(
+      'scroll_until id:lab.blur-menu-grouped.A stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,142), drawn over it — 0% of it shows — ' +
+        "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
+        '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: swipe and tap by coordinates); no scroll moves it out from under that backdrop, ' +
+        'and a swipe on it may close the menu, so none was sent. Last rect {"x":51,"y":110,"width":300,"height":64} in a 402x874 viewport',
+    );
   });
 
   it('Contacts\' discard popover over a row of the New Contact sheet: no stroke (one would close the popover), the stop is `presented`', () => {

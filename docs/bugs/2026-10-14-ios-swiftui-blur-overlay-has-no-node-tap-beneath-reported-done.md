@@ -1,8 +1,8 @@
 # BUG: an in-screen SwiftUI overlay menu with a blurred, dimmed backdrop has no node in either iOS tree, so a tap on the screen beneath it is reported "Tapped" while the backdrop takes it and only closes the menu
 
 > **Status (2026-10-22, round 16): partly fixed** at `7fd1ee5` + `73ef14e` (its review's fix: the screen beneath
-> screen-sized, the rule read only with the flags) + the code review's own kind (`backdrop`, its remedy naming the
-> evidence and a way out) (bugs/r16-blur; the probes it rests on at `5f33c10`),
+> screen-sized, the rule read only with the flags) + the code review's `a5ad7c3`, `8ba7c9b` and its
+> verification's fix (its own kind, `backdrop`, its remedy naming the evidence and a way out) (bugs/r16-blur; the probes it rests on at `5f33c10`),
 > under WDA where the backdrop is listed after the screen beneath at its origin: adapters/wda-source.ts#
 > inWindowBackdrops marks the backdrop presented, kind `backdrop` (ADR 0018, "Amendment: an in-window backdrop"). Measured by
 > the round's probes (WDA lists siblings of the same top in draw order: blur-menu-grouped and blur-menu-stacked, two

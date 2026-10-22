@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import { lookAt, type Look } from '../../src/ui-tree/look.js';
 import { usableScreen } from '../../src/ui-tree/usable-screen.js';
@@ -350,6 +351,16 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     const { outcome } = await judge((await screens()).swiftFeesSheet, 'swift_payment.form.debit_select', { first: IPHONE });
     expect(said(outcome)).toBe(
       'CoveredRefusal: swift_payment.form.debit_select is under container "dismiss popup" (-402,-874 1206x2622) at its centre (201,195), drawn over it; nothing of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under that screen; nothing was tapped',
+    );
+  });
+
+  it('the lab\'s grouped blur menu (WDA): a row of the screen beneath its in-window backdrop is refused naming the backdrop\'s evidence, the way out right after "close it first"', async () => {
+    const tree = parseWdaSource(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-grouped.wda.json', import.meta.url), 'utf8'));
+    const { outcome } = await judge(tree, 'lab.blur-menu-grouped.A', { first: IPHONE });
+    expect(said(outcome)).toBe(
+      'CoveredRefusal: lab.blur-menu-grouped.A is under container (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — ' +
+        "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
+        '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap it by coordinates); no scroll moves it out from under that backdrop; nothing was tapped',
     );
   });
 

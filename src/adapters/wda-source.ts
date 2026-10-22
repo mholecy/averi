@@ -82,10 +82,12 @@ const PRESENTATIONS: readonly (readonly [string, TypedPresentationKind])[] = [
  * and `nativeFrame` also exist; ignore them). `isVisible`/`isEnabled` are
  * "1"/"0" strings; invisible nodes are KEPT — iOS keeps off-screen nodes in
  * its tree and the assert layer relies on that (see `absent` in flow/config).
- * `isVisible` is read for three purposes: whether a `Keyboard` is on screen
+ * `isVisible` is read for four purposes: whether a `Keyboard` is on screen
  * (keyboardMarks); with `isAccessible`, which subtrees are
- * HIDDEN (`hiddenRoots`, `UiNode.hidden`); and whether a cell's content is
- * PARKED (`parkedIn`). The normalized node carries neither flag itself.
+ * HIDDEN (`hiddenRoots`, `UiNode.hidden`); whether a cell's content is
+ * PARKED (`parkedIn`); and which layers and in-window backdrops are
+ * PRESENTED (`presentedScreen`; `inWindowBackdrops`, with `isAccessible`
+ * too). The normalized node carries neither flag itself.
  * `placeholderValue` (since 2026-10-09) is the text XCUITest says the field
  * shows while empty; WDA's `value` of an EMPTY field is that same text
  * (measured 2026-10-09, iPhone 17 / iOS 27.0, Contacts "New Contact":
@@ -377,8 +379,10 @@ function atParkedFrame(own: Rect, view: Rect): boolean {
  * WDA's "0" and "1" — strings in the JSON format, a number in older payloads, compared as strings; a missing or null
  * flag is neither. The one reading of a visibility flag's value in this file (`onScreen` reads `isOne` too).
  */
-const isZero = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '0';
-const isOne = (flag: string | number | null | undefined): boolean => flag !== undefined && flag !== null && String(flag) === '1';
+const flagIs = (flag: string | number | null | undefined, value: '0' | '1'): boolean =>
+  flag !== undefined && flag !== null && String(flag) === value;
+const isZero = (flag: string | number | null | undefined): boolean => flagIs(flag, '0');
+const isOne = (flag: string | number | null | undefined): boolean => flagIs(flag, '1');
 
 /**
  * What `presentedScreen` and `inWindowBackdrops` read of one Window (`windowFacts`): its `screen` (the Window's rect),
@@ -577,7 +581,9 @@ function inWindowBackdrops(window: WdaElement): readonly WdaElement[] {
   };
   /** `backdrop` is drawn over `beneath`, as WDA's flags show it. */
   const over = (backdrop: WdaElement, beneath: WdaElement): boolean =>
-    isZero(backdrop.isVisible) ? isZero(backdrop.isAccessible) && someIn(beneath, shownContent) : isOne(backdrop.isVisible) && whollyHidden(beneath);
+    isZero(backdrop.isVisible)
+      ? isZero(backdrop.isAccessible) && someIn(beneath, shownContent)
+      : isOne(backdrop.isVisible) && whollyHidden(beneath);
   const found: WdaElement[] = [];
   const visit = (el: WdaElement): void => {
     const kids = el.children ?? [];

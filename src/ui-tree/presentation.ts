@@ -200,7 +200,8 @@ export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(t
 /**
  * A presented layer the tree source marks, as this module reads it (`markOf`): the `layer` (a Window's direct child, or
  * under WDA an in-window backdrop inside one: adapters/wda-source.ts#inWindowBackdrops), its `kind`, the `element`
- * naming a typed layer (`UiNode.presentationElement`: the alert, the action sheet, the popover), and the `cover` that reaches the whole screen for it — that element, else the layer itself.
+ * naming a typed layer (`UiNode.presentationElement`: the alert, the action sheet, the popover), and the `cover` that
+ * reaches the whole screen for it — that element, else the layer itself.
  */
 interface PresentedLayer {
   readonly layer: Placed;
@@ -233,9 +234,9 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * (WDA's in-window backdrop, a childless node inside a layer) judged as a `screen` layer, its own cover with no nodes
  * of its own, whatever is listed after it outside it (its menu card) not beneath it — only its words differ
  * (standing.ts#presentedRemedy). No stacked-screens, window or bare-frame condition: those are the shape fallback's
- * inferences (`byShape`), which the mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's one window, idb's flat list —
- * nothing of the tree lies outside it, so it covers no target, and for no target its cover takes every touch-down
- * (`topmostAt`).
+ * inferences (`byShape`), which the mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's
+ * one window, idb's flat list — nothing of the tree lies outside it, so it covers no target, and for no target its
+ * cover takes every touch-down (`topmostAt`).
  */
 function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
   /**
